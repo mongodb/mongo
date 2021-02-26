@@ -146,7 +146,6 @@ void LiteParsedPipeline::validatePipelineStagesforAPIVersion(const OperationCont
     bool isInternalClient =
         !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
 
-
     for (auto&& stage : _stageSpecs) {
         const auto& stageName = stage->getParseTimeName();
         const auto& flag = LiteParsedDocumentSource::getApiVersionAllowanceFlag(stageName);
@@ -175,8 +174,11 @@ void LiteParsedPipeline::validatePipelineStagesforAPIVersion(const OperationCont
     }
 }
 
-void LiteParsedPipeline::validate(const OperationContext* opCtx) const {
-    validatePipelineStagesforAPIVersion(opCtx);
+void LiteParsedPipeline::validate(const OperationContext* opCtx,
+                                  bool performApiVersionChecks) const {
+    if (performApiVersionChecks) {
+        validatePipelineStagesforAPIVersion(opCtx);
+    }
 
     // Validates that the pipeline contains at most one $_internalUnpackBucket stage.
     auto count =

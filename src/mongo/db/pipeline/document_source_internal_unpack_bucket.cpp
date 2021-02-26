@@ -47,7 +47,7 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceInternalUnpackBucket::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kAlways);
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
 
 namespace {
 /**

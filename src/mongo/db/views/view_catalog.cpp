@@ -408,7 +408,14 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::validatePipeline(
     const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
-    liteParsedPipeline.validate(opCtx);
+    // The API version pipeline validation should be skipped for time-series view because of
+    // following reasons:
+    //     - the view pipeline is not created by (or visible to) the end-user and should be skipped.
+    //     - the view pipeline can have stages that are not allowed in stable API version '1' eg.
+    //       '$_internalUnpackBucket'.
+    bool performApiVersionChecks = !viewDef.timeseries();
+
+    liteParsedPipeline.validate(opCtx, performApiVersionChecks);
 
     // Verify that this is a legitimate pipeline specification by making sure it parses
     // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
