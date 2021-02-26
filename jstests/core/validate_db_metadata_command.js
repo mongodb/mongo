@@ -2,12 +2,14 @@
  * Tests the validateDBMetaData commands with various input parameters.
  * @tags: [
  *   requires_fcv_49,
+ *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
+load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
 
 const dbName = jsTestName();
 
@@ -133,4 +135,23 @@ assert.commandWorked(testDB.createCollection(
     "validatorColl", {validator: {$expr: {$_testApiVersion: {unstable: true}}}}));
 
 validate({apiStrict: true, error: true});
+
+// Drop the collection with validation rules.
+assert(testDB.validatorColl.drop());
+
+//
+// Validates the metadata across all the databases and collections after creating a time-series
+// collection if time-series collection feature flag is enabled.
+//
+(function maybeValidateWithTimeseriesCollection() {
+    if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+        jsTestLog("Cannot validate metadata with timeseries collection, feature flag is disabled");
+        return;
+    }
+
+    const coll = "timeseriesCollectionMetaDataValidation";
+    assert.commandWorked(
+        testDB.createCollection(coll, {timeseries: {timeField: "time", metaField: "meta"}}));
+    validate({apiStrict: true});
+}());
 }());

@@ -175,11 +175,11 @@ public:
     void validatePipelineStagesforAPIVersion(const OperationContext* opCtx) const;
 
     /**
-     * Verifies that the pipeline contains valid stages. Calls
+     * Verifies that the pipeline contains valid stages. Optionally calls
      * 'validatePipelineStagesforAPIVersion' with 'opCtx', and throws UserException if there is
      * more than one $_internalUnpackBucket stage in the pipeline.
      */
-    void validate(const OperationContext* opCtx) const;
+    void validate(const OperationContext* opCtx, bool performApiVersionChecks = true) const;
 
 private:
     std::vector<std::unique_ptr<LiteParsedDocumentSource>> _stageSpecs;
