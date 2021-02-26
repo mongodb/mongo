@@ -55,7 +55,12 @@
 
 namespace mongo {
 
-OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
+namespace {
+constexpr auto kTempDirStem = "op_msg_fuzzer_fixture"_sd;
+}
+
+OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
+    : _dir(kTempDirStem.toString()) {
     if (!skipGlobalInitializers) {
         auto ret = runGlobalInitializers(std::vector<std::string>{});
         invariant(ret.isOK());
@@ -75,6 +80,7 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers) {
     auto clientGuard = _clientStrand->bind();
     auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
 
+    storageGlobalParams.dbpath = _dir.path();
     storageGlobalParams.engine = "ephemeralForTest";
     storageGlobalParams.engineSetByUser = true;
     storageGlobalParams.repair = false;

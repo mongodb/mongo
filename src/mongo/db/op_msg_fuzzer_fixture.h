@@ -35,6 +35,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 /**
@@ -53,6 +54,10 @@ public:
 
 private:
     const LogicalTime kInMemoryLogicalTime = LogicalTime(Timestamp(3, 1));
+
+    // This member is responsible for both creating and deleting the base directory. Think of it as
+    // a smart pointer to the directory.
+    const unittest::TempDir _dir;
 
     ServiceContext* _serviceContext;
     ClientStrandPtr _clientStrand;
