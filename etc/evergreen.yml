@@ -12340,7 +12340,6 @@ buildvariants:
   run_on:
   - ubuntu1804-build
   stepback: false
-  batchtime: 240 # 4 hours
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
@@ -12510,7 +12509,6 @@ buildvariants:
 - <<: *ubuntu1804-debug-ubsan-template
   name: ubuntu1804-debug-ubsan-all-feature-flags
   display_name: "~ Shared Library UBSAN Enterprise Ubuntu 18.04 DEBUG (all feature flags)"
-  batchtime: 240 # 4 hours
   modules:
   - enterprise
   run_on:
@@ -12746,7 +12744,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
-  batchtime: 1440 # 1 day
   modules:
   - enterprise
   expansions:
