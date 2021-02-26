@@ -1146,7 +1146,9 @@ public:
     InvocationBaseInternal(OperationContext* opCtx,
                            const Command* command,
                            const OpMsgRequest& opMsgRequest)
-        : CommandInvocation(command), _request{_parseRequest(opCtx, command, opMsgRequest)} {}
+        : CommandInvocation(command),
+          _request{_parseRequest(opCtx, command, opMsgRequest)},
+          _opMsgRequest{opMsgRequest} {}
 
 protected:
     const RequestType& request() const {
@@ -1174,6 +1176,8 @@ private:
     }
 
     RequestType _request;
+
+    const OpMsgRequest _opMsgRequest;
 };
 
 template <typename Derived>

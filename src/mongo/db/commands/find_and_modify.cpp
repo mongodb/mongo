@@ -707,8 +707,10 @@ void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) 
     const auto& req = request();
 
     bob->append(FindCommand::kCommandName, req.getNamespace().coll());
-    bob->append(FindCommand::kFilterFieldName, req.getQuery());
 
+    if (!req.getQuery().isEmpty()) {
+        bob->append(FindCommand::kFilterFieldName, req.getQuery());
+    }
     if (req.getSort()) {
         bob->append(write_ops::FindAndModifyCommand::kSortFieldName, *req.getSort());
     }
