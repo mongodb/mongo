@@ -475,6 +475,13 @@ const testCases = {
     }
 };
 
+// Force the donor to preserve all snapshot history to ensure that transactional reads do not fail
+// with TransientTransactionError "Read timestamp is older than the oldest available timestamp".
+const donorRst = tenantMigrationTest.getDonorRst();
+donorRst.nodes.forEach(node => {
+    configureFailPoint(node, "WTPreserveSnapshotHistoryIndefinitely");
+});
+
 const testFuncs = {
     inCommitted: testRejectReadsAfterMigrationCommitted,
     inAborted: testDoNotRejectReadsAfterMigrationAborted,
