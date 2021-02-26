@@ -61,7 +61,7 @@ SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
                                                       _nss.db(),
                                                       "RefineCollectionShardKey",
                                                       DistLockManager::kDefaultLockTimeout));
-            const auto fromCollDistLock =
+            const auto collDistLock =
                 uassertStatusOK(distLockManager->lock(opCtx,
                                                       _nss.ns(),
                                                       "RefineCollectionShardKey",
@@ -73,6 +73,8 @@ SemiFuture<void> RefineCollectionShardKeyCoordinator::runImpl(
             ConfigsvrRefineCollectionShardKey configsvrRefineCollShardKey(
                 _nss, _newShardKey.toBSON(), cm.getVersion().epoch());
             configsvrRefineCollShardKey.setDbName(_nss.db().toString());
+            // TODO SERVER-54810 don't set `setIsFromPrimaryShard` once 5.0 becomes last-LTS
+            configsvrRefineCollShardKey.setIsFromPrimaryShard(true);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(

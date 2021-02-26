@@ -66,3 +66,7 @@ commands:
                 description: "The expected epoch of the namespace provided to
                               refineCollectionShardKey."
                 optional: false
+            # TODO SERVER-54810 remove the following field once 5.0 becomes last-LTS
+            isFromPrimaryShard:
+                type: bool
+                optional: true
