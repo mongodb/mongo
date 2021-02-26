@@ -245,7 +245,6 @@ executor:
           runningWithShardStepdowns: true
           traceExceptions: false
           useStepdownPermittedFile: true
-          usingReplicaSetShards: true
   hooks:
   # We use a stepdown interval of 15 seconds because we will retry all commands in a transaction
   # so we need to allow time for at most 10 operations to be re-run and then re-committed. If

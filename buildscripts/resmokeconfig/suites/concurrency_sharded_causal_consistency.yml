@@ -124,7 +124,6 @@ executor:
       global_vars:
         TestData:
           runningWithCausalConsistency: true
-          usingReplicaSetShards: true
           runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:

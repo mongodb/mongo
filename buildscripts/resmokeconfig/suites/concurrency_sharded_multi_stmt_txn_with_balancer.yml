@@ -169,7 +169,6 @@ executor:
           runInsideTransaction: true
           runningWithSessions: true
           traceExceptions: false
-          usingReplicaSetShards: true
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash

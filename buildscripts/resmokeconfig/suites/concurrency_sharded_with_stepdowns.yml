@@ -199,7 +199,6 @@ executor:
           runningWithAutoSplit: false
           runningWithBalancer: false
           useStepdownPermittedFile: true
-          usingReplicaSetShards: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true

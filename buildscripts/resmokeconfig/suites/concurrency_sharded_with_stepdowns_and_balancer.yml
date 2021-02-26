@@ -205,7 +205,6 @@ executor:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
           useStepdownPermittedFile: true
-          usingReplicaSetShards: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true
