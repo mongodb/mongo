@@ -20,16 +20,20 @@ let session = testDB.getMongo().startSession(sessionOptions);
 let sessionDB = session.getDatabase(dbName);
 let sessionColl = sessionDB[collName];
 
-assert.commandWorked(sessionColl.insert({_id: "findAndModify-doc"}));
-assert.commandWorked(sessionColl.insert({_id: "delete-doc"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-1"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-2"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-3"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-delete-doc-4"}));
-assert.commandWorked(sessionColl.insert({_id: "read-doc"}));
-assert.commandWorked(sessionColl.insert({_id: "update-doc"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-update-doc-1"}));
-assert.commandWorked(sessionColl.insert({_id: "multi-update-doc-2"}));
+assert.commandWorked(sessionColl.insert(
+    [
+        {_id: "findAndModify-doc"},
+        {_id: "delete-doc"},
+        {_id: "multi-delete-doc-1"},
+        {_id: "multi-delete-doc-2"},
+        {_id: "multi-delete-doc-3"},
+        {_id: "multi-delete-doc-4"},
+        {_id: "read-doc"},
+        {_id: "update-doc"},
+        {_id: "multi-update-doc-1"},
+        {_id: "multi-update-doc-2"},
+    ],
+    {writeConcern: {w: "majority"}}));
 
 jsTestLog("Test commands that can use shell helpers.");
 session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
