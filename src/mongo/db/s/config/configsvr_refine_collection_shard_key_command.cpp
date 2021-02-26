@@ -65,6 +65,34 @@ public:
                     "refineCollectionShardKey must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            const boost::optional<bool>& isFromPrimaryShard = request().getIsFromPrimaryShard();
+            if (isFromPrimaryShard && *isFromPrimaryShard) {
+                // If the request has been received from the primary shard, the distributed lock has
+                // already been acquired.
+                return _internalRun(opCtx);
+            }
+
+            // TODO SERVER-54810 don't acquire distributed lock on CSRS after 5.0 has branched out.
+            // The request has been received from a last-lts router, acquire distlocks on the
+            // namespace's database and collection.
+            DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(
+                DistLockManager::get(opCtx)->lock(opCtx,
+                                                  nss.db(),
+                                                  "refineCollectionShardKey",
+                                                  DistLockManager::kDefaultLockTimeout)));
+            DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(
+                DistLockManager::get(opCtx)->lock(opCtx,
+                                                  nss.ns(),
+                                                  "refineCollectionShardKey",
+                                                  DistLockManager::kDefaultLockTimeout)));
+
+            _internalRun(opCtx);
+        }
+
+    private:
+        void _internalRun(OperationContext* opCtx) {
+            const NamespaceString& nss = ns();
+
             // Set the operation context read concern level to local for reads into the config
             // database.
             repl::ReadConcernArgs::get(opCtx) =
@@ -142,7 +170,6 @@ public:
                 opCtx, nss, newShardKeyPattern);
         }
 
-    private:
         NamespaceString ns() const override {
             return request().getCommandParameter();
         }
