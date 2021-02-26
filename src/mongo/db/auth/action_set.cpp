@@ -45,7 +45,7 @@ ActionSet::ActionSet(std::initializer_list<ActionType> actions) {
     }
 }
 
-void ActionSet::addAction(const ActionType& action) {
+void ActionSet::addAction(ActionType action) {
     if (action == ActionType::anyAction) {
         addAllActions();
         return;
@@ -65,7 +65,7 @@ void ActionSet::addAllActions() {
     _actions.set();
 }
 
-void ActionSet::removeAction(const ActionType& action) {
+void ActionSet::removeAction(ActionType action) {
     _actions.set(static_cast<size_t>(action), false);
     _actions.set(static_cast<size_t>(ActionType::anyAction), false);
 }
@@ -81,8 +81,12 @@ void ActionSet::removeAllActions() {
     _actions.reset();
 }
 
-bool ActionSet::contains(const ActionType& action) const {
+bool ActionSet::contains(ActionType action) const {
     return _actions[static_cast<size_t>(action)];
+}
+
+bool ActionSet::contains(const ActionSet& other) const {
+    return (_actions | other._actions) == _actions;
 }
 
 bool ActionSet::isSupersetOf(const ActionSet& other) const {

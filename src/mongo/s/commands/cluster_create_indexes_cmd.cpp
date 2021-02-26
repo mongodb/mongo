@@ -66,7 +66,7 @@ public:
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const final {
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), {ActionType::createIndex}));
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::createIndex));
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {

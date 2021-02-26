@@ -54,7 +54,7 @@ void Privilege::addPrivilegesToPrivilegeVector(PrivilegeVector* privileges,
     }
 }
 
-Privilege::Privilege(const ResourcePattern& resource, const ActionType& action)
+Privilege::Privilege(const ResourcePattern& resource, const ActionType action)
     : _resource(resource) {
     _actions.addAction(action);
 }
@@ -69,7 +69,7 @@ void Privilege::removeActions(const ActionSet& actionsToRemove) {
     _actions.removeAllActionsFromSet(actionsToRemove);
 }
 
-bool Privilege::includesAction(const ActionType& action) const {
+bool Privilege::includesAction(const ActionType action) const {
     return _actions.contains(action);
 }
 

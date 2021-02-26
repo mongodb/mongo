@@ -869,6 +869,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/auth/auth_umc',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/command_can_run_here',
         '$BUILD_DIR/mongo/db/curop_metrics',
@@ -1714,6 +1715,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/transport/transport_layer_common',
+        'auth/auth',
         'auth/authprivilege',
         'global_settings',
         'keys_collection_client_sharded',
