@@ -69,6 +69,8 @@ var ReshardingTest = class {
         this._reshardingThread = undefined;
         /** @private */
         this._isReshardingActive = false;
+        /** @private */
+        this._commandDoneSignal = undefined;
     }
 
     setup() {
@@ -189,7 +191,7 @@ var ReshardingTest = class {
         this._pauseCoordinatorBeforeCompletionFailpoint =
             configureFailPoint(configPrimary, "reshardingPauseCoordinatorBeforeCompletion");
 
-        const commandDoneSignal = new CountDownLatch(1);
+        this._commandDoneSignal = new CountDownLatch(1);
 
         this._reshardingThread = new Thread(
             function(
@@ -212,13 +214,11 @@ var ReshardingTest = class {
             this._ns,
             newShardKeyPattern,
             newChunks,
-            commandDoneSignal,
+            this._commandDoneSignal,
             expectedErrorCode);
 
         this._reshardingThread.start();
         this._isReshardingActive = true;
-
-        return commandDoneSignal;
     }
 
     /**
@@ -235,8 +235,11 @@ var ReshardingTest = class {
      * synchronization.
      *
      * @param expectedErrorCode - the expected response code for the reshardCollection command.
-     * Callers of interruptReshardingThread() will want to set this to ErrorCodes.Interrupted, for
-     * example.
+     *
+     * @param postCheckConsistencyFn - a function for evaluating additional correctness
+     * assertions. This function is called in the critical section after a successful
+     * `reshardCollection` command has shuffled data, but before the response is returned to the
+     * client.
      */
     withReshardingInBackground({newShardKeyPattern, newChunks},
                                duringReshardingFn = (tempNs) => {},
@@ -245,13 +248,12 @@ var ReshardingTest = class {
                                    postCheckConsistencyFn = (tempNs) => {},
                                    postAbortDecisionPersistedFn = () => {}
                                } = {}) {
-        const commandDoneSignal = this._startReshardingInBackgroundAndAllowCommandFailure(
-            {newShardKeyPattern, newChunks}, expectedErrorCode);
+        this._startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
+                                                                expectedErrorCode);
 
         assert.soon(() => {
             const op = this._findReshardingCommandOp();
-            return op !== undefined ||
-                (expectedErrorCode !== ErrorCodes.OK && commandDoneSignal.getCount() === 0);
+            return op !== undefined || this._commandDoneSignal.getCount() === 0;
         }, "failed to find reshardCollection in $currentOp output");
 
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
@@ -302,7 +304,10 @@ var ReshardingTest = class {
             }
 
             try {
-                this.interruptReshardingThread();
+                const op = this._findReshardingCommandOp();
+                if (op !== undefined) {
+                    assert.commandWorked(this._st.admin.killOp(op.opid));
+                }
 
                 try {
                     this._reshardingThread.join();
@@ -329,10 +334,37 @@ var ReshardingTest = class {
         assert.commandWorked(this._st.admin.killOp(op.opid));
     }
 
+    /**
+     * This method can be called with failpoints that block the `reshardCollection` command from
+     * proceeding to the next stage. This helper returns after either:
+     *
+     * 1) The node's waitForFailPoint returns successfully or
+     * 2) The `reshardCollection` command has returned a response.
+     *
+     * The function returns true when we returned because the server reached the failpoint. The
+     * function returns false when the `reshardCollection` command is no longer running.
+     * Otherwise the function throws an exception.
+     *
+     * @private
+     */
+    _waitForFailPoint(fp) {
+        assert.soon(
+            () => {
+                return this._commandDoneSignal.getCount() === 0 || fp.waitWithTimeout(1000);
+            },
+            "Timed out waiting for failpoint to be hit. Failpoint: " + fp.failPointName,
+            undefined,
+            // The `waitWithTimeout` command has the server block for an interval of time.
+            1);
+        // return true if the `reshardCollection` command is still running.
+        return this._commandDoneSignal.getCount() === 1;
+    }
+
     /** @private */
     _checkConsistencyAndPostState(expectedErrorCode,
                                   postCheckConsistencyFn = () => {},
                                   postAbortDecisionPersistedFn = () => {}) {
+        let performCorrectnessChecks = true;
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
                 // We use the reshardingPauseCoordinatorInSteadyState failpoint so that any
@@ -341,14 +373,28 @@ var ReshardingTest = class {
                 // We then use the reshardingPauseCoordinatorBeforeDecisionPersisted failpoint to
                 // wait for all of the recipient shards to have applied through all of the oplog
                 // entries from all of the donor shards.
-                this._pauseCoordinatorInSteadyStateFailpoint.wait();
+                if (!this._waitForFailPoint(this._pauseCoordinatorInSteadyStateFailpoint)) {
+                    performCorrectnessChecks = false;
+                }
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
-                this._pauseCoordinatorBeforeDecisionPersistedFailpoint.wait();
 
-                assert.commandWorked(this._st.s.adminCommand({flushRouterConfig: this._ns}));
-                this._checkConsistency();
-                this._checkDocumentOwnership();
-                postCheckConsistencyFn();
+                // A resharding command that returned a failure will not hit the "Decision
+                // Persisted" failpoint. If the command has returned, don't require that the
+                // failpoint was entered. This ensures that following up by joining the
+                // `_reshardingThread` will succeed.
+                if (!this._waitForFailPoint(
+                        this._pauseCoordinatorBeforeDecisionPersistedFailpoint)) {
+                    performCorrectnessChecks = false;
+                }
+
+                // Don't correctness check the results if the resharding command unexpectedly
+                // returned.
+                if (performCorrectnessChecks) {
+                    assert.commandWorked(this._st.s.adminCommand({flushRouterConfig: this._ns}));
+                    this._checkConsistency();
+                    this._checkDocumentOwnership();
+                    postCheckConsistencyFn();
+                }
 
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
                 this._pauseCoordinatorBeforeCompletionFailpoint.off();
@@ -362,8 +408,18 @@ var ReshardingTest = class {
             });
         }
 
-        this._reshardingThread.join();
-        this._isReshardingActive = false;
+        try {
+            this._reshardingThread.join();
+        } finally {
+            this._isReshardingActive = false;
+        }
+
+        // Reaching this line implies the `_reshardingThread` has successfully exited without
+        // throwing an exception. Assert that we performed all expected correctness checks.
+        assert(performCorrectnessChecks, {
+            msg: "Reshard collection succeeded, but correctness checks were not performed.",
+            expectedErrorCode: expectedErrorCode
+        });
 
         // TODO SERVER-52838: Call _checkPostState() when donor and recipient shards clean up their
         // local metadata on error.
