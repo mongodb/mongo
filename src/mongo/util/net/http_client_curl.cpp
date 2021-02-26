@@ -55,9 +55,9 @@
 #include "mongo/util/alarm.h"
 #include "mongo/util/alarm_runner_background_thread.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/processinfo.h"
@@ -222,11 +222,6 @@ CurlEasyHandle createCurlEasyHandle(Protocols protocol) {
 #if LIBCURL_VERSION_NUM > 0x072200
     // Requires >= 7.34.0
     curl_easy_setopt(handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-#endif
-
-#if LIBCURL_VERSION_NUM > 0x073400
-    // Requires >= 7.52.0
-    curl_easy_setopt(handle.get(), CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_3);
 #endif
 
     curl_easy_setopt(handle.get(), CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
@@ -568,7 +563,16 @@ HostAndPort exactHostAndPortFromUrl(StringData url) {
         url = url.substr(0, url.find("/"));
     }
 
-    return HostAndPort(url);
+    auto hp = HostAndPort(url);
+    if (!hp.hasPort()) {
+        if (url.startsWith("http://"_sd)) {
+            return HostAndPort(hp.host(), 80);
+        }
+
+        return HostAndPort(hp.host(), 443);
+    }
+
+    return hp;
 }
 
 /**
@@ -619,8 +623,8 @@ public:
     }
 
     DataBuilder request(HttpMethod method,
-                      StringData url,
-                      ConstDataRange cdr = {nullptr, 0}) const {
+                        StringData url,
+                        ConstDataRange cdr = {nullptr, 0}) const {
         auto protocol = _allowInsecure ? Protocols::kHttpOrHttps : Protocols::kHttpsOnly;
         if (_pool == HttpConnectionPool::kUse) {
             static CurlPool factory;
@@ -658,7 +662,7 @@ private:
                         cdr.length() == 0);
                 // Per https://curl.se/libcurl/c/CURLOPT_POST.html
                 // We need to reset the type of request we want to make when reusing the request
-                // curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
+                curl_easy_setopt(handle, CURLOPT_HTTPGET, 1);
                 break;
             case HttpMethod::kPOST:
                 curl_easy_setopt(handle, CURLOPT_PUT, 0);
@@ -683,7 +687,7 @@ private:
         const auto urlString = url.toString();
         curl_easy_setopt(handle, CURLOPT_URL, urlString.c_str());
 
-        DataBuilder dataBuilder(4096), headerBuilder(4096);
+        DataBuilder dataBuilder(4096);
         curl_easy_setopt(handle, CURLOPT_WRITEDATA, &dataBuilder);
 
         curl_slist* chunk = curl_slist_append(nullptr, "Connection: keep-alive");
