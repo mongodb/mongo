@@ -21,7 +21,7 @@ const ns = dbName + "." + collName;
 
 let st = new ShardingTest({
     shards: 3,
-    rs0: {nodes: 2},
+    rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
     causallyConsistent: true,
     other: {
         mongosOptions: {verbose: 3},
@@ -104,7 +104,7 @@ assert.commandWorked(coordPrimary.adminCommand({replSetStepDown: stepDownSecs, f
 
 failPoint.off();
 
-// The router should retry commitTransaction against the new primary and time out waiting to
+// The router should retry commitTransaction against the primary and time out waiting to
 // access the coordinator catalog.
 awaitResult();
 
