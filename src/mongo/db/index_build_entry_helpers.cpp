@@ -304,11 +304,17 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     }
 
     BSONObj obj;
-    bool foundObj = Helpers::findOne(opCtx,
-                                     collection.getCollection(),
-                                     BSON("_id" << indexBuildUUID),
-                                     obj,
-                                     /*requireIndex=*/true);
+    // This operation does not perform any writes, but the index building code is sensitive to
+    // exceptions and we must protect it from unanticipated write conflicts from reads.
+    bool foundObj = writeConflictRetry(
+        opCtx, "getIndexBuildEntry", NamespaceString::kIndexBuildEntryNamespace.ns(), [&]() {
+            return Helpers::findOne(opCtx,
+                                    collection.getCollection(),
+                                    BSON("_id" << indexBuildUUID),
+                                    obj,
+                                    /*requireIndex=*/true);
+        });
+
     if (!foundObj) {
         str::stream ss;
         ss << "No matching IndexBuildEntry found with indexBuildUUID: " << indexBuildUUID;

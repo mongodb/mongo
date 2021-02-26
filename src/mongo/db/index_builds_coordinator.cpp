@@ -343,8 +343,13 @@ repl::OpTime getLatestOplogOpTime(OperationContext* opCtx) {
     // Helpers::getLast will bypass the oplog visibility rules by doing a backwards collection
     // scan.
     BSONObj oplogEntryBSON;
-    invariant(
-        Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+    // This operation does not perform any writes, but the index building code is sensitive to
+    // exceptions and we must protect it from unanticipated write conflicts from reads.
+    writeConflictRetry(
+        opCtx, "getLatestOplogOpTime", NamespaceString::kRsOplogNamespace.ns(), [&]() {
+            invariant(Helpers::getLast(
+                opCtx, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntryBSON));
+        });
 
     auto optime = repl::OpTime::parseFromOplogEntry(oplogEntryBSON);
     invariant(optime.isOK(),

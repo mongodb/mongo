@@ -32,6 +32,7 @@
 #include "mongo/db/index/skipped_record_tracker.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/logv2/log.h"
@@ -79,14 +80,19 @@ void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recor
         _skippedRecordsTable =
             opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx);
     }
-    // A WriteUnitOfWork may not already be active if the originating operation was part of an
-    // insert into the external sorter.
-    WriteUnitOfWork wuow(opCtx);
-    uassertStatusOK(
-        _skippedRecordsTable->rs()
-            ->insertRecord(opCtx, toInsert.objdata(), toInsert.objsize(), Timestamp::min())
-            .getStatus());
-    wuow.commit();
+
+    writeConflictRetry(
+        opCtx,
+        "recordSkippedRecordTracker",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() {
+            WriteUnitOfWork wuow(opCtx);
+            uassertStatusOK(
+                _skippedRecordsTable->rs()
+                    ->insertRecord(opCtx, toInsert.objdata(), toInsert.objsize(), Timestamp::min())
+                    .getStatus());
+            wuow.commit();
+        });
 }
 
 bool SkippedRecordTracker::areAllRecordsApplied(OperationContext* opCtx) const {
