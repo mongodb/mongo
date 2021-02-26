@@ -4692,6 +4692,32 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: jstestfuzz_interrupt_replication
 
+# jstestfuzz write conflict #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_replication_write_conflicts_gen
+  tags: ["jstestfuzz", "write_conflict"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      suite: jstestfuzz_replication_write_conflicts
+      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      name: jstestfuzz_replication_write_conflicts
+
+# jstestfuzz concurrent conflict #
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication_write_conflicts_gen
+  tags: ["jstestfuzz", "write_conflict"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      jstestfuzz_vars: --jsTestsDir ../jstests
+      suite: jstestfuzz_replication_write_conflicts
+      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2}}' --numClientsPerFixture=10"
+      name: jstestfuzz_concurrent_replication_write_conflicts
+
 # jstestfuzz interrupt with flow control engaged #
 - <<: *jstestfuzz_template
   name: jstestfuzz_interrupt_replication_flow_control_gen
