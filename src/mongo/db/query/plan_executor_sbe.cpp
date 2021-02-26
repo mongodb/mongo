@@ -51,40 +51,35 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
       _opCtx(opCtx),
       _nss(std::move(nss)),
       _mustReturnOwnedBson(returnOwnedBson),
-      _env{candidates.winner().data.env},
-      _ctx{std::move(candidates.winner().data.ctx)},
       _root{std::move(candidates.winner().root)},
+      _rootData{std::move(candidates.winner().data)},
       _cq{std::move(cq)},
       _yieldPolicy(std::move(yieldPolicy)) {
     invariant(!_nss.isEmpty());
     invariant(_root);
 
+    // NOTE: 'winner.data' has been std::moved() from and is not safe to access.
     auto winner = std::move(candidates.plans[candidates.winnerIdx]);
     _solution = std::move(winner.solution);
 
-    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
-        _result = _root->getAccessor(_ctx, *slot);
+    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
+        _result = _root->getAccessor(_rootData.ctx, *slot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId);
-        slot) {
-        _resultRecordId = _root->getAccessor(_ctx, *slot);
+    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
+        _resultRecordId = _root->getAccessor(_rootData.ctx, *slot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kOplogTs);
-        slot) {
-        _oplogTs = _root->getAccessor(_ctx, *slot);
+    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kOplogTs); slot) {
+        _oplogTs = _root->getAccessor(_rootData.ctx, *slot);
         uassert(4822867, "Query does not have oplogTs slot.", _oplogTs);
     }
 
     if (winner.data.shouldUseTailableScan) {
-        _resumeRecordIdSlot = _env->getSlot("resumeRecordId"_sd);
+        _resumeRecordIdSlot = _rootData.env->getSlot("resumeRecordId"_sd);
     }
-
-    _shouldTrackLatestOplogTimestamp = winner.data.shouldTrackLatestOplogTimestamp;
-    _shouldTrackResumeToken = winner.data.shouldTrackResumeToken;
 
     if (!winner.results.empty()) {
         _stash = std::move(winner.results);
@@ -107,8 +102,9 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         // Keep only rejected candidate plans.
         candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
     }
+
     _planExplainer = plan_explainer_factory::make(
-        _root.get(), &winner.data, _solution.get(), std::move(candidates.plans), isMultiPlan);
+        _root.get(), &_rootData, _solution.get(), std::move(candidates.plans), isMultiPlan);
 }
 
 void PlanExecutorSBE::saveState() {
@@ -220,7 +216,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
                         "without a valid RecordId",
                         tag == sbe::value::TypeTags::RecordId ||
                             tag == sbe::value::TypeTags::Nothing);
-                _env->resetSlot(*_resumeRecordIdSlot, tag, val, false);
+                _rootData.env->resetSlot(*_resumeRecordIdSlot, tag, val, false);
             }
 
             _state = State::kOpened;
@@ -250,7 +246,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 }
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
-    if (_shouldTrackLatestOplogTimestamp) {
+    if (_rootData.shouldTrackLatestOplogTimestamp) {
         invariant(_oplogTs);
 
         auto [tag, val] = _oplogTs->getViewOfValue();
@@ -268,7 +264,7 @@ Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
 }
 
 BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
-    if (_shouldTrackResumeToken) {
+    if (_rootData.shouldTrackResumeToken) {
         invariant(_resultRecordId);
 
         auto [tag, val] = _resultRecordId->getViewOfValue();

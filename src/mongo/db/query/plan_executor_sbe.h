@@ -137,17 +137,14 @@ private:
     const bool _mustReturnOwnedBson;
 
     // CompileCtx owns the instance pointed by _env, so we must keep it around.
-    sbe::RuntimeEnvironment* _env{nullptr};
-    sbe::CompileCtx _ctx;
     const std::unique_ptr<sbe::PlanStage> _root;
+    stage_builder::PlanStageData _rootData;
     std::unique_ptr<QuerySolution> _solution;
 
     sbe::value::SlotAccessor* _result{nullptr};
     sbe::value::SlotAccessor* _resultRecordId{nullptr};
     sbe::value::SlotAccessor* _oplogTs{nullptr};
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
-    bool _shouldTrackLatestOplogTimestamp{false};
-    bool _shouldTrackResumeToken{false};
 
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> _stash;
 
