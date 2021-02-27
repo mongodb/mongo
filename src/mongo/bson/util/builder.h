@@ -40,6 +40,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/bson/util/builder_fwd.h"
+
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
@@ -72,9 +74,6 @@ const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 const int BSONObjMaxInternalSize = BSONObjMaxUserSize + (16 * 1024);
 
 const int BufferMaxSize = 64 * 1024 * 1024;
-
-template <typename Builder>
-class StringBuilderImpl;
 
 class SharedBufferAllocator {
     SharedBufferAllocator(const SharedBufferAllocator&) = delete;
@@ -220,7 +219,6 @@ private:
     UniqueBuffer _buf;
 };
 
-enum { StackSizeDefault = 512 };
 template <size_t SZ>
 class StackAllocator {
     StackAllocator(const StackAllocator&) = delete;
@@ -527,7 +525,6 @@ public:
     StackBufBuilderBase(const StackBufBuilderBase&) = delete;
     StackBufBuilderBase(StackBufBuilderBase&&) = delete;
 };
-using StackBufBuilder = StackBufBuilderBase<StackSizeDefault>;
 MONGO_STATIC_ASSERT(!std::is_move_constructible<StackBufBuilder>::value);
 
 /** std::stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
@@ -694,9 +691,6 @@ private:
 
     Builder _buf;
 };
-
-using StringBuilder = StringBuilderImpl<BufBuilder>;
-using StackStringBuilder = StringBuilderImpl<StackBufBuilderBase<StackSizeDefault>>;
 
 extern template class StringBuilderImpl<BufBuilder>;
 extern template class StringBuilderImpl<StackBufBuilderBase<StackSizeDefault>>;
