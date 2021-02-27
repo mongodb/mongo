@@ -60,10 +60,7 @@
 
 namespace mongo {
 
-using std::endl;
-using std::string;
-using std::stringstream;
-using std::vector;
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(reIndexCrashAfterDrop);
 
@@ -125,9 +122,9 @@ public:
     CmdReIndex() : ErrmsgCommandDeprecated("reIndex") {}
 
     bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
+                   const std::string& dbname,
                    const BSONObj& jsobj,
-                   string& errmsg,
+                   std::string& errmsg,
                    BSONObjBuilder& result) {
 
         const NamespaceString toReIndexNss =
@@ -162,9 +159,9 @@ public:
 
         const auto defaultIndexVersion = IndexDescriptor::getDefaultIndexVersion();
 
-        vector<BSONObj> all;
+        std::vector<BSONObj> all;
         {
-            vector<string> indexNames;
+            std::vector<std::string> indexNames;
             writeConflictRetry(opCtx, "listIndexes", toReIndexNss.ns(), [&] {
                 indexNames.clear();
                 DurableCatalog::get(opCtx)->getAllIndexes(
@@ -174,7 +171,7 @@ public:
             all.reserve(indexNames.size());
 
             for (size_t i = 0; i < indexNames.size(); i++) {
-                const string& name = indexNames[i];
+                const std::string& name = indexNames[i];
                 BSONObj spec = writeConflictRetry(opCtx, "getIndexSpec", toReIndexNss.ns(), [&] {
                     return DurableCatalog::get(opCtx)->getIndexSpec(
                         opCtx, collection->getCatalogId(), name);
@@ -258,4 +255,6 @@ public:
         return true;
     }
 } cmdReIndex;
+
+}  // namespace
 }  // namespace mongo
