@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/vector_clock.h"
@@ -63,6 +65,118 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(reIndexCrashAfterDrop);
+
+/**
+ * Returns time-series options if 'ns' refers to a time-series collection.
+ */
+boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
+                                                        const NamespaceString& ns) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
+    if (!viewCatalog) {
+        return {};
+    }
+
+    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
+    if (!view) {
+        return {};
+    }
+
+    // Return a copy of the time-series options so that we don't refer to the internal state of
+    // 'viewCatalog' once it goes out of scope.
+    return view->timeseries();
+}
+
+/**
+ * Returns an index key with field names mapped to the bucket collection schema.
+ */
+BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
+                                   const DropIndexes& origCmd,
+                                   const BSONObj& origKey) {
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    BSONObjBuilder builder;
+    for (const auto& elem : origKey) {
+        // Determine if the index requested on the time field is ascending or descending.
+        // The final index spec will be subjected to a more complete validation in
+        // index_key_validate::validateKeyPattern().
+        if (elem.fieldNameStringData() == timeField) {
+            uassert(
+                ErrorCodes::IndexNotFound,
+                str::stream() << "Invalid index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Indexes on the time field must be ascending or descending "
+                                 "(numbers only): "
+                              << elem,
+                elem.isNumber());
+            if (elem.number() >= 0) {
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+            } else {
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+            }
+            continue;
+        }
+
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << "Invalid index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Index must be on the '" << timeField << "' field: " << elem,
+                metaField);
+
+        if (elem.fieldNameStringData() == *metaField) {
+            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
+            continue;
+        }
+
+        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+            builder.appendAs(elem,
+                             str::stream()
+                                 << BucketUnpacker::kBucketMetaFieldName << "."
+                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
+            continue;
+        }
+
+        uasserted(ErrorCodes::IndexNotFound,
+                  str::stream() << "Invalid index spec for time-series collection: "
+                                << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                                << ". Index must be either on the '" << *metaField << "' or '"
+                                << timeField << "' fields: " << elem);
+    }
+    return builder.obj();
+}
+
+/**
+ * Returns a DropIndexes for dropping indexes on the bucket collection.
+ *
+ * The 'index' dropIndexes parameter may refer to an index name, or array of names, or "*" for all
+ * indexes, or an index spec key (an object). Only the index spec key has to be translated for the
+ * bucket collection. The other forms of 'index' can be passed along unmodified.
+ *
+ * Returns null if 'origCmd' is not for a time-series collection.
+ */
+std::unique_ptr<DropIndexes> makeTimeseriesDropIndexesCommand(OperationContext* opCtx,
+                                                              const DropIndexes& origCmd) {
+    const auto& origNs = origCmd.getNamespace();
+
+    auto timeseriesOptions = getTimeseriesOptions(opCtx, origNs);
+
+    // Return early with null if we are not working with a time-series collection.
+    if (!timeseriesOptions) {
+        return {};
+    }
+
+    auto ns = origNs.makeTimeseriesBucketsNamespace();
+
+    const auto& origIndex = origCmd.getIndex();
+    if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
+        return std::make_unique<DropIndexes>(
+            ns, makeTimeseriesIndexSpecKey(*timeseriesOptions, origCmd, *keyPtr));
+    }
+
+    return std::make_unique<DropIndexes>(ns, origIndex);
+}
 
 class CmdDropIndexes : public DropIndexesCmdVersion1Gen<CmdDropIndexes> {
 public:
@@ -93,6 +207,12 @@ public:
                                                             ActionType::dropIndex));
         }
         Reply typedRun(OperationContext* opCtx) final {
+            // If the request namespace refers to a time-series collection, transform the user
+            // time-series index request to one on the underlying bucket.
+            if (auto timeseriesCmd = makeTimeseriesDropIndexesCommand(opCtx, request())) {
+                return dropIndexes(opCtx, timeseriesCmd->getNamespace(), timeseriesCmd->getIndex());
+            }
+
             return dropIndexes(opCtx, request().getNamespace(), request().getIndex());
         }
     };
