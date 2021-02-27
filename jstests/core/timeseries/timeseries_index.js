@@ -1,5 +1,5 @@
 /**
- * Tests basic index creation and operations on a time-series collection.
+ * Tests basic index creation and drops on a time-series collection.
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
@@ -65,6 +65,12 @@ const runTest = function(keyForCreate, hint) {
     assert.eq(doc._id, bucketDoc.control.min._id, bucketDoc);
     assert.eq(doc[timeFieldName], bucketDoc.control.min[timeFieldName], bucketDoc);
     assert.docEq(doc[metaFieldName], bucketDoc.meta, bucketDoc);
+
+    // Check that the underlying buckets collection index was dropped properly.
+    assert.commandWorked(coll.dropIndex(keyForCreate),
+                         'failed to drop index: ' + tojson(keyForCreate));
+    assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
 };
 
 runTest({[metaFieldName]: 1}, {meta: 1});
@@ -101,4 +107,9 @@ assert.commandWorked(coll.insert(doc, {ordered: false}), 'failed to insert doc: 
 
 // Reject index keys that do not include the metadata field.
 assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}), ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
+
+// Index names are not transformed. dropIndexes passes the request along to the buckets collection,
+// which in this case does not possess the index by that name.
+assert.commandFailedWithCode(coll.dropIndex('mm_1'), ErrorCodes.IndexNotFound);
 })();
