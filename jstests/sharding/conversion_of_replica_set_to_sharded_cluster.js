@@ -301,7 +301,7 @@ for (var i = 0; i < 100; i++) {
 // way of providing a second collection for $lookup, $graphLookup and $merge aggregations.
 assert.commandWorked(coll.runCommand("aggregate", {pipeline: [{$out: otherCollName}], cursor: {}}));
 
-jsTest.log("Runing control tests.");
+jsTest.log("First test: run all test-cases on the replica set as a non-shard server.");
 checkCRUDCommands(rst0.getPrimary().getDB(dbName));
 checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
@@ -310,18 +310,22 @@ let st = new ShardingTest({
     mongos: 1,
 });
 
+jsTest.log("Second test: restart the replica set as a shardsvr but don't add it to a cluster.");
 rst0.restart(0, {shardsvr: ''});
 rst0.restart(1, {shardsvr: ''});
 rst0.awaitReplication();
 
-let addShardRes = st.s.adminCommand({addShard: rst0.getURL(), name: rst0.name});
-assertAddShardSucceeded(addShardRes, rst0.name);
-
-jsTest.log("First test, using the rs connection directly.");
 checkCRUDCommands(rst0.getPrimary().getDB(dbName));
 checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
 
-jsTest.log("Second test, using the router.");
+jsTest.log("Third test, using the rs connection directly.");
+let addShardRes = st.s.adminCommand({addShard: rst0.getURL(), name: rst0.name});
+assertAddShardSucceeded(addShardRes, rst0.name);
+
+checkCRUDCommands(rst0.getPrimary().getDB(dbName));
+checkDDLCommands(rst0.getPrimary().getDB(DDLDbName));
+
+jsTest.log("Fourth test, using the router.");
 checkCRUDCommands(st.s0.getDB(dbName));
 checkDDLCommands(st.s0.getDB(DDLDbName));
 
