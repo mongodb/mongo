@@ -293,6 +293,7 @@ const allCommands = {
     saslStart: {skip: isPrimaryOnly},
     sbe: {skip: isAnInternalCommand},
     serverStatus: {skip: isNotAUserDataRead},
+    setAuditConfig: {skip: isNotAUserDataRead},
     setCommittedSnapshot: {skip: isNotAUserDataRead},
     setDefaultRWConcern: {skip: isPrimaryOnly},
     setIndexCommitQuorum: {skip: isPrimaryOnly},

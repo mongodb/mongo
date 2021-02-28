@@ -613,6 +613,7 @@ let testCases = {
     saslStart: {skip: "does not accept read or write concern"},
     sbe: {skip: "internal command"},
     serverStatus: {skip: "does not accept read or write concern"},
+    setAuditConfig: {skip: "does not accept read or write concern"},
     setCommittedSnapshot: {skip: "internal command"},
     setDefaultRWConcern: {skip: "special case (must run after all other commands)"},
     setFeatureCompatibilityVersion: {skip: "does not accept read or write concern"},

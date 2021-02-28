@@ -31,6 +31,8 @@
 
 namespace mongo {
 namespace audit {
+std::function<void(OperationContext*)> initializeManager;
+std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 
 #if !MONGO_ENTERPRISE_AUDIT
 

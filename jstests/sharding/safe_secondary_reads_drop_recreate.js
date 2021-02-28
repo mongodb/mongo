@@ -282,6 +282,7 @@ let testCases = {
     saslStart: {skip: "primary only"},
     sbe: {skip: "internal command"},
     serverStatus: {skip: "does not return user data"},
+    setAuditConfig: {skip: "does not return user data"},
     setCommittedSnapshot: {skip: "does not return user data"},
     setDefaultRWConcern: {skip: "primary only"},
     setIndexCommitQuorum: {skip: "primary only"},

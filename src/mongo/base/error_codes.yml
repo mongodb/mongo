@@ -431,6 +431,9 @@ error_codes:
     - {code: 343, name: ShardCannotRefreshDueToLocksHeld,
                   extra: ShardCannotRefreshDueToLocksHeldInfo}
 
+    - {code: 344, name: AuditingNotEnabled}
+    - {code: 345, name: RuntimeAuditConfigurationNotEnabled}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

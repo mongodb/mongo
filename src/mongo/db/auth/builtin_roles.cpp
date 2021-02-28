@@ -208,6 +208,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
     // hostManager role actions that target the cluster resource
     hostManagerRoleClusterActions
         << ActionType::applicationMessage  // clusterManager gets this also
+        << ActionType::auditConfigure
         << ActionType::connPoolSync
         << ActionType::dropConnections
         << ActionType::logRotate

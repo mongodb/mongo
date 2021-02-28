@@ -45,6 +45,7 @@ enums:
            anyAction :  "anyAction"         # Special ActionType that represents *all* actions
            appendOplogNote :  "appendOplogNote"
            applicationMessage :  "applicationMessage"
+           auditConfigure :  "auditConfigure"
            auditLogRotate :  "auditLogRotate"  # ID only
            authCheck :  "authCheck"       # ID only
            authenticate :  "authenticate"    # ID only

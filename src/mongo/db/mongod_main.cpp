@@ -520,6 +520,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto const globalAuthzManager = AuthorizationManager::get(serviceContext);
     uassertStatusOK(globalAuthzManager->initialize(startupOpCtx.get()));
 
+    if (audit::initializeManager) {
+        audit::initializeManager(startupOpCtx.get());
+    }
+
     // This is for security on certain platforms (nonce generation)
     srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));
 
@@ -1033,6 +1037,10 @@ void setUpObservers(ServiceContext* serviceContext) {
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
+
+    if (audit::opObserverRegistrar) {
+        audit::opObserverRegistrar(opObserverRegistry.get());
+    }
 
     serviceContext->setOpObserver(std::move(opObserverRegistry));
 }
