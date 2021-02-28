@@ -48,7 +48,6 @@ selector:
   - jstests/core/shell_connection_strings.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/drop.js
   - jstests/core/dropdb.js
   - jstests/core/explain_upsert.js
   - jstests/core/indexes_multiple_commands.js

@@ -221,7 +221,6 @@ selector:
   - jstests/core/cursora.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/drop.js
   - jstests/core/explain_upsert.js
 
   # Expect certain responses, but retries of successfully completed commands may return
