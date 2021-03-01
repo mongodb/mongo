@@ -87,6 +87,12 @@ ERROR_ID_COMMAND_TYPE_CONTAINS_VALIDATOR = "ID0043"
 ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL = "ID0044"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED = "ID0045"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED = "ID0046"
+ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0047"
+ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0048"
+ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0049"
+ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL = "ID0050"
+ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL = "ID0051"
+ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL = "ID0052"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -166,6 +172,15 @@ class IDLCompatibilityErrorCollection(object):
         """Get the first error in the error collection with the command command_name."""
         command_name_list = [a for a in self._errors if a.command_name == command_name]
         error = next(iter(command_name_list), None)
+        assert error is not None
+        return error
+
+    def get_error_by_command_name_and_error_id(self, command_name: str,
+                                               error_id: str) -> IDLCompatibilityError:
+        """Get the first error in the error collection from command_name with error_id."""
+        command_name_list = [a for a in self._errors if a.command_name == command_name]
+        error_id_list = [a for a in command_name_list if a.error_id == error_id]
+        error = next(iter(error_id_list), None)
         assert error is not None
         return error
 
@@ -315,17 +330,18 @@ class IDLCompatibilityContext(object):
         Add an error about BSON serialization type.
 
         Add an error about the new command or command parameter type's
-        bson serialization type being of type "any" when it is not explicitly allowed.
+        bson serialization type being of type 'any' when the old type is non-any or
+        when it is not explicitly allowed.
         """
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                ("The '%s'' command has parameter '%s' that has type '%s' "
+                ("The '%s' command has new parameter '%s' that has type '%s' "
                  "that has a bson serialization type 'any'") % (command_name, param_name, new_type),
                 file)
         else:
             self._add_error(ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                            ("'%s' has type '%s' that has a bson serialization type 'any'") %
+                            ("'%s' has new type '%s' that has a bson serialization type 'any'") %
                             (command_name, new_type), file)
 
     def add_new_command_or_param_type_enum_or_struct_error(
@@ -518,11 +534,37 @@ class IDLCompatibilityContext(object):
 
     def add_new_reply_field_bson_any_error(self, command_name: str, field_name: str,
                                            new_field_type: str, file: str) -> None:
-        """Add an error about the new reply field type's bson serialization type being of type "any"."""
+        """
+        Add an error about the new reply field type's 'any' bson serialization type.
+
+        Add an error about the new reply field type's bson serialization type being of type
+        'any' when it was not 'any' in the old type or it is not explicitly allowed.
+        """
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
-            ("'%s' has a reply field '%s' of type '%s' that has a bson serialization type 'any'") %
-            (command_name, field_name, new_field_type), file)
+            ("'%s' has a new reply field '%s' of type '%s' that has a bson serialization type 'any'"
+             ) % (command_name, field_name, new_field_type), file)
+
+    def add_reply_field_bson_any_not_allowed_error(self, command_name: str, field_name: str,
+                                                   type_name: str, file: str) -> None:
+        """
+        Add an error about the old and new reply field bson serialization_type being 'any'.
+
+        Add an error about the old and new reply field type's bson serialization type being of
+        type 'any' when it is not explicitly allowed.
+        """
+        self._add_error(ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
+                        ("'%s' has an old and new reply field '%s' of type '%s' that has a bson "
+                         "serialization type 'any' when it is not explicitly allowed.") %
+                        (command_name, field_name, type_name), file)
+
+    def add_reply_field_cpp_type_not_equal_error(self, command_name: str, field_name: str,
+                                                 type_name: str, file: str) -> None:
+        """Add an error about the old and new reply field cpp_type not being equal."""
+        self._add_error(ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL, command_name,
+                        ("'%s' has reply field '%s' of type '%s' that has cpp_type "
+                         "that is not equal in the old and new versions.") %
+                        (command_name, field_name, type_name), file)
 
     def add_new_reply_field_type_not_enum_error(self, command_name: str, field_name: str,
                                                 new_field_type: str, old_field_type: str,
@@ -590,26 +632,70 @@ class IDLCompatibilityContext(object):
         Add an error about BSON serialization type.
 
         Add an error about the old command or command parameter type's
-        bson serialization type being of type "any" when it is not explicitly allowed.
+        bson serialization type being of type 'any' when the new type is non-any or
+        when it is not explicitly allowed.
         """
         if is_command_parameter:
             self._add_error(
                 ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                ("The '%s'' command has parameter '%s' that has type '%s' "
+                ("The '%s'' command has old parameter '%s' that has type '%s' "
                  "that has a bson serialization type 'any'") % (command_name, param_name, old_type),
                 file)
         else:
             self._add_error(ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY, command_name,
-                            ("'%s' has type '%s' that has a bson serialization type 'any'") %
+                            ("'%s' has old type '%s' that has a bson serialization type 'any'") %
                             (command_name, old_type), file)
+
+    def add_command_or_param_type_bson_any_not_allowed_error(
+            self, command_name: str, type_name: str, file: str, param_name: Optional[str],
+            is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """
+        Add an error about the old and new command or param type bson serialization_type being 'any'.
+
+        Add an error about the old and new command or parameter type's bson serialization type
+        being of type 'any' when it is not explicitly allowed.
+        """
+        if is_command_parameter:
+            self._add_error(ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED,
+                            command_name,
+                            ("'%s' has an old and new parameter '%s' of type '%s' that has a bson "
+                             "serialization type 'any' when it is not explicitly allowed.") %
+                            (command_name, param_name, type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED, command_name,
+                ("'%s' has an old and new command type '%s' that has a bson "
+                 "serialization type 'any' when it is not explicitly allowed.") % (command_name,
+                                                                                   type_name), file)
+
+    def add_command_or_param_cpp_type_not_equal_error(self, command_name: str, type_name: str,
+                                                      file: str, param_name: Optional[str],
+                                                      is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """Add an error about the old and new command or param cpp_type not being equal."""
+        if is_command_parameter:
+            self._add_error(ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL, command_name,
+                            ("'%s' has parameter '%s' of type '%s' that has  "
+                             "cpp_type that is not equal in the old and new versions") %
+                            (command_name, param_name, type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL, command_name,
+                ("'%s' has command type '%s' that has cpp_type "
+                 "that is not equal in the old and new versions") % (command_name, type_name), file)
 
     def add_old_reply_field_bson_any_error(self, command_name: str, field_name: str,
                                            old_field_type: str, file: str) -> None:
-        """Add an error about the old reply field type's bson serialization type being of type "any"."""
-        self._add_error(
-            ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name,
-            ("'%s' has a reply field '%s' of type '%s' that has a bson serialization type 'any'") %
-            (command_name, field_name, old_field_type), file)
+        """
+        Add an about the old reply field type's 'any' bson serialization type.
+
+        Add an error about the old reply field type's bson serialization type being of type
+        'any' when the new type is non-any or when it is not explicitly allowed.
+        """
+        self._add_error(ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY, command_name, (
+            "'%s' has an old reply field '%s' of type '%s' that has a bson serialization type 'any'"
+        ) % (command_name, field_name, old_field_type), file)
 
     def add_reply_field_contains_validator_error(self, command_name: str, field_name: str,
                                                  file: str) -> None:

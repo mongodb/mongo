@@ -68,6 +68,13 @@ types:
                       parameter's type to [int, string] in the new command parameter's type"
         cpp_type: "std::int32_t"
 
+    bsonSerializationTypeAnyAllowed:
+        bson_serialization_type:
+                                - int
+                                - any
+        description: "The bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
 enums:
     NewReplyFieldEnumSubset:
         description: "The new reply type is an enum that is a subset of the old reply type's
@@ -226,6 +233,7 @@ structs:
                     lte: 2.0
                     gte: -2.98
                     callback: "callback"
+
     AddedOptionalTypeFieldStruct:
         description: "This struct contains a field that is added and optional in the new version"
 
@@ -255,6 +263,20 @@ structs:
             keptUnstableTypeField:
                 type: string
                 unstable: true
+
+    BsonSerializationTypeAnyReply:
+        description: "This reply contains a field whose type is 'any' and is explicitly allowed"
+        fields:
+            anyTypeField:
+                type: bsonSerializationTypeAnyAllowed
+
+    BsonSerializationTypeAnyWithVariantReply:
+        description: "This reply contains a new reply field with variant types where one of the
+                      bson serialization types is 'any' and is explicitly allowed"
+        fields:
+            anyTypeField:
+                type:
+                    variant: [intStringBoolToIntString, bsonSerializationTypeAnyAllowed, StructFieldTypeRecursiveReplyTwo]
 
 commands:
     testCommand:
@@ -746,3 +768,27 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantStructRecursiveReply
+
+    commandAllowedAnyTypes:
+        description: "new command that has parameter and reply type with
+                      explicitly allowed 'any' bson serialization type passes"
+        command_name: commandAllowedAnyTypes
+        namespace: type
+        type: bsonSerializationTypeAnyAllowed
+        cpp_name: commandAllowedAnyTypes
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeAnyReply
+        fields:
+            anyTypeParam:
+                type: bsonSerializationTypeAnyAllowed
+
+    commandAllowedAnyTypesWithVariant:
+        description: "command that has reply variant types with
+                      explicitly allowed 'any' bson serialization type passes"
+        command_name: commandAllowedAnyTypesWithVariant
+        namespace: ignored
+        cpp_name: commandAllowedAnyTypesWithVariant
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeAnyWithVariantReply

@@ -65,6 +65,20 @@ types:
         description: "The new bson_serialization_type contains 'any'"
         cpp_type: "std::int32_t"
 
+    bsonSerializationTypeAny:
+        bson_serialization_type:
+                                - int
+                                - any
+        description: "The old and new bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
+    bsonSerializationTypeAnyCppTypeNotEqual:
+        bson_serialization_type:
+                                - int
+                                - any
+        description: "The old and new bson_serialization_type contains 'any'"
+        cpp_type: "std::int32_t"
+
     intStringBoolToIntString:
         bson_serialization_type:
                                 - int
@@ -184,6 +198,28 @@ structs:
         fields:
             newBsonSerializationTypeAnyReplyField:
                 type: newBsonSerializationTypeAny
+
+    BsonSerializationTypeAnyReply:
+        description: "This reply contains a field whose old and new type have a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed."
+        fields:
+            bsonSerializationTypeAnyReplyField:
+                type: bsonSerializationTypeAny
+
+    BsonSerializationTypeWithVariantAnyReply:
+        description: "This reply contains a field whose old and new variant types have a bson_serialization_type
+                        that contains 'any' that is not compatible"
+        fields:
+            bsonSerializationTypeAnyReplyField:
+                type:
+                    variant: [oldBsonSerializationTypeAny, newBsonSerializationTypeAny]
+
+    CppTypeNotEqualReply:
+        description: "This reply contains a field whose old and new type have a bson_serialization_type
+                        that contains 'any' and the cpp_types are not equal"
+        fields:
+            cppTypeNotEqualReplyField:
+                type: bsonSerializationTypeAnyCppTypeNotEqual
 
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is not 
@@ -409,6 +445,62 @@ commands:
         fields:
             bsonTypeAnyParam:
                 type: newBsonSerializationTypeAny
+
+    oldParamTypeBsonAnyAllowList:
+        description: "old command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' even when it is
+                      on the allow list"
+        command_name: oldParamTypeBsonAnyAllowList
+        namespace: ignored
+        cpp_name: oldParamTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyParam:
+                type: oldBsonSerializationTypeAny
+
+    newParamTypeBsonAnyAllowList:
+        description: "new command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' even when it is
+                      on the allow list"
+        command_name: newParamTypeBsonAnyAllowList
+        namespace: ignored
+        cpp_name: newParamTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyParam:
+                type: newBsonSerializationTypeAny
+
+    commandParameterTypeBsonSerializationAnyNotAllowed:
+        description: "command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' that is not
+                      explicitly allowed"
+        command_name: commandParameterTypeBsonSerializationAnyNotAllowed
+        namespace: ignored
+        cpp_name: commandParameterTypeBsonSerializationAnyNotAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyParam:
+                type: bsonSerializationTypeAny
+
+    commandParameterCppTypeNotEqual:
+        description: "command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' and where the cpp_types
+                      are not equal"
+        command_name: commandParameterCppTypeNotEqual
+        namespace: ignored
+        cpp_name: commandParameterCppTypeNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            cppTypeNotEqualParam:
+                type: bsonSerializationTypeAnyCppTypeNotEqual
 
     newCommandParameterTypeEnumNotSuperset:
         description: "new command fails because its parameter type is an enum that is not
@@ -666,6 +758,56 @@ commands:
         api_version: "1"
         reply_type: NewBsonSerializationTypeAnyReply
 
+    oldReplyFieldTypeBsonAnyAllowList:
+        description: "old command fails when its reply field type has a bson_serialization_type
+                      that contains 'any' even when on the allow list"
+        command_name: oldReplyFieldTypeBsonAnyAllowList
+        namespace: ignored
+        cpp_name: oldReplyFieldTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OldBsonSerializationTypeAnyReply
+
+    newReplyFieldTypeBsonAnyAllowList:
+        description: "new command fails when its reply field type has a bson_serialization_type
+                      that contains 'any' even when on the allow list"
+        command_name: newReplyFieldTypeBsonAnyAllowList
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: NewBsonSerializationTypeAnyReply
+
+    replyFieldTypeBsonAnyNotAllowed:
+        description: "command fails because its reply field type has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed"
+        command_name: replyFieldTypeBsonAnyNotAllowed
+        namespace: ignored
+        cpp_name: replyFieldTypeBsonAnyNotAllowed
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeAnyReply
+
+    replyFieldTypeBsonAnyWithVariant:
+        description: "command fails when its reply field variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: replyFieldTypeBsonAnyWithVariant
+        namespace: ignored
+        cpp_name: replyFieldTypeBsonAnyWithVariant
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeWithVariantAnyReply
+
+    replyFieldCppTypeNotEqual:
+        description: "command fails because its reply field type has a bson_serialization_type
+                      that contains 'any', and the cpp_types are not equal"
+        command_name: replyFieldCppTypeNotEqual
+        namespace: ignored
+        cpp_name: replyFieldCppTypeNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: CppTypeNotEqualReply
+
     newReplyFieldTypeStructRecursiveOne:
         description: "new command fails because its reply field type is a struct that is
                       incompatible with the old reply field type struct"
@@ -743,6 +885,50 @@ commands:
         namespace: type
         type: newBsonSerializationTypeAny
         cpp_name: newTypeBsonAny
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldTypeBsonAnyAllowList:
+        description: "old command fails because its type has a bson_serialization_type
+                      that contains 'any' even when on the allow list"
+        command_name: oldTypeBsonAnyAllowList
+        namespace: type
+        type: oldBsonSerializationTypeAny
+        cpp_name: oldTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeBsonAnyAllowList:
+        description: "new command fails because its type has a bson_serialization_type
+                      that contains 'any' even when on the allow list"
+        command_name: newTypeBsonAnyAllowList
+        namespace: type
+        type: newBsonSerializationTypeAny
+        cpp_name: newTypeBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    typeBsonAnyNotAllowed:
+        description: "command fails because its type has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed"
+        command_name: typeBsonAnyNotAllowed
+        namespace: type
+        type: bsonSerializationTypeAny
+        cpp_name: typeBsonAnyNotAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandCppTypeNotEqual:
+        description: "command fails because its type has a bson_serialization_type
+                      that contains 'any' and the cpp_types are not equal"
+        command_name: commandCppTypeNotEqual
+        namespace: type
+        type: bsonSerializationTypeAnyCppTypeNotEqual
+        cpp_name: commandCppTypeNotEqual
         strict: true
         api_version: "1"
         reply_type: OkReply
