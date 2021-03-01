@@ -386,6 +386,13 @@ public:
         AggregateCommand _makeCommittedTransactionsAggregation() const;
 
         /**
+         * Processes a committed transaction entry from the donor. Updates the recipient's
+         * 'config.transactions' collection with the entry and writes a no-op entry for the
+         * recipient secondaries to replicate the entry.
+         */
+        void _processCommittedTransactionEntry(const BSONObj& entry);
+
+        /**
          * Starts the tenant oplog fetcher.
          */
         void _startOplogFetcher();

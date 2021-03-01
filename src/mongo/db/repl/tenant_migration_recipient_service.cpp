@@ -38,8 +38,11 @@
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -52,11 +55,14 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
@@ -849,6 +855,87 @@ AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransa
     return aggRequest;
 }
 
+void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntry(
+    const BSONObj& entry) {
+    OpObserver* opObserver = cc().getServiceContext()->getOpObserver();
+
+    auto sessionTxnRecord =
+        SessionTxnRecord::parse(IDLParserErrorContext("SessionTxnRecord"), entry);
+    auto sessionId = sessionTxnRecord.getSessionId();
+    auto txnNumber = sessionTxnRecord.getTxnNum();
+
+    auto uniqueOpCtx = cc().makeOperationContext();
+    auto opCtx = uniqueOpCtx.get();
+
+    // If the tenantMigrationRecipientInfo is set on the opCtx, we will set the
+    // 'fromTenantMigration' field when writing oplog entries. That field is used to help recipient
+    // secondaries determine if a no-op entry is related to a transaction entry.
+    tenantMigrationRecipientInfo(opCtx) =
+        boost::make_optional<TenantMigrationRecipientInfo>(getMigrationUUID());
+    opCtx->setLogicalSessionId(sessionId);
+    opCtx->setTxnNumber(txnNumber);
+    opCtx->setInMultiDocumentTransaction();
+    MongoDOperationContextSession ocs(opCtx);
+
+    LOGV2_DEBUG(5351301,
+                1,
+                "Migration attempting to commit transaction",
+                "sessionId"_attr = sessionId,
+                "txnNumber"_attr = txnNumber,
+                "tenantId"_attr = getTenantId(),
+                "migrationId"_attr = getMigrationUUID());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    uassert(5351300,
+            str::stream() << "Migration failed to get transaction participant for transaction "
+                          << txnNumber << " on session " << sessionId,
+            txnParticipant);
+
+    // If the entry's transaction number is stale/older than the current active transaction number
+    // on the participant, fail the migration.
+    uassert(ErrorCodes::TransactionTooOld,
+            str::stream() << "Migration cannot apply transaction " << txnNumber << " on session "
+                          << sessionId << " because a newer transaction "
+                          << txnParticipant.getActiveTxnNumber() << " has already started",
+            txnParticipant.getActiveTxnNumber() < txnNumber);
+    if (txnParticipant.getActiveTxnNumber() == txnNumber) {
+        // If the txn numbers are equal, move on to the next entry.
+        return;
+    }
+
+    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber);
+
+    AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+    writeConflictRetry(
+        opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            WriteUnitOfWork wuow(opCtx);
+
+            OperationSessionInfo sessionInfo;
+            sessionInfo.setSessionId(sessionId);
+            sessionInfo.setTxnNumber(txnNumber);
+            auto sessionInfoBson = sessionInfo.toBSON();
+
+            // Write the no-op entry and trigger 'config.transactions' update.
+            opObserver->onInternalOpMessage(opCtx,
+                                            NamespaceString(),
+                                            boost::none /* uuid */,
+                                            {} /* msgObj */,
+                                            sessionInfoBson /* o2MsgObj */,
+                                            boost::none /* preImageOpTime */,
+                                            boost::none /* postImageOpTime */,
+                                            boost::none /* prevWriteOpTimeInTransaction */,
+                                            boost::none /* slot */
+            );
+
+            wuow.commit();
+        });
+
+    // Invalidate in-memory state so that the next time the session is checked out, it would reload
+    // the transaction state from 'config.transactions'.
+    txnParticipant.invalidate(opCtx);
+    return;
+}
+
 void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
     if (MONGO_unlikely(skipFetchingCommittedTransactions.shouldFail())) {  // Test-only.
         return;
@@ -865,15 +952,10 @@ void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBefor
         uassertStatusOK(statusWith.getStatus());
     }
 
-    auto opCtx = cc().makeOperationContext();
-
     auto cursor = statusWith.getValue().get();
     while (cursor->more()) {
         auto transactionEntry = cursor->next();
-        // TODO (SERVER-53513): Properly update 'config.transactions' and write a no-op entry
-        // instead of upserting the document.
-        uassertStatusOK(
-            tenant_migration_util::upsertCommittedTransactionEntry(opCtx.get(), transactionEntry));
+        _processCommittedTransactionEntry(transactionEntry);
 
         stdx::lock_guard lk(_mutex);
         if (_taskState.isInterrupted()) {
@@ -1154,6 +1236,12 @@ OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOp
         if (isFromCurrentMigration &&
             (oplogObj.getStringField("op") == OpType_serializer(repl::OpTypeEnum::kNoop))) {
             const auto migratedEntryObj = oplogObj.getObjectField("o");
+            if (migratedEntryObj.isEmpty()) {
+                // If the 'o' field is empty, this entry is a transaction no-op entry. Skip this
+                // entry and continue.
+                continue;
+            }
+
             const auto swDonorOpTime = repl::OpTime::parseFromOplogEntry(migratedEntryObj);
             uassert(5272305,
                     str::stream() << "Unable to parse opTime from tenant migration oplog entry: "

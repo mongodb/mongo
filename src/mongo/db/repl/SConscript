@@ -1312,6 +1312,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/transaction',
         'cloner_utils',
+        'oplog',
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
