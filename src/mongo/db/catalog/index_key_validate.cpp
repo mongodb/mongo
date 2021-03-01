@@ -652,6 +652,31 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
     return indexSpec;
 }
 
+Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds) {
+    if (expireAfterSeconds < 0) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' option cannot be less than 0"};
+    }
+
+    const std::string tooLargeErr = str::stream()
+        << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+        << "' option must be within an acceptable range, try a lower number";
+
+    // There are two cases where we can encounter an issue here.
+    // The first case is when we try to cast to millseconds from seconds, which could cause an
+    // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
+    // time.
+    if (expireAfterSeconds > std::numeric_limits<std::int64_t>::max() / 1000) {
+        return {ErrorCodes::InvalidOptions, tooLargeErr};
+    }
+    auto expireAfterMillis = duration_cast<Milliseconds>(Seconds(expireAfterSeconds));
+    if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
+        return {ErrorCodes::InvalidOptions, tooLargeErr};
+    }
+    return Status::OK();
+}
+
 Status validateIndexSpecTTL(const BSONObj& indexSpec) {
     if (!indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
         return Status::OK();
@@ -667,29 +692,10 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
                               << "'. Index spec: " << indexSpec};
     }
 
-    if (expireAfterSecondsElt.safeNumberLong() < 0) {
+    if (auto status = validateExpireAfterSeconds(expireAfterSecondsElt.safeNumberLong());
+        !status.isOK()) {
         return {ErrorCodes::CannotCreateIndex,
-                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
-                              << "' option cannot be less than 0. Index spec: " << indexSpec};
-    }
-
-    const std::string tooLargeErr = str::stream()
-        << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
-        << "' option must be within an acceptable range, try a lower number. Index spec: "
-        << indexSpec;
-
-    // There are two cases where we can encounter an issue here.
-    // The first case is when we try to cast to millseconds from seconds, which could cause an
-    // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
-    // time.
-    try {
-        auto expireAfterMillis =
-            duration_cast<Milliseconds>(Seconds(expireAfterSecondsElt.safeNumberLong()));
-        if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
-            return {ErrorCodes::CannotCreateIndex, tooLargeErr};
-        }
-    } catch (const AssertionException&) {
-        return {ErrorCodes::CannotCreateIndex, tooLargeErr};
+                str::stream() << status.reason() << "index spec: " << indexSpec};
     }
 
     const BSONObj key = indexSpec["key"].Obj();

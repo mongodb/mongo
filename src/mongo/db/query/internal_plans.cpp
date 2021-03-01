@@ -98,7 +98,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     const CollectionPtr* coll,
     std::unique_ptr<DeleteStageParams> params,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
-    Direction direction) {
+    Direction direction,
+    boost::optional<RecordId> minRecord,
+    boost::optional<RecordId> maxRecord) {
     const auto& collection = *coll;
     invariant(collection);
     auto ws = std::make_unique<WorkingSet>();
@@ -106,7 +108,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
 
-    auto root = _collectionScan(expCtx, ws.get(), &collection, direction);
+    auto root = _collectionScan(
+        expCtx, ws.get(), &collection, direction, boost::none, minRecord, maxRecord);
 
     root = std::make_unique<DeleteStage>(
         expCtx.get(), std::move(params), ws.get(), collection, root.release());
@@ -121,7 +124,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }
-
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::indexScan(
     OperationContext* opCtx,
@@ -240,7 +242,10 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     WorkingSet* ws,
     const CollectionPtr* coll,
     Direction direction,
-    boost::optional<RecordId> resumeAfterRecordId) {
+    boost::optional<RecordId> resumeAfterRecordId,
+    boost::optional<RecordId> minRecord,
+    boost::optional<RecordId> maxRecord) {
+
     const auto& collection = *coll;
     invariant(collection);
 
@@ -248,6 +253,8 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     params.shouldWaitForOplogVisibility =
         shouldWaitForOplogVisibility(expCtx->opCtx, collection, false);
     params.resumeAfterRecordId = resumeAfterRecordId;
+    params.minRecord = minRecord;
+    params.maxRecord = maxRecord;
 
     if (FORWARD == direction) {
         params.direction = CollectionScanParams::FORWARD;

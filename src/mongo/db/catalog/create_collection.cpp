@@ -242,9 +242,12 @@ Status _createTimeseries(OperationContext* opCtx,
                                                          timeField));
 
         // If possible, cluster time-series buckets collections by _id.
+        auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds();
         if (opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
             ClusteredIndexOptions clusteredOptions;
-            if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
+            if (expireAfterSeconds) {
+                uassertStatusOK(
+                    index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
                 clusteredOptions.setExpireAfterSeconds(*expireAfterSeconds);
             }
             bucketsOptions.clusteredIndex = clusteredOptions;
@@ -259,8 +262,9 @@ Status _createTimeseries(OperationContext* opCtx,
                   str::stream() << "Failed to create buckets collection " << bucketsNs
                                 << " for time-series collection " << ns);
 
-        // Create a TTL index on 'control.min.[timeField]' if 'expireAfterSeconds' is provided.
-        if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
+        // Create a TTL index on 'control.min.[timeField]' if 'expireAfterSeconds' is provided and
+        // the collection is not clustered by _id.
+        if (expireAfterSeconds && !bucketsOptions.clusteredIndex) {
             CollectionWriter collectionWriter(opCtx, bucketsCollection->uuid());
             auto indexBuildCoord = IndexBuildsCoordinator::get(opCtx);
             const std::string controlMinTimeField = str::stream()

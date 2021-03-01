@@ -51,10 +51,10 @@ TTLCollectionCache& TTLCollectionCache::get(ServiceContext* ctx) {
     return getTTLCollectionCache(ctx);
 }
 
-void TTLCollectionCache::registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo) {
+void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
     {
         stdx::lock_guard<Latch> lock(_ttlInfosLock);
-        _ttlInfos.push_back(std::move(ttlInfo));
+        _ttlInfos[uuid].push_back(info);
     }
 
     if (MONGO_unlikely(hangTTLCollectionCacheAfterRegisteringInfo.shouldFail())) {
@@ -63,14 +63,21 @@ void TTLCollectionCache::registerTTLInfo(std::pair<UUID, std::string>&& ttlInfo)
     }
 }
 
-void TTLCollectionCache::deregisterTTLInfo(const std::pair<UUID, std::string>& ttlInfo) {
+void TTLCollectionCache::deregisterTTLInfo(UUID uuid, const Info& info) {
     stdx::lock_guard<Latch> lock(_ttlInfosLock);
-    auto collIter = std::find(_ttlInfos.begin(), _ttlInfos.end(), ttlInfo);
-    fassert(40220, collIter != _ttlInfos.end());
-    _ttlInfos.erase(collIter);
+    auto infoIt = _ttlInfos.find(uuid);
+    fassert(5400705, infoIt != _ttlInfos.end());
+    auto& [_, infoVec] = *infoIt;
+
+    auto iter = std::find(infoVec.begin(), infoVec.end(), info);
+    fassert(40220, iter != infoVec.end());
+    infoVec.erase(iter);
+    if (infoVec.empty()) {
+        _ttlInfos.erase(infoIt);
+    }
 }
 
-std::vector<std::pair<UUID, std::string>> TTLCollectionCache::getTTLInfos() {
+TTLCollectionCache::InfoMap TTLCollectionCache::getTTLInfos() {
     stdx::lock_guard<Latch> lock(_ttlInfosLock);
     return _ttlInfos;
 }

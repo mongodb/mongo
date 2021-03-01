@@ -70,6 +70,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/update/update_driver.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
@@ -331,6 +332,21 @@ void CollectionImpl::init(OperationContext* opCtx) {
 
     if (collectionOptions.clusteredIndex) {
         _clustered = true;
+        if (collectionOptions.clusteredIndex->getExpireAfterSeconds()) {
+            // If this collection has been newly created, we need to register with the TTL cache at
+            // commit time, otherwise it is startup and we can register immediately.
+            auto svcCtx = opCtx->getClient()->getServiceContext();
+            auto uuid = *collectionOptions.uuid;
+            if (opCtx->lockState()->inAWriteUnitOfWork()) {
+                opCtx->recoveryUnit()->onCommit([svcCtx, uuid](auto ts) {
+                    TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                        uuid, TTLCollectionCache::ClusteredId{});
+                });
+            } else {
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(uuid,
+                                                                TTLCollectionCache::ClusteredId{});
+            }
+        }
     }
 
     getIndexCatalog()->init(opCtx).transitional_ignore();

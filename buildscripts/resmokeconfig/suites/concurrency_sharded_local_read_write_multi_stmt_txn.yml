@@ -150,6 +150,8 @@ selector:
   - catches_command_failures
   # mongos has no system.profile collection.
   - requires_profiling
+  # mongos does not support inserts on timeseries collections
+  - requires_timeseries
 
 executor:
   archive:

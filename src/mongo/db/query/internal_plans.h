@@ -86,7 +86,9 @@ public:
         const CollectionPtr* collection,
         std::unique_ptr<DeleteStageParams> params,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
-        Direction direction = FORWARD);
+        Direction direction = FORWARD,
+        boost::optional<RecordId> minRecord = boost::none,
+        boost::optional<RecordId> maxRecord = boost::none);
 
     /**
      * Returns an index scan.  Caller owns returned pointer.
@@ -138,7 +140,9 @@ private:
         WorkingSet* ws,
         const CollectionPtr* collection,
         Direction direction,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none);
+        boost::optional<RecordId> resumeAfterRecordId = boost::none,
+        boost::optional<RecordId> minRecord = boost::none,
+        boost::optional<RecordId> maxRecord = boost::none);
 
     /**
      * Returns a plan stage that is either an index scan or an index scan with a fetch stage.
