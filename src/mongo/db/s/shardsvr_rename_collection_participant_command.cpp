@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/shard_metadata_util.h"
@@ -48,12 +47,7 @@ namespace {
 void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
     bool knownNss = [&]() {
         try {
-            DropReply result;
-            uassertStatusOK(
-                dropCollection(opCtx,
-                               nss,
-                               &result,
-                               DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+            sharding_ddl_util::dropCollectionLocally(opCtx, nss);
             return true;
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
             return false;

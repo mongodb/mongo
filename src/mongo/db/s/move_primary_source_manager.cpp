@@ -69,7 +69,7 @@ MovePrimarySourceManager::MovePrimarySourceManager(OperationContext* opCtx,
 MovePrimarySourceManager::~MovePrimarySourceManager() {}
 
 NamespaceString MovePrimarySourceManager::getNss() const {
-    return _requestArgs.get_shardsvrMovePrimary().get();
+    return _requestArgs.get_shardsvrMovePrimary();
 }
 
 Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
@@ -210,10 +210,6 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     invariant(_state == kCriticalSection);
     auto scopedGuard = makeGuard([&] { cleanupOnError(opCtx); });
 
-    ConfigsvrCommitMovePrimary commitMovePrimaryRequest;
-    commitMovePrimaryRequest.set_configsvrCommitMovePrimary(getNss().ns());
-    commitMovePrimaryRequest.setTo(_toShard.toString());
-
     {
         AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
 
@@ -233,20 +229,17 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    BSONObj finalCommandObj;
-    auto commitMovePrimaryResponse = configShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendGenericCommandArgs(
-            finalCommandObj, commitMovePrimaryRequest.toBSON())),
-        Shard::RetryPolicy::kIdempotent);
-
-    auto commitStatus = Shard::CommandResponse::getEffectiveStatus(commitMovePrimaryResponse);
+    auto commitStatus = [&]() {
+        try {
+            return _commitOnConfig(opCtx);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
 
     if (!commitStatus.isOK()) {
         // Need to get the latest optime in case the refresh request goes to a secondary --
-        // otherwise the read won't wait for the write that _configsvrCommitMovePrimary may have
+        // otherwise the read won't wait for the write that _commitOnConfig may have
         // done
         LOGV2(22044,
               "Error occurred while committing the movePrimary. Performing a majority write "
@@ -327,6 +320,60 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     scopedGuard.dismiss();
 
     _state = kNeedCleanStaleData;
+
+    return Status::OK();
+}
+
+Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+    auto findResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kMajorityReadConcern,
+                                            DatabaseType::ConfigNS,
+                                            BSON(DatabaseType::name << _dbname),
+                                            BSON(DatabaseType::name << -1),
+                                            1));
+
+    const auto databasesVector = std::move(findResponse.docs);
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max database version for database '" << _dbname
+                          << "', but found no databases",
+            !databasesVector.empty());
+
+    const auto dbType = uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+
+    if (dbType.getPrimary() == _toShard) {
+        return Status::OK();
+    }
+
+    auto newDbType = dbType;
+    newDbType.setPrimary(_toShard);
+
+    auto const currentDatabaseVersion = dbType.getVersion();
+
+    newDbType.setVersion(currentDatabaseVersion.makeUpdated());
+
+    auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << _dbname));
+    updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());
+
+    auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+        opCtx,
+        DatabaseType::ConfigNS,
+        updateQueryBuilder.obj(),
+        newDbType.toBSON(),
+        false,
+        ShardingCatalogClient::kMajorityWriteConcern);
+
+    if (!updateStatus.isOK()) {
+        LOGV2(5448803,
+              "Error committing movePrimary for {db}: {error}",
+              "Error committing movePrimary",
+              "db"_attr = _dbname,
+              "error"_attr = redact(updateStatus.getStatus()));
+        return updateStatus.getStatus();
+    }
 
     return Status::OK();
 }

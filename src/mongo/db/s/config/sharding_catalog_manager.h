@@ -327,6 +327,7 @@ public:
      * Updates metadata in config.databases collection to show the given primary database on its
      * new shard.
      */
+    // TODO SERVER-xyz throw out this method once 5.0 becomes last-LTS
     Status commitMovePrimary(OperationContext* opCtx, const StringData nss, const ShardId& toShard);
 
     //

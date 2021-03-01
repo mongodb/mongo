@@ -32,10 +32,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -73,29 +73,13 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            DropReply result;
             try {
-
-                uassertStatusOK(dropCollection(
-                    opCtx,
-                    ns(),
-                    &result,
-                    DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-
+                sharding_ddl_util::dropCollectionLocally(opCtx, ns());
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 LOGV2_DEBUG(5280920,
                             1,
                             "Namespace not found while trying to delete local collection",
                             "namespace"_attr = ns());
-            }
-
-            {
-                // Clear CollectionShardingRuntime entry
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                Lock::DBLock dbLock(opCtx, ns().db(), MODE_IX);
-                Lock::CollectionLock collLock(opCtx, ns(), MODE_IX);
-                auto* csr = CollectionShardingRuntime::get(opCtx, ns());
-                csr->clearFilteringMetadata(opCtx);
             }
         }
 
