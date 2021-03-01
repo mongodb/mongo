@@ -409,8 +409,7 @@ void updateTimestampOnShardCollections(OperationContext* opCtx,
         u.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
         BSONObj updateOp = (timestamp)
             ? BSON("$set" << BSON(CollectionType::kTimestampFieldName << *timestamp))
-            : BSON("$unset" << BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName
-                                    << "" << CollectionType::kTimestampFieldName << ""));
+            : BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""));
         u.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateOp));
         return std::vector{u};
     }());

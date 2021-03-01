@@ -35,6 +35,8 @@ namespace mongo {
 
 class ShardCollectionType : private ShardCollectionTypeBase {
 public:
+    static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
+
     // Make field names accessible.
     using ShardCollectionTypeBase::kDefaultCollationFieldName;
     using ShardCollectionTypeBase::kEnterCriticalSectionCounterFieldName;
@@ -42,7 +44,6 @@ public:
     using ShardCollectionTypeBase::kKeyPatternFieldName;
     using ShardCollectionTypeBase::kLastRefreshedCollectionVersionFieldName;
     using ShardCollectionTypeBase::kNssFieldName;
-    using ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName;
     using ShardCollectionTypeBase::kRefreshingFieldName;
     using ShardCollectionTypeBase::kReshardingFieldsFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
