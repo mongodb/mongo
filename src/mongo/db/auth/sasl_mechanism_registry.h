@@ -43,6 +43,7 @@
 namespace mongo {
 
 class User;
+class BSONObjBuilder;
 
 /**
  * The set of attributes SASL mechanisms may possess.
@@ -143,6 +144,12 @@ public:
     virtual StringData getPrincipalName() const {
         return _principalName;
     }
+
+    /**
+     * Appends mechanism specific info in BSON form. The schema of this BSON will vary by mechanism
+     * implementation, thus this info is entirely diagnostic/for records.
+     */
+    virtual void appendExtraInfo(BSONObjBuilder*) const {}
 
     /**
      * Standard method in mongodb for determining if "authenticatedUser" may act as "requestedUser."

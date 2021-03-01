@@ -91,6 +91,14 @@ auto registerer = ServiceContext::ConstructorActionRegisterer{
     "AuthenticationClientObserver", [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<AuthenticationClientObserver>());
     }};
+
+auto makeAppender(ServerMechanismBase* mech) {
+    return [mech](BSONObjBuilder* bob) {
+        if (mech) {
+            mech->appendExtraInfo(bob);
+        }
+    };
+}
 }  // namespace
 
 AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType currentStep)
@@ -197,10 +205,12 @@ void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const Use
 
         // Reset _ssmUserName since we have found a conflict.
         auto ssmUserName = std::exchange(_ssmUserName, {});
-        audit::logAuthentication(_client,
-                                 auth::kSaslSupportedMechanisms,
-                                 std::move(ssmUserName),
-                                 ErrorCodes::AuthenticationAbandoned);
+        auto event = audit::AuthenticateEvent(auth::kSaslSupportedMechanisms,
+                                              ssmUserName.getDB(),
+                                              ssmUserName.getUser(),
+                                              makeAppender(_mech.get()),
+                                              ErrorCodes::AuthenticationAbandoned);
+        audit::logAuthentication(_client, event);
     }
 }
 
@@ -264,7 +274,12 @@ void AuthenticationSession::markSuccessful() {
         _mechCounter->incSpeculativeAuthenticateSuccessful();
     }
 
-    audit::logAuthentication(_client, _mechName, _userName, ErrorCodes::OK);
+    auto event = audit::AuthenticateEvent(_mechName,
+                                          _userName.getDB(),
+                                          _userName.getUser(),
+                                          makeAppender(_mech.get()),
+                                          ErrorCodes::OK);
+    audit::logAuthentication(_client, event);
 
     LOGV2_DEBUG(5286306,
                 kDiagnosticLogLevel,
@@ -280,7 +295,12 @@ void AuthenticationSession::markSuccessful() {
 void AuthenticationSession::markFailed(const Status& status) {
     _finish();
 
-    audit::logAuthentication(_client, _mechName, _userName, status.code());
+    auto event = audit::AuthenticateEvent(_mechName,
+                                          _userName.getDB(),
+                                          _userName.getUser(),
+                                          makeAppender(_mech.get()),
+                                          status.code());
+    audit::logAuthentication(_client, event);
 
     LOGV2_DEBUG(5286307,
                 kDiagnosticLogLevel,
