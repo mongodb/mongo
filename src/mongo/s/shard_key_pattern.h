@@ -185,6 +185,7 @@ public:
      *   { b: 1 } --> returns { a: null, b: 1 }
      */
     BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
+    BSONObj extractShardKeyFromDocThrows(const BSONObj& doc) const;
 
     /**
      * Returns the document with missing shard key values set to null.

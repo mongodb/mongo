@@ -35,6 +35,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/logv2/log.h"
@@ -164,9 +165,31 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator begin,
                                      std::vector<InsertStatement>::const_iterator end,
                                      bool fromMigrate) {
-    // If a document is inserted into the resharding donor collection with a `minFetchTimestamp`, we
-    // assume the document was inserted as part of initial sync and do nothing to pin history.
-    return;
+    if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
+        // If a document is inserted into the resharding donor collection with a
+        // `minFetchTimestamp`, we assume the document was inserted as part of initial sync and do
+        // nothing to pin history.
+        return;
+    }
+
+    // This is a no-op if either replication is not enabled or this node is a secondary
+    if (!repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() ||
+        !opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    if (nss.isTemporaryReshardingCollection()) {
+        const auto metadata =
+            CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+        invariant(metadata && metadata->isSharded());
+
+        auto chunkManager = *metadata->getChunkManager();
+        const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
+
+        for (auto it = begin; it != end; ++it) {
+            shardKeyPattern.extractShardKeyFromDocThrows(it->doc);
+        }
+    }
 }
 
 void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
@@ -193,6 +216,15 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
                 boost::optional<Timestamp> unusedCommitTime) mutable {
                 observer->onReshardingParticipantTransition(newCoordinatorDoc);
             });
+    } else if (args.nss.isTemporaryReshardingCollection()) {
+        const auto metadata =
+            CollectionShardingRuntime::get(opCtx, args.nss)->getCurrentMetadataIfKnown();
+        invariant(metadata && metadata->isSharded());
+
+        auto chunkManager = *metadata->getChunkManager();
+        const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
+
+        shardKeyPattern.extractShardKeyFromDocThrows(args.updateArgs.updatedDoc);
     }
 }
 
