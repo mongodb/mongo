@@ -42,15 +42,13 @@ function TenantMigrationTest({
     donorRst.asCluster(donorRst.nodes, () => {
         donorRst.getPrimary();
         donorRst.awaitReplication();
-        createFindInternalClusterTimeKeysRoleIfNotExist(donorRst);
-        createFindAggregateNamespacesRoleIfNotExist(donorRst);
+        createTenantMigrationRecipientRoleIfNotExist(donorRst);
     });
 
     recipientRst.asCluster(recipientRst.nodes, () => {
         recipientRst.getPrimary();
         recipientRst.awaitReplication();
-        createFindInternalClusterTimeKeysRoleIfNotExist(recipientRst);
-        createFindAggregateNamespacesRoleIfNotExist(recipientRst);
+        createTenantMigrationDonorRoleIfNotExist(recipientRst);
     });
 
     /**
@@ -93,49 +91,43 @@ function TenantMigrationTest({
     }
 
     /**
-     * Creates a role for running find command against admin.system.keys if it doesn't exist.
+     * Creates a role for tenant migration donor if it doesn't exist.
      */
-    function createFindInternalClusterTimeKeysRoleIfNotExist(rst) {
+    function createTenantMigrationDonorRoleIfNotExist(rst) {
         const adminDB = rst.getPrimary().getDB("admin");
 
-        if (roleExists(adminDB, "findInternalClusterTimeKeysRole")) {
+        if (roleExists(adminDB, "tenantMigrationDonorRole")) {
             return;
         }
 
         assert.commandWorked(adminDB.runCommand({
-            createRole: "findInternalClusterTimeKeysRole",
-            privileges: [{resource: {db: "admin", collection: "system.keys"}, actions: ["find"]}],
+            createRole: "tenantMigrationDonorRole",
+            privileges: [
+                {resource: {cluster: true}, actions: ["runTenantMigration"]},
+                {resource: {db: "admin", collection: "system.keys"}, actions: ["find"]}
+            ],
             roles: []
         }));
     }
 
     /**
-     * Creates a role if it doesn't exist for running an aggregate command that involves the
-     * following namespaces:
-     * - `config.transactions`
-     * - `local.oplog.rs`
-     * - `local.system.tenantMigration.oplogView`
-     *
-     * Aggregate requires find privileges.
+     * Creates a role for tenant migration recipient if it doesn't exist.
      */
-    function createFindAggregateNamespacesRoleIfNotExist(rst) {
+    function createTenantMigrationRecipientRoleIfNotExist(rst) {
         const adminDB = rst.getPrimary().getDB("admin");
 
-        if (roleExists(adminDB, "findAggregateNamespacesRole")) {
+        if (roleExists(adminDB, "tenantMigrationRecipientRole")) {
             return;
         }
 
         assert.commandWorked(adminDB.runCommand({
-            createRole: "findAggregateNamespacesRole",
+            createRole: "tenantMigrationRecipientRole",
             privileges: [
-                {resource: {db: "config", collection: "transactions"}, actions: ["find"]},
-                {resource: {db: "local", collection: "oplog.rs"}, actions: ["find"]},
-                {
-                    resource: {db: "local", collection: "system.tenantMigration.oplogView"},
-                    actions: ["find"]
-                },
+                {resource: {cluster: true}, actions: ["listDatabases", "useUUID"]},
+                {resource: {db: "", collection: ""}, actions: ["listCollections"]},
+                {resource: {anyResource: true}, actions: ["collStats", "find", "listIndexes"]}
             ],
-            roles: [],
+            roles: []
         }));
     }
 

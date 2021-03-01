@@ -18,9 +18,9 @@ const kReadPreference = {
 const kValidMigrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 const kExpiredMigrationCertificates = {
     donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
-        "jstests/libs/rs0_tenant_migration_expired.pem"),
+        "jstests/libs/tenant_migration_donor_expired.pem"),
     recipientCertificateForDonor: TenantMigrationUtil.getCertificateAndPrivateKey(
-        "jstests/libs/rs1_tenant_migration_expired.pem")
+        "jstests/libs/tenant_migration_recipient_expired.pem")
 };
 
 (() => {

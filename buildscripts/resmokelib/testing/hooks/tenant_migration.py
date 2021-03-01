@@ -343,9 +343,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
             "readPreference":
                 migration_opts.read_preference,
             "donorCertificateForRecipient":
-                get_certificate_and_private_key("jstests/libs/rs0_tenant_migration.pem"),
+                get_certificate_and_private_key("jstests/libs/tenant_migration_donor.pem"),
             "recipientCertificateForDonor":
-                get_certificate_and_private_key("jstests/libs/rs1_tenant_migration.pem"),
+                get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
         }
         is_committed = False
 
