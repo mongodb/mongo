@@ -6351,6 +6351,15 @@ tasks:
       resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 10
 
+- name: tenant_migration_causally_consistent_jscore_passthrough_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      depends_on: jsCore
+      use_large_distro: "true"
+      resmoke_args: --storageEngine=wiredTiger
+      fallback_num_sub_suites: 10
+
 - name: parallel_gen
   tags: ["misc_js"]
   commands:
@@ -10511,6 +10520,7 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: tenant_migration_jscore_passthrough_gen
+  - name: tenant_migration_causally_consistent_jscore_passthrough_gen
   - name: multiversion_gen
   - name: .query_fuzzer
   - name: .random_multiversion_ds
