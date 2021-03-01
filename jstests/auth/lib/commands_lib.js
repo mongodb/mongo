@@ -3419,52 +3419,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "recipientSyncData",
-          command: {
-              recipientSyncData: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              tenantId: "testTenantId",
-              readPreference: {mode: "primary"},
-              startMigrationDonorTimestamp: Timestamp(1, 1),
-              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // Cannot start tenant migration on a standalone mongod.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "recipientForgetMigration",
-          command: {
-              recipientForgetMigration: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              tenantId: "testTenantId",
-              readPreference: {mode: "primary"},
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                  runOnDb: adminDbName,
-                  roles: roles_clusterManager,
-                  privileges: [{resource: {cluster: true}, actions: ["runTenantMigration"]}],
-                  // This is expected to fail with InvalidOptions without cluster certificate.
-                  expectFail: true,
-              },
-              {runOnDb: firstDbName, roles: {}},
-              {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
           testname: "drop",
           command: {drop: "x"},
           setup: function(db) {
