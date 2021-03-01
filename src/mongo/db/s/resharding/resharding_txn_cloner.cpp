@@ -101,11 +101,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::makePipeline(
     stages.emplace_back(
         DocumentSourceSort::create(expCtx, BSON(SessionTxnRecord::kSessionIdFieldName << 1)));
 
-    stages.emplace_back(DocumentSourceMatch::create(
-        BSON((SessionTxnRecord::kLastWriteOpTimeFieldName + "." + repl::OpTime::kTimestampFieldName)
-             << BSON("$lt" << _fetchTimestamp)),
-        expCtx));
-
     return Pipeline::create(std::move(stages), expCtx);
 }
 
@@ -130,8 +125,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
                              pipeline.serializeToBson());
 
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
-                                << repl::readConcernLevels::kMajorityName
-                                << repl::ReadConcernArgs::kAfterClusterTimeFieldName
+                                << repl::readConcernLevels::kSnapshotName
+                                << repl::ReadConcernArgs::kAtClusterTimeFieldName
                                 << _fetchTimestamp));
     request.setWriteConcern(WriteConcernOptions());
     request.setHint(BSON(SessionTxnRecord::kSessionIdFieldName << 1));

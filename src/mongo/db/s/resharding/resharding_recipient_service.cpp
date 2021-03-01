@@ -503,6 +503,8 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
             return whenAllSucceed(std::move(txnClonerFutures));
         })
         .then([this] {
+            // ReshardingTxnCloners must complete before the recipient transitions to kApplying to
+            // avoid errors caused by donor shards unpinning the fetchTimestamp.
             _transitionState(RecipientStateEnum::kApplying);
             _updateCoordinator();
         });
