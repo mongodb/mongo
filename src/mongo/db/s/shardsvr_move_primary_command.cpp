@@ -34,11 +34,14 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/active_move_primaries_registry.h"
+#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/move_primary_coordinator.h"
 #include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -57,9 +60,25 @@ void uassertStatusOKWithWarning(const Status& status) {
     }
 }
 
+void newMovePrimaryFlow(OperationContext* opCtx,
+                        const ShardMovePrimary& cmdObj,
+                        const NamespaceString& dbNss,
+                        const StringData& toShard) {
+    auto const shardingState = ShardingState::get(opCtx);
+    uassertStatusOK(shardingState->canAcceptShardedCommands());
+
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "Move primary must be called with majority writeConcern, got "
+                          << opCtx->getWriteConcern().wMode,
+            opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+    auto movePrimaryCoordinator = std::make_shared<MovePrimaryCoordinator>(opCtx, dbNss, toShard);
+    movePrimaryCoordinator->run(opCtx).get();
+}
+
 class MovePrimaryCommand : public BasicCommand {
 public:
-    MovePrimaryCommand() : BasicCommand("_shardsvrMovePrimary", "_movePrimary") {}
+    MovePrimaryCommand() : BasicCommand("_shardsvrMovePrimary") {}
 
     std::string help() const override {
         return "should not be calling this directly";
@@ -106,15 +125,21 @@ public:
             ShardMovePrimary::parse(IDLParserErrorContext("_shardsvrMovePrimary"), cmdObj);
         const auto dbname = parseNs("", cmdObj);
 
+        const NamespaceString dbNss(dbname);
+        const auto toShard = movePrimaryRequest.getTo();
+
         uassert(
             ErrorCodes::InvalidNamespace,
             str::stream() << "invalid db name specified: " << dbname,
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't move primary for a system database " << dbname,
-                dbname != NamespaceString::kAdminDb && dbname != NamespaceString::kConfigDb &&
-                    dbname != NamespaceString::kLocalDb);
+                str::stream() << "Can't move primary for " << dbname << " database",
+                !dbNss.isOnInternalDb());
+
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "you have to specify where you want to move it",
+                !toShard.empty());
 
         uassert(
             ErrorCodes::InvalidOptions,
@@ -122,9 +147,14 @@ public:
                           << cmdObj,
             opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-        uassert(ErrorCodes::InvalidOptions,
-                "you have to specify where you want to move it",
-                !movePrimaryRequest.getTo().empty());
+        // TODO uncomment the following snippet on SERVER-54507 completion
+        // ON_BLOCK_EXIT([opCtx, dbNss]
+        // {Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db());});
+
+        if (movePrimaryRequest.getCommandIsFromRouter()) {
+            newMovePrimaryFlow(opCtx, movePrimaryRequest, dbNss, toShard);
+            return true;
+        }
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.

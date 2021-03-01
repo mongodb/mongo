@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -95,6 +96,11 @@ void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss)
  * Stops ongoing migrations and prevents future ones to start for the given nss.
  */
 void stopMigrations(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Locally drops a collection and cleans its CollectionShardingRuntime metadata
+ */
+DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss);
 
 }  // namespace sharding_ddl_util
 }  // namespace mongo

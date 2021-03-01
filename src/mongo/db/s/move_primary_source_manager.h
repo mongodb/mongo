@@ -143,6 +143,12 @@ private:
         return details.obj();
     }
 
+    /**
+     * Updates CSRS metadata in config.databases collection to move the given primary database on
+     * its new shard.
+     */
+    Status _commitOnConfig(OperationContext* opCtx);
+
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
     enum State {

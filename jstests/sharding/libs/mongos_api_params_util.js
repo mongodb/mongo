@@ -824,7 +824,6 @@ let MongosAPIParametersUtil = (function() {
             commandName: "movePrimary",
             run: {
                 inAPIVersion1: false,
-                configServerCommandName: "_configsvrMovePrimary",
                 shardCommandName: "_shardsvrMovePrimary",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,

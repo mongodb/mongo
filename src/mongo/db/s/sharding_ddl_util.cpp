@@ -279,5 +279,22 @@ void stopMigrations(OperationContext* opCtx, const NamespaceString& nss) {
                       << nss.toString());
 }
 
+DropReply dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
+    DropReply result;
+    uassertStatusOK(dropCollection(
+        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+
+    {
+        // Clear CollectionShardingRuntime entry
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+        auto* csr = CollectionShardingRuntime::get(opCtx, nss);
+        csr->clearFilteringMetadata(opCtx);
+    }
+
+    return result;
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
