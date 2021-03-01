@@ -3318,11 +3318,10 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
     auto storage = StorageInterface::get(opCtx->getServiceContext());
     ASSERT_OK(storage->createCollection(
         opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions));
-    ASSERT_OK(
-        storage->insertDocument(opCtx.get(),
-                                NamespaceString::kTenantMigrationRecipientsNamespace,
-                                {initialStateDocument.toBSON(), topOfOplogOpTime.getTimestamp()},
-                                topOfOplogOpTime.getTerm()));
+    ASSERT_OK(storage->insertDocument(opCtx.get(),
+                                      NamespaceString::kTenantMigrationRecipientsNamespace,
+                                      {initialStateDocument.toBSON()},
+                                      0));
 
     // Create and start the instance.
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
@@ -3366,11 +3365,10 @@ TEST_F(TenantMigrationRecipientServiceTest,
     auto storage = StorageInterface::get(opCtx->getServiceContext());
     ASSERT_OK(storage->createCollection(
         opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions));
-    ASSERT_OK(
-        storage->insertDocument(opCtx.get(),
-                                NamespaceString::kTenantMigrationRecipientsNamespace,
-                                {initialStateDocument.toBSON(), topOfOplogOpTime.getTimestamp()},
-                                topOfOplogOpTime.getTerm()));
+    ASSERT_OK(storage->insertDocument(opCtx.get(),
+                                      NamespaceString::kTenantMigrationRecipientsNamespace,
+                                      {initialStateDocument.toBSON()},
+                                      0));
 
     // Create and start the instance.
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
