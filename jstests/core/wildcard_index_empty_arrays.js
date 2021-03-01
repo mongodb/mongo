@@ -1,8 +1,5 @@
 /**
  * Tests that wildcard indexes will correctly match for empty arrays.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

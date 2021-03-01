@@ -1,7 +1,5 @@
-// TODO SERVER-49852: remove sbe_incompatible tag
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Test index key generation with duplicate values addressed by array index and
