@@ -46,6 +46,20 @@ from idl import parser, syntax, errors, common
 from idl.compiler import CompilerImportResolver
 from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
 
+ALLOW_ANY_TYPE_LIST: List[str] = [
+    "commandAllowedAnyTypes", "commandAllowedAnyTypes-param-anyTypeParam",
+    "commandAllowedAnyTypes-reply-anyTypeField", "oldTypeBsonAnyAllowList",
+    "newTypeBsonAnyAllowList",
+    "oldReplyFieldTypeBsonAnyAllowList-reply-oldBsonSerializationTypeAnyReplyField",
+    "newReplyFieldTypeBsonAnyAllowList-reply-newBsonSerializationTypeAnyReplyField",
+    "oldParamTypeBsonAnyAllowList-param-bsonTypeAnyParam",
+    "newParamTypeBsonAnyAllowList-param-bsonTypeAnyParam",
+    "commandAllowedAnyTypesWithVariant-reply-anyTypeField",
+    "replyFieldTypeBsonAnyWithVariant-reply-bsonSerializationTypeAnyReplyField",
+    "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField", "commandCppTypeNotEqual",
+    "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam"
+]
+
 
 def get_new_commands(
         ctxt: IDLCompatibilityContext, new_idl_dir: str, import_directories: List[str]
@@ -135,14 +149,30 @@ def check_reply_field_type_recursive(
             cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
         return
 
-    if "any" in old_field_type.bson_serialization_type:
+    # If bson_serialization_type switches from 'any' to non-any type.
+    if "any" in old_field_type.bson_serialization_type and "any" not in new_field_type.bson_serialization_type:
         ctxt.add_old_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
                                                 old_idl_file_path)
         return
-    if "any" in new_field_type.bson_serialization_type:
-        ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, new_field_type.name,
+
+    # If bson_serialization_type switches from non-any to 'any' type.
+    if "any" not in old_field_type.bson_serialization_type and "any" in new_field_type.bson_serialization_type:
+        ctxt.add_new_reply_field_bson_any_error(cmd_name, field_name, old_field_type.name,
                                                 new_idl_file_path)
         return
+
+    allow_name: str = cmd_name + "-reply-" + field_name
+
+    if "any" in old_field_type.bson_serialization_type:
+        # If 'any' is not explicitly allowed as the bson_serialization_type.
+        if allow_name not in ALLOW_ANY_TYPE_LIST:
+            ctxt.add_reply_field_bson_any_not_allowed_error(cmd_name, field_name,
+                                                            old_field_type.name, old_idl_file_path)
+            return
+
+        if old_field_type.cpp_type != new_field_type.cpp_type:
+            ctxt.add_reply_field_cpp_type_not_equal_error(cmd_name, field_name, new_field_type.name,
+                                                          new_idl_file_path)
 
     if isinstance(old_field_type, syntax.VariantType):
         # If the new type is not variant just check the single type.
@@ -300,17 +330,36 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext,
 
     if isinstance(old_type, syntax.Type):
         if isinstance(new_type, syntax.Type):
-            if "any" in old_type.bson_serialization_type:
+            # If bson_serialization_type switches from 'any' to non-any type.
+            if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
                 ctxt.add_old_command_or_param_type_bson_any_error(
                     cmd_name, old_type.name, old_idl_file_path, param_name, is_command_parameter)
-            elif "any" in new_type.bson_serialization_type:
+                return
+
+            # If bson_serialization_type switches from non-any to 'any' type.
+            if "any" not in old_type.bson_serialization_type and "any" in new_type.bson_serialization_type:
                 ctxt.add_new_command_or_param_type_bson_any_error(
                     cmd_name, new_type.name, new_idl_file_path, param_name, is_command_parameter)
+                return
 
-            else:
-                check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
-                               old_type.bson_serialization_type, new_idl_file_path, param_name,
-                               is_command_parameter)
+            allow_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
+
+            if "any" in old_type.bson_serialization_type:
+                # If 'any' is not explicitly allowed as the bson_serialization_type.
+                if allow_name not in ALLOW_ANY_TYPE_LIST:
+                    ctxt.add_command_or_param_type_bson_any_not_allowed_error(
+                        cmd_name, old_type.name, old_idl_file_path, param_name,
+                        is_command_parameter)
+                    return
+
+                if old_type.cpp_type != new_type.cpp_type:
+                    ctxt.add_command_or_param_cpp_type_not_equal_error(
+                        cmd_name, new_type.name, new_idl_file_path, param_name,
+                        is_command_parameter)
+
+            check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
+                           old_type.bson_serialization_type, new_idl_file_path, param_name,
+                           is_command_parameter)
         else:
             ctxt.add_new_command_or_param_type_enum_or_struct_error(
                 cmd_name, new_type.name, old_type.name, new_idl_file_path, param_name,
