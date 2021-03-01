@@ -560,8 +560,6 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         request.setWriteConcern(_opCtx->getWriteConcern().toBSON());
     }
 
-    request.setAllowImplicitCreate(_clientRequest.isImplicitCreateAllowed());
-
     return request;
 }
 

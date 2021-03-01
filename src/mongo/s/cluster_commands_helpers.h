@@ -133,11 +133,6 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion);
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 
 /**
- * Returns a copy of 'cmdObj' with 'allowImplicitCollectionCreation' appended.
- */
-BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
-
-/**
  * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the
  * cmdObj explicitly specifies read/writeConcern.
  */
