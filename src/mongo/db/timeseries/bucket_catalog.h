@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <deque>
+#include <queue>
+
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
@@ -36,8 +39,6 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/string_map.h"
-
-#include <queue>
 
 namespace mongo {
 class BucketCatalog {
@@ -47,6 +48,8 @@ public:
     static constexpr auto kTimeseriesBucketMaxTimeRange = Hours(1);
 
     class BucketId {
+        friend class BucketCatalog;
+
     public:
         const OID& operator*() const;
         const OID* operator->() const;
@@ -60,12 +63,12 @@ public:
             return H::combine(std::move(h), bucketId._num);
         }
 
-    protected:
-        BucketId(uint64_t num) : _num(num) {}
-
-        std::shared_ptr<OID> _id{std::make_shared<OID>(OID::gen())};
+        static BucketId min();
 
     private:
+        BucketId(uint64_t num);
+
+        std::shared_ptr<OID> _id{std::make_shared<OID>(OID::gen())};
         uint64_t _num;
     };
 
@@ -271,9 +274,17 @@ private:
         uint64_t _memoryUsage = 0;
     };
 
+    struct Bucket;
+    using IdleList = std::list<Bucket*>;
+
     struct Bucket {
+        explicit Bucket(const BucketId&);
+
         // Access to the bucket is controlled by this lock
-        Mutex lock;
+        mutable Mutex mutex;
+
+        // The ID of the bucket
+        BucketId id;
 
         // The namespace that this bucket is used for.
         NamespaceString ns;
@@ -324,11 +335,14 @@ private:
         // range.
         bool full = false;
 
+        // If the bucket is in the _idleList, then its position is recorded here.
+        boost::optional<IdleList::iterator> idleListEntry = boost::none;
+
         // Approximate memory usage of this bucket.
         uint64_t memoryUsage = sizeof(*this);
 
         /**
-         * Determines the effect of adding 'doc' to this bucket If adding 'doc' causes this bucket
+         * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
          * to overflow, we will create a new bucket and recalculate the change to the bucket size
          * and data fields.
          */
@@ -339,7 +353,7 @@ private:
                                                 uint32_t* sizeToBeAdded) const;
 
         /**
-         * Returns whether BucketCatalog::commit has been called on this bucket.
+         * Returns whether BucketCatalog::commit has been called at least once on this bucket.
          */
         bool hasBeenCommitted() const;
     };
@@ -356,17 +370,6 @@ private:
         AtomicWord<long long> numCommits;
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
-    };
-
-    // a wrapper around the numerical id to allow timestamp manipulations
-    class BucketIdInternal : public BucketId {
-    public:
-        static BucketIdInternal min();
-
-        BucketIdInternal(const Date_t& time, uint64_t num);
-
-        Date_t getTime() const;
-        void setTime(const Date_t& time);
     };
 
     /**
@@ -401,41 +404,39 @@ private:
          */
         void rollover(const std::function<bool(BucketAccess*)>& isBucketFull);
 
-        // Retrieve the (safely cached) id of the bucket.
-        const BucketIdInternal& id();
-
         // Adjust the time associated with the bucket (id) if it hasn't been committed yet.
         void setTime();
 
-    private:
-        // Constructor helper to find and lock an existing bucket. Takes a shared lock on the
-        // catalog.
-        bool _findAndLockExisting(std::size_t hash);
+        // Retrieve the time associated with the bucket (id)
+        Date_t getTime() const;
 
-        // Constructor helper to find a bucket if it exists, create it if it doesn't, and lock it.
-        // Takes an exclusive lock on the catalog.
-        void _findOrCreateAndLock(std::size_t hash);
+    private:
+        // Helper to find and lock an open bucket for the given metadata if it exists. Requires a
+        // shared lock on the catalog. Returns true if the bucket exists and was locked.
+        bool _findOpenBucketAndLock(std::size_t hash);
+
+        // Helper to find an open bucket for the given metadata if it exists, create it if it
+        // doesn't, and lock it. Requires an exclusive lock on the catalog.
+        void _findOrCreateOpenBucketAndLock(std::size_t hash);
 
         // Lock _bucket.
         void _acquire();
 
-        // Allocate a new bucket and add it to the catalog with the given ID.
-        void _create(const BucketId& id);
+        // Allocate a new bucket in the catalog, set the local state to that bucket, and aquire
+        // a lock on it.
+        void _create(bool openedDuetoMetadata = true);
 
         BucketCatalog* _catalog;
         const std::tuple<NamespaceString, BucketMetadata>* _key = nullptr;
         ExecutionStats* _stats = nullptr;
         const Date_t* _time = nullptr;
 
-        BucketIdInternal _id = BucketIdInternal::min();
+        BucketId _id = BucketId::min();
         std::shared_ptr<Bucket> _bucket;
         stdx::unique_lock<Mutex> _guard;
     };
 
     class ServerStatus;
-
-    using NsBuckets = std::set<std::tuple<NamespaceString, BucketId>>;
-    using IdleBuckets = std::set<BucketId>;
 
     StripedMutex::SharedLock _lockShared() const;
     StripedMutex::ExclusiveLock _lockExclusive() const;
@@ -443,13 +444,23 @@ private:
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
-    void _removeBucket(const BucketId& bucketId,
-                       boost::optional<NsBuckets::iterator> nsBucketsIt = boost::none,
-                       boost::optional<IdleBuckets::iterator> idleBucketsIt = boost::none);
+    bool _removeBucket(const BucketId& bucketId, bool bucketIsUnused);
 
-    void _markBucketIdle(const BucketId& bucketId);
-    void _markBucketNotIdle(const BucketId& bucketId);
-    void _markBucketNotIdle(const IdleBuckets::iterator& it);
+    /**
+     * Adds the bucket to a list of idle buckets to be expired at a later date
+     */
+    void _markBucketIdle(const std::shared_ptr<Bucket>& bucket);
+
+    /**
+     * Remove the bucket from the list of idle buckets
+     */
+    void _markBucketNotIdle(const std::shared_ptr<Bucket>& bucket);
+
+    /**
+     * Verify the bucket is currently unused by taking a lock on it. Must hold exclusive lock from
+     * the outside for the result to be meaningful.
+     */
+    void _verifyBucketIsUnused(const Bucket* bucket) const;
 
     /**
      * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
@@ -458,55 +469,56 @@ private:
 
     std::size_t _numberOfIdleBuckets() const;
 
-    /**
-     * Creates a new (internal) bucket ID to identify a bucket.
-     */
-    BucketIdInternal _createNewBucketId(const Date_t& time, ExecutionStats* stats);
+    // Allocate a new bucket (and ID) and add it to the catalog
+    std::shared_ptr<Bucket> _allocateBucket(const std::tuple<NamespaceString, BucketMetadata>& key,
+                                            const Date_t& time,
+                                            ExecutionStats* stats,
+                                            bool openedDuetoMetadata);
 
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
+    void _setIdTimestamp(BucketId* id, const Date_t& time);
+
     /**
-     * You must hold a lock on _stripedMutex when accessing _buckets, _bucketIds, or _nsBuckets.
-     * While holding a lock on _stripedMutex, you can take a lock on an individual bucket, then
-     * release _stripedMutex. Any iterators on the protected structures should be considered invalid
+     * You must hold a lock on _bucketMutex when accessing _allBuckets or _openBuckets.
+     * While holding a lock on _bucketMutex, you can take a lock on an individual bucket, then
+     * release _bucketMutex. Any iterators on the protected structures should be considered invalid
      * once the lock is released. Any subsequent access to the structures requires relocking
-     * _stripedMutex. You must *not* be holding a lock on a bucket when you attempt to acquire the
+     * _bucketMutex. You must *not* be holding a lock on a bucket when you attempt to acquire the
      * lock on _mutex, as this can result in deadlock.
      *
      * The StripedMutex class has both shared (read-only) and exclusive (write) locks. If you are
-     * going to write to any of the three protected structures, you must hold an exclusive lock.
+     * going to write to any of the protected structures, you must hold an exclusive lock.
      *
      * Typically, if you want to acquire a bucket, you should use the BucketAccess RAII
-     * class to do so, as it will take care of most of this logic for you. Only use the _mutex
+     * class to do so, as it will take care of most of this logic for you. Only use the _bucketMutex
      * directly for more global maintenance where you want to take the lock once and interact with
      * multiple buckets atomically.
      */
-    mutable StripedMutex _stripedMutex;
+    mutable StripedMutex _bucketMutex;
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
-    stdx::unordered_map<BucketId, std::shared_ptr<Bucket>> _buckets;
+    stdx::unordered_map<BucketId, std::shared_ptr<Bucket>> _allBuckets;
 
-    // The _id of the current bucket for each namespace and metadata pair.
-    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, BucketIdInternal> _bucketIds;
-
-    // All buckets ordered by their namespaces.
-    NsBuckets _nsBuckets;
+    // The current open bucket for each namespace and metadata pair.
+    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, std::shared_ptr<Bucket>>
+        _openBuckets;
 
     // This mutex protects access to _idleBuckets
-    mutable Mutex _idleBucketsLock = MONGO_MAKE_LATCH("BucketCatalog::_idleBucketsLock");
+    mutable Mutex _idleMutex = MONGO_MAKE_LATCH("BucketCatalog::_idleMutex");
 
     // Buckets that do not have any writers.
-    IdleBuckets _idleBuckets;
+    IdleList _idleBuckets;
 
     /**
      * This mutex protects access to the _executionStats map. Once you complete your lookup, you
      * can keep the shared_ptr to an individual namespace's stats object and release the lock. The
-     * object itself is thread-safe (atomics).
+     * object itself is thread-safe (using atomics).
      */
-    mutable Mutex _executionStatsLock = MONGO_MAKE_LATCH("BucketCatalog::_executionStatsLock");
+    mutable StripedMutex _statsMutex;
 
-    // Per-collection execution stats.
+    // Per-namespace execution stats.
     stdx::unordered_map<NamespaceString, std::shared_ptr<ExecutionStats>> _executionStats;
 
     // A placeholder to be returned in case a namespace has no allocated statistics object
