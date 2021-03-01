@@ -114,7 +114,7 @@ const mongod = MongoRunner.runMongod();
 runTest(mongod);
 MongoRunner.stopMongod(mongod);
 
-const st = new ShardingTest({shards: 1, mongos: 1, config: 1, other: {shardAsReplicaSet: false}});
+const st = new ShardingTest({shards: 1, mongos: 1, config: 1});
 runTest(st.s0);
 st.stop();
 })();

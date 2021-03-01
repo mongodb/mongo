@@ -162,17 +162,13 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-// TODO: SERVER-43897 Make commands_user_defined_roles.js and commands_builtin_roles.js start shards
-// as replica sets.
 conn = new ShardingTest({
-    shards: 2,
+    shards: 1,
     mongos: 1,
+    config: 1,
     keyFile: "jstests/libs/key1",
-    other: {
-        shardOptions: opts,
-        shardAsReplicaSet: false,
-        mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}
-    }
+    other:
+        {shardOptions: opts, mongosOptions: {setParameter: "trafficRecordingDirectory=" + dbPath}}
 });
 authCommandsLib.runTests(conn, impls);
 conn.stop();
