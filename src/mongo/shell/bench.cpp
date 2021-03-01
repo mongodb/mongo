@@ -132,6 +132,16 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
     return b.obj();
 }
 
+/**
+ * Adds a '$orderby' to the query document. Useful when running on the legacy reads path.
+ */
+BSONObj makeQueryLegacyCompatible(const BSONObj& query, const BSONObj& sortSpec) {
+    BSONObjBuilder bob;
+    bob.append("$query", query);
+    bob.append("$orderby", sortSpec);
+    return bob.obj();
+}
+
 bool runCommandWithSession(DBClientBase* conn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
@@ -545,6 +555,16 @@ BenchRunOp opFromBson(const BSONObj& op) {
                                   << opType,
                     (opType == "find") || (opType == "query"));
             myOp.skip = arg.numberInt();
+        } else if (name == "sort") {
+            uassert(ErrorCodes::BadValue,
+                    str::stream()
+                        << "Field 'sort' is only valid for query, fineOne and find. Op type is "
+                        << opType,
+                    (opType == "findOne") || (opType == "query") || (opType == "find"));
+            uassert(ErrorCodes::BadValue,
+                    "Expected sort to be an object",
+                    arg.type() == BSONType::Object);
+            myOp.sort = arg.Obj();
         } else if (name == "showError") {
             myOp.showError = arg.trueValue();
         } else if (name == "showResult") {
@@ -999,6 +1019,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 findCommand->setProjection(this->projection);
                 findCommand->setLimit(1LL);
                 findCommand->setSingleBatch(true);
+                findCommand->setSort(this->sort);
                 if (config.useSnapshotReads) {
                     findCommand->setReadConcern(readConcernSnapshot);
                 }
@@ -1014,6 +1035,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 runQueryWithReadCommands(
                     conn, lsid, txnNumberForOp, std::move(findCommand), Milliseconds(0), &result);
             } else {
+                if (!this->sort.isEmpty()) {
+                    fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);
+                }
                 BenchRunEventTrace _bret(&state->stats->findOneCounter);
                 result = conn->findOne(
                     this->ns, fixedQuery, nullptr, DBClientCursor::QueryOptionLocal_forceOpQuery);
@@ -1089,6 +1113,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 if (this->batchSize) {
                     findCommand->setBatchSize(this->batchSize);
                 }
+                if (!this->sort.isEmpty()) {
+                    findCommand->setSort(this->sort);
+                }
                 BSONObjBuilder readConcernBuilder;
                 if (config.useSnapshotReads) {
                     readConcernBuilder.append("level", "snapshot");
@@ -1124,6 +1151,9 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                                                  Milliseconds(delayBeforeGetMore),
                                                  nullptr);
             } else {
+                if (!this->sort.isEmpty()) {
+                    fixedQuery = makeQueryLegacyCompatible(std::move(fixedQuery), this->sort);
+                }
                 // Use special query function for exhaust query option.
                 if (this->options & QueryOption_Exhaust) {
                     BenchRunEventTrace _bret(&state->stats->queryCounter);
