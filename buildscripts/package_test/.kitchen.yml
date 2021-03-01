@@ -29,7 +29,7 @@ provisioner:
 platforms:
   - name: amazon-x86-64
     driver:
-      image_id: ami-c481fad3
+      image_id: ami-0080e4c5bc078760e
     transport:
       username: ec2-user
   - name: amazon2-x86-64
