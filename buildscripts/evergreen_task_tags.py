@@ -101,8 +101,8 @@ def is_task_tagged(task, tags, filters):
     :param filters: List of tags that should not belong to the task.
     :return: True if task matches the query.
     """
-    if all([tag in task.tags for tag in tags]):
-        if not filters or not any([tag in task.tags for tag in filters]):
+    if all(tag in task.tags for tag in tags):
+        if not filters or not any(tag in task.tags for tag in filters):
             return True
 
     return False

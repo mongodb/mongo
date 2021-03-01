@@ -76,7 +76,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
                                    shell=self.use_shell)
         buff_stdout, _ = process.communicate()
         buff = buff_stdout.decode("utf-8", "replace")
-        print(f"Result of command:")
+        print("Result of command:")
         print(textwrap.indent(buff, "[result body] "))
         return process.poll(), buff
 

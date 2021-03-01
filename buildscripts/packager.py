@@ -806,7 +806,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
         "-D",
         f"dist .{distro.release_dist(build_os)}",
         "-D",
-        f"_use_internal_dependency_generator 0",
+        "_use_internal_dependency_generator 0",
         "-D",
         f"dynamic_version {spec.pversion(distro)}",
         "-D",

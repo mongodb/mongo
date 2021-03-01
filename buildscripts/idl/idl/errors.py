@@ -682,13 +682,13 @@ class ParserContext(object):
              " struct '%s' is marked as immutable.") % (field_name, struct_name, struct_name))
 
     def add_useless_variant_error(self, location):
-        # type: (common.SourceLocation,) -> None
+        # type: (common.SourceLocation) -> None
         """Add an error about a variant with 0 or 1 variant types."""
         self._add_error(location, ERROR_ID_USELESS_VARIANT,
                         ("Cannot declare a variant with only 0 or 1 variant types"))
 
     def add_variant_comparison_error(self, location):
-        # type: (common.SourceLocation,) -> None
+        # type: (common.SourceLocation) -> None
         """Add an error about a struct with generate_comparison_operators and a variant field."""
         self._add_error(location, ERROR_ID_VARIANT_COMPARISON,
                         ("generate_comparison_operators is not supported with variant types"))

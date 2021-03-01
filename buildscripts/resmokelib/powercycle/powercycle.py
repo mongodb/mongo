@@ -481,8 +481,7 @@ def install_tarball(tarball, root_dir):
                fi ;
             done ;
             popd ;
-            """.format(  # pylint: disable=bad-continuation
-            tarball=tarball, tmp_dir=tmp_dir, root_dir=root_dir)
+            """.format(tarball=tarball, tmp_dir=tmp_dir, root_dir=root_dir)
         ret, output = execute_cmd(cmds, use_file=True)
         shutil.rmtree(tmp_dir)
     else:

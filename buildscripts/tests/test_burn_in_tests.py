@@ -181,7 +181,7 @@ class TestRepeatConfig(unittest.TestCase):
         repeat_config = under_test.RepeatConfig(repeat_tests_num=5)
         repeat_options = repeat_config.generate_resmoke_options()
 
-        self.assertEqual(repeat_options.strip(), f"--repeatSuites=5")
+        self.assertEqual(repeat_options.strip(), "--repeatSuites=5")
 
     def test_get_resmoke_repeat_options_secs(self):
         repeat_config = under_test.RepeatConfig(repeat_tests_secs=5)

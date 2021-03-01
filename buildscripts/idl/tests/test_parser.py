@@ -1446,7 +1446,7 @@ class TestParser(testcase.IDLTestcase):
         # type: () -> None
         """Negative unstable-field test cases."""
         self.assert_parse_fail(
-            textwrap.dedent(f"""
+            textwrap.dedent("""
         commands:
             foo:
                 description: foo
@@ -1464,7 +1464,7 @@ class TestParser(testcase.IDLTestcase):
         # type: () -> None
         """Positive same command_name with different api_version test cases."""
         self.assert_parse(
-            textwrap.dedent(f"""
+            textwrap.dedent("""
         commands:
             foo:
                 description: foo
@@ -1692,7 +1692,7 @@ class TestParser(testcase.IDLTestcase):
 
         # The 'command_name' and 'command_alias' fields cannot have same value.
         self.assert_parse_fail(
-            textwrap.dedent(f"""
+            textwrap.dedent("""
         commands:
             foo:
                 description: foo
