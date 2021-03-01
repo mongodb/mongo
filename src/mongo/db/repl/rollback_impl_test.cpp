@@ -45,7 +45,6 @@
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/rollback_test_fixture.h"
-#include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -1582,7 +1581,6 @@ public:
                                        << bson.jsonString(JsonStringFormat::LegacyStrict)
                                        << " in namespace with uuid " << uuid.toString();
     }
-
 
 protected:
     OpObserver::RollbackObserverInfo _rbInfo;

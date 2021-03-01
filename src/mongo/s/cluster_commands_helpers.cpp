@@ -144,8 +144,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
 
 namespace {
 
-const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_sd;
-
 /**
  * Constructs a requests vector targeting each of the specified shard ids. Each request contains the
  * same cmdObj combined with the default sharding parameters.
@@ -270,12 +268,6 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
     version.appendToCommand(&cmdWithVersionBob);
     return cmdWithVersionBob.obj();
-}
-
-BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow) {
-    BSONObjBuilder newCmdBuilder(std::move(cmdObj));
-    newCmdBuilder.append(kAllowImplicitCollectionCreation, allow);
-    return newCmdBuilder.obj();
 }
 
 BSONObj applyReadWriteConcern(OperationContext* opCtx,

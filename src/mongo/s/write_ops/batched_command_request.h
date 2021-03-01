@@ -150,14 +150,6 @@ public:
     BSONObj toBSON() const;
     std::string toString() const;
 
-    void setAllowImplicitCreate(bool doAllow) {
-        _allowImplicitCollectionCreation = doAllow;
-    }
-
-    bool isImplicitCreateAllowed() const {
-        return _allowImplicitCollectionCreation;
-    }
-
     /**
      * Generates a new request, the same as the old, but with insert _ids if required.
      */
@@ -232,7 +224,6 @@ private:
     boost::optional<DatabaseVersion> _dbVersion;
 
     boost::optional<BSONObj> _writeConcern;
-    bool _allowImplicitCollectionCreation = true;
 };
 
 /**

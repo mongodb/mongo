@@ -757,30 +757,30 @@ env.Library(
 )
 
 env.Library(
-    target="service_context_d",
+    target='service_context_d',
     source=[
-        "service_entry_point_mongod.cpp",
+        'service_entry_point_mongod.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_common',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/transport/service_entry_point',
+        'auth/auth',
         'command_can_run_here',
+        'concurrency/lock_manager',
         'curop',
         'curop_metrics',
         'lasterror',
         'rw_concern_d',
+        's/sharding_runtime_d',
+        'storage/storage_engine_common',
+        'storage/storage_engine_lock_file',
+        'storage/storage_engine_metadata',
+        'storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/fsync_locked',
-        '$BUILD_DIR/mongo/db/service_entry_point_common',
+        'commands/fsync_locked',
         'read_concern_d_impl',
+        'service_entry_point_common',
     ],
 )
 
@@ -2082,7 +2082,6 @@ env.Library(
         'query_exec',
         'read_concern_d_impl',
         'read_write_concern_defaults',
-        'repl/bgsync',
         'repl/oplog_application',
         'repl/oplog_buffer_blocking_queue',
         'repl/oplog_buffer_collection',
@@ -2098,7 +2097,6 @@ env.Library(
         'rw_concern_d',
         's/sessions_collection_config_server',
         's/sharding_commands_d',
-        's/sharding_runtime_d',
         'service_context_d',
         'service_liaison_mongod',
         'sessions_collection_rs',
