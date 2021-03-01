@@ -106,7 +106,10 @@ testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(-10)},
-                             ErrorCodes.CannotCreateIndex);
+                             ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions(
+    {timeField: "time", expireAfterSeconds: NumberLong("4611686018427387904")},
+    ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);

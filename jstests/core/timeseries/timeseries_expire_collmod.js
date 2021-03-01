@@ -47,6 +47,11 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
     ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({
+    collMod: bucketsColl.getName(),
+    clusteredIndex: {expireAfterSeconds: NumberLong("4611686018427387904")}
+}),
+                             ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {}}),
                              40414);
 

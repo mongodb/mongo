@@ -20,12 +20,6 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
-// TODO SERVER-53990: to re-enable this.
-if (true) {
-    jsTestLog("SERVER-53990 to re-enable this test");
-    return;
-}
-
 const coll = db.timeseries_expire;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 

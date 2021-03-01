@@ -234,8 +234,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-                TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                    std::make_pair(coll->uuid(), indexName));
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(coll->uuid(), indexName);
             }
         });
 }

@@ -137,7 +137,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             TTLCollectionCache::get(opCtx->getServiceContext())
-                .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
+                .registerTTLInfo(_collection->uuid(), indexName);
         }
 
         bool ready = durableCatalog->isIndexReady(opCtx, _collection->getCatalogId(), indexName);

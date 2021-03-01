@@ -39,6 +39,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -310,12 +311,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             } else {
                 invariant(elem.type() == mongo::NumberLong);
                 const int64_t elemNum = elem.safeNumberLong();
-                if (elemNum < 0) {
-                    return Status(ErrorCodes::InvalidOptions,
-                                  str::stream() << "Expected a number >= 0 for the "
-                                                << "'clusteredIndex::expireAfterSeconds' "
-                                                << "option. Got: " << elemNum);
-                }
+                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(elemNum));
             }
 
             cmr.clusteredIndexExpireAfterSeconds = e.Obj()["expireAfterSeconds"];

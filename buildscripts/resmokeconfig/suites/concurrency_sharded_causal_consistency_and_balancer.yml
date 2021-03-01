@@ -119,6 +119,8 @@ selector:
   - uses_curop_agg_stage
   # mongos has no system.profile collection.
   - requires_profiling
+  # mongos does not support inserts on timeseries collections
+  - requires_timeseries
 
 executor:
   archive:
