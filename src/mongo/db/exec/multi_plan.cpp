@@ -297,8 +297,8 @@ bool MultiPlanStage::bestPlanChosen() const {
     return kNoSuchPlan != _bestPlanIdx;
 }
 
-int MultiPlanStage::bestPlanIdx() const {
-    return _bestPlanIdx;
+boost::optional<size_t> MultiPlanStage::bestPlanIdx() const {
+    return {bestPlanChosen(), static_cast<size_t>(_bestPlanIdx)};
 }
 
 const QuerySolution* MultiPlanStage::bestSolution() const {

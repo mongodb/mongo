@@ -101,8 +101,8 @@ public:
     /** Return true if a best plan has been chosen  */
     bool bestPlanChosen() const;
 
-    /** Return the index of the best plan chosen, for testing */
-    int bestPlanIdx() const;
+    /** Return the index of the best plan chosen, or boost::none if there is no such plan. */
+    boost::optional<size_t> bestPlanIdx() const;
 
     /**
      * Returns the QuerySolution for the best plan, or NULL if no best plan.

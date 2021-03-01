@@ -49,7 +49,7 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -100,8 +100,12 @@ void flattenExecTree(const PlanStage* root, std::vector<const PlanStage*>* flatt
     if (root->stageType() == STAGE_MULTI_PLAN) {
         // Only add the winning plan from a MultiPlanStage.
         auto mps = static_cast<const MultiPlanStage*>(root);
-        const PlanStage* winningStage = mps->getChildren()[mps->bestPlanIdx()].get();
-        return flattenExecTree(winningStage, flattened);
+        auto bestPlanIdx = mps->bestPlanIdx();
+        tassert(
+            3420001, "Trying to explain MultiPlanStage without best plan", bestPlanIdx.has_value());
+        const auto winningStage = mps->getChildren()[*bestPlanIdx].get();
+        flattenExecTree(winningStage, flattened);
+        return;
     }
 
     const auto& children = root->getChildren();
@@ -111,13 +115,20 @@ void flattenExecTree(const PlanStage* root, std::vector<const PlanStage*>* flatt
 }
 
 /**
- * Traverse the tree rooted at 'root', and add all tree nodes into the list 'flattened'.
+ * Traverses the tree rooted at 'root', and adds all tree nodes into the list 'flattened'.
+ * If there is a MultiPlanStage node, follows the subplan at 'planIdx'.
  */
-void flattenStatsTree(const PlanStageStats* root, std::vector<const PlanStageStats*>* flattened) {
-    invariant(root->stageType != STAGE_MULTI_PLAN);
+void flattenStatsTree(const PlanStageStats* root,
+                      const boost::optional<size_t> planIdx,
+                      std::vector<const PlanStageStats*>* flattened) {
+    if (STAGE_MULTI_PLAN == root->stageType) {
+        // Skip the MultiPlanStage, and continue with its planIdx child
+        tassert(3420002, "Invalid child plan index", planIdx && planIdx < root->children.size());
+        root = root->children[*planIdx].get();
+    }
     flattened->push_back(root);
     for (auto&& child : root->children) {
-        flattenStatsTree(child.get(), flattened);
+        flattenStatsTree(child.get(), planIdx, flattened);
     }
 }
 
@@ -167,11 +178,13 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 
 /**
  * Converts the stats tree 'stats' into a corresponding BSON object containing explain information.
+ * If there is a MultiPlanStage node, skip that node, and follow the subplan at 'planIdx'.
  *
  * Generates the BSON stats at a verbosity specified by 'verbosity'.
  */
 void statsToBSON(const PlanStageStats& stats,
                  ExplainOptions::Verbosity verbosity,
+                 const boost::optional<size_t> planIdx,
                  BSONObjBuilder* bob,
                  BSONObjBuilder* topLevelBob) {
     invariant(bob);
@@ -180,6 +193,13 @@ void statsToBSON(const PlanStageStats& stats,
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
+    }
+
+    if (STAGE_MULTI_PLAN == stats.stageType) {
+        tassert(3420003, "Invalid child plan index", planIdx && planIdx < stats.children.size());
+        const PlanStageStats* childStage = stats.children[*planIdx].get();
+        statsToBSON(*childStage, verbosity, planIdx, bob, topLevelBob);
         return;
     }
 
@@ -477,7 +497,7 @@ void statsToBSON(const PlanStageStats& stats,
     // rather than 'inputStages'.
     if (1 == stats.children.size()) {
         BSONObjBuilder childBob;
-        statsToBSON(*stats.children[0], verbosity, &childBob, topLevelBob);
+        statsToBSON(*stats.children[0], verbosity, planIdx, &childBob, topLevelBob);
         bob->append("inputStage", childBob.obj());
         return;
     }
@@ -488,12 +508,20 @@ void statsToBSON(const PlanStageStats& stats,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (size_t i = 0; i < stats.children.size(); ++i) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(*stats.children[i], verbosity, &childBob, topLevelBob);
+        statsToBSON(*stats.children[i], verbosity, planIdx, &childBob, topLevelBob);
     }
     childrenBob.doneFast();
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats) {
+PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
+                                              const boost::optional<size_t> planIdx) {
+    if (STAGE_MULTI_PLAN == stats->stageType) {
+        tassert(3420004, "Invalid child plan index", planIdx && planIdx < stats->children.size());
+        // Skip the MultiPlanStage when it is at the top of the plan, and extract stats from
+        // its child of interest to the caller.
+        stats = stats->children[*planIdx].get();
+    }
+
     PlanSummaryStats summary;
     summary.nReturned = stats->common.advanced;
 
@@ -503,11 +531,12 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats) {
 
     // Flatten the stats tree into a list.
     std::vector<const PlanStageStats*> statsNodes;
-    flattenStatsTree(stats, &statsNodes);
+    flattenStatsTree(stats, planIdx, &statsNodes);
 
     // Iterate over all stages in the tree and get the total number of keys/docs examined.
     // These are just aggregations of information already available in the stats tree.
     for (size_t i = 0; i < statsNodes.size(); ++i) {
+        tassert(3420005, "Unexpected MultiPlanStage", STAGE_MULTI_PLAN != statsNodes[i]->stageType);
         summary.totalKeysExamined +=
             getKeysExamined(statsNodes[i]->stageType, statsNodes[i]->specific.get());
         summary.totalDocsExamined +=
@@ -548,7 +577,7 @@ const PlanExplainer::ExplainVersion& PlanExplainerImpl::getVersion() const {
 }
 
 bool PlanExplainerImpl::isMultiPlan() const {
-    return getStageByType(_root, StageType::STAGE_MULTI_PLAN) != nullptr;
+    return getStageByType(_root, STAGE_MULTI_PLAN) != nullptr;
 }
 
 std::string PlanExplainerImpl::getPlanSummary() const {
@@ -561,6 +590,8 @@ std::string PlanExplainerImpl::getPlanSummary() const {
 
     for (size_t i = 0; i < stages.size(); i++) {
         if (stages[i]->getChildren().empty()) {
+            tassert(
+                3420006, "Unexpected MultiPlanStage", STAGE_MULTI_PLAN != stages[i]->stageType());
             // This is a leaf node. Add to the plan summary string accordingly. Unless
             // this is the first leaf we've seen, add a delimiting string first.
             if (seenLeaf) {
@@ -573,6 +604,36 @@ std::string PlanExplainerImpl::getPlanSummary() const {
     }
 
     return sb.str();
+}
+
+/**
+ * Returns a pointer to a MultiPlanStage under 'root', or null if this plan has no such stage.
+ */
+MultiPlanStage* getMultiPlanStage(PlanStage* root) {
+    if (!root) {
+        return nullptr;
+    }
+    auto stage = getStageByType(root, STAGE_MULTI_PLAN);
+    tassert(3420007,
+            "Found stage must be MultiPlanStage",
+            stage == nullptr || stage->stageType() == STAGE_MULTI_PLAN);
+    auto mps = static_cast<MultiPlanStage*>(stage);
+    return mps;
+}
+
+/**
+ * If 'root' has a MultiPlanStage returns the index of its best plan. Otherwise returns an
+ * initialized value.
+ */
+const boost::optional<size_t> getWinningPlanIdx(PlanStage* root) {
+    if (auto mps = getMultiPlanStage(root); mps) {
+        auto planIdx = mps->bestPlanIdx();
+        tassert(3420008,
+                "Trying to get stats of a MultiPlanStage without winning plan",
+                planIdx.has_value());
+        return planIdx;
+    }
+    return {};
 }
 
 void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
@@ -656,46 +717,45 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
 
 PlanExplainer::PlanStatsDetails PlanExplainerImpl::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
-    auto stage = getStageByType(_root, StageType::STAGE_MULTI_PLAN);
-    invariant(stage == nullptr || stage->stageType() == StageType::STAGE_MULTI_PLAN);
-    auto mps = static_cast<MultiPlanStage*>(stage);
-
-    auto&& [stats, summary] =
-        [&]() -> std::pair<std::unique_ptr<PlanStageStats>, boost::optional<PlanSummaryStats>> {
-        auto stats =
-            mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()]) : _root->getStats();
-
+    const auto winningPlanIdx = getWinningPlanIdx(_root);
+    auto&& [stats, summary] = [&]()
+        -> std::pair<std::unique_ptr<PlanStageStats>, const boost::optional<PlanSummaryStats>> {
+        auto stats = _root->getStats();
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            return {std::move(stats), collectExecutionStatsSummary(stats.get())};
+            return {std::move(stats), collectExecutionStatsSummary(stats.get(), winningPlanIdx)};
         }
 
         return {std::move(stats), boost::none};
     }();
 
     BSONObjBuilder bob;
-    statsToBSON(*stats, verbosity, &bob, &bob);
+    statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob);
     return {bob.obj(), std::move(summary)};
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlansStats(
     ExplainOptions::Verbosity verbosity) const {
-    auto stage = getStageByType(_root, StageType::STAGE_MULTI_PLAN);
-    invariant(stage == nullptr || stage->stageType() == StageType::STAGE_MULTI_PLAN);
-    auto mps = static_cast<MultiPlanStage*>(stage);
-
     std::vector<PlanStatsDetails> res;
+    auto mps = getMultiPlanStage(_root);
+    if (nullptr == mps) {
+        return res;
+    }
+    auto bestPlanIdx = mps->bestPlanIdx();
 
+    tassert(3420009,
+            "Trying to get stats of a MultiPlanStage without winning plan",
+            bestPlanIdx.has_value());
+
+    const auto mpsStats = mps->getStats();
     // Get the stats from the trial period for all the plans.
-    if (mps) {
-        const auto mpsStats = mps->getStats();
-        for (size_t i = 0; i < mpsStats->children.size(); ++i) {
-            if (i != static_cast<size_t>(mps->bestPlanIdx())) {
-                BSONObjBuilder bob;
-                statsToBSON(*mpsStats->children[i], verbosity, &bob, &bob);
-                res.push_back({bob.obj(),
-                               {verbosity >= ExplainOptions::Verbosity::kExecStats,
-                                collectExecutionStatsSummary(mpsStats->children[i].get())}});
-            }
+    for (size_t i = 0; i < mpsStats->children.size(); ++i) {
+        if (i != *bestPlanIdx) {
+            BSONObjBuilder bob;
+            auto stats = _root->getStats();
+            statsToBSON(*stats, verbosity, i, &bob, &bob);
+            res.push_back({bob.obj(),
+                           {verbosity >= ExplainOptions::Verbosity::kExecStats,
+                            collectExecutionStatsSummary(stats.get(), i)}});
         }
     }
 
@@ -706,17 +766,20 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getCachedPlanSta
     const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
     const auto& decision = *debugInfo.decision;
     std::vector<PlanStatsDetails> res;
+    auto winningPlanIdx = getWinningPlanIdx(_root);
+
     for (auto&& stats : decision.getStats<PlanStageStats>().candidatePlanStats) {
         BSONObjBuilder bob;
-        statsToBSON(*stats, verbosity, &bob, &bob);
+        statsToBSON(*stats, verbosity, winningPlanIdx, &bob, &bob);
         res.push_back({bob.obj(),
                        {verbosity >= ExplainOptions::Verbosity::kExecStats,
-                        collectExecutionStatsSummary(stats.get())}});
+                        collectExecutionStatsSummary(stats.get(), winningPlanIdx)}});
     }
     return res;
 }
 
 PlanStage* getStageByType(PlanStage* root, StageType type) {
+    tassert(3420010, "Can't find a stage in a NULL plan root", root != nullptr);
     if (root->stageType() == type) {
         return root;
     }
