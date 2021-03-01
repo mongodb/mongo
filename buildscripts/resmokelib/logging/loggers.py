@@ -304,5 +304,8 @@ def _fallback_buildlogger_handler(include_logger_name=True):
 
 def _get_formatter(logger_info):
     """Return formatter."""
-    log_format = logger_info.get("format", _DEFAULT_FORMAT)
+    if "format" in logger_info:
+        log_format = logger_info["format"]
+    else:
+        log_format = _DEFAULT_FORMAT
     return formatters.ISO8601Formatter(fmt=log_format)
