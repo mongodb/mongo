@@ -83,35 +83,35 @@ const speculativeSHA1AuthFailedAttrs = {
     "speculative": true,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 const sha1AuthFailedAttrs = {
     "mechanism": "SCRAM-SHA-1",
     "speculative": false,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 const speculativeSHA256AuthFailedAttrs = {
     "mechanism": "SCRAM-SHA-256",
     "speculative": true,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 const sha256AuthFailedAttrs = {
     "mechanism": "SCRAM-SHA-256",
     "speculative": false,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 const speculativeSHA256MechUnavailableAttrs = {
     "mechanism": "SCRAM-SHA-256",
     "speculative": true,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result":
+    "error":
         "MechanismUnavailable: Unable to use SCRAM-SHA-256 based authentication for user without any SCRAM-SHA-256 credentials registered"
 };
 const sha256MechUnavailableAttrs = {
@@ -119,7 +119,7 @@ const sha256MechUnavailableAttrs = {
     "speculative": false,
     "principalName": "admin",
     "authenticationDatabase": "admin",
-    "result":
+    "error":
         "MechanismUnavailable: Unable to use SCRAM-SHA-256 based authentication for user without any SCRAM-SHA-256 credentials registered"
 };
 const speculativeClusterAuthFailedAttrs = {
@@ -127,14 +127,14 @@ const speculativeClusterAuthFailedAttrs = {
     "speculative": true,
     "principalName": "__system",
     "authenticationDatabase": "local",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 const clusterAuthFailedAttrs = {
     "mechanism": "SCRAM-SHA-256",
     "speculative": false,
     "principalName": "__system",
     "authenticationDatabase": "local",
-    "result": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
+    "error": "AuthenticationFailed: SCRAM authentication failed, storedKey mismatch"
 };
 admin.setLogLevel(5);
 // Invalid password should never connect regardless of speculative auth.

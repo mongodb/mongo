@@ -50,6 +50,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/sequence_util.h"
@@ -143,24 +144,33 @@ SaslReply doSaslStep(OperationContext* opCtx,
     // Passing in a payload and extracting a responsePayload
     StatusWith<std::string> swResponse = mechanism.step(opCtx, payload.get());
 
+    auto makeLogAttributes = [&]() {
+        logv2::DynamicAttributes attrs;
+        attrs.add("mechanism", mechanism.mechanismName());
+        attrs.add("speculative", session->isSpeculative());
+        attrs.add("principalName", mechanism.getPrincipalName());
+        attrs.add("authenticationDatabase", mechanism.getAuthenticationDatabase());
+        attrs.addDeepCopy("remote", opCtx->getClient()->getRemote().toString());
+        {
+            auto bob = BSONObjBuilder();
+            mechanism.appendExtraInfo(&bob);
+            attrs.add("extraInfo", bob.obj());
+        }
+
+        return attrs;
+    };
+
     if (!swResponse.isOK()) {
         int64_t dLevel = 0;
         if (session->isSpeculative() &&
             (swResponse.getStatus() == ErrorCodes::MechanismUnavailable)) {
             dLevel = 5;
         }
-        LOGV2_DEBUG(20249,
-                    dLevel,
-                    "SASL {mechanism} authentication failed for "
-                    "{principalName} on {authenticationDatabase} from client "
-                    "{client} ; {result}",
-                    "Authentication failed",
-                    "mechanism"_attr = mechanism.mechanismName(),
-                    "speculative"_attr = session->isSpeculative(),
-                    "principalName"_attr = mechanism.getPrincipalName(),
-                    "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-                    "remote"_attr = opCtx->getClient()->getRemote(),
-                    "result"_attr = redact(swResponse.getStatus()));
+
+        auto attrs = makeLogAttributes();
+        auto errorString = redact(swResponse.getStatus());
+        attrs.add("error", errorString);
+        LOGV2_DEBUG(20249, dLevel, "Authentication failed", attrs);
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
@@ -173,14 +183,8 @@ SaslReply doSaslStep(OperationContext* opCtx,
             AuthorizationSession::get(opCtx->getClient())->addAndAuthorizeUser(opCtx, userName));
 
         if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20250,
-                  "Successfully authenticated as principal {principalName} on "
-                  "{authenticationDatabase} from client {client} with mechanism {mechanism}",
-                  "Successful authentication",
-                  "mechanism"_attr = mechanism.mechanismName(),
-                  "principalName"_attr = mechanism.getPrincipalName(),
-                  "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-                  "remote"_attr = opCtx->getClient()->session()->remote());
+            auto attrs = makeLogAttributes();
+            LOGV2(20250, "Authentication succeeded", attrs);
         }
 
         session->markSuccessful();
