@@ -127,6 +127,16 @@ BSONObj fixQuery(const BSONObj& obj, BsonTemplateEvaluator& btl) {
     return b.obj();
 }
 
+/**
+ * Adds a '$orderby' to the query document. Useful when running on the legacy reads path.
+ */
+BSONObj makeQueryLegacyCompatible(const BSONObj& query, const BSONObj& sortSpec) {
+    BSONObjBuilder bob;
+    bob.append("$query", query);
+    bob.append("$orderby", sortSpec);
+    return bob.obj();
+}
+
 bool runCommandWithSession(DBClientBase* conn,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
@@ -463,6 +473,16 @@ BenchRunOp opFromBson(const BSONObj& op) {
                                   << opType,
                     (opType == "find") || (opType == "query"));
             myOp.skip = arg.numberInt();
+        } else if (name == "sort") {
+            uassert(ErrorCodes::BadValue,  // TODO
+                    str::stream()
+                        << "Field 'sort' is only valid for query, fineOne and find. Op type is "
+                        << opType,
+                    (opType == "findOne") || (opType == "query") || (opType == "find"));
+            uassert(ErrorCodes::BadValue,
+                    "Expected sort to be an object",
+                    arg.type() == BSONType::Object);
+            myOp.sort = arg.Obj();
         } else if (name == "showError") {
             myOp.showError = arg.trueValue();
         } else if (name == "showResult") {
@@ -802,11 +822,16 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             qr->setProj(op.projection);
                             qr->setLimit(1LL);
                             qr->setWantMore(false);
+                            qr->setSort(op.sort);
                             invariantOK(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             runQueryWithReadCommands(conn, lsid, std::move(qr), &result);
                         } else {
+                            if (!op.sort.isEmpty()) {
+                                fixedQuery =
+                                    makeQueryLegacyCompatible(std::move(fixedQuery), op.sort);
+                            }
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             result = conn->findOne(op.ns,
                                                    fixedQuery,
@@ -918,11 +943,19 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (op.batchSize) {
                                 qr->setBatchSize(op.batchSize);
                             }
+                            if (!op.sort.isEmpty()) {
+                                qr->setSort(op.sort);
+                            }
                             invariantOK(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.queryCounter);
                             count = runQueryWithReadCommands(conn, lsid, std::move(qr), nullptr);
                         } else {
+                            if (!op.sort.isEmpty()) {
+                                fixedQuery =
+                                    makeQueryLegacyCompatible(std::move(fixedQuery), op.sort);
+                            }
+
                             // Use special query function for exhaust query option.
                             if (op.options & QueryOption_Exhaust) {
                                 BenchRunEventTrace _bret(&stats.queryCounter);
