@@ -30,13 +30,13 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 
 (function() {
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+load("jstests/libs/fixture_helpers.js");      // For 'FixtureHelpers'.
+load("jstests/libs/sbe_explain_helpers.js");  // For 'assertIdHackPlan()'.
 
 const coll = db.jstests_index_filter_commands;
 
@@ -153,8 +153,7 @@ coll.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: queryID, indexes: [indexA1]}));
 var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
-var planStage = getPlanStage(explain.executionStats.executionStages, 'IDHACK');
-assert.neq(null, planStage);
+assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH");
 
 // Clear filters
 // Clearing filters on a missing collection should be a no-op.
