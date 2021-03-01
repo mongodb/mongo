@@ -31,7 +31,7 @@
 import collections
 import re
 import typing
-from typing import Type, TypeVar, cast, List, Set, Union
+from typing import Type, TypeVar, cast, List, Set, Union, Optional
 
 from . import ast
 from . import bson
@@ -549,6 +549,20 @@ def _bind_command_reply_type(ctxt, parsed_spec, command):
     return ast_field
 
 
+def _bind_access_check(command):
+    # type: (syntax.Command) -> Optional[List[ast.AccessCheck]]
+    """Bind the access_check field in a command."""
+    if not command.access_check:
+        return None
+
+    access_check = command.access_check
+
+    if access_check.none:
+        return []
+
+    return None
+
+
 def _bind_command(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Command
     """
@@ -568,6 +582,8 @@ def _bind_command(ctxt, parsed_spec, command):
     _inject_hidden_command_fields(command)
 
     _bind_struct_common(ctxt, parsed_spec, command, ast_command)
+
+    ast_command.access_checks = _bind_access_check(command)
 
     ast_command.namespace = command.namespace
 

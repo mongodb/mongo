@@ -971,8 +971,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         with self._block('%s {' % (fn_def), '}'):
             self._writer.write_line('return %s;' % value)
 
-    def gen_invocation_base_class_declaration(self):
-        # type: () -> None
+    def gen_invocation_base_class_declaration(self, command):
+        # type: (ast.Command) -> None
         """Generate the InvocationBaseGen class for a command's base class."""
         class_declaration = 'class InvocationBaseGen : public _TypedCommandInvocationBase {'
         with writer.IndentedScopedBlock(self._writer, class_declaration, '};'):
@@ -986,6 +986,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 'using _TypedCommandInvocationBase::_TypedCommandInvocationBase;')
 
             self._writer.write_line('virtual Reply typedRun(OperationContext* opCtx) = 0;')
+
+            if command.access_checks == []:
+                self._writer.write_line(
+                    'void doCheckAuthorization(OperationContext* opCtx) const final {}')
 
     def generate_versioned_command_base_class(self, command):
         # type: (ast.Command) -> None
@@ -1028,7 +1032,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             self.gen_api_version_fn(False, command.is_deprecated)
 
             # Write InvocationBaseGen class.
-            self.gen_invocation_base_class_declaration()
+            self.gen_invocation_base_class_declaration(command)
 
     def generate(self, spec):
         # type: (ast.IDLAST) -> None

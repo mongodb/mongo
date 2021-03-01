@@ -1649,7 +1649,7 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
-        
+
         structs:
             reply:
                 description: foo
@@ -2362,6 +2362,40 @@ class TestBinder(testcase.IDLTestcase):
                     default: false
                     version: 123
             """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
+    def test_access_check(self):
+        # type: () -> None
+        """Test access check."""
+
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+
+        structs:
+            reply:
+                description: foo
+                fields:
+                    foo: string
+        """)
+
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    none: true
+                fields:
+                    foo: string
+                reply_type: reply
+            """))
 
 
 if __name__ == '__main__':

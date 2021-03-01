@@ -1020,7 +1020,7 @@ commands:
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyType
-    
+
     CommandWithAnyTypeOwnedMember:
         description: "A mock command to test IDLAnyTypeOwned"
         command_name: CommandWithAnyTypeOwnedMember
@@ -1029,6 +1029,16 @@ commands:
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyTypeOwned
+
+    AccessCheckNone:
+        description: A versioned API command with access_check
+        command_name: AccessCheckNoneCommandName
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        access_check:
+            none: true
+        reply_type: OkReply
 
     # Test that we correctly generate C++ base classes for versioned API commands with different
     # key names, command names, and C++ names.
