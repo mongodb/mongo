@@ -64,37 +64,45 @@ function testDroppedAndDistributionModeFieldsChecksAfterUpgrade() {
 // config.cache.collections entries is removed when downgrading to prior 4.9
 //
 // This test must be removed once 5.0 is defined as the lastLTS (SERVER-52632)
+
+function checkAllowMigrationsOnConfigAndShardMetadata(expectedResult) {
+    const ns = "sharded.test2";
+    assert.eq(
+        expectedResult,
+        st.configRS.getPrimary().getDB("config").collections.findOne({_id: ns}).allowMigrations);
+    assert.eq(
+        expectedResult,
+        st.rs0.getPrimary().getDB("config").cache.collections.findOne({_id: ns}).allowMigrations);
+    assert.eq(
+        expectedResult,
+        st.rs1.getPrimary().getDB("config").cache.collections.findOne({_id: ns}).allowMigrations);
+}
+
 function testAllowedMigrationsFieldSetup() {
+    const ns = "sharded.test2";
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 0}));
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 1}));
 
-    assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.test2', key: {_id: 1}}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.rs1.getURL()}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 1}, to: st.rs0.getURL()}));
+
+    // If allowMigrations is true, it means that the allowMigration field is not defined in
+    // config.collections neither on config.cache.collections
+    assert.commandWorked(st.configRS.getPrimary().adminCommand(
+        {_configsvrSetAllowMigrations: ns, allowMigrations: true, writeConcern: {w: "majority"}}));
 
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: 'sharded.test2', find: {_id: 0}, to: st.rs1.getURL()}));
+        st.shard0.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: 'sharded.test2', find: {_id: 1}, to: st.rs0.getURL()}));
+        st.shard1.adminCommand({_flushRoutingTableCacheUpdates: ns, syncFromConfig: true}));
 
-    let updateResult = st.rs0.getPrimary().getDB("config").cache.collections.updateOne(
-        {_id: 'sharded.test2'}, {$set: {allowMigrations: false}});
-    assert.eq(1, updateResult.modifiedCount);
-
-    updateResult = st.rs1.getPrimary().getDB("config").cache.collections.updateOne(
-        {_id: 'sharded.test2'}, {$set: {allowMigrations: false}});
-    assert.eq(1, updateResult.modifiedCount);
+    checkAllowMigrationsOnConfigAndShardMetadata(undefined);
 }
 
 function testAllowedMigrationsFieldChecksAfterFCVDowngrade() {
-    assert.eq(undefined,
-              st.rs0.getPrimary()
-                  .getDB("config")
-                  .cache.collections.findOne({_id: 'sharded.test2'})
-                  .allowMigrations);
-    assert.eq(undefined,
-              st.rs1.getPrimary()
-                  .getDB("config")
-                  .cache.collections.findOne({_id: 'sharded.test2'})
-                  .allowMigrations);
+    checkAllowMigrationsOnConfigAndShardMetadata(undefined);
 }
 
 // testTimestampField: Check that on FCV upgrade to 5.0, a 'timestamp' is created for the existing
@@ -208,7 +216,6 @@ function setupInitialStateOnOldVersion() {
     assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
 
     testDroppedAndDistributionModeFieldsSetup();
-    testAllowedMigrationsFieldSetup();
     testTimestampFieldSetup();
     testChunkCollectionUuidFieldSetup();
 }
@@ -232,6 +239,7 @@ function runChecksAfterUpgrade() {
 }
 
 function setupStateBeforeDowngrade() {
+    testAllowedMigrationsFieldSetup();
 }
 
 function runChecksAfterFCVDowngrade() {

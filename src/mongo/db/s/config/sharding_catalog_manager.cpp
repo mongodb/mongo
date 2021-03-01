@@ -706,6 +706,11 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
         const auto uuid = coll.getUuid();
         const auto nss = coll.getNss();
 
+        uassert(547900,
+                str::stream() << "The 'allowMigrations' field of the " << nss
+                              << " collection must be true",
+                coll.getAllowMigrations());
+
         const auto now = VectorClock::get(opCtx)->getTime();
         const auto newTimestamp = now.clusterTime().asTimestamp();
         timestampMap.emplace(nss, newTimestamp);
@@ -831,6 +836,11 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
         const auto uuid = coll.getUuid();
         const auto nss = coll.getNss();
 
+        uassert(547901,
+                str::stream() << "The 'allowMigrations' field of the " << nss
+                              << " collection must be true",
+                coll.getAllowMigrations());
+
         updateConfigDocumentDBDirect(opCtx,
                                      ChunkType::ConfigNS,
                                      BSON(ChunkType::collectionUUID << uuid) /* query */,
@@ -842,22 +852,19 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
     // Create ns_* indexes for config.chunks
     uassertStatusOK(createNsIndexesForConfigChunks(opCtx));
 
-    // Unset timestamp for all collections
-    for (const auto& doc : collectionDocs) {
+    // Unset the timestamp field on all collections
+    {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations.
         Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-        const CollectionType coll(doc);
-        const auto nss = coll.getNss();
-
         updateConfigDocumentDBDirect(
             opCtx,
             CollectionType::ConfigNS,
-            BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+            {} /* query */,
             BSON("$unset" << BSON(CollectionType::kTimestampFieldName << "")) /* update */,
             false /* upsert */,
-            false /* multi */);
+            true /* multi */);
     }
 
     // Wait until the last operation is majority-committed
@@ -900,7 +907,7 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
             uassertStatusOK(getStatusFromCommandResult(info));
     }
 
-    // Unset uuid for all chunks on config.chunks
+    // Unset the timestamp and the uuid for all chunks on config.chunks
     {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations.

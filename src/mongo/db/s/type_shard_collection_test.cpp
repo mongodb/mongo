@@ -112,14 +112,10 @@ TEST(ShardCollectionType, ReshardingFieldsIncluded) {
 TEST(ShardCollectionType, AllowMigrationsFieldBackwardsCompatibility) {
     ShardCollectionType shardCollType(kNss, OID::gen(), UUID::gen(), kKeyPattern, true);
     shardCollType.setAllowMigrations(false);
-    ASSERT_EQ(
-        false,
-        shardCollType.toBSON()[ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName]
-            .Bool());
+    ASSERT_EQ(false, shardCollType.toBSON()[ShardCollectionType::kAllowMigrationsFieldName].Bool());
 
     shardCollType.setAllowMigrations(true);
-    ASSERT(shardCollType.toBSON()[ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName]
-               .eoo());
+    ASSERT(shardCollType.toBSON()[ShardCollectionType::kAllowMigrationsFieldName].eoo());
 }
 
 }  // namespace

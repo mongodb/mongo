@@ -79,13 +79,11 @@ using ReshardingFields = TypeCollectionReshardingFields;
 class CollectionType : private CollectionTypeBase {
 public:
     // Make field names accessible.
-    static constexpr auto kDefaultCollationFieldName =
-        CollectionTypeBase::kPre50CompatibleDefaultCollationFieldName;
-    static constexpr auto kEpochFieldName = CollectionTypeBase::kPre22CompatibleEpochFieldName;
-    static constexpr auto kKeyPatternFieldName =
-        CollectionTypeBase::kPre50CompatibleKeyPatternFieldName;
-    static constexpr auto kUuidFieldName = CollectionTypeBase::kPre50CompatibleUuidFieldName;
-    using CollectionTypeBase::kAllowMigrationsFieldName;
+    static constexpr auto kDefaultCollationFieldName = kPre50CompatibleDefaultCollationFieldName;
+    static constexpr auto kEpochFieldName = kPre22CompatibleEpochFieldName;
+    static constexpr auto kKeyPatternFieldName = kPre50CompatibleKeyPatternFieldName;
+    static constexpr auto kUuidFieldName = kPre50CompatibleUuidFieldName;
+    static constexpr auto kAllowMigrationsFieldName = kPre50CompatibleAllowMigrationsFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kTimestampFieldName;
@@ -93,13 +91,11 @@ public:
     using CollectionTypeBase::kUpdatedAtFieldName;
 
     // Make getters and setters accessible.
-    using CollectionTypeBase::getAllowMigrations;
     using CollectionTypeBase::getNss;
     using CollectionTypeBase::getReshardingFields;
     using CollectionTypeBase::getTimestamp;
     using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
-    using CollectionTypeBase::setAllowMigrations;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setTimestamp;
@@ -150,6 +146,17 @@ public:
 
     bool getAllowBalance() const {
         return !getNoBalance();
+    }
+
+    bool getAllowMigrations() const {
+        return getPre50CompatibleAllowMigrations().get_value_or(true);
+    }
+
+    void setAllowMigrations(bool allowMigrations) {
+        if (allowMigrations)
+            setPre50CompatibleAllowMigrations(boost::none);
+        else
+            setPre50CompatibleAllowMigrations(false);
     }
 };
 

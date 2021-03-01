@@ -156,6 +156,8 @@ structs:
                               almost all DDL operations in order to guarantee that the set of
                               shards, which comprise a collection will not change.
 
+                              If the flag is not present it defaults to true.
+
                               It must be optional and not present when running in FCV 4.4, because
                               binaries prior to 5.0 use strict parsing and will fail."
                 optional: true
