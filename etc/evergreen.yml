@@ -7283,6 +7283,19 @@ tasks:
   - func: "run powercycle test"
     timeout_secs: 1800 # 30 minute timeout for no output
 
+- name: powercycle_kill_mongod_smoke
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
+  depends_on:
+  - name: archive_dist_test_debug
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up EC2 instance"
+  - func: "run powercycle test"
+    timeout_secs: 1800 # 30 minute timeout for no output
+
 - name: powercycle
   tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
@@ -7340,6 +7353,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_replication_smalloplog
+  tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -7367,6 +7381,7 @@ tasks:
     timeout_secs: 1800 # 30 minute timeout for no output
 
 - name: powercycle_write_concern_majority
+  tags: ["powercycle"]
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: archive_dist_test_debug
@@ -8848,12 +8863,6 @@ buildvariants:
   - name: .powercycle
     distros:
     - ubuntu1604-powercycle
-  - name: powercycle_replication_smalloplog
-    distros:
-    - ubuntu1604-powercycle
-  - name: powercycle_write_concern_majority
-    distros:
-    - ubuntu1604-powercycle
   - name: replica_sets
   - name: watchdog_wiredtiger
   - name: .replica_sets .common
@@ -9635,7 +9644,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
-  - name: powercycle_smoke
+  - name: powercycle_kill_mongod_smoke
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: compile_run_and_archive_dbtest_TG
@@ -9900,7 +9909,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: .powercycle
+  - name: powercycle_kill_mongod
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets
@@ -10276,6 +10285,7 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
   - name: powercycle_smoke
+  - name: powercycle_kill_mongod_smoke
   - name: .query_fuzzer
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
