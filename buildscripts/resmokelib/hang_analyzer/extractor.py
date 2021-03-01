@@ -31,7 +31,7 @@ def extract_debug_symbols(root_logger):
 
 
 def _extract_tar(path, root_logger):
-    import shutil
+    import shutil  # pylint: disable=import-outside-toplevel
     # The file name is always .tgz but it's "secretly" a zip file on Windows :(
     compressed_format = 'zip' if sys.platform == "win32" else 'gztar'
     shutil.unpack_archive(path, format=compressed_format)

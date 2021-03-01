@@ -399,10 +399,9 @@ class ExcludeDependencies(Analyzer):
 
         valid_depender_nodes = []
         for depender_node in set(self.graph[self.nodes[0]]):
-            if all([
+            if all(
                     bool(excludes_node not in set(self.graph.rgraph[depender_node]))
-                    for excludes_node in self.nodes[1:]
-            ]):
+                    for excludes_node in self.nodes[1:]):
                 valid_depender_nodes.append(depender_node)
         return valid_depender_nodes
 
@@ -590,7 +589,7 @@ class GaJsonPrinter(GaPrinter):
     def print(self):
         """Print the result data."""
 
-        import json
+        import json  # pylint: disable=import-outside-toplevel
         results = self.libdeps_graph_analysis.get_results()
         print(json.dumps(self.serialize(results)))
 

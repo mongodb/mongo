@@ -64,6 +64,7 @@ class NothingImportResolver(idl.parser.ImportResolverBase):
 class IDLTestcase(unittest.TestCase):
     """IDL Test case base class."""
 
+    # pylint: disable=inconsistent-return-statements
     def _parse(self, doc_str, resolver):
         # type: (str, idl.parser.ImportResolverBase) -> idl.syntax.IDLParsedSpec
         """Parse a document and throw a unittest failure if it fails to parse as a valid YAML document."""

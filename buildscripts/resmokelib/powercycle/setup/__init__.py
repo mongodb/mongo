@@ -25,9 +25,9 @@ class SetUpEC2Instance(PowercycleCommand):
         remote_dir = powercycle_constants.REMOTE_DIR
         db_path = powercycle_constants.DB_PATH
 
-        set_permission_stmt = f"chmod -R 777"
+        set_permission_stmt = "chmod -R 777"
         if self.is_windows():
-            set_permission_stmt = f"setfacl -s user::rwx,group::rwx,other::rwx"
+            set_permission_stmt = "setfacl -s user::rwx,group::rwx,other::rwx"
         cmds = f"{self.sudo} mkdir -p {remote_dir}; {self.sudo} chown -R {user_group} {remote_dir}; {set_permission_stmt} {remote_dir}; ls -ld {remote_dir}"
         cmds = f"{cmds}; {self.sudo} mkdir -p {db_path}; {self.sudo} chown -R {user_group} {db_path}; {set_permission_stmt} {db_path}; ls -ld {db_path}"
 

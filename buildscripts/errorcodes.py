@@ -59,7 +59,7 @@ def parse_source_files(callback, src_root):
         with open(source_file, 'r', encoding='utf-8') as fh:
             text = fh.read()
 
-            if not any([zz in text for zz in quick]):
+            if not any(zz in text for zz in quick):
                 continue
 
             matchiters = [p.finditer(text) for p in patterns]

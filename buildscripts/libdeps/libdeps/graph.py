@@ -31,6 +31,8 @@ from enum import Enum, auto
 
 import networkx
 
+# pylint: disable=invalid-name
+
 
 class CountTypes(Enum):
     """Enums for the different types of counts to perform on a graph."""

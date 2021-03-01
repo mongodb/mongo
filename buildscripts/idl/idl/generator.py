@@ -1745,7 +1745,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s object(localNS);' % (common.title_case(struct.cpp_name)))
                 else:
-                    assert "Missing case"
+                    assert False, "Missing case"
             else:
                 self._writer.write_line('%s object;' % common.title_case(struct.cpp_name))
 

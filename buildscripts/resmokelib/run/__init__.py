@@ -269,6 +269,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                                suite.test_kind, suite.get_display_name(), config.RANDOM_SEED)
         random.shuffle(suite.tests)
 
+    # pylint: disable=inconsistent-return-statements
     def _get_suites(self):
         """Return the list of suites for this resmoke invocation."""
         try:

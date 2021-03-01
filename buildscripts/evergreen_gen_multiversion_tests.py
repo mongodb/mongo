@@ -93,7 +93,6 @@ def get_backports_required_last_lts_hash(task_path_suffix: str):
     """Parse the last-lts shell binary to get the commit hash."""
     last_lts_shell_exec = os.path.join(task_path_suffix, LAST_LTS_MONGO_BINARY)
     shell_version = check_output([last_lts_shell_exec, "--version"]).decode('utf-8')
-    last_lts_commit_hash = ""
     for line in shell_version.splitlines():
         if "gitVersion" in line:
             version_line = line.split(':')[1]

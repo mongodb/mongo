@@ -192,10 +192,8 @@ class ClangFormat(object):
                     self.path = os.path.join(ospath, program)
                     if os.path.exists(self.path) and self._validate_version():
                         break
-                    else:
-                        self.path = None
-                        continue
-                    break
+                    self.path = None
+                    continue
                 else:
                     continue
                 break

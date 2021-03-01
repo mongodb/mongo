@@ -110,7 +110,7 @@ class WindowsDumper(Dumper):
         cdb = spawn.find_executable(debugger)
         if cdb is not None:
             return cdb
-        from win32com.shell import shell, shellcon
+        from win32com.shell import shell, shellcon  # pylint: disable=import-outside-toplevel
 
         # Cygwin via sshd does not expose the normal environment variables
         # Use the shell api to get the variable instead

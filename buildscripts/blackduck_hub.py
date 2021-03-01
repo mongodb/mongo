@@ -927,7 +927,7 @@ Black Duck manually.  After the update to the third-party library is committed, 
 version information for this component at {BLACKDUCK_PROJECT_URL}. Click on the down arrow on the
 far right of the component, choose edit and specify the new version."""
         else:
-            component_explanation = f"""This commponent was automatically detected by Black Duck. Black Duck should automatically detect
+            component_explanation = """This commponent was automatically detected by Black Duck. Black Duck should automatically detect
 the new version after the library is updated and the daily scanner task runs again."""
 
         mgr.write_report(
