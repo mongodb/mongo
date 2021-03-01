@@ -112,6 +112,7 @@ struct BenchRunOp {
     BSONObj query;
     bool safe = false;
     int skip = 0;
+    BSONObj sort;
     bool showError = false;
     bool showResult = false;
     std::string target;
