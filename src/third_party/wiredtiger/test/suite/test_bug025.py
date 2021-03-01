@@ -55,31 +55,30 @@ class test_bug025(wttest.WiredTigerTestCase):
         pos = os.path.getsize(filename) - 1024
         os.remove(filename)
 
-        # We get an error message, but the open succeeds.
-        with self.expectedStderrPattern('.*No such file or directory'):
+        # We will get error output, but not always in the same API calls from run to run,
+        # in particular the open connection doesn't always report the missing file, as
+        # index files are usually lazily loaded. As long as the missing file is reported
+        # at least once in the following code, it's good.
+        with self.expectedStderrPattern('.*No such file or directory.*'):
             self.open_conn()
 
-        newkey = ds.key(self.nrows)
-        newval = ds.value(self.nrows)
-        cursor = self.session.open_cursor(self.uri)
+            newkey = ds.key(self.nrows)
+            newval = ds.value(self.nrows)
+            cursor = self.session.open_cursor(self.uri)
 
-        # We get an error message, and the insert fails.
-        # The cursor remains open.
-        with self.expectedStderrPattern('.*No such file or directory'):
+            # The insert fails, and the cursor remains open.
             try:
                 cursor[newkey] = newval
             except Exception as e:
                 self.pr('Exception in first access: ' + str(e))
 
-        # We get an error message, and the insert fails.
-        # Before the associated fix was made, the insert crashed.
-        with self.expectedStderrPattern('.*No such file or directory'):
+            # The insert fails again.  Before the associated fix was made, the insert crashed.
             try:
                 cursor[newkey] = newval    # point of crash
             except Exception as e:
                 self.pr('Exception in second access: ' + str(e))
 
-        cursor.close()
+            cursor.close()
 
 if __name__ == '__main__':
     wttest.run()
