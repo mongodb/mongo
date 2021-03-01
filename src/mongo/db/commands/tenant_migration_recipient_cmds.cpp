@@ -28,7 +28,6 @@
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
@@ -129,15 +128,9 @@ public:
             }
         }
 
-    private:
-        void doCheckAuthorization(OperationContext* opCtx) const final {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::runTenantMigration));
-        }
+        void doCheckAuthorization(OperationContext* opCtx) const {}
 
+    private:
         bool supportsWriteConcern() const override {
             return false;
         }
@@ -211,15 +204,9 @@ public:
             recipientInstance->getCompletionFuture().get(opCtx);
         }
 
-    private:
-        void doCheckAuthorization(OperationContext* opCtx) const final {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::runTenantMigration));
-        }
+        void doCheckAuthorization(OperationContext* opCtx) const {}
 
+    private:
         bool supportsWriteConcern() const override {
             return false;
         }
