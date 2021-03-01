@@ -147,6 +147,8 @@ MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
 MONGO_FAIL_POINT_DEFINE(skipRetriesWhenConnectingToDonorHost);
 MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
 MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
+MONGO_FAIL_POINT_DEFINE(fpAfterFetchingCommittedTransactions);
+MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
 
 namespace {
 // We never restart just the oplog fetcher.  If a failure occurs, we restart the whole state machine
@@ -898,7 +900,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
             str::stream() << "Migration cannot apply transaction " << txnNumber << " on session "
                           << sessionId << " because a newer transaction "
                           << txnParticipant.getActiveTxnNumber() << " has already started",
-            txnParticipant.getActiveTxnNumber() < txnNumber);
+            txnParticipant.getActiveTxnNumber() <= txnNumber);
     if (txnParticipant.getActiveTxnNumber() == txnNumber) {
         // If the txn numbers are equal, move on to the next entry.
         return;
@@ -935,11 +937,30 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     // Invalidate in-memory state so that the next time the session is checked out, it would reload
     // the transaction state from 'config.transactions'.
     txnParticipant.invalidate(opCtx);
+
+    if (MONGO_unlikely(hangAfterUpdatingTransactionEntry.shouldFail())) {
+        LOGV2(5351400, "hangAfterUpdatingTransactionEntry failpoint enabled");
+        hangAfterUpdatingTransactionEntry.pauseWhileSet();
+    }
 }
 
-void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
+SemiFuture<void>
+TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
     if (MONGO_unlikely(skipFetchingCommittedTransactions.shouldFail())) {  // Test-only.
-        return;
+        return SemiFuture<void>::makeReady();
+    }
+
+    {
+        stdx::lock_guard lk(_mutex);
+        if (_stateDoc.getCompletedUpdatingTransactionsBeforeStartOpTime()) {
+            LOGV2_DEBUG(
+                5351401,
+                2,
+                "Already completed fetching committed transactions from donor, skipping stage",
+                "migrationId"_attr = getMigrationUUID(),
+                "tenantId"_attr = getTenantId());
+            return SemiFuture<void>::makeReady();
+        }
     }
 
     auto aggRequest = _makeCommittedTransactionsAggregation();
@@ -963,6 +984,16 @@ void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBefor
             uassertStatusOK(_taskState.getInterruptStatus());
         }
     }
+
+    stdx::lock_guard lk(_mutex);
+    _stateDoc.setCompletedUpdatingTransactionsBeforeStartOpTime(true);
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
+            auto opCtx = cc().makeOperationContext();
+            uassertStatusOK(
+                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
+        })
+        .semi();
 }
 
 void TenantMigrationRecipientService::Instance::_createOplogBuffer() {
@@ -1899,14 +1930,14 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                    })
                    .then([this, self = shared_from_this()] { return _onCloneSuccess(); })
                    .then([this, self = shared_from_this()] {
-                       _fetchCommittedTransactionsBeforeStartOpTime();
-                   })
-                   .then([this, self = shared_from_this()] {
                        {
                            auto opCtx = cc().makeOperationContext();
                            _stopOrHangOnFailPoint(&fpAfterCollectionClonerDone, opCtx.get());
                        }
-
+                       return _fetchCommittedTransactionsBeforeStartOpTime();
+                   })
+                   .then([this, self = shared_from_this()] {
+                       _stopOrHangOnFailPoint(&fpAfterFetchingCommittedTransactions);
                        LOGV2_DEBUG(4881200,
                                    1,
                                    "Recipient migration service starting oplog applier",

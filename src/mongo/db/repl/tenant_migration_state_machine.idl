@@ -237,3 +237,10 @@ structs:
                     A counter that is incremented on each restart due to a recipient failure.
                 type: long
                 default: 0
+            completedUpdatingTransactionsBeforeStartOpTime:
+                description: >-
+                    Indicates if the recipient has finished updating transaction entries that were
+                    committed before 'startFetchingDonorOpTime'. If true, the recipient can skip
+                    the fetching transactions stage.
+                type: bool
+                default: false
