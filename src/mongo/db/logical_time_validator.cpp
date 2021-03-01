@@ -51,6 +51,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(alwaysValidateClientsClusterTime);
+MONGO_FAIL_POINT_DEFINE(externalClientsNeverAuthorizedToAdvanceLogicalClock);
 MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients);
 
 const auto getLogicalTimeValidator =
@@ -209,6 +210,12 @@ void LogicalTimeValidator::enableKeyGenerator(OperationContext* opCtx, bool doEn
 }
 
 bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
+    if (MONGO_unlikely(externalClientsNeverAuthorizedToAdvanceLogicalClock.shouldFail())) {
+        auto isInternalClient = opCtx->getClient()->session() &&
+            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+        return isInternalClient;
+    }
+
     auto client = opCtx->getClient();
     // Note: returns true if auth is off, courtesy of
     // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.

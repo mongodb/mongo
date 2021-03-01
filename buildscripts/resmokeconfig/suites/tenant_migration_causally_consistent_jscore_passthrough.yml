@@ -4,6 +4,10 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  #
+  # Blacklists from tenant_migration_jscore_passthrough.yml
+  #
+
   - jstests/core/txns/**/*.js
   # These tests depend on hardcoded database name equality.
   - jstests/core/json_schema/misc_validation.js
@@ -88,6 +92,60 @@ selector:
   - jstests/core/where_system_js.js
   - jstests/core/write_result.js
 
+  #
+  # Blacklists from causally_consistent_jscore_passthrough.yml
+  #
+
+  - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+  # Tests that fail for Causal Consistency as they have statements that do not support
+  # non-local read concern.
+  - jstests/core/geo_big_polygon3.js
+  - jstests/core/mr*.js
+  - jstests/core/collation.js
+  - jstests/core/loadserverscripts.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/capped_max1.js
+  - jstests/core/commands_namespace_parsing.js
+  - jstests/core/tailable_cursor_invalidation.js
+  - jstests/core/tailable_getmore_batch_size.js
+  - jstests/core/tailable_skip_limit.js
+  - jstests/core/constructors.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/or4.js
+  - jstests/core/recursion.js
+  # An index drop does not necessarily cause cursors to be killed on the secondary.
+  - jstests/core/ord.js
+  # The `dbstats` command builds in-memory structures that are not causally consistent.
+  - jstests/core/dbstats.js
+  # TODO SERVER-30466
+  - jstests/core/explain_multi_plan.js
+  - jstests/core/explain_shell_helpers.js
+  - jstests/core/index_partial_read_ops.js
+  - jstests/core/update_arrayFilters.js
+  # TODO SERVER-30488
+  # In-memory data structures are not causally consistent.
+  - jstests/core/apitest_dbcollection.js
+  - jstests/core/getmore_invalidated_cursors.js
+  - jstests/core/orf.js #explain.executionStats is not CC
+  - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
+
+  #
+  # Blacklists from session_jscore_passthrough.yml
+  #
+
+  # These test run commands using legacy queries, which are not supported on sessions.
+  - jstests/core/comment_field.js
+  - jstests/core/exhaust.js
+  - jstests/core/invalidated_legacy_cursors.js
+  - jstests/core/validate_cmd_ns.js
+  - jstests/core/tailable_cursor_legacy_read_mode.js
+
+  # Unacknowledged writes prohibited in an explicit session.
+  - jstests/core/crud_api.js
+  - jstests/core/batch_write_command_w0.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
@@ -102,7 +160,17 @@ selector:
   - requires_profiling
   # emptycapped command is blocked during tenant migration.
   - requires_emptycapped
-  - tenant_migration_incompatible
+  ##
+  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
+  # override when it refuses to replace the readPreference of a particular command. Above each tag
+  # are the message(s) that cause the tag to be warranted.
+  ##
+  # "Cowardly refusing to override read preference of command: ..."
+  # "Cowardly refusing to run test with overridden read preference when it reads from a
+  #  non-replicated collection: ..."
+  - assumes_read_preference_unchanged
+  - does_not_support_causal_consistency
+  - requires_collstats
 
 executor:
   archive:
@@ -115,6 +183,8 @@ executor:
       eval: >-
         testingReplication = true;
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
+        load('jstests/libs/override_methods/enable_causal_consistency.js');
+        load('jstests/libs/override_methods/enable_sessions.js');
       global_vars:
         TestData: &TestData
           tenantId: "tenantMigrationTenantId"
@@ -144,6 +214,12 @@ executor:
             mode: alwaysOn
             data:
               blockTimeMS: 250
+        # Disable some cluster time validation optimizations to get more consistent coverage of
+        # gossiping cluster times across tenant migrations.
+        failpoint.alwaysValidateClientsClusterTime:
+            mode: alwaysOn
+        failpoint.externalClientsNeverAuthorizedToAdvanceLogicalClock:
+            mode: alwaysOn
         # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
         # only runs donorForgetMigration against the donor of each migration when it is safe to do
         # so. Therefore, the garbage collection delay doesn't need to be large.
