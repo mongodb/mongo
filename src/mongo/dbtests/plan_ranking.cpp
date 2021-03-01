@@ -140,8 +140,9 @@ public:
         _mps->pickBestPlan(&yieldPolicy).transitional_ignore();
         ASSERT(_mps->bestPlanChosen());
 
-        size_t bestPlanIdx = _mps->bestPlanIdx();
-        ASSERT_LESS_THAN(bestPlanIdx, solutions.size());
+        auto bestPlanIdx = _mps->bestPlanIdx();
+        ASSERT(bestPlanIdx.has_value());
+        ASSERT_LESS_THAN(*bestPlanIdx, solutions.size());
 
         // And return a pointer to the best solution.
         return static_cast<const MultiPlanStage*>(_mps.get())->bestSolution();

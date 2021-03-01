@@ -421,14 +421,21 @@ function assertExplainCount({explainResults, expectedCount}) {
         for (let shardExplain of execStages.shards) {
             const countStage = shardExplain.executionStages;
             assert(countStage.stage === "COUNT" || countStage.stage === "RECORD_STORE_FAST_COUNT",
-                   "root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT");
+                   `Root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT. ` +
+                       `The actual plan is: ${tojson(explainResults)}`);
             totalCounted += countStage.nCounted;
         }
-        assert.eq(totalCounted, expectedCount, "wrong count result");
+        assert.eq(totalCounted,
+                  expectedCount,
+                  assert.eq(totalCounted, expectedCount, "wrong count result"));
     } else {
         assert(execStages.stage === "COUNT" || execStages.stage === "RECORD_STORE_FAST_COUNT",
-               "root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT");
-        assert.eq(execStages.nCounted, expectedCount, "wrong count result");
+               `Root stage on shard is not COUNT or RECORD_STORE_FAST_COUNT. ` +
+                   `The actual plan is: ${tojson(explainResults)}`);
+        assert.eq(
+            execStages.nCounted,
+            expectedCount,
+            "Wrong count result. Actual: " + execStages.nCounted + "expected: " + expectedCount);
     }
 }
 

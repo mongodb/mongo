@@ -206,13 +206,17 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
     NoopYieldPolicy yieldPolicy(expCtx->opCtx->getServiceContext()->getFastClockSource());
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
-    ASSERT_EQUALS(0, mps->bestPlanIdx());
+    ASSERT_EQUALS(0, *mps->bestPlanIdx());
 
     return mps;
 }
 
 size_t getBestPlanWorks(MultiPlanStage* mps) {
-    return mps->getChildren()[mps->bestPlanIdx()]->getStats()->common.works;
+    auto bestPlanIdx = mps->bestPlanIdx();
+    tassert(3420011,
+            "Trying to get stats of a MultiPlanStage without winning plan",
+            bestPlanIdx.has_value());
+    return mps->getChildren()[*bestPlanIdx]->getStats()->common.works;
 }
 
 
@@ -253,7 +257,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     NoopYieldPolicy yieldPolicy(_clock);
     ASSERT_OK(mps->pickBestPlan(&yieldPolicy));
     ASSERT(mps->bestPlanChosen());
-    ASSERT_EQUALS(0, mps->bestPlanIdx());
+    ASSERT_EQUALS(0, *mps->bestPlanIdx());
 
     // Takes ownership of arguments other than 'collection'.
     auto statusWithPlanExecutor =
@@ -513,7 +517,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     auto root = static_cast<MultiPlanStage*>(execImpl->getRootStage());
     ASSERT_TRUE(root->bestPlanChosen());
     // The first candidate plan should have won.
-    ASSERT_EQ(root->bestPlanIdx(), 0);
+    ASSERT_EQ(*root->bestPlanIdx(), 0);
 
     BSONObjBuilder bob;
     Explain::explainStages(exec.get(),
