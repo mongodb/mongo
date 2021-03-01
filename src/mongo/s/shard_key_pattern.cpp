@@ -371,6 +371,16 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     return keyBuilder.obj();
 }
 
+BSONObj ShardKeyPattern::extractShardKeyFromDocThrows(const BSONObj& doc) const {
+    auto shardKey = extractShardKeyFromDoc(doc);
+
+    uassert(ErrorCodes::ShardKeyNotFound,
+            "Shard key cannot contain array values or array descendants.",
+            !shardKey.isEmpty());
+
+    return shardKey;
+}
+
 BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const {
     BSONObjBuilder fullDocBuilder(doc);
     for (const auto& skField : _keyPattern.toBSON()) {

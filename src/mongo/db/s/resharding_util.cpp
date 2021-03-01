@@ -487,7 +487,7 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
 
     uassertStatusOK(tempNssRoutingInfo);
 
-    auto shardKey = reshardingKeyPattern->extractShardKeyFromDoc(fullDocument);
+    auto shardKey = reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
 
     return tempNssRoutingInfo.getValue()
         .findIntersectingChunkWithSimpleCollation(shardKey)

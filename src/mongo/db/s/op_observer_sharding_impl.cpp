@@ -63,7 +63,7 @@ void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
     if (!atClusterTime)
         return;
 
-    auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDoc(doc);
+    auto shardKey = metadata.getShardKeyPattern().extractShardKeyFromDocThrows(doc);
 
     // We can assume the simple collation because shard keys do not support non-simple collations.
     auto cmAtTimeOfWrite =

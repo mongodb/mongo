@@ -182,7 +182,7 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
                                     long dataWritten,
                                     bool fromMigrate) {
     const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
-    BSONObj shardKey = shardKeyPattern.extractShardKeyFromDoc(document);
+    BSONObj shardKey = shardKeyPattern.extractShardKeyFromDocThrows(document);
 
     // Use the shard key to locate the chunk into which the document was updated, and increment the
     // number of bytes tracked for the chunk.
