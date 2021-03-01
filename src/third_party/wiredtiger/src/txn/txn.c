@@ -2178,7 +2178,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
          */
         if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP)) {
             __wt_verbose(session, WT_VERB_RTS,
-              "Performing shutdown rollback to stable with stable timestamp: %s",
+              "performing shutdown rollback to stable with stable timestamp: %s",
               __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string));
             WT_TRET(__wt_rollback_to_stable(session, cfg, true));
         }

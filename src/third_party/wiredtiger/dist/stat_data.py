@@ -875,6 +875,7 @@ conn_dsrc_stats = [
     TxnStat('txn_rts_hs_restore_updates', 'rollback to stable restored updates from history store'),
     TxnStat('txn_rts_hs_restore_tombstones', 'rollback to stable restored tombstones from history store'),
     TxnStat('txn_rts_hs_stop_older_than_newer_start', 'rollback to stable hs records with stop timestamps older than newer records'),
+    TxnStat('txn_rts_inconsistent_ckpt', 'rollback to stable inconsistent checkpoint'),
     TxnStat('txn_rts_keys_removed', 'rollback to stable keys removed'),
     TxnStat('txn_rts_keys_restored', 'rollback to stable keys restored'),
     TxnStat('txn_rts_sweep_hs_keys', 'rollback to stable sweeping history store keys'),
