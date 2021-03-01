@@ -184,21 +184,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> createCommittedTransactionsPipelineFo
     return Pipeline::create(std::move(stages), expCtx);
 }
 
-Status upsertCommittedTransactionEntry(OperationContext* opCtx, const BSONObj& entry) {
-    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
-
-    // Sanity check.
-    uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "No longer primary while attempting to insert transactions entry",
-            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
-
-    return writeConflictRetry(opCtx, "insertCommittedTransactionEntry", nss.ns(), [&]() -> Status {
-        Helpers::upsert(opCtx, nss.ns(), entry, false /* fromMigrate */);
-        return Status::OK();
-    });
-}
-
 std::unique_ptr<Pipeline, PipelineDeleter>
 createRetryableWritesOplogFetchingPipelineForTenantMigrations(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

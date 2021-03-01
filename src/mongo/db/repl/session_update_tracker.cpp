@@ -185,8 +185,8 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     // entries originating from multi-statement transactions.
     if (auto txnTableUpdate = _createTransactionTableUpdateFromTransactionOp(entry)) {
         if (entry.getFromTenantMigration()) {
-            // If the entry is from tenant migrations, the session info will be stored as a field
-            // inside of the 'o2' field.
+            // If the entry is from tenant migrations, the session info will be stored inside of the
+            // 'o2' field.
             auto sessionInfo = OperationSessionInfo::parse(
                 IDLParserErrorContext("OperationSessionInfo"), *entry.getObject2());
             _sessionsToUpdate.erase(*sessionInfo.getSessionId());

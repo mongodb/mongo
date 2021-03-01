@@ -50,7 +50,8 @@ assert.commandWorked(donorPrimary.getCollection(tenantNS).insert([{_id: 0, x: 0}
 }
 
 // This should be the only transaction entry on the donor fetched by the recipient.
-const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).find().toArray();
+assert.eq(1, donorPrimary.getCollection(transactionsNS).find().itcount());
+const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).find().toArray()[0];
 
 {
     jsTestLog("Run and abort a transaction prior to the migration");
@@ -84,7 +85,11 @@ const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).
     session.endSession();
 }
 
-jsTestLog("Starting a migration");
+const donorTxnEntries = donorPrimary.getCollection(transactionsNS).find().toArray();
+jsTestLog(`All donor entries: ${tojson(donorTxnEntries)}`);
+assert.eq(3, donorTxnEntries.length, `donor transaction entries: ${tojson(donorTxnEntries)}`);
+
+jsTestLog("Running a migration");
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
@@ -94,21 +99,22 @@ assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
 // Verify that the recipient has fetched and written only the first committed transaction entry from
 // the donor.
-const recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
-assert.eq(
-    1, recipientTxnEntries.length, `recipient transaction entries: ${tojson(recipientTxnEntries)}`);
-assert.eq(donorTxnEntryBeforeMigration,
-          recipientTxnEntries,
-          `fetched donor transaction entries: ${
-              tojson(donorTxnEntryBeforeMigration)}; recipient transaction entries: ${
-              tojson(recipientTxnEntries)}`);
+assert.eq(1, recipientPrimary.getCollection(transactionsNS).find().itcount());
+const recipientTxnEntry = recipientPrimary.getCollection(transactionsNS).find().toArray()[0];
 
-// Test that the client can retry 'commitTransaction' on the recipient for the transaction committed
-// prior to the tenant migration.
+assert.eq(donorTxnEntryBeforeMigration._id, recipientTxnEntry._id);
+assert.eq(donorTxnEntryBeforeMigration.txnNum, recipientTxnEntry.txnNum);
+assert.eq(donorTxnEntryBeforeMigration.state, recipientTxnEntry.state);
+
+// The recipient should have replaced the 'lastWriteOpTime' and 'lastWriteDate' fields.
+assert.neq(donorTxnEntryBeforeMigration.lastWriteOpTime, recipientTxnEntry.lastWriteOpTime);
+assert.neq(donorTxnEntryBeforeMigration.lastWriteDate, recipientTxnEntry.lastWriteDate);
+
+// Test that the client can retry 'commitTransaction' on the recipient.
 assert.commandWorked(recipientPrimary.adminCommand({
     commitTransaction: 1,
-    lsid: donorTxnEntryBeforeMigration[0]._id,
-    txnNumber: donorTxnEntryBeforeMigration[0].txnNum,
+    lsid: donorTxnEntryBeforeMigration._id,
+    txnNumber: donorTxnEntryBeforeMigration.txnNum,
     autocommit: false,
 }));
 
