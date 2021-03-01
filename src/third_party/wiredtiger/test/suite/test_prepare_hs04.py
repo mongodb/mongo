@@ -41,7 +41,7 @@ def timestamp_str(t):
 #
 class test_prepare_hs04(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=50MB,statistics=(fast)'
+    conn_config = 'cache_size=5MB,statistics=(fast)'
 
     # Create a small table.
     uri = "table:test_prepare_hs04"
@@ -81,8 +81,12 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
 
     def prepare_updates(self, ds):
 
-        # Commit some updates to get eviction and history store fired up
-        # Insert a key at timestamp 1
+        # Set oldest and stable timestamp for the database.
+        self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(1))
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
+
+        # Commit some updates to get eviction and history store fired up.
+        # Insert a key at timestamp 1.
         commit_key = "C"
         commit_value = b"bbbbb" * 100
         cursor = self.session.open_cursor(self.uri)
@@ -95,7 +99,7 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(1))
         cursor.close()
 
-        # Call checkpoint
+        # Call checkpoint.
         self.session.checkpoint()
 
         cursor = self.session.open_cursor(self.uri)
@@ -107,10 +111,12 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(10))
         cursor.close()
 
+        # Move the stable timestamp to match the timestamp for the last update.
+        self.conn.set_timestamp('stable_timestamp=' + timestamp_str(10))
+
         hs_writes_start = self.get_stat(stat.conn.cache_write_hs)
-        # Have prepared updates in multiple sessions. This should ensure writing
-        # prepared updates to the data store
-        # Insert the same key at timestamp 20, but with prepare updates.
+        # Have prepared updates in multiple sessions. This should ensure writing prepared updates to
+        # the data store. Insert the same key at timestamp 20, but with prepare updates.
         sessions = [0] * self.nsessions
         cursors = [0] * self.nsessions
         prepare_value = b"ccccc" * 100
@@ -128,7 +134,6 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             sessions[j].prepare_transaction('prepare_timestamp=' + timestamp_str(20))
 
         hs_writes = self.get_stat(stat.conn.cache_write_hs) - hs_writes_start
-
         # Assert if not writing anything to the history store.
         self.assertGreaterEqual(hs_writes, 0)
 
@@ -152,6 +157,8 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
             for j in range (0, self.nsessions):
                 sessions[j].commit_transaction(
                     'commit_timestamp=' + timestamp_str(30) + ',durable_timestamp=' + timestamp_str(30))
+            # Move the stable timestamp to match the durable timestamp for prepared updates.
+            self.conn.set_timestamp('stable_timestamp=' + timestamp_str(30))
 
         self.session.checkpoint()
 
@@ -162,22 +169,21 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         self.conn = self.setUpConnectionOpen("RESTART")
         self.session = self.setUpSessionOpen(self.conn)
 
-        # After simulating a crash, search for the keys inserted.
+        # After simulating a crash, search for the keys inserted. Rollback-to-stable as part of recovery
+        # will try restoring values according to the last known stable timestamp.
 
+        # Search keys with timestamp 5, ignore_prepare=true and expect the cursor search to return
+        # value committed before prepared update.
         txn_config = 'read_timestamp=' + timestamp_str(5) + ',ignore_prepare=false'
-        if self.commit == True:
-            # Search keys with timestamp 5, ignore_prepare=false and expect the cursor search to return WT_NOTFOUND.
-            self.search_keys_timestamp_and_ignore(ds, txn_config, None)
-        else:
-            # Search keys with timestamp 5, ignore_prepare=false and expect the cursor value to be commit_value.
-            self.search_keys_timestamp_and_ignore(ds, txn_config, commit_value)
+        self.search_keys_timestamp_and_ignore(ds, txn_config, commit_value)
 
+        # Search keys with timestamp 20, ignore_prepare=true and expect the cursor search to return
+        # WT_NOTFOUND.
         txn_config = 'read_timestamp=' + timestamp_str(20) + ',ignore_prepare=true'
-        # Search keys with timestamp 20, ignore_prepare=true and expect the cursor search to return WT_NOTFOUND.
         self.search_keys_timestamp_and_ignore(ds, txn_config, None)
 
-        txn_config = 'read_timestamp=' + timestamp_str(20) + ',ignore_prepare=false'
         # Search keys with timestamp 20, ignore_prepare=false and expect the cursor search to return WT_NOTFOUND.
+        txn_config = 'read_timestamp=' + timestamp_str(20) + ',ignore_prepare=false'
         self.search_keys_timestamp_and_ignore(ds, txn_config, None)
 
         # If commit is true then the commit_tramsactions was called and we will expect prepare_value.
