@@ -377,7 +377,7 @@ public:
          * Runs the aggregation from '_makeCommittedTransactionsAggregation()' and migrates the
          * resulting committed transactions entries into 'config.transactions'.
          */
-        void _fetchCommittedTransactionsBeforeStartOpTime();
+        SemiFuture<void> _fetchCommittedTransactionsBeforeStartOpTime();
 
         /**
          * Creates an aggregation pipeline to fetch transaction entries with 'lastWriteOpTime' <
