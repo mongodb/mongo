@@ -1,8 +1,5 @@
 /**
  * Tests that $match works correctly with dotted numeric path.
- *
- * TODO SERVER-49852: remove sbe_incompatible tag
- * @tags: [sbe_incompatible]
  */
 (function() {
 "use strict";

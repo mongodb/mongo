@@ -1,9 +1,5 @@
-
 /**
- * TODO SERVER-49852: remove sbe_incompatible tag
- * @tags: [
- *   sbe_incompatible,
- * ]
+ * Basic test for querying on documents containing arrays.
  */
 t = db.array4;
 t.drop();

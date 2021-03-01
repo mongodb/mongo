@@ -1,10 +1,8 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// TODO SERVER-49852: remove sbe_incompatible tag
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 // Checking for positional array updates with either .$ or .0 at the end
