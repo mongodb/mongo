@@ -183,6 +183,15 @@ public:
     }
 
     /**
+     * Construct an empty ordered multimap from Value to type T whose ordering and equivalence
+     * classes are given by this comparator. This comparator must outlive the returned set.
+     */
+    template <typename T>
+    std::multimap<Value, T, LessThan> makeOrderedValueMultimap() const {
+        return std::multimap<Value, T, LessThan>(LessThan(this));
+    }
+
+    /**
      * Construct an empty unordered map from Value to type T whose equivalence classes are given by
      * this comparator. This comparator must outlive the returned set.
      */
@@ -207,6 +216,9 @@ using ValueUnorderedSet =
 
 template <typename T>
 using ValueMap = std::map<Value, T, ValueComparator::LessThan>;
+
+template <typename T>
+using ValueMultimap = std::multimap<Value, T, ValueComparator::LessThan>;
 
 template <typename T>
 using ValueUnorderedMap =
