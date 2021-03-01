@@ -549,6 +549,18 @@ class Struct(common.SourceLocation):
         super(Struct, self).__init__(file_name, line, column)
 
 
+class AccessChecks(common.SourceLocation):
+    """IDL access checks information."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct an AccessChecks."""
+
+        self.none = None  # type: bool
+
+        super(AccessChecks, self).__init__(file_name, line, column)
+
+
 class Command(Struct):
     """
     IDL command information, a subtype of Struct.
@@ -568,6 +580,7 @@ class Command(Struct):
         self.reply_type = None  # type: str
         self.api_version = None  # type: str
         self.is_deprecated = False  # type: bool
+        self.access_check = None  # type: AccessChecks
         super(Command, self).__init__(file_name, line, column)
 
 

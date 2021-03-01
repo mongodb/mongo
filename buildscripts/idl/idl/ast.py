@@ -225,6 +225,16 @@ class Field(common.SourceLocation):
         super(Field, self).__init__(file_name, line, column)
 
 
+class AccessCheck(common.SourceLocation):
+    """IDL commmand access check information."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct an AccessCheck."""
+        self.placeholder = None  # type: str
+        super(AccessCheck, self).__init__(file_name, line, column)
+
+
 class Command(Struct):
     """
     IDL commmand information.
@@ -244,6 +254,7 @@ class Command(Struct):
         self.reply_type = None  # type: Field
         self.api_version = ""  # type: str
         self.is_deprecated = False  # type: bool
+        self.access_checks = None  # type: List[AccessCheck]
         super(Command, self).__init__(file_name, line, column)
 
 

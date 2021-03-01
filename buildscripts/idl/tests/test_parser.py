@@ -885,7 +885,7 @@ class TestParser(testcase.IDLTestcase):
                 deserializer: foo
                 default: foo
 
-        structs: 
+        structs:
             foo:
                 description: foo
                 strict: true
@@ -1235,7 +1235,7 @@ class TestParser(testcase.IDLTestcase):
         # Commands and structs with same name
         self.assert_parse_fail(
             test_preamble + textwrap.dedent("""
-            commands: 
+            commands:
                 foo:
                     description: foo
                     command_name: foo
@@ -1243,7 +1243,7 @@ class TestParser(testcase.IDLTestcase):
                     api_version: ""
                     fields:
                         foo: string
-            
+
             structs:
                 foo:
                     description: foo
@@ -1254,7 +1254,7 @@ class TestParser(testcase.IDLTestcase):
         # Commands and types with same name
         self.assert_parse_fail(
             test_preamble + textwrap.dedent("""
-            commands: 
+            commands:
                 string:
                     description: foo
                     command_name: foo
@@ -1322,7 +1322,7 @@ class TestParser(testcase.IDLTestcase):
                 fields:
                     foo:
                         type: bar
-                        supports_doc_sequence: false 
+                        supports_doc_sequence: false
             """))
 
         # supports_doc_sequence can be true
@@ -1705,6 +1705,25 @@ class TestParser(testcase.IDLTestcase):
                         type: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS)
+
+    def test_access_checks_positive(self):
+        # type: () -> None
+        """Positive access_check test cases."""
+
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    none: true
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
 
 
 if __name__ == '__main__':
