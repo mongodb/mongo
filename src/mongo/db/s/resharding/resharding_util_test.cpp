@@ -351,26 +351,6 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineSorted) {
     ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
 }
 
-
-TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineBeforeFetchTimestamp) {
-    size_t numTransactions = 10;
-    Timestamp fetchTimestamp(numTransactions / 2 + 1, 0);
-    auto [mockResults, expectedTransactions] = makeTransactions(
-        numTransactions, numTransactions, [](size_t i) { return Timestamp(i + 1, 0); });
-    expectedTransactions.erase(
-        std::remove_if(expectedTransactions.begin(),
-                       expectedTransactions.end(),
-                       [&fetchTimestamp](SessionTxnRecord transaction) {
-                           return transaction.getLastWriteOpTime().getTimestamp() >= fetchTimestamp;
-                       }),
-        expectedTransactions.end());
-
-    auto pipeline = constructPipeline(mockResults, fetchTimestamp, boost::none);
-
-    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
-}
-
-
 TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     size_t numTransactions = 10;
     auto [mockResults, expectedTransactions] = makeTransactions(

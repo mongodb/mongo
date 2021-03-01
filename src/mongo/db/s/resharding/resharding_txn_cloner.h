@@ -66,7 +66,6 @@ public:
      * [
      *      {$match: {_id: {$gt: <startAfter>}}},
      *      {$sort: {_id: 1}},
-     *      {$match: {"lastWriteOpTime.ts": {$lt: <fetchTimestamp>}}},
      * ]
      */
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
@@ -110,7 +109,6 @@ private:
  * pipeline: [
  *      {$match: {_id: {$gt: <startAfter>}}},
  *      {$sort: {_id: 1}},
- *      {$match: {"lastWriteOpTime.ts": {$lt: <fetchTimestamp>}}},
  * ],
  * Note that the caller is responsible for making sure that the transactions ns is set in the
  * expCtx.
