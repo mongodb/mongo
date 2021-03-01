@@ -67,9 +67,9 @@ var TenantMigrationUtil = (function() {
     function makeMigrationCertificatesForTest() {
         return {
             donorCertificateForRecipient:
-                getCertificateAndPrivateKey("jstests/libs/rs0_tenant_migration.pem"),
+                getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem"),
             recipientCertificateForDonor:
-                getCertificateAndPrivateKey("jstests/libs/rs1_tenant_migration.pem")
+                getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem")
         };
     }
 
