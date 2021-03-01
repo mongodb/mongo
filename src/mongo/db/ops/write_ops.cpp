@@ -75,11 +75,6 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
     }
 }
 
-void validateInsertOp(const write_ops::Insert& insertOp) {
-    const auto& docs = insertOp.getDocuments();
-    checkOpCountForCommand(insertOp, docs.size());
-}
-
 }  // namespace
 
 namespace write_ops {
@@ -136,7 +131,7 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
 write_ops::Insert InsertOp::parse(const OpMsgRequest& request) {
     auto insertOp = Insert::parse(IDLParserErrorContext("insert"), request);
 
-    validateInsertOp(insertOp);
+    validate(insertOp);
     return insertOp;
 }
 
@@ -163,8 +158,13 @@ write_ops::Insert InsertOp::parseLegacy(const Message& msgRaw) {
         return documents;
     }());
 
-    validateInsertOp(op);
+    validate(op);
     return op;
+}
+
+void InsertOp::validate(const write_ops::Insert& insertOp) {
+    const auto& docs = insertOp.getDocuments();
+    checkOpCountForCommand(insertOp, docs.size());
 }
 
 write_ops::Update UpdateOp::parse(const OpMsgRequest& request) {
@@ -211,6 +211,10 @@ write_ops::UpdateReply UpdateOp::parseResponse(const BSONObj& obj) {
     return write_ops::UpdateReply::parse(IDLParserErrorContext("updateReply"), obj);
 }
 
+void UpdateOp::validate(const Update& updateOp) {
+    checkOpCountForCommand(updateOp, updateOp.getUpdates().size());
+}
+
 write_ops::FindAndModifyReply FindAndModifyOp::parseResponse(const BSONObj& obj) {
     uassertStatusOK(getStatusFromCommandResult(obj));
 
@@ -250,6 +254,10 @@ write_ops::Delete DeleteOp::parseLegacy(const Message& msgRaw) {
     }());
 
     return op;
+}
+
+void DeleteOp::validate(const Delete& deleteOp) {
+    checkOpCountForCommand(deleteOp, deleteOp.getDeletes().size());
 }
 
 write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry(

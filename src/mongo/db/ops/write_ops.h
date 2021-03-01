@@ -39,20 +39,22 @@ class InsertOp {
 public:
     static write_ops::Insert parse(const OpMsgRequest& request);
     static write_ops::Insert parseLegacy(const Message& msg);
+    static void validate(const write_ops::Insert& insertOp);
 };
 
 class UpdateOp {
 public:
     static write_ops::Update parse(const OpMsgRequest& request);
     static write_ops::Update parseLegacy(const Message& msg);
-
     static write_ops::UpdateReply parseResponse(const BSONObj& obj);
+    static void validate(const write_ops::Update& updateOp);
 };
 
 class DeleteOp {
 public:
     static write_ops::Delete parse(const OpMsgRequest& request);
     static write_ops::Delete parseLegacy(const Message& msg);
+    static void validate(const write_ops::Delete& deleteOp);
 };
 
 class FindAndModifyOp {
