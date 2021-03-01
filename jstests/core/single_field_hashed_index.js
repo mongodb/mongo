@@ -5,7 +5,6 @@
  * @tags: [
  *   assumes_no_implicit_index_creation,
  *   requires_fastcount,
- *   sbe_incompatible,
  *   requires_fcv_49,
  * ]
  */
