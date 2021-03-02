@@ -219,9 +219,9 @@ void CommonMongodProcessInterface::appendLatencyStats(OperationContext* opCtx,
 
 Status CommonMongodProcessInterface::appendStorageStats(OperationContext* opCtx,
                                                         const NamespaceString& nss,
-                                                        const BSONObj& param,
+                                                        const StorageStatsSpec& spec,
                                                         BSONObjBuilder* builder) const {
-    return appendCollectionStorageStats(opCtx, nss, param, builder);
+    return appendCollectionStorageStats(opCtx, nss, spec, builder);
 }
 
 Status CommonMongodProcessInterface::appendRecordCount(OperationContext* opCtx,

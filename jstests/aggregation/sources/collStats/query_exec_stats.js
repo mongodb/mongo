@@ -27,9 +27,9 @@ for (let i = 0; i < nDocs; i++) {
 
 // Test that an error is returned if queryExecStats is not an object.
 let pipeline = [{$collStats: {queryExecStats: 1}}];
-assertErrorCode(coll, pipeline, 31141, "queryExecStats spec must be an object");
+assertErrorCode(coll, pipeline, ErrorCodes.TypeMismatch, "queryExecStats spec must be an object");
 pipeline = [{$collStats: {queryExecStats: "1"}}];
-assertErrorCode(coll, pipeline, 31141, "queryExecStats spec must be an object");
+assertErrorCode(coll, pipeline, ErrorCodes.TypeMismatch, "queryExecStats spec must be an object");
 
 // Test the accuracy of the result of queryExecStats as a standalone option.
 pipeline = [{$collStats: {queryExecStats: {}}}];

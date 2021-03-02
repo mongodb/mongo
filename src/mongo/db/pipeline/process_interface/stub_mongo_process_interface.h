@@ -99,7 +99,7 @@ public:
 
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& param,
+                              const StorageStatsSpec& spec,
                               BSONObjBuilder* builder) const override {
         MONGO_UNREACHABLE;
     }

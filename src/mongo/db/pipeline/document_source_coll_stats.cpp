@@ -55,48 +55,10 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);
-    intrusive_ptr<DocumentSourceCollStats> collStats(new DocumentSourceCollStats(pExpCtx));
+    auto spec = DocumentSourceCollStatsSpec::parse(IDLParserErrorContext(kStageName),
+                                                   specElem.embeddedObject());
 
-    for (const auto& elem : specElem.embeddedObject()) {
-        StringData fieldName = elem.fieldNameStringData();
-
-        if ("latencyStats" == fieldName) {
-            uassert(40167,
-                    str::stream() << "latencyStats argument must be an object, but got " << elem
-                                  << " of type " << typeName(elem.type()),
-                    elem.type() == BSONType::Object);
-            if (!elem["histograms"].eoo()) {
-                uassert(40305,
-                        str::stream() << "histograms option to latencyStats must be bool, got "
-                                      << elem << "of type " << typeName(elem.type()),
-                        elem["histograms"].isBoolean());
-            }
-        } else if ("storageStats" == fieldName) {
-            uassert(40279,
-                    str::stream() << "storageStats argument must be an object, but got " << elem
-                                  << " of type " << typeName(elem.type()),
-                    elem.type() == BSONType::Object);
-        } else if ("count" == fieldName) {
-            uassert(40480,
-                    str::stream() << "count argument must be an object, but got " << elem
-                                  << " of type " << typeName(elem.type()),
-                    elem.type() == BSONType::Object);
-        } else if ("queryExecStats" == fieldName) {
-            uassert(31141,
-                    str::stream() << "queryExecStats argument must be an empty object, but got "
-                                  << elem << " of type " << typeName(elem.type()),
-                    elem.type() == BSONType::Object);
-            uassert(31170,
-                    str::stream() << "queryExecStats argument must be an empty object, but got "
-                                  << elem,
-                    elem.embeddedObject().isEmpty());
-        } else {
-            uasserted(40168, str::stream() << "unrecognized option to $collStats: " << fieldName);
-        }
-    }
-
-    collStats->_collStatsSpec = specElem.Obj().getOwned();
-    return collStats;
+    return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }
 
 DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
@@ -119,33 +81,27 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     builder.append("host", getHostNameCachedAndPort());
     builder.appendDate("localTime", jsTime());
 
-    if (_collStatsSpec.hasField("latencyStats")) {
-        // If the latencyStats field exists, it must have been validated as an object when parsing.
-        bool includeHistograms = false;
-        if (_collStatsSpec["latencyStats"].type() == BSONType::Object) {
-            includeHistograms = _collStatsSpec["latencyStats"]["histograms"].boolean();
-        }
+    if (auto latencyStatsSpec = _collStatsSpec.getLatencyStats()) {
         pExpCtx->mongoProcessInterface->appendLatencyStats(
-            pExpCtx->opCtx, pExpCtx->ns, includeHistograms, &builder);
+            pExpCtx->opCtx, pExpCtx->ns, latencyStatsSpec->getHistograms(), &builder);
     }
 
-    if (_collStatsSpec.hasField("storageStats")) {
+    if (auto storageStats = _collStatsSpec.getStorageStats()) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        uassertStatusOKWithContext(
-            pExpCtx->mongoProcessInterface->appendStorageStats(
-                pExpCtx->opCtx, pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder),
-            "Unable to retrieve storageStats in $collStats stage");
+        uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendStorageStats(
+                                       pExpCtx->opCtx, pExpCtx->ns, *storageStats, &storageBuilder),
+                                   "Unable to retrieve storageStats in $collStats stage");
         storageBuilder.doneFast();
     }
 
-    if (_collStatsSpec.hasField("count")) {
+    if (_collStatsSpec.getCount()) {
         uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendRecordCount(
                                        pExpCtx->opCtx, pExpCtx->ns, &builder),
                                    "Unable to retrieve count in $collStats stage");
     }
 
-    if (_collStatsSpec.hasField("queryExecStats")) {
+    if (_collStatsSpec.getQueryExecStats()) {
         uassertStatusOKWithContext(pExpCtx->mongoProcessInterface->appendQueryExecStats(
                                        pExpCtx->opCtx, pExpCtx->ns, &builder),
                                    "Unable to retrieve queryExecStats in $collStats stage");
@@ -155,7 +111,7 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
 }
 
 Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _collStatsSpec}});
+    return Value(Document{{getSourceName(), _collStatsSpec.toBSON()}});
 }
 
 }  // namespace mongo

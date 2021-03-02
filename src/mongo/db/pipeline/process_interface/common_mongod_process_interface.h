@@ -63,7 +63,7 @@ public:
                             BSONObjBuilder* builder) const final;
     Status appendStorageStats(OperationContext* opCtx,
                               const NamespaceString& nss,
-                              const BSONObj& param,
+                              const StorageStatsSpec& spec,
                               BSONObjBuilder* builder) const final;
     Status appendRecordCount(OperationContext* opCtx,
                              const NamespaceString& nss,

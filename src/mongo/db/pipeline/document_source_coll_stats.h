@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_coll_stats_gen.h"
 
 namespace mongo {
 
@@ -44,15 +45,21 @@ public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& spec) {
-            bool hasCount = spec.isABSONObj() && spec.embeddedObject().hasField("count");
-            return std::make_unique<LiteParsed>(spec.fieldName(), nss, hasCount);
+                                                 const BSONElement& specElem) {
+            uassert(5447000,
+                    str::stream() << "$collStats must take a nested object but found: " << specElem,
+                    specElem.type() == BSONType::Object);
+            auto spec = DocumentSourceCollStatsSpec::parse(IDLParserErrorContext(kStageName),
+                                                           specElem.embeddedObject());
+            return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
         }
 
-        explicit LiteParsed(std::string parseTimeName, NamespaceString nss, bool hasCount)
+        explicit LiteParsed(std::string parseTimeName,
+                            NamespaceString nss,
+                            DocumentSourceCollStatsSpec spec)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _nss(std::move(nss)),
-              _hasCount(hasCount) {}
+              _spec(std::move(spec)) {}
 
         bool isCollStats() const final {
             return true;
@@ -72,16 +79,17 @@ public:
         }
 
         bool isCollStatsWithCount() const final {
-            return _hasCount;
+            return static_cast<bool>(_spec.getCount());
         }
 
     private:
         const NamespaceString _nss;
-        const bool _hasCount;
+        const DocumentSourceCollStatsSpec _spec;
     };
 
-    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-        : DocumentSource(kStageName, pExpCtx) {}
+    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                            DocumentSourceCollStatsSpec spec)
+        : DocumentSource(kStageName, pExpCtx), _collStatsSpec(std::move(spec)) {}
 
     const char* getSourceName() const final;
 
@@ -112,7 +120,7 @@ private:
     GetNextResult doGetNext() final;
 
     // The raw object given to $collStats containing user specified options.
-    BSONObj _collStatsSpec;
+    DocumentSourceCollStatsSpec _collStatsSpec;
     bool _finished = false;
 };
 

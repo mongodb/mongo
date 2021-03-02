@@ -21,9 +21,13 @@ assertErrorCode(coll, pipeline, 40602);
 
 // Test that an error is returned if count is not an object.
 pipeline = [{$collStats: {count: 1}}];
-assertErrorCode(coll, pipeline, 40480, "count spec must be an object");
+assertErrorCode(coll, pipeline, ErrorCodes.TypeMismatch, "count spec must be an object");
 pipeline = [{$collStats: {count: "1"}}];
-assertErrorCode(coll, pipeline, 40480, "count spec must be an object");
+assertErrorCode(coll, pipeline, ErrorCodes.TypeMismatch, "count spec must be an object");
+
+// Test that an error is returned if count is not an empty object.
+pipeline = [{$collStats: {count: {unrecognized: 1}}}];
+assertErrorCode(coll, pipeline, 31170, "count spec must be an empty object");
 
 // Test the accuracy of the record count as a standalone option.
 pipeline = [{$collStats: {count: {}}}];

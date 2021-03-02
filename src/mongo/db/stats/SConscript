@@ -120,7 +120,7 @@ env.Library(
     source=[
         "latency_server_status_section.cpp",
         "lock_server_status_section.cpp",
-        'storage_stats.cpp',
+        "storage_stats.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -132,6 +132,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
     ],
 )
