@@ -368,10 +368,10 @@ public:
 
         /**
          * Runs an aggregation that gets the entire oplog chain for every retryable write entry in
-         * `config.transactions` with `lastWriteOpTime` < `startFetchingOpTime`. Adds these oplog
-         * entries to the oplog buffer.
+         * `config.transactions`. Only returns oplog entries in the chain where
+         * `ts` < `startFetchingOpTime.ts` and adds them to the oplog buffer.
          */
-        void _fetchRetryableWritesOplogBeforeStartOpTime();
+        SemiFuture<void> _fetchRetryableWritesOplogBeforeStartOpTime();
 
         /**
          * Runs the aggregation from '_makeCommittedTransactionsAggregation()' and migrates the
