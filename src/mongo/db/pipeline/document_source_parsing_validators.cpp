@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,38 +27,20 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/storage_stats_spec_gen.h"
+#include "mongo/db/pipeline/document_source_parsing_validators.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
-/**
- * Appends to 'builder' storage related statistics for the collection represented by 'nss'.
- *
- * Params:
- * opCtx
- * nss Fully qualified namespace.
- * spec Includes options such as "scale" (default = 1) and "verbose".
- * builder out; object the stats will be appended to.
- *
- * returns Status, (note "NamespaceNotFound" will fill result with 0-ed stats)
- */
-Status appendCollectionStorageStats(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const StorageStatsSpec& spec,
-                                    BSONObjBuilder* builder);
-
-/**
- * Appends the collection record count to 'builder' for the collection represented by 'nss'.
- */
-Status appendCollectionRecordCount(OperationContext* opCtx,
-                                   const NamespaceString& nss,
-                                   BSONObjBuilder* builder);
-
-};  // namespace mongo
+Status validateObjectIsEmpty(const BSONObj& object) {
+    if (!object.isEmpty()) {
+        return {
+            ErrorCodes::Error{31170},
+            str::stream() << "expected an empty object, but got " << object,
+        };
+    }
+    return Status::OK();
+}
+}  // namespace mongo

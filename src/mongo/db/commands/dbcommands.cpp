@@ -75,6 +75,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/storage_stats_spec_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -513,7 +514,8 @@ public:
         }
 
         result.append("ns", nss.ns());
-        Status status = appendCollectionStorageStats(opCtx, nss, jsobj, &result);
+        auto spec = StorageStatsSpec::parse(IDLParserErrorContext("collStats"), jsobj);
+        Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
         if (!status.isOK() && status.code() != ErrorCodes::NamespaceNotFound) {
             errmsg = status.reason();
             return false;

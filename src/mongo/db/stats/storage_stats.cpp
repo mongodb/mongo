@@ -47,20 +47,11 @@ namespace mongo {
 
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    const BSONObj& param,
+                                    const StorageStatsSpec& storageStatsSpec,
                                     BSONObjBuilder* result) {
-    int scale = 1;
-    if (param["scale"].isNumber()) {
-        scale = param["scale"].numberInt();
-        if (scale < 1) {
-            return {ErrorCodes::BadValue, "scale has to be >= 1"};
-        }
-    } else if (param["scale"].trueValue()) {
-        return {ErrorCodes::BadValue, "scale has to be a number >= 1"};
-    }
-
-    bool verbose = param["verbose"].trueValue();
-    bool waitForLock = !param.hasField("waitForLock") || param["waitForLock"].trueValue();
+    auto scale = storageStatsSpec.getScale().value_or(1);
+    bool verbose = storageStatsSpec.getVerbose();
+    bool waitForLock = storageStatsSpec.getWaitForLock();
 
     bool isTimeseries = false;
     if (auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db())) {
