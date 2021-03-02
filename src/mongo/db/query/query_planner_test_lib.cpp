@@ -387,9 +387,9 @@ bool QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         }
 
         return true;
-    } else if (STAGE_TEXT == trueSoln->getType()) {
+    } else if (STAGE_TEXT_MATCH == trueSoln->getType()) {
         // {text: {search: "somestr", language: "something", filter: {blah: 1}}}
-        const TextNode* node = static_cast<const TextNode*>(trueSoln);
+        const TextMatchNode* node = static_cast<const TextMatchNode*>(trueSoln);
         BSONElement el = testSoln["text"];
         if (el.eoo() || !el.isABSONObj()) {
             return false;

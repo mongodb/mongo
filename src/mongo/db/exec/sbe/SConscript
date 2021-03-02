@@ -20,6 +20,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/storage/key_string',
@@ -48,7 +49,6 @@ sbeEnv.Library(
         'stages/sort.cpp',
         'stages/sorted_merge.cpp',
         'stages/spool.cpp',
-        'stages/text_match.cpp',
         'stages/traverse.cpp',
         'stages/union.cpp',
         'stages/unique.cpp',

@@ -68,7 +68,7 @@ public:
     };
 
     TextOrStage(ExpressionContext* expCtx,
-                const FTSSpec& ftsSpec,
+                size_t keyPrefixSize,
                 WorkingSet* ws,
                 const MatchExpression* filter,
                 const CollectionPtr& collection);
@@ -123,8 +123,8 @@ private:
      */
     StageState returnResults(WorkingSetID* out);
 
-    // The index spec used to determine where to find the score.
-    FTSSpec _ftsSpec;
+    // The key prefix length within a possibly compound key: {prefix,term,score,suffix}.
+    const size_t _keyPrefixSize;
 
     // Not owned by us.
     WorkingSet* _ws;

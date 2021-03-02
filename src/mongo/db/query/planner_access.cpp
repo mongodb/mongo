@@ -40,6 +40,9 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/fts/fts_query_noop.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -65,7 +68,7 @@ namespace dps = ::mongo::dotted_path_support;
  * Text node functors.
  */
 bool isTextNode(const QuerySolutionNode* node) {
-    return STAGE_TEXT == node->getType();
+    return STAGE_TEXT_MATCH == node->getType();
 }
 
 /**
@@ -346,9 +349,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeLeafNode(
         // We must not keep the expression node around.
         *tightnessOut = IndexBoundsBuilder::EXACT;
         auto textExpr = static_cast<const TextMatchExpressionBase*>(expr);
-        auto ret = std::make_unique<TextNode>(index);
-        ret->ftsQuery = textExpr->getFTSQuery().clone();
-
+        auto ret = std::make_unique<TextMatchNode>(
+            index,
+            textExpr->getFTSQuery().clone(),
+            query.metadataDeps()[DocumentMetadataFields::kTextScore]);
         // Count the number of prefix fields before the "text" field.
         for (auto&& keyPatternElt : ret->index.keyPattern) {
             // We know that the only key pattern with a type of String is the _fts field
@@ -415,7 +419,7 @@ bool QueryPlannerAccess::shouldMergeWithLeaf(const MatchExpression* expr,
     // by adding a filter to the special leaf type.
     //
 
-    if (STAGE_TEXT == type) {
+    if (STAGE_TEXT_MATCH == type) {
         // Currently only one text predicate is allowed, but to be safe, make sure that we
         // do not try to merge two text predicates.
         return MatchExpression::AND == mergeType && MatchExpression::TEXT != exprType;
@@ -469,8 +473,8 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
 
     const StageType type = node->getType();
 
-    if (STAGE_TEXT == type) {
-        auto textNode = static_cast<TextNode*>(node);
+    if (STAGE_TEXT_MATCH == type) {
+        auto textNode = static_cast<TextMatchNode*>(node);
 
         if (pos < textNode->numPrefixFields) {
             // This predicate is assigned to one of the prefix fields of the text index. Such
@@ -568,12 +572,108 @@ void QueryPlannerAccess::mergeWithLeafNode(MatchExpression* expr, ScanBuildingSt
     }
 }
 
+void buildTextSubPlan(TextMatchNode* tn) {
+    tassert(5432205, "text match node is null", tn);
+    tassert(5432206, "text match node already has children", tn->children.empty());
+    tassert(5432207, "text search query is not provided", tn->ftsQuery.get());
+
+    auto query = dynamic_cast<const fts::FTSQueryImpl*>(tn->ftsQuery.get());
+    // If we're unable to cast to FTSQueryImpl, then the given query must be an FTSQueryNoop, which
+    // is only used for testing the QueryPlanner and never tries to execute the query, so we don't
+    // need to construct an entire text sub-plan. Moreover, to compute index bounds we need a list
+    // of terms, which can only be obtain from FTSQueryImpl.
+    if (!query) {
+        return;
+    }
+
+    // If the query requires the "textScore" field or involves multiple search terms, a TEXT_OR or
+    // OR stage is needed. Otherwise, we can use a single index scan directly.
+    const bool needOrStage = tn->wantTextScore || query->getTermsForBounds().size() > 1;
+
+    tassert(5432208,
+            "failed to obtain text index version",
+            tn->index.infoObj.hasField("textIndexVersion"));
+    const auto textIndexVersion =
+        static_cast<fts::TextIndexVersion>(tn->index.infoObj["textIndexVersion"].numberInt());
+
+    // Get all the index scans for each term in our query.
+    std::vector<std::unique_ptr<QuerySolutionNode>> indexScanList;
+    indexScanList.reserve(query->getTermsForBounds().size());
+    for (const auto& term : query->getTermsForBounds()) {
+        auto ixscan = std::make_unique<IndexScanNode>(tn->index);
+        ixscan->bounds.startKey = fts::FTSIndexFormat::getIndexKey(
+            fts::MAX_WEIGHT, term, tn->indexPrefix, textIndexVersion);
+        ixscan->bounds.endKey =
+            fts::FTSIndexFormat::getIndexKey(0, term, tn->indexPrefix, textIndexVersion);
+        ixscan->bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+        ixscan->bounds.isSimpleRange = true;
+        ixscan->direction = -1;
+        ixscan->shouldDedup = tn->index.multikey;
+
+        // If we will be adding a TEXT_OR or OR stage, then it is responsible for applying the
+        // filter. Otherwise, the index scan applies the filter.
+        if (!needOrStage && tn->filter) {
+            ixscan->filter = tn->filter->shallowClone();
+        }
+
+        indexScanList.push_back(std::move(ixscan));
+    }
+
+    // In case the query didn't have any search term, we can simply use an EOF sub-plan, as no
+    // results can be returned in this case anyway.
+    if (indexScanList.empty()) {
+        indexScanList.push_back(std::make_unique<EofNode>());
+    }
+
+    // Build the union of the index scans as a TEXT_OR or an OR stage, depending on whether the
+    // projection requires the "textScore" $meta field.
+    if (tn->wantTextScore) {
+        // We use a TEXT_OR stage to get the union of the results from the index scans and then
+        // compute their text scores. This is a blocking operation.
+        auto textScorer = std::make_unique<TextOrNode>();
+        textScorer->filter = std::move(tn->filter);
+        for (auto&& ixscan : indexScanList) {
+            textScorer->children.push_back(ixscan.release());
+        }
+
+        tn->children.push_back(textScorer.release());
+    } else {
+        // Because we don't need the text score, we can use a non-blocking OR stage to get the union
+        // of the index scans or use the index scan directly if there is only one.
+        auto textSearcher = [&]() -> std::unique_ptr<QuerySolutionNode> {
+            if (indexScanList.size() == 1) {
+                tassert(5397400,
+                        "If there is only one index scan and we do not need textScore, needOrStage "
+                        "should be false",
+                        !needOrStage);
+                return std::move(indexScanList[0]);
+            } else {
+                auto orTextSearcher = std::make_unique<OrNode>();
+                orTextSearcher->filter = std::move(tn->filter);
+                for (auto&& ixscan : indexScanList) {
+                    orTextSearcher->children.push_back(ixscan.release());
+                }
+                return std::move(orTextSearcher);
+            }
+        }();
+
+        // Unlike the TEXT_OR stage, the OR stage does not fetch the documents that it outputs. We
+        // add our own FETCH stage to satisfy the requirement of the TEXT_MATCH stage that its
+        // WorkingSetMember inputs have fetched data.
+        auto fetchNode = std::make_unique<FetchNode>();
+        fetchNode->children.push_back(textSearcher.release());
+
+        tn->children.push_back(fetchNode.release());
+    }
+}
+
 void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntry& index) {
-    TextNode* tn = static_cast<TextNode*>(node);
+    auto tn = static_cast<TextMatchNode*>(node);
 
     // If there's no prefix, the filter is already on the node and the index prefix is null.
     // We can just return.
     if (!tn->numPrefixFields) {
+        buildTextSubPlan(tn);
         return;
     }
 
@@ -648,6 +748,8 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
     }
 
     tn->indexPrefix = prefixBob.obj();
+
+    buildTextSubPlan(tn);
 }
 
 bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
@@ -698,7 +800,7 @@ void QueryPlannerAccess::finishAndOutputLeaf(ScanBuildingState* scanState,
 void QueryPlannerAccess::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
     const StageType type = node->getType();
 
-    if (STAGE_TEXT == type) {
+    if (STAGE_TEXT_MATCH == type) {
         return finishTextNode(node, index);
     }
 

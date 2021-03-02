@@ -47,10 +47,13 @@ const char* TextMatchStage::kStageType = "TEXT_MATCH";
 
 TextMatchStage::TextMatchStage(ExpressionContext* expCtx,
                                unique_ptr<PlanStage> child,
-                               const FTSQueryImpl& query,
-                               const FTSSpec& spec,
+                               const TextMatchParams& params,
                                WorkingSet* ws)
-    : PlanStage(kStageType, expCtx), _ftsMatcher(query, spec), _ws(ws) {
+    : PlanStage(kStageType, expCtx), _ftsMatcher(params.query, params.spec), _ws(ws) {
+    _specificStats.indexPrefix = params.indexPrefix;
+    _specificStats.indexName = params.index->indexName();
+    _specificStats.parsedTextQuery = params.query.toBSON();
+    _specificStats.textIndexVersion = params.index->infoObj()["textIndexVersion"].numberInt();
     _children.emplace_back(std::move(child));
 }
 

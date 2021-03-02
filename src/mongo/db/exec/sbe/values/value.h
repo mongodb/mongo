@@ -44,6 +44,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/platform/decimal128.h"
@@ -134,6 +135,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a collator interface object.
     collator,
+
+    // Pointer to fts::FTSMatcher for full text search.
+    ftsMatcher,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -906,6 +910,10 @@ inline CollatorInterface* getCollatorView(Value val) noexcept {
     return reinterpret_cast<CollatorInterface*>(val);
 }
 
+inline fts::FTSMatcher* getFtsMatcherView(Value val) noexcept {
+    return reinterpret_cast<fts::FTSMatcher*>(val);
+}
+
 /**
  * Pattern and flags of Regex are stored in BSON as two C strings written one after another.
  *
@@ -960,6 +968,8 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
 
 std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer&);
+
+std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
 
 void releaseValue(TypeTags tag, Value val) noexcept;
 
@@ -1017,6 +1027,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyBsonRegex(getBsonRegexView(val));
         case TypeTags::bsonJavascript:
             return makeCopyBsonJavascript(getBsonJavascriptView(val));
+        case TypeTags::ftsMatcher:
+            return makeCopyFtsMatcher(*getFtsMatcherView(val));
         default:
             break;
     }

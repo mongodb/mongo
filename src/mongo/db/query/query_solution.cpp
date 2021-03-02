@@ -168,44 +168,6 @@ void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
 }
 
 //
-// TextNode
-//
-
-void TextNode::appendToString(str::stream* ss, int indent) const {
-    addIndent(ss, indent);
-    *ss << "TEXT\n";
-    addIndent(ss, indent + 1);
-    *ss << "name = " << index.identifier.catalogName << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "keyPattern = " << index.keyPattern.toString() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "query = " << ftsQuery->getQuery() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "language = " << ftsQuery->getLanguage() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "caseSensitive= " << ftsQuery->getCaseSensitive() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "diacriticSensitive= " << ftsQuery->getDiacriticSensitive() << '\n';
-    addIndent(ss, indent + 1);
-    *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
-    if (nullptr != filter) {
-        addIndent(ss, indent + 1);
-        *ss << " filter = " << filter->debugString();
-    }
-    addCommon(ss, indent);
-}
-
-QuerySolutionNode* TextNode::clone() const {
-    TextNode* copy = new TextNode(this->index);
-    cloneBaseData(copy);
-
-    copy->ftsQuery = this->ftsQuery->clone();
-    copy->indexPrefix = this->indexPrefix;
-
-    return copy;
-}
-
-//
 // CollectionScanNode
 //
 
@@ -1372,6 +1334,68 @@ QuerySolutionNode* EofNode::clone() const {
     auto copy = new EofNode();
     cloneBaseData(copy);
     return copy;
+}
+
+//
+// TextOrNode
+//
+void TextOrNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "TEXT_OR\n";
+    if (nullptr != filter) {
+        addIndent(ss, indent + 1);
+        *ss << " filter = " << filter->debugString() << '\n';
+    }
+    addCommon(ss, indent);
+    for (size_t i = 0; i < children.size(); ++i) {
+        addIndent(ss, indent + 1);
+        *ss << "Child " << i << ":\n";
+        children[i]->appendToString(ss, indent + 2);
+        *ss << '\n';
+    }
+}
+
+QuerySolutionNode* TextOrNode::clone() const {
+    auto copy = std::make_unique<TextOrNode>();
+    cloneBaseData(copy.get());
+    copy->dedup = this->dedup;
+    return copy.release();
+}
+
+//
+// TextMatchNode
+//
+void TextMatchNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "TEXT_MATCH\n";
+    addIndent(ss, indent + 1);
+    *ss << "name = " << index.identifier.catalogName << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "keyPattern = " << index.keyPattern.toString() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "query = " << ftsQuery->getQuery() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "language = " << ftsQuery->getLanguage() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "caseSensitive= " << ftsQuery->getCaseSensitive() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "diacriticSensitive= " << ftsQuery->getDiacriticSensitive() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "indexPrefix = " << indexPrefix.toString() << '\n';
+    addIndent(ss, indent + 1);
+    *ss << "wantTextScorex = " << wantTextScore << '\n';
+    if (nullptr != filter) {
+        addIndent(ss, indent + 1);
+        *ss << " filter = " << filter->debugString();
+    }
+    addCommon(ss, indent);
+}
+
+QuerySolutionNode* TextMatchNode::clone() const {
+    auto copy = std::make_unique<TextMatchNode>(index, ftsQuery->clone(), wantTextScore);
+    cloneBaseData(copy.get());
+    copy->indexPrefix = indexPrefix;
+    return copy.release();
 }
 
 }  // namespace mongo

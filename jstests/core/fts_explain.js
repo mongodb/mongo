@@ -2,6 +2,7 @@
 // collection.
 // @tags: [
 //   assumes_no_implicit_index_creation,
+//   requires_fcv_49,
 // ]
 
 // Test $text explain.  SERVER-12037.
@@ -30,10 +31,9 @@ if ("SINGLE_SHARD" === stage.stage) {
 assert.eq(stage.stage, "PROJECTION_DEFAULT");
 
 let textStage = stage.inputStage;
-assert.eq(textStage.stage, "TEXT");
+assert.eq(textStage.stage, "TEXT_MATCH");
 assert.gte(textStage.textIndexVersion, 1, "textIndexVersion incorrect or missing.");
-assert.eq(textStage.inputStage.stage, "TEXT_MATCH");
-assert.eq(textStage.inputStage.inputStage.stage, "TEXT_OR");
+assert.eq(textStage.inputStage.stage, "TEXT_OR");
 assert.eq(textStage.parsedTextQuery.terms, ["a"]);
 assert.eq(textStage.parsedTextQuery.negatedTerms, ["b"]);
 assert.eq(textStage.parsedTextQuery.phrases, ["a"]);

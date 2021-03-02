@@ -158,8 +158,8 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("sortPattern", smn->sort);
             break;
         }
-        case STAGE_TEXT: {
-            auto tn = static_cast<const TextNode*>(node);
+        case STAGE_TEXT_MATCH: {
+            auto tn = static_cast<const TextMatchNode*>(node);
 
             bob->append("indexPrefix", tn->indexPrefix);
             bob->append("indexName", tn->index.identifier.catalogName);
@@ -388,8 +388,8 @@ std::string PlanExplainerSBE::getPlanSummary() const {
                     sb << " " << keyPattern;
                     break;
                 }
-                case STAGE_TEXT: {
-                    auto tn = static_cast<const TextNode*>(node);
+                case STAGE_TEXT_MATCH: {
+                    auto tn = static_cast<const TextMatchNode*>(node);
                     const KeyPattern keyPattern{tn->indexPrefix};
                     sb << " " << keyPattern;
                     break;
@@ -460,8 +460,8 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
                 statsOut->indexesUsed.insert(ixn->index.identifier.catalogName);
                 break;
             }
-            case STAGE_TEXT: {
-                auto tn = static_cast<const TextNode*>(node);
+            case STAGE_TEXT_MATCH: {
+                auto tn = static_cast<const TextMatchNode*>(node);
                 statsOut->indexesUsed.insert(tn->index.identifier.catalogName);
                 break;
             }

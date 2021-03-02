@@ -1187,7 +1187,6 @@ env.Library(
         'exec/sort.cpp',
         'exec/sort_key_generator.cpp',
         'exec/subplan.cpp',
-        'exec/text.cpp',
         'exec/text_match.cpp',
         'exec/text_or.cpp',
         'exec/trial_period_utils.cpp',

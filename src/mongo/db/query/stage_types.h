@@ -113,7 +113,6 @@ enum StageType {
     STAGE_SUBPLAN,
 
     // Stages for running text search.
-    STAGE_TEXT,
     STAGE_TEXT_OR,
     STAGE_TEXT_MATCH,
 

@@ -59,7 +59,8 @@
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/sort_key_generator.h"
-#include "mongo/db/exec/text.h"
+#include "mongo/db/exec/text_match.h"
+#include "mongo/db/exec/text_or.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/record_id_helpers.h"
@@ -270,26 +271,47 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             return std::make_unique<GeoNear2DSphereStage>(
                 params, expCtx, _ws, _collection, s2Index);
         }
-        case STAGE_TEXT: {
-            const TextNode* node = static_cast<const TextNode*>(root);
-            invariant(_collection);
-            const IndexDescriptor* desc = _collection->getIndexCatalog()->findIndexByName(
-                _opCtx, node->index.identifier.catalogName);
-            invariant(desc);
-            const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(
-                _collection->getIndexCatalog()->getEntry(desc)->accessMethod());
-            invariant(fam);
+        case STAGE_TEXT_OR: {
+            tassert(5432204,
+                    "text index key prefix must be defined before processing TEXT_OR node",
+                    _ftsKeyPrefixSize);
 
-            TextStageParams params(fam->getSpec());
-            params.index = desc;
-            params.indexPrefix = node->indexPrefix;
+            auto node = static_cast<const TextOrNode*>(root);
+            auto ret = std::make_unique<TextOrStage>(
+                expCtx, *_ftsKeyPrefixSize, _ws, node->filter.get(), _collection);
+            for (auto childNode : root->children) {
+                ret->addChild(build(childNode));
+            }
+            return ret;
+        }
+        case STAGE_TEXT_MATCH: {
+            auto node = static_cast<const TextMatchNode*>(root);
+            tassert(5432200, "collection object is not provided", _collection);
+            auto catalog = _collection->getIndexCatalog();
+            tassert(5432201, "index catalog is unavailable", catalog);
+            auto desc = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
+            tassert(5432202,
+                    str::stream() << "no index named '" << node->index.identifier.catalogName
+                                  << "' found in catalog",
+                    catalog);
+            auto fam = static_cast<const FTSAccessMethod*>(catalog->getEntry(desc)->accessMethod());
+            tassert(5432203, "access method for index is not defined", fam);
+
             // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop. In
             // practice, this means that it is illegal to use the StageBuilder on a QuerySolution
             // created by planning a query that contains "no-op" expressions.
-            params.query = static_cast<FTSQueryImpl&>(*node->ftsQuery);
-            params.wantTextScore = _cq.metadataDeps()[DocumentMetadataFields::kTextScore];
-            return std::make_unique<TextStage>(
-                expCtx, _collection, params, _ws, node->filter.get());
+            TextMatchParams params{desc,
+                                   fam->getSpec(),
+                                   node->indexPrefix,
+                                   static_cast<const FTSQueryImpl&>(*node->ftsQuery)};
+
+            // Children of this node may need to know about the key prefix size, so we'll set it
+            // here before recursively descending into procession child nodes, and will reset once a
+            // text sub-tree is constructed.
+            _ftsKeyPrefixSize.emplace(params.spec.numExtraBefore());
+            ON_BLOCK_EXIT([&] { _ftsKeyPrefixSize = {}; });
+
+            return std::make_unique<TextMatchStage>(expCtx, build(root->children[0]), params, _ws);
         }
         case STAGE_SHARDING_FILTER: {
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
@@ -392,8 +414,6 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_QUEUED_DATA:
         case STAGE_RECORD_STORE_FAST_COUNT:
         case STAGE_SUBPLAN:
-        case STAGE_TEXT_MATCH:
-        case STAGE_TEXT_OR:
         case STAGE_TRIAL:
         case STAGE_UNKNOWN:
         case STAGE_UPDATE: {

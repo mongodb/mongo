@@ -5,7 +5,6 @@
  * @tags: [
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
- *   sbe_incompatible,
  * ]
  */
 
