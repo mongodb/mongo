@@ -50,7 +50,7 @@ assert.commandWorked(donorPrimary.getCollection(tenantNS).insert([{_id: 0, x: 0}
 }
 
 // This should be the only transaction entry on the donor fetched by the recipient.
-const fetchedDonorTxnEntry = donorPrimary.getCollection(transactionsNS).find().toArray();
+const donorTxnEntryBeforeMigration = donorPrimary.getCollection(transactionsNS).find().toArray();
 
 {
     jsTestLog("Run and abort a transaction prior to the migration");
@@ -84,57 +84,31 @@ const fetchedDonorTxnEntry = donorPrimary.getCollection(transactionsNS).find().t
     session.endSession();
 }
 
-const fpAfterRetrievingStartOpTime = configureFailPoint(
-    recipientPrimary, "fpAfterRetrievingStartOpTimesMigrationRecipientInstance", {action: "hang"});
-
 jsTestLog("Starting a migration");
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     tenantId,
 };
-assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
-fpAfterRetrievingStartOpTime.wait();
-
-{
-    jsTestLog("Run and commit a transaction in the middle of the migration");
-    const session = donorPrimary.startSession({causalConsistency: false});
-    const sessionDb = session.getDatabase(tenantDB);
-    const sessionColl = sessionDb.getCollection(collName);
-
-    session.startTransaction({writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionColl.insert([{_id: 2, x: 2}, {_id: 3, x: 3}]));
-    assert.commandWorked(session.commitTransaction_forTesting());
-    session.endSession();
-}
-
-jsTestLog("Waiting for migration to complete");
-fpAfterRetrievingStartOpTime.off();
-assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-
-const donorTxnEntries = donorPrimary.getCollection(transactionsNS).find().toArray();
-jsTestLog(`All donor entries: ${tojson(donorTxnEntries)}`);
-assert.eq(4, donorTxnEntries.length, `donor transaction entries: ${tojson(donorTxnEntries)}`);
-
-const recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
+assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
 // Verify that the recipient has fetched and written only the first committed transaction entry from
 // the donor.
+const recipientTxnEntries = recipientPrimary.getCollection(transactionsNS).find().toArray();
 assert.eq(
     1, recipientTxnEntries.length, `recipient transaction entries: ${tojson(recipientTxnEntries)}`);
-assert.eq(
-    fetchedDonorTxnEntry,
-    recipientTxnEntries,
-    `fetched donor transaction entries: ${
-        tojson(
-            fetchedDonorTxnEntry)}; recipient transaction entries: ${tojson(recipientTxnEntries)}`);
+assert.eq(donorTxnEntryBeforeMigration,
+          recipientTxnEntries,
+          `fetched donor transaction entries: ${
+              tojson(donorTxnEntryBeforeMigration)}; recipient transaction entries: ${
+              tojson(recipientTxnEntries)}`);
 
-// Test that the client can retry 'commitTransaction' on the recipient.
-const recipientTxnEntry = recipientTxnEntries[0];
+// Test that the client can retry 'commitTransaction' on the recipient for the transaction committed
+// prior to the tenant migration.
 assert.commandWorked(recipientPrimary.adminCommand({
     commitTransaction: 1,
-    lsid: recipientTxnEntry._id,
-    txnNumber: recipientTxnEntry.txnNum,
+    lsid: donorTxnEntryBeforeMigration[0]._id,
+    txnNumber: donorTxnEntryBeforeMigration[0].txnNum,
     autocommit: false,
 }));
 
