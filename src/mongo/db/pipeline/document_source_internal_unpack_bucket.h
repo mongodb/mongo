@@ -183,14 +183,27 @@ public:
                                                      Pipeline::SourceContainer* container) final;
 
     /*
-     * Given a source container and an iterator pointing to the unpack stage, attempt to internalize
-     * a following $project, and update the state for 'container' and '_bucketUnpacker'.
+     * Given a $project produced by 'extractOrBuildProjectToInternalize()', attempt to internalize
+     * its top-level fields by updating the state of '_bucketUnpacker'.
      */
-    void internalizeProject(Pipeline::SourceContainer::iterator itr,
-                            Pipeline::SourceContainer* container);
+    void internalizeProject(const BSONObj& project, bool isInclusion);
 
-    BSONObj buildProjectToInternalize(Pipeline::SourceContainer::iterator itr,
-                                      Pipeline::SourceContainer* container) const;
+    /**
+     * Given a SourceContainer and an iterator pointing to $_internalUnpackBucket, extracts or
+     * builds a $project that can be entirely internalized according to the below rules. Returns the
+     * $project and a bool indicating its type (true for inclusion, false for exclusion).
+     *    1. If there is an inclusion projection immediately after $_internalUnpackBucket which can
+     *       be internalized, it will be removed from the pipeline and returned.
+     *    2. Otherwise, if there is a finite dependency set for the rest of the pipeline, an
+     *       inclusion $project representing it and containing only root-level fields will be
+     *       returned. An inclusion $project will be returned here even if there is a viable
+     *       exclusion $project next in the pipeline.
+     *    3. Otherwise, if there is an exclusion projection immediately after $_internalUnpackBucket
+     *       which can be internalized, it will be removed from the pipeline and returned.
+     *    3. Otherwise, an empty BSONObj will be returned.
+     */
+    std::pair<BSONObj, bool> extractOrBuildProjectToInternalize(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const;
 
     /**
      * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument, and
