@@ -41,7 +41,6 @@
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/near.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"

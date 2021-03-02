@@ -405,46 +405,6 @@ private:
     std::unique_ptr<QuerySolutionNode> _root;
 };
 
-struct TextNode : public QuerySolutionNodeWithSortSet {
-    TextNode(IndexEntry index) : index(std::move(index)) {}
-
-    virtual ~TextNode() {}
-
-    virtual StageType getType() const {
-        return STAGE_TEXT;
-    }
-
-    virtual void appendToString(str::stream* ss, int indent) const;
-
-    // Text's return is LOC_AND_OBJ so it's fetched and has all fields.
-    bool fetched() const {
-        return true;
-    }
-    FieldAvailability getFieldAvailability(const std::string& field) const {
-        return FieldAvailability::kFullyProvided;
-    }
-    bool sortedByDiskLoc() const {
-        return false;
-    }
-
-    QuerySolutionNode* clone() const;
-
-    IndexEntry index;
-    std::unique_ptr<fts::FTSQuery> ftsQuery;
-
-    // The number of fields in the prefix of the text index. For example, if the key pattern is
-    //
-    //   { a: 1, b: 1, _fts: "text", _ftsx: 1, c: 1 }
-    //
-    // then the number of prefix fields is 2, because of "a" and "b".
-    size_t numPrefixFields = 0u;
-
-    // "Prefix" fields of a text index can handle equality predicates.  We group them with the
-    // text node while creating the text leaf node and convert them into a BSONObj index prefix
-    // when we finish the text leaf node.
-    BSONObj indexPrefix;
-};
-
 struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     CollectionScanNode();
     virtual ~CollectionScanNode() {}
@@ -1278,4 +1238,58 @@ struct EofNode : public QuerySolutionNodeWithSortSet {
 
     QuerySolutionNode* clone() const;
 };
+
+struct TextOrNode : public OrNode {
+    TextOrNode() {}
+
+    StageType getType() const override {
+        return STAGE_TEXT_OR;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+    QuerySolutionNode* clone() const override;
+};
+
+struct TextMatchNode : public QuerySolutionNodeWithSortSet {
+    TextMatchNode(IndexEntry index, std::unique_ptr<fts::FTSQuery> ftsQuery, bool wantTextScore)
+        : index(std::move(index)), ftsQuery(std::move(ftsQuery)), wantTextScore(wantTextScore) {}
+
+    StageType getType() const override {
+        return STAGE_TEXT_MATCH;
+    }
+
+    void appendToString(str::stream* ss, int indent) const override;
+
+    // Text's return is LOC_AND_OBJ so it's fetched and has all fields.
+    bool fetched() const {
+        return true;
+    }
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
+    }
+    bool sortedByDiskLoc() const override {
+        return false;
+    }
+
+    QuerySolutionNode* clone() const override;
+
+    IndexEntry index;
+    std::unique_ptr<fts::FTSQuery> ftsQuery;
+
+    // The number of fields in the prefix of the text index. For example, if the key pattern is
+    //
+    //   { a: 1, b: 1, _fts: "text", _ftsx: 1, c: 1 }
+    //
+    // then the number of prefix fields is 2, because of "a" and "b".
+    size_t numPrefixFields = 0u;
+
+    // "Prefix" fields of a text index can handle equality predicates.  We group them with the
+    // text node while creating the text leaf node and convert them into a BSONObj index prefix
+    // when we finish the text leaf node.
+    BSONObj indexPrefix;
+
+    // True, if we need to compute text scores.
+    bool wantTextScore;
+};
+
 }  // namespace mongo

@@ -45,7 +45,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/subplan.h"
-#include "mongo/db/exec/text.h"
+#include "mongo/db/exec/text_match.h"
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
@@ -84,8 +84,8 @@ void addStageSummaryStr(const PlanStage* stage, StringBuilder& sb) {
         const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
         const KeyPattern keyPattern{spec->keyPattern};
         sb << " " << keyPattern;
-    } else if (STAGE_TEXT == stage->stageType()) {
-        const TextStats* spec = static_cast<const TextStats*>(specific);
+    } else if (STAGE_TEXT_MATCH == stage->stageType()) {
+        const TextMatchStats* spec = static_cast<const TextMatchStats*>(specific);
         const KeyPattern keyPattern{spec->indexPrefix};
         sb << " " << keyPattern;
     }
@@ -460,15 +460,13 @@ void statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
             bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
         }
-    } else if (STAGE_TEXT == stats.stageType) {
-        TextStats* spec = static_cast<TextStats*>(stats.specific.get());
+    } else if (STAGE_TEXT_MATCH == stats.stageType) {
+        TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
 
         bob->append("indexPrefix", spec->indexPrefix);
         bob->append("indexName", spec->indexName);
         bob->append("parsedTextQuery", spec->parsedTextQuery);
         bob->append("textIndexVersion", spec->textIndexVersion);
-    } else if (STAGE_TEXT_MATCH == stats.stageType) {
-        TextMatchStats* spec = static_cast<TextMatchStats*>(stats.specific.get());
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsRejected", static_cast<long long>(spec->docsRejected));
@@ -685,10 +683,10 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
             const DistinctScanStats* distinctScanStats =
                 static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
             statsOut->indexesUsed.insert(distinctScanStats->indexName);
-        } else if (STAGE_TEXT == stages[i]->stageType()) {
-            const TextStage* textStage = static_cast<const TextStage*>(stages[i]);
-            const TextStats* textStats =
-                static_cast<const TextStats*>(textStage->getSpecificStats());
+        } else if (STAGE_TEXT_MATCH == stages[i]->stageType()) {
+            const TextMatchStage* textStage = static_cast<const TextMatchStage*>(stages[i]);
+            const TextMatchStats* textStats =
+                static_cast<const TextMatchStats*>(textStage->getSpecificStats());
             statsOut->indexesUsed.insert(textStats->indexName);
         } else if (STAGE_GEO_NEAR_2D == stages[i]->stageType() ||
                    STAGE_GEO_NEAR_2DSPHERE == stages[i]->stageType()) {

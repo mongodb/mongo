@@ -53,12 +53,12 @@ using fts::FTSSpec;
 const char* TextOrStage::kStageType = "TEXT_OR";
 
 TextOrStage::TextOrStage(ExpressionContext* expCtx,
-                         const FTSSpec& ftsSpec,
+                         size_t keyPrefixSize,
                          WorkingSet* ws,
                          const MatchExpression* filter,
                          const CollectionPtr& collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
-      _ftsSpec(ftsSpec),
+      _keyPrefixSize(keyPrefixSize),
       _ws(ws),
       _scoreIterator(_scores.end()),
       _filter(filter),
@@ -284,7 +284,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
     // Locate score within possibly compound key: {prefix,term,score,suffix}.
     BSONObjIterator keyIt(newKeyData.keyData);
-    for (unsigned i = 0; i < _ftsSpec.numExtraBefore(); i++) {
+    for (unsigned i = 0; i < _keyPrefixSize; i++) {
         keyIt.next();
     }
 

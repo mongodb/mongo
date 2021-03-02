@@ -445,6 +445,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"reverseArray", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::reverseArray, false}},
     {"dateAdd", BuiltinFn{[](size_t n) { return n == 5; }, vm::Builtin::dateAdd, false}},
     {"hasNullBytes", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::hasNullBytes, false}},
+    {"ftsMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::ftsMatch, false}},
 };
 
 /**

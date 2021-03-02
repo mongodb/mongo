@@ -244,7 +244,7 @@ assertPipelineDoesNotUseAggregation(
 assertPipelineDoesNotUseAggregation({
     pipeline:
         [{$match: {$text: {$search: "abc"}}}, {$sort: {sortField: 1}}, {$project: {a: 1, b: 1}}],
-    expectedStages: ["TEXT", "SORT", "PROJECTION_SIMPLE"],
+    expectedStages: ["TEXT_MATCH", "SORT", "PROJECTION_SIMPLE"],
     optimizedAwayStages: ["$match", "$sort", "$project"]
 });
 assert.commandWorked(coll.dropIndexes());

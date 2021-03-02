@@ -49,5 +49,7 @@ public:
 
 private:
     WorkingSet* _ws;
+
+    boost::optional<size_t> _ftsKeyPrefixSize;
 };
 }  // namespace mongo::stage_builder

@@ -2,6 +2,7 @@
  * Tests that a {$**: 1} index can coexist with a {$**: 'text'} index in the same collection.
  * @tags: [
  *   assumes_balancer_off,
+ *   requires_fcv_49,
  * ]
  */
 (function() {
@@ -52,7 +53,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // when the query filter contains a compound field in the $text index.
     const textQuery = Object.assign(textIndex.a ? {a: 1} : {}, {$text: {$search: 'banana'}});
     let explainOut = assert.commandWorked(coll.find(textQuery).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT"));
+    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT_MATCH"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -60,7 +61,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // where the query filter contains a field which is not present in the text index.
     explainOut = assert.commandWorked(
         coll.find(Object.assign({_fts: {$gt: 0, $lt: 4}}, textQuery)).explain("executionStats"));
-    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT"));
+    assert(planHasStage(coll.getDB(), getWinningPlan(explainOut.queryPlanner), "TEXT_MATCH"));
     assert.eq(getRejectedPlans(explainOut).length, 0);
     assert.eq(explainOut.executionStats.nReturned, 2);
 
@@ -72,9 +73,9 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
 
     const textOrWildcard = getPlanStages(getWinningPlan(explainOut.queryPlanner), "OR").shift();
     assert.eq(textOrWildcard.inputStages.length, 2);
-    const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT" ? 0 : 1);
+    const textBranch = (textOrWildcard.inputStages[0].stage === "TEXT_MATCH" ? 0 : 1);
     const wildcardBranch = (textBranch + 1) % 2;
-    assert.eq(textOrWildcard.inputStages[textBranch].stage, "TEXT");
+    assert.eq(textOrWildcard.inputStages[textBranch].stage, "TEXT_MATCH");
     assert.eq(textOrWildcard.inputStages[wildcardBranch].stage, "IXSCAN");
     assert.eq(textOrWildcard.inputStages[wildcardBranch].keyPattern, {$_path: 1, _fts: 1});
 

@@ -36,6 +36,7 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 
@@ -46,6 +47,26 @@ using fts::FTSSpec;
 
 class OperationContext;
 class RecordID;
+
+struct TextMatchParams {
+    TextMatchParams(const IndexDescriptor* index,
+                    const FTSSpec& spec,
+                    BSONObj indexPrefix,
+                    const FTSQueryImpl& query)
+        : index(index), spec(spec), indexPrefix(std::move(indexPrefix)), query(query) {}
+
+    // Text index descriptor.  IndexCatalog owns this.
+    const IndexDescriptor* const index;
+
+    // Index spec.
+    const FTSSpec spec;
+
+    // Index keys that precede the "text" index key.
+    const BSONObj indexPrefix;
+
+    // The text query.
+    const FTSQueryImpl query;
+};
 
 /**
  * A stage that returns every document in the child that satisfies the FTS text matcher built with
@@ -58,8 +79,7 @@ class TextMatchStage final : public PlanStage {
 public:
     TextMatchStage(ExpressionContext* expCtx,
                    std::unique_ptr<PlanStage> child,
-                   const FTSQueryImpl& query,
-                   const FTSSpec& spec,
+                   const TextMatchParams& params,
                    WorkingSet* ws);
     ~TextMatchStage();
 

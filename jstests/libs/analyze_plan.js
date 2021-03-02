@@ -51,11 +51,6 @@ function getPlanStages(root, stage) {
         results = results.concat(getPlanStages(getWinningPlan(root.queryPlanner), stage));
     }
 
-    // This field is used in SBE explain output.
-    if ("queryPlan" in root) {
-        results = results.concat(getPlanStages(root.queryPlan, stage));
-    }
-
     if ("thenStage" in root) {
         results = results.concat(getPlanStages(root.thenStage, stage));
     }

@@ -1,9 +1,6 @@
 /**
  * Tests the tightness of index bounds when attempting to match a regex that contains escaped and
  * non-escaped pipe '|' characters.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 'use strict';

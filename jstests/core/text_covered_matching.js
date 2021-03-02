@@ -10,7 +10,6 @@
 // @tags: [
 //   assumes_balancer_off,
 //   requires_fcv_49,
-//   sbe_incompatible,
 // ]
 
 load("jstests/libs/analyze_plan.js");
@@ -80,7 +79,7 @@ assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on TEXT
 // underlying IXSCANs, but we should get an equivalent result.
 explainResult = coll.find({$text: {$search: "hello world"}, b: 1}).explain("executionStats");
 assert.commandWorked(explainResult);
-assert(planHasStage(db, explainResult.queryPlanner.winningPlan, "OR"));
+assert(planHasStage(db, getWinningPlan(explainResult.queryPlanner), "OR"));
 assert.eq(explainResult.executionStats.totalKeysExamined,
           4,
           "Unexpected number of keys examined: " + tojson(explainResult));

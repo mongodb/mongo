@@ -122,6 +122,11 @@ std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer& filterer) 
     return {TypeTags::shardFilterer, filter};
 }
 
+std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher& matcher) {
+    auto copy = bitcastFrom<fts::FTSMatcher*>(new fts::FTSMatcher(matcher.query(), matcher.spec()));
+    return {TypeTags::ftsMatcher, copy};
+}
+
 void releaseValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::NumberDecimal:
@@ -163,6 +168,9 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::shardFilterer:
             delete getShardFiltererView(val);
+            break;
+        case TypeTags::ftsMatcher:
+            delete getFtsMatcherView(val);
             break;
         default:
             break;
@@ -267,6 +275,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::bsonJavascript:
             stream << "bsonJavascript";
+            break;
+        case TypeTags::ftsMatcher:
+            stream << "ftsMatcher";
             break;
         default:
             stream << "unknown tag";
@@ -490,6 +501,11 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case value::TypeTags::bsonJavascript:
             stream << "Javascript(" << getBsonJavascriptView(val) << ")";
             break;
+        case value::TypeTags::ftsMatcher: {
+            auto ftsMatcher = getFtsMatcherView(val);
+            stream << "FtsMatcher(" << ftsMatcher->query().toBSON().toString() << ")";
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -693,7 +709,6 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
 
     return 0;
 }
-
 
 /**
  * Performs a three-way comparison for any type that has < and == operators. Additionally,

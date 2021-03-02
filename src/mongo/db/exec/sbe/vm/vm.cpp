@@ -2935,6 +2935,31 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateAdd(ArityTy
         false, value::TypeTags::Date, value::bitcastFrom<int64_t>(resDate.toMillisSinceEpoch())};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinFtsMatch(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [matcherOwn, matcherTag, matcherVal] = getFromStack(0);
+    auto [inputOwn, inputTag, inputVal] = getFromStack(1);
+
+    if (matcherTag != value::TypeTags::ftsMatcher || !value::isObject(inputTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto obj = [inputTag = inputTag, inputVal = inputVal]() {
+        if (inputTag == value::TypeTags::bsonObject) {
+            return BSONObj{value::bitcastTo<const char*>(inputVal)};
+        }
+
+        invariant(inputTag == value::TypeTags::Object);
+        BSONObjBuilder builder;
+        bson::convertToBsonObj(builder, value::getObjectView(inputVal));
+        return builder.obj();
+    }();
+
+    const bool matches = value::getFtsMatcherView(matcherVal)->matches(obj);
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches)};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -3090,6 +3115,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinGetRegexPattern(arity);
         case Builtin::getRegexFlags:
             return builtinGetRegexFlags(arity);
+        case Builtin::ftsMatch:
+            return builtinFtsMatch(arity);
     }
 
     MONGO_UNREACHABLE;

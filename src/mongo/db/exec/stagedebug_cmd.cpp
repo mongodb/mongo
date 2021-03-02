@@ -52,7 +52,6 @@
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/jsobj.h"
@@ -437,38 +436,6 @@ public:
                 mergeStage->addChild(std::move(subNode));
             }
             return mergeStage.release();
-        } else if ("text" == nodeName) {
-            string search = nodeArgs["search"].String();
-
-            vector<const IndexDescriptor*> idxMatches;
-            collection->getIndexCatalog()->findIndexByType(opCtx, "text", idxMatches);
-            uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
-
-            const IndexDescriptor* index = idxMatches[0];
-            const FTSAccessMethod* fam = dynamic_cast<const FTSAccessMethod*>(
-                collection->getIndexCatalog()->getEntry(index)->accessMethod());
-            invariant(fam);
-            TextStageParams params(fam->getSpec());
-            params.index = index;
-
-            // TODO: Deal with non-empty filters.  This is a hack to put in covering information
-            // that can only be checked for equality.  We ignore this now.
-            Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
-            if (!s.isOK()) {
-                return nullptr;
-            }
-
-            params.spec = fam->getSpec();
-
-            params.query.setQuery(search);
-            params.query.setLanguage(fam->getSpec().defaultLanguage().str());
-            params.query.setCaseSensitive(TextMatchExpressionBase::kCaseSensitiveDefault);
-            params.query.setDiacriticSensitive(TextMatchExpressionBase::kDiacriticSensitiveDefault);
-            if (!params.query.parse(fam->getSpec().getTextIndexVersion()).isOK()) {
-                return nullptr;
-            }
-
-            return new TextStage(expCtx.get(), collection, params, workingSet, matcher);
         } else if ("delete" == nodeName) {
             uassert(18636,
                     "Delete stage doesn't have a filter (put it on the child)",

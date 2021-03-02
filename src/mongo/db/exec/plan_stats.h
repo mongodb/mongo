@@ -753,11 +753,11 @@ struct UpdateStats : public SpecificStats {
     BSONObj objInserted;
 };
 
-struct TextStats : public SpecificStats {
-    TextStats() : parsedTextQuery(), textIndexVersion(0) {}
+struct TextMatchStats : public SpecificStats {
+    TextMatchStats() : parsedTextQuery(), textIndexVersion(0) {}
 
     std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<TextStats>(*this);
+        return std::make_unique<TextMatchStats>(*this);
     }
 
     uint64_t estimateObjectSizeInBytes() const {
@@ -774,18 +774,6 @@ struct TextStats : public SpecificStats {
 
     // Index keys that precede the "text" index key.
     BSONObj indexPrefix;
-};
-
-struct TextMatchStats : public SpecificStats {
-    TextMatchStats() : docsRejected(0) {}
-
-    std::unique_ptr<SpecificStats> clone() const final {
-        return std::make_unique<TextMatchStats>(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const {
-        return sizeof(*this);
-    }
 
     size_t docsRejected;
 };
