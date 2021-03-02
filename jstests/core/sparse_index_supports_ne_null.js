@@ -7,7 +7,6 @@
  * but another's is still not multikey, they may need to use different plans for certain queries).
  * @tags: [
  *   assumes_unsharded_collection,
- *   sbe_incompatible,
  * ]
  */
 (function() {
