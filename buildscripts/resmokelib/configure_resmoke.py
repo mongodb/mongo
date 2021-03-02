@@ -236,6 +236,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.INTERNAL_PARAMS = config.pop("internal_params")
 
     # Evergreen options.
+    _config.EVERGREEN_URL = config.pop("evergreen_url")
     _config.EVERGREEN_BUILD_ID = config.pop("build_id")
     _config.EVERGREEN_DISTRO_ID = config.pop("distro_id")
     _config.EVERGREEN_EXECUTION = config.pop("execution_number")

@@ -106,6 +106,11 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         unittest.TestResult.startTest(self, test)
 
         test_info = _TestInfo(test.id(), test.test_name, test.dynamic)
+        if _config.SPAWN_USING == "jasper":
+            # The group id represents the group of logs this test belongs to in
+            # cedar buildlogger. It must be sent to evergreen/cedar in order to
+            # create the correct log URL.
+            test_info.group_id = str(self.job_num)
 
         basename = test.basename()
         command = test.as_command()
@@ -293,6 +298,9 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                     "elapsed": test_info.end_time - test_info.start_time,
                 }
 
+                if test_info.group_id is not None:
+                    result["group_id"] = test_info.group_id
+
                 if test_info.url_endpoint is not None:
                     result["url"] = test_info.url_endpoint
                     result["url_raw"] = test_info.url_endpoint + "?raw=1"
@@ -319,6 +327,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.
             test_info = _TestInfo(test_file, test_file, is_dynamic)
+            test_info.group_id = result.get("group_id")
             test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
             test_info.evergreen_status = test_info.status
@@ -374,6 +383,7 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
         self.test_file = test_file
         self.dynamic = dynamic
 
+        self.group_id = None
         self.start_time = None
         self.end_time = None
         self.status = None
