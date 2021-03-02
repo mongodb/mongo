@@ -91,6 +91,13 @@ bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& to
     return status.isOK() || !ErrorCodes::isRetriableError(status) || token.isCanceled();
 }
 
+bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status, const CancelationToken& token) {
+    // TODO (SERVER-54926): Convert HostUnreachable error in
+    // _fetchAndStoreRecipientClusterTimeKeyDocs to specific error.
+    return status.isOK() || !ErrorCodes::isRetriableError(status) ||
+        status.code() == ErrorCodes::HostUnreachable || token.isCanceled();
+}
+
 void checkIfReceivedDonorAbortMigration(const CancelationToken& serviceToken,
                                         const CancelationToken& instanceToken) {
     // If only the instance token was canceled, then we must have gotten donorAbortMigration.
@@ -369,87 +376,105 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancelationToken& serviceToken,
     const CancelationToken& instanceToken) {
-    return recipientTargeterRS->findHost(kPrimaryOnlyReadPreference, instanceToken)
-        .thenRunOn(**executor)
-        .then([this, self = shared_from_this(), executor](HostAndPort host) {
-            const auto nss = NamespaceString::kKeysCollectionNamespace;
 
-            const auto cmdObj = [&] {
-                FindCommand request(NamespaceStringOrUUID{nss});
-                request.setReadConcern(
-                    repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern)
-                        .toBSONInner());
-                return request.toBSON(BSONObj());
-            }();
+    return AsyncTry([this,
+                     self = shared_from_this(),
+                     executor,
+                     recipientTargeterRS,
+                     serviceToken,
+                     instanceToken] {
+               return recipientTargeterRS->findHost(kPrimaryOnlyReadPreference, instanceToken)
+                   .thenRunOn(**executor)
+                   .then([this, self = shared_from_this(), executor](HostAndPort host) {
+                       const auto nss = NamespaceString::kKeysCollectionNamespace;
 
-            std::vector<ExternalKeysCollectionDocument> keyDocs;
-            boost::optional<Status> fetchStatus;
+                       const auto cmdObj = [&] {
+                           FindCommand request(NamespaceStringOrUUID{nss});
+                           request.setReadConcern(
+                               repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern)
+                                   .toBSONInner());
+                           return request.toBSON(BSONObj());
+                       }();
 
-            auto fetcherCallback = [this, self = shared_from_this(), &keyDocs, &fetchStatus](
-                                       const Fetcher::QueryResponseStatus& dataStatus,
-                                       Fetcher::NextAction* nextAction,
-                                       BSONObjBuilder* getMoreBob) {
-                // Throw out any accumulated results on error
-                if (!dataStatus.isOK()) {
-                    fetchStatus = dataStatus.getStatus();
-                    keyDocs.clear();
-                    return;
-                }
+                       std::vector<ExternalKeysCollectionDocument> keyDocs;
+                       boost::optional<Status> fetchStatus;
 
-                const auto& data = dataStatus.getValue();
-                for (const BSONObj& doc : data.documents) {
-                    keyDocs.push_back(tenant_migration_util::makeExternalClusterTimeKeyDoc(
-                        _stateDoc.getId(), doc.getOwned()));
-                }
-                fetchStatus = Status::OK();
+                       auto fetcherCallback =
+                           [this, self = shared_from_this(), &keyDocs, &fetchStatus](
+                               const Fetcher::QueryResponseStatus& dataStatus,
+                               Fetcher::NextAction* nextAction,
+                               BSONObjBuilder* getMoreBob) {
+                               // Throw out any accumulated results on error
+                               if (!dataStatus.isOK()) {
+                                   fetchStatus = dataStatus.getStatus();
+                                   keyDocs.clear();
+                                   return;
+                               }
 
-                if (!getMoreBob) {
-                    return;
-                }
-                getMoreBob->append("getMore", data.cursorId);
-                getMoreBob->append("collection", data.nss.coll());
-            };
+                               const auto& data = dataStatus.getValue();
+                               for (const BSONObj& doc : data.documents) {
+                                   keyDocs.push_back(
+                                       tenant_migration_util::makeExternalClusterTimeKeyDoc(
+                                           _stateDoc.getId(), doc.getOwned()));
+                               }
+                               fetchStatus = Status::OK();
 
-            auto fetcher = std::make_shared<Fetcher>(
-                _recipientCmdExecutor.get(),
-                host,
-                nss.db().toString(),
-                cmdObj,
-                fetcherCallback,
-                kPrimaryOnlyReadPreference.toContainingBSON(),
-                executor::RemoteCommandRequest::kNoTimeout, /* findNetworkTimeout */
-                executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
-                RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-                    kMaxRecipientKeyDocsFindAttempts, executor::RemoteCommandRequest::kNoTimeout),
-                _sslMode);
-            uassertStatusOK(fetcher->schedule());
+                               if (!getMoreBob) {
+                                   return;
+                               }
+                               getMoreBob->append("getMore", data.cursorId);
+                               getMoreBob->append("collection", data.nss.coll());
+                           };
 
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
-                _recipientKeysFetcher = fetcher;
-            }
+                       auto fetcher = std::make_shared<Fetcher>(
+                           _recipientCmdExecutor.get(),
+                           host,
+                           nss.db().toString(),
+                           cmdObj,
+                           fetcherCallback,
+                           kPrimaryOnlyReadPreference.toContainingBSON(),
+                           executor::RemoteCommandRequest::kNoTimeout, /* findNetworkTimeout */
+                           executor::RemoteCommandRequest::kNoTimeout, /* getMoreNetworkTimeout */
+                           RemoteCommandRetryScheduler::makeRetryPolicy<
+                               ErrorCategory::RetriableError>(
+                               kMaxRecipientKeyDocsFindAttempts,
+                               executor::RemoteCommandRequest::kNoTimeout),
+                           _sslMode);
+                       uassertStatusOK(fetcher->schedule());
 
-            fetcher->join();
+                       {
+                           stdx::lock_guard<Latch> lg(_mutex);
+                           _recipientKeysFetcher = fetcher;
+                       }
 
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
-                _recipientKeysFetcher.reset();
-            }
+                       fetcher->join();
 
-            if (!fetchStatus) {
-                // The callback never got invoked.
-                uasserted(5340400, "Internal error running cursor callback in command");
-            }
-            uassertStatusOK(fetchStatus.get());
+                       {
+                           stdx::lock_guard<Latch> lg(_mutex);
+                           _recipientKeysFetcher.reset();
+                       }
 
-            return keyDocs;
+                       if (!fetchStatus) {
+                           // The callback never got invoked.
+                           uasserted(5340400, "Internal error running cursor callback in command");
+                       }
+                       uassertStatusOK(fetchStatus.get());
+
+                       return keyDocs;
+                   })
+                   .then([this, self = shared_from_this(), executor, serviceToken, instanceToken](
+                             auto keyDocs) {
+                       checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
+
+                       tenant_migration_util::storeExternalClusterTimeKeyDocs(executor,
+                                                                              std::move(keyDocs));
+                   });
+           })
+        .until([instanceToken](Status status) {
+            return shouldStopFetchingRecipientClusterTimeKeyDocs(status, instanceToken);
         })
-        .then([this, self = shared_from_this(), executor, serviceToken, instanceToken](
-                  auto keyDocs) {
-            checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
-
-            tenant_migration_util::storeExternalClusterTimeKeyDocs(executor, std::move(keyDocs));
-        });
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDoc(
