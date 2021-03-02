@@ -1693,10 +1693,6 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     LOGV2(21191, "Initial sync attempt finishing up");
 
     stdx::lock_guard<Latch> lock(_mutex);
-    LOGV2(21192,
-          "Initial Sync Attempt Statistics: {statistics}",
-          "Initial Sync Attempt Statistics",
-          "statistics"_attr = redact(_getInitialSyncProgress_inlock()));
 
     auto runTime = _initialSyncState ? _initialSyncState->timer.millis() : 0;
     int rollBackId = -1;
@@ -1710,6 +1706,12 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
             durationCount<Milliseconds>(_sharedData->getTotalTimeUnreachable(sdLock));
     }
 
+    if (MONGO_unlikely(failAndHangInitialSync.shouldFail())) {
+        LOGV2(21193, "failAndHangInitialSync fail point enabled");
+        failAndHangInitialSync.pauseWhileSet();
+        result = Status(ErrorCodes::InternalError, "failAndHangInitialSync fail point enabled");
+    }
+
     _stats.initialSyncAttemptInfos.emplace_back(
         InitialSyncer::InitialSyncAttemptInfo{runTime,
                                               result.getStatus(),
@@ -1718,24 +1720,26 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
                                               operationsRetried,
                                               totalTimeUnreachableMillis});
 
-    if (MONGO_unlikely(failAndHangInitialSync.shouldFail())) {
-        LOGV2(21193, "failAndHangInitialSync fail point enabled");
-        failAndHangInitialSync.pauseWhileSet();
-        result = Status(ErrorCodes::InternalError, "failAndHangInitialSync fail point enabled");
+    if (!result.isOK()) {
+        // This increments the number of failed attempts for the current initial sync request.
+        ++_stats.failedInitialSyncAttempts;
+        // This increments the number of failed attempts across all initial sync attempts since
+        // process startup.
+        initialSyncFailedAttempts.increment();
     }
+
+    bool hasRetries = _stats.failedInitialSyncAttempts < _stats.maxFailedInitialSyncAttempts;
+
+    LOGV2(21192,
+          "Initial sync status: {status}, initial sync attempt statistics: {statistics}",
+          "Initial sync status and statistics",
+          "status"_attr = result.isOK() ? "successful" : (hasRetries ? "in_progress" : "failed"),
+          "statistics"_attr = redact(_getInitialSyncProgress_inlock()));
 
     if (result.isOK()) {
         // Scope guard will invoke _finishCallback().
         return;
     }
-
-
-    // This increments the number of failed attempts for the current initial sync request.
-    ++_stats.failedInitialSyncAttempts;
-
-    // This increments the number of failed attempts across all initial sync attempts since process
-    // startup.
-    initialSyncFailedAttempts.increment();
 
     LOGV2_ERROR(21200,
                 "Initial sync attempt failed -- attempts left: "
@@ -1747,7 +1751,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
                 "error"_attr = redact(result.getStatus()));
 
     // Check if need to do more retries.
-    if (_stats.failedInitialSyncAttempts >= _stats.maxFailedInitialSyncAttempts) {
+    if (!hasRetries) {
         LOGV2_FATAL_CONTINUE(21202,
                              "The maximum number of retries have been exhausted for initial sync");
 
@@ -1774,7 +1778,6 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
 
     if (!status.isOK()) {
         result = status;
-
         // Scope guard will invoke _finishCallback().
         return;
     }
