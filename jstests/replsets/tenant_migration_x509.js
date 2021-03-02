@@ -42,7 +42,7 @@ const kRecipientCertificateAndPrivateKey =
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, true /* migrationCommitted */);
 })();
@@ -280,7 +280,7 @@ const kRecipientCertificateAndPrivateKey =
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
@@ -303,7 +303,7 @@ const kRecipientCertificateAndPrivateKey =
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.InvalidSSLConfiguration);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
@@ -330,7 +330,7 @@ if (!TestData.auth) {
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.Unauthorized);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
@@ -351,7 +351,7 @@ if (!TestData.auth) {
 
     tenantMigrationTest.insertDonorDB(dbName, collName);
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.Unauthorized);
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);

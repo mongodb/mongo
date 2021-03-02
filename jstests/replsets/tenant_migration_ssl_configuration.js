@@ -178,7 +178,7 @@ const kExpiredMigrationCertificates = {
         donorRst,
         false /* retryOnRetryableErrors */,
         TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     // The command should fail with HostUnreachable since the donor was unable to establish an SSL
     // connection with the recipient.
     assert.eq(stateRes.abortReason.code, ErrorCodes.HostUnreachable);
@@ -304,7 +304,7 @@ const kExpiredMigrationCertificates = {
         donorRst,
         false /* retryOnRetryableErrors */,
         TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
 })();
@@ -352,7 +352,7 @@ const kExpiredMigrationCertificates = {
         donorRst,
         false /* retryOnRetryableErrors */,
         TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();
     recipientRst.stopSet();
@@ -405,7 +405,7 @@ const kExpiredMigrationCertificates = {
         donorRst,
         false /* retryOnRetryableErrors */,
         TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     donorRst.stopSet();
     recipientRst.stopSet();

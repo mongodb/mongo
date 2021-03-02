@@ -1,5 +1,5 @@
 /**
- * Tests that tenant migrations resume successfully on stepup and restart.
+ * Tests that tenant migrations resume successfully on donor stepup and restart.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, requires_persistence,
  * incompatible_with_eft, incompatible_with_windows_tls]
@@ -23,31 +23,14 @@ const kMigrationFpNames = [
     ""
 ];
 
-// Set the delay before a donor state doc is garbage collected to be short to speed up the test.
+// Set the delay before a state doc is garbage collected to be short to speed up the test but long
+// enough for the state doc to still be around after stepup or restart.
 const kGarbageCollectionDelayMS = 30 * 1000;
 
 // Set the TTL monitor to run at a smaller interval to speed up the test.
 const kTTLMonitorSleepSecs = 1;
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
-
-/**
- * If the donor state doc for the migration 'migrationId' exists on the donor (i.e. the donor's
- * primary stepped down or shut down after inserting the doc), asserts that the migration
- * eventually commits.
- */
-function assertMigrationCommitsIfDurableStateExists(tenantMigrationTest, migrationId, tenantId) {
-    const donorRst = tenantMigrationTest.getDonorRst();
-    const donorPrimary = tenantMigrationTest.getDonorPrimary();
-
-    const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    if (configDonorsColl.count({_id: migrationId}) > 0) {
-        tenantMigrationTest.waitForNodesToReachState(
-            donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
-        assert.commandWorked(
-            tenantMigrationTest.forgetMigration(extractUUIDFromObject(migrationId)));
-    }
-}
 
 /**
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
@@ -91,9 +74,13 @@ function testDonorStartMigrationInterrupt(interruptFunc) {
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst);
 
-    assert.commandWorked(runMigrationThread.returnData());
-    assertMigrationCommitsIfDurableStateExists(
-        tenantMigrationTest, migrationId, migrationOpts.tenantId);
+    const stateRes = assert.commandWorked(runMigrationThread.returnData());
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    tenantMigrationTest.waitForDonorNodesToReachState(donorRst.nodes,
+                                                      migrationId,
+                                                      migrationOpts.tenantId,
+                                                      TenantMigrationTest.DonorState.kCommitted);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     tenantMigrationTest.stop();
     donorRst.stopSet();
@@ -143,7 +130,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         recipientRst.stopSet();
         return;
     }
-    let donorPrimary = tenantMigrationTest.getDonorPrimary();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
@@ -153,8 +140,9 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     };
     const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
 
-    assert.commandWorked(tenantMigrationTest.runMigration(
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,
@@ -167,11 +155,9 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
             donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
         return res.inprog[0].expireAt != null;
     });
-
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst);
 
-    donorPrimary = donorRst.getPrimary();
     assert.commandWorkedOrFailedWithCode(
         tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString),
         ErrorCodes.NoSuchTenantMigration);
@@ -276,9 +262,9 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
 
     if (!res.ok) {
-        assert.eq(donorDoc.state, TenantMigrationTest.State.kCommitted);
+        assert.eq(donorDoc.state, TenantMigrationTest.DonorState.kCommitted);
     } else {
-        assert.eq(donorDoc.state, TenantMigrationTest.State.kAborted);
+        assert.eq(donorDoc.state, TenantMigrationTest.DonorState.kAborted);
     }
 
     tenantMigrationTest.stop();

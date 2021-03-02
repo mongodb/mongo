@@ -60,7 +60,7 @@ migrationOptsArray.forEach((migrationOpts) => {
     jsTestLog("Waiting for migration for tenant: " + migrationOpts.tenantId + " to complete");
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 });
 
 tenantMigrationTest.stop();

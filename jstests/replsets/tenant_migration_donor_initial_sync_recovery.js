@@ -1,5 +1,6 @@
 /**
- * Tests initial sync's recovery to a tenant migration's in-memory state.
+ * Tests that tenant migration donor's in memory state is initialized correctly on initial sync.
+ * This test randomly selects a point during the migration to add a node to the donor replica set.
  *
  * Tenant migrations are not expected to be run on servers with ephemeralForTest.
  *
@@ -28,7 +29,7 @@ const kTenantId = 'testTenantId';
 
 let donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-// Force the migration to pause after entering a randomly selected state to simulate a failure.
+// Force the migration to pause after entering a randomly selected state.
 Random.setRandomSeed();
 const kMigrationFpNames = [
     "pauseTenantMigrationBeforeLeavingDataSyncState",
@@ -59,27 +60,27 @@ donorRst.awaitSecondaryNodes();
 let configDonorsColl = initialSyncNode.getCollection(TenantMigrationTest.kConfigDonorsNS);
 let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
 if (donorDoc) {
-    let state = donorDoc.state;
-    switch (state) {
-        case TenantMigrationTest.State.kDataSync:
+    switch (donorDoc.state) {
+        case TenantMigrationTest.DonorState.kDataSync:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.AccessState.kAllow);
+                                  .state == TenantMigrationTest.DonorAccessState.kAllow);
             break;
-        case TenantMigrationTest.State.kBlocking:
-            assert.soon(() => tenantMigrationTest
-                                  .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.AccessState.kBlockWritesAndReads);
+        case TenantMigrationTest.DonorState.kBlocking:
+            assert.soon(
+                () =>
+                    tenantMigrationTest.getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
+                        .state == TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
-        case TenantMigrationTest.State.kCommitted:
+        case TenantMigrationTest.DonorState.kCommitted:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.AccessState.kReject);
+                                  .state == TenantMigrationTest.DonorAccessState.kReject);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
@@ -91,10 +92,10 @@ if (donorDoc) {
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
-        case TenantMigrationTest.State.kAborted:
+        case TenantMigrationTest.DonorState.kAborted:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.AccessState.kAborted);
+                                  .state == TenantMigrationTest.DonorAccessState.kAborted);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)

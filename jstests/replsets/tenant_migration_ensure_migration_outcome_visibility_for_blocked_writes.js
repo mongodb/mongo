@@ -92,7 +92,7 @@ function insertDocument(primaryHost, dbName, collName) {
     migrationThread.join();
 
     const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, tenantId);
@@ -156,7 +156,7 @@ function insertDocument(primaryHost, dbName, collName) {
     migrationThread.join();
 
     const migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(migrationRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));

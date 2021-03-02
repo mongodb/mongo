@@ -275,7 +275,7 @@ function testRejectWritesAfterMigrationCommitted(testCase, testOpts) {
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
@@ -299,7 +299,7 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
         configureFailPoint(testOpts.primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Wait until the in-memory migration state is updated after the migration has majority
@@ -308,7 +308,7 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     assert.soon(() => {
         const mtabs =
             testOpts.primaryDB.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[tenantId].state === TenantMigrationTest.AccessState.kAborted;
+        return mtabs[tenantId].state === TenantMigrationTest.DonorAccessState.kAborted;
     });
 
     runCommand(testOpts);
@@ -343,7 +343,7 @@ function testBlockWritesAfterMigrationEnteredBlocking(testCase, testOpts) {
     blockingFp.off();
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, false /* retryOnRetryableErrors */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
     checkTenantMigrationAccessBlocker(testOpts.primaryDB, tenantId, {numBlockedWrites: 1});
@@ -381,7 +381,7 @@ function testRejectBlockedWritesAfterMigrationCommitted(testCase, testOpts) {
     resumeMigrationThread.join();
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, false /* retryOnRetryableErrors */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
     checkTenantMigrationAccessBlocker(
@@ -423,7 +423,7 @@ function testRejectBlockedWritesAfterMigrationAborted(testCase, testOpts) {
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, false /* retryOnRetryableErrors */));
     abortFp.off();
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
     checkTenantMigrationAccessBlocker(

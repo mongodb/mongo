@@ -74,7 +74,7 @@ const kTenantId = "testTenantId";
 
     waitForRejectReadsBeforeTsFp.off();
     const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     // Write after the migration committed.
     assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
@@ -107,7 +107,7 @@ const kTenantId = "testTenantId";
                                      {action: "stop", stopErrorCode: ErrorCodes.InternalError});
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Write after the migration aborted.
@@ -139,7 +139,7 @@ const kTenantId = "testTenantId";
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Write after the migration aborted.

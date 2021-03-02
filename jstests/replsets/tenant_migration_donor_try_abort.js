@@ -56,7 +56,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     fp.off();
     tenantMigrationTest.stop();
@@ -97,7 +97,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     fp.off();
     tenantMigrationTest.stop();
@@ -158,7 +158,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     tenantMigrationTest.stop();
 })();
@@ -197,7 +197,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
         {migrationIdString: migrationOpts.migrationIdString}));
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     tenantMigrationTest.stop();
 })();
 
@@ -244,7 +244,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     tenantMigrationTest.stop();
 })();
@@ -292,7 +292,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     tenantMigrationTest.stop();
 })();
@@ -318,7 +318,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     };
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     fp.off();
 
@@ -346,7 +346,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     };
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assert.commandFailedWithCode(
         tenantMigrationTest.tryAbortMigration({migrationIdString: migrationOpts.migrationIdString}),

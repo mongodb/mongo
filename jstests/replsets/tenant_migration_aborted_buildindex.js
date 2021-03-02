@@ -98,7 +98,7 @@ const blockingFp =
 dataSyncFp.off();
 assert.soon(
     () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state ===
-        TenantMigrationTest.AccessState.kBlockWritesAndReads);
+        TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 
 // Clear the log so we can wait for the new index builds to start.
 assert.commandWorked(donorPrimary.adminCommand({clearLog: "global"}));

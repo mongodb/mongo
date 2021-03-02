@@ -46,7 +46,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         tenantMigrationTest.runMigration({migrationIdString: migrationId1, tenantId: tenantId},
                                          false /* retryOnRetryableErrors */,
                                          false /* automaticForgetMigration */));
-    assert.eq(abortRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(abortRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     // Forget the aborted migration.
@@ -59,7 +59,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
               migrationId2 + ", tenantId: " + tenantId);
     const commitRes = assert.commandWorked(
         tenantMigrationTest.runMigration({migrationIdString: migrationId2, tenantId: tenantId}));
-    assert.eq(commitRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(commitRes.state, TenantMigrationTest.DonorState.kCommitted);
 })();
 
 (() => {
@@ -99,7 +99,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 
     const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         {migrationIdString: migrationId1, tenantId: tenantId}));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
     // Forget the aborted migration.
     jsTestLog("Forgetting aborted migration with migrationId: " + migrationId1);
@@ -111,7 +111,7 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
               migrationId2 + ", tenantId: " + tenantId);
     const commitRes = assert.commandWorked(
         tenantMigrationTest.runMigration({migrationIdString: migrationId2, tenantId: tenantId}));
-    assert.eq(commitRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(commitRes.state, TenantMigrationTest.DonorState.kCommitted);
 })();
 
 tenantMigrationTest.stop();

@@ -1,5 +1,5 @@
 /**
- * Tests that tenant migrations that go through rollback are recovered correctly.
+ * Tests that tenant migrations that go through donor rollback are recovered correctly.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls]
@@ -18,8 +18,10 @@ const kTenantId = "testTenantId";
 
 const kMaxSleepTimeMS = 250;
 
-// Set the delay before a donor state doc is garbage collected to be short to speed up the test.
-const kGarbageCollectionDelayMS = 5 * 1000;
+// Set the delay before a state doc is garbage collected to be short to speed up the test but long
+// enough for the state doc to still be around after the donor is back in the replication steady
+// state.
+const kGarbageCollectionDelayMS = 30 * 1000;
 
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
@@ -53,10 +55,10 @@ function makeMigrationOpts(migrationId, tenantId) {
 }
 
 /**
- * Starts a RollbackTest donor replica set. Runs 'setUpFunc' after the replica set reaches the
- * replication steady state. Then runs 'rollbackOpsFunc' while it is in rollback operations state
- * (operations run in this state will be rolled back). Finally, runs 'steadyStateFunc' after it is
- * back in the replication steady state.
+ * Starts a donor ReplSetTest and creates a TenantMigrationTest for it. Runs 'setUpFunc' and then
+ * starts a RollbackTest from the donor ReplSetTest. Runs 'rollbackOpsFunc' while it is in rollback
+ * operations state (operations run in this state will be rolled back). Finally, runs
+ * 'steadyStateFunc' after it is back in the replication steady state.
  *
  * See rollback_test.js for more information about RollbackTest.
  */
@@ -80,13 +82,11 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), recipientRst, donorRst});
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    setUpFunc(tenantMigrationTest, donorRstArgs);
 
     const donorRollbackTest = new RollbackTest("donorRst", donorRst);
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
-
     let donorPrimary = donorRollbackTest.getPrimary();
-
-    setUpFunc(tenantMigrationTest, donorRstArgs);
     donorRollbackTest.awaitLastOpCommitted();
 
     // Writes during this state will be rolled back.
@@ -110,8 +110,8 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
 
 /**
  * Starts a migration and waits for the donor's primary to insert the donor's state doc. Forces the
- * write to be rolled back. After the replication steady state is reached, asserts that there is no
- * state doc and that the migration can be restarted on the new primary.
+ * write to be rolled back. After the replication steady state is reached, asserts that
+ * donorStartMigration can restart the migration on the new primary.
  */
 function testRollbackInitialState() {
     const migrationId = UUID();
@@ -138,11 +138,13 @@ function testRollbackInitialState() {
 
     let steadyStateFunc = (tenantMigrationTest, donorPrimary, donorSecondary) => {
         // Verify that the migration restarted successfully on the new primary despite rollback.
-        assert.commandWorked(migrationThread.returnData());
-        tenantMigrationTest.assertNodesInExpectedState([donorPrimary, donorSecondary],
-                                                       migrationId,
-                                                       migrationOpts.tenantId,
-                                                       TenantMigrationTest.State.kCommitted);
+        const stateRes = assert.commandWorked(migrationThread.returnData());
+        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        tenantMigrationTest.assertDonorNodesInExpectedState(
+            [donorPrimary, donorSecondary],
+            migrationId,
+            migrationOpts.tenantId,
+            TenantMigrationTest.DonorState.kCommitted);
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     };
 
@@ -191,11 +193,13 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
 
     let steadyStateFunc = (tenantMigrationTest, donorPrimary, donorSecondary) => {
         // Verify that the migration resumed successfully on the new primary despite the rollback.
-        assert.commandWorked(migrationThread.returnData());
-        tenantMigrationTest.waitForNodesToReachState([donorPrimary, donorSecondary],
-                                                     migrationId,
-                                                     migrationOpts.tenantId,
-                                                     TenantMigrationTest.State.kCommitted);
+        const stateRes = assert.commandWorked(migrationThread.returnData());
+        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+        tenantMigrationTest.waitForDonorNodesToReachState(
+            [donorPrimary, donorSecondary],
+            migrationId,
+            migrationOpts.tenantId,
+            TenantMigrationTest.DonorState.kCommitted);
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     };
 
@@ -205,8 +209,8 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
 /**
  * Runs donorForgetMigration after completing a migration. Waits for the donor's primary to
  * mark the donor's state doc as garbage collectable, then forces the write to be rolled back.
- * After the replication steady state is reached, asserts that the state doc doesn't get garbage
- * collected until donorForgetMigration is sent to the new primary.
+ * After the replication steady state is reached, asserts that donorForgetMigration can be retried
+ * on the new primary and that the state doc is eventually garbage collected.
  */
 function testRollBackMarkingStateGarbageCollectable() {
     const migrationId = UUID();
@@ -214,8 +218,11 @@ function testRollBackMarkingStateGarbageCollectable() {
     let forgetMigrationThread;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {
-        const res = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-        assert.eq(TenantMigrationTest.State.kCommitted, res.state);
+        const stateRes = assert.commandWorked(
+            tenantMigrationTest.runMigration(migrationOpts,
+                                             true /* retryOnRetryableErrors */,
+                                             false /* automaticForgetMigration */));
+        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     };
 
     let rollbackOpsFunc = (tenantMigrationTest, donorRstArgs) => {
@@ -249,7 +256,7 @@ function testRollBackMarkingStateGarbageCollectable() {
 /**
  * Starts a migration and forces the donor's primary to go through rollback after a random amount
  * of time. After the replication steady state is reached, asserts that the migration is resumed
- * if the donor's doc insertion did not roll back.
+ * successfully.
  */
 function testRollBackRandom() {
     const migrationId = UUID();
@@ -280,16 +287,13 @@ function testRollBackRandom() {
         // Verify that the migration completed and was garbage collected successfully despite the
         // rollback.
         migrationThread.join();
-        if (donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
-                _id: migrationId
-            }) > 0) {
-            tenantMigrationTest.waitForNodesToReachState([donorPrimary, donorSecondary],
-                                                         migrationId,
-                                                         migrationOpts.tenantId,
-                                                         TenantMigrationTest.State.kCommitted);
-            assert.commandWorked(
-                tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-        }
+        tenantMigrationTest.waitForDonorNodesToReachState(
+            [donorPrimary, donorSecondary],
+            migrationId,
+            migrationOpts.tenantId,
+            TenantMigrationTest.DonorState.kCommitted);
+        tenantMigrationTest.waitForMigrationGarbageCollection(
+            migrationId, migrationOpts.tenantId, [donorPrimary, donorSecondary]);
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);
