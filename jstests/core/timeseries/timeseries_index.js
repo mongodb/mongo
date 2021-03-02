@@ -112,4 +112,8 @@ assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.Index
 // Index names are not transformed. dropIndexes passes the request along to the buckets collection,
 // which in this case does not possess the index by that name.
 assert.commandFailedWithCode(coll.dropIndex('mm_1'), ErrorCodes.IndexNotFound);
+
+// Unique indexes are not supported
+assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: true}),
+                             ErrorCodes.InvalidOptions);
 })();

@@ -140,6 +140,11 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
                     !ns.isSystem() || indexSpec[IndexDescriptor::kHiddenFieldName].eoo());
         }
 
+        uassert(ErrorCodes::InvalidOptions,
+                "Unique indexes are not supported on time-series buckets collections",
+                !ns.isTimeseriesBucketsCollection() ||
+                    !indexSpec[IndexDescriptor::kUniqueFieldName].trueValue());
+
         indexSpecs.push_back(std::move(indexSpec));
     }
 
