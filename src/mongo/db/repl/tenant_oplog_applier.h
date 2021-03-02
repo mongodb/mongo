@@ -108,10 +108,11 @@ private:
     Status _applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops);
     void _checkNsAndUuidsBelongToTenant(OperationContext* opCtx, const TenantOplogBatch& batch);
     OpTimePair _writeNoOpEntries(OperationContext* opCtx, const TenantOplogBatch& batch);
+
+    using TenantNoOpEntry = std::pair<const OplogEntry*, std::vector<OplogSlot>::iterator>;
     void _writeNoOpsForRange(OpObserver* opObserver,
-                             std::vector<TenantOplogEntry>::const_iterator begin,
-                             std::vector<TenantOplogEntry>::const_iterator end,
-                             std::vector<OplogSlot>::iterator firstSlot);
+                             std::vector<TenantNoOpEntry>::const_iterator begin,
+                             std::vector<TenantNoOpEntry>::const_iterator end);
 
     Status _applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                             const OplogEntryOrGroupedInserts& entryOrGroupedInserts,

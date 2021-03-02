@@ -85,8 +85,11 @@ public:
      */
     bool lastOpWasSetExplicitlyByClientForCurrentOperation(OperationContext* opCtx) const;
 
-    // Resets the last op on this client; should only be used in testing.
-    void clearLastOp_forTest() {
+    /**
+     * Resets the last op on this client.
+     * WARNING: This should only be used when the lastOp is no longer needed for the client.
+     */
+    void clearLastOp() {
         _lastOp = OpTime();
     }
 

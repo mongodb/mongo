@@ -206,7 +206,7 @@ public:
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
-        repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp_forTest();
+        repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp();
 
         auto registry = std::make_unique<OpObserverRegistry>();
         registry->addObserver(std::make_unique<OpObserverImpl>());
