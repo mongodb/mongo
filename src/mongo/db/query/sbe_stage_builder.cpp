@@ -180,6 +180,31 @@ std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage
 
     return sbe::makeProjectStage(std::move(stage), nodeId, resultSlot, std::move(keyExpr));
 }
+
+/**
+ * Generates an EOF plan. Note that even though this plan will return nothing, it will still define
+ * the slots specified by 'reqs'.
+ */
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
+    PlanNodeId nodeId, const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator) {
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+
+    PlanStageSlots outputs(reqs, slotIdGenerator);
+    outputs.forEachSlot(reqs, [&](auto&& slot) {
+        projects.insert({slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
+    });
+
+    auto stage = sbe::makeS<sbe::LimitSkipStage>(
+        sbe::makeS<sbe::CoScanStage>(nodeId), 0, boost::none, nodeId);
+
+    if (!projects.empty()) {
+        // Even though this SBE tree will produce zero documents, we still need a ProjectStage to
+        // define the slots in 'outputSlots' so that calls to getAccessor() won't fail.
+        stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), nodeId);
+    }
+
+    return {std::move(stage), std::move(outputs)};
+}
 }  // namespace
 
 
@@ -1113,6 +1138,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         ixscanOutputSlots.push_back(sbe::makeSV(recordIdSlot));
     }
 
+    // If we don't have any index scan stages, produce an EOF plan.
+    if (indexScanList.empty()) {
+        return generateEofPlan(root->nodeId(), reqs, &_slotIdGenerator);
+    }
+
     PlanStageSlots outputs;
 
     // Union will output a slot for the record id and another for the record.
@@ -1181,24 +1211,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEof(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-
-    PlanStageSlots outputs(reqs, &_slotIdGenerator);
-    outputs.forEachSlot(reqs, [&](auto&& slot) {
-        projects.insert({slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
-    });
-
-    auto stage = sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::CoScanStage>(root->nodeId()), 0, boost::none, root->nodeId());
-
-    if (!projects.empty()) {
-        // Even though this SBE tree will produce zero documents, we still need a ProjectStage to
-        // define the slots in 'outputSlots' so that calls to getAccessor() won't fail.
-        stage =
-            sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), root->nodeId());
-    }
-
-    return {std::move(stage), std::move(outputs)};
+    return generateEofPlan(root->nodeId(), reqs, &_slotIdGenerator);
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndHash(
