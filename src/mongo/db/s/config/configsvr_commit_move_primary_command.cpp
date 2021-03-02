@@ -37,7 +37,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 
-// TODO SERVER-xyz throw out this file once 5.0 becomes last-LTS
+// TODO SERVER-54879 throw out this file once 5.0 becomes last-LTS
 namespace mongo {
 namespace {
 

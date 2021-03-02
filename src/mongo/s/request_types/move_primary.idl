@@ -73,7 +73,7 @@ structs:
             to:
                 type: string
                 description: "The shard serving as the destination for un-sharded collections."
-            # TODO SERVER-xyz remove the following field and adapt the code accordingly once 5.0 becomes last-LTS
+            # TODO SERVER-54879 remove the following field and adapt the code accordingly once 5.0 becomes last-LTS
             commandIsFromRouter:
                 type: bool
                 description: "Indicates whether the command has been sent by a router"
