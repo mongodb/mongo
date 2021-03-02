@@ -45,7 +45,8 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(avg, genericParseSingleExpressionAccumulator<AccumulatorAvg>);
 REGISTER_EXPRESSION(avg, ExpressionFromAccumulator<AccumulatorAvg>::parse);
-REGISTER_WINDOW_FUNCTION(avg, window_function::ExpressionFromAccumulator<AccumulatorAvg>::parse);
+REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+    avg, window_function::ExpressionFromAccumulator<AccumulatorAvg>::parse);
 
 const char* AccumulatorAvg::getOpName() const {
     return "$avg";

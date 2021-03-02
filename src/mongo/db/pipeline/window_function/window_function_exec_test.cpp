@@ -73,9 +73,7 @@ private:
 
 class WindowFunctionExecRemovableDocumentTest : public AggregationContextFixture {
 public:
-    WindowFunctionExecRemovableDocumentTest()
-        : collator(CollatorInterfaceMock::MockType::kToLowerString), cmp(&collator) {}
-
+    WindowFunctionExecRemovableDocumentTest() {}
     WindowFunctionExecRemovableDocument createForFieldPath(
         std::deque<DocumentSource::GetNextResult> docs,
         const std::string& inputPath,
@@ -85,7 +83,8 @@ public:
             std::make_unique<PartitionIterator>(getExpCtx().get(), _docSource.get(), boost::none);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
-        std::unique_ptr<WindowFunctionState> maxFunc = std::make_unique<WindowFunctionMax>(cmp);
+        std::unique_ptr<WindowFunctionState> maxFunc =
+            std::make_unique<WindowFunctionMax>(getExpCtx().get());
         return WindowFunctionExecRemovableDocument(
             _iter.get(), std::move(input), std::move(maxFunc), bounds);
     }
@@ -95,8 +94,6 @@ public:
     }
 
 private:
-    CollatorInterfaceMock collator;
-    ValueComparator cmp;
     boost::intrusive_ptr<DocumentSourceMock> _docSource;
     std::unique_ptr<PartitionIterator> _iter;
 };
@@ -334,8 +331,8 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
     CollatorInterfaceMock collator = CollatorInterfaceMock::MockType::kToLowerString;
-    ValueComparator cmp(&collator);
-    std::unique_ptr<WindowFunctionState> maxFunc = std::make_unique<WindowFunctionMax>(cmp);
+    std::unique_ptr<WindowFunctionState> maxFunc =
+        std::make_unique<WindowFunctionMax>(getExpCtx().get());
     auto mgr = WindowFunctionExecRemovableDocument(
         &iter, std::move(input), std::move(maxFunc), WindowBounds::DocumentBased{0, 0});
     ASSERT_VALUE_EQ(Value(3), mgr.getNext());
@@ -360,7 +357,7 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
     iter = PartitionIterator{
         getExpCtx().get(), mockTwo.get(), boost::optional<boost::intrusive_ptr<Expression>>(key)};
     input = ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    maxFunc = std::make_unique<WindowFunctionMax>(cmp);
+    maxFunc = std::make_unique<WindowFunctionMax>(getExpCtx().get());
     mgr = WindowFunctionExecRemovableDocument(
         &iter, std::move(input), std::move(maxFunc), WindowBounds::DocumentBased{-1, 0});
     ASSERT_VALUE_EQ(Value(3), mgr.getNext());

@@ -46,7 +46,8 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(sum, genericParseSingleExpressionAccumulator<AccumulatorSum>);
 REGISTER_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
-REGISTER_WINDOW_FUNCTION(sum, window_function::ExpressionFromAccumulator<AccumulatorSum>::parse);
+REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+    sum, window_function::ExpressionFromAccumulator<AccumulatorSum>::parse);
 REGISTER_ACCUMULATOR(count, parseCountAccumulator);
 
 const char* AccumulatorSum::getOpName() const {

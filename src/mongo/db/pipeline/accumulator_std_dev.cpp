@@ -45,10 +45,10 @@ REGISTER_ACCUMULATOR(stdDevPop, genericParseSingleExpressionAccumulator<Accumula
 REGISTER_ACCUMULATOR(stdDevSamp, genericParseSingleExpressionAccumulator<AccumulatorStdDevSamp>);
 REGISTER_EXPRESSION(stdDevPop, ExpressionFromAccumulator<AccumulatorStdDevPop>::parse);
 REGISTER_EXPRESSION(stdDevSamp, ExpressionFromAccumulator<AccumulatorStdDevSamp>::parse);
-REGISTER_WINDOW_FUNCTION(stdDevPop,
-                         window_function::ExpressionFromAccumulator<AccumulatorStdDevPop>::parse);
-REGISTER_WINDOW_FUNCTION(stdDevSamp,
-                         window_function::ExpressionFromAccumulator<AccumulatorStdDevSamp>::parse);
+REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+    stdDevPop, mongo::window_function::ExpressionFromAccumulator<AccumulatorStdDevPop>::parse);
+REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+    stdDevSamp, mongo::window_function::ExpressionFromAccumulator<AccumulatorStdDevSamp>::parse);
 
 const char* AccumulatorStdDev::getOpName() const {
     return (_isSamp ? "$stdDevSamp" : "$stdDevPop");

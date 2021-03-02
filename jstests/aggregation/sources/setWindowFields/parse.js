@@ -53,7 +53,7 @@ assert.commandFailedWithCode(run({$setWindowFields: {what_is_this: 1}}), 40415);
 // $setWindowFields:
 // {partitionBy: "$state", sortBy: {city: 1}, output: {a: {$sum: {input: 1}}}}
 // }),
-// 5397903);
+// 5374100);
 
 function runSum(spec) {
     // Include a single-field sortBy in this helper to allow all kinds of bounds.
@@ -61,7 +61,7 @@ function runSum(spec) {
 }
 
 // The most basic case: $sum everything.
-assert.commandFailedWithCode(runSum({input: "$a"}), 5397903);
+assert.commandFailedWithCode(runSum({input: "$a"}), 5374100);
 
 // Extra arguments to a window function are rejected.
 assert.commandFailedWithCode(runSum({abcde: 1}),
@@ -69,12 +69,12 @@ assert.commandFailedWithCode(runSum({abcde: 1}),
                              'Window function $sum found an unknown argument: abcde');
 
 // That's equivalent to bounds of [unbounded, unbounded].
-assert.commandFailedWithCode(runSum({input: "$a", documents: ['unbounded', 'unbounded']}), 5397903);
+assert.commandFailedWithCode(runSum({input: "$a", documents: ['unbounded', 'unbounded']}), 5374100);
 
 // Bounds can be bounded, or bounded on one side.
-assert.commandFailedWithCode(runSum({input: "$a", documents: [-2, +4]}), 5397904);
-assert.commandFailedWithCode(runSum({input: "$a", documents: [-3, 'unbounded']}), 5397904);
-assert.commandFailedWithCode(runSum({input: "$a", documents: ['unbounded', +5]}), 5397903);
+assert.commandFailedWithCode(runSum({input: "$a", documents: [-2, +4]}), 5461500);
+assert.commandFailedWithCode(runSum({input: "$a", documents: [-3, 'unbounded']}), 5461500);
+assert.commandWorked(runSum({input: "$a", documents: ['unbounded', +5]}));
 
 // Range-based bounds:
 assert.commandFailedWithCode(runSum({input: "$a", range: ['unbounded', 'unbounded']}), 5397901);
@@ -90,7 +90,7 @@ assert.commandFailedWithCode(runSum({input: "$a", range: [-3, 'unbounded'], unit
 
 // Numeric bounds can be a constant expression:
 let expr = {$add: [2, 2]};
-assert.commandFailedWithCode(runSum({input: "$a", documents: [expr, expr]}), 5397904);
+assert.commandFailedWithCode(runSum({input: "$a", documents: [expr, expr]}), 5461500);
 assert.commandFailedWithCode(runSum({input: "$a", range: [expr, expr]}), 5397901);
 assert.commandFailedWithCode(runSum({input: "$a", range: [expr, expr], unit: 'hour'}), 5397902);
 // But 'current' and 'unbounded' are not expressions: they're more like keywords.
@@ -126,7 +126,7 @@ assert.commandFailedWithCode(
         $setWindowFields:
             {output: {v: {$sum: {input: "$a", documents: ['unbounded', 'unbounded']}}}}
     }),
-    5397903);
+    5374100);
 assert.commandFailedWithCode(
     run({
         $setWindowFields:
@@ -195,7 +195,7 @@ assert.commandFailedWithCode(
 
 // Variety of accumulators:
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$sum: {input: "$a"}}}}}),
-                             5397903);
+                             5374100);
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$avg: {input: "$a"}}}}}),
                              5397900);
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$max: {input: "$a"}}}}}),
