@@ -6,13 +6,13 @@
  * @tags: [
  *   requires_fcv_47,
  *   uses_api_parameters,
- *   sbe_incompatible,
  * ]
  */
 
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");     // For 'getWinningPlan'.
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
 
 const collName = "api_verision_unstable_indexes";
@@ -33,7 +33,7 @@ assert.commandWorked(coll.createIndex({"views": 1}, {sparse: true}));
 if (!FixtureHelpers.isMongos(db)) {
     const explainRes = assert.commandWorked(
         db.runCommand({explain: {"find": collName, "filter": {$text: {$search: "coffee"}}}}));
-    assert.eq(explainRes["queryPlanner"]["winningPlan"]["indexName"], "subject_text", explainRes);
+    assert.eq(getWinningPlan(explainRes.queryPlanner).indexName, "subject_text", explainRes);
 }
 
 // No "text" index can be used for $text search as the "text" index is excluded from API version 1.
@@ -57,8 +57,6 @@ assert.commandFailedWithCode(db.runCommand({
 if (!FixtureHelpers.isMongos(db)) {
     const explainRes = assert.commandWorked(
         db.runCommand({explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
-    assert.eq(explainRes["queryPlanner"]["winningPlan"]["inputStage"]["indexName"],
-              "views_1",
-              explainRes);
+    assert.eq(getWinningPlan(explainRes.queryPlanner).inputStage.indexName, "views_1", explainRes);
 }
 })();
