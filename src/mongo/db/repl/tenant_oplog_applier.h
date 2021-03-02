@@ -113,6 +113,9 @@ private:
     void _writeNoOpsForRange(OpObserver* opObserver,
                              std::vector<TenantNoOpEntry>::const_iterator begin,
                              std::vector<TenantNoOpEntry>::const_iterator end);
+    void _writeSessionNoOpsForRange(OpObserver* opObserver,
+                                    std::vector<TenantNoOpEntry>::const_iterator begin,
+                                    std::vector<TenantNoOpEntry>::const_iterator end);
 
     Status _applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                             const OplogEntryOrGroupedInserts& entryOrGroupedInserts,

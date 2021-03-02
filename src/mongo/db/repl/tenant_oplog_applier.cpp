@@ -50,6 +50,8 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
+#include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -434,6 +436,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 "lastDonorOptime"_attr = batch.ops.back().entry.getOpTime(),
                 "numOplogThreads"_attr = numOplogThreads,
                 "numOpsPerThread"_attr = numOpsPerThread,
+                "numOplogEntries"_attr = batch.ops.size(),
                 "numSessionsInBatch"_attr = sessionOps.size());
 
     // Vector to store errors from each writer thread. The first numOplogThreads entries store
@@ -474,7 +477,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 status = scheduleStatus;
             } else {
                 try {
-                    _writeNoOpsForRange(opObserver, s.second.begin(), s.second.end());
+                    _writeSessionNoOpsForRange(opObserver, s.second.begin(), s.second.end());
                 } catch (const DBException& e) {
                     status = e.toStatus();
                 }
@@ -497,6 +500,108 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         uassertStatusOK(status);
     }
     return {batch.ops.back().entry.getOpTime(), greatestOplogSlotUsed};
+}
+
+void TenantOplogApplier::_writeSessionNoOpsForRange(
+    OpObserver* opObserver,
+    std::vector<TenantNoOpEntry>::const_iterator begin,
+    std::vector<TenantNoOpEntry>::const_iterator end) {
+    auto opCtx = cc().makeOperationContext();
+    tenantMigrationRecipientInfo(opCtx.get()) =
+        boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
+
+    // Since the client object persists across each noop write call and the same writer thread could
+    // be reused to write noop entries with older optime, we need to clear the lastOp associated
+    // with the client to avoid the invariant in replClientInfo::setLastOp that the optime only goes
+    // forward.
+    repl::ReplClientInfo::forClient(opCtx->getClient()).clearLastOp();
+
+    for (auto iter = begin; iter != end; iter++) {
+        const auto& entry = *iter->first;
+        invariant(!isResumeTokenNoop(entry));
+        invariant(entry.getSessionId());
+
+        boost::optional<MongoDOperationContextSession> scopedSession;
+        boost::optional<BSONObj> o2;
+        if (entry.getTxnNumber() && !entry.isPartialTransaction() &&
+            (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
+             entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps)) {
+            // Final applyOp for a transaction.
+            const auto& sessionId = *entry.getSessionId();
+            const auto& txnNumber = *entry.getTxnNumber();
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNumber);
+            opCtx->setInMultiDocumentTransaction();
+            LOGV2_DEBUG(5351502,
+                        1,
+                        "Tenant Oplog Applier committing transaction",
+                        "sessionId"_attr = sessionId,
+                        "txnNumber"_attr = txnNumber,
+                        "tenant"_attr = _tenantId,
+                        "migrationUuid"_attr = _migrationUuid);
+
+            // Check out the session.
+            scopedSession.emplace(opCtx.get());
+            auto txnParticipant = TransactionParticipant::get(opCtx.get());
+            uassert(
+                5351500,
+                str::stream() << "Tenant oplog application failed to get transaction participant "
+                                 "for transaction "
+                              << txnNumber << " on session " << sessionId,
+                txnParticipant);
+            // We should only write the noop entry for this transaction commit once.
+            uassert(5351501,
+                    str::stream() << "Tenant oplog application cannot apply transaction "
+                                  << txnNumber << " on session " << sessionId
+                                  << " because the transaction number "
+                                  << txnParticipant.getActiveTxnNumber() << " has already started",
+                    txnParticipant.getActiveTxnNumber() < txnNumber);
+            txnParticipant.beginOrContinueTransactionUnconditionally(opCtx.get(), txnNumber);
+
+            OperationSessionInfo sessionInfo;
+            sessionInfo.setSessionId(sessionId);
+            sessionInfo.setTxnNumber(txnNumber);
+            o2 = sessionInfo.toBSON();
+        }
+
+        AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+        writeConflictRetry(
+            opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
+                WriteUnitOfWork wuow(opCtx.get());
+
+                // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
+                const boost::optional<OpTime> preImageOpTime = boost::none;
+                const boost::optional<OpTime> postImageOpTime = boost::none;
+                // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
+                const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
+
+                // Write the noop entry and trigger config.transactions update.
+                opObserver->onInternalOpMessage(
+                    opCtx.get(),
+                    entry.getNss(),
+                    entry.getUuid(),
+                    entry.getEntry().toBSON(),
+                    o2,
+                    // We link the no-ops together by recipient op time the same way the actual ops
+                    // were linked together by donor op time.  This is to allow retryable writes
+                    // and changestreams to find the ops they need.
+                    preImageOpTime,
+                    postImageOpTime,
+                    prevWriteOpTimeInTransaction,
+                    *iter->second);
+
+                wuow.commit();
+            });
+
+        // Invalidate in-memory state so that the next time the session is checked out, it
+        // would reload the transaction state from config.transactions.
+        if (opCtx->inMultiDocumentTransaction()) {
+            auto txnParticipant = TransactionParticipant::get(opCtx.get());
+            invariant(txnParticipant);
+            txnParticipant.invalidate(opCtx.get());
+            opCtx->resetMultiDocumentTransactionState();
+        }
+    }
 }
 
 void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
@@ -523,10 +628,9 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     // not be applied in a change stream anyways.
                     continue;
                 }
-                // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
+                // We don't need to link no-ops entries for operations done outside of a session.
                 const boost::optional<OpTime> preImageOpTime = boost::none;
                 const boost::optional<OpTime> postImageOpTime = boost::none;
-                // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
                 const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
                 opObserver->onInternalOpMessage(
                     opCtx.get(),
