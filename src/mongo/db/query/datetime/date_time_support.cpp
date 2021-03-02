@@ -878,11 +878,17 @@ std::pair<long long, long long> addMonths(long long year, long long month, long 
 }
 
 /**
- * A helper function that checks if last day adjustment is needed for a dateAdd operation.
- * If yes, the function computes and returns the time interval in a number of days, so that the day
- * in the result date is the last valid day in the respective month. Example: 2020-10-31 + 1 month
- * -> day adjustment is needed since there is no 31st of November. The function computes adjusted
- * time interval of 30 days.
+ * A helper function that computes the number of days to add to get an equivalent result as from
+ * adding an 'amount' number of 'unit's in two use cases:
+ * In case the date is in UTC, a last day adjustment is needed if the day is greater than 28th.
+ * In case the date is in a timezone different from UTC, the time interval is always converted into
+ * a number of days to produce correct result in this timezone. This may also include a last day
+ * adjustment.
+ *
+ * The last day adjustment computation makes sure that the day in the result date is not greater
+ * than the last valid day in the respective month. Example: 2020-10-31 + 1 month -> day adjustment
+ * is needed since there is no 31st of November. The function computes adjusted time interval of 30
+ * days. For dates in UTC and day smaller than 29th, the function returns boost::none.
  *
  * tm: start date of the operation
  * unit: the time unit
@@ -890,8 +896,8 @@ std::pair<long long, long long> addMonths(long long year, long long month, long 
  * returns optional intervalInDays : adjusted time interval in number of days if adjustment is
  * needed
  */
-boost::optional<long long> needsDayAdjustment(timelib_time* tm, TimeUnit unit, long long amount) {
-    if (tm->d <= 28) {
+boost::optional<long long> daysToAdd(timelib_time* tm, TimeUnit unit, long long amount) {
+    if (tm->d <= 28 && tm->z == 0) {
         return boost::none;
     }
     if (unit == TimeUnit::year) {
@@ -905,13 +911,10 @@ boost::optional<long long> needsDayAdjustment(timelib_time* tm, TimeUnit unit, l
 
     auto [resYear, resMonth] = addMonths(tm->y, tm->m, amount);
     auto maxResDay = timelib_days_in_month(resYear, resMonth);
-
-    if (tm->d > maxResDay) {
-        long long intervalInDays = timelib_day_of_year(resYear, resMonth, maxResDay) -
-            timelib_day_of_year(tm->y, tm->m, tm->d) + daysBetweenYears(tm->y, resYear);
-        return boost::make_optional(intervalInDays);
-    }
-    return boost::none;
+    auto targetDay = std::min(tm->d, maxResDay);
+    long long intervalInDays = timelib_day_of_year(resYear, resMonth, targetDay) -
+        timelib_day_of_year(tm->y, tm->m, tm->d) + daysBetweenYears(tm->y, resYear);
+    return boost::make_optional(intervalInDays);
 }
 
 /**
@@ -926,6 +929,11 @@ long long dateAddDSTCorrection(long long startSse, long long endSse, const TimeZ
     auto startOffset = timelib_get_time_zone_info(startSse, tz.get());
     auto endOffset = timelib_get_time_zone_info(endSse, tz.get());
     long long corr = startOffset->offset - endOffset->offset;
+    // If the result date falls into the missing hour during Standard to DST time
+    // change, forward the clock with 1 hour.
+    if (endOffset->is_dst && endSse - endOffset->transition_time <= 3600) {
+        corr += 3600;
+    }
     timelib_time_offset_dtor(startOffset);
     timelib_time_offset_dtor(endOffset);
     return corr;
@@ -941,11 +949,11 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
     if (unit == TimeUnit::year || unit == TimeUnit::quarter || unit == TimeUnit::month) {
         auto intervalInDays = [&]() {
             if (timezone.isUtcZone()) {
-                return needsDayAdjustment(utcTime.get(), unit, amount);
+                return daysToAdd(utcTime.get(), unit, amount);
             }
             // If a timezone is provided, the last day adjustment is computed in this timezone.
             auto localTime = timezone.getTimelibTime(date);
-            return needsDayAdjustment(localTime.get(), unit, amount);
+            return daysToAdd(localTime.get(), unit, amount);
         }();
         if (intervalInDays) {
             unit = TimeUnit::day;

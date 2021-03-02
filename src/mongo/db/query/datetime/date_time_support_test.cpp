@@ -1596,30 +1596,42 @@ TEST(DateAdd, DateAddQuarter) {
 }
 
 TEST(DateAdd, DateAddMonth) {
-    auto startDate = kDefaultTimeZone.createFromDateParts(2020, 8, 31, 10, 5, 0, 0);
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, 1, kDefaultTimeZone),
+    auto utc2020_08_31 = kDefaultTimeZone.createFromDateParts(2020, 8, 31, 10, 5, 0, 0);
+    auto utc2021_04_30 = kDefaultTimeZone.createFromDateParts(2021, 4, 30, 0, 0, 0, 0);
+    auto utc2021_03_01 = kDefaultTimeZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0);
+
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, 1, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2020, 9, 30, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, 5, kDefaultTimeZone),
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, 5, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2021, 1, 31, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, 6, kDefaultTimeZone),
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, 6, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2021, 2, 28, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, -1, kDefaultTimeZone),
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, -1, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2020, 7, 31, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, -4, kDefaultTimeZone),
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, -4, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2020, 4, 30, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(startDate, TimeUnit::month, -18, kDefaultTimeZone),
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, -6, kDefaultTimeZone),
+              kDefaultTimeZone.createFromDateParts(2020, 2, 29, 10, 5, 0, 0));
+
+    ASSERT_EQ(dateAdd(utc2020_08_31, TimeUnit::month, -18, kDefaultTimeZone),
               kDefaultTimeZone.createFromDateParts(2019, 2, 28, 10, 5, 0, 0));
 
-    ASSERT_EQ(dateAdd(kDefaultTimeZone.createFromDateParts(2020, 1, 30, 10, 5, 0, 0),
-                      TimeUnit::month,
-                      1,
-                      kDefaultTimeZone),
-              kDefaultTimeZone.createFromDateParts(2020, 2, 29, 10, 5, 0, 0));
+    ASSERT_EQ(dateAdd(utc2021_04_30, TimeUnit::month, 1, kDefaultTimeZone),
+              kDefaultTimeZone.createFromDateParts(2021, 5, 30, 0, 0, 0, 0));
+
+    ASSERT_EQ(dateAdd(utc2021_04_30, TimeUnit::month, -2, kDefaultTimeZone),
+              kDefaultTimeZone.createFromDateParts(2021, 2, 28, 0, 0, 0, 0));
+
+    ASSERT_EQ(dateAdd(utc2021_03_01, TimeUnit::month, 2, kDefaultTimeZone),
+              kDefaultTimeZone.createFromDateParts(2021, 5, 1, 0, 0, 0, 0));
+
+    ASSERT_EQ(dateAdd(utc2021_03_01, TimeUnit::month, -1, kDefaultTimeZone),
+              kDefaultTimeZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0));
 }
 
 /**
@@ -1633,63 +1645,171 @@ TEST(DateAdd, DateAddDayAdjustmentWithTimezone) {
         Date_t expectedDate;
     };
 
-    auto amsZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Amsterdam");
-    // Last day of month in Amsterdam zone 2021-05-31T00:30:00
-    auto startDate = kDefaultTimeZone.createFromDateParts(2021, 05, 30, 22, 30, 0, 0);
+    auto europeAmsterdamZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Amsterdam");
+    // Last day of month in Amsterdam zone 2021-05-31T00:30:00.
+    auto ams2021_05_31T00_30 = europeAmsterdamZone.createFromDateParts(2021, 05, 31, 0, 30, 0, 0);
+    // First day in Amsterdam zone, last day in UTC.
+    auto ams2021_02_01 = europeAmsterdamZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0);
 
-    const std::vector<TestCase> tests{
-        {startDate,
+    const std::vector<TestCase> testsAmsterdamZone{
+        {ams2021_05_31T00_30,
          TimeUnit::month,
          1,
-         kDefaultTimeZone.createFromDateParts(
-             2021, 06, 29, 22, 30, 0, 0)},  // 2021-06-30T00:30:00 Ams
-        {startDate,
+         europeAmsterdamZone.createFromDateParts(2021, 06, 30, 0, 30, 0, 0)},
+        {ams2021_05_31T00_30,
          TimeUnit::month,
          -1,
-         kDefaultTimeZone.createFromDateParts(
-             2021, 04, 29, 22, 30, 0, 0)},  // 2021-04-30T00:30:00 Ams
-        {startDate,
+         europeAmsterdamZone.createFromDateParts(2021, 04, 30, 0, 30, 0, 0)},
+        {ams2021_05_31T00_30,
          TimeUnit::quarter,
          -1,
-         kDefaultTimeZone.createFromDateParts(
-             2021, 02, 27, 23, 30, 0, 0)},  // 2021-02-28T00:30:00 Ams
-        {startDate,
+         europeAmsterdamZone.createFromDateParts(2021, 02, 28, 0, 30, 0, 0)},
+        {ams2021_05_31T00_30,
          TimeUnit::quarter,
          -5,
-         kDefaultTimeZone.createFromDateParts(
-             2020, 02, 28, 23, 30, 0, 0)},  // 2020-02-29T00:30:00 Ams
+         europeAmsterdamZone.createFromDateParts(2020, 02, 29, 0, 30, 0, 0)},
+        {ams2021_02_01,
+         TimeUnit::month,
+         1,
+         europeAmsterdamZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0)},
+        {ams2021_02_01,
+         TimeUnit::month,
+         -2,
+         europeAmsterdamZone.createFromDateParts(2020, 12, 1, 0, 0, 0, 0)},
+        {ams2021_02_01,
+         TimeUnit::quarter,
+         1,
+         europeAmsterdamZone.createFromDateParts(2021, 5, 1, 0, 0, 0, 0)},
     };
-    for (const auto& test : tests) {
-        const auto testNumber = &test - &tests.front();
-        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, amsZone), test.expectedDate)
+    for (const auto& test : testsAmsterdamZone) {
+        const auto testNumber = &test - &testsAmsterdamZone.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, europeAmsterdamZone),
+                  test.expectedDate)
             << "on test " << testNumber;
     }
 
-    auto nyZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
-    // Instant in NY zone 2020-12-30T22:00:00
-    auto startDateNY = kDefaultTimeZone.createFromDateParts(2020, 12, 31, 3, 0, 0, 0);
+    auto europeSofiaZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Sofia");
+    // First day in Sofia timezone, last day of month in UTC.
+    auto sofia2021_02_01 = europeSofiaZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0);
+    auto sofia2021_03_01 = europeSofiaZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0);
 
-    const std::vector<TestCase> tests2{
-        {startDateNY,
+    const std::vector<TestCase> testsSofiaZone{
+        {sofia2021_02_01,
+         TimeUnit::month,
+         1,
+         europeSofiaZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0)},
+        {sofia2021_02_01,
+         TimeUnit::month,
+         -2,
+         europeSofiaZone.createFromDateParts(2020, 12, 1, 0, 0, 0, 0)},
+        {sofia2021_02_01,
+         TimeUnit::quarter,
+         1,
+         europeSofiaZone.createFromDateParts(2021, 5, 1, 0, 0, 0, 0)},
+        {sofia2021_03_01,
+         TimeUnit::month,
+         1,
+         europeSofiaZone.createFromDateParts(2021, 4, 1, 0, 0, 0, 0)},
+        {sofia2021_03_01,
+         TimeUnit::month,
+         -1,
+         europeSofiaZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0)},
+        {sofia2021_03_01,
+         TimeUnit::quarter,
+         1,
+         europeSofiaZone.createFromDateParts(2021, 6, 1, 0, 0, 0, 0)}};
+
+    for (const auto& test : testsSofiaZone) {
+        const auto testNumber = &test - &testsSofiaZone.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, europeSofiaZone),
+                  test.expectedDate)
+            << "on test " << testNumber;
+    }
+
+    auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
+    auto ny2020_12_30T22 = kDefaultTimeZone.createFromDateParts(2020, 12, 31, 3, 0, 0, 0);
+    auto ny2021_04_30T20 = newYorkZone.createFromDateParts(2021, 4, 30, 20, 0, 0, 0);
+    auto ny2021_03_01 = newYorkZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0);
+
+    const std::vector<TestCase> testsNYZone{
+        {ny2020_12_30T22,
          TimeUnit::month,
          -1,
          kDefaultTimeZone.createFromDateParts(
              2020, 12, 1, 3, 0, 0, 0)},  // 2020-11-30T22:00:00 NY zone
-        {startDateNY,
+        {ny2020_12_30T22,
          TimeUnit::month,
          2,
          kDefaultTimeZone.createFromDateParts(
              2021, 3, 1, 3, 0, 0, 0)},  // 2021-02-28T22:00:00 NY zone
-        {startDateNY,
+        {ny2020_12_30T22,
          TimeUnit::quarter,
          -2,
          kDefaultTimeZone.createFromDateParts(
              2020, 7, 1, 2, 0, 0, 0)},  // 2020-06-30T22:00:00 NY zone
+        {ny2020_12_30T22,
+         TimeUnit::month,
+         2,
+         kDefaultTimeZone.createFromDateParts(
+             2021, 3, 1, 3, 0, 0, 0)},  // 2021-02-28T22:00:00 NY zone
+        {ny2021_04_30T20,
+         TimeUnit::month,
+         1,
+         newYorkZone.createFromDateParts(2021, 5, 30, 20, 0, 0, 0)},
+        {ny2021_04_30T20,
+         TimeUnit::month,
+         -2,
+         newYorkZone.createFromDateParts(2021, 2, 28, 20, 0, 0, 0)},
+        {ny2021_03_01, TimeUnit::month, 1, newYorkZone.createFromDateParts(2021, 4, 1, 0, 0, 0, 0)},
+        {ny2021_03_01,
+         TimeUnit::month,
+         -1,
+         newYorkZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0)},
+        {ny2021_03_01,
+         TimeUnit::quarter,
+         1,
+         newYorkZone.createFromDateParts(2021, 6, 1, 0, 0, 0, 0)},
     };
 
-    for (const auto& test : tests2) {
-        const auto testNumber = &test - &tests2.front();
-        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, nyZone), test.expectedDate)
+    for (const auto& test : testsNYZone) {
+        const auto testNumber = &test - &testsNYZone.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, newYorkZone), test.expectedDate)
+            << "on test " << testNumber;
+    }
+
+    auto australiaEuclaZone = kDefaultTimeZoneDatabase.getTimeZone("Australia/Eucla");
+    auto eucla2021_02_01 = australiaEuclaZone.createFromDateParts(2021, 2, 1, 0, 0, 0, 0);
+    auto eucla2021_04_30 = australiaEuclaZone.createFromDateParts(2021, 4, 30, 0, 0, 0, 0);
+    const std::vector<TestCase> testsEuclaZone{
+        {eucla2021_02_01,
+         TimeUnit::month,
+         1,
+         australiaEuclaZone.createFromDateParts(2021, 3, 1, 0, 0, 0, 0)},
+        {eucla2021_02_01,
+         TimeUnit::month,
+         -2,
+         australiaEuclaZone.createFromDateParts(2020, 12, 1, 0, 0, 0, 0)},
+        {eucla2021_02_01,
+         TimeUnit::quarter,
+         1,
+         australiaEuclaZone.createFromDateParts(2021, 5, 1, 0, 0, 0, 0)},
+        {eucla2021_04_30,
+         TimeUnit::month,
+         1,
+         australiaEuclaZone.createFromDateParts(2021, 5, 30, 0, 0, 0, 0)},
+        {eucla2021_04_30,
+         TimeUnit::month,
+         -2,
+         australiaEuclaZone.createFromDateParts(2021, 2, 28, 0, 0, 0, 0)},
+        {eucla2021_04_30,
+         TimeUnit::quarter,
+         1,
+         australiaEuclaZone.createFromDateParts(2021, 7, 30, 0, 0, 0, 0)}};
+
+    for (const auto& test : testsEuclaZone) {
+        const auto testNumber = &test - &testsEuclaZone.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, australiaEuclaZone),
+                  test.expectedDate)
             << "on test " << testNumber;
     }
 }
@@ -1753,13 +1873,15 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
         Date_t expectedDate;
     };
 
-    auto amsZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Amsterdam");
+    auto europeAmsterdamZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Amsterdam");
     // The test uses the DST change in Amsterdam zone that happens at 2020-10-25T01:00:00 UTC.
     // Pick two time instants in UTC just before and after the DST change.
     auto startDateBeforeDSTChange = kDefaultTimeZone.createFromDateParts(2020, 10, 25, 0, 50, 5, 0);
     auto startDateAfterDSTChange = kDefaultTimeZone.createFromDateParts(2020, 10, 25, 1, 10, 5, 0);
 
     std::vector<TestCase> tests{
+        // DST to Standard change in Amsterdam zone that happens at 2020-10-25T01:00:00 UTC.
+        // 2020-10-25T03:00:00 -> 2020-10-25T02:00:00 in Amsterdam.
         {startDateBeforeDSTChange,
          TimeUnit::minute,
          10,
@@ -1768,11 +1890,6 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::hour,
          1,
          kDefaultTimeZone.createFromDateParts(2020, 10, 25, 1, 50, 5, 0)},
-        {startDateBeforeDSTChange,
-         TimeUnit::day,
-         1,
-         // Adds an hour DST correction to produce the same local time next day in Ams timezone.
-         kDefaultTimeZone.createFromDateParts(2020, 10, 26, 1, 50, 5, 0)},
         {startDateAfterDSTChange,
          TimeUnit::minute,
          -20,
@@ -1781,25 +1898,84 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::hour,
          -1,
          kDefaultTimeZone.createFromDateParts(2020, 10, 25, 0, 10, 5, 0)},
-        {startDateAfterDSTChange,
+
+        // For units of day or larger, compute DST correction to produce the same local time in
+        // Amsterdam timezone.
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 25, 1, 50, 0, 0),
+         TimeUnit::day,
+         1,
+         europeAmsterdamZone.createFromDateParts(2020, 10, 26, 1, 50, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 25, 2, 30, 0, 0),
+         TimeUnit::day,
+         1,
+         europeAmsterdamZone.createFromDateParts(2020, 10, 26, 2, 30, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 2, 0, 1, 0),
+         TimeUnit::day,
+         1,
+         // Use UTC since the time is ambiguous in Amsterdam zone.
+         kDefaultTimeZone.createFromDateParts(2020, 10, 25, 0, 0, 1, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 3, 0, 1, 0),
+         TimeUnit::day,
+         1,
+         kDefaultTimeZone.createFromDateParts(2020, 10, 25, 2, 0, 1, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 3, 0, 1, 0),
+         TimeUnit::day,
+         1,
+         // The same as above in Amsterdam zone.
+         europeAmsterdamZone.createFromDateParts(2020, 10, 25, 3, 0, 1, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 25, 3, 30, 0, 0),
          TimeUnit::day,
          -1,
-         // Subtracts an hour DST correction to produce the same local time previous day in Ams
-         // timezone.
-         kDefaultTimeZone.createFromDateParts(2020, 10, 24, 0, 10, 5, 0)},
+         europeAmsterdamZone.createFromDateParts(2020, 10, 24, 3, 30, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 25, 2, 30, 0, 0),
+         TimeUnit::day,
+         -1,
+         europeAmsterdamZone.createFromDateParts(2020, 10, 24, 2, 30, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 10, 26, 2, 30, 0, 0),
+         TimeUnit::day,
+         -1,
+         europeAmsterdamZone.createFromDateParts(2020, 10, 25, 2, 30, 0, 0)},
+
+        // Standard to DST change at 2021-03-28T02:00:00 -> 2021-03-28T03:00:00 Amsterdam timezone.
+        {europeAmsterdamZone.createFromDateParts(2021, 3, 28, 1, 20, 0, 0),
+         TimeUnit::day,
+         1,
+         europeAmsterdamZone.createFromDateParts(2021, 3, 29, 1, 20, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2021, 3, 27, 2, 20, 0, 0),
+         TimeUnit::day,
+         1,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         europeAmsterdamZone.createFromDateParts(2021, 3, 28, 3, 20, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2021, 3, 28, 3, 20, 0, 0),
+         TimeUnit::day,
+         -1,
+         europeAmsterdamZone.createFromDateParts(2021, 3, 27, 3, 20, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2021, 3, 29, 2, 20, 0, 0),
+         TimeUnit::day,
+         -1,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         europeAmsterdamZone.createFromDateParts(2021, 3, 28, 3, 20, 0, 0)},
+        {europeAmsterdamZone.createFromDateParts(2020, 11, 28, 2, 20, 0, 0),
+         TimeUnit::month,
+         4,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         europeAmsterdamZone.createFromDateParts(2021, 3, 28, 3, 20, 0, 0)},
     };
 
     for (auto&& test : tests) {
-        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, amsZone), test.expectedDate);
+        const auto testNumber = &test - &tests.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, europeAmsterdamZone),
+                  test.expectedDate)
+            << " on test " << testNumber << " in Amsterdam timezone.";
     }
 
-    auto nyZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
+    auto newYorkZone = kDefaultTimeZoneDatabase.getTimeZone("America/New_York");
     // The following test uses the DST change in New York at 2020-03-08T07:00:00Z.
     // Pick two time instants in UTC just before and after the DST change.
     auto startDateInEST = kDefaultTimeZone.createFromDateParts(2020, 3, 8, 6, 50, 0, 0);
     auto startDateInEDT = kDefaultTimeZone.createFromDateParts(2020, 3, 8, 7, 20, 0, 0);
 
-    std::vector<TestCase> tests2{
+    std::vector<TestCase> testsNYZone{
         {startDateInEST,
          TimeUnit::minute,
          15,
@@ -1808,10 +1984,6 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::hour,
          1,
          kDefaultTimeZone.createFromDateParts(2020, 3, 8, 7, 50, 0, 0)},
-        {startDateInEST,
-         TimeUnit::day,
-         1,
-         kDefaultTimeZone.createFromDateParts(2020, 3, 9, 5, 50, 0, 0)},
         {startDateInEDT,
          TimeUnit::minute,
          -25,
@@ -1820,14 +1992,66 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::hour,
          -1,
          kDefaultTimeZone.createFromDateParts(2020, 3, 8, 6, 20, 0, 0)},
-        {startDateInEDT,
+        // For units of day or larger, compute DST correction to produce the same local time in New
+        // York timezone.
+
+        // DST to Standard change in New York zone at 2020-11-01T06:00:00 UTC,
+        // 2020-11-01T02:00:00 -> 2020-11-01T01:00:00 New York.
+        {newYorkZone.createFromDateParts(2020, 11, 1, 0, 30, 0, 0),
+         TimeUnit::day,
+         1,
+         newYorkZone.createFromDateParts(2020, 11, 2, 0, 30, 0, 0)},
+        {newYorkZone.createFromDateParts(2020, 11, 1, 1, 30, 0, 0),
+         TimeUnit::day,
+         1,
+         newYorkZone.createFromDateParts(2020, 11, 2, 1, 30, 0, 0)},
+        {newYorkZone.createFromDateParts(2020, 10, 31, 1, 30, 0, 0),
+         TimeUnit::day,
+         1,
+         newYorkZone.createFromDateParts(2020, 11, 1, 1, 30, 0, 0)},
+        {newYorkZone.createFromDateParts(2020, 11, 1, 3, 0, 0, 0),
          TimeUnit::day,
          -1,
-         kDefaultTimeZone.createFromDateParts(2020, 3, 7, 8, 20, 0, 0)},
+         newYorkZone.createFromDateParts(2020, 10, 31, 3, 0, 0, 0)},
+        {newYorkZone.createFromDateParts(2020, 11, 1, 1, 30, 0, 0),
+         TimeUnit::day,
+         -1,
+         newYorkZone.createFromDateParts(2020, 10, 31, 1, 30, 0, 0)},
+        {newYorkZone.createFromDateParts(2020, 11, 2, 1, 30, 0, 0),
+         TimeUnit::day,
+         -1,
+         kDefaultTimeZone.createFromDateParts(2020, 11, 1, 6, 30, 0, 0)},
+
+        // Standard to DST change: 2021-03-14T02:00:00 -> 2021-03-14T03:00:00 New York timezone.
+        {newYorkZone.createFromDateParts(2021, 3, 14, 1, 30, 0, 0),
+         TimeUnit::day,
+         1,
+         newYorkZone.createFromDateParts(2021, 3, 15, 1, 30, 0, 0)},
+        {newYorkZone.createFromDateParts(2021, 3, 13, 2, 20, 0, 0),
+         TimeUnit::day,
+         1,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         newYorkZone.createFromDateParts(2021, 3, 14, 3, 20, 0, 0)},
+        {newYorkZone.createFromDateParts(2021, 3, 14, 3, 20, 0, 0),
+         TimeUnit::day,
+         -1,
+         newYorkZone.createFromDateParts(2021, 3, 13, 3, 20, 0, 0)},
+        {newYorkZone.createFromDateParts(2021, 3, 15, 2, 20, 0, 0),
+         TimeUnit::day,
+         -1,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         newYorkZone.createFromDateParts(2021, 3, 14, 3, 20, 0, 0)},
+        {newYorkZone.createFromDateParts(2021, 1, 14, 2, 20, 0, 0),
+         TimeUnit::month,
+         2,
+         // Computed time falls into the missing hour: forward the clock 1 hour.
+         newYorkZone.createFromDateParts(2021, 3, 14, 3, 20, 0, 0)},
     };
 
-    for (auto&& test : tests2) {
-        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, nyZone), test.expectedDate);
+    for (auto&& test : testsNYZone) {
+        const auto testNumber = &test - &testsNYZone.front();
+        ASSERT_EQ(dateAdd(test.startDate, test.unit, test.amount, newYorkZone), test.expectedDate)
+            << " on test " << testNumber << " in New York timezone.";
     }
 }
 
