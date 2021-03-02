@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-/* Define helpful functions. */
+/* Define helpful functions related to debugging. */
 namespace test_harness {
 
 #define DEBUG_ABORT -1

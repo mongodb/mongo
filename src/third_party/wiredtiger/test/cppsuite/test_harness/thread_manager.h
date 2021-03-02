@@ -4,6 +4,7 @@
 #include "thread_context.h"
 
 namespace test_harness {
+/* Class that handles threads, from their initialization to their deletion. */
 class thread_manager {
     public:
     ~thread_manager()
