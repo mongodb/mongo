@@ -58,8 +58,8 @@ function testAbortInitialState(donorRst) {
 
     // Verify that the migration completes successfully.
     assert.commandWorked(migrationThread.returnData());
-    tenantMigrationTest.waitForNodesToReachState(
-        donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
+    tenantMigrationTest.waitForDonorNodesToReachState(
+        donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kCommitted);
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
@@ -107,12 +107,12 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
 
     // Verify that the migration completes successfully.
     assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
-    if (nextState === TenantMigrationTest.State.kAborted) {
-        tenantMigrationTest.waitForNodesToReachState(
-            donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kAborted);
+    if (nextState === TenantMigrationTest.DonorState.kAborted) {
+        tenantMigrationTest.waitForDonorNodesToReachState(
+            donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kAborted);
     } else {
-        tenantMigrationTest.waitForNodesToReachState(
-            donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kCommitted);
+        tenantMigrationTest.waitForDonorNodesToReachState(
+            donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kCommitted);
     }
     failPointsToClear.forEach(failPoint => {
         failPoint.off();
@@ -128,16 +128,16 @@ testAbortInitialState(donorRst);
 jsTest.log("Test aborting donor's state doc update");
 [{
     pauseFailPoint: "pauseTenantMigrationBeforeLeavingDataSyncState",
-    nextState: TenantMigrationTest.State.kBlocking
+    nextState: TenantMigrationTest.DonorState.kBlocking
 },
  {
      pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState",
-     nextState: TenantMigrationTest.State.kCommitted
+     nextState: TenantMigrationTest.DonorState.kCommitted
  },
  {
      pauseFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState",
      setUpFailPoints: ["abortTenantMigrationBeforeLeavingBlockingState"],
-     nextState: TenantMigrationTest.State.kAborted
+     nextState: TenantMigrationTest.DonorState.kAborted
  }].forEach(({pauseFailPoint, setUpFailPoints = [], nextState}) => {
     testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nextState);
 });

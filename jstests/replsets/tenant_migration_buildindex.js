@@ -128,8 +128,8 @@ dataSyncFp.off();
 assert.soon(() => {
     const state =
         tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state;
-    return state === TenantMigrationTest.AccessState.kBlockWritesAndReads ||
-        state === TenantMigrationTest.AccessState.kReject;
+    return state === TenantMigrationTest.DonorAccessState.kBlockWritesAndReads ||
+        state === TenantMigrationTest.DonorAccessState.kReject;
 });
 assert.commandWorked(migrationThread.returnData());
 

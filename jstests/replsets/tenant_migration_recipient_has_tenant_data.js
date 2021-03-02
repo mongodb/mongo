@@ -55,7 +55,7 @@ jsTest.log("Start a tenant migration and verify that it commits successfully");
     };
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
 })();
@@ -72,7 +72,7 @@ jsTest.log(
     };
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.NamespaceExists);
 })();
 

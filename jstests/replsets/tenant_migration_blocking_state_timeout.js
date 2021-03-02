@@ -60,11 +60,11 @@ function testTimeoutBlockingState() {
         configureFailPoint(donorPrimary, "pauseScheduleCallWithCancelTokenUntilCanceled");
     afterDataSyncFp.off();
 
-    tenantMigrationTest.waitForNodesToReachState(
-        donorRst.nodes, migrationId, tenantId, TenantMigrationTest.State.kAborted);
+    tenantMigrationTest.waitForDonorNodesToReachState(
+        donorRst.nodes, migrationId, tenantId, TenantMigrationTest.DonorState.kAborted);
 
     const stateRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     assert.eq(stateRes.abortReason.code, ErrorCodes.ExceededTimeLimit);
 
     // This fail point is pausing all calls to recipient, so it has to be disabled to make

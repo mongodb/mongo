@@ -148,8 +148,9 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
 
     fp.off();
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
@@ -195,8 +196,9 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
 
     fp.off();
-    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
         migrationOpts, true /* retryOnRetryableErrors */));
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 

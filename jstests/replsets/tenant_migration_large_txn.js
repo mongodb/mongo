@@ -83,7 +83,7 @@ logApplyOpsForTxnFp.wait();
 dataSyncFp.off();
 assert.soon(
     () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state ===
-        TenantMigrationTest.AccessState.kBlockWritesAndReads);
+        TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 logApplyOpsForTxnFp.off();
 assert.commandWorked(migrationThread.returnData());
 

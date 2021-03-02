@@ -85,7 +85,7 @@ function testRejectAllReadsAfterCloningDone(testCase, dbName, collName) {
 
     clonerDoneFp.off();
     const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 }
 
@@ -140,7 +140,7 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
 
     waitForRejectReadsBeforeTsFp.off();
     const stateRes = assert.commandWorked(runMigrationThread.returnData());
-    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
 
     nodes.forEach(node => {
         const db = node.getDB(dbName);
@@ -182,7 +182,7 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingBlockTimestamp(
                                      {action: "stop", stopErrorCode: ErrorCodes.InternalError});
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
@@ -230,7 +230,7 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
         migrationOpts, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */));
-    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
     abortFp.off();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({

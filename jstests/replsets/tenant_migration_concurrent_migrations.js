@@ -69,8 +69,8 @@ const kTenantIdPrefix = "testTenantId";
         assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert.eq(stateRes0.state, TenantMigrationTest.State.kCommitted);
-    assert.eq(stateRes1.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
+    assert.eq(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
 
     const connPoolStatsAfter0 = assert.commandWorked(donorPrimary.adminCommand({connPoolStats: 1}));
     // Donor targeted two different replica sets.
@@ -121,8 +121,8 @@ const kTenantIdPrefix = "testTenantId";
         assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert.eq(stateRes0.state, TenantMigrationTest.State.kCommitted);
-    assert.eq(stateRes1.state, TenantMigrationTest.State.kCommitted);
+    assert.eq(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
+    assert.eq(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
 
     // Cleanup.
     assert.commandWorked(tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
@@ -176,7 +176,7 @@ const kTenantIdPrefix = "testTenantId";
     blockFp.wait();
     const stateRes0 =
         assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
-    assert(stateRes0.state, TenantMigrationTest.State.kCommitted);
+    assert(stateRes0.state, TenantMigrationTest.DonorState.kCommitted);
 
     // Verify that exactly one RSM was created.
     const connPoolStatsDuringMigration =
@@ -196,7 +196,7 @@ const kTenantIdPrefix = "testTenantId";
     blockFp.off();
     const stateRes1 =
         assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
-    assert(stateRes1.state, TenantMigrationTest.State.kCommitted);
+    assert(stateRes1.state, TenantMigrationTest.DonorState.kCommitted);
 
     // Verify that now the RSM is garbage collected after the migration1 is cleaned.
     assert.commandWorked(tenantMigrationTest1.forgetMigration(migrationOpts1.migrationIdString));

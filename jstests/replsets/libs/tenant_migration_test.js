@@ -408,22 +408,22 @@ function TenantMigrationTest({
 
     /**
      * Asserts that the migration 'migrationId' and 'tenantId' eventually goes to the
-     * expected state on all the given nodes.
+     * expected state on all the given donor nodes.
      */
-    this.waitForNodesToReachState = function(nodes, migrationId, tenantId, expectedState) {
+    this.waitForDonorNodesToReachState = function(nodes, migrationId, tenantId, expectedState) {
         nodes.forEach(node => {
-            assert.soon(() =>
-                            this.isNodeInExpectedState(node, migrationId, tenantId, expectedState));
+            assert.soon(
+                () => this.isDonorNodeInExpectedState(node, migrationId, tenantId, expectedState));
         });
     };
 
     /**
      * Asserts that the migration 'migrationId' and 'tenantId' is in the expected state on all the
-     * given nodes.
+     * given donor nodes.
      */
-    this.assertNodesInExpectedState = function(nodes, migrationId, tenantId, expectedState) {
+    this.assertDonorNodesInExpectedState = function(nodes, migrationId, tenantId, expectedState) {
         nodes.forEach(node => {
-            assert(this.isNodeInExpectedState(node, migrationId, tenantId, expectedState));
+            assert(this.isDonorNodeInExpectedState(node, migrationId, tenantId, expectedState));
         });
     };
 
@@ -431,7 +431,7 @@ function TenantMigrationTest({
      * Returns true if the durable and in-memory state for the migration 'migrationId' and
      * 'tenantId' is in the expected state, and false otherwise.
      */
-    this.isNodeInExpectedState = function(node, migrationId, tenantId, expectedState) {
+    this.isDonorNodeInExpectedState = function(node, migrationId, tenantId, expectedState) {
         const configDonorsColl =
             this.getDonorPrimary().getCollection("config.tenantMigrationDonors");
         if (configDonorsColl.findOne({_id: migrationId}).state !== expectedState) {
@@ -439,8 +439,8 @@ function TenantMigrationTest({
         }
 
         const expectedAccessState = (expectedState === TenantMigrationTest.State.kCommitted)
-            ? TenantMigrationTest.AccessState.kReject
-            : TenantMigrationTest.AccessState.kAborted;
+            ? TenantMigrationTest.DonorAccessState.kReject
+            : TenantMigrationTest.DonorAccessState.kAborted;
         const mtabs =
             assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
         return (mtabs[tenantId].state === expectedAccessState);
@@ -635,7 +635,7 @@ function TenantMigrationTest({
     };
 }
 
-TenantMigrationTest.State = {
+TenantMigrationTest.DonorState = {
     kCommitted: "committed",
     kAborted: "aborted",
     kDataSync: "data sync",
@@ -643,12 +643,25 @@ TenantMigrationTest.State = {
     kAbortingIndexBuilds: "aborting index builds",
 };
 
-TenantMigrationTest.AccessState = {
+TenantMigrationTest.RecipientState = {
+    kStarted: "started",
+    kConsistent: "consistent",
+    kDone: "done",
+};
+
+TenantMigrationTest.State = TenantMigrationTest.DonorState;
+
+TenantMigrationTest.DonorAccessState = {
     kAllow: "allow",
     kBlockWrites: "blockWrites",
     kBlockWritesAndReads: "blockWritesAndReads",
     kReject: "reject",
     kAborted: "aborted",
+};
+
+TenantMigrationTest.RecipientAccessState = {
+    kReject: "reject",
+    kRejectBefore: "rejectBefore"
 };
 
 TenantMigrationTest.kConfigDonorsNS = "config.tenantMigrationDonors";

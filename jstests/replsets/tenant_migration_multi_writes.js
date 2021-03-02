@@ -144,7 +144,7 @@ function testMultiWritesWhileInBlockingState(readConcern, writeConcern) {
 
         const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
             migrationOpts, false /* retryOnRetryableErrors */));
-        assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
+        assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
 
         abortFp.wait();
         abortFp.off();
