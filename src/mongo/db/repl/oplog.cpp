@@ -750,6 +750,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                  idIndexElem.Obj());
           }
 
+          // Collections clustered by _id do not need _id indexes.
+          if (auto clusteredElem = cmd["clusteredIndex"]) {
+              return createCollectionForApplyOps(
+                  opCtx, nss.db().toString(), ui, cmd, allowRenameOutOfTheWay, boost::none);
+          }
+
           // No _id index spec was provided, so we should build a v:1 _id index.
           BSONObjBuilder idIndexSpecBuilder;
           idIndexSpecBuilder.append(IndexDescriptor::kIndexVersionFieldName,
