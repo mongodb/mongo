@@ -2,73 +2,102 @@
 """Determine the timeout value a task should use in evergreen."""
 
 import argparse
+import math
 import sys
+from datetime import timedelta
+from typing import Optional
 
 import yaml
 
 COMMIT_QUEUE_ALIAS = "__commit_queue"
+UNITTEST_TASK = "run_unittests"
 
-COMMIT_QUEUE_TIMEOUT_SECS = 40 * 60
-DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS = 30 * 60
-DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS = 2 * 60 * 60
+COMMIT_QUEUE_TIMEOUT = timedelta(minutes=40)
+DEFAULT_REQUIRED_BUILD_TIMEOUT = timedelta(hours=1, minutes=20)
+DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
 # 2x the longest "run tests" phase for unittests as of c9bf1dbc9cc46e497b2f12b2d6685ef7348b0726,
 # which is 5 mins 47 secs, excluding outliers below
-UNITTESTS_TIMEOUT_SECS = 12 * 60
+UNITTESTS_TIMEOUT = timedelta(minutes=12)
 
 SPECIFIC_TASK_OVERRIDES = {
-    "linux-64-debug": {"auth": 60 * 60, },
+    "linux-64-debug": {"auth": timedelta(minutes=60), },
 
     # unittests outliers
     # repeated execution runs a suite 10 times
-    "linux-64-repeated-execution": {"unittests": 10 * UNITTESTS_TIMEOUT_SECS},
+    "linux-64-repeated-execution": {UNITTEST_TASK: 10 * UNITTESTS_TIMEOUT},
     # some of the a/ub/t san variants need a little extra time
-    "enterprise-ubuntu2004-debug-tsan": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
-    "ubuntu1804-asan": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
-    "ubuntu1804-ubsan": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
-    "ubuntu1804-debug-asan": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
-    "ubuntu1804-debug-aubsan-lite": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
-    "ubuntu1804-debug-ubsan": {"unittests": 2 * UNITTESTS_TIMEOUT_SECS},
+    "enterprise-ubuntu2004-debug-tsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-asan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-ubsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-debug-asan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-debug-aubsan-lite": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
+    "ubuntu1804-debug-ubsan": {UNITTEST_TASK: 2 * UNITTESTS_TIMEOUT},
 }
 
-REQUIRED_BUILD_VARIANTS = {
-    "linux-64-debug", "enterprise-windows-64-2k8", "enterprise-rhel-62-64-bit",
-    "enterprise-ubuntu1604-clang-3.8-libcxx", "enterprise-rhel-62-64-bit-required-inmem",
-    "ubuntu1604-debug-aubsan-lite"
-}
+
+def _is_required_build_variant(build_variant: str) -> bool:
+    """
+    Determine if the given build variants is a required build variant.
+
+    :param build_variant: Name of build variant to check.
+    :return: True if the given build variant is required.
+    """
+    return build_variant.endswith("-required")
 
 
 def _has_override(variant: str, task_name: str) -> bool:
+    """
+    Determine if the given task has a timeout override.
+
+    :param variant: Build Variant task is running on.
+    :param task_name: Task to check.
+    :return: True if override exists for task.
+    """
     return variant in SPECIFIC_TASK_OVERRIDES and task_name in SPECIFIC_TASK_OVERRIDES[variant]
 
 
-def determine_timeout(task_name: str, variant: str, timeout: int = 0, evg_alias: str = '') -> int:
-    """Determine what timeout should be used."""
+def determine_timeout(task_name: str, variant: str, timeout: Optional[timedelta] = None,
+                      evg_alias: str = '') -> timedelta:
+    """
+    Determine what exec timeout should be used.
 
-    if timeout and timeout != 0:
+    :param task_name: Name of task being run.
+    :param variant: Name of build variant being run.
+    :param timeout: Override to use for timeout or 0 if no override.
+    :param evg_alias: Evergreen alias running the task.
+    :return: Exec timeout to use for running task.
+    """
+
+    if timeout and timeout.total_seconds() != 0:
         return timeout
 
-    if task_name == "unittests" and not _has_override(variant, task_name):
-        return UNITTESTS_TIMEOUT_SECS
+    if task_name == UNITTEST_TASK and not _has_override(variant, task_name):
+        return UNITTESTS_TIMEOUT
 
     if evg_alias == COMMIT_QUEUE_ALIAS:
-        return COMMIT_QUEUE_TIMEOUT_SECS
+        return COMMIT_QUEUE_TIMEOUT
 
     if _has_override(variant, task_name):
         return SPECIFIC_TASK_OVERRIDES[variant][task_name]
 
-    if variant in REQUIRED_BUILD_VARIANTS:
-        return DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS
-    return DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS
+    if _is_required_build_variant(variant):
+        return DEFAULT_REQUIRED_BUILD_TIMEOUT
+    return DEFAULT_NON_REQUIRED_BUILD_TIMEOUT
 
 
-def output_timeout(timeout, options):
-    """Output timeout configuration to the specified location."""
+def output_timeout(timeout: timedelta, output_file: Optional[str]) -> None:
+    """
+    Output timeout configuration to the specified location.
+
+    :param timeout: Timeout to output.
+    :param output_file: Location of output file to write.
+    """
     output = {
-        "timeout_secs": timeout,
+        "timeout_secs": math.ceil(timeout.total_seconds()),
     }
 
-    if options.outfile:
-        with open(options.outfile, "w") as outfile:
+    if output_file:
+        with open(output_file, "w") as outfile:
             yaml.dump(output, stream=outfile, default_flow_style=False)
 
     yaml.dump(output, stream=sys.stdout, default_flow_style=False)
@@ -83,13 +112,14 @@ def main():
                         help="Build variant task is being executed on.")
     parser.add_argument("--evg-alias", dest="evg_alias", required=True,
                         help="Evergreen alias used to trigger build.")
-    parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use.")
+    parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use (in sec).")
     parser.add_argument("--out-file", dest="outfile", help="File to write configuration to.")
 
     options = parser.parse_args()
 
-    timeout = determine_timeout(options.task, options.variant, options.timeout)
-    output_timeout(timeout, options)
+    timeout_override = timedelta(seconds=options.timeout) if options.timeout else None
+    timeout = determine_timeout(options.task, options.variant, timeout_override, options.evg_alias)
+    output_timeout(timeout, options.outfile)
 
 
 if __name__ == "__main__":

@@ -1027,7 +1027,7 @@ functions:
   "update task timeout": &update_task_timeout
     command: timeout.update
     params:
-      timeout_secs: ${timeout_secs}
+      exec_timeout_secs: ${timeout_secs}
 
   "update bypass expansions": &update_bypass_expansions
     command: expansions.update

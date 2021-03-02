@@ -1,30 +1,37 @@
 """Unit tests for the evergreen_task_timeout script."""
-
+from datetime import timedelta
 import unittest
 
-from buildscripts import evergreen_task_timeout as ett
+import buildscripts.evergreen_task_timeout as under_test
 
 # pylint: disable=missing-docstring,no-self-use
 
 
 class DetermineTimeoutTest(unittest.TestCase):
     def test_timeout_used_if_specified(self):
-        self.assertEqual(ett.determine_timeout("task_name", "variant", 42), 42)
+        timeout = timedelta(seconds=42)
+        self.assertEqual(under_test.determine_timeout("task_name", "variant", timeout), timeout)
 
     def test_default_is_returned_with_no_timeout(self):
         self.assertEqual(
-            ett.determine_timeout("task_name", "variant"),
-            ett.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS)
+            under_test.determine_timeout("task_name", "variant"),
+            under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
 
     def test_default_is_returned_with_timeout_at_zero(self):
         self.assertEqual(
-            ett.determine_timeout("task_name", "variant", 0),
-            ett.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT_SECS)
+            under_test.determine_timeout("task_name", "variant", timedelta(seconds=0)),
+            under_test.DEFAULT_NON_REQUIRED_BUILD_TIMEOUT)
 
     def test_default_required_returned_on_required_variants(self):
         self.assertEqual(
-            ett.determine_timeout("task_name", next(iter(ett.REQUIRED_BUILD_VARIANTS))),
-            ett.DEFAULT_REQUIRED_BUILD_TIMEOUT_SECS)
+            under_test.determine_timeout("task_name", "variant-required"),
+            under_test.DEFAULT_REQUIRED_BUILD_TIMEOUT)
 
     def test_task_specific_timeout(self):
-        self.assertEqual(ett.determine_timeout("auth", "linux-64-debug"), 60 * 60)
+        self.assertEqual(
+            under_test.determine_timeout("auth", "linux-64-debug"), timedelta(minutes=60))
+
+    def test_commit_queue_items_use_commit_queue_timeout(self):
+        timeout = under_test.determine_timeout("auth", "variant",
+                                               evg_alias=under_test.COMMIT_QUEUE_ALIAS)
+        self.assertEqual(timeout, under_test.COMMIT_QUEUE_TIMEOUT)
