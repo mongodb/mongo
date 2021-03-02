@@ -5,11 +5,6 @@
  *
  * Intersperse queries which use the TEXT stage with updates and deletes of documents they may
  * match.
- *
- * TODO SERVER-54323: Re-enable this test when SBE is on.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
 load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
