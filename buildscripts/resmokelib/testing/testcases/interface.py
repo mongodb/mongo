@@ -21,7 +21,7 @@ def make_test_case(test_kind, *args, **kwargs):
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):  # pylint: disable=too-many-instance-attributes
+class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):  # pylint: disable=too-many-instance-attributes, invalid-metaclass
     """A test case to execute."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED

@@ -104,6 +104,7 @@ DEFAULTS = {
     "linear_chain": None,
     "num_replset_nodes": None,
     "num_shards": None,
+    "export_mongod_config": "off",
 
     # Internal testing options.
     "internal_params": [],
@@ -436,6 +437,9 @@ NUM_REPLSETS = None
 
 # Specifies the number of shards in a ShardedClusterFixture.
 NUM_SHARDS = None
+
+# Specifies whether to export the history of mongod config options.
+EXPORT_MONGOD_CONFIG = None
 
 # If true, run ReplicaSetFixture with linear chaining.
 LINEAR_CHAIN = None

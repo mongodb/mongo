@@ -6,22 +6,26 @@ This pattern enables the associated class to be looked up later by using
 its name.
 """
 
+from buildscripts.resmokelib.utils import default_if_none
+
 # Specifying 'LEAVE_UNREGISTERED' as the "REGISTERED_NAME" attribute will cause the class to be
 # omitted from the registry. This is particularly useful for base classes that define an interface
 # or common functionality, and aren't intended to be constructed explicitly.
 LEAVE_UNREGISTERED = object()
 
 
-def make_registry_metaclass(registry_store):
+def make_registry_metaclass(registry_store, base_metaclass=None):
     """Return a new Registry metaclass."""
 
     if not isinstance(registry_store, dict):
         raise TypeError("'registry_store' argument must be a dict")
 
-    class Registry(type):
+    base_metaclass = default_if_none(base_metaclass, type)
+
+    class Registry(base_metaclass):
         """A metaclass that stores a reference to all registered classes."""
 
-        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-mcs-classmethod-argument
+        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-mcs-classmethod-argument,bad-classmethod-argument
             """Create and returns a new instance of Registry.
 
             The registry is a class named 'class_name' derived from 'base_classes'
@@ -40,7 +44,7 @@ def make_registry_metaclass(registry_store):
             """
 
             registered_name = class_dict.setdefault("REGISTERED_NAME", class_name)
-            cls = type.__new__(mcs, class_name, base_classes, class_dict)
+            cls = base_metaclass.__new__(mcs, class_name, base_classes, class_dict)
 
             if registered_name is not LEAVE_UNREGISTERED:
                 if registered_name in registry_store:

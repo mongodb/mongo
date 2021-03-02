@@ -11,6 +11,7 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils.history import make_historic
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures import replicaset_utils
@@ -40,12 +41,13 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
         self.mongod_executable = mongod_executable
-        self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.mongod_options = make_historic(utils.default_if_none(mongod_options, {}))
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
         self.write_concern_majority_journal_default = write_concern_majority_journal_default
         self.auth_options = auth_options
-        self.replset_config_options = utils.default_if_none(replset_config_options, {})
+        self.replset_config_options = make_historic(
+            utils.default_if_none(replset_config_options, {}))
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
         self.use_replica_set_connection_string = use_replica_set_connection_string
@@ -92,12 +94,12 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             self.use_replica_set_connection_string = self.all_nodes_electable
 
         if self.default_write_concern is True:
-            self.default_write_concern = {
+            self.default_write_concern = make_historic({
                 "w": "majority",
                 # Use a "signature" value that won't typically match a value assigned in normal use.
                 # This way the wtimeout set by this override is distinguishable in the server logs.
                 "wtimeout": 5 * 60 * 1000 + 321,  # 300321ms
-            }
+            })
 
         # Set the default oplogSize to 511MB.
         self.mongod_options.setdefault("oplogSize", 511)
@@ -132,10 +134,10 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                 self.nodes[i].mongod_options["set_parameters"][steady_state_constraint_param] = True
             if self.linear_chain and i > 0:
                 self.nodes[i].mongod_options["set_parameters"][
-                    "failpoint.forceSyncSourceCandidate"] = {
+                    "failpoint.forceSyncSourceCandidate"] = make_historic({
                         "mode": "alwaysOn",
                         "data": {"hostAndPort": self.nodes[i - 1].get_internal_connection_string()}
-                    }
+                    })
             self.nodes[i].setup()
 
         if self.start_initial_sync_node:

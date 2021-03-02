@@ -11,6 +11,7 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import core
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils.history import make_historic
 from buildscripts.resmokelib.testing.fixtures import interface
 
 
@@ -24,7 +25,7 @@ class MongoDFixture(interface.Fixture):
             preserve_dbpath=False):
         """Initialize MongoDFixture with different options for the mongod process."""
 
-        self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.mongod_options = make_historic(utils.default_if_none(mongod_options, {}))
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
         if "dbpath" in self.mongod_options and dbpath_prefix is not None:
@@ -33,7 +34,7 @@ class MongoDFixture(interface.Fixture):
         # Default to command line options if the YAML configuration is not passed in.
         self.mongod_executable = utils.default_if_none(mongod_executable, config.MONGOD_EXECUTABLE)
 
-        self.mongod_options = utils.default_if_none(mongod_options, {}).copy()
+        self.mongod_options = make_historic(utils.default_if_none(mongod_options, {})).copy()
 
         # The dbpath in mongod_options takes precedence over other settings to make it easier for
         # users to specify a dbpath containing data to test against.
@@ -66,8 +67,9 @@ class MongoDFixture(interface.Fixture):
             self.mongod_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongod_options["port"]
 
-        mongod = core.programs.mongod_program(
-            self.logger, self.job_num, executable=self.mongod_executable, **self.mongod_options)
+        mongod = core.programs.mongod_program(self.logger, self.job_num,
+                                              executable=self.mongod_executable,
+                                              mongod_options=self.mongod_options)
         try:
             self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
             mongod.start()
