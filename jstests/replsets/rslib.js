@@ -638,7 +638,8 @@ getFirstOplogEntry = function(conn) {
     // "CappedPositionLost" error. This can be safely retried.
     assert.soon(() => {
         try {
-            firstEntry = conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1)[0];
+            firstEntry =
+                conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1).toArray()[0];
             return true;
         } catch (e) {
             if (e.code == ErrorCodes.CappedPositionLost) {
