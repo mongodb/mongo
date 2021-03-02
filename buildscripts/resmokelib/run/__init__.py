@@ -314,7 +314,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
 
     def _setup_jasper(self):
         """Start up the jasper process manager."""
-        curator_path = self._get_jasper_reqs()
+        curator_path = _get_jasper_reqs()
 
         from jasper import jasper_pb2
         from jasper import jasper_pb2_grpc
@@ -907,6 +907,10 @@ class RunPlugin(PluginInterface):
             title=_EVERGREEN_ARGUMENT_TITLE, description=(
                 "Options used to propagate information about the Evergreen task running this"
                 " script."))
+
+        evergreen_options.add_argument("--evergreenURL", dest="evergreen_url",
+                                       metavar="EVERGREEN_URL",
+                                       help=("The URL of the Evergreen service."))
 
         evergreen_options.add_argument(
             "--archiveLimitMb", type=int, dest="archive_limit_mb", metavar="ARCHIVE_LIMIT_MB",

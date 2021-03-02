@@ -226,7 +226,7 @@ def new_test_logger(test_shortname, test_basename, command, parent, job_num, tes
 
     if config.SPAWN_USING == "jasper":
         _add_jasper_logger_handler(logger, job_num, test_id=test_id)
-        return (logger, jasper_logger.get_test_log_url(job_num, test_id))
+        return (logger, None)
 
     (test_id, url) = _get_test_endpoint(job_num, test_basename, command, job_logger)
     _add_build_logger_handler(logger, job_num, test_id)

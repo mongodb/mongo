@@ -1,4 +1,4 @@
-curatorbin == 0.9
+curatorbin == 0.11
 PyKMIP == 0.4.0 # It's now 0.8.0. We're far enough back to have API conflicts.
 evergreen.py == 2.1.0
 jinja2

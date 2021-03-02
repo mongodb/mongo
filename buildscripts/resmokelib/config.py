@@ -110,6 +110,7 @@ DEFAULTS = {
     "internal_params": [],
 
     # Evergreen options.
+    "evergreen_url": "evergreen.mongodb.com",
     "build_id": None,
     "distro_id": None,
     "execution_number": 0,
@@ -271,6 +272,9 @@ DBTEST_EXECUTABLE = None
 # If set to "tests", then resmoke.py will output the tests that would be run by each suite (without
 # actually running them).
 DRY_RUN = None
+
+# URL to connect to the Evergreen service.
+EVERGREEN_URL = None
 
 # An identifier consisting of the project name, build variant name, commit hash, and the timestamp.
 # For patch builds, it also includes the patch version id.

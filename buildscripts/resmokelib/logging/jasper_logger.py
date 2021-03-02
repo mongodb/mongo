@@ -13,13 +13,6 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
 
 
-def get_test_log_url(group_id, test_id):
-    """Return a URL to the test log in cedar."""
-
-    return "https://{}/rest/v1/buildlogger/test_name/{}/{}/group/{}?execution={}".format(
-        config.CEDAR_URL, config.EVERGREEN_TASK_ID, test_id, group_id, config.EVERGREEN_EXECUTION)
-
-
 def get_logger_config(group_id=None, test_id=None, process_name=None, prefix=None, trial=None):
     # pylint: disable=too-many-locals
     """Return the jasper logger config."""
