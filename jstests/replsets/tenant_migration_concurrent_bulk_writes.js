@@ -88,31 +88,6 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     return {res: res.getRawResponse(), ops: bulk.getOperations()};
 }
 
-/**
- * TODO SERVER-51764: Refine test cases to check if write errors are retried properly.
- * Looks through the write errors array and retries command against the recipient.
- */
-function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
-    jsTestLog("Retrying writes that errored during migration.");
-
-    writeErrors.forEach(err => {
-        let retryOp = ops[0].operations[err.index];
-        switch (ops[0].batchType) {
-            case kBatchTypes.insert:
-                assert.commandWorked(primaryDB[collName].insert(retryOp));
-                break;
-            case kBatchTypes.update:
-                assert.commandWorked(primaryDB[collName].update(retryOp.q, retryOp.u));
-                break;
-            case kBatchTypes.remove:
-                assert.commandWorked(primaryDB[collName].remove(retryOp));
-                break;
-            default:
-                throw new Error(`Invalid write op type ${retryOp.batchType}.`);
-        }
-    });
-}
-
 (() => {
     jsTestLog("Testing unordered bulk insert against a tenant migration that commits.");
 
