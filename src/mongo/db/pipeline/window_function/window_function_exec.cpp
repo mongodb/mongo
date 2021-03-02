@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
 
 namespace mongo {
 
@@ -38,17 +39,19 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
     PartitionIterator* iter,
     boost::intrusive_ptr<window_function::Expression> expr,
     const WindowBounds::DocumentBased& bounds) {
-    uassert(5397904,
-            "Only 'unbounded' lower bound is currently supported",
-            stdx::holds_alternative<WindowBounds::Unbounded>(bounds.lower));
-    uassert(5397903,
-            "Only 'current' upper bound is currently supported",
-            stdx::holds_alternative<WindowBounds::Current>(bounds.upper));
-
-    // A left unbounded window will always be non-removable regardless of the upper
-    // bound.
-    return std::make_unique<WindowFunctionExecNonRemovable<AccumulatorState>>(
-        iter, expr->input(), expr->buildAccumulatorOnly(), bounds.upper);
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](const WindowBounds::Unbounded&) -> std::unique_ptr<WindowFunctionExec> {
+                // A left unbounded window will always be non-removable regardless of the upper
+                // bound.
+                return std::make_unique<WindowFunctionExecNonRemovable<AccumulatorState>>(
+                    iter, expr->input(), expr->buildAccumulatorOnly(), bounds.upper);
+            },
+            [&](const auto&) -> std::unique_ptr<WindowFunctionExec> {
+                return std::make_unique<WindowFunctionExecRemovableDocument>(
+                    iter, expr->input(), expr->buildRemovable(), bounds);
+            }},
+        bounds.lower);
 }
 
 }  // namespace

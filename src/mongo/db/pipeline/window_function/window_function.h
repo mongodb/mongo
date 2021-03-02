@@ -45,26 +45,30 @@ namespace mongo {
  */
 class WindowFunctionState {
 public:
+    WindowFunctionState(ExpressionContext* const expCtx) : _expCtx(expCtx) {}
     virtual ~WindowFunctionState() = default;
     virtual void add(Value) = 0;
     virtual void remove(Value) = 0;
     virtual Value getValue() const = 0;
     virtual void reset() = 0;
+
+protected:
+    ExpressionContext* _expCtx;
 };
 
 
 template <AccumulatorMinMax::Sense sense>
 class WindowFunctionMinMax : public WindowFunctionState {
 public:
-    static Value getDefault() {
-        return Value{BSONNULL};
-    };
+    static inline const Value kDefault = Value{BSONNULL};
 
-    /**
-     * The comparator must outlive the constructed WindowFunctionMinMax.
-     */
-    explicit WindowFunctionMinMax(const ValueComparator& cmp)
-        : _values(cmp.makeOrderedValueMultiset()) {}
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionMinMax<sense>>(expCtx);
+    }
+
+    explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
+        : WindowFunctionState(expCtx),
+          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
 
     void add(Value value) final {
         _values.insert(std::move(value));
@@ -85,7 +89,7 @@ public:
 
     Value getValue() const final {
         if (_values.empty())
-            return getDefault();
+            return kDefault;
         switch (sense) {
             case AccumulatorMinMax::Sense::kMin:
                 return *_values.begin();
@@ -94,6 +98,7 @@ public:
         }
         MONGO_UNREACHABLE_TASSERT(5371401);
     }
+
 
 protected:
     // Holds all the values in the window, in order, with constant-time access to both ends.

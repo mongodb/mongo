@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -37,16 +38,16 @@
 namespace mongo {
 namespace {
 
-class WindowFunctionMinMaxTest : public unittest::Test {
+class WindowFunctionMinMaxTest : public AggregationContextFixture {
 public:
-    WindowFunctionMinMaxTest()
-        : collator(CollatorInterfaceMock::MockType::kToLowerString),
-          cmp(&collator),
-          min(cmp),
-          max(cmp) {}
+    WindowFunctionMinMaxTest() : expCtx(getExpCtx()), min(expCtx.get()), max(expCtx.get()) {
+        auto collator = std::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kToLowerString);
+        expCtx->setCollator(std::move(collator));
+    }
 
-    CollatorInterfaceMock collator;
-    ValueComparator cmp;
+
+    boost::intrusive_ptr<ExpressionContext> expCtx;
     WindowFunctionMin min;
     WindowFunctionMax max;
 };
@@ -119,7 +120,7 @@ TEST_F(WindowFunctionMinMaxTest, Ties) {
     // x and y are distinguishable,
     ASSERT_VALUE_NE(x, y);
     // but they compare equal according to the ordering.
-    ASSERT(cmp.evaluate(x == y));
+    ASSERT(expCtx->getValueComparator().evaluate(x == y));
 
     min.add(x);
     min.add(y);

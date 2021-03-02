@@ -46,13 +46,14 @@ using boost::intrusive_ptr;
 
 // These don't make sense as accumulators, so only register them as window functions.
 // TODO SERVER-53716 Enable rank function parsing.
-// REGISTER_WINDOW_FUNCTION(rank,
-// window_function::ExpressionFromAccumulator<AccumulatorRank>::parse);
-// REGISTER_WINDOW_FUNCTION(denseRank,
-//                          window_function::ExpressionFromAccumulator<AccumulatorDenseRank>::parse);
-// REGISTER_WINDOW_FUNCTION(
+// REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+//     rank, mongo::window_function::ExpressionFromRankAccumulator<AccumulatorRank>::parse);
+// REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+//     denseRank,
+//     mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDenseRank>::parse);
+// REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
 //     documentNumber,
-//     window_function::ExpressionFromAccumulator<AccumulatorDocumentNumber>::parse);
+//     mongo::window_function::ExpressionFromRankAccumulator<AccumulatorDocumentNumber>::parse);
 
 const char* AccumulatorRank::getOpName() const {
     return "$rank";

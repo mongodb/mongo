@@ -43,8 +43,8 @@ using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(addToSet, genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
-REGISTER_WINDOW_FUNCTION(addToSet,
-                         window_function::ExpressionFromAccumulator<AccumulatorAddToSet>::parse);
+REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+    addToSet, window_function::ExpressionFromAccumulator<AccumulatorAddToSet>::parse);
 
 const char* AccumulatorAddToSet::getOpName() const {
     return "$addToSet";

@@ -66,7 +66,8 @@ void Expression::registerParser(std::string functionName, Parser parser) {
 
 MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
-    // defined by REGISTER_WINDOW_FUNCTION.
+    // defined by REGISTER_NON_REMOVABLE_WINDOW_FUNCTION and REGISTER_REMOVABLE_WINDOW_FUNCTION
+    // macros.
 }
 
 }  // namespace mongo::window_function
