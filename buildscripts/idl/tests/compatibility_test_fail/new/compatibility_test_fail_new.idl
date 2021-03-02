@@ -290,6 +290,21 @@ structs:
                 type: 
                     variant: [int, StructFieldTypeRecursiveReplyTwo]
 
+    CommandParamStructRecursiveOne:
+        description: "This command parameter struct type contains an unstable field while the
+                      old struct field is stable"
+        fields:
+            stableToUnstableField:
+                type: string
+                unstable: true
+
+    CommandParamStructRecursiveTwo:
+        description: "This command parameter struct type contains a field that
+                      is not a superset of the old struct field"
+        fields:
+            notSupersetField:
+                type: intStringToInt
+
     NewCommandTypeValidatorStruct:
         description: "This struct contains a field where the new version contains a validator while
                       the old version does not"
@@ -642,6 +657,32 @@ commands:
         fields:
             newParamBsonNotSuperset:
                 type: intStringToInt
+
+    newCommandParameterTypeStructRecursiveOne:
+        description: "new command fails because its parameter type is a struct that is
+                      not compatible with the old command parameter type struct"
+        command_name: newCommandParameterTypeStructRecursiveOne
+        namespace: ignored
+        cpp_name: newCommandParameterTypeStructRecursiveOne
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            stableToUnstableStructParameter:
+                type: CommandParamStructRecursiveOne
+
+    newCommandParameterTypeStructRecursiveTwo:
+        description: "new command fails because its parameter type is a struct that is
+                      not compatible with the old command parameter type struct"
+        command_name: newCommandParameterTypeStructRecursiveTwo
+        namespace: ignored
+        cpp_name: newCommandParameterTypeStructRecursiveTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            notSupersetStructParameter:
+                type: CommandParamStructRecursiveTwo
 
     newCommandParameterValidator:
         description: "new command fails because it contains a parameter that contains a validator

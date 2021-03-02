@@ -106,7 +106,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 88)
+        self.assertTrue(error_collection.count() == 90)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -262,6 +262,22 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_parameter_type_bson_not_superset),
             "newCommandParameterTypeBsonNotSuperset")
+
+        new_command_parameter_type_recursive_one_error = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeStructRecursiveOne")
+        self.assertTrue(new_command_parameter_type_recursive_one_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_UNSTABLE)
+        self.assertRegex(
+            str(new_command_parameter_type_recursive_one_error),
+            "newCommandParameterTypeStructRecursiveOne")
+
+        new_command_parameter_type_recursive_two_error = error_collection.get_error_by_command_name(
+            "newCommandParameterTypeStructRecursiveTwo")
+        self.assertTrue(new_command_parameter_type_recursive_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_parameter_type_recursive_two_error),
+            "newCommandParameterTypeStructRecursiveTwo")
 
         new_reply_field_unstable_error = error_collection.get_error_by_command_name(
             "newReplyFieldUnstable")
