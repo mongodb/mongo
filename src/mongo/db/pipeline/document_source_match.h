@@ -42,10 +42,9 @@ namespace mongo {
 
 class DocumentSourceMatch : public DocumentSource {
 public:
-    template <typename T, typename... Args, typename>
-    friend boost::intrusive_ptr<T> make_intrusive(Args&&...);
     virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
+        // Raw new is needed to access non-public constructors.
+        return new auto(*this);
     }
 
     static constexpr StringData kStageName = "$match"_sd;
