@@ -244,3 +244,10 @@ structs:
                     the fetching transactions stage.
                 type: bool
                 default: false
+            completedFetchingRetryableWritesBeforeStartOpTime:
+                description: >-
+                    Indicates if the recipient has finished fetching retryable writes oplog entries
+                    before 'startFetchingDonorOpTime' for each retryable writes entry in
+                    'config.transactions'
+                type: bool
+                default: false

@@ -121,6 +121,7 @@ MONGO_FAIL_POINT_DEFINE(skipComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(pauseAfterCreatingOplogBuffer);
 MONGO_FAIL_POINT_DEFINE(skipFetchingCommittedTransactions);
+MONGO_FAIL_POINT_DEFINE(skipFetchingRetryableWritesEntriesBeforeStartOpTime);
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
@@ -129,7 +130,8 @@ MONGO_FAIL_POINT_DEFINE(fpAfterConnectingTenantMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpAfterRecordingRecipientPrimaryStartingFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
-MONGO_FAIL_POINT_DEFINE(skipFetchingRetryableWritesEntriesBeforeStartOpTime);
+MONGO_FAIL_POINT_DEFINE(fpSetSmallAggregationBatchSize);
+MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingRetryableWritesBatch);
 MONGO_FAIL_POINT_DEFINE(fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
@@ -139,7 +141,7 @@ MONGO_FAIL_POINT_DEFINE(fpAfterCollectionClonerDone);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogApplierMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpBeforeFulfillingDataConsistentPromise);
 MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
-MONGO_FAIL_POINT_DEFINE(fpBeforePersistingRejectReadsBeforeTimestamp)
+MONGO_FAIL_POINT_DEFINE(fpBeforePersistingRejectReadsBeforeTimestamp);
 MONGO_FAIL_POINT_DEFINE(fpAfterWaitForRejectReadsBeforeTimestamp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
@@ -1030,14 +1032,44 @@ void TenantMigrationRecipientService::Instance::_createOplogBuffer() {
     pauseAfterCreatingOplogBuffer.pauseWhileSet();
 }
 
-void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTime() {
+SemiFuture<void>
+TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStartOpTime() {
     if (MONGO_unlikely(
             skipFetchingRetryableWritesEntriesBeforeStartOpTime.shouldFail())) {  // Test-only.
-        return;
+        return SemiFuture<void>::makeReady();
+    }
+
+    {
+        stdx::lock_guard lk(_mutex);
+        if (_stateDoc.getCompletedFetchingRetryableWritesBeforeStartOpTime()) {
+            LOGV2_DEBUG(5350800,
+                        2,
+                        "Already completed fetching retryable writes oplog entries from donor, "
+                        "skipping stage",
+                        "migrationId"_attr = getMigrationUUID(),
+                        "tenantId"_attr = getTenantId());
+            return SemiFuture<void>::makeReady();
+        }
     }
 
     auto opCtx = cc().makeOperationContext();
     auto expCtx = makeExpressionContext(opCtx.get());
+    // If the oplog buffer contains entries at this point, it indicates that the recipient went
+    // through failover before it finished writing all oplog entries to the buffer. Clear it and
+    // redo the work.
+    auto oplogBufferNS = getOplogBufferNs(getMigrationUUID());
+    if (_donorOplogBuffer->getCount() > 0) {
+        // Ensure we are primary when trying to clear the oplog buffer since it will drop and
+        // re-create the collection.
+        auto coordinator = repl::ReplicationCoordinator::get(opCtx.get());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
+        if (!coordinator->canAcceptWritesForDatabase(opCtx.get(), oplogBufferNS.db())) {
+            uassertStatusOK(
+                Status(ErrorCodes::NotWritablePrimary,
+                       "Recipient node is not primary, cannot clear oplog buffer collection."));
+        }
+        _donorOplogBuffer->clear(opCtx.get());
+    }
 
     Timestamp startFetchingTimestamp;
     {
@@ -1062,13 +1094,20 @@ void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBefore
     // We must set a writeConcern on internal commands.
     aggRequest.setWriteConcern(WriteConcernOptions());
 
+    // Failpoint to set a small batch size on the aggregation request.
+    if (MONGO_unlikely(fpSetSmallAggregationBatchSize.shouldFail())) {
+        SimpleCursorOptions cursor;
+        cursor.setBatchSize(1);
+        aggRequest.setCursor(cursor);
+    }
+
     std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
         _client.get(), std::move(aggRequest), true /* secondaryOk */, false /* useExhaust */));
 
-    // Similar to the OplogFetcher, we keep track of each oplog entry to apply and the number of
-    // the bytes of the documents read off the network.
+    // cursor->more() will automatically request more from the server if necessary.
     while (cursor->more()) {
-        // cursor->more() will automatically request more from the server if necessary.
+        // Similar to the OplogFetcher, we keep track of each oplog entry to apply and the number of
+        // the bytes of the documents read off the network.
         std::vector<BSONObj> retryableWritesEntries;
         retryableWritesEntries.reserve(cursor->objsLeftInBatch());
         auto toApplyDocumentBytes = 0;
@@ -1087,7 +1126,29 @@ void TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBefore
             _donorOplogBuffer->push(
                 opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());
         }
+
+        pauseAfterRetrievingRetryableWritesBatch.pauseWhileSet();
+
+        // In between batches, check for recipient failover.
+        {
+            stdx::unique_lock lk(_mutex);
+            if (_taskState.isInterrupted()) {
+                uassertStatusOK(_taskState.getInterruptStatus());
+            }
+        }
     }
+
+    // Update _stateDoc to indicate that we've finished the retryable writes oplog entry fetching
+    // stage.
+    stdx::lock_guard lk(_mutex);
+    _stateDoc.setCompletedFetchingRetryableWritesBeforeStartOpTime(true);
+    return ExecutorFuture(**_scopedExecutor)
+        .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
+            auto opCtx = cc().makeOperationContext();
+            uassertStatusOK(
+                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
+        })
+        .semi();
 }
 
 void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
@@ -1848,7 +1909,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        _stopOrHangOnFailPoint(
                            &fpAfterRetrievingStartOpTimesMigrationRecipientInstance);
                        _createOplogBuffer();
-                       _fetchRetryableWritesOplogBeforeStartOpTime();
+                       return _fetchRetryableWritesOplogBeforeStartOpTime();
                    })
                    .then([this, self = shared_from_this()] {
                        _stopOrHangOnFailPoint(
