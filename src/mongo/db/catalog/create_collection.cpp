@@ -69,8 +69,7 @@ void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* d
 
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   CollectionOptions&& collectionOptions,
-                   boost::optional<BSONObj> idIndex) {
+                   CollectionOptions&& collectionOptions) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
@@ -107,13 +106,7 @@ Status _createView(OperationContext* opCtx,
 
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
-        Status status = Status::OK();
-        if (idIndex == boost::none) {
-            status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
-        } else {
-            status =
-                db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/true, *idIndex);
-        }
+        Status status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         if (!status.isOK()) {
             return status;
         }
@@ -241,9 +234,12 @@ Status _createTimeseries(OperationContext* opCtx,
                                                          timeField,
                                                          timeField));
 
+
         // If possible, cluster time-series buckets collections by _id.
+        const bool useClusteredIdIndex =
+            opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex();
         auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds();
-        if (opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex()) {
+        if (useClusteredIdIndex) {
             ClusteredIndexOptions clusteredOptions;
             if (expireAfterSeconds) {
                 uassertStatusOK(
@@ -253,9 +249,8 @@ Status _createTimeseries(OperationContext* opCtx,
             bucketsOptions.clusteredIndex = clusteredOptions;
         }
 
-        // Create the buckets collection that will back the view. Do not create the _id index as the
-        // buckets collection will have a clustered index on _id.
-        const bool createIdIndex = false;
+        // Create the buckets collection that will back the view.
+        const bool createIdIndex = !useClusteredIdIndex;
         auto bucketsCollection =
             db->createCollection(opCtx, bucketsNs, bucketsOptions, createIdIndex);
         invariant(bucketsCollection,
@@ -326,6 +321,18 @@ Status _createCollection(OperationContext* opCtx,
                           str::stream() << "A view already exists. NS: " << nss);
         }
 
+        if (collectionOptions.clusteredIndex && !nss.isTimeseriesBucketsCollection()) {
+            return Status(
+                ErrorCodes::InvalidOptions,
+                "The 'clusteredIndex' option is only supported on time-series buckets collections");
+        }
+
+        if (collectionOptions.clusteredIndex && idIndex && !idIndex->isEmpty()) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The 'clusteredIndex' option is not supported with the 'idIndex' option");
+        }
+
+
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotWritablePrimary,
@@ -350,7 +357,7 @@ Status _createCollection(OperationContext* opCtx,
         // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
         // because 'userCreateNS' may throw a WriteConflictException.
         Status status = Status::OK();
-        if (idIndex == boost::none) {
+        if (idIndex == boost::none || collectionOptions.clusteredIndex) {
             status = autoDb.getDb()->userCreateNS(
                 opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         } else {
@@ -383,7 +390,7 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create a view in a multi-document "
                                  "transaction.",
                 !opCtx->inMultiDocumentTransaction());
-        return _createView(opCtx, ns, std::move(options), idIndex);
+        return _createView(opCtx, ns, std::move(options));
     } else if (options.timeseries) {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream()
@@ -469,7 +476,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const OptionalCollectionUUID& ui,
                                    const BSONObj& cmdObj,
                                    const bool allowRenameOutOfTheWay,
-                                   const BSONObj& idIndex) {
+                                   boost::optional<BSONObj> idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
@@ -619,16 +626,6 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         newCmd = cmdObj.addField(uuidObj.firstElement());
     }
 
-    // Secondaries replicate two create oplog entries for new time-series collections, a view and
-    // the underlying buckets collection. The underlying buckets collection must not create an _id
-    // index as it has a clustered index on _id.
-    if (newCollName.isTimeseriesBucketsCollection()) {
-        return createCollection(opCtx,
-                                newCollName,
-                                newCmd,
-                                /*idIndex=*/boost::none,
-                                CollectionOptions::parseForStorage);
-    }
     return createCollection(
         opCtx, newCollName, newCmd, idIndex, CollectionOptions::parseForStorage);
 }

@@ -242,8 +242,9 @@ TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
             operationContext(), idxSpec);
         ASSERT_NOT_OK(swSpec.getStatus());
         ASSERT_EQ(swSpec.getStatus().code(), ErrorCodes::CannotCreateIndex);
-        ASSERT_STRING_CONTAINS(swSpec.getStatus().reason(),
-                               "cannot have an _id index on a time-series bucket collection");
+        ASSERT_STRING_CONTAINS(
+            swSpec.getStatus().reason(),
+            "cannot create an _id index on a collection already clustered by _id");
 
         // Rollback.
     }

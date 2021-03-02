@@ -744,10 +744,9 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     }
 
     if (IndexDescriptor::isIdIndexPattern(key)) {
-        if (nss.isTimeseriesBucketsCollection()) {
-            // Time-series collections have a clustered index on _id.
+        if (_collection->isClustered()) {
             return Status(ErrorCodes::CannotCreateIndex,
-                          "cannot have an _id index on a time-series bucket collection");
+                          "cannot create an _id index on a collection already clustered by _id");
         }
 
         BSONElement uniqueElt = spec["unique"];

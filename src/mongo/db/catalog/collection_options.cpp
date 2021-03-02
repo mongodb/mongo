@@ -193,7 +193,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             collectionOptions.collation = e.Obj().getOwned();
-        } else if (fieldName == "clusteredIndex" && kind == parseForStorage) {
+        } else if (fieldName == "clusteredIndex") {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, "'clusteredIndex' has to be a document.");
             }
@@ -301,6 +301,9 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     }
     if (auto timeseries = cmd.getTimeseries()) {
         options.timeseries = std::move(*timeseries);
+    }
+    if (auto clusteredIndex = cmd.getClusteredIndex()) {
+        options.clusteredIndex = std::move(*clusteredIndex);
     }
     if (auto temp = cmd.getTemp()) {
         options.temp = *temp;

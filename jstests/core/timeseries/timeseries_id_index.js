@@ -7,6 +7,7 @@
  *     requires_fcv_49,
  *     requires_find_command,
  *     requires_getmore,
+ *     requires_wiredtiger,
  *     sbe_incompatible,
  * ]
  */
@@ -30,5 +31,5 @@ const bucketsColl = db.getCollection("system.buckets." + coll.getName());
 
 const res = bucketsColl.createIndex({"_id": 1});
 assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
-assert(res.errmsg.includes("cannot have an _id index on a time-series bucket collection"));
+assert(res.errmsg.includes("cannot create an _id index on a collection already clustered by _id"));
 })();

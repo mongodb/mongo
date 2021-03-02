@@ -33,6 +33,7 @@ global:
 
 imports:
     - "mongo/db/catalog/collection_options.idl"
+    - "mongo/db/catalog/clustered_index_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
 
 structs:
@@ -140,6 +141,10 @@ commands:
             timeseries:
                 description: "The options to create the time-series collection with."
                 type: TimeseriesOptions
+                optional: true
+            clusteredIndex:
+                description: "Specifies how this collection should be clustered on _id."
+                type: ClusteredIndexOptions
                 optional: true
             temp:
                 description: "DEPRECATED"
