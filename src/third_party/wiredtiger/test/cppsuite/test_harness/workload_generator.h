@@ -2,21 +2,24 @@
 #define WORKLOAD_GENERATOR_H
 
 #include "api_const.h"
-#include "configuration_settings.h"
 #include "random_generator.h"
 #include "debug_utils.h"
 #include "thread_manager.h"
+#include "workload_tracking.h"
 
 namespace test_harness {
+/* Class that can execute operations based on a given configuration. */
 class workload_generator {
     public:
-    workload_generator(configuration *configuration)
+    workload_generator(configuration *configuration, bool enable_tracking)
+        : _configuration(configuration), _enable_tracking(enable_tracking)
     {
-        _configuration = configuration;
     }
 
     ~workload_generator()
     {
+        delete _workload_tracking;
+
         if (_session != nullptr) {
             if (_session->close(_session, NULL) != 0)
                 /* Failing to close session is not blocking. */
@@ -46,7 +49,7 @@ class workload_generator {
      * defined by the configuration.
      */
     int
-    load(const char *home = DEFAULT_DIR)
+    load(const std::string &home = DEFAULT_DIR)
     {
         WT_CURSOR *cursor;
         int64_t collection_count, key_count, value_size;
@@ -57,10 +60,16 @@ class workload_generator {
         collection_name = "";
 
         /* Create the working dir. */
-        testutil_make_work_dir(home);
+        testutil_make_work_dir(home.c_str());
 
         /* Open connection. */
-        testutil_check(wiredtiger_open(home, NULL, CONNECTION_CREATE, &_conn));
+        testutil_check(wiredtiger_open(home.c_str(), NULL, CONNECTION_CREATE, &_conn));
+
+        /* Create the activity tracker if required. */
+        if (_enable_tracking) {
+            _workload_tracking = new workload_tracking(_conn, TRACKING_COLLECTION);
+            _workload_tracking->load();
+        }
 
         /* Open session. */
         testutil_check(_conn->open_session(_conn, NULL, NULL, &_session));
@@ -71,6 +80,9 @@ class workload_generator {
             collection_name = "table:collection" + std::to_string(i);
             testutil_check(
               _session->create(_session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
+            if (_enable_tracking)
+                testutil_check(
+                  _workload_tracking->save(tracking_operation::CREATE, collection_name, "", ""));
             _collection_names.push_back(collection_name);
         }
         debug_info(
@@ -85,17 +97,14 @@ class workload_generator {
             testutil_check(
               _session->open_cursor(_session, collection_name.c_str(), NULL, NULL, &cursor));
             for (size_t j = 0; j < key_count; ++j) {
-                cursor->set_key(cursor, j);
                 /* Generation of a random string value using the size defined in the test
                  * configuration. */
                 std::string generated_value =
                   random_generator::random_generator::get_instance().generate_string(value_size);
-                cursor->set_value(cursor, generated_value.c_str());
-                testutil_check(cursor->insert(cursor));
+                testutil_check(
+                  insert(cursor, collection_name, j, generated_value.c_str(), _enable_tracking));
             }
         }
-        debug_info(
-          std::to_string(collection_count) + " key/value inserted", _trace_level, DEBUG_INFO);
         debug_info("Load stage done", _trace_level, DEBUG_INFO);
         return (0);
     }
@@ -189,12 +198,28 @@ class workload_generator {
     }
 
     /* WiredTiger APIs wrappers for single operations. */
-    static int
-    insert(WT_CURSOR *cursor)
+    template <typename K, typename V>
+    int
+    insert(WT_CURSOR *cursor, const std::string &collection_name, K key, V value, bool save)
     {
+        int error_code;
+
         if (cursor == nullptr)
             throw std::invalid_argument("Failed to call insert, invalid cursor");
-        return (cursor->insert(cursor));
+
+        cursor->set_key(cursor, key);
+        cursor->set_value(cursor, value);
+        error_code = cursor->insert(cursor);
+
+        if (error_code == 0) {
+            debug_info("key/value inserted", _trace_level, DEBUG_INFO);
+            if (save)
+                error_code =
+                  _workload_tracking->save(tracking_operation::INSERT, collection_name, key, value);
+        } else
+            debug_info("key/value insertion failed", _trace_level, DEBUG_ERROR);
+
+        return error_code;
     }
 
     static int
@@ -225,8 +250,10 @@ class workload_generator {
     std::vector<std::string> _collection_names;
     configuration *_configuration = nullptr;
     WT_CONNECTION *_conn = nullptr;
+    bool _enable_tracking = false;
     WT_SESSION *_session = nullptr;
     thread_manager _thread_manager;
+    workload_tracking *_workload_tracking;
 };
 } // namespace test_harness
 
