@@ -19,7 +19,7 @@ def make_hook(class_name, *args, **kwargs):
     return _HOOKS[class_name](*args, **kwargs)
 
 
-class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):
+class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylint: disable=invalid-metaclass
     """Common interface all Hooks will inherit from."""
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED

@@ -12,6 +12,7 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.core import process
+from buildscripts.resmokelib.utils.history import make_historic, HistoryDict
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
@@ -24,34 +25,35 @@ from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
 
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
-DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = {
+DEFAULT_MONGOD_LOG_COMPONENT_VERBOSITY = make_historic({
     "replication": {"rollback": 2}, "sharding": {"migration": 2}, "transaction": 4,
     "tenantMigration": 4
-}
+})
 
-DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {"replication": {"rollback": 2}, "transaction": 4}
+DEFAULT_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = make_historic(
+    {"replication": {"rollback": 2}, "transaction": 4})
 
 # The default verbosity setting for any mongod processes running in Evergreen i.e. started with an
 # Evergreen task id.
-DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = {
+DEFAULT_EVERGREEN_MONGOD_LOG_COMPONENT_VERBOSITY = make_historic({
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "sharding": {"migration": 2}, "storage": {"recovery": 2}, "transaction": 4, "tenantMigration": 4
-}
+})
 
 # The default verbosity setting for any last-lts mongod processes running in Evergreen i.e. started
 # with an Evergreen task id.
-DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = {
+DEFAULT_EVERGREEN_LAST_LTS_MONGOD_LOG_COMPONENT_VERBOSITY = make_historic({
     "replication": {"election": 4, "heartbeats": 2, "initialSync": 2, "rollback": 2},
     "storage": {"recovery": 2}, "transaction": 4
-}
+})
 
 # The default verbosity setting for any tests that are not started with an Evergreen task id. This
 # will apply to any tests run locally.
-DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
+DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY = make_historic({"transaction": 3})
 
 # The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
 # task id.
-DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY = {"transaction": 3}
+DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY = make_historic({"transaction": 3})
 
 
 def make_process(*args, **kwargs):
@@ -119,18 +121,27 @@ def _add_testing_set_parameters(suite_set_parameters):
 
 
 def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
-        logger, job_num, executable=None, process_kwargs=None, **kwargs):
-    """Return a Process instance that starts mongod arguments constructed from 'kwargs'."""
+        logger, job_num, executable=None, process_kwargs=None, mongod_options=None):
+    """
+    Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
+
+    @param logger - The logger to pass into the process.
+    @param executable - The mongod executable to run.
+    @param process_kwargs - A dict of key-value pairs to pass to the process.
+    @param mongod_options - A HistoryDict describing the various options to pass to the mongod.
+    """
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
+    mongod_options = utils.default_if_none(mongod_options, make_historic({})).copy()
     args = [executable]
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
-    suite_set_parameters = kwargs.pop("set_parameters", {})
+    # We leave the parameters attached for now so the top-level dict tracks its history.
+    suite_set_parameters = mongod_options.setdefault("set_parameters", make_historic({}))
 
     if config.MONGOD_SET_PARAMETERS is not None:
-        suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+        suite_set_parameters.update(make_historic(utils.load_yaml(config.MONGOD_SET_PARAMETERS)))
 
     # Set default log verbosity levels if none were specified.
     if "logComponentVerbosity" not in suite_set_parameters:
@@ -142,14 +153,14 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     # issue split commands to create more chunks. As a result, the balancer will also end up moving
     # chunks for the sessions collection to balance the chunks across shards. Unless the suite is
     # explicitly prepared to handle these background migrations, set the parameter to 1.
-    if "configsvr" in kwargs and "minNumChunksForSessionsCollection" not in suite_set_parameters:
+    if "configsvr" in mongod_options and "minNumChunksForSessionsCollection" not in suite_set_parameters:
         suite_set_parameters["minNumChunksForSessionsCollection"] = 1
 
     # orphanCleanupDelaySecs controls an artificial delay before cleaning up an orphaned chunk
     # that has migrated off of a shard, meant to allow most dependent queries on secondaries to
     # complete first. It defaults to 900, or 15 minutes, which is prohibitively long for tests.
     # Setting it in the .yml file overrides this.
-    if "shardsvr" in kwargs and "orphanCleanupDelaySecs" not in suite_set_parameters:
+    if "shardsvr" in mongod_options and "orphanCleanupDelaySecs" not in suite_set_parameters:
         suite_set_parameters["orphanCleanupDelaySecs"] = 1
 
     # The LogicalSessionCache does automatic background refreshes in the server. This is
@@ -198,14 +209,15 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     # the potential to mask issues such as SERVER-31609 because it allows the operationTime of
     # cluster to advance even if the client is blocked for other reasons. We should disable the
     # periodic no-op writer. Set in the .yml file to override this.
-    if "replSet" in kwargs and "writePeriodicNoops" not in suite_set_parameters:
+    if "replSet" in mongod_options and "writePeriodicNoops" not in suite_set_parameters:
         suite_set_parameters["writePeriodicNoops"] = False
 
     # The default time for stepdown and quiesce mode in response to SIGTERM is 15 seconds. Reduce
     # this to 100ms for faster shutdown. On branches 4.4 and earlier, there is no quiesce mode, but
     # the default time for stepdown is 10 seconds.
     # TODO(SERVER-47797): Remove reference to waitForStepDownOnNonCommandShutdown.
-    if ("replSet" in kwargs and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
+    if ("replSet" in mongod_options
+            and "waitForStepDownOnNonCommandShutdown" not in suite_set_parameters
             and "shutdownTimeoutMillisForSignaledShutdown" not in suite_set_parameters):
         if executable == LAST_LTS_MONGOD_BINARY:
             suite_set_parameters["waitForStepDownOnNonCommandShutdown"] = False
@@ -217,9 +229,8 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
 
     if ("failpoint.flowControlTicketOverride" not in suite_set_parameters
             and config.FLOW_CONTROL_TICKETS is not None):
-        suite_set_parameters["failpoint.flowControlTicketOverride"] = {
-            "mode": "alwaysOn", "data": {"numTickets": config.FLOW_CONTROL_TICKETS}
-        }
+        suite_set_parameters["failpoint.flowControlTicketOverride"] = make_historic(
+            {"mode": "alwaysOn", "data": {"numTickets": config.FLOW_CONTROL_TICKETS}})
 
     _add_testing_set_parameters(suite_set_parameters)
 
@@ -246,13 +257,13 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     opts_without_vals = ("nojournal", "logappend")
 
     # Have the --nojournal command line argument to resmoke.py unset the journal option.
-    if shortcut_opts["nojournal"] and "journal" in kwargs:
-        del kwargs["journal"]
+    if shortcut_opts["nojournal"] and "journal" in mongod_options:
+        del mongod_options["journal"]
 
     # Ensure that config servers run with journaling enabled.
-    if "configsvr" in kwargs:
+    if "configsvr" in mongod_options:
         shortcut_opts["nojournal"] = False
-        kwargs["journal"] = ""
+        mongod_options["journal"] = ""
 
     # Command line options override the YAML configuration.
     for opt_name in shortcut_opts:
@@ -261,25 +272,32 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
             # Options that are specified as --flag on the command line are represented by a boolean
             # value where True indicates that the flag should be included in 'kwargs'.
             if opt_value:
-                kwargs[opt_name] = ""
+                mongod_options[opt_name] = ""
         else:
             # Options that are specified as --key=value on the command line are represented by a
             # value where None indicates that the key-value pair shouldn't be included in 'kwargs'.
             if opt_value is not None:
-                kwargs[opt_name] = opt_value
+                mongod_options[opt_name] = opt_value
 
     # Override the storage engine specified on the command line with "wiredTiger" if running a
     # config server replica set.
-    if "replSet" in kwargs and "configsvr" in kwargs:
-        kwargs["storageEngine"] = "wiredTiger"
+    if "replSet" in mongod_options and "configsvr" in mongod_options:
+        mongod_options["storageEngine"] = "wiredTiger"
+
+    # set_parameters has its own logic above
+    mongod_options.pop("set_parameters")
 
     # Apply the rest of the command line arguments.
-    _apply_kwargs(args, kwargs)
+    _apply_kwargs(args, mongod_options)
 
-    _set_keyfile_permissions(kwargs)
+    _set_keyfile_permissions(mongod_options)
 
-    process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
     process_kwargs["job_num"] = job_num
+    if config.EXPORT_MONGOD_CONFIG == "regular":
+        mongod_options.dump_history(f"{logger.name}_config.yml")
+    elif config.EXPORT_MONGOD_CONFIG == "detailed":
+        mongod_options.dump_history(f"{logger.name}_config.yml", include_location=True)
     return make_process(logger, args, **process_kwargs)
 
 
@@ -291,7 +309,7 @@ def mongos_program(logger, job_num, test_id=None, executable=None, process_kwarg
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
-    suite_set_parameters = kwargs.pop("set_parameters", {})
+    suite_set_parameters = make_historic(kwargs.pop("set_parameters", {}))
 
     if config.MONGOS_SET_PARAMETERS is not None:
         suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
@@ -309,7 +327,7 @@ def mongos_program(logger, job_num, test_id=None, executable=None, process_kwarg
 
     _set_keyfile_permissions(kwargs)
 
-    process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
     process_kwargs["job_num"] = job_num
     process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
@@ -506,7 +524,7 @@ def _format_shell_vars(sb, paths, value):
         return lst[0] + ''.join(f'["{i}"]' for i in lst[1:])
 
     # Only need to do special handling for JSON objects.
-    if not isinstance(value, dict):
+    if not isinstance(value, (dict, HistoryDict)):
         sb.append("%s = %s" % (bracketize(paths), json.dumps(value)))
         return
 

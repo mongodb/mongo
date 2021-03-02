@@ -11,6 +11,7 @@ from buildscripts.resmokelib import core
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib import utils
+from buildscripts.resmokelib.utils.history import make_historic
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
@@ -38,12 +39,13 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             raise ValueError("Cannot specify mongod_options.dbpath")
 
         self.mongos_executable = mongos_executable
-        self.mongos_options = utils.default_if_none(mongos_options, {})
-        self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.mongos_options = make_historic(utils.default_if_none(mongos_options, {}))
+        self.mongod_options = make_historic(utils.default_if_none(mongod_options, {}))
         self.mongod_executable = mongod_executable
-        self.mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
+        self.mongod_options["set_parameters"] = make_historic(
+            mongod_options.get("set_parameters", {})).copy()
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
-                mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
+                self.mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
         self.preserve_dbpath = preserve_dbpath
         # Use 'num_shards' and 'num_rs_nodes_per_shard' values from the command line if they exist.
         num_shards_option = config.NUM_SHARDS
@@ -55,8 +57,8 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.enable_balancer = enable_balancer
         self.enable_autosplit = enable_autosplit
         self.auth_options = auth_options
-        self.configsvr_options = utils.default_if_none(configsvr_options, {})
-        self.shard_options = utils.default_if_none(shard_options, {})
+        self.configsvr_options = make_historic(utils.default_if_none(configsvr_options, {}))
+        self.shard_options = make_historic(utils.default_if_none(shard_options, {}))
         self.mixed_bin_versions = utils.default_if_none(mixed_bin_versions,
                                                         config.MIXED_BIN_VERSIONS)
 
@@ -269,7 +271,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         replset_config_options["configsvr"] = True
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(configsvr_options.pop("mongod_options", {}))
+        mongod_options.update(make_historic(configsvr_options.pop("mongod_options", {})))
         mongod_options["configsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "config")
         mongod_options["replSet"] = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
@@ -294,7 +296,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         auth_options = shard_options.pop("auth_options", self.auth_options)
         preserve_dbpath = shard_options.pop("preserve_dbpath", self.preserve_dbpath)
 
-        replset_config_options = shard_options.pop("replset_config_options", {})
+        replset_config_options = make_historic(shard_options.pop("replset_config_options", {}))
         replset_config_options["configsvr"] = False
 
         mixed_bin_versions = self.mixed_bin_versions
@@ -304,7 +306,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                                                     num_rs_nodes_per_shard]
 
         mongod_options = self.mongod_options.copy()
-        mongod_options.update(shard_options.pop("mongod_options", {}))
+        mongod_options.update(make_historic(shard_options.pop("mongod_options", {})))
         mongod_options["shardsvr"] = ""
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
         mongod_options["replSet"] = ShardedClusterFixture._SHARD_REPLSET_NAME_PREFIX + str(index)
@@ -369,7 +371,7 @@ class _MongoSFixture(interface.Fixture):
         # Default to command line options if the YAML configuration is not passed in.
         self.mongos_executable = utils.default_if_none(mongos_executable, config.MONGOS_EXECUTABLE)
 
-        self.mongos_options = utils.default_if_none(mongos_options, {}).copy()
+        self.mongos_options = make_historic(utils.default_if_none(mongos_options, {})).copy()
 
         self.mongos = None
         self.port = None

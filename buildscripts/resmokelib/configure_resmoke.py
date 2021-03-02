@@ -221,6 +221,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.SHELL_READ_MODE = config.pop("shell_read_mode")
     _config.SHELL_WRITE_MODE = config.pop("shell_write_mode")
     _config.SPAWN_USING = config.pop("spawn_using")
+    _config.EXPORT_MONGOD_CONFIG = config.pop("export_mongod_config")
     _config.STAGGER_JOBS = config.pop("stagger_jobs") == "on"
     _config.STORAGE_ENGINE = config.pop("storage_engine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storage_engine_cache_size_gb")

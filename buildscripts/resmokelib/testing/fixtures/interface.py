@@ -40,7 +40,7 @@ def make_fixture(class_name, *args, **kwargs):
     return _FIXTURES[class_name](*args, **kwargs)
 
 
-class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):
+class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass
     """Base class for all fixtures."""
 
     # We explicitly set the 'REGISTERED_NAME' attribute so that PyLint realizes that the attribute
