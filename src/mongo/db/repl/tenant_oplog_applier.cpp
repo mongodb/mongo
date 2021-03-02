@@ -45,6 +45,7 @@
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
@@ -391,6 +392,11 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
     OperationContext* opCtx, const TenantOplogBatch& batch) {
     auto* opObserver = cc().getServiceContext()->getOpObserver();
 
+    // Group donor oplog entries from the same session together.
+    LogicalSessionIdMap<std::vector<TenantNoOpEntry>> sessionOps;
+    // All other oplog entries.
+    std::vector<TenantNoOpEntry> nonSessionOps;
+
     // We start WriteUnitOfWork only to reserve oplog slots. So, it's ok to abort the
     // WriteUnitOfWork when it goes out of scope.
     WriteUnitOfWork wuow(opCtx);
@@ -407,13 +413,18 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
             slotIter++;
             continue;
         }
-        greatestOplogSlotUsed = *slotIter;
+        // Group oplog entries from the same session for noop writes.
+        if (auto sessionId = op.entry.getOperationSessionInfo().getSessionId()) {
+            sessionOps[*sessionId].emplace_back(&op.entry, slotIter);
+        } else {
+            nonSessionOps.emplace_back(&op.entry, slotIter);
+        }
+        greatestOplogSlotUsed = *slotIter++;
     }
+
     const size_t numOplogThreads = _writerPool->getStats().numThreads;
     const size_t numOpsPerThread = std::max(std::size_t(minOplogEntriesPerThread.load()),
-                                            (batch.ops.size() / numOplogThreads));
-    slotIter = oplogSlots.begin();
-    auto opsIter = batch.ops.begin();
+                                            (nonSessionOps.size() / numOplogThreads));
     LOGV2_DEBUG(4886003,
                 1,
                 "Tenant Oplog Applier scheduling no-ops ",
@@ -422,10 +433,18 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 "firstDonorOptime"_attr = batch.ops.front().entry.getOpTime(),
                 "lastDonorOptime"_attr = batch.ops.back().entry.getOpTime(),
                 "numOplogThreads"_attr = numOplogThreads,
-                "numOpsPerThread"_attr = numOpsPerThread);
-    size_t numOpsRemaining = batch.ops.size();
-    std::vector<Status> statusVector(numOplogThreads, Status::OK());
-    for (size_t thread = 0; thread < numOplogThreads && opsIter != batch.ops.end(); thread++) {
+                "numOpsPerThread"_attr = numOpsPerThread,
+                "numSessionsInBatch"_attr = sessionOps.size());
+
+    // Vector to store errors from each writer thread. The first numOplogThreads entries store
+    // errors from the noop writes for non-session oplog entries. And the rest store errors from the
+    // noop writes for each session in the batch.
+    std::vector<Status> statusVector(numOplogThreads + sessionOps.size(), Status::OK());
+
+    // Dispatch noop writes for non-session oplog entries into numOplogThreads writer threads.
+    auto opsIter = nonSessionOps.begin();
+    size_t numOpsRemaining = nonSessionOps.size();
+    for (size_t thread = 0; thread < numOplogThreads && opsIter != nonSessionOps.end(); thread++) {
         auto numOps = std::min(numOpsPerThread, numOpsRemaining);
         if (thread == numOplogThreads - 1) {
             numOps = numOpsRemaining;
@@ -435,16 +454,36 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 status = scheduleStatus;
             } else {
                 try {
-                    _writeNoOpsForRange(opObserver, opsIter, opsIter + numOps, slotIter);
+                    _writeNoOpsForRange(opObserver, opsIter, opsIter + numOps);
                 } catch (const DBException& e) {
                     status = e.toStatus();
                 }
             }
         });
-        slotIter += numOps;
         opsIter += numOps;
         numOpsRemaining -= numOps;
     }
+    invariant(opsIter == nonSessionOps.end());
+
+    // Dispatch noop writes for oplog entries from the same session into the same writer thread.
+    size_t sessionThreadNum = 0;
+    for (const auto& s : sessionOps) {
+        _writerPool->schedule([=, &status = statusVector.at(numOplogThreads + sessionThreadNum)](
+                                  auto scheduleStatus) {
+            if (!scheduleStatus.isOK()) {
+                status = scheduleStatus;
+            } else {
+                try {
+                    _writeNoOpsForRange(opObserver, s.second.begin(), s.second.end());
+                } catch (const DBException& e) {
+                    status = e.toStatus();
+                }
+            }
+        });
+        sessionThreadNum++;
+    }
+
+    _writerPool->waitForIdle();
 
     // Make sure all the workers succeeded.
     for (const auto& status : statusVector) {
@@ -457,26 +496,28 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         }
         uassertStatusOK(status);
     }
-
-    invariant(opsIter == batch.ops.end());
-    _writerPool->waitForIdle();
     return {batch.ops.back().entry.getOpTime(), greatestOplogSlotUsed};
 }
 
 void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
-                                             std::vector<TenantOplogEntry>::const_iterator begin,
-                                             std::vector<TenantOplogEntry>::const_iterator end,
-                                             std::vector<OplogSlot>::iterator firstSlot) {
+                                             std::vector<TenantNoOpEntry>::const_iterator begin,
+                                             std::vector<TenantNoOpEntry>::const_iterator end) {
     auto opCtx = cc().makeOperationContext();
     tenantMigrationRecipientInfo(opCtx.get()) =
         boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
+
+    // Since the client object persists across each noop write call and the same writer thread could
+    // be reused to write noop entries with older optime, we need to clear the lastOp associated
+    // with the client to avoid the invariant in replClientInfo::setLastOp that the optime only goes
+    // forward.
+    repl::ReplClientInfo::forClient(opCtx->getClient()).clearLastOp();
+
     AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx.get());
-            auto slot = firstSlot;
-            for (auto iter = begin; iter != end; iter++, slot++) {
-                const auto& entry = iter->entry;
+            for (auto iter = begin; iter != end; iter++) {
+                const auto& entry = *iter->first;
                 if (isResumeTokenNoop(entry)) {
                     // We don't want to write noops for resume token noop oplog entries. They would
                     // not be applied in a change stream anyways.
@@ -499,7 +540,7 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     preImageOpTime,
                     postImageOpTime,
                     prevWriteOpTimeInTransaction,
-                    *slot);
+                    *iter->second);
             }
             wuow.commit();
         });
