@@ -172,6 +172,7 @@ enums:
            validate :  "validate"
            viewRole :  "viewRole"
            viewUser :  "viewUser"
+           applyOps :  "applyOps"
 
     MatchType:
         description: "test"

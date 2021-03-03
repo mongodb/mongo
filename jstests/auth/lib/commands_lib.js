@@ -301,6 +301,7 @@ var authCommandsLib = {
                       actions: ["appendOplogNote"],
                       removeWhenTestingAuthzFailure: false
                     },
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
@@ -324,17 +325,13 @@ var authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles: {
-                    readWrite: 1,
-                    dbAdmin: 1,
-                    dbOwner: 1,
-                    readWriteAnyDatabase: 1,
                     dbAdminAnyDatabase: 1,
                     root: 1,
-                    restore: 1,
                     __system: 1
                 },
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ]
               },
           ]
@@ -359,10 +356,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {root: 1, restore: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
-                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID", "applyOps"]},
                 ]
               },
           ]
@@ -389,7 +386,7 @@ var authCommandsLib = {
               privileges: [
                   {resource: {db: firstDbName, collection: "x"}, actions: ["createCollection"]},
                   // Do not have forceUUID.
-                  {resource: {cluster: true}, actions: ["useUUID"]}
+                  {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
               ]
           }]
         },
@@ -415,17 +412,13 @@ var authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 roles: {
-                    readWrite: 1,
-                    dbAdmin: 1,
-                    dbOwner: 1,
-                    readWriteAnyDatabase: 1,
                     dbAdminAnyDatabase: 1,
                     root: 1,
-                    restore: 1,
                     __system: 1
                 },
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ]
               },
           ]
@@ -460,10 +453,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {root: 1, restore: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
                 ]
               },
           ]
@@ -500,7 +493,8 @@ var authCommandsLib = {
                 expectAuthzFailure: true,
                 runOnDb: adminDbName,
                 privileges: [
-                    {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]}
+                    {resource: {db: firstDbName, collection: "x"}, actions: ["dropCollection"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                     // don't have useUUID privilege.
                 ]
               },
@@ -514,13 +508,13 @@ var authCommandsLib = {
               {
                 runOnDb: adminDbName,
                 privileges: [
-                    {resource: {cluster: true}, actions: ["appendOplogNote"]},
+                    {resource: {cluster: true}, actions: ["appendOplogNote", "applyOps"]},
                 ],
               },
               {
                 runOnDb: firstDbName,
                 privileges: [
-                    {resource: {cluster: true}, actions: ["appendOplogNote"]},
+                    {resource: {cluster: true}, actions: ["appendOplogNote", "applyOps"]},
                 ],
                 expectFailure: true
               }
@@ -551,7 +545,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {readWriteAnyDatabase: 1, root: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {
                       resource: {db: firstDbName, collection: "x"},
@@ -560,7 +554,8 @@ var authCommandsLib = {
                     {
                       resource: {db: secondDbName, collection: "y"},
                       actions: ["insert", "createIndex"]
-                    }
+                    },
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ]
               },
           ]
@@ -584,9 +579,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: roles_write,
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
@@ -619,10 +615,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {root: 1, restore: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
                 ],
               },
           ]
@@ -659,10 +655,10 @@ var authCommandsLib = {
                 // failure.
                 expectFail: true,
                 runOnDb: adminDbName,
-                roles: {root: 1, restore: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
                 ],
               },
           ]
@@ -698,6 +694,7 @@ var authCommandsLib = {
                 runOnDb: adminDbName,
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                     // Don't have useUUID privilege.
                 ],
               },
@@ -739,7 +736,7 @@ var authCommandsLib = {
                 runOnDb: adminDbName,
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
-                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID", "applyOps"]},
                     // Require universal privilege set.
                 ],
               },
@@ -779,7 +776,7 @@ var authCommandsLib = {
                       actions: ["createCollection", "insert"]
                     },
                     {resource: {db: firstDbName, collection: "y"}, actions: ["createCollection"]},
-                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID", "applyOps"]},
                 ],
               },
           ]
@@ -819,7 +816,7 @@ var authCommandsLib = {
                       resource: {db: firstDbName, collection: "y"},
                       actions: ["createCollection", "insert"]
                     },
-                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "forceUUID", "applyOps"]},
                 ],
               },
           ]
@@ -844,9 +841,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: Object.merge(roles_write, {restore: 0}, true),
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["update", "insert"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
@@ -872,9 +870,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: Object.merge(roles_write, {restore: 0}, true),
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["update"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
@@ -909,10 +908,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {root: 1, __system: 1},
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["update"]},
-                    {resource: {cluster: true}, actions: ["useUUID"]}
+                    {resource: {cluster: true}, actions: ["useUUID", "applyOps"]},
                 ],
               },
           ]
@@ -950,6 +949,7 @@ var authCommandsLib = {
                 runOnDb: adminDbName,
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["update"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
@@ -967,9 +967,10 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: Object.merge(roles_write, {restore: 0}, true),
+                roles: {__system: 1, root: 1},
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["remove"]},
+                    {resource: {cluster: true}, actions: ["applyOps"]},
                 ],
               },
           ]
