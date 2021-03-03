@@ -284,9 +284,12 @@ function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
  * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns the
  * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
  * Asserts that no more than one stage is a match.
+ *
+ * If 'useQueryPlannerSection' is set to 'true', the 'queryPlanner' section of the explain output
+ * will be used to lookup the given 'stage', even if 'executionStats' section is available.
  */
-function getAggPlanStage(root, stage) {
-    let planStageList = getAggPlanStages(root, stage);
+function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
+    let planStageList = getAggPlanStages(root, stage, useQueryPlannerSection);
 
     if (planStageList.length === 0) {
         return null;

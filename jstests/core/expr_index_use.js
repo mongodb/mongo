@@ -1,6 +1,6 @@
 // Confirms expected index use when performing a match with a $expr statement.
 // @tags: [
-//   sbe_incompatible, requires_fcv_49
+//   requires_fcv_49
 // ]
 
 (function() {
@@ -51,6 +51,14 @@ assert.commandWorked(coll.insert({w: {z: 2}}));
 assert.commandWorked(coll.createIndex({w: 1}));
 assert.commandWorked(coll.createIndex({"w.z": 1}));
 
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
+
 /**
  * Executes the expression 'expr' as both a find and an aggregate. Then confirms
  * 'metricsToCheck', which is an object containing:
@@ -89,7 +97,8 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
     ];
     assert.eq(metricsToCheck.nReturned, coll.aggregate(pipelineWithProject, aggOptions).itcount());
     let explain = coll.explain("executionStats").aggregate(pipelineWithProject, aggOptions);
-    assert(getAggPlanStage(explain, "COLLSCAN"), tojson(explain));
+    assert(getAggPlanStage(explain, "COLLSCAN", isSBEEnabled /* useQueryPlannerSection */),
+           explain);
 
     // Verifies that there are no rejected plans, and that the winning plan uses the expected
     // index.
