@@ -151,6 +151,11 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
                 !ns.isTimeseriesBucketsCollection() ||
                     !indexSpec[IndexDescriptor::kUniqueFieldName].trueValue());
 
+        uassert(ErrorCodes::InvalidOptions,
+                "TTL indexes are not supported on time-series buckets collections",
+                !ns.isTimeseriesBucketsCollection() ||
+                    !indexSpec[IndexDescriptor::kExpireAfterSecondsFieldName]);
+
         indexSpecs.push_back(std::move(indexSpec));
     }
 

@@ -132,4 +132,8 @@ assert.commandFailedWithCode(
 // Unique indexes are not supported on time-series bucket collections.
 assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: true}),
                              ErrorCodes.InvalidOptions);
+
+// TTL indexes are not supported on a time-series buckets collection.
+assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {expireAfterSeconds: 3600}),
+                             ErrorCodes.InvalidOptions);
 })();
