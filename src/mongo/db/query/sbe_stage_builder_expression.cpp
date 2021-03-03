@@ -1001,13 +1001,21 @@ public:
                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                       sbe::value::bitcastFrom<int32_t>(0)));
 
-        // If either operand evaluates to "Nothing," then the entire operation expressed by 'cmp'
-        // will also evaluate to "Nothing." MQL comparisons, however, treat "Nothing" as if it is a
+        // If either operand evaluates to "Nothing", then the entire operation expressed by 'cmp'
+        // will also evaluate to "Nothing". MQL comparisons, however, treat "Nothing" as if it is a
         // value that is less than everything other than MinKey. (Notably, two expressions that
         // evaluate to "Nothing" are considered equal to each other.)
-        auto nothingFallbackCmp = makeBinaryOp(comparisonOperator,
-                                               makeFunction("exists", lhsRef.clone()),
-                                               makeFunction("exists", rhsRef.clone()));
+        // We also need to explicitly check for 'bsonUndefined' type because it is considered equal
+        // to "Nothing" according to MQL semantics.
+        auto generateExists = [&](const sbe::EVariable& var) {
+            return makeBinaryOp(
+                sbe::EPrimBinary::logicAnd,
+                makeFunction("exists", var.clone()),
+                sbe::makeE<sbe::ETypeMatch>(var.clone(), ~getBSONTypeMask(BSONType::Undefined)));
+        };
+
+        auto nothingFallbackCmp =
+            makeBinaryOp(comparisonOperator, generateExists(lhsRef), generateExists(rhsRef));
 
         auto cmpWithFallback =
             makeFunction("fillEmpty", std::move(cmp), std::move(nothingFallbackCmp));
