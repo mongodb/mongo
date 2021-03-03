@@ -21,6 +21,7 @@ function forEachDocumentBounds(callback) {
     callback(["unbounded", -1]);
     callback(["unbounded", 1]);
     callback(["unbounded", 5]);
+    callback(["unbounded", "unbounded"]);
 }
 
 /**
@@ -39,14 +40,14 @@ function computeAsGroup({coll, partitionKey, accum, lower, upper}) {
     if (lower < 0 || upper < 0)
         return null;
 
-    return coll
-        .aggregate([
-            {$match: partitionKey},
-            {$sort: {_id: 1}},
-            {$skip: lower},
-            {$limit: upper + 1},
-            {$group: {_id: null, res: {[accum]: "$price"}}}
-        ])
+    let prefixPipe = [{$match: partitionKey}, {$sort: {_id: 1}}, {$skip: lower}];
+
+    // Only attach a $limit if there's a numeric upper bound (or "current"), since "unbounded"
+    // implies an infinite limit.
+    if (upper != "unbounded")
+        prefixPipe = prefixPipe.concat([{$limit: upper + 1}]);
+
+    return coll.aggregate(prefixPipe.concat([{$group: {_id: null, res: {[accum]: "$price"}}}]))
         .toArray()[0]
         .res;
 }
@@ -81,22 +82,21 @@ function testAccumAgainstGroup(coll, accum) {
                 let groupRes;
                 // If there's no partitioning, then only the upper bound increases per doc.
                 if (partition == null) {
-                    groupRes = computeAsGroup({
-                        coll: coll,
-                        partitionKey: {},
-                        accum: accum,
-                        lower: 0,
-                        upper: index + bounds[1]
-                    });
+                    const upperBound = bounds[1] == "unbounded" ? "unbounded" : index + bounds[1];
+                    groupRes = computeAsGroup(
+                        {coll: coll, partitionKey: {}, accum: accum, lower: 0, upper: upperBound});
                 } else {
                     // There is partitioning, so we need to adjust the bounds within the current
-                    // partition.
+                    // partition. Use the 'partIndex' field within each document that gives its
+                    // relative offset.
+                    const upperBound =
+                        bounds[1] == "unbounded" ? "unbounded" : wfRes.partIndex + bounds[1];
                     groupRes = computeAsGroup({
                         coll: coll,
                         partitionKey: {ticker: wfRes.ticker},
                         accum: accum,
                         lower: 0,
-                        upper: wfRes.partIndex + bounds[1]
+                        upper: upperBound
                     });
                 }
                 assert.eq(groupRes,
