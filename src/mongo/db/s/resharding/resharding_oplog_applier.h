@@ -102,7 +102,7 @@ public:
      * greater than or equal to reshardingCloneFinishedTs.
      * It is undefined to call applyUntilCloneFinishedTs more than once.
      */
-    ExecutorFuture<void> applyUntilCloneFinishedTs();
+    ExecutorFuture<void> applyUntilCloneFinishedTs(CancelationToken cancelToken);
 
     /**
      * Applies oplog from the iterator until it is exhausted or hits an error. It is an error to
@@ -111,7 +111,7 @@ public:
      * It is an error to call this when applyUntilCloneFinishedTs future returns an error.
      * It is undefined to call applyUntilDone more than once.
      */
-    ExecutorFuture<void> applyUntilDone();
+    ExecutorFuture<void> applyUntilDone(CancelationToken cancelToken);
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
         OperationContext* opCtx, const ReshardingSourceId& id);
@@ -130,7 +130,7 @@ private:
      * Returns a future that becomes ready when the next batch of oplog entries have been collected
      * and applied.
      */
-    ExecutorFuture<void> _scheduleNextBatch();
+    ExecutorFuture<void> _scheduleNextBatch(CancelationToken cancelToken);
 
     /**
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all

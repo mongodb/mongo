@@ -69,7 +69,7 @@ public:
      *    final oplog entry hasn't been returned yet.
      */
     virtual ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor) = 0;
+        std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) = 0;
 };
 
 /**
@@ -94,7 +94,7 @@ public:
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor) override;
+        std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) override;
 
     static constexpr auto kActualOpFieldName = "actualOp"_sd;
     static constexpr auto kPreImageOpFieldName = "preImageOp"_sd;

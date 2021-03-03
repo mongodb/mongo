@@ -265,6 +265,8 @@ std::vector<InsertStatement> ReshardingCollectionCloner::_fillBatch(Pipeline& pi
 
 void ReshardingCollectionCloner::_insertBatch(OperationContext* opCtx,
                                               std::vector<InsertStatement>& batch) {
+    // TODO SERVER-55102: Use CancelableOperationContext to prevent retrying once the operation has
+    // been canceled.
     writeConflictRetry(opCtx, "ReshardingCollectionCloner::_insertBatch", _outputNss.ns(), [&] {
         AutoGetCollection outputColl(opCtx, _outputNss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
@@ -404,7 +406,7 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
                    return true;
                });
            })
-        .until([this, chainCtx](Status status) {
+        .until([this, chainCtx, cancelToken](Status status) {
             if (status.isOK() && chainCtx->moreToCome) {
                 return false;
             }
@@ -419,9 +421,12 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
             if (status.isA<ErrorCategory::CancelationError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>()) {
                 // Cancellation and NotPrimary errors indicate the primary-only service Instance
-                // will be shut down or is shutting down now. Don't retry and leave resuming to when
-                // the RecipientStateMachine is restarted on the new primary.
-                return true;
+                // will be shut down or is shutting down now - provided the cancelToken is also
+                // canceled. Otherwise, the errors may have originated from a remote response rather
+                // than the shard itself.
+                //
+                // Don't retry when primary-only service Instance is shutting down.
+                return cancelToken.isCanceled();
             }
 
             if (status.isA<ErrorCategory::RetriableError>() ||
@@ -449,7 +454,19 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
 
             return true;
         })
-        .on(std::move(executor), std::move(cancelToken));
+        .on(executor, cancelToken)
+        .onCompletion([this, chainCtx](Status status) {
+            if (chainCtx->pipeline) {
+                // Guarantee the pipeline is always cleaned up - even upon cancelation.
+                _withTemporaryOperationContext([&](auto* opCtx) {
+                    chainCtx->pipeline->dispose(opCtx);
+                    chainCtx->pipeline.reset();
+                });
+            }
+
+            // Propagate the result of the AsyncTry.
+            return status;
+        });
 }
 
 }  // namespace mongo

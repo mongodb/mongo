@@ -347,7 +347,7 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
                chainCtx->donorRecord = boost::none;
                return makeReadyFutureWith([] {}).share();
            })
-        .until([this, chainCtx](Status status) {
+        .until([this, cancelToken, chainCtx](Status status) {
             if (status.isOK() && chainCtx->moreToCome) {
                 return false;
             }
@@ -362,9 +362,12 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
             if (status.isA<ErrorCategory::CancelationError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>()) {
                 // Cancellation and NotPrimary errors indicate the primary-only service Instance
-                // will be shut down or is shutting down now. Don't retry and leave resuming to when
-                // the RecipientStateMachine is restarted on the new primary.
-                return true;
+                // will be shut down or is shutting down now - provided the cancelToken is also
+                // canceled. Otherwise, the errors may have originated from a remote response rather
+                // than the shard itself.
+                //
+                // Don't retry when primary-only service Instance is shutting down.
+                return !cancelToken.isCanceled();
             }
 
             if (status.isA<ErrorCategory::RetriableError>() ||
@@ -391,7 +394,19 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
 
             return true;
         })
-        .on(std::move(executor), std::move(cancelToken));
+        .on(executor, cancelToken)
+        .onCompletion([this, chainCtx](Status status) {
+            if (chainCtx->pipeline) {
+                // Guarantee the pipeline is always cleaned up - even upon cancelation.
+                _withTemporaryOperationContext([&](auto* opCtx) {
+                    chainCtx->pipeline->dispose(opCtx);
+                    chainCtx->pipeline.reset();
+                });
+            }
+
+            // Propagate the result of the AsyncTry.
+            return status;
+        });
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(

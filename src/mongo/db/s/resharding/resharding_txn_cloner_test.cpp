@@ -343,17 +343,21 @@ protected:
             Grid::get(getServiceContext())->getExecutorPool()->getFixedExecutor());
     }
 
-    ExecutorFuture<void> runCloner(ReshardingTxnCloner& cloner,
-                                   std::shared_ptr<executor::ThreadPoolTaskExecutor> executor) {
+    ExecutorFuture<void> runCloner(
+        ReshardingTxnCloner& cloner,
+        std::shared_ptr<executor::ThreadPoolTaskExecutor> executor,
+        boost::optional<CancelationToken> customCancelToken = boost::none) {
+        // Allows callers to control the cancelation of the cloner's run() function when specified.
+        auto cancelToken = customCancelToken.is_initialized()
+            ? customCancelToken.get()
+            : operationContext()->getCancelationToken();
+
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return cloner
-            .run(getServiceContext(),
-                 std::move(executor),
-                 operationContext()->getCancelationToken(),
-                 makeMongoProcessInterface())
+            .run(getServiceContext(), std::move(executor), cancelToken, makeMongoProcessInterface())
             .onCompletion([](auto x) { return x; });
     }
 
@@ -540,6 +544,27 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
     checkTxnHasBeenUpdated(sessionIdMultiDocTxn, txnNum);
 }
 
+/**
+ * Test that the ReshardingTxnCloner stops processing batches when canceled via cancelToken.
+ */
+TEST_F(ReshardingTxnClonerTest, ClonerOneBatchThenCanceled) {
+    const auto txns = makeSortedTxns(4);
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    auto opCtxToken = operationContext()->getCancelationToken();
+    auto cancelSource = CancelationSource(opCtxToken);
+    auto future = runCloner(cloner, executor, cancelSource.token());
+
+    onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
+                            CursorId{123},
+                            true /* isFirstBatch */);
+
+    cancelSource.cancel();
+
+    auto status = future.getNoThrow();
+    ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
+}
+
 TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
     const auto txns = makeSortedTxns(2);
     const auto lastLsid = getTxnRecordLsid(txns.back());
@@ -595,7 +620,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor);
+    auto cancelSource = CancelationSource(operationContext()->getCancelationToken());
+    auto future = runCloner(cloner, executor, cancelSource.token());
 
     // The progress document is updated asynchronously after the session record is updated. We fake
     // the cloning operation being canceled to inspect the progress document after the first batch
@@ -603,11 +629,14 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
     onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
                             CursorId{123},
                             true /* isFirstBatch */);
-
     onCommand([&](const executor::RemoteCommandRequest& request) {
+        // Simulate a stepdown.
+        cancelSource.cancel();
+
+        // With a non-mock network, disposing of the pipeline upon cancelation would also cancel the
+        // original request.
         return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
-
     auto status = future.getNoThrow();
     ASSERT_EQ(status, ErrorCodes::CallbackCanceled);
 
@@ -641,7 +670,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto future = runCloner(cloner, executor);
+    auto cancelSource = CancelationSource(operationContext()->getCancelationToken());
+    auto future = runCloner(cloner, executor, cancelSource.token());
 
     onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
 
@@ -652,6 +682,11 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
         ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
         ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
 
+        // Simulate a stepdown.
+        cancelSource.cancel();
+
+        // With a non-mock network, disposing of the pipeline upon cancelation would also cancel the
+        // original request.
         return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
 

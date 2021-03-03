@@ -238,19 +238,22 @@ ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
 
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& cancelToken) noexcept {
+    const CancelationToken& stepdownToken) noexcept {
+    auto abortToken = _initAbortSource(stepdownToken);
+
     return ExecutorFuture<void>(**executor)
         .then([this, executor] {
             _metrics()->onStart();
             return _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(executor);
         })
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
-        .then([this, executor, cancelToken] {
-            return _cloneThenTransitionToApplying(executor, cancelToken);
+        .then([this, executor, abortToken] {
+            return _cloneThenTransitionToApplying(executor, abortToken);
         })
         .then([this, executor] { return _applyThenTransitionToSteadyState(executor); })
-        .then([this, executor] {
-            return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor);
+        .then([this, executor, abortToken] {
+            return _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(executor,
+                                                                                  abortToken);
         })
         .then([this, executor] {
             return _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(executor);
@@ -349,6 +352,12 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     stdx::lock_guard<Latch> lk(_mutex);
     if (reshardingFields.getAbortReason()) {
         auto status = getStatusFromAbortReason(reshardingFields);
+        invariant(!status.isOK());
+
+        if (_abortSource) {
+            _abortSource->cancel();
+        }
+
         _onAbortOrStepdown(lk, status);
         return;
     }
@@ -438,7 +447,7 @@ void ReshardingRecipientService::RecipientStateMachine::_initTxnCloner(
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancelationToken& cancelToken) {
+    const CancelationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kCloning) {
         return ExecutorFuture(**executor);
     }
@@ -494,15 +503,15 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
         _oplogFetcherFutures.emplace_back(
             _oplogFetchers.back()
-                ->schedule(_oplogFetcherExecutor, cancelToken)
+                ->schedule(_oplogFetcherExecutor, abortToken)
                 .onError([](Status status) {
                     LOGV2(5259300, "Error fetching oplog entries", "error"_attr = redact(status));
                     return status;
                 }));
     }
 
-    return _collectionCloner->run(**executor, cancelToken)
-        .then([this, executor, cancelToken] {
+    return _collectionCloner->run(**executor, abortToken)
+        .then([this, executor, abortToken] {
             if (_txnCloners.empty()) {
                 return SemiFuture<void>::makeReady();
             }
@@ -511,7 +520,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
 
             std::vector<ExecutorFuture<void>> txnClonerFutures;
             for (auto&& txnCloner : _txnCloners) {
-                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor, cancelToken));
+                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor, abortToken));
             }
 
             return whenAllSucceed(std::move(txnClonerFutures));
@@ -548,13 +557,14 @@ ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyS
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancelationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kSteadyState) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
     auto opCtx = cc().makeOperationContext();
-    return _updateCoordinator(opCtx.get(), executor).then([this, executor] {
+    return _updateCoordinator(opCtx.get(), executor).then([this, executor, abortToken] {
         auto numDonors = _donorShardIds.size();
         _oplogAppliers.reserve(numDonors);
         _oplogApplierWorkers.reserve(numDonors);
@@ -619,8 +629,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             // ReshardingCollectionCloner has finished. This is why applyUntilCloneFinishedTs() and
             // applyUntilDone() are both called here in sequence.
             auto* applier = _oplogAppliers.back().get();
-            futuresToWaitOn.emplace_back(applier->applyUntilCloneFinishedTs().then(
-                [applier] { return applier->applyUntilDone(); }));
+            futuresToWaitOn.emplace_back(
+                applier->applyUntilCloneFinishedTs(abortToken).then([applier, abortToken] {
+                    return applier->applyUntilDone(abortToken);
+                }));
         }
 
         return whenAllSucceed(std::move(futuresToWaitOn))
@@ -930,10 +942,6 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortOrStepdown(WithL
         _oplogFetcherExecutor->shutdown();
     }
 
-    for (auto&& fetcher : _oplogFetchers) {
-        fetcher->interrupt(status);
-    }
-
     for (auto&& threadPool : _oplogApplierWorkers) {
         threadPool->shutdown();
     }
@@ -945,6 +953,13 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortOrStepdown(WithL
     if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
         _coordinatorHasDecisionPersisted.setError(status);
     }
+}
+
+CancelationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
+    const CancelationToken& stepdownToken) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _abortSource = CancelationSource(stepdownToken);
+    return _abortSource->token();
 }
 
 }  // namespace mongo

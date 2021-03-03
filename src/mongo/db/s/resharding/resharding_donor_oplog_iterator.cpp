@@ -49,6 +49,7 @@
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -207,7 +208,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
 }
 
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getNextBatch(
-    std::shared_ptr<executor::TaskExecutor> executor) {
+    std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) {
     if (_hasSeenFinalOplogEntry) {
         invariant(!_pipeline);
         return ExecutorFuture(std::move(executor), std::vector<repl::OplogEntry>{});
@@ -246,8 +247,13 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
 
     if (batch.empty() && !_hasSeenFinalOplogEntry) {
         return ExecutorFuture(executor)
-            .then([this] { return _insertNotifier->awaitInsert(_resumeToken); })
-            .then([this, executor] { return getNextBatch(std::move(executor)); });
+            .then([this, cancelToken] {
+                return future_util::withCancelation(_insertNotifier->awaitInsert(_resumeToken),
+                                                    cancelToken);
+            })
+            .then([this, cancelToken, executor] {
+                return getNextBatch(std::move(executor), cancelToken);
+            });
     }
 
     return ExecutorFuture(std::move(executor), std::move(batch));
