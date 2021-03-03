@@ -106,7 +106,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 72)
+        self.assertTrue(error_collection.count() == 88)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -518,6 +518,13 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_reply_field_variant_not_subset_error), "newReplyFieldVariantNotSubset")
 
+        new_reply_field_variant_not_subset_two_errors = error_collection.get_all_errors_by_command_name(
+            "newReplyFieldVariantNotSubsetTwo")
+        self.assertTrue(len(new_reply_field_variant_not_subset_two_errors) == 2)
+        for error in new_reply_field_variant_not_subset_two_errors:
+            self.assertTrue(error.error_id == idl_compatibility_errors.
+                            ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+
         new_reply_field_variant_recursive_error = error_collection.get_error_by_command_name(
             "replyFieldVariantRecursive")
         self.assertTrue(new_reply_field_variant_recursive_error.error_id ==
@@ -565,6 +572,89 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL)
         self.assertRegex(
             str(command_type_validators_not_equal_error), "commandTypeValidatorsNotEqual")
+
+        new_param_variant_not_superset_error = error_collection.get_error_by_command_name(
+            "newParamVariantNotSuperset")
+        self.assertTrue(new_param_variant_not_superset_error.error_id == idl_compatibility_errors.
+                        ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(new_param_variant_not_superset_error), "newParamVariantNotSuperset")
+
+        new_param_variant_not_superset_two_errors = error_collection.get_all_errors_by_command_name(
+            "newParamVariantNotSupersetTwo")
+        self.assertTrue(len(new_param_variant_not_superset_two_errors) == 2)
+        for error in new_param_variant_not_superset_two_errors:
+            self.assertTrue(error.error_id == idl_compatibility_errors.
+                            ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+
+        new_param_type_not_variant_error = error_collection.get_error_by_command_name(
+            "newParamTypeNotVariant")
+        self.assertTrue(new_param_type_not_variant_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_VARIANT)
+        self.assertRegex(str(new_param_type_not_variant_error), "newParamTypeNotVariant")
+
+        new_param_variant_recursive_error = error_collection.get_error_by_command_name(
+            "newParamVariantRecursive")
+        self.assertTrue(new_param_variant_recursive_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(str(new_param_variant_recursive_error), "newParamVariantRecursive")
+
+        new_param_variant_struct_not_superset_error = error_collection.get_error_by_command_name(
+            "newParamVariantStructNotSuperset")
+        self.assertTrue(
+            new_param_variant_struct_not_superset_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_struct_not_superset_error), "newParamVariantStructNotSuperset")
+
+        new_param_variant_struct_recursive_error = error_collection.get_error_by_command_name(
+            "newParamVariantStructRecursive")
+        self.assertTrue(new_param_variant_struct_recursive_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_struct_recursive_error), "newParamVariantStructRecursive")
+
+        new_command_type_variant_not_superset_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantNotSuperset")
+        self.assertTrue(new_command_type_variant_not_superset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_not_superset_error), "newCommandTypeVariantNotSuperset")
+
+        new_command_type_variant_not_superset_two_errors = error_collection.get_all_errors_by_command_name(
+            "newCommandTypeVariantNotSupersetTwo")
+        self.assertTrue(len(new_command_type_variant_not_superset_two_errors) == 2)
+        for error in new_command_type_variant_not_superset_two_errors:
+            self.assertTrue(error.error_id ==
+                            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+
+        new_command_type_not_variant_error = error_collection.get_error_by_command_name(
+            "newCommandTypeNotVariant")
+        self.assertTrue(new_command_type_not_variant_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT)
+        self.assertRegex(str(new_command_type_not_variant_error), "newCommandTypeNotVariant")
+
+        new_command_type_variant_recursive_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantRecursive")
+        self.assertTrue(new_command_type_variant_recursive_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_recursive_error), "newCommandTypeVariantRecursive")
+
+        new_command_type_variant_struct_not_superset_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantStructNotSuperset")
+        self.assertTrue(new_command_type_variant_struct_not_superset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_struct_not_superset_error),
+            "newCommandTypeVariantStructNotSuperset")
+
+        new_command_type_variant_struct_recursive_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantStructRecursive")
+        self.assertTrue(new_command_type_variant_struct_recursive_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_struct_recursive_error),
+            "newCommandTypeVariantStructRecursive")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""

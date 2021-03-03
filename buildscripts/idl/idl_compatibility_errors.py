@@ -93,6 +93,10 @@ ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0049"
 ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL = "ID0050"
 ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL = "ID0051"
 ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL = "ID0052"
+ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_VARIANT = "ID0053"
+ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT = "ID0054"
+ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET = "ID0055"
+ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET = "ID0056"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -183,6 +187,10 @@ class IDLCompatibilityErrorCollection(object):
         error = next(iter(error_id_list), None)
         assert error is not None
         return error
+
+    def get_all_errors_by_command_name(self, command_name: str) -> List[IDLCompatibilityError]:
+        """Get all the errors in the error collection with the command command_name."""
+        return [a for a in self._errors if a.command_name == command_name]
 
     def to_list(self) -> List[str]:
         """Return a list of formatted error messages."""
@@ -508,6 +516,52 @@ class IDLCompatibilityContext(object):
                 ("'%s' has type '%s' that is not a struct while the corresponding "
                  "old type was a struct of type '%s'.") % (command_name, new_type, old_type), file)
 
+    def add_new_command_or_param_type_not_variant_type_error(self, command_name: str, new_type: str,
+                                                             file: str, param_name: Optional[str],
+                                                             is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """
+        Add an error about the new command or parameter type not being a variant type.
+
+        Add an error about the new command or parameter type not being a variant type
+        when the old type is variant.
+        """
+
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_VARIANT, command_name,
+                ("The '%s' command has parameter '%s' of type '%s' that is not variant while the"
+                 " corresponding old parameter type is variant.") % (command_name, param_name,
+                                                                     new_type), file)
+        else:
+            self._add_error(ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT, command_name,
+                            ("'%s' has type '%s' that is not variant while the corresponding "
+                             "old type is variant.") % (command_name, new_type), file)
+
+    def add_new_command_or_param_variant_type_not_superset_error(
+            self, command_name: str, variant_type_name: str, file: str, param_name: Optional[str],
+            is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """
+        Add an error about the new variant types not being a superset.
+
+        Add an error about the new command or parameter variant types not being a superset
+        of the old variant types.
+        """
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET, command_name,
+                ("The '%s' command has parameter '%s' of variant types that is not a superset"
+                 " of the corresponding old parameter variant types: "
+                 "The type '%s' is in the old parameter types but not the new parameter types.") %
+                (command_name, param_name, variant_type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET, command_name,
+                ("'%s' has variant types that is not a supserset of the corresponding"
+                 " old command variant types: The type '%s' is in the old command "
+                 "types but not the new command types.") % (command_name, variant_type_name), file)
+
     def add_new_namespace_incompatible_error(self, command_name: str, old_namespace: str,
                                              new_namespace: str, file: str) -> None:
         """Add an error about the new namespace being incompatible with the old namespace."""
@@ -606,23 +660,23 @@ class IDLCompatibilityContext(object):
             (command_name, field_name), file)
 
     def add_new_reply_field_variant_type_error(self, command_name: str, field_name: str,
-                                               new_field_type: str, old_field_type: str,
-                                               file: str) -> None:
+                                               old_field_type: str, file: str) -> None:
         # pylint: disable=too-many-arguments
         """Add an error about the new reply field type being variant when the old one is not."""
         self._add_error(
             ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE, command_name,
-            ("'%s' has a reply field '%s' of type '%s' that is variant while the corresponding "
-             "old reply field type '%s' is not.") % (command_name, field_name, new_field_type,
-                                                     old_field_type), file)
+            ("'%s' has a reply field '%s' that has a variant type while the corresponding "
+             "old reply field type '%s' is not variant.") % (command_name, field_name,
+                                                             old_field_type), file)
 
-    def add_new_reply_field_variant_type_not_subset_error(self, command_name: str, field_name: str,
-                                                          type_name: str, file: str) -> None:
+    def add_new_reply_field_variant_type_not_subset_error(
+            self, command_name: str, field_name: str, variant_type_name: str, file: str) -> None:
         # pylint: disable=too-many-arguments
         """Add an error about the new reply field variant types not being a subset of the old variant types."""
         self._add_error(ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET, command_name, (
-            "'%s' has a reply field '%s' with variant alternative type '%s' that is not a subset of the corresponding "
-            "old reply field type") % (command_name, field_name, type_name), file)
+            "'%s' has a reply field '%s' with variant types that is not a subset of the corresponding "
+            "old reply field types: The type '%s' is not in the old reply field types.") %
+                        (command_name, field_name, variant_type_name), file)
 
     def add_old_command_or_param_type_bson_any_error(self, command_name: str, old_type: str,
                                                      file: str, param_name: Optional[str],
