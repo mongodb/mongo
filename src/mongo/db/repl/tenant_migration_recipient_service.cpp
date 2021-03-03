@@ -134,10 +134,12 @@ MONGO_FAIL_POINT_DEFINE(fpAfterFetchingRetryableWritesEntriesBeforeStartOpTime);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogFetcherMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
 MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingLastTxnMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(fpBeforeMarkingCollectionClonerDone);
 MONGO_FAIL_POINT_DEFINE(fpAfterCollectionClonerDone);
 MONGO_FAIL_POINT_DEFINE(fpAfterStartingOplogApplierMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(fpBeforeFulfillingDataConsistentPromise);
 MONGO_FAIL_POINT_DEFINE(fpAfterDataConsistentMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(fpBeforePersistingRejectReadsBeforeTimestamp)
 MONGO_FAIL_POINT_DEFINE(fpAfterWaitForRejectReadsBeforeTimestamp);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
@@ -438,6 +440,7 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
         stdx::lock_guard lk(_mutex);
         _stateDoc.setRejectReadsBeforeTimestamp(returnAfterReachingTimestamp);
     }
+    _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
 
     auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
@@ -445,9 +448,9 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
     WriteConcernOptions writeConcern(repl::ReplSetConfig::kConfigAllWriteConcernName,
                                      WriteConcernOptions::SyncMode::NONE,
                                      opCtx->getWriteConcern().wTimeout);
-    replCoord->awaitReplication(opCtx, writeOpTime, writeConcern);
+    uassertStatusOK(replCoord->awaitReplication(opCtx, writeOpTime, writeConcern).status);
 
-    _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp);
+    _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp, opCtx);
 
     return swDonorRecipientOpTimePair.getValue().donorOpTime;
 }
@@ -1183,7 +1186,8 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
     _oplogFetcherStatus = oplogFetcherStatus;
 }
 
-void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint* fp) {
+void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint* fp,
+                                                                       OperationContext* opCtx) {
     fp->executeIf(
         [&](const BSONObj& data) {
             LOGV2(4881103,
@@ -1193,7 +1197,11 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
                   "name"_attr = fp->getName(),
                   "args"_attr = data);
             if (data["action"].str() == "hang") {
-                fp->pauseWhileSet();
+                if (opCtx) {
+                    fp->pauseWhileSet(opCtx);
+                } else {
+                    fp->pauseWhileSet();
+                }
             } else {
                 uasserted(data["stopErrorCode"].numberInt(),
                           "Skipping remaining processing due to fail point");
@@ -1315,6 +1323,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
             auto opCtx = cc().makeOperationContext();
+
+            _stopOrHangOnFailPoint(&fpBeforeMarkingCollectionClonerDone, opCtx.get());
             uassertStatusOK(
                 tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
 
@@ -1894,7 +1904,11 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        _fetchCommittedTransactionsBeforeStartOpTime();
                    })
                    .then([this, self = shared_from_this()] {
-                       _stopOrHangOnFailPoint(&fpAfterCollectionClonerDone);
+                       {
+                           auto opCtx = cc().makeOperationContext();
+                           _stopOrHangOnFailPoint(&fpAfterCollectionClonerDone, opCtx.get());
+                       }
+
                        LOGV2_DEBUG(4881200,
                                    1,
                                    "Recipient migration service starting oplog applier",
@@ -1980,6 +1994,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // normally stop by itself on success. It completes only on errors or on external
             // interruption (e.g. by shutDown/stepDown or by recipientForgetMigration command).
             Status status = applierStatus.getStatus();
+
+            // TODO (SERVER-54735): Remove this once AsyncTry can no longer set its result with
+            // BrokenPromise error.
+            if (status == ErrorCodes::BrokenPromise) {
+                status = Status{ErrorCodes::InterruptedDueToReplStateChange,
+                                "operation was interrupted"};
+            }
 
             // If we were interrupted during oplog application, replace oplog application
             // status with error state.

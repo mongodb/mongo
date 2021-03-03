@@ -463,9 +463,10 @@ public:
         std::vector<HostAndPort> _getExcludedDonorHosts(WithLock);
 
         /*
-         * Makes the failpoint to stop or hang based on failpoint data "action" field.
+         * Makes the failpoint stop or hang the migration based on failpoint data "action" field.
+         * If "action" is "hang" and 'opCtx' is not null, the failpoint will be interruptible.
          */
-        void _stopOrHangOnFailPoint(FailPoint* fp);
+        void _stopOrHangOnFailPoint(FailPoint* fp, OperationContext* opCtx = nullptr);
 
         /**
          * Updates the state doc in the database and waits for that to be propagated to a majority.

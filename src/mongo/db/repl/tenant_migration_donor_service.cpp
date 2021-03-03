@@ -88,7 +88,10 @@ bool shouldStopUpdatingDonorStateDoc(Status status, const CancelationToken& toke
 }
 
 bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& token) {
-    return status.isOK() || !ErrorCodes::isRetriableError(status) || token.isCanceled();
+    return status.isOK() ||
+        !(ErrorCodes::isRetriableError(status) ||
+          status == ErrorCodes::FailedToSatisfyReadPreference) ||
+        token.isCanceled();
 }
 
 bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status, const CancelationToken& token) {
