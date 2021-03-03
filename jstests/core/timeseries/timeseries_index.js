@@ -66,6 +66,13 @@ const runTest = function(keyForCreate, hint) {
     assert.eq(doc[timeFieldName], bucketDoc.control.min[timeFieldName], bucketDoc);
     assert.docEq(doc[metaFieldName], bucketDoc.meta, bucketDoc);
 
+    // Check listIndexes command result directly so that we can inspect the namespace in addition
+    // to the index key pattern.
+    const cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
+    assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
+    assert.eq(1, cursorDoc.firstBatch.length, tojson(cursorDoc));
+    assert.docEq(keyForCreate, cursorDoc.firstBatch[0].key, tojson(cursorDoc));
+
     // Check that the underlying buckets collection index was dropped properly.
     assert.commandWorked(coll.dropIndex(keyForCreate),
                          'failed to drop index: ' + tojson(keyForCreate));
@@ -136,4 +143,12 @@ assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: tru
 // TTL indexes are not supported on a time-series buckets collection.
 assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {expireAfterSeconds: 3600}),
                              ErrorCodes.InvalidOptions);
+
+// If listIndexes fails to convert a non-conforming index on the bucket collection, it should omit
+// that index from the results.
+const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
+                     'failed to create index: ' + tojson({not_metadata: 1}));
+assert.eq(1, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
+assert.eq(0, coll.getIndexes().length, tojson(coll.getIndexes()));
 })();
