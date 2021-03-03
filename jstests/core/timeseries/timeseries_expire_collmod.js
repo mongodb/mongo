@@ -1,5 +1,6 @@
 /**
- * Tests that collMod can change a time-series bucket collections expireAfterSeconds option.
+ * Tests that collMod can change the expireAfterSeconds option on both a time-series collection and
+ * the underlying bucket collection.
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
@@ -37,7 +38,19 @@ assert.commandFailedWithCode(
     db.runCommand({collMod: collNotClustered.getName(), clusteredIndex: {expireAfterSeconds: 10}}),
     ErrorCodes.InvalidOptions);
 
-// Check for invalid input.
+// Check for invalid input on the time-series collection.
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: {}}}),
+    ErrorCodes.TypeMismatch);
+assert.commandFailedWithCode(
+    db.runCommand({collMod: coll.getName(), clusteredIndex: {expireAfterSeconds: -10}}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(db.runCommand({collMod: coll.getName(), clusteredIndex: {}}), 40414);
+
+// Check for invalid input on the underlying bucket collection.
 assert.commandFailedWithCode(
     db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "10"}}),
     ErrorCodes.InvalidOptions);
@@ -57,37 +70,60 @@ assert.commandFailedWithCode(db.runCommand({collMod: bucketsColl.getName(), clus
 
 let res = assert.commandWorked(
     db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert.eq(expireAfterSeconds, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
+assert(res.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex"),
+       bucketsColl.getName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+assert.eq(expireAfterSeconds,
+          res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds,
+          bucketsColl.getName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+
+/**
+ * Runs collMod on 'collToChange' with the given 'expireAfterSeconds' value and checks the expected
+ * value using listCollections on the bucketCollection.
+ */
+const runTest = function(collToChange, expireAfterSeconds) {
+    assert.commandWorked(db.runCommand({
+        collMod: collToChange.getName(),
+        clusteredIndex: {expireAfterSeconds: expireAfterSeconds}
+    }));
+
+    res = assert.commandWorked(
+        db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
+    if (expireAfterSeconds !== 'off') {
+        assert.eq(expireAfterSeconds,
+                  res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds,
+                  collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+    } else {
+        assert(
+            !res.cursor.firstBatch[0].options.clusteredIndex.hasOwnProperty("expireAfterSeconds"),
+            collToChange.getFullName() + ': ' + expireAfterSeconds + ': ' + tojson(res));
+    }
+};
+
+// Tests for collMod on the time-series collection.
 
 // Change expireAfterSeconds to 10.
-assert.commandWorked(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 10}}));
-
-res = assert.commandWorked(
-    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert.eq(10, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
+runTest(coll, 10);
 
 // Change expireAfterSeconds to 0.
-assert.commandWorked(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 0}}));
-
-res = assert.commandWorked(
-    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert.eq(0, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
+runTest(coll, 0);
 
 // Disable expireAfterSeconds.
-assert.commandWorked(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: "off"}}));
-
-res = assert.commandWorked(
-    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert(!res.cursor.firstBatch[0].options.clusteredIndex.hasOwnProperty("expireAfterSeconds"));
+runTest(coll, 'off');
 
 // Enable expireAfterSeconds again.
-assert.commandWorked(
-    db.runCommand({collMod: bucketsColl.getName(), clusteredIndex: {expireAfterSeconds: 100}}));
+runTest(coll, 100);
 
-res = assert.commandWorked(
-    db.runCommand({listCollections: 1, filter: {name: bucketsColl.getName()}}));
-assert.eq(100, res.cursor.firstBatch[0].options.clusteredIndex.expireAfterSeconds);
+// Tests for collMod on the underlying bucket collection.
+
+// Change expireAfterSeconds to 10.
+runTest(bucketsColl, 10);
+
+// Change expireAfterSeconds to 0.
+runTest(bucketsColl, 0);
+
+// Disable expireAfterSeconds.
+runTest(bucketsColl, 'off');
+
+// Enable expireAfterSeconds again.
+runTest(bucketsColl, 100);
 })();

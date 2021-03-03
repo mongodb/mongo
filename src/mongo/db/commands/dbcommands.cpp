@@ -93,6 +93,7 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/async_request_executor.h"
 #include "mongo/logv2/log.h"
@@ -111,6 +112,23 @@ using std::stringstream;
 using std::unique_ptr;
 
 namespace {
+
+/**
+ * Returns true if 'ns' refers to a time-series collection.
+ */
+bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
+    if (!viewCatalog) {
+        return false;
+    }
+
+    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
+    if (!view) {
+        return false;
+    }
+
+    return bool(view->timeseries());
+}
 
 class CmdDropDatabase : public DropDatabaseCmdVersion1Gen<CmdDropDatabase> {
 public:
@@ -755,7 +773,23 @@ public:
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
         auto cmd = requestParser.request();
-        uassertStatusOK(collMod(opCtx, cmd.getNamespace(), cmd.toBSON(BSONObj()), &result));
+        auto ns = cmd.getNamespace();
+
+        // If the target namespace refers to a time-series collection, we will redirect the
+        // collection modification request to the underlying bucket collection.
+        // Aliasing collMod on a time-series collection in this manner has a few advantages:
+        // - It supports modifying the expireAfterSeconds setting (which is also a collection
+        //   creation option).
+        // - It avoids any accidental changes to critical view-specific properties of the
+        //   time-series collection, which are important for maintaining the view-bucket
+        //   relationship.
+        // - It disallows hiding/unhiding indexes on the time-series collection due to a
+        //   restriction on system collections. TODO(SERVER-54646): Update this comment.
+        if (isTimeseries(opCtx, ns)) {
+            ns = ns.makeTimeseriesBucketsNamespace();
+        }
+
+        uassertStatusOK(collMod(opCtx, ns, cmd.toBSON(BSONObj()), &result));
         return true;
     }
 
