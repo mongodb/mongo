@@ -231,7 +231,9 @@ class AccessCheck(common.SourceLocation):
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct an AccessCheck."""
-        self.placeholder = None  # type: str
+
+        self.check = None  # type: str
+
         super(AccessCheck, self).__init__(file_name, line, column)
 
 

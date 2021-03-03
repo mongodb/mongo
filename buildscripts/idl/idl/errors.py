@@ -123,6 +123,7 @@ ERROR_ID_VARIANT_DUPLICATE_TYPES = "ID0080"
 ERROR_ID_VARIANT_STRUCTS = "ID0081"
 ERROR_ID_NO_VARIANT_ENUM = "ID0082"
 ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS = "ID0083"
+ERROR_ID_UNKOWN_ENUM_VALUE = "ID0084"
 
 
 class IDLError(Exception):
@@ -914,6 +915,13 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_node_error(node, ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS,
                              "Duplicate command_name and command_alias found.")
+
+    def add_unknown_enum_value(self, location, enum_name, enum_value):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about an unknown enum value."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_UNKOWN_ENUM_VALUE,
+                        "Cannot find enum value '%s' in enum '%s'." % (enum_value, enum_name))
 
 
 def _assert_unique_error_messages():
