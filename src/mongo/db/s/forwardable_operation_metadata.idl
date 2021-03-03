@@ -34,6 +34,19 @@ imports:
      - "mongo/rpc/metadata/impersonated_user_metadata.idl"
 
 structs:
+    AuthenticationMetadata:
+        # Since we need to store this struct in collection,
+        # we need to redefine the ImpersonatedUserMetadata struct because
+        # it has fields prefixed with with '$' dollar sign that are not supported
+        # by our storage engine.
+        description: "A struct representing the impersonated users associated with a specific operation."
+        strict: false
+        fields:
+            users:
+                type: array<UserName>
+            roles:
+                type: array<RoleName>
+
     ForwardableOperationMetadataBase:
         description: "Used to store metadata of an operation context that can be safely passed among different threads."
         strict: false
@@ -43,6 +56,6 @@ structs:
                 description: "The comment assiociated with the operation."
                 optional: true
             impersonatedUserMetadata:
-                type: ImpersonatedUserMetadata
-                description: "A struct representing the impersonated users from a mongos"
+                type: AuthenticationMetadata
+                description: "The impersonated users associated with the operation."
                 optional: true
