@@ -166,22 +166,15 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
     ASSERT_VALUE_EQ(Value(3), mgr.getNext());
 }
 
-TEST_F(WindowFunctionExecNonRemovableTest, UnboundedNotYetSupported) {
-    auto docSource = DocumentSourceMock::createForTest({}, getExpCtx());
-    auto iter =
-        std::make_unique<PartitionIterator>(getExpCtx().get(), docSource.get(), boost::none);
-    auto input =
-        ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    ASSERT_THROWS_CODE(
-        [&]() {
-            auto unused = WindowFunctionExecNonRemovable<AccumulatorState>(
-                iter.get(),
-                std::move(input),
-                AccumulatorSum::create(getExpCtx().get()),
-                WindowBounds::Unbounded{});
-        }(),
-        AssertionException,
-        5374100);
+TEST_F(WindowFunctionExecNonRemovableTest, FullPartitionWindow) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
+    auto mgr = createForFieldPath<AccumulatorSum>(std::move(docs), "$a", WindowBounds::Unbounded{});
+    ASSERT_VALUE_EQ(Value(6), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(6), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(6), mgr.getNext());
 }
 
 TEST_F(WindowFunctionExecRemovableDocumentTest, AccumulateCurrentToInteger) {

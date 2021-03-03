@@ -62,38 +62,25 @@ public:
         : WindowFunctionExec(iter),
           _input(std::move(input)),
           _function(std::move(function)),
-          _upperDocumentBound(upperDocumentBound) {
-        uassert(5374100,
-                "Right unbounded windows are not yet supported",
-                !stdx::holds_alternative<WindowBounds::Unbounded>(_upperDocumentBound));
-    };
+          _upperDocumentBound(upperDocumentBound){};
 
     Value getNext() final {
-        int upperIndex = stdx::visit(
-            visit_helper::Overloaded{
-                [](const WindowBounds::Unbounded&) {
-                    MONGO_UNREACHABLE; /** Not supported */
-                    return 0;
-                },
-                [](const WindowBounds::Current&) { return 0; },
-                [](const int& n) { return n; },
-            },
-            _upperDocumentBound);
         if (!_initialized) {
-            _initialized = true;
-            for (int i = 0; i <= upperIndex; i++) {
-                if (auto doc = (*this->_iter)[i]) {
-                    _function->process(_input->evaluate(*doc, nullptr), false);
-                } else {
-                    // Already reached the end of partition for the first value to compute.
-                    break;
-                }
-            }
-        } else {
+            initialize();
+        } else if (!stdx::holds_alternative<WindowBounds::Unbounded>(_upperDocumentBound)) {
+            // Right-unbounded windows will accumulate all values on the first pass during
+            // initialization.
+            auto upperIndex = [&]() {
+                if (stdx::holds_alternative<WindowBounds::Current>(_upperDocumentBound))
+                    return 0;
+                else
+                    return stdx::get<int>(_upperDocumentBound);
+            }();
+
             if (auto doc = (*this->_iter)[upperIndex])
                 _function->process(_input->evaluate(*doc, nullptr), false);
             else {
-                // Document is out of range, but may be because it's off of the beginning of the
+                // Upper bound is out of range, but may be because it's off of the end of the
                 // partition. For instance, for bounds [unbounded, -1] we won't be able to
                 // access the upper bound until the second call to getNext().
             }
@@ -115,6 +102,28 @@ private:
     // In one of two states: either the initial window has not been populated or we are sliding and
     // accumulating a single value per iteration.
     bool _initialized = false;
+
+    void initialize() {
+        auto needMore = [&](int index) {
+            return stdx::visit(
+                visit_helper::Overloaded{
+                    [&](const WindowBounds::Unbounded&) { return true; },
+                    [&](const WindowBounds::Current&) { return index == 0; },
+                    [&](const int& n) { return index <= n; },
+                },
+                _upperDocumentBound);
+        };
+
+        _initialized = true;
+        for (int i = 0; needMore(i); i++) {
+            if (auto doc = (*this->_iter)[i]) {
+                _function->process(_input->evaluate(*doc, nullptr), false);
+            } else {
+                // Already reached the end of partition for the first value to compute.
+                break;
+            }
+        }
+    }
 };
 
 }  // namespace mongo

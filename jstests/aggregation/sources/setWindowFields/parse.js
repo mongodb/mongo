@@ -61,15 +61,15 @@ function runSum(spec) {
 }
 
 // The most basic case: $sum everything.
-assert.commandFailedWithCode(runSum({input: "$a"}), 5374100);
+assert.commandWorked(runSum({input: "$a"}));
+
+// That's equivalent to bounds of [unbounded, unbounded].
+assert.commandWorked(runSum({input: "$a", documents: ['unbounded', 'unbounded']}));
 
 // Extra arguments to a window function are rejected.
 assert.commandFailedWithCode(runSum({abcde: 1}),
                              ErrorCodes.FailedToParse,
                              'Window function $sum found an unknown argument: abcde');
-
-// That's equivalent to bounds of [unbounded, unbounded].
-assert.commandFailedWithCode(runSum({input: "$a", documents: ['unbounded', 'unbounded']}), 5374100);
 
 // Bounds can be bounded, or bounded on one side.
 assert.commandFailedWithCode(runSum({input: "$a", documents: [-2, +4]}), 5461500);
@@ -121,12 +121,9 @@ badBounds({range: [+1, 'current'], unit: 'day'});
 
 // Any bound besides [unbounded, unbounded] requires a sort:
 // - document-based
-assert.commandFailedWithCode(
-    run({
-        $setWindowFields:
-            {output: {v: {$sum: {input: "$a", documents: ['unbounded', 'unbounded']}}}}
-    }),
-    5374100);
+assert.commandWorked(run({
+    $setWindowFields: {output: {v: {$sum: {input: "$a", documents: ['unbounded', 'unbounded']}}}}
+}));
 assert.commandFailedWithCode(
     run({
         $setWindowFields:
