@@ -52,7 +52,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -61,10 +60,10 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
-#include "mongo/logv2/redaction.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/scopeguard.h"
@@ -616,87 +615,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 }
 
 /**
- * Returns time-series options if 'ns' refers to a time-series collection.
- */
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& ns) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
-    if (!viewCatalog) {
-        return {};
-    }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
-    if (!view) {
-        return {};
-    }
-
-    // Return a copy of the time-series options so that we don't refer to the internal state of
-    // 'viewCatalog' once it goes out of scope.
-    return view->timeseries();
-}
-
-/**
- * Returns an index key with field names mapped to the bucket collection schema.
- */
-BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
-                                   const CreateIndexesCommand& origCmd,
-                                   const BSONObj& origKey) {
-    auto timeField = timeseriesOptions.getTimeField();
-    auto metaField = timeseriesOptions.getMetaField();
-
-    BSONObjBuilder builder;
-    for (const auto& elem : origKey) {
-        // Determine if the index requested on the time field is ascending or descending.
-        // The final index spec will be subjected to a more complete validation in
-        // index_key_validate::validateKeyPattern().
-        if (elem.fieldNameStringData() == timeField) {
-            uassert(
-                ErrorCodes::CannotCreateIndex,
-                str::stream() << "Invalid index spec for time-series collection: "
-                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                              << ". Indexes on the time field must be ascending or descending "
-                                 "(numbers only): "
-                              << elem,
-                elem.isNumber());
-            if (elem.number() >= 0) {
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
-            } else {
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
-            }
-            continue;
-        }
-
-        uassert(ErrorCodes::CannotCreateIndex,
-                str::stream() << "Invalid index spec for time-series collection: "
-                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                              << ". Index must be on the '" << timeField << "' field: " << elem,
-                metaField);
-
-        if (elem.fieldNameStringData() == *metaField) {
-            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
-            continue;
-        }
-
-        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
-            builder.appendAs(elem,
-                             str::stream()
-                                 << BucketUnpacker::kBucketMetaFieldName << "."
-                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
-            continue;
-        }
-
-        uasserted(ErrorCodes::CannotCreateIndex,
-                  str::stream() << "Invalid index spec for time-series collection: "
-                                << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                                << ". Index must be either on the '" << *metaField << "' or '"
-                                << timeField << "' fields: " << elem);
-    }
-    return builder.obj();
-}
-
-/**
  * Returns a CreateIndexesCommand for creating indexes on the bucket collection.
  * Returns null if 'origCmd' is not for a time-series collection.
  */
@@ -704,22 +622,29 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
     OperationContext* opCtx, const CreateIndexesCommand& origCmd) {
     const auto& origNs = origCmd.getNamespace();
 
-    auto timeseriesOptions = getTimeseriesOptions(opCtx, origNs);
+    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
 
     // Return early with null if we are not working with a time-series collection.
     if (!timeseriesOptions) {
         return {};
     }
 
-    // TODO(SERVER-54639): Map index specs to bucket collection using helper function.
     const auto& origIndexes = origCmd.getIndexes();
     std::vector<mongo::BSONObj> indexes;
     for (const auto& origIndex : origIndexes) {
         BSONObjBuilder builder;
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
+                auto bucketsIndexSpecWithStatus =
+                    timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(*timeseriesOptions,
+                                                                             elem.Obj());
+                uassert(ErrorCodes::CannotCreateIndex,
+                        str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
+                                      << " Command request: " << redact(origCmd.toBSON({})),
+                        bucketsIndexSpecWithStatus.isOK());
+
                 builder.append(NewIndexSpec::kKeyFieldName,
-                               makeTimeseriesIndexSpecKey(*timeseriesOptions, origCmd, elem.Obj()));
+                               std::move(bucketsIndexSpecWithStatus.getValue()));
                 continue;
             }
             builder.append(elem);
