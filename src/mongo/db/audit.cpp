@@ -36,37 +36,51 @@ namespace audit {
 
 ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}
 
-void logAuthentication(Client*, const AuthenticateEvent&) {}
+void logAuthentication(Client* client, const AuthenticateEvent&) {
+    invariant(client);
+}
 
 void logCommandAuthzCheck(Client* client,
                           const OpMsgRequest& cmdObj,
                           const CommandInterface& command,
-                          ErrorCodes::Error result) {}
+                          ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logDeleteAuthzCheck(Client* client,
                          const NamespaceString& ns,
                          const BSONObj& pattern,
-                         ErrorCodes::Error result) {}
+                         ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logGetMoreAuthzCheck(Client* client,
                           const NamespaceString& ns,
                           long long cursorId,
-                          ErrorCodes::Error result) {}
+                          ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logInsertAuthzCheck(Client* client,
                          const NamespaceString& ns,
                          const BSONObj& insertedObj,
-                         ErrorCodes::Error result) {}
+                         ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logKillCursorsAuthzCheck(Client* client,
                               const NamespaceString& ns,
                               long long cursorId,
-                              ErrorCodes::Error result) {}
+                              ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logQueryAuthzCheck(Client* client,
                         const NamespaceString& ns,
                         const BSONObj& query,
-                        ErrorCodes::Error result) {}
+                        ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logUpdateAuthzCheck(Client* client,
                          const NamespaceString& ns,
@@ -74,129 +88,203 @@ void logUpdateAuthzCheck(Client* client,
                          const write_ops::UpdateModification& update,
                          bool isUpsert,
                          bool isMulti,
-                         ErrorCodes::Error result) {}
+                         ErrorCodes::Error result) {
+    invariant(client);
+}
 
 void logCreateUser(Client* client,
                    const UserName& username,
                    bool password,
                    const BSONObj* customData,
                    const std::vector<RoleName>& roles,
-                   const boost::optional<BSONArray>& restrictions) {}
+                   const boost::optional<BSONArray>& restrictions) {
+    invariant(client);
+}
 
-void logDropUser(Client* client, const UserName& username) {}
+void logDropUser(Client* client, const UserName& username) {
+    invariant(client);
+}
 
-void logDropAllUsersFromDatabase(Client* client, StringData dbname) {}
+void logDropAllUsersFromDatabase(Client* client, StringData dbname) {
+    invariant(client);
+}
 
 void logUpdateUser(Client* client,
                    const UserName& username,
                    bool password,
                    const BSONObj* customData,
                    const std::vector<RoleName>* roles,
-                   const boost::optional<BSONArray>& restrictions) {}
+                   const boost::optional<BSONArray>& restrictions) {
+    invariant(client);
+}
 
 void logGrantRolesToUser(Client* client,
                          const UserName& username,
-                         const std::vector<RoleName>& roles) {}
+                         const std::vector<RoleName>& roles) {
+    invariant(client);
+}
 
 void logRevokeRolesFromUser(Client* client,
                             const UserName& username,
-                            const std::vector<RoleName>& roles) {}
+                            const std::vector<RoleName>& roles) {
+    invariant(client);
+}
 
 void logCreateRole(Client* client,
                    const RoleName& role,
                    const std::vector<RoleName>& roles,
                    const PrivilegeVector& privileges,
-                   const boost::optional<BSONArray>& restrictions) {}
+                   const boost::optional<BSONArray>& restrictions) {
+    invariant(client);
+}
 
 void logUpdateRole(Client* client,
                    const RoleName& role,
                    const std::vector<RoleName>* roles,
                    const PrivilegeVector* privileges,
-                   const boost::optional<BSONArray>& restrictions) {}
+                   const boost::optional<BSONArray>& restrictions) {
+    invariant(client);
+}
 
-void logDropRole(Client* client, const RoleName& role) {}
+void logDropRole(Client* client, const RoleName& role) {
+    invariant(client);
+}
 
-void logDropAllRolesFromDatabase(Client* client, StringData dbname) {}
+void logDropAllRolesFromDatabase(Client* client, StringData dbname) {
+    invariant(client);
+}
 
 void logGrantRolesToRole(Client* client, const RoleName& role, const std::vector<RoleName>& roles) {
 }
 
 void logRevokeRolesFromRole(Client* client,
                             const RoleName& role,
-                            const std::vector<RoleName>& roles) {}
+                            const std::vector<RoleName>& roles) {
+    invariant(client);
+}
 
 void logGrantPrivilegesToRole(Client* client,
                               const RoleName& role,
-                              const PrivilegeVector& privileges) {}
+                              const PrivilegeVector& privileges) {
+    invariant(client);
+}
 
 void logRevokePrivilegesFromRole(Client* client,
                                  const RoleName& role,
-                                 const PrivilegeVector& privileges) {}
+                                 const PrivilegeVector& privileges) {
+    invariant(client);
+}
 
-void logReplSetReconfig(Client* client, const BSONObj* oldConfig, const BSONObj* newConfig) {}
+void logReplSetReconfig(Client* client, const BSONObj* oldConfig, const BSONObj* newConfig) {
+    invariant(client);
+}
 
-void logApplicationMessage(Client* client, StringData msg) {}
+void logApplicationMessage(Client* client, StringData msg) {
+    invariant(client);
+}
 
-void logStartupOptions(Client* client, const BSONObj& startupOptions) {}
+void logStartupOptions(Client* client, const BSONObj& startupOptions) {
+    invariant(client);
+}
 
-void logShutdown(Client* client) {}
+void logShutdown(Client* client) {
+    invariant(client);
+}
 
 void logLogout(Client* client,
                StringData reason,
                const BSONArray& initialUsers,
-               const BSONArray& updatedUsers) {}
+               const BSONArray& updatedUsers) {
+    invariant(client);
+}
 
 void logCreateIndex(Client* client,
                     const BSONObj* indexSpec,
                     StringData indexname,
                     const NamespaceString& nsname,
                     StringData indexBuildState,
-                    ErrorCodes::Error result) {}
+                    ErrorCodes::Error result) {
+    invariant(client);
+}
 
-void logCreateCollection(Client* client, const NamespaceString& nsname) {}
+void logCreateCollection(Client* client, const NamespaceString& nsname) {
+    invariant(client);
+}
 
 void logCreateView(Client* client,
                    const NamespaceString& nsname,
                    StringData viewOn,
                    BSONArray pipeline,
-                   ErrorCodes::Error code) {}
+                   ErrorCodes::Error code) {
+    invariant(client);
+}
 
-void logImportCollection(Client* client, const NamespaceString& nsname) {}
+void logImportCollection(Client* client, const NamespaceString& nsname) {
+    invariant(client);
+}
 
-void logCreateDatabase(Client* client, StringData dbname) {}
+void logCreateDatabase(Client* client, StringData dbname) {
+    invariant(client);
+}
 
 
-void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname) {}
+void logDropIndex(Client* client, StringData indexname, const NamespaceString& nsname) {
+    invariant(client);
+}
 
-void logDropCollection(Client* client, const NamespaceString& nsname) {}
+void logDropCollection(Client* client, const NamespaceString& nsname) {
+    invariant(client);
+}
 
 void logDropView(Client* client,
                  const NamespaceString& nsname,
                  StringData viewOn,
                  const std::vector<BSONObj>& pipeline,
-                 ErrorCodes::Error code) {}
+                 ErrorCodes::Error code) {
+    invariant(client);
+}
 
-void logDropDatabase(Client* client, StringData dbname) {}
+void logDropDatabase(Client* client, StringData dbname) {
+    invariant(client);
+}
 
 void logRenameCollection(Client* client,
                          const NamespaceString& source,
-                         const NamespaceString& target) {}
+                         const NamespaceString& target) {
+    invariant(client);
+}
 
-void logEnableSharding(Client* client, StringData dbname) {}
+void logEnableSharding(Client* client, StringData dbname) {
+    invariant(client);
+}
 
-void logAddShard(Client* client, StringData name, const std::string& servers, long long maxSize) {}
+void logAddShard(Client* client, StringData name, const std::string& servers, long long maxSize) {
+    invariant(client);
+}
 
-void logRemoveShard(Client* client, StringData shardname) {}
+void logRemoveShard(Client* client, StringData shardname) {
+    invariant(client);
+}
 
-void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique) {}
+void logShardCollection(Client* client, StringData ns, const BSONObj& keyPattern, bool unique) {
+    invariant(client);
+}
 
-void logRefineCollectionShardKey(Client* client, StringData ns, const BSONObj& keyPattern) {}
+void logRefineCollectionShardKey(Client* client, StringData ns, const BSONObj& keyPattern) {
+    invariant(client);
+}
 
-void logInsertOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {}
+void logInsertOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {
+    invariant(client);
+}
 
-void logUpdateOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {}
+void logUpdateOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {
+    invariant(client);
+}
 
-void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {}
+void logRemoveOperation(Client* client, const NamespaceString& nss, const BSONObj& doc) {
+    invariant(client);
+}
 
 #endif
 

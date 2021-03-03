@@ -88,7 +88,8 @@ public:
 
     RoleNameIterator getAuthenticatedRoleNames() override;
 
-    void logoutDatabase(OperationContext* opCtx, StringData dbname) override;
+    void logoutAllDatabases(Client* client, StringData reason) override;
+    void logoutDatabase(Client* client, StringData dbname, StringData reason) override;
 
     void grantInternalAuthorization(Client* client) override;
 
