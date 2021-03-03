@@ -393,6 +393,8 @@ void addDbAdminAnyDbPrivileges(PrivilegeVector* privileges) {
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
         Privilege(ResourcePattern::forCollectionName("system.profile"), profileActions));
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges, Privilege(ResourcePattern::forClusterResource(), ActionType::applyOps));
 }
 
 void addClusterMonitorPrivileges(PrivilegeVector* privileges) {
