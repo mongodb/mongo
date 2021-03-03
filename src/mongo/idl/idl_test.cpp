@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/auth/authorization_contract.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -3665,6 +3666,25 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
                       BSON("anyTypeField" << BSON_ARRAY("a"
                                                         << "b"))["anyTypeField"]);
 }
+
+void verifyContract(const AuthorizationContract& left, const AuthorizationContract& right) {
+    ASSERT_TRUE(left.contains(right));
+    ASSERT_TRUE(right.contains(left));
+}
+
+TEST(IDLAccessCheck, TestNone) {
+    AuthorizationContract empty;
+
+    verifyContract(empty, AccessCheckNone::kAuthorizationContract);
+}
+
+TEST(IDLAccessCheck, TestSimpleAccessCheck) {
+    AuthorizationContract ac;
+    ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
+
+    verifyContract(ac, AccessCheckSimpleAccessCheck::kAuthorizationContract);
+}
+
 
 }  // namespace
 }  // namespace mongo

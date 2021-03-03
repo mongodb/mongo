@@ -1649,6 +1649,45 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """))
 
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple:
+                        check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
+
+    def test_access_checks_negative(self):
+        # type: () -> None
+        """Negative access_check test cases."""
+
+        # check is not a sequence
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple:
+                        check:
+                            - one
+                            - two
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
 
 if __name__ == '__main__':
 

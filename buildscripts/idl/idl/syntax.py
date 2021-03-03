@@ -527,6 +527,18 @@ class Struct(common.SourceLocation):
         super(Struct, self).__init__(file_name, line, column)
 
 
+class AccessCheck(common.SourceLocation):
+    """IDL access check information."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct an AccessCheck."""
+
+        self.check = None  # type: str
+
+        super(AccessCheck, self).__init__(file_name, line, column)
+
+
 class AccessChecks(common.SourceLocation):
     """IDL access checks information."""
 
@@ -535,6 +547,7 @@ class AccessChecks(common.SourceLocation):
         """Construct an AccessChecks."""
 
         self.none = None  # type: bool
+        self.simple = None  # type: AccessCheck
 
         super(AccessChecks, self).__init__(file_name, line, column)
 

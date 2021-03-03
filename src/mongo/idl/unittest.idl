@@ -37,6 +37,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/idl/unittest_import.idl"
+    - "mongo/db/auth/access_checks.idl"
 
 types:
 
@@ -1031,7 +1032,7 @@ commands:
             anyTypeField: IDLAnyTypeOwned
 
     AccessCheckNone:
-        description: A versioned API command with access_check
+        description: A versioned API command with access_check and none
         command_name: AccessCheckNoneCommandName
         namespace: ignored
         strict: true
@@ -1039,6 +1040,18 @@ commands:
         access_check:
             none: true
         reply_type: OkReply
+
+    AccessCheckSimpleAccessCheck:
+        description: A versioned API command with access_check and simple check
+        command_name: AccessCheckSimpleAccessCheckCommandName
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        access_check:
+            simple:
+                check: is_authenticated
+        reply_type: OkReply
+
 
     # Test that we correctly generate C++ base classes for versioned API commands with different
     # key names, command names, and C++ names.

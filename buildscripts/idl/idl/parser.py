@@ -682,23 +682,35 @@ def _parse_enum(ctxt, spec, name, node):
     spec.symbols.add_enum(ctxt, idl_enum)
 
 
+def _parse_privilege_or_check(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.AccessCheck
+    """Parse a access check section in a struct in the IDL file."""
+
+    access_check = syntax.AccessCheck(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    _generic_parser(ctxt, node, "privilege_or_check", access_check, {
+        "check": _RuleDesc('scalar'),
+    })
+
+    # TODO (SERVER-54521) - validate only one of check or privilege
+
+    return access_check
+
+
 def _parse_access_checks(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.AccessChecks
     """Parse an access check section in a struct in the IDL file."""
 
-    access_checks = None
-
-    if not ctxt.is_mapping_node(node, "access_check"):
-        return None
-
     access_checks = syntax.AccessChecks(ctxt.file_name, node.start_mark.line,
                                         node.start_mark.column)
 
-    _generic_parser(ctxt, node, "access_check", access_checks, {
-        "none": _RuleDesc('bool_scalar'),
-    })
+    _generic_parser(
+        ctxt, node, "access_check", access_checks, {
+            "none": _RuleDesc('bool_scalar'),
+            "simple": _RuleDesc('mapping', mapping_parser_func=_parse_privilege_or_check),
+        })
 
-    # TODO(SERVER-54522) TODO(SERVER-54523) - validate only one of none, simple or complex is set
+    # TODO(SERVER-54523) - validate only one of none, simple or complex is set
 
     return access_checks
 

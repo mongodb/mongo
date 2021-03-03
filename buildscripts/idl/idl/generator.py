@@ -736,6 +736,19 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                         'static constexpr auto kCommandAlias = "${command_alias}"_sd;',
                         command_alias=struct.command_alias))
 
+    def gen_authorization_contract_declaration(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the authorization contract declaration."""
+
+        if not isinstance(struct, ast.Command):
+            return
+
+        if struct.access_checks is None:
+            return
+
+        self._writer.write_line('static AuthorizationContract kAuthorizationContract;')
+        self.write_empty_line()
+
     def gen_enum_functions(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the declaration for an enum's supporting functions."""
@@ -1097,6 +1110,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
+        self._writer.write_line("namespace mongo { class AuthorizationContract; }")
+        self.write_empty_line()
+
         # Generate namespace
         with self.gen_namespace_block(spec.globals.cpp_namespace):
             self.write_empty_line()
@@ -1120,6 +1136,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     # Generate a sorted list of string constants
                     self.gen_string_constants_declarations(struct)
                     self.write_empty_line()
+
+                    self.gen_authorization_contract_declaration(struct)
 
                     # Write constructor
                     self.gen_class_constructors(struct)
@@ -1213,6 +1231,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
+    # pylint: disable=too-many-public-methods
     """C++ .cpp File writer."""
 
     def __init__(self, indented_writer, target_arch):
@@ -2210,6 +2229,27 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     common.template_args('constexpr StringData ${class_name}::kCommandAlias;',
                                          class_name=common.title_case(struct.cpp_name)))
 
+    def gen_authorization_contract_definition(self, struct):
+        # type: (ast.Struct) -> None
+        # pylint: disable=invalid-name
+        """Generate the authorization contract defintion."""
+
+        if not isinstance(struct, ast.Command):
+            return
+
+        # None means access_checks was not specified, empty list means it has "none: true"
+        if struct.access_checks is None:
+            return
+
+        checks = ",".join(
+            [("AccessCheckEnum::" + ac.check) for ac in struct.access_checks if ac.check])
+
+        self._writer.write_line(
+            'mongo::AuthorizationContract %s::kAuthorizationContract = AuthorizationContract(std::initializer_list<AccessCheckEnum>{%s}, std::initializer_list<Privilege>{});'
+            % (common.title_case(struct.cpp_name), checks))
+
+        self._writer.write_empty_line()
+
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None
         """Generate the definitions for an enum's supporting functions."""
@@ -2614,6 +2654,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Generate mongo includes third
         header_list = [
             'mongo/bson/bsonobjbuilder.h',
+            'mongo/db/auth/authorization_contract.h',
             'mongo/db/commands.h',
             'mongo/idl/command_generic_argument.h',
         ]
@@ -2645,6 +2686,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             for struct in spec.structs:
                 self.gen_string_constants_definitions(struct)
                 self.write_empty_line()
+
+                self.gen_authorization_contract_definition(struct)
 
                 # Write known fields declaration for command
                 self.gen_known_fields_declaration(struct)
