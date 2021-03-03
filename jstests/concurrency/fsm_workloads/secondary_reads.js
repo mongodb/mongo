@@ -59,8 +59,7 @@ var $config = (function() {
 
     function readFromSecondaries(db, readConcernLevel) {
         let arr = [];
-        let success = false;
-        while (!success) {
+        assert.soon(() => {
             try {
                 arr = db[this.collName]
                           .find()
@@ -70,7 +69,7 @@ var $config = (function() {
                           .hint({x: 1})
                           .limit(this.nDocumentsToCheck)
                           .toArray();
-                success = true;
+                return true;
             } catch (e) {
                 // We propagate TransientTransactionErrors to allow the state function to
                 // automatically be retried when TestData.runInsideTransaction=true
@@ -79,8 +78,10 @@ var $config = (function() {
                     throw e;
                 }
                 this.assertSecondaryReadOk(e);
+                print("retrying failed secondary read operation: " + tojson(e));
+                return false;
             }
-        }
+        });
         // Make sure there is no hole in the result.
         for (let i = 0; i < arr.length - 1; i++) {
             assertWhenOwnColl.eq(arr[i].x, arr[i + 1].x + 1, () => tojson(arr));
