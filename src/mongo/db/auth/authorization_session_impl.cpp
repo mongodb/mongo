@@ -77,14 +77,8 @@ AuthorizationSessionImpl::AuthorizationSessionImpl(
     : _externalState(std::move(externalState)), _impersonationFlag(false) {}
 
 AuthorizationSessionImpl::~AuthorizationSessionImpl() {
-    // Emit logout audit event. Since the AuthorizationSessionImpl is being destroyed, there will
-    // be no users remaining after this event.
-    if (_authenticatedUsers.count() > 0) {
-        audit::logLogout(Client::getCurrent(),
-                         "Implicit logout due to client connection closure",
-                         _authenticatedUsers.toBSON(),
-                         BSONArray());
-    }
+    invariant(_authenticatedUsers.count() == 0,
+              "All authenticated users should be logged out by the Client destruction hook");
 }
 
 AuthorizationManager& AuthorizationSessionImpl::getAuthorizationManager() {
@@ -149,17 +143,31 @@ User* AuthorizationSessionImpl::getSingleUser() {
     return lookupUser(userName);
 }
 
-void AuthorizationSessionImpl::logoutDatabase(OperationContext* opCtx, StringData dbname) {
-    stdx::lock_guard<Client> lk(*opCtx->getClient());
+void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData reason) {
+    stdx::lock_guard<Client> lk(*client);
+
+    auto users = std::exchange(_authenticatedUsers, {});
+    if (users.count() == 0) {
+        return;
+    }
+
+    audit::logLogout(client, reason, users.toBSON(), BSONArray());
+
+    clearImpersonatedUserData();
+    _buildAuthenticatedRolesVector();
+}
+
+
+void AuthorizationSessionImpl::logoutDatabase(Client* client,
+                                              StringData dbname,
+                                              StringData reason) {
+    stdx::lock_guard<Client> lk(*client);
 
     // Emit logout audit event and then remove all users logged into dbname.
     UserSet updatedUsers(_authenticatedUsers);
     updatedUsers.removeByDBName(dbname);
     if (updatedUsers.count() != _authenticatedUsers.count()) {
-        audit::logLogout(opCtx->getClient(),
-                         str::stream() << "Explicit logout from db '" << dbname << "'",
-                         _authenticatedUsers.toBSON(),
-                         updatedUsers.toBSON());
+        audit::logLogout(client, reason, _authenticatedUsers.toBSON(), updatedUsers.toBSON());
     }
     std::swap(_authenticatedUsers, updatedUsers);
 

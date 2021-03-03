@@ -106,7 +106,11 @@ public:
         // Always okay to do something, on embedded.
     }
 
-    void logoutDatabase(OperationContext* opCtx, const StringData) override {
+    void logoutAllDatabases(Client*, StringData) override {
+        // Since we didn't actively authorize, we do not actively deauthorize.
+    }
+
+    void logoutDatabase(Client*, StringData, StringData) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

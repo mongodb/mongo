@@ -83,22 +83,12 @@ private:
 
 class AuthorizationSessionTest : public ScopedGlobalServiceContextForTest, public unittest::Test {
 public:
-    FailureCapableAuthzManagerExternalStateMock* managerState;
-    transport::TransportLayerMock transportLayer;
-    transport::SessionHandle session;
-    ServiceContext::UniqueClient client;
-    ServiceContext::UniqueOperationContext _opCtx;
-    AuthzSessionExternalStateMock* sessionState;
-    AuthorizationManager* authzManager;
-    std::unique_ptr<AuthorizationSessionForTest> authzSession;
-    BSONObj credentials;
-
     void setUp() {
-        session = transportLayer.createSession();
-        client = getServiceContext()->makeClient("testClient", session);
+        _session = transportLayer.createSession();
+        _client = getServiceContext()->makeClient("testClient", _session);
         RestrictionEnvironment::set(
-            session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
-        _opCtx = client->makeOperationContext();
+            _session, std::make_unique<RestrictionEnvironment>(SockAddr(), SockAddr()));
+        _opCtx = _client->makeOperationContext();
         auto localManagerState = std::make_unique<FailureCapableAuthzManagerExternalStateMock>();
         managerState = localManagerState.get();
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
@@ -120,6 +110,21 @@ public:
                                << scram::Secrets<SHA256Block>::generateCredentials(
                                       "a", saslGlobalParams.scramSHA256IterationCount.load()));
     }
+
+    void tearDown() override {
+        authzSession->logoutAllDatabases(_client.get(), "Ending AuthorizationSessionTest");
+    }
+
+protected:
+    FailureCapableAuthzManagerExternalStateMock* managerState;
+    transport::TransportLayerMock transportLayer;
+    transport::SessionHandle _session;
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
+    AuthzSessionExternalStateMock* sessionState;
+    AuthorizationManager* authzManager;
+    std::unique_ptr<AuthorizationSessionForTest> authzSession;
+    BSONObj credentials;
 };
 
 const NamespaceString testFooNss("test.foo");
@@ -218,7 +223,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 
-    authzSession->logoutDatabase(_opCtx.get(), "test");
+    authzSession->logoutDatabase(_client.get(), "test", "Kill the test!");
     ASSERT_TRUE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_TRUE(
@@ -226,7 +231,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::collMod));
 
-    authzSession->logoutDatabase(_opCtx.get(), "admin");
+    authzSession->logoutDatabase(_client.get(), "admin", "Fire the admin!");
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(otherFooCollResource, ActionType::insert));
     ASSERT_FALSE(
@@ -542,7 +547,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 
     auto assertWorks = [this](StringData clientSource, StringData serverAddress) {
         RestrictionEnvironment::set(
-            session,
+            _session,
             std::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
         ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));
@@ -550,7 +555,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
 
     auto assertFails = [this](StringData clientSource, StringData serverAddress) {
         RestrictionEnvironment::set(
-            session,
+            _session,
             std::make_unique<RestrictionEnvironment>(SockAddr(clientSource, 5555, AF_UNSPEC),
                                                      SockAddr(serverAddress, 27017, AF_UNSPEC)));
         ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), UserName("spencer", "test")));

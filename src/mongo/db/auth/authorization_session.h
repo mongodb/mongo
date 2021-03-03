@@ -163,10 +163,14 @@ public:
     // Gets an iterator over the roles of all authenticated users stored in this manager.
     virtual RoleNameIterator getAuthenticatedRoleNames() = 0;
 
+    // Removes any authenticated principals and revokes any privileges that were granted via those
+    // principals. This function modifies state. Synchronizes with the Client lock.
+    virtual void logoutAllDatabases(Client* client, StringData reason) = 0;
+
     // Removes any authenticated principals whose authorization credentials came from the given
     // database, and revokes any privileges that were granted via that principal. This function
     // modifies state. Synchronizes with the Client lock.
-    virtual void logoutDatabase(OperationContext* opCtx, StringData dbname) = 0;
+    virtual void logoutDatabase(Client* client, StringData dbname, StringData reason) = 0;
 
     // Adds the internalSecurity user to the set of authenticated users.
     // Used to grant internal threads full access. Takes in the Client

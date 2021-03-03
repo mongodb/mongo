@@ -64,7 +64,13 @@ public:
         }
     }
 
-    void onDestroyClient(Client* client) override {}
+    void onDestroyClient(Client* client) override {
+        // Logout before the client is destroyed.
+        auto& authzSession = getAuthorizationSession(client);
+        if (authzSession) {
+            authzSession->logoutAllDatabases(client, "Client has disconnected");
+        }
+    }
 
     void onCreateOperationContext(OperationContext* opCtx) override {}
     void onDestroyOperationContext(OperationContext* opCtx) override {}
