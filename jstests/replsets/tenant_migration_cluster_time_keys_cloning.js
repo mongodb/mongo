@@ -79,6 +79,13 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
+    // Inserting an invalid key should fail.
+    assert.commandFailedWithCode(
+        tenantMigrationTest.getDonorPrimary().getCollection(kExternalKeysNs).insert({
+            _id: "invalid key"
+        }),
+        ErrorCodes.TypeMismatch);
+
     tenantMigrationTest.stop();
 })();
 
