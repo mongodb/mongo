@@ -656,7 +656,7 @@ BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
         if (elem.fieldNameStringData() == timeField) {
             uassert(
                 ErrorCodes::CannotCreateIndex,
-                str::stream() << "Failed to convert index spec for time-series collection: "
+                str::stream() << "Invalid index spec for time-series collection: "
                               << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
                               << ". Indexes on the time field must be ascending or descending "
                                  "(numbers only): "
@@ -673,9 +673,9 @@ BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
         }
 
         uassert(ErrorCodes::CannotCreateIndex,
-                str::stream() << "Failed to convert index spec for time-series collection: "
+                str::stream() << "Invalid index spec for time-series collection: "
                               << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                              << ". Index must be either on the meta or the time field: " << elem,
+                              << ". Index must be on the '" << timeField << "' field: " << elem,
                 metaField);
 
         if (elem.fieldNameStringData() == *metaField) {
@@ -692,9 +692,10 @@ BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
         }
 
         uasserted(ErrorCodes::CannotCreateIndex,
-                  str::stream() << "Failed to convert index spec for time-series collection: "
+                  str::stream() << "Invalid index spec for time-series collection: "
                                 << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                                << ". Unable to convert field: " << elem);
+                                << ". Index must be either on the '" << *metaField << "' or '"
+                                << timeField << "' fields: " << elem);
     }
     return builder.obj();
 }
