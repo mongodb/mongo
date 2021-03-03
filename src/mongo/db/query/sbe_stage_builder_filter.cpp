@@ -365,13 +365,21 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                 mode,
                                 stateHelper);
 
-    if (stateHelper.stateContainsValue()) {
-        auto isInputArray = slotIdGenerator->generate();
-        fromBranch = makeProject(std::move(fromBranch),
-                                 planNodeId,
-                                 isInputArray,
-                                 makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(fieldSlot)));
+    auto isInputArray = [&]() -> boost::optional<sbe::value::SlotId> {
+        if (stateHelper.stateContainsValue() || !isLeafField) {
+            auto slot = slotIdGenerator->generate();
+            fromBranch =
+                makeProject(std::move(fromBranch),
+                            planNodeId,
+                            slot,
+                            makeFillEmptyFalse(makeFunction("isArray", makeVariable(fieldSlot))));
+            return slot;
+        }
+        return {};
+    }();
 
+    if (stateHelper.stateContainsValue()) {
+        tassert(5442101, "isInputArray must be set", isInputArray.has_value());
         // The expression below checks if input is an array. In this case it returns initial state.
         // This value will be the first one to be stored in 'traverseOutputSlot'. On the subsequent
         // iterations 'traverseOutputSlot' is updated according to fold expression.
@@ -383,7 +391,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
             makeLocalBind(frameIdGenerator,
                           [&](sbe::EVariable state) {
                               return sbe::makeE<sbe::EIf>(
-                                  sbe::makeE<sbe::EVariable>(isInputArray),
+                                  makeVariable(*isInputArray),
                                   stateHelper.makeInitialState(stateHelper.getBool(state.clone())),
                                   state.clone());
                           },
@@ -393,6 +401,25 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     auto innerResultSlot = slotIdGenerator->generate();
     innerBranch =
         makeProject(std::move(innerBranch), planNodeId, innerResultSlot, innerExpr.extractExpr());
+
+    // For the non leaf nodes we insert a filter that allows the nested getField only for objects.
+    // But only if the outer value is an array. This is relevant in this example: given 2 documents
+    // {a:10} and {a:[10]} the filer {'a.b':null} returns the first document but not the second.
+    // Without the filter we'd try to traverse 'a', and in both cases the inner side of the
+    // 'traverse' would get the value '10'. However, in the first case we'd try to apply getField()
+    // to a standalone scalar, which would return a missing field, which is equal to null, whilst in
+    // a second case to a scalar which is an array element. According to the legacy implementation,
+    // this is not allowed and we shouldn't try to do a nesting path traversal of the array
+    // elements, unless an element is an object.
+    if (!isLeafField) {
+        tassert(5442102, "isInputArray must be set", isInputArray.has_value());
+        innerBranch = makeFilter<true>(
+            std::move(innerBranch),
+            sbe::makeE<sbe::EIf>(makeVariable(*isInputArray),
+                                 makeFunction("isObject", makeVariable(fieldSlot)),
+                                 makeConstant(sbe::value::TypeTags::Boolean, true)),
+            planNodeId);
+    }
 
     // Generate the traverse stage for the current nested level. There are several cases covered
     // during this phase:
@@ -1299,12 +1326,16 @@ public:
 
         auto arrSet = sbe::value::getArraySetView(arrSetVal);
 
+        auto hasNull = false;
         for (auto&& equality : equalities) {
             auto [tagView, valView] = sbe::bson::convertFrom(true,
                                                              equality.rawdata(),
                                                              equality.rawdata() + equality.size(),
                                                              equality.fieldNameSize() - 1);
 
+            if (tagView == sbe::value::TypeTags::Null) {
+                hasNull = true;
+            }
             // An ArraySet assumes ownership of it's values so we have to make a copy here.
             auto [tag, val] = sbe::value::copyValue(tagView, valView);
             arrSet->push_back(tag, val);
@@ -1320,7 +1351,14 @@ public:
                 // makePredicate function can be invoked multiple times in 'generateTraverse'.
                 auto [equalitiesTag, equalitiesVal] = sbe::value::copyValue(arrSetTag, arrSetVal);
 
-                return {makeIsMember(sbe::makeE<sbe::EVariable>(inputSlot),
+                // We have to match nulls and undefined if a 'null' is present in equalities.
+                auto inputExpr = !hasNull
+                    ? makeVariable(inputSlot)
+                    : sbe::makeE<sbe::EIf>(generateNullOrMissing(sbe::EVariable(inputSlot)),
+                                           makeConstant(sbe::value::TypeTags::Null, 0),
+                                           makeVariable(inputSlot));
+
+                return {makeIsMember(std::move(inputExpr),
                                      sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
                                      _context->env),
                         std::move(inputStage)};
@@ -1398,8 +1436,16 @@ public:
                     auto [equalitiesTag, equalitiesVal] =
                         sbe::value::copyValue(arrSetTag, arrSetVal);
                     std::vector<EvalExprStagePair> branches;
+
+                    // We have to match nulls and undefined if a 'null' is present in equalities.
+                    auto inputExpr = !hasNull
+                        ? makeVariable(inputSlot)
+                        : sbe::makeE<sbe::EIf>(generateNullOrMissing(sbe::EVariable(inputSlot)),
+                                               makeConstant(sbe::value::TypeTags::Null, 0),
+                                               makeVariable(inputSlot));
+
                     branches.emplace_back(
-                        makeIsMember(sbe::makeE<sbe::EVariable>(inputSlot),
+                        makeIsMember(std::move(inputExpr),
                                      sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
                                      _context->env),
                         EvalStage{});

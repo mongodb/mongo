@@ -1,7 +1,4 @@
 // Test indexed elemmatch of missing field.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_arrayfind5;
 t.drop();

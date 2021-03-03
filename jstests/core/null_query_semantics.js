@@ -1,7 +1,4 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 
@@ -102,14 +99,19 @@ function testNotEqualsNullSemantics() {
             {_id: "a_subobject_b_not_null", a: {b: "hi"}},
             {_id: "a_subobject_b_null", a: {b: null}},
             {_id: "a_subobject_b_undefined", a: {b: undefined}},
-
-            // TODO: SERVER-21929: $in may (or may not) miss fields with value "undefined".
-            {_id: "a_undefined", a: undefined},
         ];
-        assert(resultsEq(noProjectResults, expected), tojson(noProjectResults));
+        // TODO: SERVER-21929: $in may (or may not) miss fields with value "undefined".
+        const expectedWithUndefined = expected.concat([
+            {_id: "a_undefined", a: undefined},
+        ]);
+        assert(resultsEq(noProjectResults, expected) ||
+                   resultsEq(noProjectResults, expectedWithUndefined),
+               tojson(noProjectResults));
 
         const projectResults = coll.find(query, projectToOnlyA).toArray();
-        assert(resultsEq(projectResults, extractAValues(expected)), tojson(projectResults));
+        assert(resultsEq(projectResults, extractAValues(expected)) ||
+                   resultsEq(projectResults, extractAValues(expectedWithUndefined)),
+               projectResults);
     }());
 
     (function testExistsFalse() {
