@@ -204,6 +204,11 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
                                                    const BSONObj& cmdObj,
                                                    OplogApplicationValidity validity) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
+    if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::applyOps)) {
+        return Status(ErrorCodes::Unauthorized, "Unauthorized");
+    }
+
     if (validity == OplogApplicationValidity::kNeedsSuperuser) {
         std::vector<Privilege> universalPrivileges;
         RoleGraph::generateUniversalPrivileges(&universalPrivileges);
