@@ -18,6 +18,14 @@ from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import standalone
 from buildscripts.resmokelib.utils import registry
 
+# The default verbosity setting for any tests that are not started with an Evergreen task id. This
+# will apply to any tests run locally.
+DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY = make_historic({"transaction": 3})
+
+# The default verbosity setting for any tests running in Evergreen i.e. started with an Evergreen
+# task id.
+DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY = make_historic({"transaction": 3})
+
 
 class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a sharded cluster to run against."""
@@ -357,6 +365,13 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         client.admin.command({"addShard": connection_string})
 
 
+def default_mongos_log_component_verbosity():
+    """Return the default 'logComponentVerbosity' value to use for mongos processes."""
+    if config.EVERGREEN_TASK_ID:
+        return DEFAULT_EVERGREEN_MONGOS_LOG_COMPONENT_VERBOSITY
+    return DEFAULT_MONGOS_LOG_COMPONENT_VERBOSITY
+
+
 class _MongoSFixture(interface.Fixture):
     """Fixture which provides JSTests with a mongos to connect to."""
 
@@ -388,8 +403,8 @@ class _MongoSFixture(interface.Fixture):
                 port=self.port)
             self.mongos_options["logappend"] = ""
 
-        mongos = core.programs.mongos_program(
-            self.logger, self.job_num, executable=self.mongos_executable, **self.mongos_options)
+        mongos = _mongos_program(self.logger, self.job_num, executable=self.mongos_executable,
+                                 **self.mongos_options)
         try:
             self.logger.info("Starting mongos on port %d...\n%s", self.port, mongos.as_command())
             mongos.start()
@@ -493,3 +508,25 @@ class _MongoSFixture(interface.Fixture):
         """Return a list of NodeInfo objects."""
         info = interface.NodeInfo(name=self.logger.name, port=self.port, pid=self.mongos.pid)
         return [info]
+
+
+def _mongos_program(logger, job_num, test_id=None, executable=None, process_kwargs=None, **kwargs):
+    """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
+
+    executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
+
+    # Apply the --setParameter command line argument. Command line options to resmoke.py override
+    # the YAML configuration.
+    suite_set_parameters = kwargs.setdefault("set_parameters", {})
+
+    if config.MONGOS_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+
+    # Set default log verbosity levels if none were specified.
+    if "logComponentVerbosity" not in suite_set_parameters:
+        suite_set_parameters["logComponentVerbosity"] = default_mongos_log_component_verbosity()
+
+    standalone.add_testing_set_parameters(suite_set_parameters)
+
+    return core.programs.mongos_program(logger, job_num, test_id, executable, process_kwargs,
+                                        **kwargs)
