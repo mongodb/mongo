@@ -71,6 +71,14 @@ const runTest = function(keyForCreate, hint) {
                          'failed to drop index: ' + tojson(keyForCreate));
     assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
                                               ErrorCodes.BadValue);
+
+    // Check that we are able to drop the index by name (single name and array of names).
+    assert.commandWorked(coll.createIndex(keyForCreate, {name: 'myindex1'}),
+                         'failed to create index: ' + tojson(keyForCreate));
+    assert.commandWorked(coll.dropIndex('myindex1'), 'failed to drop index: myindex1');
+    assert.commandWorked(coll.createIndex(keyForCreate, {name: 'myindex2'}),
+                         'failed to create index: ' + tojson(keyForCreate));
+    assert.commandWorked(coll.dropIndexes(['myindex2']), 'failed to drop indexes: [myindex2]');
 };
 
 runTest({[metaFieldName]: 1}, {meta: 1});
