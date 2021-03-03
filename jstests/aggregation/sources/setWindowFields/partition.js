@@ -16,9 +16,17 @@ const coll = db[jsTestName()];
 coll.drop();
 assert.commandWorked(coll.insert({int_field: 0, arr: [1, 2]}));
 
-// TODO SERVER-53402 Enable partitionBy tests.
-// Test for runtime error when partitionBy expression evaluates to an array
-// assert.commandFailedWithCode(
-// run({$setWindowFields: {partitionBy: "$arr", output: {}}}),
-// ErrorCodes.TypeMismatch);
+// Test for runtime error when 'partitionBy' expression evaluates to an array
+assert.commandFailedWithCode(coll.runCommand({
+    aggregate: coll.getName(),
+    pipeline: [{
+        $setWindowFields: {
+            partitionBy: "$arr",
+            sortBy: {_id: 1},
+            output: {a: {$sum: {input: "$int_field", documents: ["unbounded", "current"]}}}
+        }
+    }],
+    cursor: {}
+}),
+                             ErrorCodes.TypeMismatch);
 })();
