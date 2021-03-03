@@ -261,6 +261,14 @@ structs:
                 type: 
                     variant: [int, string]
     
+    NewVariantNotSubsetReplyTwo:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantNotSubsetReplyFieldTwo:
+                type: 
+                    variant: [int, string]
+
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is not
                       compatible with the old variant type"
@@ -315,6 +323,60 @@ structs:
                 type: string
                 unstable: true
 
+    StructCommandParameterTypeRecursive:
+        description: "This param struct type contains a field that is not compatible between the
+                      old and new versions"
+        fields:
+            structCommandParameterTypeRecursiveField:
+                type: intStringToInt
+
+    VariantNotSupersetStruct:
+        description: "This struct contains a field where the new variant types are not a superset
+                      of the old variant types"
+        fields:
+            variantNotSupersetField:
+                type: 
+                    variant: [int, bool, string]
+
+    VariantNotSupersetStructTwo:
+        description: "This struct contains a field where the new variant types are not a superset
+                      of the old variant types"
+        fields:
+            variantNotSupersetFieldTwo:
+                type: 
+                    variant: [int, bool, string, double]
+
+    NewTypeNotVariantStruct:
+        description: "This struct contains a field where the new type is not variant while the
+                      old one is"
+        fields:
+            variantField:
+                type: 
+                    variant: [int, bool]
+
+    VariantRecursiveStruct:
+        description: "This struct contains a field where the new variant types are not
+                      compatible with the old variant types"
+        fields:
+            variantRecursiveField:
+                type: 
+                    variant: [int, intStringBoolToIntString]
+
+    VariantStructNotSupersetStruct:
+        description: "This struct contains a field where the old variant types contains a struct
+                      while the new one does not"
+        fields:
+            variantStructNotSupersetField:
+                type: 
+                    variant: [int, string, StructCommandParameterType]
+
+    VariantStructRecursiveStruct:
+        description: "This struct contains a field where the old variant struct and the new
+                      variant struct are not compatible"
+        fields:
+            variantStructRecursiveField:
+                type:
+                    variant: [int, string, StructCommandParameterTypeRecursive]
 
 commands:
     invalidAPIVersionOld:
@@ -1081,6 +1143,16 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewVariantStructNotSubsetReply
+
+    newReplyFieldVariantNotSubsetTwo:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantNotSubsetTwo
+        namespace: ignored
+        cpp_name: newReplyFieldVariantNotSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantNotSubsetReplyTwo
     
     replyFieldVariantStructRecursive:
         description: "new command fails because its reply field type has a variant
@@ -1092,3 +1164,155 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantStructRecursiveReply
+
+    newParamVariantNotSuperset:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a superset of the old parameter variant types"
+        command_name: newParamVariantNotSuperset
+        namespace: ignored
+        cpp_name: newParamVariantNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantNotSupersetParam:
+                type: 
+                    variant: [int, bool, string]
+
+    newParamVariantNotSupersetTwo:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a superset of the old parameter variant types"
+        command_name: newParamVariantNotSupersetTwo
+        namespace: ignored
+        cpp_name: newParamVariantNotSupersetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantNotSupersetParamTwo:
+                type: 
+                    variant: [int, bool, string, double]
+
+    newParamTypeNotVariant:
+        description: "new command fails because its parameter type is not variant while the old
+                      param type is"
+        command_name: newParamTypeNotVariant
+        namespace: ignored
+        cpp_name: newParamTypeNotVariant
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantParam:
+                type: 
+                    variant: [int, bool]
+
+    newParamVariantRecursive:
+        description: "new command fails because its param type is a variant type that is not
+                      compatible with the old param variant type"
+        command_name: newParamVariantRecursive
+        namespace: ignored
+        cpp_name: newParamVariantRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantRecursiveParam:
+                type: 
+                    variant: [int, intStringBoolToIntString]
+
+    newParamVariantStructNotSuperset:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a superset of the old parameter variant types"
+        command_name: newParamVariantStructNotSuperset
+        namespace: ignored
+        cpp_name: newParamVariantStructNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantStructNotSupersetParam:
+                type: 
+                    variant: [int, string, StructCommandParameterType]
+
+    newParamVariantStructRecursive:
+        description: "new command fails because its parameter type has a variant
+                      struct type that is not compatible with the old parameter variant
+                      struct type"
+        command_name: newParamVariantStructRecursive
+        namespace: ignored
+        cpp_name: newParamVariantStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantStructRecursiveParam:
+                type:
+                    variant: [int, string, StructCommandParameterTypeRecursive]
+
+    newCommandTypeVariantNotSuperset:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old type variant types"
+        command_name: newCommandTypeVariantNotSuperset
+        namespace: type
+        type: VariantNotSupersetStruct
+        cpp_name: newCommandTypeVariantNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantNotSupersetTwo:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old command type variant types"
+        command_name: newCommandTypeVariantNotSupersetTwo
+        namespace: type
+        type: VariantNotSupersetStructTwo
+        cpp_name: newCommandTypeVariantNotSupersetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeNotVariant:
+        description: "new command fails because its type is not variant while the old
+                      type is"
+        command_name: newCommandTypeNotVariant
+        namespace: type
+        type: NewTypeNotVariantStruct
+        cpp_name: newCommandTypeNotVariant
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantRecursive:
+        description: "new command fails because its type is a variant type that is not
+                      compatible with the old command type variant type"
+        command_name: newCommandTypeVariantRecursive
+        namespace: type
+        type: VariantRecursiveStruct
+        cpp_name: newCommandTypeVariantRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantStructNotSuperset:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old command type variant types"
+        command_name: newCommandTypeVariantStructNotSuperset
+        namespace: type
+        type: VariantStructNotSupersetStruct
+        cpp_name: newCommandTypeVariantStructNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantStructRecursive:
+        description: "new command fails because its type has a variant
+                      struct type that is not compatible with the old command type variant
+                      struct type"
+        command_name: newCommandTypeVariantStructRecursive
+        namespace: type
+        type: VariantStructRecursiveStruct
+        cpp_name: newCommandTypeVariantStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

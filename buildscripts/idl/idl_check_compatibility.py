@@ -182,18 +182,18 @@ def check_reply_field_type_recursive(
 
         # Check that new variant types are a subset of old variant types.
         for new_variant_type in new_variant_types:
-            old_variant_type_exists = False
             for old_variant_type in old_variant_types:
                 if old_variant_type.name == new_variant_type.name:
-                    old_variant_type_exists = True
                     # Check that the old and new version of each variant type is also compatible.
                     check_reply_field_type_recursive(
                         ctxt, old_variant_type, new_variant_type, cmd_name, field_name,
                         old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
+                    break
 
-            if not old_variant_type_exists:
+            else:
+                # new_variant_type was not found in old_variant_types.
                 ctxt.add_new_reply_field_variant_type_not_subset_error(
-                    cmd_name, field_name, new_field_type.name, new_idl_file_path)
+                    cmd_name, field_name, new_variant_type.name, new_idl_file_path)
 
         # If new type is variant and has a struct as a variant type, compare old and new variant_struct_type.
         # Since enums can't be part of variant types, we don't explicitly check for enums.
@@ -211,7 +211,7 @@ def check_reply_field_type_recursive(
     else:
         if isinstance(new_field_type, syntax.VariantType):
             ctxt.add_new_reply_field_variant_type_error(cmd_name, field_name, old_field_type.name,
-                                                        new_field_type.name, new_idl_file_path)
+                                                        new_idl_file_path)
         else:
             check_subset(ctxt, cmd_name, field_name, new_field_type.name,
                          new_field_type.bson_serialization_type,
@@ -308,6 +308,96 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
             ctxt.add_new_reply_field_missing_error(cmd_name, old_field.name, old_idl_file_path)
 
 
+def check_param_or_command_type_recursive(
+        ctxt: IDLCompatibilityContext,
+        old_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+        new_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]], cmd_name: str,
+        old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
+        old_idl_file_path: str, new_idl_file_path: str, param_name: Optional[str],
+        is_command_parameter: bool):
+    # pylint: disable=too-many-arguments,too-many-branches
+    """
+    Check compatibility between old and new command or param type recursively.
+
+    If the old type is a syntax.Type instance, check the compatibility between the old and new
+    command type or parameter type recursively.
+    """
+    if not isinstance(new_type, syntax.Type):
+        ctxt.add_new_command_or_param_type_enum_or_struct_error(cmd_name, new_type.name,
+                                                                old_type.name, new_idl_file_path,
+                                                                param_name, is_command_parameter)
+        return
+
+    # If bson_serialization_type switches from 'any' to non-any type.
+    if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
+        ctxt.add_old_command_or_param_type_bson_any_error(
+            cmd_name, old_type.name, old_idl_file_path, param_name, is_command_parameter)
+        return
+
+    # If bson_serialization_type switches from non-any to 'any' type.
+    if "any" not in old_type.bson_serialization_type and "any" in new_type.bson_serialization_type:
+        ctxt.add_new_command_or_param_type_bson_any_error(
+            cmd_name, new_type.name, new_idl_file_path, param_name, is_command_parameter)
+        return
+
+    allow_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
+
+    if "any" in old_type.bson_serialization_type:
+        # If 'any' is not explicitly allowed as the bson_serialization_type.
+        if allow_name not in ALLOW_ANY_TYPE_LIST:
+            ctxt.add_command_or_param_type_bson_any_not_allowed_error(
+                cmd_name, old_type.name, old_idl_file_path, param_name, is_command_parameter)
+            return
+
+        if old_type.cpp_type != new_type.cpp_type:
+            ctxt.add_command_or_param_cpp_type_not_equal_error(
+                cmd_name, new_type.name, new_idl_file_path, param_name, is_command_parameter)
+
+    if isinstance(old_type, syntax.VariantType):
+        if not isinstance(new_type, syntax.VariantType):
+            ctxt.add_new_command_or_param_type_not_variant_type_error(
+                cmd_name, new_type.name, new_idl_file_path, param_name, is_command_parameter)
+        else:
+            new_variant_types = new_type.variant_types
+            old_variant_types = old_type.variant_types
+
+            # Check that new variant types are a superset of old variant types.
+            for old_variant_type in old_variant_types:
+                for new_variant_type in new_variant_types:
+                    if old_variant_type.name == new_variant_type.name:
+                        # Check that the old and new version of each variant type is also compatible.
+                        check_param_or_command_type_recursive(
+                            ctxt, old_variant_type, new_variant_type, cmd_name, old_idl_file,
+                            new_idl_file, old_idl_file_path, new_idl_file_path, param_name,
+                            is_command_parameter)
+                        break
+                else:
+                    # old_variant_type was not found in new_variant_types.
+                    ctxt.add_new_command_or_param_variant_type_not_superset_error(
+                        cmd_name, old_variant_type.name, new_idl_file_path, param_name,
+                        is_command_parameter)
+
+            # If old and new types both have a struct as a variant type, compare old and new variant_struct_type.
+            # Since enums can't be part of variant types, we don't explicitly check for enums.
+            if old_type.variant_struct_type is not None:
+                if new_type.variant_struct_type is not None:
+                    check_command_params_or_type_struct_fields(
+                        ctxt, old_type.variant_struct_type, new_type.variant_struct_type, cmd_name,
+                        old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path,
+                        is_command_parameter)
+
+                # If old type has a variant struct type and new type does not have a variant struct type.
+                else:
+                    ctxt.add_new_command_or_param_variant_type_not_superset_error(
+                        cmd_name, old_type.variant_struct_type.name, new_idl_file_path, param_name,
+                        is_command_parameter)
+
+    else:
+        check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
+                       old_type.bson_serialization_type, new_idl_file_path, param_name,
+                       is_command_parameter)
+
+
 def check_param_or_command_type(ctxt: IDLCompatibilityContext,
                                 old_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
                                 new_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
@@ -329,41 +419,9 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext,
         sys.exit(1)
 
     if isinstance(old_type, syntax.Type):
-        if isinstance(new_type, syntax.Type):
-            # If bson_serialization_type switches from 'any' to non-any type.
-            if "any" in old_type.bson_serialization_type and "any" not in new_type.bson_serialization_type:
-                ctxt.add_old_command_or_param_type_bson_any_error(
-                    cmd_name, old_type.name, old_idl_file_path, param_name, is_command_parameter)
-                return
-
-            # If bson_serialization_type switches from non-any to 'any' type.
-            if "any" not in old_type.bson_serialization_type and "any" in new_type.bson_serialization_type:
-                ctxt.add_new_command_or_param_type_bson_any_error(
-                    cmd_name, new_type.name, new_idl_file_path, param_name, is_command_parameter)
-                return
-
-            allow_name: str = cmd_name + "-param-" + param_name if is_command_parameter else cmd_name
-
-            if "any" in old_type.bson_serialization_type:
-                # If 'any' is not explicitly allowed as the bson_serialization_type.
-                if allow_name not in ALLOW_ANY_TYPE_LIST:
-                    ctxt.add_command_or_param_type_bson_any_not_allowed_error(
-                        cmd_name, old_type.name, old_idl_file_path, param_name,
-                        is_command_parameter)
-                    return
-
-                if old_type.cpp_type != new_type.cpp_type:
-                    ctxt.add_command_or_param_cpp_type_not_equal_error(
-                        cmd_name, new_type.name, new_idl_file_path, param_name,
-                        is_command_parameter)
-
-            check_superset(ctxt, cmd_name, new_type.name, new_type.bson_serialization_type,
-                           old_type.bson_serialization_type, new_idl_file_path, param_name,
-                           is_command_parameter)
-        else:
-            ctxt.add_new_command_or_param_type_enum_or_struct_error(
-                cmd_name, new_type.name, old_type.name, new_idl_file_path, param_name,
-                is_command_parameter)
+        check_param_or_command_type_recursive(ctxt, old_type, new_type, cmd_name, old_idl_file,
+                                              new_idl_file, old_idl_file_path, new_idl_file_path,
+                                              param_name, is_command_parameter)
 
     elif isinstance(old_type, syntax.Enum):
         if isinstance(new_type, syntax.Enum):
