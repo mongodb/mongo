@@ -4,6 +4,8 @@
  * Perform CRUD operations, some of which may implicitly create collections. Also perform index
  * creations which may implicitly create collections. Performs these in parallel with collection-
  * dropping operations.
+ *
+ * @tags: [requires_fcv_49]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/CRUD_and_commands.js');  // for $config
