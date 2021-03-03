@@ -170,11 +170,6 @@ public:
     void tickGlobalStageCounters() const;
 
     /**
-     * Performs API versioning validations on the aggregate pipeline stages.
-     */
-    void validatePipelineStagesforAPIVersion(const OperationContext* opCtx) const;
-
-    /**
      * Verifies that the pipeline contains valid stages. Optionally calls
      * 'validatePipelineStagesforAPIVersion' with 'opCtx', and throws UserException if there is
      * more than one $_internalUnpackBucket stage in the pipeline.

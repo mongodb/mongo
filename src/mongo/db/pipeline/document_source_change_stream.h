@@ -47,7 +47,7 @@ namespace mongo {
  */
 class DocumentSourceChangeStream final {
 public:
-    class LiteParsed final : public LiteParsedDocumentSource {
+    class LiteParsed : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec) {
@@ -71,7 +71,7 @@ public:
 
         ActionSet actions{ActionType::changeStream, ActionType::find};
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final {
+                                           bool bypassDocumentValidation) const override {
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
                 return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
@@ -209,6 +209,29 @@ private:
     // It is illegal to construct a DocumentSourceChangeStream directly, use createFromBson()
     // instead.
     DocumentSourceChangeStream() = default;
+};
+
+/**
+ * A LiteParse class to be used to register all internal change stream stages. This class will
+ * ensure that all the necessary authentication and input validation checks are applied while
+ * parsing.
+ */
+class LiteParsedDocumentSourceChangeStreamInternal final
+    : public DocumentSourceChangeStream::LiteParsed {
+public:
+    static std::unique_ptr<LiteParsedDocumentSourceChangeStreamInternal> parse(
+        const NamespaceString& nss, const BSONElement& spec) {
+        return std::make_unique<LiteParsedDocumentSourceChangeStreamInternal>(spec.fieldName(),
+                                                                              nss);
+    }
+
+    LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName, NamespaceString nss)
+        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss)) {}
+
+    PrivilegeVector requiredPrivileges(bool isMongos,
+                                       bool bypassDocumentValidation) const override final {
+        return {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)};
+    }
 };
 
 /**

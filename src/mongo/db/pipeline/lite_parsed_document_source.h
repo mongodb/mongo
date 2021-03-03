@@ -65,10 +65,17 @@ public:
         kNeverInVersion1
     };
 
-    LiteParsedDocumentSource(std::string parseTimeName)
-        : _parseTimeName(std::move(parseTimeName)) {}
-
-    virtual ~LiteParsedDocumentSource() = default;
+    /**
+     * Determines the type of client which is permitted to use a particular stage in its command
+     * request. Ensures that only internal clients are permitted to send or deserialize certain
+     * stages.
+     */
+    enum class AllowedWithClientType {
+        // The stage can be specified in the command request of any client.
+        kAny,
+        // The stage can be specified in the command request of an internal client only.
+        kInternal,
+    };
 
     /*
      * This is the type of parser you should register using REGISTER_DOCUMENT_SOURCE. It need not
@@ -80,6 +87,18 @@ public:
      */
     using Parser = std::function<std::unique_ptr<LiteParsedDocumentSource>(const NamespaceString&,
                                                                            const BSONElement&)>;
+
+    struct LiteParserInfo {
+        Parser parser;
+        AllowedWithApiStrict allowedWithApiStrict;
+        AllowedWithClientType allowedWithClientType;
+    };
+
+    LiteParsedDocumentSource(std::string parseTimeName)
+        : _parseTimeName(std::move(parseTimeName)) {}
+
+    virtual ~LiteParsedDocumentSource() = default;
+
     /**
      * Registers a DocumentSource with a spec parsing function, so that when a stage with the given
      * name is encountered, it will call 'parser' to construct that stage's specification object.
@@ -91,12 +110,13 @@ public:
      */
     static void registerParser(const std::string& name,
                                Parser parser,
-                               AllowedWithApiStrict allowedWithApiStrict);
+                               AllowedWithApiStrict allowedWithApiStrict,
+                               AllowedWithClientType allowedWithClientType);
 
     /**
-     * Returns the 'ApiVersionAllowanceFlag' flag value for the specified stage name.
+     * Returns the 'LiteParserInfo' for the specified stage name.
      */
-    static AllowedWithApiStrict getApiVersionAllowanceFlag(std::string stageName);
+    static const LiteParserInfo& getInfo(const std::string& stageName);
 
     /**
      * Constructs a LiteParsedDocumentSource from the user-supplied BSON, or throws a

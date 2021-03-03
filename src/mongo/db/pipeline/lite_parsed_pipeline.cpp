@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/stats/counters.h"
 
 namespace mongo {
@@ -124,70 +125,72 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
     }
 }
 
-void LiteParsedPipeline::validatePipelineStagesforAPIVersion(const OperationContext* opCtx) const {
-    invariant(opCtx);
-
-    using AllowanceFlags = LiteParsedDocumentSource::AllowedWithApiStrict;
-
-    auto apiParameters = APIParameters::get(opCtx);
-    bool apiStrict = apiParameters.getAPIStrict().value_or(false);
-
-    // These checks gets applied only when apiStrict is set to true.
-    if (!apiStrict) {
-        return;
-    }
-
-    auto apiVersion = apiParameters.getAPIVersion().value_or("");
-    auto client = opCtx->getClient();
-
+void LiteParsedPipeline::validate(const OperationContext* opCtx,
+                                  bool performApiVersionChecks) const {
     // An internal client could be one of the following :
     //     - Does not have any transport session
     //     - The transport session tag is internal
-    bool isInternalClient =
+    auto client = opCtx->getClient();
+    const auto isInternalClient =
         !client->session() || (client->session()->getTags() & transport::Session::kInternalClient);
 
+    const auto apiParameters = APIParameters::get(opCtx);
+    auto apiVersion = apiParameters.getAPIVersion().value_or("");
+    auto apiStrict = apiParameters.getAPIStrict().value_or(false);
+    using AllowanceFlags = LiteParsedDocumentSource::AllowedWithApiStrict;
+
+    int internalUnpackBucketCount = 0;
     for (auto&& stage : _stageSpecs) {
         const auto& stageName = stage->getParseTimeName();
-        const auto& flag = LiteParsedDocumentSource::getApiVersionAllowanceFlag(stageName);
+        const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);
 
-        // Checks that the stage is allowed in API version 1.
-        if (apiVersion == "1") {
-            uassert(ErrorCodes::APIStrictError,
-                    str::stream() << "stage " << stageName
-                                  << " is not allowed with 'apiStrict: true' in API Version "
-                                  << apiVersion,
-                    AllowanceFlags::kNeverInVersion1 != flag);
+        uassert(5491300,
+                str::stream() << "The stage '" << stageName << "' is not allowed in user requests",
+                !(stageInfo.allowedWithClientType ==
+                      LiteParsedDocumentSource::AllowedWithClientType::kInternal &&
+                  !isInternalClient));
+
+        // Validate that the stage is API version compatible.
+        if (performApiVersionChecks && apiStrict) {
+            switch (stageInfo.allowedWithApiStrict) {
+                case AllowanceFlags::kNeverInVersion1: {
+                    uassert(ErrorCodes::APIStrictError,
+                            str::stream()
+                                << "stage " << stageName
+                                << " is not allowed with 'apiStrict: true' in API Version "
+                                << apiVersion,
+                            apiVersion != "1");
+                    break;
+                }
+                case AllowanceFlags::kInternal: {
+                    uassert(ErrorCodes::APIStrictError,
+                            str::stream()
+                                << "Internal stage " << stageName
+                                << " cannot be specified with 'apiStrict: true' in API Version "
+                                << apiVersion,
+                            isInternalClient);
+                    break;
+                }
+                case AllowanceFlags::kAlways: {
+                    break;
+                }
+            }
         }
 
-        // Checks that the internal stage can be specified only by the internal client.
-        if (AllowanceFlags::kInternal == flag) {
-            uassert(ErrorCodes::APIStrictError,
-                    str::stream() << "Internal stage " << stageName
-                                  << " cannot be specified with 'apiStrict: true' in API Version "
-                                  << apiVersion,
-                    isInternalClient);
-        }
+        internalUnpackBucketCount +=
+            (DocumentSourceInternalUnpackBucket::kStageName == stageName) ? 1 : 0;
 
         for (auto&& subPipeline : stage->getSubPipelines()) {
-            subPipeline.validatePipelineStagesforAPIVersion(opCtx);
+            subPipeline.validate(opCtx, performApiVersionChecks);
         }
     }
-}
 
-void LiteParsedPipeline::validate(const OperationContext* opCtx,
-                                  bool performApiVersionChecks) const {
-    if (performApiVersionChecks) {
-        validatePipelineStagesforAPIVersion(opCtx);
-    }
 
     // Validates that the pipeline contains at most one $_internalUnpackBucket stage.
-    auto count =
-        std::accumulate(_stageSpecs.begin(), _stageSpecs.end(), 0, [](auto&& acc, auto&& spec) {
-            return acc + (spec->getParseTimeName() == "$_internalUnpackBucket" ? 1 : 0);
-        });
     uassert(5348302,
-            "Encountered pipeline with more than one $_internalUnpackBucket stage",
-            count <= 1);
+            str::stream() << "Encountered pipeline with more than one "
+                          << DocumentSourceInternalUnpackBucket::kStageName << " stage",
+            internalUnpackBucketCount <= 1);
 }
 
 }  // namespace mongo
