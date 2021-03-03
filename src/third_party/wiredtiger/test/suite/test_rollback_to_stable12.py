@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2020 MongoDB, Inc.
+# Public Domain 2014-present MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -120,7 +120,7 @@ class test_rollback_to_stable12(test_rollback_to_stable_base):
         self.assertGreater(pages_visited, 0)
         self.assertGreaterEqual(hs_removed, 0)
         self.assertEqual(hs_sweep, 0)
-        self.assertGreater(pages_walk_skipped, 0)
+        self.assertGreaterEqual(pages_walk_skipped, 0)
 
 if __name__ == '__main__':
     wttest.run()

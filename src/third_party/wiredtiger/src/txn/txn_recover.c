@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -743,12 +743,14 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     char *config;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool do_checkpoint, eviction_started, hs_exists, needs_rec, was_backup;
+    bool rts_executed;
 
     conn = S2C(session);
     WT_CLEAR(r);
     WT_INIT_LSN(&r.ckpt_lsn);
     config = NULL;
     do_checkpoint = hs_exists = true;
+    rts_executed = false;
     eviction_started = false;
     was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
@@ -761,7 +763,6 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
 
     F_SET(conn, WT_CONN_RECOVERING);
     WT_ERR(__recovery_set_ckpt_base_write_gen(&r));
-    WT_ERR(__recovery_set_checkpoint_snapshot(session));
     WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
     WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
     WT_ERR(__wt_metadata_cursor_open(session, NULL, &metac));
@@ -928,6 +929,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
 done:
     WT_ERR(__recovery_set_checkpoint_timestamp(&r));
     WT_ERR(__recovery_set_oldest_timestamp(&r));
+    WT_ERR(__recovery_set_checkpoint_snapshot(session));
+
     /*
      * Perform rollback to stable only when the following conditions met.
      * 1. The connection is not read-only. A read-only connection expects that there shouldn't be
@@ -941,17 +944,6 @@ done:
             eviction_started = true;
         }
 
-        /*
-         * Currently, rollback to stable only needs to make changes to tables that use timestamps.
-         * That is because eviction does not run in parallel with a checkpoint, so content that is
-         * written never uses transaction IDs newer than the checkpoint's transaction ID and thus
-         * never needs to be rolled back. Once eviction is allowed while a checkpoint is active, it
-         * will be necessary to take the page write generation number into account during rollback
-         * to stable. For example, a page with write generation 10 and txnid 20 is written in one
-         * checkpoint, and in the next restart a new page with write generation 30 and txnid 20 is
-         * written. The rollback to stable operation should only rollback the latest page changes
-         * solely based on the write generation numbers.
-         */
         WT_ASSERT(session,
           conn->txn_global.has_stable_timestamp == false &&
             conn->txn_global.stable_timestamp == WT_TS_NONE);
@@ -967,18 +959,30 @@ done:
             conn->txn_global.has_stable_timestamp = true;
 
         __wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RTS,
-          "Performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
+          "performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
           "%s",
           __wt_timestamp_to_string(conn->txn_global.stable_timestamp, ts_string[0]),
           __wt_timestamp_to_string(conn->txn_global.oldest_timestamp, ts_string[1]));
+        rts_executed = true;
+        WT_ERR(__wt_rollback_to_stable(session, NULL, true));
+    }
 
-        WT_ERR(__wt_rollback_to_stable(session, NULL, false));
-    } else if (do_checkpoint)
+    if (do_checkpoint || rts_executed)
         /*
          * Forcibly log a checkpoint so the next open is fast and keep the metadata up to date with
          * the checkpoint LSN and archiving.
          */
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+
+    /* Initialize the connection's base write generation after rollback to stable. */
+    WT_ERR(__wt_metadata_init_base_write_gen(session));
+
+    /*
+     * Update the open dhandles write generations and base write generation with the connection's
+     * base write generation because the recovery checkpoint writes the pages to disk with new write
+     * generation number which contains transaction ids that are needed to reset later.
+     */
+    __wt_dhandle_update_write_gens(session);
 
     /*
      * If we're downgrading and have newer log files, force an archive, no matter what the archive

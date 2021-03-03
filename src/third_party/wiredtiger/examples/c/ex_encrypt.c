@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2020 MongoDB, Inc.
+ * Public Domain 2014-present MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -408,11 +408,11 @@ int
 main(int argc, char *argv[])
 {
     WT_CONNECTION *conn;
-    WT_CURSOR *c1, *c2, *nc;
+    WT_CURSOR *c1, *c2, *nc, *sysc;
     WT_SESSION *session;
     int i, ret;
     char keybuf[32], valbuf[32];
-    char *key1, *key2, *key3, *val1, *val2, *val3;
+    char *key1, *key2, *key3, *key4, *val1, *val2, *val3, *val4;
 
     home = example_setup(argc, argv);
 
@@ -428,8 +428,9 @@ main(int argc, char *argv[])
     simple_walk_log(session);
 
     /*
-     * Create and open some encrypted and not encrypted tables. Also use column store and
-     * compression for some tables.
+     * Create and open some tables. Also use column store and compression for some tables. Create
+     * some tables with their own keyid, a table using the default system encryptor and a table that
+     * is not encrypted, using the reserved name of none.
      */
     error_check(session->create(session, "table:crypto1",
       "encryption=(name=rotn,keyid=" USER1_KEYID
@@ -438,7 +439,9 @@ main(int argc, char *argv[])
       "encryption=(name=rotn,keyid=" USER1_KEYID "),columns=(value0,key0)"));
     error_check(session->create(session, "table:crypto2",
       "encryption=(name=rotn,keyid=" USER2_KEYID "),key_format=S,value_format=S"));
-    error_check(session->create(session, "table:nocrypto", "key_format=S,value_format=S"));
+    error_check(session->create(
+      session, "table:nocrypto", "encryption=(name=none),key_format=S,value_format=S"));
+    error_check(session->create(session, "table:syscrypto", "key_format=S,value_format=S"));
 
     /*
      * Send in an unknown keyid. WiredTiger will try to add in the new keyid, but the customize
@@ -454,6 +457,7 @@ main(int argc, char *argv[])
     error_check(session->open_cursor(session, "table:crypto1", NULL, NULL, &c1));
     error_check(session->open_cursor(session, "table:crypto2", NULL, NULL, &c2));
     error_check(session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc));
+    error_check(session->open_cursor(session, "table:syscrypto", NULL, NULL, &sysc));
 
     /*
      * Insert a set of keys and values. Insert the same data into all tables so that we can verify
@@ -464,15 +468,18 @@ main(int argc, char *argv[])
         c1->set_key(c1, keybuf);
         c2->set_key(c2, keybuf);
         nc->set_key(nc, keybuf);
+        sysc->set_key(sysc, keybuf);
 
         (void)snprintf(valbuf, sizeof(valbuf), "value%d", i);
         c1->set_value(c1, valbuf);
         c2->set_value(c2, valbuf);
         nc->set_value(nc, valbuf);
+        sysc->set_value(sysc, valbuf);
 
         error_check(c1->insert(c1));
         error_check(c2->insert(c2));
         error_check(nc->insert(nc));
+        error_check(sysc->insert(sysc));
         if (i % 5 == 0)
             error_check(session->log_printf(session, "Wrote %d records", i));
     }
@@ -504,6 +511,7 @@ main(int argc, char *argv[])
     error_check(session->open_cursor(session, "table:crypto1", NULL, NULL, &c1));
     error_check(session->open_cursor(session, "table:crypto2", NULL, NULL, &c2));
     error_check(session->open_cursor(session, "table:nocrypto", NULL, NULL, &nc));
+    error_check(session->open_cursor(session, "table:syscrypto", NULL, NULL, &sysc));
 
     /*
      * Read the same data from each cursor. All should be identical.
@@ -511,25 +519,29 @@ main(int argc, char *argv[])
     while (c1->next(c1) == 0) {
         error_check(c2->next(c2));
         error_check(nc->next(nc));
+        error_check(sysc->next(sysc));
         error_check(c1->get_key(c1, &key1));
         error_check(c1->get_value(c1, &val1));
         error_check(c2->get_key(c2, &key2));
         error_check(c2->get_value(c2, &val2));
         error_check(nc->get_key(nc, &key3));
         error_check(nc->get_value(nc, &val3));
+        error_check(sysc->get_key(sysc, &key4));
+        error_check(sysc->get_value(sysc, &val4));
 
+        /* If key 1 matches all the other keys then all the other keys match each other. */
         if (strcmp(key1, key2) != 0)
             fprintf(stderr, "Key1 %s and Key2 %s do not match\n", key1, key2);
         if (strcmp(key1, key3) != 0)
             fprintf(stderr, "Key1 %s and Key3 %s do not match\n", key1, key3);
-        if (strcmp(key2, key3) != 0)
-            fprintf(stderr, "Key2 %s and Key3 %s do not match\n", key2, key3);
+        if (strcmp(key1, key4) != 0)
+            fprintf(stderr, "Key1 %s and Key4 %s do not match\n", key1, key4);
         if (strcmp(val1, val2) != 0)
             fprintf(stderr, "Val1 %s and Val2 %s do not match\n", val1, val2);
         if (strcmp(val1, val3) != 0)
             fprintf(stderr, "Val1 %s and Val3 %s do not match\n", val1, val3);
-        if (strcmp(val2, val3) != 0)
-            fprintf(stderr, "Val2 %s and Val3 %s do not match\n", val2, val3);
+        if (strcmp(val1, val4) != 0)
+            fprintf(stderr, "Val1 %s and Val4 %s do not match\n", val1, val4);
 
         printf("Verified key %s; value %s\n", key1, val1);
     }

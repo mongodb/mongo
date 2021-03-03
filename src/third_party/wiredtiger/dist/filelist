@@ -59,6 +59,7 @@ src/config/config_check.c
 src/config/config_collapse.c
 src/config/config_def.c
 src/config/config_ext.c
+src/config/test_config.c
 src/conn/api_calc_modify.c
 src/conn/api_strerror.c
 src/conn/api_version.c
@@ -216,4 +217,3 @@ src/txn/txn_log.c
 src/txn/txn_recover.c
 src/txn/txn_rollback_to_stable.c
 src/txn/txn_timestamp.c
-test/cppsuite/test_config.c

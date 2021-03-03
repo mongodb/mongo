@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2020 MongoDB, Inc.
+ * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -524,9 +524,22 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
     /* If this is the first time opening the tree this run. */
     if (F_ISSET(session, WT_SESSION_IMPORT) || ckpt->run_write_gen < conn->base_write_gen)
-        btree->base_write_gen = btree->run_write_gen = btree->write_gen;
+        btree->run_write_gen = btree->write_gen;
     else
-        btree->base_write_gen = btree->run_write_gen = ckpt->run_write_gen;
+        btree->run_write_gen = ckpt->run_write_gen;
+
+    /*
+     * In recovery use the last checkpointed run write generation number as base write generation
+     * number to reset the transaction ids of the pages that were modified before the restart. The
+     * transaction ids are retained only on the pages that are written after the restart.
+     *
+     * Rollback to stable does not operate on logged tables and metadata, so it is skipped.
+     */
+    if (!F_ISSET(conn, WT_CONN_RECOVERING) || WT_IS_METADATA(btree->dhandle) ||
+      __wt_btree_immediately_durable(session))
+        btree->base_write_gen = btree->run_write_gen;
+    else
+        btree->base_write_gen = ckpt->run_write_gen;
 
     /*
      * We've just overwritten the runtime write generation based off the fact that know that we're

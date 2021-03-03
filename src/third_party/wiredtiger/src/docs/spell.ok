@@ -76,6 +76,7 @@ LRU
 LRrVv
 LSB
 LSM
+LSNs
 LZ
 Lameter
 LevelDB
@@ -122,9 +123,11 @@ WiredTigerCheckpoint
 WiredTigerException
 WiredTigerLog
 WiredTigerPanicException
+WiredTigerPreplog
 WiredTigerRollbackException
 WiredTigerStat
 WiredTigerTestCase
+WiredTigerTmplog
 XRay
 Yann
 Za
@@ -179,6 +182,7 @@ checkpointed
 checksum
 checksums
 ckp
+ckpt
 clickable
 colgroup
 colgroups
@@ -466,6 +470,8 @@ plantuml
 png
 posix
 pre
+prealloc
+prepended
 prepends
 prev
 primary's

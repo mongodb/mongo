@@ -107,6 +107,7 @@ DeadStores
 Decrement
 Decrypt
 DeleteFileW
+Destructor
 Dh
 EACCES
 EAGAIN
@@ -1313,6 +1314,7 @@ sx
 sy
 sys
 syscall
+syscrypto
 sysinfo
 sz
 t's
@@ -1413,6 +1415,7 @@ usercfg
 usr
 utf
 util
+utils
 uu
 vN
 vW
