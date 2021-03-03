@@ -635,13 +635,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         replCoord->startup(startupOpCtx.get(), lastStorageEngineShutdownState);
     }
 
+    startMongoDFTDC();
+
     if (!storageGlobalParams.readOnly) {
 
         if (storageEngine->supportsCappedCollections()) {
             logStartup(startupOpCtx.get());
         }
-
-        startMongoDFTDC();
 
         startFreeMonitoring(serviceContext);
 
