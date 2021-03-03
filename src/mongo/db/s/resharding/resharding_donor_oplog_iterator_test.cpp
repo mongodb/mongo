@@ -176,7 +176,9 @@ public:
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
         return ExecutorFuture(executor)
-            .then([iter, executor] { return iter->getNextBatch(std::move(executor)); })
+            .then([iter, executor] {
+                return iter->getNextBatch(std::move(executor), CancelationToken::uncancelable());
+            })
             .then([](auto x) { return x; })
             .get();
     }

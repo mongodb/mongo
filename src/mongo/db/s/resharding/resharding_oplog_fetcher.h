@@ -81,8 +81,6 @@ public:
 
     Future<void> awaitInsert(const ReshardingDonorOplogId& lastSeen) override;
 
-    void interrupt(Status status);
-
     /**
      * Schedules a task that will do the following:
      *
@@ -160,7 +158,6 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogFetcher::_mutex");
     Promise<void> _onInsertPromise;
     Future<void> _onInsertFuture;
-    boost::optional<Status> _interruptStatus;
 
     // For testing to control behavior.
 

@@ -112,10 +112,6 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
     // being issued.
 
     stdx::lock_guard lk(_mutex);
-    if (_interruptStatus) {
-        return Future<void>::makeReady(*_interruptStatus);
-    }
-
     if (lastSeen < _startAt) {
         // `lastSeen < _startAt` means there's at least one document which has been inserted by
         // ReshardingOplogFetcher and hasn't been returned by
@@ -133,20 +129,6 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
     // ReshardingDonorOplogIterator only uses _id's from documents that it actually read from the
     // oplog buffer collection for `lastSeen`, but would also mean the caller wants to wait.
     return std::move(_onInsertFuture);
-}
-
-void ReshardingOplogFetcher::interrupt(Status status) {
-    invariant(!status.isOK());
-
-    // We replace the promise/future pair with a fresh one because consume() won't know an error has
-    // already been set and would otherwise attempt to fulfill the promise again. Later calls to
-    // awaitInsert() won't ever look at `_onInsertFuture` though.
-    auto [p, f] = makePromiseFuture<void>();
-    stdx::lock_guard lk(_mutex);
-    _interruptStatus = status;
-    _onInsertPromise.setError(*_interruptStatus);
-    _onInsertPromise = std::move(p);
-    _onInsertFuture = std::move(f);
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::schedule(
@@ -181,6 +163,13 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
         .then([this, executor, cancelToken](bool moreToCome) {
             if (!moreToCome) {
                 return ExecutorFuture(std::move(executor));
+            }
+
+            if (cancelToken.isCanceled()) {
+                return ExecutorFuture<void>(
+                    executor,
+                    Status{ErrorCodes::CallbackCanceled,
+                           "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
             return _reschedule(std::move(executor), cancelToken);
         });
