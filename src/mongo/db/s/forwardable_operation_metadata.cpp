@@ -32,11 +32,12 @@
 #include "mongo/db/s/forwardable_operation_metadata.h"
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
 
 ForwardableOperationMetadata::ForwardableOperationMetadata(const BSONObj& obj) {
-    ForwardableOperationMetadataBase::parse(
+    ForwardableOperationMetadataBase::parseProtected(
         IDLParserErrorContext("ForwardableOperationMetadataBase"), obj);
 }
 
@@ -44,11 +45,9 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
     if (auto optComment = opCtx->getComment()) {
         setComment(optComment->wrap());
     }
-    auto authzSession = AuthorizationSession::get(opCtx->getClient());
-    setImpersonatedUserMetadata({{userNameIteratorToContainer<std::vector<UserName>>(
-                                      authzSession->getImpersonatedUserNames()),
-                                  roleNameIteratorToContainer<std::vector<RoleName>>(
-                                      authzSession->getImpersonatedRoleNames())}});
+    if (const auto authMetadata = rpc::getImpersonatedUserMetadata(opCtx)) {
+        setImpersonatedUserMetadata({{authMetadata->getUsers(), authMetadata->getRoles()}});
+    }
 }
 
 void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {

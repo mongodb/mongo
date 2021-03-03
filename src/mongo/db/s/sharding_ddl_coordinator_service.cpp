@@ -82,7 +82,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
         coorMetadata.setDatabaseVersion(clientDbVersion);
     }
 
-    coorMetadata.setForwardableOpMetadata({{opCtx}});
+    coorMetadata.setForwardableOpMetadata(boost::optional<ForwardableOperationMetadata>(opCtx));
     const auto patchedCoorDoc = coorDoc.addFields(coorMetadata.toBSON());
 
     auto [coordinator, created] = [&] {
