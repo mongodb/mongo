@@ -446,6 +446,47 @@ function TenantMigrationTest({
         return (mtabs[tenantId].state === expectedAccessState);
     };
 
+    /**
+     * Asserts that the migration 'migrationId' and 'tenantId' eventually goes to the expected state
+     * on all the given recipient nodes.
+     */
+    this.waitForRecipientNodesToReachState = function(
+        nodes, migrationId, tenantId, expectedState, expectedAccessState) {
+        nodes.forEach(node => {
+            assert.soon(() => this.isRecipientNodeInExpectedState(
+                            node, migrationId, tenantId, expectedState, expectedAccessState));
+        });
+    };
+
+    /**
+     * Asserts that the migration 'migrationId' and 'tenantId' is in the expected state on all the
+     * given recipient nodes.
+     */
+    this.assertRecipientNodesInExpectedState = function(
+        nodes, migrationId, tenantId, expectedState, expectedAccessState) {
+        nodes.forEach(node => {
+            assert(this.isRecipientNodeInExpectedState(
+                node, migrationId, tenantId, expectedState, expectedAccessState));
+        });
+    };
+
+    /**
+     * Returns true if the durable and in-memory state for the migration 'migrationId' and
+     * 'tenantId' is in the expected state, and false otherwise.
+     */
+    this.isRecipientNodeInExpectedState = function(
+        node, migrationId, tenantId, expectedState, expectedAccessState) {
+        const configRecipientsColl =
+            this.getRecipientPrimary().getCollection("config.tenantMigrationRecipients");
+        if (configRecipientsColl.findOne({_id: migrationId}).state !== expectedState) {
+            return false;
+        }
+
+        const mtabs =
+            assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
+        return (mtabs[tenantId].state === expectedAccessState);
+    };
+
     function loadDummyData() {
         const numDocs = 20;
         const testData = [];

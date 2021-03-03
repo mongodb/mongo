@@ -233,15 +233,16 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         return;
     }
 
-    PersistentTaskStore<TenantMigrationDonorDocument> store(
+    // Recover TenantMigrationDonorAccessBlockers.
+    PersistentTaskStore<TenantMigrationDonorDocument> donorStore(
         NamespaceString::kTenantMigrationDonorsNamespace);
-    Query query;
 
-    store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
+    donorStore.forEach(opCtx, {}, [&](const TenantMigrationDonorDocument& doc) {
         // Skip creating a TenantMigrationDonorAccessBlocker for aborted migrations that have been
         // marked as garbage collected.
-        if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted)
+        if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted) {
             return true;
+        }
 
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
@@ -274,6 +275,45 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().get());
                 break;
             case TenantMigrationDonorStateEnum::kUninitialized:
+                MONGO_UNREACHABLE;
+        }
+        return true;
+    });
+
+    // Recover TenantMigrationRecipientAccessBlockers.
+    PersistentTaskStore<TenantMigrationRecipientDocument> recipientStore(
+        NamespaceString::kTenantMigrationRecipientsNamespace);
+
+    recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
+        // Skip creating a TenantMigrationRecipientAccessBlocker for aborted migrations that have
+        // been marked as garbage collected.
+        if (doc.getExpireAt() && doc.getState() == TenantMigrationRecipientStateEnum::kStarted) {
+            return true;
+        }
+
+        if (!doc.getDataConsistentStopDonorOpTime()) {
+            return true;
+        }
+
+        auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
+            opCtx->getServiceContext(),
+            doc.getId(),
+            doc.getTenantId().toString(),
+            doc.getDonorConnectionString().toString());
+
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+            .add(doc.getTenantId(), mtab);
+
+        switch (doc.getState()) {
+            case TenantMigrationRecipientStateEnum::kDone:
+            case TenantMigrationRecipientStateEnum::kStarted:
+                break;
+            case TenantMigrationRecipientStateEnum::kConsistent:
+                if (doc.getRejectReadsBeforeTimestamp()) {
+                    mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
+                }
+                break;
+            case TenantMigrationRecipientStateEnum::kUninitialized:
                 MONGO_UNREACHABLE;
         }
         return true;
