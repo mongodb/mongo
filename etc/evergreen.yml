@@ -1681,6 +1681,10 @@ functions:
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
+    - command: timeout.update
+      params:
+        exec_timeout_secs: 10800  # 3 hours
+
     - command: generate.tasks
       params:
         optional: true
@@ -1726,6 +1730,10 @@ functions:
         content_type: ${content_type|application/gzip}
         display_name: Generated Task Config - Execution ${execution}
         optional: true
+
+    - command: timeout.update
+      params:
+        exec_timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -2158,6 +2166,10 @@ functions:
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
+    - command: timeout.update
+      params:
+        exec_timeout_secs: 10800  # 3 hours
+
     - command: generate.tasks
       params:
         optional: true
@@ -2203,6 +2215,10 @@ functions:
         content_type: ${content_type|application/gzip}
         display_name: Generated Task Config - Execution ${execution}
         optional: true
+
+    - command: timeout.update
+      params:
+        exec_timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -2250,6 +2266,10 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/gzip}
         display_name: Generated Task Config - Execution ${execution}
+
+    - command: timeout.update
+      params:
+        exec_timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
