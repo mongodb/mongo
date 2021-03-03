@@ -48,7 +48,9 @@ protected:
                                   boost::intrusive_ptr<Expression> input,
                                   WindowBounds bounds,
                                   boost::optional<boost::intrusive_ptr<Expression>> defaultValue)
-        : WindowFunctionExec(iter), _input(std::move(input)), _bounds(std::move(bounds)) {
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpointsOnly)),
+          _input(std::move(input)),
+          _bounds(std::move(bounds)) {
         if (!defaultValue) {
             _default = Value{BSONNULL};
         } else {
@@ -60,18 +62,18 @@ protected:
     }
 
     Value getFirst() {
-        auto endpoints = _iter->getEndpoints(_bounds);
+        auto endpoints = _iter.getEndpoints(_bounds);
         if (!endpoints)
             return _default;
-        const Document doc = *(*_iter)[endpoints->first];
+        const Document doc = *(_iter)[endpoints->first];
         return _input->evaluate(doc, &_input->getExpressionContext()->variables);
     }
 
     Value getLast() {
-        auto endpoints = _iter->getEndpoints(_bounds);
+        auto endpoints = _iter.getEndpoints(_bounds);
         if (!endpoints)
             return _default;
-        const Document doc = *(*_iter)[endpoints->second];
+        const Document doc = *(_iter)[endpoints->second];
         return _input->evaluate(doc, &_input->getExpressionContext()->variables);
     }
 

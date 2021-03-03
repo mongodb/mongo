@@ -77,9 +77,9 @@ public:
     virtual size_t getApproximateSize() const = 0;
 
 protected:
-    WindowFunctionExec(PartitionIterator* iter) : _iter(iter){};
+    WindowFunctionExec(PartitionAccessor iter) : _iter(iter){};
 
-    PartitionIterator* _iter;
+    PartitionAccessor _iter;
 };
 
 /**
@@ -93,7 +93,10 @@ public:
     WindowFunctionExecRemovable(PartitionIterator* iter,
                                 boost::intrusive_ptr<Expression> input,
                                 std::unique_ptr<WindowFunctionState> function)
-        : WindowFunctionExec(iter), _input(std::move(input)), _function(std::move(function)) {}
+        : WindowFunctionExec(
+              PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential)),
+          _input(std::move(input)),
+          _function(std::move(function)) {}
 
     Value getNext() {
         if (!_initialized) {

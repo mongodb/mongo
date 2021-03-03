@@ -35,14 +35,18 @@
 namespace mongo {
 
 boost::optional<Document> PartitionIterator::operator[](int index) {
-    auto desired = _currentIndex + index;
+    auto desired = _currentCacheIndex + index;
 
     if (_state == IteratorState::kAdvancedToEOF)
         return boost::none;
 
+    // Check that the caller is not attempting to access a document which has been released
+    // already.
+    tassert(5371202,
+            str::stream() << "Invalid access of expired document in partition at index " << desired,
+            desired >= 0 || ((_currentPartitionIndex + index) < 0));
+
     // Case 0: Outside of lower bound of partition.
-    // TODO SERVER-53712: when we add expiry, this should tassert that the caller is not asking
-    // for a document that the caller promised it wouldn't need.
     if (desired < 0)
         return boost::none;
 
@@ -68,11 +72,47 @@ boost::optional<Document> PartitionIterator::operator[](int index) {
     return _cache[desired];
 }
 
+void PartitionIterator::releaseExpired() {
+    if (_slots.size() == 0)
+        return;
+
+    // The mapping of SlotId -> cacheIndex represents the highest index document in the cache which
+    // the executor no longer requires. To be able to safely free the document at index N from the
+    // cache, the following conditions must be met:
+    // * All executors have expired at least index N
+    // * The current index has advanced past N. We need to keep around the "current" document since
+    //   the aggregation stage hasn't projected the output fields yet.
+    auto minIndex = _slots[0];
+    for (auto&& cacheIndex : _slots) {
+        minIndex = std::min(minIndex, cacheIndex);
+    }
+
+    auto newCurrent = _currentCacheIndex;
+    for (auto i = 0; i <= minIndex && i < _currentCacheIndex; i++) {
+        _cache.pop_front();
+        newCurrent--;
+    }
+
+    // Adjust the expired indexes for each slot since some documents may have been freed
+    // from the front of the cache.
+    if (newCurrent == _currentCacheIndex)
+        return;
+    for (size_t slot = 0; slot < _slots.size(); slot++) {
+        _slots[slot] -= (_currentCacheIndex - newCurrent);
+    }
+    _currentCacheIndex = newCurrent;
+}
+
 PartitionIterator::AdvanceResult PartitionIterator::advance() {
+    // After advancing the iterator, check whether there are any documents that can be released from
+    // the cache.
+    ON_BLOCK_EXIT([&] { releaseExpired(); });
+
     // Check if the next document is in the cache.
-    if ((_currentIndex + 1) < (int)_cache.size()) {
+    if ((_currentCacheIndex + 1) < (int)_cache.size()) {
         // Same partition, update the current index.
-        _currentIndex++;
+        _currentCacheIndex++;
+        _currentPartitionIndex++;
         return AdvanceResult::kAdvanced;
     }
 
@@ -84,10 +124,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
             // Pull in the next document and advance the pointer.
             getNextDocument();
             if (_state == IteratorState::kAwaitingAdvanceToEOF) {
-                _cache.clear();
-                // Everything should be empty at this point.
-                _memUsageBytes = 0;
-                _currentIndex = 0;
+                resetCache();
                 _state = IteratorState::kAdvancedToEOF;
                 return AdvanceResult::kEOF;
             } else if (_state == IteratorState::kAwaitingAdvanceToNext) {
@@ -95,7 +132,8 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
                 return AdvanceResult::kNewPartition;
             } else {
                 // Same partition, update the current index.
-                _currentIndex++;
+                _currentCacheIndex++;
+                _currentPartitionIndex++;
                 return AdvanceResult::kAdvanced;
             }
         case IteratorState::kAwaitingAdvanceToNext:
@@ -106,9 +144,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
         case IteratorState::kAdvancedToEOF:
             // In either of these states, there's no point in reading from the prior document source
             // because we've already hit EOF.
-            _cache.clear();
-            _memUsageBytes = 0;
-            _currentIndex = 0;
+            resetCache();
             return AdvanceResult::kEOF;
         default:
             MONGO_UNREACHABLE_TASSERT(5340102);
@@ -155,9 +191,9 @@ boost::optional<std::pair<int, int>> PartitionIterator::getEndpoints(const Windo
         }
     }
 
-    // Valid offsets into the cache are any 'i' such that '_cache[_currentIndex + i]' is valid.
+    // Valid offsets into the cache are any 'i' such that '_cache[_currentCacheIndex + i]' is valid.
     // We know the cache is nonempty because it contains the current document.
-    int cacheOffsetMin = -_currentIndex;
+    int cacheOffsetMin = -_currentCacheIndex;
     int cacheOffsetMax = cacheOffsetMin + _cache.size() - 1;
 
     // The window can only be empty if the bounds are shifted completely out of the partition.

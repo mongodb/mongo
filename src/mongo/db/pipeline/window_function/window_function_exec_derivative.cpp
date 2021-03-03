@@ -42,13 +42,13 @@ Value orNull(StatusWith<Value> val) {
 }  // namespace
 
 Value WindowFunctionExecDerivative::getNext() {
-    auto endpoints = _iter->getEndpoints(_bounds);
+    auto endpoints = _iter.getEndpoints(_bounds);
     if (!endpoints)
         return kDefault;
 
     auto [leftOffset, rightOffset] = *endpoints;
-    const Document leftDoc = *(*_iter)[leftOffset];
-    const Document rightDoc = *(*_iter)[rightOffset];
+    const Document& leftDoc = *(_iter)[leftOffset];
+    const Document& rightDoc = *(_iter)[rightOffset];
 
     // Conceptually, $derivative computes 'rise/run' where 'rise' is dimensionless and 'run' is
     // a time. The result has dimension 1/time, which doesn't correspond to any BSON type, so
