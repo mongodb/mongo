@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <memory>
+#include <utility>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -58,13 +59,25 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-using std::vector;
-
 namespace {
+
+/**
+ * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.
+ */
+using IndexSpecsWithNamespaceString = std::pair<std::list<BSONObj>, NamespaceString>;
+IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext* opCtx,
+                                                               const ListIndexes& cmd) {
+    const auto& origNssOrUUID = cmd.getNamespaceOrUUID();
+
+    AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, origNssOrUUID);
+
+    const auto& nss = autoColl.getNss();
+    const CollectionPtr& coll = autoColl.getCollection();
+    uassert(
+        ErrorCodes::NamespaceNotFound, str::stream() << "ns does not exist: " << nss.ns(), coll);
+
+    return std::make_pair(listIndexesInLock(opCtx, coll, nss, cmd.getIncludeBuildUUIDs()), nss);
+}
 
 /**
  * Lists the indexes for a given collection.
@@ -163,18 +176,13 @@ public:
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             std::vector<mongo::ListIndexesReplyItem> firstBatch;
             {
-                AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx,
-                                                                        cmd.getNamespaceOrUUID());
-                uassert(ErrorCodes::NamespaceNotFound,
-                        str::stream() << "ns does not exist: " << collection.getNss().ns(),
-                        collection);
-                nss = collection.getNss();
+                auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, request());
+                const auto& indexList = indexSpecsWithNss.first;
+                nss = indexSpecsWithNss.second;
 
                 auto expCtx = make_intrusive<ExpressionContext>(
                     opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
 
-                auto indexList = listIndexesInLock(
-                    opCtx, collection.getCollection(), nss, cmd.getIncludeBuildUUIDs());
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
@@ -234,9 +242,10 @@ public:
 
                 exec->saveState();
                 exec->detachFromOperationContext();
-            }  // Drop collection lock. Global cursor registration must be done without holding any
-            // locks.
+            }
 
+
+            // Global cursor registration must be done without holding any locks.
             auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
                 opCtx,
                 {std::move(exec),
