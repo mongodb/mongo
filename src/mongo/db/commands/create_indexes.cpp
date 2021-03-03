@@ -140,6 +140,12 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
                     !ns.isSystem() || indexSpec[IndexDescriptor::kHiddenFieldName].eoo());
         }
 
+        // TODO(SERVER-54917): Check for clustered index instead of inspecting namespace.
+        uassert(ErrorCodes::InvalidOptions,
+                "Partial indexes are not supported on time-series buckets collections",
+                !ns.isTimeseriesBucketsCollection() ||
+                    !indexSpec[IndexDescriptor::kPartialFilterExprFieldName]);
+
         uassert(ErrorCodes::InvalidOptions,
                 "Unique indexes are not supported on time-series buckets collections",
                 !ns.isTimeseriesBucketsCollection() ||

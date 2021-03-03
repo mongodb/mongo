@@ -121,7 +121,15 @@ assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.Index
 // which in this case does not possess the index by that name.
 assert.commandFailedWithCode(coll.dropIndex('mm_1'), ErrorCodes.IndexNotFound);
 
-// Unique indexes are not supported
+// Partial indexes are not supported on time-series bucket collections.
+assert.commandFailedWithCode(
+    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}}),
+    ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {[metaFieldName]: {$gt: 5}}}),
+    ErrorCodes.InvalidOptions);
+
+// Unique indexes are not supported on time-series bucket collections.
 assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: true}),
                              ErrorCodes.InvalidOptions);
 })();
