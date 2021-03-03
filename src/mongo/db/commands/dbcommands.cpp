@@ -94,6 +94,7 @@
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/async_request_executor.h"

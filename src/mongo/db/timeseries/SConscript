@@ -38,3 +38,19 @@ env.CppUnitTest(
         'bucket_catalog',
     ],
 )
+
+env.Library(
+    target='timeseries_index_schema_conversion_functions',
+    source=[
+        'timeseries_index_schema_conversion_functions.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'timeseries_idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/views/views',
+    ],
+)
