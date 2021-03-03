@@ -165,6 +165,21 @@ public:
 
         ListIndexesReply typedRun(OperationContext* opCtx) final {
             CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+            auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, request());
+            const auto& indexList = indexSpecsWithNss.first;
+            const auto& nss = indexSpecsWithNss.second;
+            return ListIndexesReply(_makeCursor(opCtx, indexList, nss));
+        }
+
+    private:
+        /**
+         * Constructs a cursor that iterates the index specs found in 'indexSpecsWithNss'.
+         * This function does not hold any locks because it does not access in-memory
+         * or on-disk data.
+         */
+        ListIndexesReplyCursor _makeCursor(OperationContext* opCtx,
+                                           const std::list<BSONObj>& indexList,
+                                           const NamespaceString& nss) {
             auto& cmd = request();
 
             long long batchSize = std::numeric_limits<long long>::max();
@@ -172,78 +187,68 @@ public:
                 batchSize = *cmd.getCursor()->getBatchSize();
             }
 
-            NamespaceString nss;
-            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-            std::vector<mongo::ListIndexesReplyItem> firstBatch;
-            {
-                auto indexSpecsWithNss = getIndexSpecsWithNamespaceString(opCtx, request());
-                const auto& indexList = indexSpecsWithNss.first;
-                nss = indexSpecsWithNss.second;
+            auto expCtx = make_intrusive<ExpressionContext>(
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
 
-                auto expCtx = make_intrusive<ExpressionContext>(
-                    opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+            auto ws = std::make_unique<WorkingSet>();
+            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
-                auto ws = std::make_unique<WorkingSet>();
-                auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
-
-                for (auto&& indexSpec : indexList) {
-                    WorkingSetID id = ws->allocate();
-                    WorkingSetMember* member = ws->get(id);
-                    member->keyData.clear();
-                    member->recordId = RecordId();
-                    member->resetDocument(SnapshotId(), indexSpec.getOwned());
-                    member->transitionToOwnedObj();
-                    root->pushBack(id);
-                }
-
-                exec = uassertStatusOK(
-                    plan_executor_factory::make(expCtx,
-                                                std::move(ws),
-                                                std::move(root),
-                                                &CollectionPtr::null,
-                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                false, /* whether returned BSON must be owned */
-                                                nss));
-
-                int bytesBuffered = 0;
-                for (long long objCount = 0; objCount < batchSize; objCount++) {
-                    BSONObj nextDoc;
-                    PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
-                    if (state == PlanExecutor::IS_EOF) {
-                        break;
-                    }
-                    invariant(state == PlanExecutor::ADVANCED);
-
-                    // If we can't fit this result inside the current batch, then we stash it for
-                    // later.
-                    if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
-                        exec->enqueue(nextDoc);
-                        break;
-                    }
-
-                    try {
-                        firstBatch.push_back(ListIndexesReplyItem::parse(
-                            IDLParserErrorContext("ListIndexesReplyItem"), nextDoc));
-                    } catch (const DBException& exc) {
-                        LOGV2_ERROR(5254500,
-                                    "Could not parse catalog entry while replying to listIndexes",
-                                    "entry"_attr = nextDoc,
-                                    "error"_attr = exc);
-                        uasserted(5254501,
-                                  "Could not parse catalog entry while replying to listIndexes");
-                    }
-                    bytesBuffered += nextDoc.objsize();
-                }
-
-                if (exec->isEOF()) {
-                    return ListIndexesReply(
-                        ListIndexesReplyCursor(0 /* cursorId */, nss, std::move(firstBatch)));
-                }
-
-                exec->saveState();
-                exec->detachFromOperationContext();
+            for (auto&& indexSpec : indexList) {
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->keyData.clear();
+                member->recordId = RecordId();
+                member->resetDocument(SnapshotId(), indexSpec.getOwned());
+                member->transitionToOwnedObj();
+                root->pushBack(id);
             }
 
+            auto exec = uassertStatusOK(
+                plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(root),
+                                            &CollectionPtr::null,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            false, /* whether returned BSON must be owned */
+                                            nss));
+
+            std::vector<mongo::ListIndexesReplyItem> firstBatch;
+            int bytesBuffered = 0;
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                BSONObj nextDoc;
+                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
+                if (state == PlanExecutor::IS_EOF) {
+                    break;
+                }
+                invariant(state == PlanExecutor::ADVANCED);
+
+                // If we can't fit this result inside the current batch, then we stash it for
+                // later.
+                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+                    exec->enqueue(nextDoc);
+                    break;
+                }
+
+                try {
+                    firstBatch.push_back(ListIndexesReplyItem::parse(
+                        IDLParserErrorContext("ListIndexesReplyItem"), nextDoc));
+                } catch (const DBException& exc) {
+                    LOGV2_ERROR(5254500,
+                                "Could not parse catalog entry while replying to listIndexes",
+                                "entry"_attr = nextDoc,
+                                "error"_attr = exc);
+                    uasserted(5254501,
+                              "Could not parse catalog entry while replying to listIndexes");
+                }
+                bytesBuffered += nextDoc.objsize();
+            }
+
+            if (exec->isEOF()) {
+                return ListIndexesReplyCursor(0 /* cursorId */, nss, std::move(firstBatch));
+            }
+
+            exec->saveState();
+            exec->detachFromOperationContext();
 
             // Global cursor registration must be done without holding any locks.
             auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
@@ -260,8 +265,8 @@ public:
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
-            return ListIndexesReply(ListIndexesReplyCursor(
-                pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch)));
+            return ListIndexesReplyCursor(
+                pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch));
         }
     };
 } cmdListIndexes;
