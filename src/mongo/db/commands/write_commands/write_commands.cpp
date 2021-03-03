@@ -651,6 +651,7 @@ public:
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
                                      const BucketCatalog::BucketId& bucketId,
+                                     size_t start,
                                      size_t index,
                                      std::vector<BSONObj>* errors,
                                      boost::optional<repl::OpTime>* opTime,
@@ -673,7 +674,7 @@ public:
                     return;
                 }
 
-                if (auto error = generateError(opCtx, result, index, errors->size())) {
+                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
                     errors->push_back(*error);
                 }
 
@@ -694,10 +695,10 @@ public:
         }
 
         /**
-         * Writes to the underlying system.buckets collection. Returns the indices of the batch
-         * which were attempted in an update operation, but found no bucket to update. These indices
-         * can be passed as the optional 'indices' parameter in a subsequent call to this function,
-         * in order to to be retried as inserts.
+         * Writes to the underlying system.buckets collection. Returns the indices, relative to
+         * 'start', of the batch which were attempted in an update operation, but found no bucket to
+         * update. These indices can be passed as the optional 'indices' parameter in a subsequent
+         * call to this function, in order to to be retried as inserts.
          */
         std::vector<size_t> _performUnorderedTimeseriesWrites(
             OperationContext* opCtx,
@@ -712,6 +713,8 @@ public:
             std::vector<std::pair<BucketCatalog::BucketId, size_t>> bucketsToCommit;
             std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
             auto insert = [&](size_t index) {
+                invariant(start + index < request().getDocuments().size());
+
                 auto result =
                     bucketCatalog.insert(opCtx, ns(), request().getDocuments()[start + index]);
                 if (auto error = generateError(opCtx, result, index, errors->size())) {
@@ -741,7 +744,8 @@ public:
             for (const auto& [bucketId, index] : bucketsToCommit) {
                 _commitTimeseriesBucket(opCtx,
                                         bucketId,
-                                        start + index,
+                                        start,
+                                        index,
                                         errors,
                                         opTime,
                                         electionId,
