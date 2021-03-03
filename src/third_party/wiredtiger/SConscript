@@ -131,11 +131,16 @@ env.Substfile(
     ],
     SUBST_DICT=replacements)
 
-env.Install(
-    target='.',
+# TODO: SERVER-54914
+# This should be a copy which would be an optimization
+# but ninja does not supports SCons Copy function action until
+# SERVER-54914 is completed.
+env.Substfile(
+    target='wiredtiger_ext.h',
     source=[
         'src/include/wiredtiger_ext.h'
     ],
+    SUBST_DICT={}
 )
 
 env.Alias('generated-sources', "wiredtiger.h")
