@@ -1075,7 +1075,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     CursorKey key = makeCursorKey(id);
-    setKey(c, key);
+    setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     if (ret == WT_NOTFOUND) {
         return false;
@@ -1109,7 +1109,7 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     cursor.assertInActiveTxn();
     WT_CURSOR* c = cursor.get();
     CursorKey key = makeCursorKey(id);
-    setKey(c, key);
+    setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret);
 
@@ -1225,7 +1225,7 @@ void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
     // of the table.
     if (!firstRecordId.isNull()) {
         CursorKey key = makeCursorKey(firstRecordId);
-        setKey(cursor, key);
+        setKey(cursor, &key);
         // Truncate does not require its cursor to be explicitly positioned.
         if (!forTruncate) {
             int cmp = 0;
@@ -1284,7 +1284,7 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
         // If we know where the first record is, go to it
         if (_cappedFirstRecord != RecordId()) {
             CursorKey key = makeCursorKey(_cappedFirstRecord);
-            setKey(truncateEnd, key);
+            setKey(truncateEnd, &key);
             ret = wiredTigerPrepareConflictRetry(opCtx,
                                                  [&] { return truncateEnd->search(truncateEnd); });
             metricsCollector.incrementOneCursorSeek();
@@ -1488,7 +1488,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
             // the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall between
             // records, the stone check is not sufficient.
             CursorKey key = makeCursorKey(stone->lastRecord);
-            setKey(cursor, key);
+            setKey(cursor, &key);
             ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->search(cursor); });
             invariantWTOK(ret);
             ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
@@ -1508,7 +1508,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
                 return;
             }
             invariantWTOK(cursor->reset(cursor));
-            setKey(cursor, key);
+            setKey(cursor, &key);
             invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr));
             _changeNumRecords(opCtx, -stone->records);
             _increaseDataSize(opCtx, -stone->bytes);
@@ -1609,7 +1609,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             fassert(39001, opCtx->recoveryUnit()->setTimestamp(ts));
         }
         CursorKey key = makeCursorKey(record.id);
-        setKey(c, key);
+        setKey(c, &key);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
@@ -1722,7 +1722,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     CursorKey key = makeCursorKey(id);
-    setKey(c, key);
+    setKey(c, &key);
     int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
 
     invariantWTOK(ret,
@@ -1836,7 +1836,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     WT_CURSOR* c = curwrap.get();
     invariant(c);
     CursorKey key = makeCursorKey(id);
-    setKey(c, key);
+    setKey(c, &key);
 
     // The test harness calls us with empty damage vectors which WiredTiger doesn't allow.
     if (nentries == 0)
@@ -2217,7 +2217,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
     WiredTigerCursor startwrap(_uri, _tableId, true, opCtx);
     WT_CURSOR* start = startwrap.get();
     CursorKey key = makeCursorKey(firstRemovedId);
-    setKey(start, key);
+    setKey(start, &key);
 
     WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
     invariantWTOK(session->truncate(session, nullptr, start, nullptr, nullptr));
@@ -2369,7 +2369,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
     WiredTigerRecordStore::CursorKey key = makeCursorKey(id);
-    setKey(c, key);
+    setKey(c, &key);
     // Nothing after the next line can throw WCEs.
     int seekRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
     if (seekRet == WT_NOTFOUND) {
@@ -2405,7 +2405,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     WT_CURSOR* c = _cursor->get();
 
     WiredTigerRecordStore::CursorKey key = makeCursorKey(start);
-    setKey(c, key);
+    setKey(c, &key);
 
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
@@ -2503,7 +2503,7 @@ bool WiredTigerRecordStoreCursorBase::restore() {
 
     WT_CURSOR* c = _cursor->get();
     WiredTigerRecordStore::CursorKey key = makeCursorKey(_lastReturnedId);
-    setKey(c, key);
+    setKey(c, &key);
 
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
@@ -2567,10 +2567,10 @@ RecordId StandardWiredTigerRecordStore::getKey(WT_CURSOR* cursor) const {
     }
 }
 
-void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, const CursorKey& key) const {
-    if (auto itemPtr = stdx::get_if<WiredTigerItem>(&key)) {
+void StandardWiredTigerRecordStore::setKey(WT_CURSOR* cursor, const CursorKey* key) const {
+    if (auto itemPtr = stdx::get_if<WiredTigerItem>(key)) {
         cursor->set_key(cursor, itemPtr->Get());
-    } else if (auto longPtr = stdx::get_if<int64_t>(&key)) {
+    } else if (auto longPtr = stdx::get_if<int64_t>(key)) {
         cursor->set_key(cursor, *longPtr);
     }
 }
@@ -2600,10 +2600,10 @@ WiredTigerRecordStoreStandardCursor::WiredTigerRecordStoreStandardCursor(
     : WiredTigerRecordStoreCursorBase(opCtx, rs, forward) {}
 
 void WiredTigerRecordStoreStandardCursor::setKey(
-    WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey& key) const {
-    if (auto itemPtr = stdx::get_if<WiredTigerItem>(&key)) {
+    WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) const {
+    if (auto itemPtr = stdx::get_if<WiredTigerItem>(key)) {
         cursor->set_key(cursor, itemPtr->Get());
-    } else if (auto longPtr = stdx::get_if<int64_t>(&key)) {
+    } else if (auto longPtr = stdx::get_if<int64_t>(key)) {
         cursor->set_key(cursor, *longPtr);
     }
 }

@@ -281,7 +281,7 @@ public:
 protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 
-    virtual void setKey(WT_CURSOR* cursor, const CursorKey& key) const = 0;
+    virtual void setKey(WT_CURSOR* cursor, const CursorKey* key) const = 0;
 
 private:
     class RandomCursor;
@@ -408,9 +408,9 @@ public:
         OperationContext* opCtx, StringData extraConfig) const override;
 
 protected:
-    virtual RecordId getKey(WT_CURSOR* cursor) const;
+    virtual RecordId getKey(WT_CURSOR* cursor) const override;
 
-    virtual void setKey(WT_CURSOR* cursor, const CursorKey& key) const;
+    virtual void setKey(WT_CURSOR* cursor, const CursorKey* key) const override;
 };
 
 class WiredTigerRecordStoreCursorBase : public SeekableRecordCursor {
@@ -438,7 +438,7 @@ public:
 protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 
-    virtual void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey& key) const = 0;
+    virtual void setKey(WT_CURSOR* cursor, const WiredTigerRecordStore::CursorKey* key) const = 0;
 
     /**
      * Called when restoring a cursor that has not been advanced.
@@ -475,9 +475,9 @@ protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const override;
 
     virtual void setKey(WT_CURSOR* cursor,
-                        const WiredTigerRecordStore::CursorKey& key) const override;
+                        const WiredTigerRecordStore::CursorKey* key) const override;
 
-    virtual void initCursorToBeginning(){};
+    virtual void initCursorToBeginning() override{};
 };
 
 // WT failpoint to throw write conflict exceptions randomly
