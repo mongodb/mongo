@@ -12,6 +12,11 @@ t.drop();
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_explain_helpers.js");
 
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
+
 assert.commandWorked(t.insert({_id: {x: 1}, z: 1}));
 assert.commandWorked(t.insert({_id: {x: 2}, z: 2}));
 assert.commandWorked(t.insert({_id: {x: 3}, z: 3}));
@@ -38,26 +43,26 @@ const query = {
 let explain = t.find(query).explain("allPlansExecution");
 assert.eq(1, explain.executionStats.nReturned, explain);
 assert.eq(1, explain.executionStats.totalKeysExamined, explain);
-assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH");
+assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH", isSBEEnabled);
 
 // ID hack cannot be used with hint().
 t.createIndex({_id: 1, a: 1});
 explain = t.find(query).hint({_id: 1, a: 1}).explain();
-assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner));
+assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner), isSBEEnabled);
 
 // ID hack cannot be used with skip().
 explain = t.find(query).skip(1).explain();
-assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner));
+assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner), isSBEEnabled);
 
 // ID hack cannot be used with a regex predicate.
 assert.commandWorked(t.insert({_id: "abc"}));
 explain = t.find({_id: /abc/}).explain();
 assert.eq({_id: "abc"}, t.findOne({_id: /abc/}));
-assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner));
+assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner), isSBEEnabled);
 
 // Covered query returning _id field only can be handled by ID hack.
 explain = t.find(query, {_id: 1}).explain();
-assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED");
+assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED", isSBEEnabled);
 // Check doc from covered ID hack query.
 assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}), explain);
 
@@ -104,5 +109,5 @@ assert.eq(0, t.find({_id: 1}).hint({_id: 1}).max({_id: 0}).itcount());
 assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
 
 explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
-assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner));
+assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner), isSBEEnabled);
 })();

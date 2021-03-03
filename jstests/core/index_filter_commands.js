@@ -153,7 +153,12 @@ coll.find(queryA1, projectionA1).sort(sortA1).hint(indexA1).itcount();
 assert.commandWorked(coll.runCommand('planCacheSetFilter', {query: queryID, indexes: [indexA1]}));
 var explain = coll.explain("executionStats").find(queryID).finish();
 assert.commandWorked(explain);
-assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH");
+
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
+assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH", isSBEEnabled);
 
 // Clear filters
 // Clearing filters on a missing collection should be a no-op.
