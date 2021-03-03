@@ -36,7 +36,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -111,12 +110,6 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx,
-                    DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
-                    "renameCollection",
-                    DistLockManager::kDefaultLockTimeout)));
             bool useNewPath = [&] {
                 return feature_flags::gShardingFullDDLSupport.isEnabled(
                            serverGlobalParams.featureCompatibility) &&

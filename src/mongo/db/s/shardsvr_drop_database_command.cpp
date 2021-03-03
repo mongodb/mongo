@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
 #include "mongo/db/s/sharding_state.h"
@@ -80,12 +79,6 @@ public:
 
             const auto dbName = request().getDbName();
 
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx,
-                    DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
-                    "dropDatabase",
-                    DistLockManager::kDefaultLockTimeout)));
             bool useNewPath = [&] {
                 return feature_flags::gShardingFullDDLSupport.isEnabled(
                            serverGlobalParams.featureCompatibility) &&

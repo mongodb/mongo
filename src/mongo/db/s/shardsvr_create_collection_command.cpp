@@ -37,7 +37,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/create_collection_coordinator.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -215,12 +214,6 @@ public:
                     "Create Collection path has not been implemented",
                     request().getShardKey());
 
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx,
-                    DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
-                    "createCollection",
-                    DistLockManager::kDefaultLockTimeout)));
             bool useNewPath = [&] {
                 return feature_flags::gShardingFullDDLSupport.isEnabled(
                            serverGlobalParams.featureCompatibility) &&
