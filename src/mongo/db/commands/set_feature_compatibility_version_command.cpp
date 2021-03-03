@@ -54,7 +54,6 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
@@ -313,13 +312,6 @@ public:
             }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                DistLockManager::ScopedDistLock dbDistLock(
-                    uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                        opCtx,
-                        DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
-                        "fcvUpgrade",
-                        DistLockManager::kDefaultLockTimeout)));
-
                 // Upgrade metadata created before FCV 4.9.
                 // TODO SERVER-53283: Remove once 5.0 has been released.
                 if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
@@ -422,13 +414,6 @@ public:
                 return false;
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                DistLockManager::ScopedDistLock dbDistLock(
-                    uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                        opCtx,
-                        DistLockManager::kShardingRoutingInfoFormatStabilityLockName,
-                        "fcvDowngrade",
-                        DistLockManager::kDefaultLockTimeout)));
-
                 // Downgrade metadata created in FCV 4.9.
                 // TODO SERVER-53283: Remove once 5.0 has been released.
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
