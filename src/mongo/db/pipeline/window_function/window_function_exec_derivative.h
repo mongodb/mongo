@@ -57,7 +57,7 @@ public:
                                  boost::intrusive_ptr<Expression> time,
                                  WindowBounds bounds,
                                  boost::optional<TimeUnit> outputUnit)
-        : WindowFunctionExec(iter),
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpointsOnly)),
           _position(std::move(position)),
           _time(std::move(time)),
           _bounds(std::move(bounds)),

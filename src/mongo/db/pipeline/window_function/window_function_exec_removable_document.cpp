@@ -67,7 +67,7 @@ void WindowFunctionExecRemovableDocument::initialize() {
     // bound.
     for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
         // If this is false, we're over the end of the partition.
-        if (auto doc = (*this->_iter)[i]) {
+        if (auto doc = (this->_iter)[i]) {
             addValue(_input->evaluate(*doc, nullptr));
         } else {
             break;
@@ -79,7 +79,7 @@ void WindowFunctionExecRemovableDocument::processDocumentsToUpperBound() {
     // If there is no upper bound, the whole partition is loaded by initialize.
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
-        if (auto doc = (*this->_iter)[_upperBound.get()]) {
+        if (auto doc = (this->_iter)[_upperBound.get()]) {
             addValue(_input->evaluate(*doc, nullptr));
         }
     }
@@ -90,7 +90,7 @@ void WindowFunctionExecRemovableDocument::removeDocumentsUnderLowerBound() {
     // must always remove a document if there is a document left to remove.
     // For a negative lower bound we can start removing every time only after we have seen
     // documents to fill the left side of the window.
-    if (_lowerBound >= 0 || _iter->getCurrentOffset() > abs(_lowerBound)) {
+    if (_lowerBound >= 0 || _iter.getCurrentPartitionIndex() > abs(_lowerBound)) {
         removeFirstValueIfExists();
     }
 }

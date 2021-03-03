@@ -49,13 +49,23 @@ public:
           _partitionExpr(partitionExpr),
           _state(IteratorState::kNotInitialized) {}
 
+    using SlotId = unsigned int;
+    SlotId newSlot() {
+        tassert(5371200,
+                "Unexpected usage of partition iterator, expected all consumers to create slots "
+                "before retrieving documents",
+                _state == IteratorState::kNotInitialized);
+        auto retId = static_cast<SlotId>(_slots.size());
+        _slots.emplace_back(-1);
+        return retId;
+    }
+
     /**
-     * Request the document in the current partition that is 'index' positions from the current. For
-     * instance, index 0 refers to the current document pointed to by the iterator.
-     *
-     * Returns boost::none if the document is not in the partition or we've hit EOF.
+     * Returns the current document pointed to by the iterator.
      */
-    boost::optional<Document> operator[](int index);
+    boost::optional<Document> current() {
+        return (*this)[0];
+    }
 
     enum class AdvanceResult {
         kAdvanced,
@@ -70,10 +80,12 @@ public:
     AdvanceResult advance();
 
     /**
-     * Returns the offset of the iterator for the current partition.
+     * Returns the index of the iterator for the current partition. Note that the returned index
+     * refers to the global index in the partition and should not be used as an argument to the
+     * operator[] overload.
      */
-    auto getCurrentOffset() const {
-        return _currentIndex;
+    auto getCurrentPartitionIndex() const {
+        return _currentPartitionIndex;
     }
 
     /**
@@ -82,6 +94,26 @@ public:
     void setSource(DocumentSource* source) {
         _source = source;
     }
+
+    /**
+     * Returns the value in bytes of the data being stored by this partition iterator. Does not
+     * include the size of the constant size objects being held or the overhead of the data
+     * structures.
+     */
+    auto getApproximateSize() const {
+        return _memUsageBytes;
+    }
+
+private:
+    friend class PartitionAccessor;
+
+    /**
+     * Request the document in the current partition that is 'index' positions from the current. For
+     * instance, index 0 refers to the current document pointed to by the iterator.
+     *
+     * Returns boost::none if the document is not in the partition or we've hit EOF.
+     */
+    boost::optional<Document> operator[](int index);
 
     /**
      * Resolve any type of WindowBounds to a concrete pair of indices, '[lower, upper]'.
@@ -103,19 +135,35 @@ public:
     boost::optional<std::pair<int, int>> getEndpoints(const WindowBounds& bounds);
 
     /**
-     * Returns the value in bytes of the data being stored by this partition iterator. Does not
-     * include the size of the constant size objects being held or the overhead of the data
-     * structures.
+     * Marks the given index as expired for the slot 'id'. This does not necessarily mean that the
+     * document will be released, just that this slot no longer requires it.
      */
-    auto getApproximateSize() const {
-        return _memUsageBytes;
+    void expireUpTo(SlotId id, int index) {
+        // 'index' is relevant to the current document, adjust it to figure out what index it refers
+        // to in the cache.
+        _slots[id] = std::max(_slots[id], _currentCacheIndex + index);
     }
 
-private:
+    /**
+     * Frees any documents from the cache which have been marked as "expired" by all slots.
+     */
+    void releaseExpired();
+
     /**
      * Retrieves the next document from the prior stage and updates the state accordingly.
      */
     void getNextDocument();
+
+    void resetCache() {
+        _cache.clear();
+        // Everything should be empty at this point.
+        _memUsageBytes = 0;
+        _currentCacheIndex = 0;
+        _currentPartitionIndex = 0;
+        for (size_t slot = 0; slot < _slots.size(); slot++) {
+            _slots[slot] = -1;
+        }
+    }
 
     /**
      * Resets the state of the iterator with the first document of the new partition.
@@ -124,23 +172,24 @@ private:
         tassert(5340101,
                 "Invalid call to PartitionIterator::advanceToNextPartition",
                 _nextPartition != boost::none);
-        _cache.clear();
+        resetCache();
         // Cache is cleared, and we are moving the _nextPartition value to different positions.
         _memUsageBytes = getNextPartitionStateSize();
         _cache.emplace_back(std::move(_nextPartition->_doc));
         _partitionKey = std::move(_nextPartition->_partitionKey);
         _nextPartition.reset();
-        _currentIndex = 0;
         _state = IteratorState::kIntraPartition;
     }
 
     ExpressionContext* _expCtx;
     DocumentSource* _source;
     boost::optional<boost::intrusive_ptr<Expression>> _partitionExpr;
-    std::vector<Document> _cache;
-    // '_cache[_currentIndex]' is the current document, which '(*this)[0]' returns.
-    int _currentIndex = 0;
+    std::deque<Document> _cache;
+    // '_cache[_currentCacheIndex]' is the current document, which '(*this)[0]' returns.
+    int _currentCacheIndex = 0;
+    int _currentPartitionIndex = 0;
     Value _partitionKey;
+    std::vector<int> _slots;
 
     // When encountering the first document of the next partition, we stash it away until the
     // iterator has advanced to it. This document is not accessible until then.
@@ -176,6 +225,55 @@ private:
         // The iterator has exhausted the input documents. Any access should be disallowed.
         kAdvancedToEOF,
     } _state;
+};
+
+/**
+ * This class provides access to an underlying PartitionIterator and manages when documents in the
+ * partition are no longer needed.
+ */
+class PartitionAccessor {
+public:
+    enum class Policy {
+        // This policy assumes that when the caller accesses a certain index 'i', that it will no
+        // longer require all documents up to and including the document at index 'i'.
+        kDefaultSequential,
+        // This policy should be used if the caller requires the endpoints of a window, potentially
+        // accessing the same bound twice.
+        kEndpointsOnly
+    };
+    PartitionAccessor(PartitionIterator* iter, Policy policy)
+        : _iter(iter), _slot(iter->newSlot()), _policy(policy) {}
+
+    boost::optional<Document> operator[](int index) {
+        auto ret = (*_iter)[index];
+        switch (_policy) {
+            case Policy::kDefaultSequential:
+                _iter->expireUpTo(_slot, index);
+                break;
+            case Policy::kEndpointsOnly:
+                break;
+        }
+        return ret;
+    }
+
+    auto getCurrentPartitionIndex() const {
+        return _iter->getCurrentPartitionIndex();
+    }
+
+    boost::optional<std::pair<int, int>> getEndpoints(const WindowBounds& bounds) {
+        tassert(5371201, "Invalid usage of partition accessor", _policy == Policy::kEndpointsOnly);
+        auto endpoints = _iter->getEndpoints(bounds);
+        // With this policy, all documents before the lower bound can be marked as expired.
+        if (endpoints) {
+            _iter->expireUpTo(_slot, endpoints->first - 1);
+        }
+        return endpoints;
+    }
+
+private:
+    PartitionIterator* _iter;
+    const PartitionIterator::SlotId _slot;
+    const Policy _policy;
 };
 
 }  // namespace mongo

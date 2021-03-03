@@ -286,7 +286,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     if (_eof)
         return DocumentSource::GetNextResult::makeEOF();
 
-    auto curDoc = _iterator[0];
+    auto curDoc = _iterator.current();
     // The only way we hit this case is if there are no documents, since otherwise _eof will be set.
     if (!curDoc) {
         _eof = true;

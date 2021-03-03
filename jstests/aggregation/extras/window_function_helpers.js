@@ -15,25 +15,43 @@ function seedWithTickerData(coll, docsPerTicker) {
 function forEachPartitionCase(callback) {
     callback(null);
     callback("$ticker");
+    callback({$toLower: "$ticker"});
 }
 
-function forEachDocumentBounds(callback) {
-    callback(["unbounded", 0]);
-    callback(["unbounded", -1]);
-    callback(["unbounded", 1]);
-    callback(["unbounded", 5]);
-    callback(["unbounded", "unbounded"]);
-    callback([0, "unbounded"]);
-    callback([0, 1]);
-    callback(["current", 2]);
-    callback([0, 5]);
-    callback(["current", 4]);
-    callback([-1, 1]);
-    callback([-2, "unbounded"]);
-    callback([1, "unbounded"]);
-    callback([-3, -1]);
-    callback([1, 3]);
-    callback([-2, 3]);
+const documentBounds = [
+    ["unbounded", 0],
+    ["unbounded", -1],
+    ["unbounded", 1],
+    ["unbounded", 5],
+    ["unbounded", "unbounded"],
+    [0, "unbounded"],
+    [0, 1],
+    ["current", 2],
+    [0, 5],
+    ["current", 4],
+    [-1, 1],
+    [-2, "unbounded"],
+    [1, "unbounded"],
+    [-3, -1],
+    [1, 3],
+    [-2, 3],
+];
+
+function forEachDocumentBoundsCombo(callback) {
+    documentBounds.forEach(function(bounds, index) {
+        let boundsCombo = [bounds];
+        for (let j = index + 1; j < documentBounds.length; j++) {
+            boundsCombo.push(documentBounds[j]);
+            callback(boundsCombo);
+            boundsCombo.pop();
+        }
+    });
+
+    // Add a few combinations that test 3+ bounds.
+    callback([["unbounded", "unbounded"], ["unbounded", 0], ["unbounded", -1]]);
+    callback([[-1, 1], [-1, 0], ["unbounded", -1]]);
+    callback([[2, 3], [2, 3], ["unbounded", -1]]);
+    callback([[-5, -5], [-5, -5], [-5, -5]]);
 }
 
 /**
@@ -132,6 +150,41 @@ function calculateLimit(lowerBound, upperBound, indexInPartition) {
     return limitValueToUse;
 }
 
+function assertResultsEqual(wfRes, index, groupRes, accum) {
+    // On DEBUG builds, the computed $group may be slightly different due to precision
+    // loss when spilling to disk.
+    // TODO SERVER-42616: Enable the exact check for $stdDevPop/Samp.
+    if (accum == "$stdDevSamp" || accum == "$stdDevPop") {
+        // $group doesn't return NaN, returns 0 or null.
+        // TODO SERVER-55063: The stdDev functions should not return NaN.
+        if (isNaN(wfRes.res)) {
+            if (accum == "$stdDevPop") {
+                assert.eq(groupRes,
+                          0,
+                          "$stdDevPop window function returned NaN, but $group returned " +
+                              tojson(groupRes) + " at index " + index);
+            } else {
+                assert.eq(groupRes,
+                          null,
+                          "$stdDevSamp window function returned NaN, but $group returned " +
+                              tojson(groupRes) + " at index " + index);
+            }
+        } else {
+            assert.close(groupRes,
+                         wfRes.res,
+                         "Window function $stdDev result for index " + index + ": " + tojson(wfRes),
+                         10 /* 10 decimal places */);
+        }
+    } else if (accum == "$addToSet") {
+        // Order doesn't matter for $addToSet.
+        assert(arrayEq(groupRes, wfRes.res),
+               "Window function $addToSet results for index " + index + ": " + tojson(wfRes));
+    } else
+        assert.eq(groupRes,
+                  wfRes.res,
+                  "Window function result for index " + index + ": " + tojson(wfRes));
+}
+
 /**
  * Runs the given 'accum' as both a window function and its equivalent accumulator in $group across
  * various combinations of partitioning and window bounds. Asserts that the results are consistent.
@@ -141,13 +194,13 @@ function calculateLimit(lowerBound, upperBound, indexInPartition) {
  */
 function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable = false) {
     forEachPartitionCase(function(partition) {
-        forEachDocumentBounds(function(bounds) {
+        documentBounds.forEach(function(bounds, index) {
             if (disableRemovable && bounds[0] !== "unbounded") {
-                jsTestLog("Skipping testing accumulator " + accum + " against " + partition +
-                          " partition and [" + bounds + "] bounds");
+                jsTestLog("Skipping testing accumulator " + accum + " against " +
+                          tojson(partition) + " partition and [" + bounds + "] bounds");
                 return;
             }
-            jsTestLog("Testing accumulator " + accum + " against " + partition +
+            jsTestLog("Testing accumulator " + accum + " against " + tojson(partition) +
                       " partition and [" + bounds + "] bounds");
             const wfResults =
                 coll.aggregate([
@@ -185,43 +238,35 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null, disableRemovable
                     });
                 }
 
-                // On DEBUG builds, the computed $group may be slightly different due to precision
-                // loss when spilling to disk.
-                // TODO SERVER-42616: Enable the exact check for $stdDevPop/Samp.
-                if (accum == "$stdDevSamp" || accum == "$stdDevPop") {
-                    // $group doesn't return NaN, returns 0 or null.
-                    // TODO SERVER-55063: The stdDev functions should not return NaN.
-                    if (isNaN(wfResults[index].res)) {
-                        if (accum == "$stdDevPop") {
-                            assert.eq(
-                                groupRes,
-                                0,
-                                "$stdDevPop window function returned NaN, but $group returned " +
-                                    tojson(groupRes) + " at index " + index);
-                        } else {
-                            assert.eq(
-                                groupRes,
-                                null,
-                                "$stdDevSamp window function returned NaN, but $group returned " +
-                                    tojson(groupRes) + " at index " + index);
-                        }
-                    } else {
-                        assert.close(groupRes,
-                                     wfResults[index].res,
-                                     "Window function $stdDev result for index " + index + ": " +
-                                         tojson(wfRes),
-                                     10 /* 10 decimal places */);
-                    }
-                } else if (accum == "$addToSet") {
-                    // Order doesn't matter for $addToSet.
-                    assert(arrayEq(groupRes, wfResults[index].res),
-                           "Window function $addToSet results for index " + index + ": " +
-                               tojson(wfRes));
-                } else
-                    assert.eq(groupRes,
-                              wfResults[index].res,
-                              "Window function result for index " + index + ": " + tojson(wfRes));
+                assertResultsEqual(wfRes, index, groupRes, accum);
             }
+
+            jsTestLog("Done");
+        });
+
+        // To get additional coverage, specifically regarding the expiration policy, test
+        // combinations of various window types in the same $setWindowFields stage. This is more of
+        // a fuzz test so no need to check results.
+        forEachDocumentBoundsCombo(function(arrayOfBounds) {
+            jsTestLog("Testing accumulator " + accum +
+                      " against multiple bounds: " + tojson(arrayOfBounds));
+            let baseSpec = {
+                partitionBy: partition,
+                sortBy: {_id: 1},
+            };
+            let outputFields = {};
+            arrayOfBounds.forEach(function(bounds, index) {
+                if (disableRemovable && bounds[0] !== "unbounded") {
+                    jsTestLog("Skipping testing accumulator " + accum + " against " +
+                              tojson(partition) + " partition and [" + tojson(bounds) + "] bounds");
+                    return;
+                }
+                outputFields["res" + index] = {[accum]: "$price", window: {documents: bounds}};
+            });
+            let specWithOutput = Object.merge(baseSpec, {output: outputFields});
+            const wfResults = coll.aggregate([{$setWindowFields: specWithOutput}]).toArray();
+            assert.gt(wfResults.length, 0);
+            jsTestLog("Done");
         });
     });
 }

@@ -40,16 +40,31 @@
 namespace mongo {
 namespace {
 
-// This provides access to getExpCtx(), but we'll use a different name for this test suite.
-using PartitionIteratorTest = AggregationContextFixture;
-
 #define ASSERT_ADVANCE_RESULT(expected, received) ASSERT_EQ((int)expected, (int)received)
+
+class PartitionIteratorTest : public AggregationContextFixture {
+public:
+    auto makeDefaultAccessor(
+        boost::intrusive_ptr<DocumentSourceMock> mock,
+        boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
+        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(), mock.get(), partExpr);
+        return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kDefaultSequential);
+    }
+
+    auto advance() {
+        invariant(_iter);
+        return _iter->advance();
+    }
+
+private:
+    std::unique_ptr<PartitionIterator> _iter;
+};
 
 TEST_F(PartitionIteratorTest, IndexAccessPullsInRequiredDocument) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto partIter = makeDefaultAccessor(mock);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[2]);
@@ -59,7 +74,7 @@ TEST_F(PartitionIteratorTest, MultipleConsumer) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"b", 1}}, Document{{"c", 1}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto partIter = makeDefaultAccessor(mock);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[2]);
@@ -71,7 +86,7 @@ TEST_F(PartitionIteratorTest, MultipleConsumer) {
 TEST_F(PartitionIteratorTest, LookaheadOutOfRangeAccessEOF) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"key", 1}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto partIter = makeDefaultAccessor(mock);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_FALSE(partIter[1]);
     ASSERT_FALSE(partIter[-1]);
@@ -84,8 +99,8 @@ TEST_F(PartitionIteratorTest, LookaheadOutOfRangeAccessNewPartition) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_FALSE(partIter[2]);
@@ -99,14 +114,13 @@ TEST_F(PartitionIteratorTest, AdvanceMovesCurrent) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
     ASSERT_FALSE(partIter[2]);
-    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, partIter.advance());
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, advance());
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[0]);
-    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[-1]);
     ASSERT_FALSE(partIter[1]);
 }
 
@@ -118,13 +132,13 @@ TEST_F(PartitionIteratorTest, AdvanceOverPartitionBoundary) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     // First advance to the final document in partition with key "1".
-    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, partIter.advance());
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, advance());
     // Next advance triggers a new partition.
-    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kNewPartition, partIter.advance());
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kNewPartition, advance());
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[0]);
     ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *partIter[1]);
     ASSERT_FALSE(partIter[2]);
@@ -136,10 +150,10 @@ TEST_F(PartitionIteratorTest, AdvanceResultsInEof) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
-    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, partIter.advance());
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, advance());
 
     // Any access is disallowed.
     ASSERT_FALSE(partIter[0]);
@@ -153,12 +167,12 @@ TEST_F(PartitionIteratorTest, CurrentReturnsCorrectDocumentAsIteratorAdvances) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
-    partIter.advance();
+    advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[0]);
-    partIter.advance();
+    advance();
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[0]);
 }
 
@@ -167,10 +181,10 @@ TEST_F(PartitionIteratorTest, EmptyCollectionReturnsEOF) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_FALSE(partIter[0]);
-    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, partIter.advance());
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kEOF, advance());
 }
 
 TEST_F(PartitionIteratorTest, PartitionByArrayErrs) {
@@ -179,8 +193,8 @@ TEST_F(PartitionIteratorTest, PartitionByArrayErrs) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
     ASSERT_THROWS_CODE(*partIter[1], AssertionException, ErrorCodes::TypeMismatch);
 }
@@ -191,20 +205,204 @@ TEST_F(PartitionIteratorTest, CurrentOffsetIsCorrectAfterDocumentsAreAccessed) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto key = ExpressionFieldPath::createPathFromString(
         getExpCtx().get(), "a", getExpCtx()->variablesParseState);
-    auto partIter = PartitionIterator(
-        getExpCtx().get(), mock.get(), boost::optional<boost::intrusive_ptr<Expression>>(key));
-    ASSERT_EQ(0, partIter.getCurrentOffset());
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
+    ASSERT_EQ(0, partIter.getCurrentPartitionIndex());
     auto doc = partIter[0];
-    partIter.advance();
-    ASSERT_EQ(1, partIter.getCurrentOffset());
+    advance();
+    ASSERT_EQ(1, partIter.getCurrentPartitionIndex());
     doc = partIter[0];
-    partIter.advance();
-    ASSERT_EQ(2, partIter.getCurrentOffset());
+    advance();
+    ASSERT_EQ(2, partIter.getCurrentPartitionIndex());
     doc = partIter[0];
-    partIter.advance();
-    ASSERT_EQ(3, partIter.getCurrentOffset());
+    advance();
+    ASSERT_EQ(3, partIter.getCurrentPartitionIndex());
     doc = partIter[0];
-    ASSERT_EQ(3, partIter.getCurrentOffset());
+    ASSERT_EQ(3, partIter.getCurrentPartitionIndex());
+}
+
+TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document{{"a", 1}}, Document{{"a", 2}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+
+    // Test that an accessor that attempts to read off the end of the partition returns boost::none
+    // instead of tassert'ing.
+    ASSERT_FALSE(accessor[-1]);
+    ASSERT_FALSE(accessor[2]);
+}
+
+DEATH_TEST_F(PartitionIteratorTest,
+             SingleConsumerDefaultPolicy,
+             "Invalid access of expired document") {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    // Access the first document, which marks it as expired.
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *accessor[0]);
+    // Advance the iterator which frees the first expired document.
+    partIter.advance();
+    // Attempting to access the first doc results in a tripwire assertion.
+    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
+}
+
+DEATH_TEST_F(PartitionIteratorTest,
+             MultipleConsumerDefaultPolicy,
+             "Invalid access of expired document") {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto laggingAccessor =
+        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    auto leadingAccessor =
+        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+
+    // The lagging accessor is referencing 1 doc behind current, and leading is 1 doc ahead.
+    ASSERT_FALSE(laggingAccessor[-1]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *leadingAccessor[1]);
+    partIter.advance();
+
+    // At this point, no documents are expired.
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *laggingAccessor[-1]);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *leadingAccessor[1]);
+    partIter.advance();
+
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *laggingAccessor[-1]);
+    // The leading accessor has fallen off the right side of the partiiton.
+    ASSERT_FALSE(leadingAccessor[1]);
+
+    // The first document should now be expired.
+    ASSERT_THROWS_CODE(laggingAccessor[-2], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(leadingAccessor[-2], AssertionException, 5371202);
+}
+
+DEATH_TEST_F(PartitionIteratorTest,
+             SingleConsumerEndpointPolicy,
+             "Invalid access of expired document") {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpointsOnly);
+    // Mock a window with documents [1, 2].
+    auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
+                                      SortPattern(BSON("a" << 1), getExpCtx()),
+                                      getExpCtx().get());
+    // Retrieving the endpoints triggers the expiration, with the assumption that all documents
+    // below the lower bound are not needed.
+    auto endpoints = accessor.getEndpoints(bounds);
+    // Advance the iterator which frees the first expired document.
+    partIter.advance();
+
+    // Advancing again does not trigger any expiration since there has not been a subsequent call to
+    // getEndpoints().
+    partIter.advance();
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *accessor[-1]);
+
+    endpoints = accessor.getEndpoints(bounds);
+    // Now the second document, currently at index 0 in the cache, will be released.
+    partIter.advance();
+    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5371202);
+}
+
+DEATH_TEST_F(PartitionIteratorTest,
+             MultipleConsumerEndpointPolicy,
+             "Invalid access of expired document") {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+
+    // Create two endpoint accessors, one at [-1, 0] and another at [0, 1]. Since the first one may
+    // access the document at (current - 1), the only expiration that can happen on advance() would
+    // be (newCurrent - 2).
+    auto lookBehindAccessor =
+        PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpointsOnly);
+    auto lookAheadAccessor =
+        PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpointsOnly);
+    auto negBounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-1 << 0)),
+                                         SortPattern(BSON("a" << 1), getExpCtx()),
+                                         getExpCtx().get());
+    auto posBounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(0 << 1)),
+                                         SortPattern(BSON("a" << 1), getExpCtx()),
+                                         getExpCtx().get());
+
+    auto endpoints = lookBehindAccessor.getEndpoints(negBounds);
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookBehindAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookBehindAccessor[endpoints->second]);
+    endpoints = lookAheadAccessor.getEndpoints(posBounds);
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookAheadAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookAheadAccessor[endpoints->second]);
+    // Advance the iterator which does not free any documents.
+    partIter.advance();
+
+    endpoints = lookBehindAccessor.getEndpoints(negBounds);
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookBehindAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[endpoints->second]);
+    endpoints = lookAheadAccessor.getEndpoints(posBounds);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookAheadAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *lookAheadAccessor[endpoints->second]);
+
+    // Advance again, the current document is now {a: 3}.
+    partIter.advance();
+    endpoints = lookBehindAccessor.getEndpoints(negBounds);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *lookBehindAccessor[endpoints->second]);
+    endpoints = lookAheadAccessor.getEndpoints(posBounds);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *lookAheadAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *lookAheadAccessor[endpoints->second]);
+
+    // Since both accessors are done with document 0, the next advance will free it but keep around
+    // the other docs.
+    partIter.advance();
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[-2]);
+    ASSERT_THROWS_CODE(lookBehindAccessor[-3], AssertionException, 5371202);
+}
+
+DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Invalid access of expired document") {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto partIter = PartitionIterator(getExpCtx().get(), mock.get(), boost::none);
+    auto endpointAccessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpointsOnly);
+    auto defaultAccessor =
+        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    // Mock a window with documents [1, 2].
+    auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
+                                      SortPattern(BSON("a" << 1), getExpCtx()),
+                                      getExpCtx().get());
+
+    // Before advancing, ensure that both accessors expire the first document.
+    auto endpoints = endpointAccessor.getEndpoints(bounds);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *endpointAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *endpointAccessor[endpoints->second]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *defaultAccessor[1]);
+
+    // Advance the iterator which frees the first expired document.
+    partIter.advance();
+
+    // Advance again to get the iterator to document {a: 3}.
+    partIter.advance();
+    // Adjust the default accessor to refer back to the document {a: 2}.
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *defaultAccessor[-1]);
+    // Keep the same endpoint accessor, which will only include the last document.
+    endpoints = endpointAccessor.getEndpoints(bounds);
+    ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *endpointAccessor[endpoints->first]);
+    ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *endpointAccessor[endpoints->second]);
+
+    // Since the default accessor has not read {a: 3} yet, it won't be released after another
+    // advance.
+    partIter.advance();
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *defaultAccessor[-1]);
+
+    // The iterator is currently at {a: 4}, with {a: 1} and {a: 2} both being released.
+    ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5371202);
 }
 
 }  // namespace
