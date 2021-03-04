@@ -857,8 +857,6 @@ AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransa
 
 void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntry(
     const BSONObj& entry) {
-    OpObserver* opObserver = cc().getServiceContext()->getOpObserver();
-
     auto sessionTxnRecord =
         SessionTxnRecord::parse(IDLParserErrorContext("SessionTxnRecord"), entry);
     auto sessionId = sessionTxnRecord.getSessionId();
@@ -905,27 +903,28 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     txnParticipant.beginOrContinueTransactionUnconditionally(opCtx, txnNumber);
 
+    MutableOplogEntry noopEntry;
+    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
+    noopEntry.setNss({});
+    noopEntry.setObject({});
+    noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    noopEntry.setSessionId(sessionId);
+    noopEntry.setTxnNumber(txnNumber);
+
+    // Use the same wallclock time as the noop entry.
+    sessionTxnRecord.setStartOpTime(boost::none);
+    sessionTxnRecord.setLastWriteOpTime(OpTime());
+    sessionTxnRecord.setLastWriteDate(noopEntry.getWallClockTime());
+
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx, "writeDonorCommittedTxnEntry", NamespaceString::kRsOplogNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
 
-            OperationSessionInfo sessionInfo;
-            sessionInfo.setSessionId(sessionId);
-            sessionInfo.setTxnNumber(txnNumber);
-            auto sessionInfoBson = sessionInfo.toBSON();
-
-            // Write the no-op entry and trigger 'config.transactions' update.
-            opObserver->onInternalOpMessage(opCtx,
-                                            NamespaceString(),
-                                            boost::none /* uuid */,
-                                            {} /* msgObj */,
-                                            sessionInfoBson /* o2MsgObj */,
-                                            boost::none /* preImageOpTime */,
-                                            boost::none /* postImageOpTime */,
-                                            boost::none /* prevWriteOpTimeInTransaction */,
-                                            boost::none /* slot */
-            );
+            // Write the no-op entry and update 'config.transactions'.
+            repl::logOp(opCtx, &noopEntry);
+            TransactionParticipant::get(opCtx).onWriteOpCompletedOnPrimary(
+                opCtx, {}, sessionTxnRecord);
 
             wuow.commit();
         });
@@ -933,7 +932,6 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     // Invalidate in-memory state so that the next time the session is checked out, it would reload
     // the transaction state from 'config.transactions'.
     txnParticipant.invalidate(opCtx);
-    return;
 }
 
 void TenantMigrationRecipientService::Instance::_fetchCommittedTransactionsBeforeStartOpTime() {
@@ -1234,14 +1232,9 @@ OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOp
              getMigrationUUID());
         // Find the most recent no-op oplog entry from the current migration.
         if (isFromCurrentMigration &&
-            (oplogObj.getStringField("op") == OpType_serializer(repl::OpTypeEnum::kNoop))) {
-            const auto migratedEntryObj = oplogObj.getObjectField("o");
-            if (migratedEntryObj.isEmpty()) {
-                // If the 'o' field is empty, this entry is a transaction no-op entry. Skip this
-                // entry and continue.
-                continue;
-            }
-
+            (oplogObj.getStringField("op") == OpType_serializer(repl::OpTypeEnum::kNoop)) &&
+            oplogObj.hasField("o2")) {
+            const auto migratedEntryObj = oplogObj.getObjectField("o2");
             const auto swDonorOpTime = repl::OpTime::parseFromOplogEntry(migratedEntryObj);
             uassert(5272305,
                     str::stream() << "Unable to parse opTime from tenant migration oplog entry: "

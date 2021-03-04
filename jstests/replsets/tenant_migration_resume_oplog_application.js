@@ -82,8 +82,8 @@ let resultsArr = appliedNoOps.toArray();
 // We should have applied the no-op oplog entries for the first batch of documents (size 2).
 assert.eq(2, appliedNoOps.count(), appliedNoOps);
 // No-op entries will be in the same order.
-assert.eq(docsToApply[0], resultsArr[0].o.o, resultsArr);
-assert.eq(docsToApply[1], resultsArr[1].o.o, resultsArr);
+assert.eq(docsToApply[0], resultsArr[0].o2.o, resultsArr);
+assert.eq(docsToApply[1], resultsArr[1].o2.o, resultsArr);
 
 // Step up a new node in the recipient set and trigger a failover. The new primary should resume
 // fetching starting from the unapplied documents.
@@ -100,7 +100,7 @@ local = newRecipientPrimary.getDB("local");
 appliedNoOps = local.oplog.rs.find({fromTenantMigration: migrationId, op: "n"});
 resultsArr = appliedNoOps.toArray();
 assert.eq(3, appliedNoOps.count(), appliedNoOps);
-assert.eq(docsToApply[2], resultsArr[2].o.o, resultsArr);
+assert.eq(docsToApply[2], resultsArr[2].o2.o, resultsArr);
 
 tenantMigrationTest.checkTenantDBHashes(tenantId);
 tenantMigrationTest.stop();
