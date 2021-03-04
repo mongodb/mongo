@@ -51,6 +51,8 @@ selector:
   # Tests which expect commands to fail and catch the error can cause transactions to abort and
   # retry indefinitely.
   - catches_command_failures
+  # time-series collections do not support write transactions
+  - requires_timeseries
 
 executor:
   archive:

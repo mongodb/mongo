@@ -2,8 +2,8 @@
 
 /**
  * Creates a time-series collection with a short expireAfterSeconds value. Each thread does an
- * insert on each iteration with the current time and its thread id. At the end, we wait until the
- * first set of documents has been deleted.
+ * insert on each iteration with a time, a metadata field, 'tid', and random measurement, 'data'. At
+ * the end, we wait until the first set of documents has been deleted.
  *
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
@@ -25,6 +25,7 @@ var $config = (function() {
     const metaFieldName = "tid";
     const ttlSeconds = 3;
     const defaultBucketMaxRangeMs = 3600 * 1000;
+    const batchSize = 10;
 
     const getCollectionName = function(collName) {
         return "insert_ttl_timeseries_" + collName;
@@ -56,7 +57,10 @@ var $config = (function() {
             assertAlways.eq(1, res.nInserted, tojson(res));
         },
 
-        insert: function insert(db, collName) {
+        /**
+         * Insert a single measurement for the current thread id.
+         */
+        insertOne: function insertOne(db, collName) {
             if (!this.supportsTimeseriesCollections) {
                 return;
             }
@@ -66,10 +70,109 @@ var $config = (function() {
             const res = coll.insert({
                 [metaFieldName]: this.tid,
                 [timeFieldName]: getTime(),
-                data: Math.random(),
+                data: Random.rand(),
             });
             assertAlways.commandWorked(res);
             assertAlways.eq(1, res.nInserted, tojson(res));
+        },
+
+        /**
+         * Insert an ordered batch for the current thread id. All measurements should end up in the
+         * same bucket.
+         */
+        insertManyOrdered: function insertManyOrdered(db, collName) {
+            if (!this.supportsTimeseriesCollections) {
+                return;
+            }
+
+            collName = getCollectionName(collName);
+            const coll = db.getCollection(collName);
+            const docs = [];
+            for (let i = 0; i < batchSize; i++) {
+                docs.push({
+                    [metaFieldName]: this.tid,
+                    [timeFieldName]: getTime(),
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: true});
+            assertAlways.commandWorked(res);
+            assertAlways.eq(res.insertedIds.length, batchSize);
+        },
+
+        /**
+         * Insert an unordered batch for a specific thread id. All measurements should end up in
+         * the same bucket.
+         */
+        insertManyUnordered: function insertManyUnordered(db, collName) {
+            if (!this.supportsTimeseriesCollections) {
+                return;
+            }
+
+            collName = getCollectionName(collName);
+            const coll = db.getCollection(collName);
+            const docs = [];
+            for (let i = 0; i < batchSize; i++) {
+                docs.push({
+                    [metaFieldName]: this.tid,
+                    [timeFieldName]: getTime(),
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: false});
+            assertAlways.commandWorked(res);
+            assertAlways.eq(res.insertedIds.length, batchSize);
+        },
+
+        /**
+         * Writers are not restricted to insert documents for their thread id. Insert a batch with
+         * randomized thread ids to exercise the case where a batch insert results in writes to
+         * several different buckets.
+         */
+        insertManyRandTid: function insertManyRandTid(db, collName) {
+            if (!this.supportsTimeseriesCollections) {
+                return;
+            }
+
+            collName = getCollectionName(collName);
+            const coll = db.getCollection(collName);
+            const docs = [];
+            for (let i = 0; i < batchSize; i++) {
+                docs.push({
+                    [metaFieldName]: Random.randInt(this.threadCount),
+                    [timeFieldName]: getTime(),
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: false});
+            assertAlways.commandWorked(res);
+            assertAlways.eq(res.insertedIds.length, batchSize);
+        },
+
+        /**
+         * Insert a batch for the current thread id but with older times that should be inserted in
+         * different buckets.
+         */
+        insertManyOld: function insertManyOld(db, collName) {
+            if (!this.supportsTimeseriesCollections) {
+                return;
+            }
+
+            collName = getCollectionName(collName);
+            const coll = db.getCollection(collName);
+            const docs = [];
+            const start = getTime();
+            for (let i = 0; i < batchSize; i++) {
+                let time = new Date(start.getTime() - ((batchSize - i) * defaultBucketMaxRangeMs));
+                docs.push({
+                    [metaFieldName]: this.tid,
+                    [timeFieldName]: time,
+                    data: Random.rand(),
+                });
+            }
+            const res = coll.insertMany(docs, {ordered: false});
+            assertAlways.commandWorked(res);
+            assertAlways.eq(res.insertedIds.length, batchSize);
         }
     };
 
@@ -111,14 +214,26 @@ var $config = (function() {
         }, 'Expected oldest documents to be removed', timeoutMS);
     }
 
+    const standardTransition = {
+        insertOne: 0.4,
+        insertManyOrdered: 0.1,
+        insertManyUnordered: 0.1,
+        insertManyRandTid: 0.1,
+        insertManyOld: 0.1
+    };
+
     const transitions = {
-        init: {insert: 1},
-        insert: {insert: 1},
+        init: standardTransition,
+        insertOne: standardTransition,
+        insertManyOrdered: standardTransition,
+        insertManyUnordered: standardTransition,
+        insertManyRandTid: standardTransition,
+        insertManyOld: standardTransition,
     };
 
     return {
         threadCount: 20,
-        iterations: 200,
+        iterations: 150,
         states: states,
         data: initData,
         transitions: transitions,
