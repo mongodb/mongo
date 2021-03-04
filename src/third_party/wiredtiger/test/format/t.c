@@ -378,7 +378,7 @@ format_die(void)
         testutil_check(__wt_debug_cursor_page(g.page_dump_cursor, g.home_pagedump));
         fprintf(stderr, "snapshot-isolation error: Dumping HS to %s\n", g.home_hsdump);
 #if WIREDTIGER_VERSION_MAJOR >= 10
-        testutil_check(__wt_debug_cursor_tree_hs(g.page_dump_cursor, g.home_hsdump));
+        testutil_check(__wt_debug_cursor_tree_hs(CUR2S(g.page_dump_cursor), g.home_hsdump));
 #endif
     }
 #endif
