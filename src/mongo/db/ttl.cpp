@@ -59,6 +59,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/log_with_sampling.h"
 
 namespace mongo {
 
@@ -215,7 +216,7 @@ private:
                 } catch (const DBException& ex) {
                     LOGV2_ERROR(5400703,
                                 "Error running TTL job on collection",
-                                "collection"_attr = nss,
+                                logAttrs(*nss),
                                 "error"_attr = ex);
                     continue;
                 }
@@ -328,7 +329,7 @@ private:
         LOGV2_DEBUG(22533,
                     1,
                     "running TTL job for index",
-                    "collection"_attr = collection->ns(),
+                    logAttrs(collection->ns()),
                     "key"_attr = key,
                     "name"_attr = name);
 
@@ -381,6 +382,7 @@ private:
         params->isMulti = true;
         params->canonicalQuery = canonicalQuery.getValue().get();
 
+        Timer timer;
         auto exec =
             InternalPlanner::deleteWithIndexScan(opCtx,
                                                  &collection,
@@ -395,7 +397,20 @@ private:
         try {
             const auto numDeleted = exec->executeDelete();
             ttlDeletedDocuments.increment(numDeleted);
-            LOGV2_DEBUG(22536, 1, "deleted: {numDeleted}", "numDeleted"_attr = numDeleted);
+
+            const auto duration = Milliseconds(timer.millis());
+            if (shouldLogSlowOpWithSampling(opCtx,
+                                            logv2::LogComponent::kIndex,
+                                            duration,
+                                            Milliseconds(serverGlobalParams.slowMS))
+                    .first) {
+                LOGV2(5479200,
+                      "Deleted expired documents using index",
+                      logAttrs(collection->ns()),
+                      "index"_attr = name,
+                      "numDeleted"_attr = numDeleted,
+                      "duration"_attr = duration);
+            }
         } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
             // It is expected that a collection drop can kill a query plan while the TTL monitor
             // is deleting an old document, so ignore this error.
@@ -425,7 +440,7 @@ private:
         LOGV2_DEBUG(5400704,
                     1,
                     "running TTL job for collection clustered by _id",
-                    "collection"_attr = collection->ns());
+                    logAttrs(collection->ns()));
 
         const auto expirationDate = safeExpirationDate(collection, *expireAfterSeconds);
 
@@ -440,6 +455,7 @@ private:
 
         // Deletes records using a bounded collection scan from the beginning of time to the
         // expiration time (inclusive).
+        Timer timer;
         auto exec =
             InternalPlanner::deleteWithCollectionScan(opCtx,
                                                       &collection,
@@ -452,7 +468,19 @@ private:
         try {
             const auto numDeleted = exec->executeDelete();
             ttlDeletedDocuments.increment(numDeleted);
-            LOGV2_DEBUG(5400702, 1, "deleted", "numDeleted"_attr = numDeleted);
+
+            const auto duration = Milliseconds(timer.millis());
+            if (shouldLogSlowOpWithSampling(opCtx,
+                                            logv2::LogComponent::kIndex,
+                                            duration,
+                                            Milliseconds(serverGlobalParams.slowMS))
+                    .first) {
+                LOGV2(5400702,
+                      "Deleted expired documents using collection scan",
+                      logAttrs(collection->ns()),
+                      "numDeleted"_attr = numDeleted,
+                      "duration"_attr = duration);
+            }
         } catch (const ExceptionFor<ErrorCodes::QueryPlanKilled>&) {
             // It is expected that a collection drop can kill a query plan while the TTL monitor
             // is deleting an old document, so ignore this error.

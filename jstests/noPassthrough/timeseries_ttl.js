@@ -106,5 +106,40 @@ testCase((coll, bucketsColl) => {
     assert.eq(0, bucketsColl.find().itcount());
 });
 
+testCase((coll, bucketsColl) => {
+    // Insert two measurements using insertMany that end up in the same bucket, but where the
+    // minimum is 5 minutes earlier. Expect that the TTL monitor does not delete the data even
+    // though the bucket minimum is past the expiry.
+    const maxTime = new Date();
+    const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
+    assert.commandWorked(coll.insertMany([
+        {[timeFieldName]: minTime, [metaFieldName]: "localhost"},
+        {[timeFieldName]: maxTime, [metaFieldName]: "localhost"}
+    ]));
+
+    assert.eq(2, coll.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
+
+    waitForTTL();
+    assert.eq(2, coll.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
+});
+
+testCase((coll, bucketsColl) => {
+    // Insert two measurements with insertMany 5 minutes apart that end up in the same bucket and
+    // both are older than the TTL expiry and the maximum bucket range. Expect that the TTL monitor
+    // deletes the data because the bucket minimum is past the expiry plus the maximum bucket range.
+    const maxTime = new Date((new Date()).getTime() - (1000 * defaultBucketMaxRange));
+    const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
+    assert.commandWorked(coll.insertMany([
+        {[timeFieldName]: minTime, [metaFieldName]: "localhost"},
+        {[timeFieldName]: maxTime, [metaFieldName]: "localhost"}
+    ]));
+
+    waitForTTL();
+    assert.eq(0, coll.find().itcount());
+    assert.eq(0, bucketsColl.find().itcount());
+});
+
 MongoRunner.stopMongod(conn);
 })();
