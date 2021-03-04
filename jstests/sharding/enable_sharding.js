@@ -5,7 +5,7 @@
 (function() {
 'use strict';
 
-var st = new ShardingTest({mongos: 2, shards: 2});
+var st = new ShardingTest({shards: 2});
 
 jsTest.log('enableSharding can run only against the admin database');
 {
@@ -49,20 +49,7 @@ jsTest.log('Verify config.databases metadata');
 }
 
 jsTest.log('Sharding a collection before enableSharding is called fails');
-{
-    assert.commandFailed(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
-    assert.commandFailed(st.s1.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
-
-    assert.commandWorked(st.s0.getDB('TestDB').TestColl.insert({_id: 0}));
-    assert.commandWorked(st.s1.getDB('TestDB').TestColl.insert({_id: 1}));
-}
-
-jsTest.log('Calling enableSharding on one mongos and shardCollection through another must work');
-{
-    assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
-    assert.commandWorked(st.s1.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
-    assert.commandWorked(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}}));
-}
+{ assert.commandFailed(st.s0.adminCommand({shardCollection: 'TestDB.TestColl', key: {_id: 1}})); }
 
 jsTest.log('Cannot enable sharding on a database using a wrong shard name');
 {
