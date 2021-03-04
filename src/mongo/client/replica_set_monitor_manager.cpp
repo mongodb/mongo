@@ -342,4 +342,10 @@ bool ReplicaSetMonitorManager::isShutdown() const {
 void ReplicaSetMonitorConnectionManager::dropConnections(const HostAndPort& hostAndPort) {
     _network->dropConnections(hostAndPort);
 }
+
+void ReplicaSetMonitorManager::installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _monitors[monitor->getName()] = monitor;
+}
+
 }  // namespace mongo

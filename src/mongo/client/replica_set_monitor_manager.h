@@ -156,6 +156,7 @@ public:
 
     bool isShutdown() const;
 
+    void installMonitor_forTests(std::shared_ptr<ReplicaSetMonitor> monitor);
 
 private:
     /**
