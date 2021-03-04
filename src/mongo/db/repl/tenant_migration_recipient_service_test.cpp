@@ -113,7 +113,8 @@ MutableOplogEntry makeNoOpOplogEntry(OpTime opTime,
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setOpTime(opTime);
     oplogEntry.setNss(nss);
-    oplogEntry.setObject(o);
+    oplogEntry.setObject({});
+    oplogEntry.setObject2(o);
     oplogEntry.setWallClockTime(Date_t::now());
     if (migrationUUID) {
         oplogEntry.setFromTenantMigration(migrationUUID.get());
@@ -1913,11 +1914,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     // Create and insert the following into the oplog:
     // - (1) An oplog entry with opTime earlier than 'cloneFinishedRecipientOpTime'.
     // - (2) An oplog entry with opTime greater than 'cloneFinishedRecipientOpTime'.
-    // - (3) A no-op oplog entry with an inner donor oplog entry as the 'o' field. The donor opTime
-    //   is less than the 'startApplyingDonorOpTime'.
-    // - (4) A no-op oplog entry with an inner oplog entry as the 'o' field but no 'fromMigrate'
-    // field. These oplog entries do not satisfy the conditions for the oplog applier to resume from
-    // so we default to resuming from 'startDonorApplyingOpTime'.
+    // - (3) A no-op oplog entry with an inner donor oplog entry as the 'o2' field. The donor opTime
+    //       is less than the 'startApplyingDonorOpTime'.
+    // - (4) A no-op oplog entry with an inner oplog entry as the 'o2' field but no
+    //       'fromTenantMigrate' field. These oplog entries do not satisfy the conditions for the
+    //       oplog applier to resume from so we default to resuming from 'startDonorApplyingOpTime'.
     const auto insertNss = NamespaceString("tenantA_foo.bar");
     const auto beforeStartApplyingOpTime = OpTime(Timestamp(1, 1), 1);
     const auto entryBeforeStartApplyingOpTime = makeOplogEntry(

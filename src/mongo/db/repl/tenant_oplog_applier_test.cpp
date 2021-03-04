@@ -160,7 +160,7 @@ public:
     }
 
     void assertNoOpMatches(const OplogEntry& op, const MutableOplogEntry& noOp) {
-        ASSERT_BSONOBJ_EQ(op.getEntry().toBSON(), noOp.getObject());
+        ASSERT_BSONOBJ_EQ(op.getEntry().toBSON(), *noOp.getObject2());
         ASSERT_EQ(op.getNss(), noOp.getNss());
         ASSERT_EQ(op.getUuid(), noOp.getUuid());
         ASSERT_EQ(_migrationUuid, noOp.getFromTenantMigration());

@@ -696,27 +696,6 @@ void OpObserverImpl::onInternalOpMessage(
         oplogEntry.setOpTime(*slot);
     }
     logOperation(opCtx, &oplogEntry);
-
-    if (repl::tenantMigrationRecipientInfo(opCtx) && o2MsgObj) {
-        OperationSessionInfo sessionInfo;
-        try {
-            sessionInfo = OperationSessionInfo::parse(IDLParserErrorContext("OperationSessionInfo"),
-                                                      *o2MsgObj);
-        } catch (const DBException&) {
-            // Not a transaction no-op for tenant migration.
-        }
-        // TODO SERVER-53509: Handle retryable writes.
-        if (sessionInfo.getSessionId() && sessionInfo.getTxnNumber()) {
-            SessionTxnRecord sessionTxnRecord;
-            sessionTxnRecord.setSessionId(*sessionInfo.getSessionId());
-            sessionTxnRecord.setTxnNum(*sessionInfo.getTxnNumber());
-            sessionTxnRecord.setLastWriteOpTime(repl::OpTime());
-            sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
-            sessionTxnRecord.setState(DurableTxnStateEnum::kCommitted);
-            TransactionParticipant::get(opCtx).onWriteOpCompletedOnPrimary(
-                opCtx, {}, sessionTxnRecord);
-        }
-    }
 }
 
 void OpObserverImpl::onCreateCollection(OperationContext* opCtx,

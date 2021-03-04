@@ -477,7 +477,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
                 status = scheduleStatus;
             } else {
                 try {
-                    _writeSessionNoOpsForRange(opObserver, s.second.begin(), s.second.end());
+                    _writeSessionNoOpsForRange(s.second.begin(), s.second.end());
                 } catch (const DBException& e) {
                     status = e.toStatus();
                 }
@@ -503,7 +503,6 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
 }
 
 void TenantOplogApplier::_writeSessionNoOpsForRange(
-    OpObserver* opObserver,
     std::vector<TenantNoOpEntry>::const_iterator begin,
     std::vector<TenantNoOpEntry>::const_iterator end) {
     auto opCtx = cc().makeOperationContext();
@@ -521,14 +520,23 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
         invariant(!isResumeTokenNoop(entry));
         invariant(entry.getSessionId());
 
+        MutableOplogEntry noopEntry;
+        noopEntry.setOpType(repl::OpTypeEnum::kNoop);
+        noopEntry.setNss(entry.getNss());
+        noopEntry.setUuid(entry.getUuid());
+        noopEntry.setObject({});  // Empty 'o' field.
+        noopEntry.setObject2(entry.getEntry().toBSON());
+        noopEntry.setOpTime(*iter->second);
+        noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
         boost::optional<MongoDOperationContextSession> scopedSession;
-        boost::optional<BSONObj> o2;
+        boost::optional<SessionTxnRecord> sessionTxnRecord;
         if (entry.getTxnNumber() && !entry.isPartialTransaction() &&
             (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
              entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps)) {
             // Final applyOp for a transaction.
-            const auto& sessionId = *entry.getSessionId();
-            const auto& txnNumber = *entry.getTxnNumber();
+            auto sessionId = *entry.getSessionId();
+            auto txnNumber = *entry.getTxnNumber();
             opCtx->setLogicalSessionId(sessionId);
             opCtx->setTxnNumber(txnNumber);
             opCtx->setInMultiDocumentTransaction();
@@ -538,7 +546,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         "sessionId"_attr = sessionId,
                         "txnNumber"_attr = txnNumber,
                         "tenant"_attr = _tenantId,
-                        "migrationUuid"_attr = _migrationUuid);
+                        "migrationUuid"_attr = _migrationUuid,
+                        "op"_attr = redact(entry.toBSONForLogging()));
 
             // Check out the session.
             scopedSession.emplace(opCtx.get());
@@ -558,37 +567,35 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     txnParticipant.getActiveTxnNumber() < txnNumber);
             txnParticipant.beginOrContinueTransactionUnconditionally(opCtx.get(), txnNumber);
 
-            OperationSessionInfo sessionInfo;
-            sessionInfo.setSessionId(sessionId);
-            sessionInfo.setTxnNumber(txnNumber);
-            o2 = sessionInfo.toBSON();
+            // Only set sessionId and txnNumber for the final applyOp in a transaction.
+            noopEntry.setSessionId(sessionId);
+            noopEntry.setTxnNumber(txnNumber);
+
+            // Use the same wallclock time as the noop entry.
+            sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
+            sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
         }
+
+        // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
+        const boost::optional<OpTime> preImageOpTime = boost::none;
+        const boost::optional<OpTime> postImageOpTime = boost::none;
+        // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
+        const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
+        noopEntry.setPreImageOpTime(preImageOpTime);
+        noopEntry.setPostImageOpTime(postImageOpTime);
+        noopEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
 
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
         writeConflictRetry(
             opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 WriteUnitOfWork wuow(opCtx.get());
 
-                // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
-                const boost::optional<OpTime> preImageOpTime = boost::none;
-                const boost::optional<OpTime> postImageOpTime = boost::none;
-                // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
-                const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
-
-                // Write the noop entry and trigger config.transactions update.
-                opObserver->onInternalOpMessage(
-                    opCtx.get(),
-                    entry.getNss(),
-                    entry.getUuid(),
-                    entry.getEntry().toBSON(),
-                    o2,
-                    // We link the no-ops together by recipient op time the same way the actual ops
-                    // were linked together by donor op time.  This is to allow retryable writes
-                    // and changestreams to find the ops they need.
-                    preImageOpTime,
-                    postImageOpTime,
-                    prevWriteOpTimeInTransaction,
-                    *iter->second);
+                // Write the noop entry and update config.transactions.
+                repl::logOp(opCtx.get(), &noopEntry);
+                if (sessionTxnRecord) {
+                    TransactionParticipant::get(opCtx.get())
+                        .onWriteOpCompletedOnPrimary(opCtx.get(), {}, *sessionTxnRecord);
+                }
 
                 wuow.commit();
             });
@@ -636,8 +643,8 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                     opCtx.get(),
                     entry.getNss(),
                     entry.getUuid(),
+                    {},  // Empty 'o' field.
                     entry.getEntry().toBSON(),
-                    BSONObj(),
                     // We link the no-ops together by recipient op time the same way the actual ops
                     // were linked together by donor op time.  This is to allow retryable writes
                     // and changestreams to find the ops they need.
