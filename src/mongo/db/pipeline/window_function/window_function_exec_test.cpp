@@ -270,14 +270,34 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, DefaultValueWorksAsExpected) {
     ASSERT(mgr.getNext().nullish());  // Default value
 }
 
-TEST_F(WindowFunctionExecRemovableDocumentTest, FunctionalityNotSupported) {
+TEST_F(WindowFunctionExecRemovableDocumentTest, RightUnboundedDoesNotAddDocumentsDuringWindow) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
-        Document{{"a", 3}}, Document{{"a", 2}}, Document{{"a", 1}}};
-    ASSERT_THROWS_CODE(
-        createForFieldPath(
-            std::move(docs), "$a", WindowBounds::DocumentBased{1, WindowBounds::Unbounded{}}),
-        AssertionException,
-        5339801);
+        Document{{"a", 3}}, Document{{"a", 2}}, Document{{"a", 1}}, Document{{"a", 17}}};
+    auto mgr = createForFieldPath(
+        std::move(docs),
+        "$a",
+        WindowBounds::DocumentBased{WindowBounds::Current{}, WindowBounds::Unbounded{}});
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
+
+    const auto docsTwo = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 18}}, Document{{"a", 2}}, Document{{"a", 1}}, Document{{"a", 17}}};
+    mgr = createForFieldPath(
+        std::move(docsTwo), "$a", WindowBounds::DocumentBased{-1, WindowBounds::Unbounded{}});
+    ASSERT_VALUE_EQ(Value(18), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(18), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
+    ASSERT_VALUE_EQ(Value(17), mgr.getNext());
+    advanceIterator();
 }
 
 TEST_F(WindowFunctionExecRemovableDocumentTest, EnsureFirstDocumentIsNotRemovedEarly) {

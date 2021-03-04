@@ -53,7 +53,7 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
     stdx::visit(
         visit_helper::Overloaded{
             [](const WindowBounds::Unbounded&) {
-                uasserted(5339801, "Right unbounded windows are not yet supported");
+                // Pass. _upperBound defaults to boost::none which represents no upper bound.
             },
             [&](const WindowBounds::Current&) { _upperBound = 0; },
             [&](const int& upperIndex) { _upperBound = upperIndex; },
@@ -63,7 +63,9 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
 
 void WindowFunctionExecRemovableDocument::initialize() {
     int lowerBoundForInit = _lowerBound > 0 ? _lowerBound : 0;
-    for (int i = lowerBoundForInit; i <= _upperBound; ++i) {
+    // Run the loop until we hit the out of partition break (right unbounded) or we hit the upper
+    // bound.
+    for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (*this->_iter)[i]) {
             addValue(_input->evaluate(*doc, nullptr));
