@@ -57,7 +57,7 @@ namespace mongo {
 class DistLockManager {
 public:
     // Default timeout which will be used if one is not passed to the lock method.
-    static const Seconds kDefaultLockTimeout;
+    static const Minutes kDefaultLockTimeout;
 
     // Timeout value, which specifies that if the lock is not available immediately, no attempt
     // should be made to wait for it to become free.

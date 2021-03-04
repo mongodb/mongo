@@ -43,7 +43,7 @@ const auto getDistLockManager =
 
 }  // namespace
 
-const Seconds DistLockManager::kDefaultLockTimeout(20);
+const Minutes DistLockManager::kDefaultLockTimeout(5);
 const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
 
 DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* opCtx,
@@ -155,7 +155,7 @@ DistLockManager::ScopedLock::~ScopedLock() {
 
         iter->second->numWaiting--;
         iter->second->isInProgress = false;
-        iter->second->cvLocked.notify_all();
+        iter->second->cvLocked.notify_one();
 
         if (iter->second->numWaiting == 0) {
             _lockManager->_inProgressMap.erase(_ns);
