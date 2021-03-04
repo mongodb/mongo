@@ -222,17 +222,30 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
             }
 
-            // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
-            if (!cmr.indexHidden.eoo() && cmr.idx->hidden() == cmr.indexHidden.booleanSafe()) {
-                // If the collMod includes "expireAfterSeconds", remove the no-op "hidden" parameter
-                // and write the remaining "index" object to the oplog entry builder.
-                if (!cmr.indexExpireAfterSeconds.eoo()) {
-                    oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
+            if (cmr.indexHidden) {
+                // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
+                if (cmr.idx->hidden() == cmr.indexHidden.booleanSafe()) {
+                    // If the collMod includes "expireAfterSeconds", remove the no-op "hidden"
+                    // parameter and write the remaining "index" object to the oplog entry builder.
+                    if (!cmr.indexExpireAfterSeconds.eoo()) {
+                        oplogEntryBuilder->append(fieldName, indexObj.removeField("hidden"));
+                    }
+                    // Un-set "indexHidden" in CollModRequest, and skip the automatic write to the
+                    // oplogEntryBuilder that occurs at the end of the parsing loop.
+                    cmr.indexHidden = {};
+                    continue;
                 }
-                // Un-set "indexHidden" in CollModRequest, and skip the automatic write to the
-                // oplogEntryBuilder that occurs at the end of the parsing loop.
-                cmr.indexHidden = {};
-                continue;
+
+                // Disallow index hiding/unhiding on system collections.
+                if (nss.isSystem()) {
+                    return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
+                }
+
+                // Disallow index hiding/unhiding on _id indexes - these are created by default and
+                // are critical to most collection operations.
+                if (cmr.idx->isIdIndex()) {
+                    return Status(ErrorCodes::BadValue, "can't hide _id index");
+                }
             }
         } else if (fieldName == "validator" && !isView) {
             // If the feature compatibility version is not kLatest, and we are validating features
@@ -436,13 +449,6 @@ Status _collModInternal(OperationContext* opCtx,
     // WriteConflictExceptions thrown in the writeConflictRetry loop below can cause cmrNew.idx to
     // become invalid, so save a copy to use in the loop until we can refresh it.
     auto idx = cmrNew.idx;
-
-    if (indexHidden) {
-        if (coll->ns().isSystem())
-            return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
-        if (idx->isIdIndex())
-            return Status(ErrorCodes::BadValue, "can't hide _id index");
-    }
 
     return writeConflictRetry(opCtx, "collMod", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
