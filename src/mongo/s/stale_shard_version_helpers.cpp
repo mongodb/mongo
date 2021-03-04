@@ -31,10 +31,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/s/stale_shard_version_helpers.h"
+
 #include "mongo/logv2/log.h"
-#include "stale_shard_version_helpers.h"
 
 namespace mongo {
+
 void logFailedRetryAttempt(StringData taskDescription, const DBException& exception) {
     LOGV2_DEBUG(4553800,
                 3,
@@ -42,4 +44,5 @@ void logFailedRetryAttempt(StringData taskDescription, const DBException& except
                 "task_description"_attr = taskDescription,
                 "exception"_attr = exception);
 }
+
 }  // namespace mongo

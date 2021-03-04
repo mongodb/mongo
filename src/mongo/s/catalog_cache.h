@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-class BSONObjBuilder;
-
 static constexpr int kMaxNumStaleVersionRetries = 10;
 
 using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, ComparableDatabaseVersion>;

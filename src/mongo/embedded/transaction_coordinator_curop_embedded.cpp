@@ -26,6 +26,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_curop.h"
 
@@ -38,7 +41,6 @@ void reportCurrentOpsForTransactionCoordinatorsImpl(OperationContext* opCtx,
 
 auto reportCurrentOpsForTransactionCoordinatorsRegistration = MONGO_WEAK_FUNCTION_REGISTRATION(
     reportCurrentOpsForTransactionCoordinators, reportCurrentOpsForTransactionCoordinatorsImpl);
-
 
 }  // namespace
 }  // namespace mongo

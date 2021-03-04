@@ -35,10 +35,10 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/resharding_test_commands_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding_test_commands_gen.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
