@@ -8,6 +8,20 @@ logging:
     handlers:
       - class: logging.StreamHandler
   tests:
-    format: '[%(name)s] %(asctime)s %(message)s'
+    format: '[%(name)s] %(message)s'
     handlers:
       - class: logging.StreamHandler
+
+shorten_logger_name:
+  remove:
+    - MongoDFixture
+    - ReplicaSetFixture
+    - ShardedClusterFixture
+  replace:
+    primary: prim
+    secondary: sec
+    node: n
+    shard: s
+    configsvr: c
+    mongos: s
+    job: j

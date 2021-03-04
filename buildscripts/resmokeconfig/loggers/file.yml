@@ -12,8 +12,22 @@ logging:
         filename: fixture.log
         mode: w
   tests:
-    format: '[%(name)s] %(asctime)s %(message)s'
+    format: '[%(name)s] %(message)s'
     handlers:
       - class: logging.FileHandler
         filename: tests.log
         mode: w
+
+shorten_logger_name:
+  remove:
+    - MongoDFixture
+    - ReplicaSetFixture
+    - ShardedClusterFixture
+  replace:
+    primary: prim
+    secondary: sec
+    node: n
+    shard: s
+    configsvr: c
+    mongos: s
+    job: j

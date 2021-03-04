@@ -649,6 +649,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         output = []
         for node in self.nodes:
             output += node.get_node_info()
+        if self.initial_sync_node:
+            output += self.initial_sync_node.get_node_info()
         return output
 
     def get_driver_connection_url(self):

@@ -349,7 +349,9 @@ def _set_logging_config():
         # If the user provides a full valid path to a logging config
         # we don't need to search LOGGER_DIR for the file.
         if os.path.exists(pathname):
-            _config.LOGGING_CONFIG = utils.load_yaml_file(pathname).pop("logging")
+            logger_config = utils.load_yaml_file(pathname)
+            _config.LOGGING_CONFIG = logger_config.pop("logging")
+            _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop("shorten_logger_name")
             return
 
         root = os.path.abspath(_config.LOGGER_DIR)
@@ -360,7 +362,9 @@ def _set_logging_config():
                 config_file = os.path.join(root, filename)
                 if not os.path.isfile(config_file):
                     raise ValueError("Expected a logger YAML config, but got '%s'" % pathname)
-                _config.LOGGING_CONFIG = utils.load_yaml_file(config_file).pop("logging")
+                logger_config = utils.load_yaml_file(config_file)
+                _config.LOGGING_CONFIG = logger_config.pop("logging")
+                _config.SHORTEN_LOGGER_NAME_CONFIG = logger_config.pop("shorten_logger_name")
                 return
 
         raise ValueError("Unknown logger '%s'" % pathname)

@@ -506,7 +506,8 @@ class _MongoSFixture(interface.Fixture):
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
-        info = interface.NodeInfo(name=self.logger.name, port=self.port, pid=self.mongos.pid)
+        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
+                                  port=self.port, pid=self.mongos.pid)
         return [info]
 
 

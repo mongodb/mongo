@@ -8,6 +8,20 @@ logging:
     handlers:
       - class: buildlogger
   tests:
-    format: '[%(name)s] %(asctime)s %(message)s'
+    format: '[%(name)s] %(message)s'
     handlers:
       - class: buildlogger
+
+shorten_logger_name:
+  remove:
+    - MongoDFixture
+    - ReplicaSetFixture
+    - ShardedClusterFixture
+  replace:
+    primary: prim
+    secondary: sec
+    node: n
+    shard: s
+    configsvr: c
+    mongos: s
+    job: j
