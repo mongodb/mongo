@@ -193,7 +193,8 @@ class MongoDFixture(interface.Fixture):
 
     def get_node_info(self):
         """Return a list of NodeInfo objects."""
-        info = interface.NodeInfo(name=self.logger.name, port=self.port, pid=self.mongod.pid)
+        info = interface.NodeInfo(full_name=self.logger.full_name, name=self.logger.name,
+                                  port=self.port, pid=self.mongod.pid)
         return [info]
 
     def get_internal_connection_string(self):

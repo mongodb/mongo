@@ -527,3 +527,4 @@ LOGGER_DIR = None
 
 # Generated logging config for the current invocation.
 LOGGING_CONFIG: dict = {}
+SHORTEN_LOGGER_NAME_CONFIG: dict = {}

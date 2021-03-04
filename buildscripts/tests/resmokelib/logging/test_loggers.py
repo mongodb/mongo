@@ -1,6 +1,5 @@
 """Unit tests for the buildscripts.resmokelib.logging.loggers module."""
 
-import json
 import unittest
 from unittest.mock import MagicMock
 
@@ -72,3 +71,34 @@ class TestLoggers(unittest.TestCase):
         loggers._FIXTURE_LOGGER_REGISTRY[22] = "dummy_fixture_logger"
         logger = loggers.new_hook_logger("dummy_class", 22)
         self.assertEqual(logger.parent, "dummy_fixture_logger")
+
+    def test_shorten_logger_name(self):
+        config.SHORTEN_LOGGER_NAME_CONFIG = {
+            "remove": ["MongoDFixture", "ReplicaSetFixture", "ShardedClusterFixture"],
+            "replace": {
+                "primary": "prim",
+                "secondary": "sec",
+                "node": "n",
+                "shard": "s",
+                "configsvr": "c",
+                "mongos": "s",
+                "job": "j",
+            },
+        }
+        transform = [
+            ("MongoDFixture:job0", "j0"),
+            ("ReplicaSetFixture:job0:primary", "j0:prim"),
+            ("ReplicaSetFixture:job0:secondary", "j0:sec"),
+            ("ReplicaSetFixture:job0:secondary0", "j0:sec0"),
+            ("ReplicaSetFixture:job0:node0", "j0:n0"),
+            ("ShardedClusterFixture:job0:mongos", "j0:s"),
+            ("ShardedClusterFixture:job0:configsvr:primary", "j0:c:prim"),
+            ("ShardedClusterFixture:job0:configsvr:secondary", "j0:c:sec"),
+            ("ShardedClusterFixture:job0:configsvr:secondary0", "j0:c:sec0"),
+            ("ShardedClusterFixture:job0:shard0:primary", "j0:s0:prim"),
+            ("ShardedClusterFixture:job0:shard0:secondary", "j0:s0:sec"),
+            ("ShardedClusterFixture:job0:shard0:secondary0", "j0:s0:sec0"),
+        ]
+        for full_name, expected_short_name in transform:
+            short_name = loggers._shorten(full_name)
+            self.assertEqual(short_name, expected_short_name)

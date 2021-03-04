@@ -340,4 +340,4 @@ def create_fixture_table(fixture):
 
 
 # Represents a row in a node info table.
-NodeInfo = namedtuple('NodeInfo', ['name', 'port', 'pid'])
+NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid'])
