@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 
@@ -40,7 +39,7 @@ namespace mongo {
  * Adds a log message with the given message. Simple helper to avoid defining the log component in a
  * header file.
  */
-void logFailedRetryAttempt(StringData taskDescription, const DBException&);
+void logFailedRetryAttempt(StringData taskDescription, const DBException& ex);
 
 /**
  * A retry loop which handles errors in ErrorCategory::StaleShardVersionError. When such an error is
@@ -65,8 +64,10 @@ auto shardVersionRetry(OperationContext* opCtx,
                              << " retries attempting " << taskDescription);
         return false;
     };
+
     while (true) {
         catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, numAttempts);
+
         try {
             return callbackFn();
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {

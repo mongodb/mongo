@@ -250,6 +250,7 @@ env.Library(
         'balancer/cluster_statistics.cpp',
         'balancer/migration_manager.cpp',
         'balancer/scoped_migration_request.cpp',
+        'sharding_config_server_parameters.idl',
         'balancer/type_migration.cpp',
         'config/initial_split_policy.cpp',
         'config/sharding_catalog_manager_chunk_operations.cpp',
@@ -297,7 +298,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'sharding_logging',
-        'sharding_runtime_d_params',
     ],
 )
 
@@ -349,7 +349,10 @@ env.Library(
         'rename_collection_coordinator.cpp',
         'refine_collection_shard_key_coordinator.cpp',
         'reshard_collection_coordinator.cpp',
+        'resharding_test_commands.cpp',
+        'resharding_test_commands.idl',
         'set_shard_version_command.cpp',
+        'sharded_index_consistency_server_status.cpp',
         'sharding_ddl_coordinator.cpp',
         'sharding_ddl_coordinator.idl',
         'sharding_ddl_coordinator_service.cpp',

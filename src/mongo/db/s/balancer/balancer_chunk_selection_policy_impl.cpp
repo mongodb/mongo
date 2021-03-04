@@ -39,7 +39,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/bits.h"
 #include "mongo/s/balancer_configuration.h"
@@ -54,9 +54,6 @@ namespace mongo {
 
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
 using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
-using std::shared_ptr;
-using std::unique_ptr;
-using std::vector;
 
 namespace {
 
