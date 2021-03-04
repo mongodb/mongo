@@ -100,9 +100,18 @@ function testAccumAgainstGroup(coll, accum) {
                     });
                 }
 
-                assert.eq(groupRes,
-                          wfResults[index].res,
-                          "Window function result for index " + index + ": " + tojson(wfRes));
+                // On DEBUG builds, the computed $group may be slightly different due to precision
+                // loss when spilling to disk.
+                // TODO SERVER-42616: Enable the exact check for $stdDevPop/Samp.
+                if (accum == "$stdDevSamp" || accum == "$stdDevPop")
+                    assert.close(groupRes,
+                                 wfResults[index].res,
+                                 "Window function result for index " + index + ": " + tojson(wfRes),
+                                 10 /* 10 decimal places */);
+                else
+                    assert.eq(groupRes,
+                              wfResults[index].res,
+                              "Window function result for index " + index + ": " + tojson(wfRes));
             }
         });
     });
