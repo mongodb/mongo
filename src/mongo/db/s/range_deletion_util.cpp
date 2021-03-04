@@ -56,7 +56,6 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/remove_saver.h"
@@ -413,6 +412,35 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
 }
 
 }  // namespace
+
+std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
+                                                               const NamespaceString& nss) {
+    std::vector<RangeDeletionTask> tasks;
+
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
+
+    store.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
+        tasks.push_back(std::move(deletionTask));
+        return true;
+    });
+
+    return tasks;
+}
+
+void storeRangeDeletionTasks(OperationContext* opCtx, std::vector<RangeDeletionTask>& tasks) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    for (const auto& deletionTask : tasks) {
+        store.add(opCtx, deletionTask);
+    }
+}
+
+void deleteRangeDeletionTasks(OperationContext* opCtx, const NamespaceString& nss) {
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+    const auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
+    store.remove(opCtx, query);
+}
+
 
 SharedSemiFuture<void> removeDocumentsInRange(
     const std::shared_ptr<executor::TaskExecutor>& executor,

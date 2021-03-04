@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -233,7 +234,14 @@ SemiFuture<void> RenameCollectionCoordinator::runImpl(
                 });
 
                 if (sourceIsSharded) {
+                    auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, _nss);
                     _renameShardedCollection(opCtx);
+                    deleteRangeDeletionTasks(opCtx, _toNss);
+                    for (auto& task : rangeDeletionTasks) {
+                        task.setId(UUID::gen());
+                        task.setNss(_toNss);
+                    }
+                    storeRangeDeletionTasks(opCtx, rangeDeletionTasks);
                 } else {
                     _renameUnshardedCollection(opCtx);
                 }

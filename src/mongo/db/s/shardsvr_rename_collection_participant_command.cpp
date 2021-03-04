@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -108,10 +109,19 @@ public:
             dropCollectionLocally(opCtx, toNss);
 
             try {
+                auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
+
                 // Rename the collection locally and clear the cache
                 validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
                 uassertStatusOK(
                     shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, fromNss));
+
+                deleteRangeDeletionTasks(opCtx, toNss);
+                for (auto& task : rangeDeletionTasks) {
+                    task.setId(UUID::gen());
+                    task.setNss(toNss);
+                }
+                storeRangeDeletionTasks(opCtx, rangeDeletionTasks);
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // It's ok for a participant shard to have no knowledge about a collection
                 LOGV2_DEBUG(
