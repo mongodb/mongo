@@ -136,7 +136,10 @@ private:
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
     void _transitionToError(Status abortReason);
 
-    void _updateCoordinator();
+    BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, DonorStateEnum newState);
+
+    ExecutorFuture<void> _updateCoordinator(
+        OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Updates the mutable portion of the on-disk and in-memory donor document with 'newDonorCtx'.
     void _updateDonorDocument(DonorShardContext&& newDonorCtx);

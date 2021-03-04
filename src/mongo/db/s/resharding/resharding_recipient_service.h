@@ -145,7 +145,8 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancelationToken& cancelToken);
 
-    void _applyThenTransitionToSteadyState();
+    ExecutorFuture<void> _applyThenTransitionToSteadyState(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -167,7 +168,10 @@ private:
     // Transitions the on-disk and in-memory state to RecipientStateEnum::kError.
     void _transitionToError(Status abortReason);
 
-    void _updateCoordinator();
+    BSONObj _makeQueryForCoordinatorUpdate(const ShardId& shardId, RecipientStateEnum newState);
+
+    ExecutorFuture<void> _updateCoordinator(
+        OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Updates the mutable portion of the on-disk and in-memory recipient document with
     // 'newRecipientCtx' and 'fetchTimestamp'.
