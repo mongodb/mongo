@@ -112,6 +112,14 @@ typedef struct demo_file_handle {
     size_t size; /* Read/write data size */
 } DEMO_FILE_HANDLE;
 
+typedef struct demo_location_handle {
+    WT_LOCATION_HANDLE iface;
+
+    char *loc_string; /* location as a string. */
+} DEMO_LOCATION_HANDLE;
+
+#define LOCATION_STRING(lh) (((DEMO_LOCATION_HANDLE *)lh)->loc_string)
+
 /*
  * Extension initialization function.
  */
@@ -130,7 +138,6 @@ static int demo_ss_exist(
   WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, bool *);
 static int demo_ss_location_handle(
   WT_STORAGE_SOURCE *, WT_SESSION *, const char *, WT_LOCATION_HANDLE **);
-static int demo_ss_location_handle_free(WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *);
 static int demo_ss_location_list(WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *,
   const char *, uint32_t, char ***, uint32_t *);
 static int demo_ss_location_list_free(WT_STORAGE_SOURCE *, WT_SESSION *, char **, uint32_t);
@@ -141,6 +148,11 @@ static int demo_ss_remove(
 static int demo_ss_size(
   WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, wt_off_t *);
 static int demo_ss_terminate(WT_STORAGE_SOURCE *, WT_SESSION *);
+
+/*
+ * Forward function declarations for location API implementation.
+ */
+static int demo_location_close(WT_LOCATION_HANDLE *, WT_SESSION *);
 
 /*
  * Forward function declarations for file handle API implementation.
@@ -161,11 +173,6 @@ static DEMO_FILE_HANDLE *demo_handle_search(
   WT_STORAGE_SOURCE *, WT_LOCATION_HANDLE *, const char *);
 
 #define DEMO_FILE_SIZE_INCREMENT 32768
-
-/*
- * Saved version of the storage source interface for direct testing.
- */
-static WT_STORAGE_SOURCE *saved_storage_source;
 
 /*
  * string_match --
@@ -254,7 +261,6 @@ demo_storage_source_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
     /* Initialize the in-memory jump table. */
     storage_source->ss_exist = demo_ss_exist;
     storage_source->ss_location_handle = demo_ss_location_handle;
-    storage_source->ss_location_handle_free = demo_ss_location_handle_free;
     storage_source->ss_location_list = demo_ss_location_list;
     storage_source->ss_location_list_free = demo_ss_location_list_free;
     storage_source->ss_open_object = demo_ss_open;
@@ -268,11 +274,6 @@ demo_storage_source_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
         goto err;
     }
 
-    /*
-     * The WiredTiger API does not have a direct way to use the storage_source API. Save the
-     * structure so we can call it directly.
-     */
-    saved_storage_source = storage_source;
     return (0);
 
 err:
@@ -345,7 +346,7 @@ demo_ss_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     demo_fh->size = 0;
 
     /* Construct the public name. */
-    location = (const char *)location_handle;
+    location = LOCATION_STRING(location_handle);
     name_len = strlen(location) + strlen(name) + 1;
     full_name = calloc(1, name_len);
     if (snprintf(full_name, name_len, "%s%s", location, name) != (ssize_t)(name_len - 1)) {
@@ -400,40 +401,53 @@ static int
 demo_ss_location_handle(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
   const char *location_info, WT_LOCATION_HANDLE **location_handlep)
 {
+    DEMO_LOCATION_HANDLE *demo_loc;
     size_t len;
+    int ret;
     char *p;
 
     (void)storage_source; /* Unused */
     (void)session;        /* Unused */
 
+    ret = 0;
+    p = NULL;
+    demo_loc = NULL;
+
     /*
-     * Our "handle" is nothing more than the location string followed by a slash delimiter. We won't
-     * allow slashes in the location info parameter.
+     * We save the location string we're given followed by a slash delimiter. We won't allow slashes
+     * in the location info parameter.
      */
     if (strchr(location_info, '/') != NULL)
         return (EINVAL);
     len = strlen(location_info) + 2;
     p = malloc(len);
     if (snprintf(p, len, "%s/", location_info) != (ssize_t)(len - 1)) {
-        free(p);
-        return (ENOMEM);
+        ret = ENOMEM;
+        goto err;
     }
-    *location_handlep = (WT_LOCATION_HANDLE *)p;
-    return (0);
-}
 
-/*
- * demo_ss_location_handle_free --
- *     Free a location handle created by ss_location_handle.
- */
-static int
-demo_ss_location_handle_free(
-  WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_LOCATION_HANDLE *location_handle)
-{
-    (void)storage_source; /* Unused */
-    (void)session;        /* Unused */
+    /*
+     * Now create the location handle and save the string.
+     */
+    if ((demo_loc = calloc(1, sizeof(DEMO_LOCATION_HANDLE))) == NULL) {
+        ret = ENOMEM;
+        goto err;
+    }
 
-    free(location_handle);
+    /* Initialize private information. */
+    demo_loc->loc_string = p;
+
+    /* Initialize public information. */
+    demo_loc->iface.close = demo_location_close;
+
+    *location_handlep = &demo_loc->iface;
+
+err:
+    if (ret != 0) {
+        free(p);
+        free(demo_loc);
+        return (ret);
+    }
     return (0);
 }
 
@@ -464,7 +478,7 @@ demo_ss_location_list(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
 
     entries = NULL;
     allocated = count = 0;
-    location = (const char *)location_handle;
+    location = LOCATION_STRING(location_handle);
     location_len = strlen(location);
     prefix_len = (prefix == NULL ? 0 : strlen(prefix));
 
@@ -630,6 +644,20 @@ demo_ss_terminate(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session)
     free(demo_ss);
 
     return (ret);
+}
+
+/*
+ * demo_location_close --
+ *     Free a location handle created by ss_location_handle.
+ */
+static int
+demo_location_close(WT_LOCATION_HANDLE *location_handle, WT_SESSION *session)
+{
+    (void)session; /* Unused */
+
+    free(LOCATION_STRING(location_handle));
+    free(location_handle);
+    return (0);
 }
 
 /*
@@ -877,10 +905,10 @@ demo_handle_search(
     DEMO_FILE_HANDLE *demo_fh;
     DEMO_STORAGE_SOURCE *demo_ss;
     size_t len;
-    char *location;
+    const char *location;
 
     demo_ss = (DEMO_STORAGE_SOURCE *)storage_source;
-    location = (char *)location_handle;
+    location = LOCATION_STRING(location_handle);
     len = strlen(location);
 
     TAILQ_FOREACH (demo_fh, &demo_ss->fileq, q)
@@ -972,8 +1000,8 @@ err:
 }
 
 static int
-demo_test_list(WT_STORAGE_SOURCE *ss, WT_SESSION *session, WT_LOCATION_HANDLE *location,
-  const char *prefix, uint32_t limit, uint32_t expect)
+demo_test_list(WT_STORAGE_SOURCE *ss, WT_SESSION *session, const char *description,
+  WT_LOCATION_HANDLE *location, const char *prefix, uint32_t limit, uint32_t expect)
 {
     char **obj_list;
     const char *op;
@@ -991,7 +1019,7 @@ demo_test_list(WT_STORAGE_SOURCE *ss, WT_SESSION *session, WT_LOCATION_HANDLE *l
         ret = EINVAL;
         goto err;
     }
-    printf("list: %s:\n", (const char *)location);
+    printf("list: %s:\n", description);
     for (i = 0; i < obj_count; i++) {
         printf("  %s\n", obj_list[i]);
     }
@@ -1005,7 +1033,7 @@ err:
     if (ret != 0)
         fprintf(stderr, "demo failed during %s: %s\n", op, wiredtiger_strerror(ret));
     else
-        printf("demo succeeded location_list %s\n", (const char *)location);
+        printf("demo succeeded location_list %s\n", description);
 
     return (ret);
 }
@@ -1070,39 +1098,37 @@ demo_test_storage_source(WT_STORAGE_SOURCE *ss, WT_SESSION *session)
      * List the locations. For location-one, we expect just one object.
      */
     op = "list checks";
-    if ((ret = demo_test_list(ss, session, location1, NULL, 0, 1)) != 0)
+    if ((ret = demo_test_list(ss, session, "location1", location1, NULL, 0, 1)) != 0)
         goto err;
 
     /*
      * For location-two, we expect three objects.
      */
-    if ((ret = demo_test_list(ss, session, location2, NULL, 0, 3)) != 0)
+    if ((ret = demo_test_list(ss, session, "location2", location2, NULL, 0, 3)) != 0)
         goto err;
 
     /*
      * If we limit the number of objects received to 2, we should only see 2.
      */
-    if ((ret = demo_test_list(ss, session, location2, NULL, 2, 2)) != 0)
+    if ((ret = demo_test_list(ss, session, "location2, limit:2", location2, NULL, 2, 2)) != 0)
         goto err;
 
     /*
      * With a prefix of "A", and no limit, we'll see two objects.
      */
-    if ((ret = demo_test_list(ss, session, location2, "A", 0, 2)) != 0)
+    if ((ret = demo_test_list(ss, session, "location2: A", location2, "A", 0, 2)) != 0)
         goto err;
 
     /*
      * With a prefix of "A", and a limit of one, we'll see just one object.
      */
-    if ((ret = demo_test_list(ss, session, location2, "A", 1, 1)) != 0)
+    if ((ret = demo_test_list(ss, session, "location2: A, limit:1", location2, "A", 1, 1)) != 0)
         goto err;
 
 err:
-    if (location1 != NULL && (t_ret = ss->ss_location_handle_free(ss, session, location1)) != 0 &&
-      ret == 0)
+    if (location1 != NULL && (t_ret = location1->close(location1, session)) != 0 && ret == 0)
         ret = t_ret;
-    if (location2 != NULL && (t_ret = ss->ss_location_handle_free(ss, session, location2)) != 0 &&
-      ret == 0)
+    if (location2 != NULL && (t_ret = location2->close(location2, session)) != 0 && ret == 0)
         ret = t_ret;
     if (ret != 0)
         fprintf(stderr, "demo failed during %s: %s\n", op, wiredtiger_strerror(ret));
@@ -1114,9 +1140,10 @@ int
 main(void)
 {
     WT_CONNECTION *conn;
-    const char *open_config;
-    int ret = 0;
     WT_SESSION *session;
+    WT_STORAGE_SOURCE *storage_source;
+    const char *open_config;
+    int ret;
 
     fprintf(stderr, "ex_storage_source: starting\n");
     /*
@@ -1125,7 +1152,10 @@ main(void)
      */
     if (getenv("WIREDTIGER_HOME") == NULL) {
         home = "WT_HOME";
-        ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+        if ((ret = system("rm -rf WT_HOME && mkdir WT_HOME")) != 0) {
+            fprintf(stderr, "system: directory recreate failed: %s\n", strerror(ret));
+            return (EXIT_FAILURE);
+        }
     } else
         home = NULL;
 
@@ -1150,11 +1180,16 @@ main(void)
         fprintf(stderr, "WT_CONNECTION.open_session: %s\n", wiredtiger_strerror(ret));
         return (EXIT_FAILURE);
     }
+
+    if ((ret = conn->get_storage_source(conn, "demo", &storage_source)) != 0) {
+        fprintf(stderr, "WT_CONNECTION.get_storage_source: %s\n", wiredtiger_strerror(ret));
+        return (EXIT_FAILURE);
+    }
     /*
      * At the moment, the infrastructure within WiredTiger that would use the storage source
      * extension does not exist. So call the interface directly as a demonstration.
      */
-    if ((ret = demo_test_storage_source(saved_storage_source, session)) != 0) {
+    if ((ret = demo_test_storage_source(storage_source, session)) != 0) {
         fprintf(stderr, "storage source test failed: %s\n", wiredtiger_strerror(ret));
         return (EXIT_FAILURE);
     }

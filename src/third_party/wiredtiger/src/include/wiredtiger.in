@@ -81,6 +81,7 @@ struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 #if !defined(SWIG)
 #if !defined(DOXYGEN)
 struct __wt_storage_source; typedef struct __wt_storage_source WT_STORAGE_SOURCE;
+struct __wt_location_handle; typedef struct __wt_location_handle WT_LOCATION_HANDLE;
 #endif
 #endif
 
@@ -2582,7 +2583,22 @@ struct __wt_connection {
 	 * @errors
 	 */
 	int __F(add_storage_source)(WT_CONNECTION *connection, const char *name,
-            WT_STORAGE_SOURCE *storage_source, const char *config);
+	    WT_STORAGE_SOURCE *storage_source, const char *config);
+
+	/*!
+	 * Get a storage source implementation.
+	 *
+	 * Look up a storage source by name.
+	 *
+	 * @snippet ex_storage_source.c WT_STORAGE_SOURCE register
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the storage source implementation
+	 * @param storage_source the storage source structure
+	 * @errors
+	 */
+	int __F(get_storage_source)(WT_CONNECTION *connection, const char *name,
+	    WT_STORAGE_SOURCE **storage_sourcep);
 #endif
 #endif
 
@@ -4710,7 +4726,18 @@ struct __wt_file_handle {
  * A location handle, and its encoding is defined by each implementation
  * of the WT_STORAGE_SOURCE interface.
  */
-typedef struct __wt_location_handle WT_LOCATION_HANDLE;
+struct __wt_location_handle {
+	/*!
+	 * Close a location handle, the handle will not be further accessed by
+	 * WiredTiger.
+	 *
+	 * @errors
+	 *
+	 * @param location_handle the WT_LOCATION_HANDLE
+	 * @param session the current WiredTiger session
+	 */
+	int (*close)(WT_LOCATION_HANDLE *location_handle, WT_SESSION *session);
+};
 
 /*!
  * The interface implemented by applications to provide a storage source
@@ -4744,18 +4771,6 @@ struct __wt_storage_source {
 	    WT_SESSION *session, const char *location, WT_LOCATION_HANDLE **location_handle);
 
 	/*!
-	 * Free a location handle created by WT_STORAGE_SOURCE::ss_location_handle.
-	 *
-	 * @errors
-	 *
-	 * @param storage_source the WT_STORAGE_SOURCE
-	 * @param session the current WiredTiger session
-	 * @param location_handle the handle to be freed.
-	 */
-	int (*ss_location_handle_free)(WT_STORAGE_SOURCE *storage_source,
-	    WT_SESSION *session, WT_LOCATION_HANDLE *location_handle);
-
-	/*!
 	 * Return a list of object names for the given location.
 	 *
 	 * @errors
@@ -4772,7 +4787,7 @@ struct __wt_storage_source {
 	 */
 	int (*ss_location_list)(WT_STORAGE_SOURCE *storage_source,
 	    WT_SESSION *session, WT_LOCATION_HANDLE *location_handle, const char *prefix,
-            uint32_t limit, char ***object_list, uint32_t *countp);
+	    uint32_t limit, char ***object_list, uint32_t *countp);
 
 	/*!
 	 * Free memory allocated by WT_STORAGE_SOURCE::location_list.
@@ -4802,7 +4817,38 @@ struct __wt_storage_source {
 	    WT_LOCATION_HANDLE *location_handle, const char *name, bool *existp);
 
 	/*!
-	 * Open a handle for a named storage source object
+	 * Flush any existing objects that match the location and name from
+	 * local storage to shared object storage.  The implementation guarantees
+	 * that all objects that are in a created state (see WT_STORAGE_SOURCE::ss_open_object)
+	 * at the beginning of this call have been transferred when this call returns.
+	 *
+	 * @errors
+	 *
+	 * @param storage_source the WT_STORAGE_SOURCE
+	 * @param session the current WiredTiger session
+	 * @param location_handle the location to flush (or NULL for all)
+	 * @param name the name of the object to flush (or NULL for all)
+	 * @param config additional configuration, currently must be NULL
+	 */
+	int (*ss_flush)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+	    WT_LOCATION_HANDLE *location_handle, const char *name, const char *config);
+
+	/*!
+	 * Open a handle for a named storage source object.
+	 *
+	 * Objects created are not deemed to "exist" and be visible to other APIs
+	 * like WT_STORAGE_SOURCE::ss_exist until the new handle has been closed.
+	 * Objects once created are immutable. That is, only objects that do not already
+	 * exist can be opened with the create flag, and objects that already exist can
+	 * only be opened with the readonly flag.
+	 *
+	 * Only objects that exist can be transferred to and made visible in the underlying
+	 * shared object store.  However, they don't need to be transferred immediately when
+	 * the created handle is closed.  Transfers can be forced with WT_STORAGE_SOURCE::ss_flush.
+	 *
+	 * File handles returned behave as file handles to a local file.  For example,
+	 * WT_FILE_HANDLE::fh_sync synchronizes writes to the local file, and does not
+	 * imply any transferring of data to the shared object store.
 	 *
 	 * The method should return ENOENT if the object is not being created and
 	 * does not exist.

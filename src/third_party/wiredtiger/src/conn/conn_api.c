@@ -701,6 +701,34 @@ err:
 }
 
 /*
+ * __conn_get_storage_source --
+ *     WT_CONNECTION->get_storage_source method.
+ */
+static int
+__conn_get_storage_source(
+  WT_CONNECTION *wt_conn, const char *name, WT_STORAGE_SOURCE **storage_sourcep)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_NAMED_STORAGE_SOURCE *nstorage_source;
+
+    conn = (WT_CONNECTION_IMPL *)wt_conn;
+    *storage_sourcep = NULL;
+
+    ret = EINVAL;
+    TAILQ_FOREACH (nstorage_source, &conn->storagesrcqh, q)
+        if (WT_STREQ(nstorage_source->name, name)) {
+            *storage_sourcep = nstorage_source->storage_source;
+            ret = 0;
+            break;
+        }
+    if (ret != 0)
+        WT_RET_MSG(conn->default_session, ret, "unknown storage_source '%s'", name);
+
+    return (ret);
+}
+
+/*
  * __wt_conn_remove_storage_source --
  *     Remove storage_source added by WT_CONNECTION->add_storage_source, only used internally.
  */
@@ -2379,7 +2407,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
       __conn_query_timestamp, __conn_set_timestamp, __conn_rollback_to_stable,
       __conn_load_extension, __conn_add_data_source, __conn_add_collator, __conn_add_compressor,
       __conn_add_encryptor, __conn_add_extractor, __conn_set_file_system, __conn_add_storage_source,
-      __conn_get_extension_api};
+      __conn_get_storage_source, __conn_get_extension_api};
     static const WT_NAME_FLAG file_types[] = {{"checkpoint", WT_DIRECT_IO_CHECKPOINT},
       {"data", WT_DIRECT_IO_DATA}, {"log", WT_DIRECT_IO_LOG}, {NULL, 0}};
 
