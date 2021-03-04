@@ -25,12 +25,10 @@ function testRename(st, dbName, toNs, dropTarget, mustFail) {
 
     const fromUUID = getUUIDFromConfigCollections(mongos, fromNs);
     const aChunk = mongos.getDB('config').chunks.findOne({uuid: fromUUID});
-    // TODO SERVER-54631 Remove 'waitForDelete: true'
     assert.commandWorked(mongos.adminCommand({
         moveChunk: fromNs,
         bounds: [aChunk.min, aChunk.max],
         to: st.shard1.shardName,
-        waitForDelete: true
     }));
 
     const res = fromColl.renameCollection(toNs.split('.')[1], dropTarget);
@@ -89,12 +87,10 @@ if (isDDLFeatureFlagEnabled) {
 
         const toUUID = getUUIDFromConfigCollections(mongos, toNs);
         const aChunk = mongos.getDB('config').chunks.findOne({uuid: toUUID});
-        // TODO SERVER-54631 Remove 'waitForDelete: true'
         assert.commandWorked(mongos.adminCommand({
             moveChunk: toNs,
             bounds: [aChunk.min, aChunk.max],
             to: st.shard1.shardName,
-            waitForDelete: true
         }));
 
         testRename(st, dbName, toNs, true /* dropTarget */, false /* mustFail */);

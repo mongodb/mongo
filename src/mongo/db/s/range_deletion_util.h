@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -74,4 +75,11 @@ SharedSemiFuture<void> removeDocumentsInRange(
     int numDocsToRemovePerBatch,
     Seconds delayForActiveQueriesOnSecondariesToComplete,
     Milliseconds delayBetweenBatches);
+
+std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
+                                                               const NamespaceString& nss);
+void storeRangeDeletionTasks(OperationContext* opCtx, std::vector<RangeDeletionTask>& tasks);
+
+void deleteRangeDeletionTasks(OperationContext* opCtx, const NamespaceString& nss);
+
 }  // namespace mongo
