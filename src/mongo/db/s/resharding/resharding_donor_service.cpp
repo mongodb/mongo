@@ -42,6 +42,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -169,8 +170,12 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         .then([this, executor] {
             return _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(executor);
         })
-        .then([this] { return _dropOriginalCollection(); })
-        .onError([this](Status status) {
+        .then([this] { _dropOriginalCollection(); })
+        .then([this, executor] {
+            auto opCtx = cc().makeOperationContext();
+            return _updateCoordinator(opCtx.get(), executor);
+        })
+        .onError([this, executor](Status status) {
             LOGV2(4956400,
                   "Resharding operation donor state machine failed",
                   "namespace"_attr = _metadata.getSourceNss(),
@@ -178,14 +183,20 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
                   "error"_attr = status);
 
             _transitionToError(status);
-            _updateCoordinator();
-
-            // TODO SERVER-52838: Ensure all local collections that may have been created for
-            // resharding are removed, with the exception of the ReshardingDonorDocument, before
-            // transitioning to kDone.
-            _transitionState(DonorStateEnum::kDone);
-            _updateCoordinator();
-            return status;
+            auto opCtx = cc().makeOperationContext();
+            return _updateCoordinator(opCtx.get(), executor)
+                .then([this] {
+                    // TODO SERVER-52838: Ensure all local collections that may have been created
+                    // for
+                    // resharding are removed, with the exception of the ReshardingDonorDocument,
+                    // before transitioning to kDone.
+                    _transitionState(DonorStateEnum::kDone);
+                })
+                .then([this, executor] {
+                    auto opCtx = cc().makeOperationContext();
+                    return _updateCoordinator(opCtx.get(), executor);
+                })
+                .then([this, status] { return status; });
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             {
@@ -313,7 +324,6 @@ void ReshardingDonorService::DonorStateMachine::
                 "reshardingUUID"_attr = _metadata.getReshardingUUID());
 
     _transitionToDonatingInitialData(minFetchTimestamp, bytesToClone, documentsToClone);
-    _updateCoordinator();
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
@@ -323,7 +333,9 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _allRecipientsDoneCloning.getFuture()
+    auto opCtx = cc().makeOperationContext();
+    return _updateCoordinator(opCtx.get(), executor)
+        .then([this] { return _allRecipientsDoneCloning.getFuture(); })
         .thenRunOn(**executor)
         .then([this]() { _transitionState(DonorStateEnum::kDonatingOplogEntries); })
         .onCompletion([=](Status s) {
@@ -448,7 +460,6 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
     }
 
     _transitionState(DonorStateEnum::kDone);
-    _updateCoordinator();
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(DonorStateEnum newState) {
@@ -493,20 +504,100 @@ void ReshardingDonorService::DonorStateMachine::_transitionToError(Status abortR
     _transitionState(std::move(newDonorCtx));
 }
 
-void ReshardingDonorService::DonorStateMachine::_updateCoordinator() {
-    auto opCtx = cc().makeOperationContext();
-    auto shardId = ShardingState::get(opCtx.get())->shardId();
+/**
+ * Returns a query filter of the form
+ * {
+ *     _id: <reshardingUUID>,
+ *     donorShards: {$elemMatch: {
+ *         id: <this donor's ShardId>,
+ *         "mutableState.state: {$in: [ <list of valid current states> ]},
+ *     }},
+ * }
+ */
+BSONObj ReshardingDonorService::DonorStateMachine::_makeQueryForCoordinatorUpdate(
+    const ShardId& shardId, DonorStateEnum newState) {
+    // The donor only updates the coordinator when it transitions to states which the coordinator
+    // depends on for its own transitions. The table maps the donor states which could be updated on
+    // the coordinator to the only states the donor could have already persisted to the current
+    // coordinator document in order for its transition to the newState to be valid.
+    static const stdx::unordered_map<DonorStateEnum, std::vector<DonorStateEnum>>
+        validPreviousStateMap = {
+            {DonorStateEnum::kDonatingInitialData, {DonorStateEnum::kUnused}},
+            {DonorStateEnum::kError,
+             {DonorStateEnum::kUnused, DonorStateEnum::kDonatingInitialData}},
+            {DonorStateEnum::kDone,
+             {DonorStateEnum::kUnused,
+              DonorStateEnum::kDonatingInitialData,
+              DonorStateEnum::kError}},
+        };
 
-    uassertStatusOK(
-        Grid::get(opCtx.get())
-            ->catalogClient()
-            ->updateConfigDocument(
-                opCtx.get(),
-                NamespaceString::kConfigReshardingOperationsNamespace,
-                BSON("_id" << _metadata.getReshardingUUID() << "donorShards.id" << shardId),
-                BSON("$set" << BSON("donorShards.$.mutableState" << _donorCtx.toBSON())),
-                false /* upsert */,
-                ShardingCatalogClient::kMajorityWriteConcern));
+    auto it = validPreviousStateMap.find(newState);
+    invariant(it != validPreviousStateMap.end());
+
+    // The network isn't perfectly reliable so it is possible for update commands sent by
+    // _updateCoordinator() to be received out of order by the coordinator. To overcome this
+    // behavior, the donor shard includes the list of valid current states as part of the
+    // update to transition to the next state. This way, the update from a delayed message
+    // won't match the document if it or any later state transitions have already occurred.
+    BSONObjBuilder queryBuilder;
+    {
+        _metadata.getReshardingUUID().appendToBuilder(
+            &queryBuilder, ReshardingCoordinatorDocument::kReshardingUUIDFieldName);
+
+        BSONObjBuilder donorShardsBuilder(
+            queryBuilder.subobjStart(ReshardingCoordinatorDocument::kDonorShardsFieldName));
+        {
+            BSONObjBuilder elemMatchBuilder(donorShardsBuilder.subobjStart("$elemMatch"));
+            {
+                elemMatchBuilder.append(DonorShardEntry::kIdFieldName, shardId);
+
+                BSONObjBuilder mutableStateBuilder(
+                    elemMatchBuilder.subobjStart(DonorShardEntry::kMutableStateFieldName + "." +
+                                                 DonorShardContext::kStateFieldName));
+                {
+                    BSONArrayBuilder inBuilder(mutableStateBuilder.subarrayStart("$in"));
+                    for (const auto& state : it->second) {
+                        inBuilder.append(DonorState_serializer(state));
+                    }
+                }
+            }
+        }
+    }
+
+    return queryBuilder.obj();
+}
+
+ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinator(
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+    auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    return WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(clientOpTime)
+        .thenRunOn(**executor)
+        .then([this] {
+            auto opCtx = cc().makeOperationContext();
+            auto shardId = ShardingState::get(opCtx.get())->shardId();
+
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+                {
+                    setBuilder.append(ReshardingCoordinatorDocument::kDonorShardsFieldName + ".$." +
+                                          DonorShardEntry::kMutableStateFieldName,
+                                      _donorCtx.toBSON());
+                }
+            }
+
+            uassertStatusOK(Grid::get(opCtx.get())
+                                ->catalogClient()
+                                ->updateConfigDocument(
+                                    opCtx.get(),
+                                    NamespaceString::kConfigReshardingOperationsNamespace,
+                                    _makeQueryForCoordinatorUpdate(shardId, _donorCtx.getState()),
+                                    updateBuilder.done(),
+                                    false /* upsert */,
+                                    ShardingCatalogClient::kMajorityWriteConcern));
+        });
 }
 
 void ReshardingDonorService::DonorStateMachine::insertStateDocument(
@@ -526,7 +617,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << _metadata.getReshardingUUID()),
         BSON("$set" << BSON(ReshardingDonorDocument::kMutableStateFieldName
                             << newDonorCtx.toBSON())),
-        WriteConcerns::kMajorityWriteConcern);
+        kNoWaitWriteConcern);
 
     _donorCtx = newDonorCtx;
 }
@@ -538,7 +629,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
     store.remove(
         opCtx.get(),
         BSON(ReshardingDonorDocument::kReshardingUUIDFieldName << _metadata.getReshardingUUID()),
-        WriteConcerns::kMajorityWriteConcern);
+        kNoWaitWriteConcern);
 }
 
 void ReshardingDonorService::DonorStateMachine::_onAbortOrStepdown(WithLock, Status status) {
