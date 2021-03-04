@@ -72,7 +72,7 @@ class test_hs05(wttest.WiredTigerTestCase):
         score_diff = score_end - score_start
         self.pr("After large updates score start: " + str(score_start))
         self.pr("After large updates score end: " + str(score_end))
-        self.pr("After large updates hs score diff: " + str(score_diff))
+        self.pr("After large updates history store score diff: " + str(score_diff))
 
     def test_checkpoint_hs_reads(self):
         # Create a small table.

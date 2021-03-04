@@ -71,7 +71,7 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
             if hs_before[0] == hs_after[0] and hs_before[1] == hs_after[1]:
                 break
 
-            # Fail if we haven't been able to get stable hs stats after too many attempts.
+            # Fail if we haven't been able to get stable history store stats after too many attempts.
             # Seems impossible, but better to check than to have an accidental infinite loop.
             self.assertNotEqual(i, max_tries - 1)
 

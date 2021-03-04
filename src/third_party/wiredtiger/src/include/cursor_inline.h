@@ -7,6 +7,32 @@
  */
 
 /*
+ * __wt_curhs_get_btree --
+ *     Convert a history store cursor to the underlying btree.
+ */
+static inline WT_BTREE *
+__wt_curhs_get_btree(WT_CURSOR *cursor)
+{
+    WT_CURSOR_HS *hs_cursor;
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+
+    return (CUR2BT(hs_cursor->file_cursor));
+}
+
+/*
+ * __wt_curhs_get_cbt --
+ *     Convert a history store cursor to the underlying btree cursor.
+ */
+static inline WT_CURSOR_BTREE *
+__wt_curhs_get_cbt(WT_CURSOR *cursor)
+{
+    WT_CURSOR_HS *hs_cursor;
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+
+    return ((WT_CURSOR_BTREE *)hs_cursor->file_cursor);
+}
+
+/*
  * __cursor_set_recno --
  *     The cursor value in the interface has to track the value in the underlying cursor, update
  *     them in parallel.

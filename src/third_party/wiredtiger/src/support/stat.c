@@ -208,7 +208,8 @@ static const char *const __stats_dsrc_desc[] = {
   "session: flush_tier operation calls",
   "session: tiered storage local retention time (secs)",
   "transaction: race to read prepared update retry",
-  "transaction: rollback to stable hs records with stop timestamps older than newer records",
+  "transaction: rollback to stable history store records with stop timestamps older than newer "
+  "records",
   "transaction: rollback to stable inconsistent checkpoint",
   "transaction: rollback to stable keys removed",
   "transaction: rollback to stable keys restored",
@@ -1098,12 +1099,8 @@ static const char *const __stats_connection_desc[] = {
   "cursor: cursor modify key and value bytes affected",
   "cursor: cursor modify value bytes modified",
   "cursor: cursor next calls",
-  "cursor: cursor next calls that skip due to a globally visible history store tombstone in "
-  "rollback to stable",
   "cursor: cursor operation restarted",
   "cursor: cursor prev calls",
-  "cursor: cursor prev calls that skip due to a globally visible history store tombstone in "
-  "rollback to stable",
   "cursor: cursor remove calls",
   "cursor: cursor remove key bytes removed",
   "cursor: cursor reserve calls",
@@ -1437,7 +1434,8 @@ static const char *const __stats_connection_desc[] = {
   "session: flush_tier operation calls",
   "session: tiered storage local retention time (secs)",
   "transaction: race to read prepared update retry",
-  "transaction: rollback to stable hs records with stop timestamps older than newer records",
+  "transaction: rollback to stable history store records with stop timestamps older than newer "
+  "records",
   "transaction: rollback to stable inconsistent checkpoint",
   "transaction: rollback to stable keys removed",
   "transaction: rollback to stable keys restored",
@@ -1625,10 +1623,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cursor_modify_bytes = 0;
     stats->cursor_modify_bytes_touch = 0;
     stats->cursor_next = 0;
-    stats->cursor_next_hs_tombstone_rts = 0;
     stats->cursor_restart = 0;
     stats->cursor_prev = 0;
-    stats->cursor_prev_hs_tombstone_rts = 0;
     stats->cursor_remove = 0;
     stats->cursor_remove_bytes = 0;
     stats->cursor_reserve = 0;
@@ -2139,10 +2135,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cursor_modify_bytes += WT_STAT_READ(from, cursor_modify_bytes);
     to->cursor_modify_bytes_touch += WT_STAT_READ(from, cursor_modify_bytes_touch);
     to->cursor_next += WT_STAT_READ(from, cursor_next);
-    to->cursor_next_hs_tombstone_rts += WT_STAT_READ(from, cursor_next_hs_tombstone_rts);
     to->cursor_restart += WT_STAT_READ(from, cursor_restart);
     to->cursor_prev += WT_STAT_READ(from, cursor_prev);
-    to->cursor_prev_hs_tombstone_rts += WT_STAT_READ(from, cursor_prev_hs_tombstone_rts);
     to->cursor_remove += WT_STAT_READ(from, cursor_remove);
     to->cursor_remove_bytes += WT_STAT_READ(from, cursor_remove_bytes);
     to->cursor_reserve += WT_STAT_READ(from, cursor_reserve);
