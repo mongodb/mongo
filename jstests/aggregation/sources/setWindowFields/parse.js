@@ -57,14 +57,14 @@ assert.commandWorked(run({
 
 function runSum(spec) {
     // Include a single-field sortBy in this helper to allow all kinds of bounds.
-    return run({$setWindowFields: {sortBy: {ts: 1}, output: {v: {$sum: spec}}}});
+    return run({$setWindowFields: {sortBy: {ts: 1}, output: {v: spec}}});
 }
 
 // The most basic case: $sum everything.
-assert.commandWorked(runSum({input: "$a"}));
+assert.commandWorked(runSum({$sum: "$a"}));
 
 // That's equivalent to bounds of [unbounded, unbounded].
-assert.commandWorked(runSum({input: "$a", documents: ['unbounded', 'unbounded']}));
+assert.commandWorked(runSum({$sum: "$a", window: {documents: ['unbounded', 'unbounded']}}));
 
 // Extra arguments to a window function are rejected.
 assert.commandFailedWithCode(runSum({abcde: 1}),
@@ -72,38 +72,41 @@ assert.commandFailedWithCode(runSum({abcde: 1}),
                              'Window function $sum found an unknown argument: abcde');
 
 // Bounds can be bounded, or bounded on one side.
-assert.commandFailedWithCode(runSum({input: "$a", documents: [-2, +4]}), 5461500);
-assert.commandFailedWithCode(runSum({input: "$a", documents: [-3, 'unbounded']}), 5461500);
-assert.commandWorked(runSum({input: "$a", documents: ['unbounded', +5]}));
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {documents: [-2, +4]}}), 5461500);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {documents: [-3, 'unbounded']}}),
+                             5461500);
+assert.commandWorked(runSum({"$sum": "$a", window: {documents: ['unbounded', +5]}}));
 
 // Range-based bounds:
-assert.commandFailedWithCode(runSum({input: "$a", range: ['unbounded', 'unbounded']}), 5397901);
-assert.commandFailedWithCode(runSum({input: "$a", range: [-2, +4]}), 5397901);
-assert.commandFailedWithCode(runSum({input: "$a", range: [-3, 'unbounded']}), 5397901);
-assert.commandFailedWithCode(runSum({input: "$a", range: ['unbounded', +5]}), 5397901);
-assert.commandFailedWithCode(runSum({input: "$a", range: [NumberDecimal('1.42'), NumberLong(5)]}),
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: ['unbounded', 'unbounded']}}),
                              5397901);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: [-2, +4]}}), 5397901);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: [-3, 'unbounded']}}), 5397901);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: ['unbounded', +5]}}), 5397901);
+assert.commandFailedWithCode(
+    runSum({"$sum": "$a", window: {range: [NumberDecimal('1.42'), NumberLong(5)]}}), 5397901);
 
 // Time-based bounds:
-assert.commandFailedWithCode(runSum({input: "$a", range: [-3, 'unbounded'], unit: 'hour'}),
-                             5397902);
+assert.commandFailedWithCode(
+    runSum({"$sum": "$a", window: {range: [-3, 'unbounded'], unit: 'hour'}}), 5397902);
 
 // Numeric bounds can be a constant expression:
 let expr = {$add: [2, 2]};
-assert.commandFailedWithCode(runSum({input: "$a", documents: [expr, expr]}), 5461500);
-assert.commandFailedWithCode(runSum({input: "$a", range: [expr, expr]}), 5397901);
-assert.commandFailedWithCode(runSum({input: "$a", range: [expr, expr], unit: 'hour'}), 5397902);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {documents: [expr, expr]}}), 5461500);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: [expr, expr]}}), 5397901);
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {range: [expr, expr], unit: 'hour'}}),
+                             5397902);
 // But 'current' and 'unbounded' are not expressions: they're more like keywords.
-assert.commandFailedWithCode(runSum({input: "$a", documents: [{$const: 'current'}, 3]}),
+assert.commandFailedWithCode(runSum({"$sum": "$a", window: {documents: [{$const: 'current'}, 3]}}),
                              ErrorCodes.FailedToParse,
                              'Numeric document-based bounds must be an integer');
-assert.commandFailedWithCode(runSum({input: "$a", range: [{$const: 'current'}, 3]}),
+assert.commandFailedWithCode(runSum({"$sum": "$a", range: [{$const: 'current'}, 3]}),
                              ErrorCodes.FailedToParse,
                              'Range-based bounds expression must be a number');
 
 // Bounds must not be backwards.
 function badBounds(bounds) {
-    assert.commandFailedWithCode(runSum(Object.merge({input: "$a"}, bounds)),
+    assert.commandFailedWithCode(runSum(Object.merge({"$sum": "$a"}, {window: bounds})),
                                  5339900,
                                  'Lower bound must not exceed upper bound');
 }
@@ -122,38 +125,39 @@ badBounds({range: [+1, 'current'], unit: 'day'});
 // Any bound besides [unbounded, unbounded] requires a sort:
 // - document-based
 assert.commandWorked(run({
-    $setWindowFields: {output: {v: {$sum: {input: "$a", documents: ['unbounded', 'unbounded']}}}}
+    $setWindowFields:
+        {output: {v: {$sum: "$a", window: {documents: ['unbounded', 'unbounded']}}}}
 }));
 assert.commandFailedWithCode(
     run({
         $setWindowFields:
-            {output: {v: {$sum: {input: "$a", documents: ['unbounded', 'current']}}}}
+            {output: {v: {$sum: "$a", window: {documents: ['unbounded', 'current']}}}}
     }),
     5339901,
     'Document-based bounds require a sortBy');
 // - range-based
 assert.commandFailedWithCode(
     run({
-        $setWindowFields: {output: {v: {$sum: {input: "$a", range: ['unbounded', 'unbounded']}}}}
+        $setWindowFields: {output: {v: {$sum: "$a", window: {range: ['unbounded', 'unbounded']}}}}
     }),
     5397901);
 assert.commandFailedWithCode(
     run({
         $setWindowFields: {
             sortBy: {a: 1, b: 1},
-            output: {v: {$sum: {input: "$a", range: ['unbounded', 'unbounded']}}}
+            output: {v: {$sum: "$a", window: {range: ['unbounded', 'unbounded']}}}
         }
     }),
     5397901);
 assert.commandFailedWithCode(
-    run({$setWindowFields: {output: {v: {$sum: {input: "$a", range: ['unbounded', 'current']}}}}}),
+    run({$setWindowFields: {output: {v: {$sum: "$a", window: {range: ['unbounded', 'current']}}}}}),
     5339902,
     'Range-based bounds require a sortBy a single field');
 assert.commandFailedWithCode(
     run({
         $setWindowFields: {
             sortBy: {a: 1, b: 1},
-            output: {v: {$sum: {input: "$a", range: ['unbounded', 'current']}}}
+            output: {v: {$sum: "$a", window: {range: ['unbounded', 'current']}}}
         }
     }),
     5339902,
@@ -162,21 +166,21 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     run({
         $setWindowFields:
-            {output: {v: {$sum: {input: "$a", range: ['unbounded', 'unbounded'], unit: 'second'}}}}
+            {output: {v: {$sum: "$a", window: {range: ['unbounded', 'unbounded'], unit: 'second'}}}}
     }),
     5397902);
 assert.commandFailedWithCode(
     run({
         $setWindowFields: {
             sortBy: {a: 1, b: 1},
-            output: {v: {$sum: {input: "$a", range: ['unbounded', 'unbounded'], unit: 'second'}}}
+            output: {v: {$sum: "$a", window: {range: ['unbounded', 'unbounded'], unit: 'second'}}}
         }
     }),
     5397902);
 assert.commandFailedWithCode(
     run({
         $setWindowFields:
-            {output: {v: {$sum: {input: "$a", range: ['unbounded', 'current'], unit: 'second'}}}}
+            {output: {v: {$sum: "$a", window: {range: ['unbounded', 'current'], unit: 'second'}}}}
     }),
     5339902,
     'Range-based bounds require sortBy a single field');
@@ -184,7 +188,7 @@ assert.commandFailedWithCode(
     run({
         $setWindowFields: {
             sortBy: {a: 1, b: 1},
-            output: {v: {$sum: {input: "$a", range: ['unbounded', 'current'], unit: 'second'}}}
+            output: {v: {$sum: "$a", window: {range: ['unbounded', 'current'], unit: 'second'}}}
         }
     }),
     5339902,
@@ -194,29 +198,29 @@ assert.commandFailedWithCode(
 assert.commandWorked(run({
     $setWindowFields:
         {sortBy: {ts: 1},
-         output: {v: {$sum: {input: "$a", documents: ['unbounded', 'current']}}}}
+         output: {v: {$sum: "$a", window: {documents: ['unbounded', 'current']}}}}
 }));
 assert.commandWorked(run({
     $setWindowFields:
         {sortBy: {ts: 1},
-         output: {v: {$avg: {input: "$a", documents: ['unbounded', 'current']}}}}
+         output: {v: {$avg: "$a", window: {documents: ['unbounded', 'current']}}}}
 }));
 assert.commandWorked(run({
     $setWindowFields:
         {sortBy: {ts: 1},
-         output: {v: {$max: {input: "$a", documents: ['unbounded', 'current']}}}}
+         output: {v: {$max: "$a", window: {documents: ['unbounded', 'current']}}}}
 }));
 assert.commandWorked(run({
     $setWindowFields:
         {sortBy: {ts: 1},
-         output: {v: {$min: {input: "$a", documents: ['unbounded', 'current']}}}}
+         output: {v: {$min: "$a", window: {documents: ['unbounded', 'current']}}}}
 }));
 
 // Not every accumulator is automatically a window function.
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$mergeObjects: {input: "$a"}}}}}),
+assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$mergeObjects: "$a"}}}}),
                              ErrorCodes.FailedToParse,
                              'No such window function: $mergeObjects');
-assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$accumulator: {input: "$a"}}}}}),
+assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$accumulator: "$a"}}}}),
                              ErrorCodes.FailedToParse,
                              'No such window function: $accumulator');
 })();

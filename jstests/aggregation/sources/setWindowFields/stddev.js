@@ -35,9 +35,9 @@ let results =
                     sortBy: {ts: 1},
                     output: {
                         stdDevPop:
-                            {$stdDevPop: {input: "$str", documents: ["unbounded", "current"]}},
+                            {$stdDevPop: "$str", window: {documents: ["unbounded", "current"]}},
                         stdDevSamp:
-                            {$stdDevSamp: {input: "$str", documents: ["unbounded", "current"]}},
+                            {$stdDevSamp: "$str", window: {documents: ["unbounded", "current"]}},
                     }
                 }
             }

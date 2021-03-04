@@ -89,6 +89,10 @@ struct WindowBounds {
 
     stdx::variant<DocumentBased, RangeBased, TimeBased> bounds;
 
+    static WindowBounds defaultBounds() {
+        return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};
+    }
+
     /**
      * Check if these bounds are unbounded on both ends.
      * This case is special because it means you don't need a sortBy to interpret the bounds:
@@ -102,11 +106,11 @@ struct WindowBounds {
      *
      *     {$setWindowFields: {
      *         output: {
-     *             v: {$sum: {input: "$x", range: [-1, +1], unit: 'seconds'}},
+     *             v: {$sum: "$x", window: {range: [-1, +1], unit: 'seconds'}},
      *         }
      *     }}
      *
-     * 'args' would be {input: "$x", range: [-1, +1], unit: 'seconds'}.
+     * 'args' would be {range: [-1, +1], unit: 'seconds'}.
      *
      * If the BSON doesn't specify bounds, we default to:
      *

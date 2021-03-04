@@ -36,8 +36,8 @@ let results =
                 $setWindowFields: {
                     sortBy: {ts: 1},
                     output: {
-                        minStr: {$min: {input: "$str", documents: ["unbounded", "current"]}},
-                        maxStr: {$max: {input: "$str", documents: ["unbounded", "current"]}},
+                        minStr: {$min: "$str", window: {documents: ["unbounded", "current"]}},
+                        maxStr: {$max: "$str", window: {documents: ["unbounded", "current"]}},
                     }
                 }
             }
