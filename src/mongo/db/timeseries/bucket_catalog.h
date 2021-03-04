@@ -388,6 +388,7 @@ private:
         bool isLocked() const;
         Bucket* operator->();
         operator bool() const;
+        operator std::shared_ptr<Bucket>() const;
 
         // Release the bucket lock, typically in order to reacquire the catalog lock.
         void release();

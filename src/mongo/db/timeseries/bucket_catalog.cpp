@@ -320,17 +320,23 @@ void BucketCatalog::clear(const BucketId& bucketId) {
         return;
     }
 
-    while (!bucket->promises.empty()) {
-        if (auto& promise = bucket->promises.front()) {
-            promise->setError({ErrorCodes::TimeseriesBucketCleared,
-                               str::stream() << "Time-series bucket " << *bucketId << " for "
-                                             << bucket->ns << " was cleared"});
-        }
-        bucket->promises.pop();
-    }
-
+    // Retain pointer to bucket, release so we can get an exclusive lock.
+    std::shared_ptr<Bucket> underlyingBucket{bucket};
     bucket.release();
     auto lk = _lockExclusive();
+
+    {
+        stdx::lock_guard blk{underlyingBucket->lock};
+        while (!underlyingBucket->promises.empty()) {
+            if (auto& promise = underlyingBucket->promises.front()) {
+                promise->setError({ErrorCodes::TimeseriesBucketCleared,
+                                   str::stream() << "Time-series bucket " << *bucketId << " for "
+                                                 << underlyingBucket->ns << " was cleared"});
+            }
+            underlyingBucket->promises.pop();
+        }
+    }
+
     _removeBucket(bucketId);
 }
 
@@ -650,6 +656,10 @@ BucketCatalog::Bucket* BucketCatalog::BucketAccess::operator->() {
 
 BucketCatalog::BucketAccess::operator bool() const {
     return isLocked();
+}
+
+BucketCatalog::BucketAccess::operator std::shared_ptr<BucketCatalog::Bucket>() const {
+    return _bucket;
 }
 
 void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess*)>& isBucketFull) {
