@@ -743,6 +743,18 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
         }
     }
 
+    uassert(ErrorCodes::InvalidOptions,
+            "Partial indexes are not supported on collections clustered by _id",
+            !_collection->isClustered() || !spec[IndexDescriptor::kPartialFilterExprFieldName]);
+
+    uassert(ErrorCodes::InvalidOptions,
+            "Unique indexes are not supported on collections clustered by _id",
+            !_collection->isClustered() || !spec[IndexDescriptor::kUniqueFieldName].trueValue());
+
+    uassert(ErrorCodes::InvalidOptions,
+            "TTL indexes are not supported on collections clustered by _id",
+            !_collection->isClustered() || !spec[IndexDescriptor::kExpireAfterSecondsFieldName]);
+
     if (IndexDescriptor::isIdIndexPattern(key)) {
         if (_collection->isClustered()) {
             return Status(ErrorCodes::CannotCreateIndex,
