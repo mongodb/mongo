@@ -52,16 +52,17 @@ const sortStage = {
 };
 
 // Test using $sum to count.
-let result = coll.aggregate([
-                     sortStage,
-                     {
-                         $setWindowFields: {
-                             sortBy: {one: 1},
-                             output: {a: {$sum: {input: 1, documents: ["unbounded", "current"]}}}
-                         }
-                     }
-                 ])
-                 .toArray();
+let result =
+    coll.aggregate([
+            sortStage,
+            {
+                $setWindowFields: {
+                    sortBy: {one: 1},
+                    output: {a: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
+                }
+            }
+        ])
+        .toArray();
 verifyResults(result, function(num, baseObj) {
     baseObj.a = num + 1;
     return baseObj;
@@ -74,7 +75,7 @@ result =
             {
                 $setWindowFields: {
                     sortBy: {one: 1},
-                    output: {a: {$sum: {input: "$one", documents: ["unbounded", "current"]}}}
+                    output: {a: {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
                 }
             }
         ])
@@ -91,8 +92,8 @@ result = coll.aggregate([
                      $setWindowFields: {
                          sortBy: {one: 1},
                          output: {
-                             a: {$sum: {input: "$one", documents: ["unbounded", "current"]}},
-                             b: {$sum: {input: "$two", documents: ["unbounded", "current"]}}
+                             a: {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                             b: {$sum: "$two", window: {documents: ["unbounded", "current"]}}
                          }
                      }
                  }
@@ -111,7 +112,7 @@ result =
             {
                 $setWindowFields: {
                     sortBy: {one: 1},
-                    output: {one: {$sum: {input: "$one", documents: ["unbounded", "current"]}}}
+                    output: {one: {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
                 }
             }
         ])
@@ -128,9 +129,9 @@ result =
             {
                 $setWindowFields: {
                     sortBy: {one: 1},
-                    output: {
-                        "docArr.a": {$sum: {input: "$one", documents: ["unbounded", "current"]}}
-                    }
+                    output:
+                        {"docArr.a":
+                             {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
                 }
             }
         ])
@@ -149,10 +150,10 @@ result =
                 $setWindowFields: {
                     sortBy: {one: 1},
                     output: {
-                        "docArr.1": {$sum: {input: "$one", documents: ["unbounded", "current"]}},
-                        "docArr.2": {$sum: {input: "$one", documents: ["unbounded", "current"]}},
+                        "docArr.1": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                        "docArr.2": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
                         "simpleArr.1":
-                            {$sum: {input: "$one", documents: ["unbounded", "current"]}}
+                            {$sum: "$one", window: {documents: ["unbounded", "current"]}}
                     }
                 }
             }
@@ -175,7 +176,8 @@ result =
             {
                 $setWindowFields: {
                     sortBy: {one: 1},
-                    output: {"a.b": {$sum: {input: "$one", documents: ["unbounded", "current"]}}}
+                    output:
+                        {"a.b": {$sum: "$one", window: {documents: ["unbounded", "current"]}}}
                 }
             }
         ])
@@ -193,12 +195,12 @@ result =
                 $setWindowFields: {
                     sortBy: {one: 1},
                     output: {
-                        "a": {$sum: {input: "$one", documents: ["unbounded", "current"]}},
-                        "newField.a": {$sum: {input: "$two", documents: ["unbounded", "current"]}},
+                        "a": {$sum: "$one", window: {documents: ["unbounded", "current"]}},
+                        "newField.a": {$sum: "$two", window: {documents: ["unbounded", "current"]}},
                         "simpleArr.0.b":
-                            {$sum: {input: "$one", documents: ["unbounded", "current"]}},
+                            {$sum: "$one", window: {documents: ["unbounded", "current"]}},
                         "nestedDoc.1.2.a":
-                            {$sum: {input: "$one", documents: ["unbounded", "current"]}}
+                            {$sum: "$one", window: {documents: ["unbounded", "current"]}}
                     }
                 }
             }
@@ -219,7 +221,7 @@ result = coll.aggregate([
                  {
                      $setWindowFields: {
                          sortBy: {one: 1},
-                         output: {one: {$sum: {input: "$one", documents: ["unbounded", 1]}}}
+                         output: {one: {$sum: "$one", window: {documents: ["unbounded", 1]}}}
                      }
                  }
              ])
@@ -237,7 +239,7 @@ result = coll.aggregate([
                  {
                      $setWindowFields: {
                          sortBy: {one: 1},
-                         output: {one: {$sum: {input: "$one", documents: ["unbounded", -1]}}}
+                         output: {one: {$sum: "$one", window: {documents: ["unbounded", -1]}}}
                      }
                  }
              ])
@@ -257,7 +259,7 @@ result = coll.aggregate([
                          sortBy: {one: 1},
                          output: {
                              mixedTypeSum:
-                                 {$sum: {input: "$mixed", documents: ["unbounded", "current"]}}
+                                 {$sum: "$mixed", window: {documents: ["unbounded", "current"]}}
                          }
                      }
                  }

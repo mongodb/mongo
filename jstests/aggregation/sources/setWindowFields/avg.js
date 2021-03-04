@@ -32,8 +32,8 @@ let results =
                     sortBy: {_id: 1},
                     partitionBy: "$ticker",
                     output: {
-                        runningAvg: {$avg: {input: "$price", documents: ["unbounded", "current"]}},
-                        runningAvgLead: {$avg: {input: "$price", documents: ["unbounded", 3]}},
+                        runningAvg: {$avg: "$price", window: {documents: ["unbounded", "current"]}},
+                        runningAvgLead: {$avg: "$price", window: {documents: ["unbounded", 3]}},
                     }
                 },
             },

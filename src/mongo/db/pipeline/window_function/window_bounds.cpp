@@ -133,7 +133,12 @@ WindowBounds WindowBounds::parse(BSONObj args,
     }
 
     if (!range && !documents) {
-        return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'window' field can only contain '" << kArgDocuments
+                              << "' as the only argument or '" << kArgRange
+                              << "' with an optional '" << kArgUnit << "' field",
+                args.nFields() == 0);
+        return defaultBounds();
     }
 
     auto unpack = [](BSONElement e) -> std::pair<BSONElement, BSONElement> {
@@ -144,7 +149,12 @@ WindowBounds WindowBounds::parse(BSONObj args,
         auto upper = e.Obj()[1];
         return {lower, upper};
     };
+
     if (documents) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'window' field that specifies " << kArgDocuments
+                              << " cannot have other fields",
+                args.nFields() == 1);
         // Parse document-based bounds.
         auto [lowerElem, upperElem] = unpack(documents);
 
@@ -166,6 +176,10 @@ WindowBounds WindowBounds::parse(BSONObj args,
         if (unit) {
             // Parse time-based bounds (range-based, with a unit).
             uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "'window' field that specifies " << kArgUnit
+                                  << " cannot have other fields besides 'range'",
+                    args.nFields() == 2);
+            uassert(ErrorCodes::FailedToParse,
                     str::stream() << "'" << kArgUnit << "' must be a string",
                     unit.type() == BSONType::String);
 
@@ -182,6 +196,10 @@ WindowBounds WindowBounds::parse(BSONObj args,
             bounds = WindowBounds{TimeBased{lower, upper, parseTimeUnit(unit.str())}};
         } else {
             // Parse range-based bounds.
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "'window' field that specifies " << kArgRange
+                                  << " cannot have other fields besides 'unit'",
+                    args.nFields() == 1);
             auto parseNumber = [](Value v) -> Value {
                 uassert(ErrorCodes::FailedToParse,
                         "Range-based bounds expression must be a number",

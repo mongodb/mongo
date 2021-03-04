@@ -99,12 +99,11 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
                                                        ExpressionContext* expCtx) {
     // 'elem' is a statement like 'v: {$sum: {...}}', whereas the expression is '$sum: {...}'.
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The field '" << elem.fieldName()
-                          << "' must be a window-function object",
-            elem.type() == BSONType::Object && elem.Obj().nFields() == 1);
+            str::stream() << "The field '" << elem.fieldName() << "' must be an object",
+            elem.type() == BSONType::Object);
     return WindowFunctionStatement(
         elem.fieldName(),
-        window_function::Expression::parse(elem.Obj().firstElement(), sortBy, expCtx));
+        window_function::Expression::parse(elem.embeddedObject(), sortBy, expCtx));
 }
 void WindowFunctionStatement::serialize(MutableDocument& outputFields,
                                         boost::optional<ExplainOptions::Verbosity> explain) const {

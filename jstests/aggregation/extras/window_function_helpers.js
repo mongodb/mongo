@@ -71,7 +71,7 @@ function testAccumAgainstGroup(coll, accum) {
                             $setWindowFields: {
                                 partitionBy: partition,
                                 sortBy: {_id: 1},
-                                output: {res: {[accum]: {input: "$price", documents: bounds}}}
+                                output: {res: {[accum]: "$price", window: {documents: bounds}}}
                             },
                         },
                     ])
@@ -99,6 +99,7 @@ function testAccumAgainstGroup(coll, accum) {
                         upper: upperBound
                     });
                 }
+
                 assert.eq(groupRes,
                           wfResults[index].res,
                           "Window function result for index " + index + ": " + tojson(wfRes));

@@ -81,10 +81,30 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseInvalidArgumentTypes) {
         40415);
 }
 
+TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfArgumentsAreRepeated) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', $max: '$pop', window: {documents: [-10, 0]}}}}})");
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfWindowFieldHasExtraArgument) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: [0, 10], document: [0,8]} }}}})");
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx()),
+        AssertionException,
+        ErrorCodes::FailedToParse);
+}
+
 TEST_F(DocumentSourceSetWindowFieldsTest, SuccessfullyParsesAndReserializes) {
     auto spec = fromjson(R"(
-        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum: {$sum: 
-        {input: '$pop', documents: [-10, 0]}}}}})");
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: [-10, 0]}}}}})");
     auto parsedStage =
         DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
     std::vector<Value> serializedArray;
@@ -94,8 +114,8 @@ TEST_F(DocumentSourceSetWindowFieldsTest, SuccessfullyParsesAndReserializes) {
 
 TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfFeatureFlagDisabled) {
     auto spec = fromjson(R"(
-        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum: {$sum: 
-        {input: '$pop', documents: [-10, 0]}}}}})");
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: [-10, 0]}}}}})");
     // By default, the unit test will have the feature flag disabled.
     ASSERT_THROWS_CODE(
         Pipeline::parse(std::vector<BSONObj>({spec}), getExpCtx()), AssertionException, 16436);
