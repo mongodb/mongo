@@ -123,5 +123,59 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
     return builder.obj();
 }
 
+BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& timeseriesOptions,
+                                                     const BSONObj& bucketsIndexSpecBSON) {
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    const std::string controlMinTimeField = str::stream() << "control.min." << timeField;
+    const std::string controlMaxTimeField = str::stream() << "control.max." << timeField;
+
+    BSONObjBuilder builder;
+    for (const auto& elem : bucketsIndexSpecBSON) {
+        // The index specification on the time field is ascending or descending.
+        if (elem.fieldNameStringData() == controlMinTimeField) {
+            if (!elem.isNumber()) {
+                // This index spec on the underlying buckets collection is not valid for
+                // time-series. Therefore, we will not convert the index spec..
+                return {};
+            }
+
+            builder.appendAs(elem, timeField);
+            continue;
+        } else if (elem.fieldNameStringData() == controlMaxTimeField) {
+            // Skip 'control.max.<timeField>' since the 'control.min.<timeField>' field is
+            // sufficient to determine whether the index is ascending or descending.
+            continue;
+        }
+
+        if (!metaField) {
+            // 'elem' is an invalid index spec field for this time-series collection. It does not
+            // match the time field and there is no metaField set. Therefore, we will not convert
+            // the index spec.
+            return {};
+        }
+
+        if (elem.fieldNameStringData() == BucketUnpacker::kBucketMetaFieldName) {
+            builder.appendAs(elem, *metaField);
+            continue;
+        }
+
+        if (elem.fieldNameStringData().startsWith(BucketUnpacker::kBucketMetaFieldName + ".")) {
+            builder.appendAs(elem,
+                             str::stream() << *metaField << "."
+                                           << elem.fieldNameStringData().substr(
+                                                  BucketUnpacker::kBucketMetaFieldName.size() + 1));
+            continue;
+        }
+
+        // 'elem' is an invalid index spec field for this time-series collection. It matches neither
+        // the time field  nor the metaField field. Therefore, we will not convert the index spec.
+        return {};
+    }
+
+    return builder.obj();
+}
+
 }  // namespace timeseries
 }  // namespace mongo

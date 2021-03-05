@@ -36,7 +36,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -49,7 +48,6 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/list_indexes_gen.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -57,7 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/uuid.h"
 
@@ -65,105 +63,20 @@ namespace mongo {
 namespace {
 
 /**
- * Returns time-series options if 'ns' refers to a time-series collection.
- */
-boost::optional<TimeseriesOptions> getTimeseriesOptions(
-    OperationContext* opCtx, const boost::optional<NamespaceString>& ns) {
-    if (!ns) {
-        return {};
-    }
-
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns->db());
-    if (!viewCatalog) {
-        return {};
-    }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns->ns());
-    if (!view) {
-        return {};
-    }
-
-    // Return a copy of the time-series options so that we don't refer to the internal state of
-    // 'viewCatalog' once it goes out of scope.
-    return view->timeseries();
-}
-
-/**
- * Returns an index key with field names mapped from the bucket collection schema.
- * Returns an empty BSONObj if the index key cannot be converted.
- */
-BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
-                                   const BSONObj& origKey) {
-    auto timeField = timeseriesOptions.getTimeField();
-    auto metaField = timeseriesOptions.getMetaField();
-
-    std::string controlMinTimeField = str::stream() << "control.min." << timeField;
-    std::string controlMaxTimeField = str::stream() << "control.max." << timeField;
-
-    BSONObjBuilder builder;
-    for (const auto& elem : origKey) {
-        // Determine if the index requested on the time field is ascending or descending.
-        // The final index spec will be subjected to a more complete validation in
-        // index_key_validate::validateKeyPattern().
-        if (elem.fieldNameStringData() == controlMinTimeField) {
-            if (!elem.isNumber()) {
-                return {};
-            }
-            builder.appendAs(elem, timeField);
-            continue;
-        } else if (elem.fieldNameStringData() == controlMaxTimeField) {
-            // Skip control.max.<timeField> since the control.min.<timeField> field is enough to
-            // figure out the direction of the index (ascending/descending).
-            continue;
-        }
-
-        if (!metaField) {
-            return {};
-        }
-
-        if (elem.fieldNameStringData() == BucketUnpacker::kBucketMetaFieldName) {
-            builder.appendAs(elem, *metaField);
-            continue;
-        }
-
-        if (elem.fieldNameStringData().startsWith(BucketUnpacker::kBucketMetaFieldName + ".")) {
-            builder.appendAs(elem,
-                             str::stream() << *metaField << "."
-                                           << elem.fieldNameStringData().substr(
-                                                  BucketUnpacker::kBucketMetaFieldName.size() + 1));
-            continue;
-        }
-
-        return {};
-    }
-    return builder.obj();
-}
-
-/**
+ * Converts buckets collection index specs to the time-series collection schema.
  * Returns a list of index specs mapped from the bucket collection schema.
  */
 std::list<BSONObj> makeTimeseriesIndexSpecs(const TimeseriesOptions& timeseriesOptions,
-                                            const std::list<BSONObj>& bucketIndexSpecs) {
+                                            const std::list<BSONObj>& bucketsIndexSpecs) {
     std::list<BSONObj> indexSpecs;
-    for (const auto& bucketIndexSpec : bucketIndexSpecs) {
+    for (const auto& bucketsIndexSpec : bucketsIndexSpecs) {
         // TODO(SERVER-54639): Map index specs from bucket collection using helper function.
         BSONObjBuilder builder;
         bool skip = false;
-        for (const auto& elem : bucketIndexSpec) {
+        for (const auto& elem : bucketsIndexSpec) {
             if (elem.fieldNameStringData() == ListIndexesReplyItem::kKeyFieldName) {
-                // On a time-series collection with 'tm' time field and 'mm' metadata field,
-                // we may see a compound index on the underlying bucket collection mapped from:
-                // {
-                //     'meta.tag1': 1,
-                //     'control.min.tm': 1,
-                //     'control.max.tm': 1
-                // }
-                // to an index on the time-series collection:
-                // {
-                //     'mm.tag1': 1,
-                //     tm: 1
-                // }
-                auto key = makeTimeseriesIndexSpecKey(timeseriesOptions, elem.Obj());
+                auto key = timeseries::convertBucketsIndexSpecToTimeseriesIndexSpec(
+                    timeseriesOptions, elem.Obj());
                 if (key.isEmpty()) {
                     // Skip index spec due to failed conversion.
                     skip = true;
@@ -204,21 +117,22 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
 
     // Since time-series collections don't have UUIDs, we skip the time-series lookup
     // if the target collection is specified as a UUID.
-    if (const auto& origNss = origNssOrUUID.nss();
-        auto timeseriesOptions = getTimeseriesOptions(opCtx, origNss)) {
-        auto bucketsNss = origNss->makeTimeseriesBucketsNamespace();
-        AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, bucketsNss);
+    if (const auto& origNss = origNssOrUUID.nss()) {
+        if (auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, *origNss)) {
+            auto bucketsNss = origNss->makeTimeseriesBucketsNamespace();
+            AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, bucketsNss);
 
-        const CollectionPtr& coll = autoColl.getCollection();
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "ns does not exist: " << bucketsNss,
-                coll);
+            const CollectionPtr& coll = autoColl.getCollection();
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "ns does not exist: " << bucketsNss,
+                    coll);
 
-        return std::make_pair(
-            makeTimeseriesIndexSpecs(
-                *timeseriesOptions,
-                listIndexesInLock(opCtx, coll, bucketsNss, cmd.getIncludeBuildUUIDs())),
-            *origNss);
+            return std::make_pair(
+                makeTimeseriesIndexSpecs(
+                    *timeseriesOptions,
+                    listIndexesInLock(opCtx, coll, bucketsNss, cmd.getIncludeBuildUUIDs())),
+                *origNss);
+        }
     }
 
     AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, origNssOrUUID);
