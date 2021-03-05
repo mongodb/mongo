@@ -1027,6 +1027,12 @@ protected:
     // Custom logic to validate results to enforce API versioning.
     virtual void validateResult(const BSONObj& resultObj) = 0;
 
+    /*
+     * If the result is an error, assert that it satisfies the IDL-defined requirements on a
+     * command error reply.
+     * Calls to this function should be done only in test mode so that we don't expose users to
+     * errors if we construct an invalid error reply.
+     */
     static bool checkIsErrorStatus(const BSONObj& resultObj, const IDLParserErrorContext& ctx) {
         auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
         if (!wcStatus.isOK()) {
