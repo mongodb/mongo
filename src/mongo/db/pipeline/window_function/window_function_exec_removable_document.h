@@ -61,11 +61,8 @@ public:
     }
 
 private:
-    void processDocumentsToUpperBound() final;
-
-    void removeDocumentsUnderLowerBound() final;
-
-    void initialize() final;
+    void update() final;
+    void initialize();
 
     void removeFirstValueIfExists() {
         if (_values.size() == 0) {
@@ -75,6 +72,10 @@ private:
         _function->remove(_values.front());
         _values.pop();
     }
+
+    // In one of two states: either the initial window has not been populated or we are sliding and
+    // accumulating/removing values.
+    bool _initialized = false;
 
     int _lowerBound;
     // Will stay boost::none if right unbounded.

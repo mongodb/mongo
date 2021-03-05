@@ -57,7 +57,7 @@ public:
         auto vps = expCtx->variablesParseState;
         auto optKey =
             keyPath ? optExp(ExpressionFieldPath::parse(expCtx, *keyPath, vps)) : boost::none;
-        _iter = std::make_unique<PartitionIterator>(expCtx, _docSource.get(), optKey);
+        _iter = std::make_unique<PartitionIterator>(expCtx, _docSource.get(), optKey, boost::none);
         auto inputField = ExpressionFieldPath::parse(expCtx, "$val", vps);
         auto defaultExp = defaultValue
             ? optExp(ExpressionConstant::parse(expCtx, *defaultValue, vps))

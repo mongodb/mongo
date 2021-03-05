@@ -32,22 +32,26 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 
 /**
  * This class provides an abstraction for accessing documents in a partition via an interator-type
- * interface. There is always a "current" document with which indexed access is relative to.
+ * interface. There is always a "current" document; operator[] provides random access relative to
+ * the current document, so that iter[+2] is refers to the 2 positions ahead of the current one.
+ *
+ * The 'partionExpr' is used to determine partition boundaries, provide the illusion that only the
+ * current partition exists.
+ *
+ * The 'sortPattern' is used for resolving range-based and time-based bounds, in 'getEndpoints()'.
  */
 class PartitionIterator {
 public:
     PartitionIterator(ExpressionContext* expCtx,
                       DocumentSource* source,
-                      boost::optional<boost::intrusive_ptr<Expression>> partitionExpr)
-        : _expCtx(expCtx),
-          _source(source),
-          _partitionExpr(partitionExpr),
-          _state(IteratorState::kNotInitialized) {}
+                      boost::optional<boost::intrusive_ptr<Expression>> partitionExpr,
+                      const boost::optional<SortPattern>& sortPattern);
 
     using SlotId = unsigned int;
     SlotId newSlot() {
@@ -116,7 +120,7 @@ private:
     boost::optional<Document> operator[](int index);
 
     /**
-     * Resolve any type of WindowBounds to a concrete pair of indices, '[lower, upper]'.
+     * Resolves any type of WindowBounds to a concrete pair of indices, '[lower, upper]'.
      *
      * Both 'lower' and 'upper' are valid offsets, such that '(*this)[lower]' and '(*this)[upper]'
      * returns a document. If the window contains one document, then 'lower == upper'. If the
@@ -131,8 +135,46 @@ private:
      *
      * This method is non-const because it may pull documents into memory up to the end of the
      * window.
+     *
+     * 'hint', if specified, should be the last result of getEndpoints() for the same 'bounds'.
      */
-    boost::optional<std::pair<int, int>> getEndpoints(const WindowBounds& bounds);
+    boost::optional<std::pair<int, int>> getEndpoints(
+        const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
+
+    /**
+     * Returns the smallest offset 'i' such that (*this)[i] is in '_cache'.
+     *
+     * This value is negative or zero, because the current document is always in '_cache'.
+     */
+    auto getMinCachedOffset() const {
+        return -_currentCacheIndex;
+    }
+
+    /**
+     * Returns the largest offset 'i' such that (*this)[i] is in '_cache'.
+     *
+     * Note that offsets greater than 'i' might still be in the partition, even though they
+     * haven't been loaded into '_cache' yet. If you want to know where the partition ends,
+     * call 'cacheWholePartition' first.
+     *
+     * This value is positive or zero, because the current document is always in '_cache'.
+     */
+    auto getMaxCachedOffset() const {
+        return getMinCachedOffset() + _cache.size() - 1;
+    }
+
+    /**
+     * Loads documents into '_cache' until we reach a partition boundary.
+     */
+    void cacheWholePartition() {
+        // Start from one past the end of the _cache.
+        int i = getMinCachedOffset() + _cache.size();
+        // If we have already loaded everything into '_cache' then this condition will be false
+        // immediately.
+        while ((*this)[i]) {
+            ++i;
+        }
+    }
 
     /**
      * Marks the given index as expired for the slot 'id'. This does not necessarily mean that the
@@ -181,9 +223,21 @@ private:
         _state = IteratorState::kIntraPartition;
     }
 
+    // Internal helpers for 'getEndpoints()'.
+    boost::optional<std::pair<int, int>> getEndpointsRangeBased(
+        const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
+    boost::optional<std::pair<int, int>> getEndpointsDocumentBased(
+        const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
+
     ExpressionContext* _expCtx;
     DocumentSource* _source;
     boost::optional<boost::intrusive_ptr<Expression>> _partitionExpr;
+
+    // '_sortExpr' tells us which field is the "time" field. When the user writes
+    // 'sortBy: {ts: 1}', any time-based or range-based window bounds are defined using
+    // the value of the "$ts" field. This _sortExpr is used in getEndpoints().
+    boost::optional<boost::intrusive_ptr<ExpressionFieldPath>> _sortExpr;
+
     std::deque<Document> _cache;
     // '_cache[_currentCacheIndex]' is the current document, which '(*this)[0]' returns.
     int _currentCacheIndex = 0;
@@ -237,9 +291,12 @@ public:
         // This policy assumes that when the caller accesses a certain index 'i', that it will no
         // longer require all documents up to and including the document at index 'i'.
         kDefaultSequential,
-        // This policy should be used if the caller requires the endpoints of a window, potentially
-        // accessing the same bound twice.
-        kEndpointsOnly
+        // This policy should be used if the caller requires the endpoints of a window. Documents
+        // to the left of the left endpoint may disappear on the next call to releaseExpired().
+        kEndpoints,
+        // This policy means the caller only looks at how the right endpoint changes.
+        // The caller may look at documents between the most recent two right endpoints.
+        kRightEndpoint,
     };
     PartitionAccessor(PartitionIterator* iter, Policy policy)
         : _iter(iter), _slot(iter->newSlot()), _policy(policy) {}
@@ -250,7 +307,8 @@ public:
             case Policy::kDefaultSequential:
                 _iter->expireUpTo(_slot, index);
                 break;
-            case Policy::kEndpointsOnly:
+            case Policy::kEndpoints:
+            case Policy::kRightEndpoint:
                 break;
         }
         return ret;
@@ -260,12 +318,32 @@ public:
         return _iter->getCurrentPartitionIndex();
     }
 
-    boost::optional<std::pair<int, int>> getEndpoints(const WindowBounds& bounds) {
-        tassert(5371201, "Invalid usage of partition accessor", _policy == Policy::kEndpointsOnly);
-        auto endpoints = _iter->getEndpoints(bounds);
-        // With this policy, all documents before the lower bound can be marked as expired.
-        if (endpoints) {
-            _iter->expireUpTo(_slot, endpoints->first - 1);
+    boost::optional<std::pair<int, int>> getEndpoints(
+        const WindowBounds& bounds,
+        const boost::optional<std::pair<int, int>>& hint = boost::none) {
+        auto endpoints = _iter->getEndpoints(bounds, hint);
+        switch (_policy) {
+            case Policy::kDefaultSequential:
+                tasserted(5371201, "Invalid usage of partition accessor");
+                break;
+            case Policy::kEndpoints:
+                // With this policy, all documents before the lower bound can be marked as expired.
+                // They will only be released on the next call to releaseExpired(), so when
+                // getEndpoints() returns, the caller may also look at documents from the previous
+                // result of getEndpoints(), until it returns control to the DocumentSource.
+                if (endpoints) {
+                    _iter->expireUpTo(_slot, endpoints->first - 1);
+                }
+                break;
+            case Policy::kRightEndpoint:
+                // With this policy, all documents before the upper bound can be marked as expired.
+                // They will only be released on the next call to releaseExpired(), so when
+                // getEndpoints() returns, the caller may also look at documents from the previous
+                // result of getEndpoints(), until it returns control to the DocumentSource.
+                if (endpoints) {
+                    _iter->expireUpTo(_slot, endpoints->second - 1);
+                }
+                break;
         }
         return endpoints;
     }

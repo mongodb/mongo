@@ -48,7 +48,7 @@ protected:
                                   boost::intrusive_ptr<Expression> input,
                                   WindowBounds bounds,
                                   boost::optional<boost::intrusive_ptr<Expression>> defaultValue)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpointsOnly)),
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints)),
           _input(std::move(input)),
           _bounds(std::move(bounds)) {
         if (!defaultValue) {

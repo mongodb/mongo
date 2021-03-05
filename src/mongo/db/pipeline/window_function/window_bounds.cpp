@@ -213,7 +213,7 @@ WindowBounds WindowBounds::parse(BSONObj args,
         }
         uassert(5339902,
                 "Range-based bounds require sortBy a single field",
-                bounds.isUnbounded() || (sortBy && sortBy->size() == 1));
+                sortBy && sortBy->size() == 1);
         return bounds;
     }
 }

@@ -34,55 +34,55 @@
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
-#include "mongo/db/query/datetime/date_time_support.h"
 
 namespace mongo {
 
 /**
- * $derivative computes 'rise/run', by comparing the two endpoints of its window.
+ * An executor that handles left-bounded, range-based windows.
  *
- * 'rise' is the difference in 'position' between the endpoints; 'run' is the difference in 'time'.
- *
- * We assume the 'time' is provided as an expression, even though the surface syntax uses a
- * SortPattern. When the WindowFunctionExpression translates itself to an exec, it can also
- * translate the SortPattern to an expression.
+ * Left-bounded windows require a window-function state that supports removing elements.
  */
-class WindowFunctionExecDerivative final : public WindowFunctionExec {
+class WindowFunctionExecRemovableRange final : public WindowFunctionExecRemovable {
 public:
-    // Default value to use when the window is empty.
-    static inline const Value kDefault = Value(BSONNULL);
+    /**
+     * Constructs a removable window function executor with the given input expression to be
+     * evaluated and passed to the corresponding WindowFunc for each document in the window.
+     *
+     * For example, in
+     *     {$setWindowFields: {
+     *         sortBy: {ts: 1},
+     *         output: {
+     *             v: {$max: "$x", window: {range: [-5, 'unbounded']}}
+     *         }
+     *     }}
+     *
+     * 'input' is "$x"
+     * 'sortBy' is "$ts" (translated from the sort spec, {ts: 1})
+     * 'function' is a WindowFunctionMax
+     * 'bounds' is WindowBounds::RangeBased{Value{-5}, WindowBounds::Unbounded{}}
+     */
+    WindowFunctionExecRemovableRange(PartitionIterator* iter,
+                                     boost::intrusive_ptr<Expression> input,
+                                     boost::intrusive_ptr<ExpressionFieldPath> sortBy,
+                                     std::unique_ptr<WindowFunctionState> function,
+                                     WindowBounds bounds);
 
-    WindowFunctionExecDerivative(PartitionIterator* iter,
-                                 boost::intrusive_ptr<Expression> position,
-                                 boost::intrusive_ptr<Expression> time,
-                                 WindowBounds bounds,
-                                 boost::optional<TimeUnit> outputUnit)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints)),
-          _position(std::move(position)),
-          _time(std::move(time)),
-          _bounds(std::move(bounds)),
-          _outputUnitMillis([&]() -> boost::optional<long long> {
-              if (!outputUnit)
-                  return boost::none;
+    Value getNext() override {
+        update();
+        return _function->getValue();
+    }
 
-              auto status = timeUnitTypicalMilliseconds(*outputUnit);
-              tassert(status);
-              return status.getValue();
-          }()) {}
-
-    Value getNext() final;
-    void reset() final {}
-
-    // This executor does not store any documents as it processes.
-    size_t getApproximateSize() const final {
-        return 0;
+    void reset() final {
+        _function->reset();
+        _lastEndpoints = boost::none;
+        _memUsageBytes = 0;
     }
 
 private:
-    boost::intrusive_ptr<Expression> _position;
-    boost::intrusive_ptr<Expression> _time;
-    WindowBounds _bounds;
-    boost::optional<long long> _outputUnitMillis;
-};
+    void update() final;
 
+    boost::intrusive_ptr<ExpressionFieldPath> _sortBy;
+    WindowBounds _bounds;
+    boost::optional<std::pair<int, int>> _lastEndpoints;
+};
 }  // namespace mongo

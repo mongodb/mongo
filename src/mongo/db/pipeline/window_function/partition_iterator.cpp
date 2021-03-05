@@ -32,9 +32,63 @@
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/util/visit_helper.h"
 
+using boost::optional;
+
 namespace mongo {
 
-boost::optional<Document> PartitionIterator::operator[](int index) {
+namespace {
+/**
+ * Create an Expression from a SortPattern, if the sort is simple enough.
+ *
+ * The sort must have one, ascending, non-expression field.
+ * The field may be dotted.
+ *
+ * For example: {ab.c: 1} becomes "$ab.c", but {a: -1} becomes boost::none.
+ */
+static optional<boost::intrusive_ptr<ExpressionFieldPath>> exprFromSort(
+    ExpressionContext* expCtx, const optional<SortPattern>& sortPattern) {
+    if (!sortPattern)
+        return boost::none;
+    if (sortPattern->size() != 1)
+        return boost::none;
+    const SortPattern::SortPatternPart& part = *sortPattern->begin();
+
+    bool hasFieldPath = part.fieldPath != boost::none;
+    bool hasExpression = part.expression != nullptr;
+    tassert(5429403,
+            "SortPatternPart is supposed to have exactly one: fieldPath, or expression.",
+            hasFieldPath != hasExpression);
+
+    if (hasExpression)
+        return boost::none;
+
+    // Descending sorts are not allowed with range-based bounds.
+    //
+    // We think this would be confusing.
+    // Does [x, y] mean [lower, upper] or [left, right] ?
+    //
+    // For example, suppose you sort by {time: -1} to put recent documents first.
+    // Would you write 'range: [-5, +2]', with the smaller value first?
+    // Or would you write 'range: [+2, -5]', with the more recent value first?
+    if (!part.isAscending)
+        return boost::none;
+
+    return ExpressionFieldPath::createPathFromString(
+        expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
+}
+}  // namespace
+
+PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
+                                     DocumentSource* source,
+                                     optional<boost::intrusive_ptr<Expression>> partitionExpr,
+                                     const optional<SortPattern>& sortPattern)
+    : _expCtx(expCtx),
+      _source(source),
+      _partitionExpr(std::move(partitionExpr)),
+      _sortExpr(exprFromSort(_expCtx, sortPattern)),
+      _state(IteratorState::kNotInitialized) {}
+
+optional<Document> PartitionIterator::operator[](int index) {
     auto desired = _currentCacheIndex + index;
 
     if (_state == IteratorState::kAdvancedToEOF)
@@ -152,49 +206,209 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
 }
 
 namespace {
-boost::optional<int> numericBound(WindowBounds::Bound<int> bound) {
+optional<int> numericBound(WindowBounds::Bound<int> bound) {
     return stdx::visit(
         visit_helper::Overloaded{
-            [](WindowBounds::Unbounded) -> boost::optional<int> { return boost::none; },
-            [](WindowBounds::Current) -> boost::optional<int> { return 0; },
-            [](int i) -> boost::optional<int> { return i; },
+            [](WindowBounds::Unbounded) -> optional<int> { return boost::none; },
+            [](WindowBounds::Current) -> optional<int> { return 0; },
+            [](int i) -> optional<int> { return i; },
         },
         bound);
 }
+
+// Assumes both arguments are numeric, and performs Decimal128 addition on them.
+Value decimalAdd(const Value& left, const Value& right) {
+    // Widening to Decimal128 is a convenient way to avoid having many cases for different numeric
+    // types. The 'threshold' values we compute are only used to choose a set of documents; the
+    // user can't observe the type.
+    return Value(left.coerceToDecimal().add(right.coerceToDecimal()));
+}
 }  // namespace
 
-boost::optional<std::pair<int, int>> PartitionIterator::getEndpoints(const WindowBounds& bounds) {
-    // For range-based bounds, we will need to:
-    // 1. extract the sortBy for (*this)[0]
-    // 2. step backwards until we cross bounds.lower
-    // 3. step forwards until we cross bounds.upper
-    // This means we'll need to pass in sortBy somewhere.
-    tassert(5423300,
-            "TODO SERVER-54294: range-based and time-based bounds",
-            stdx::holds_alternative<WindowBounds::DocumentBased>(bounds.bounds));
+optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
+    const WindowBounds& bounds, const optional<std::pair<int, int>>& hint) {
+    tassert(5429404, "Missing _sortExpr with range-based bounds", _sortExpr != boost::none);
+    // TODO SERVER-54295: time-based bounds
+    uassert(5429402,
+            "Time-based bounds not supported yet",
+            stdx::holds_alternative<WindowBounds::RangeBased>(bounds.bounds));
+    auto range = stdx::get<WindowBounds::RangeBased>(bounds.bounds);
+
+    auto lessThan = _expCtx->getValueComparator().getLessThan();
+
+    Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables);
+    uassert(5429413,
+            "Invalid range: For windows that involve date or time ranges, a unit must be provided.",
+            base.getType() != BSONType::Date);
+    uassert(5429414,
+            str::stream() << "Invalid range: Expected the sortBy field to be a number, but it was "
+                          << base.getType(),
+            base.numeric());
+
+    // 'lower' is the smallest offset in the partition that's within the lower bound of the window.
+    optional<int> lower = stdx::visit(
+        visit_helper::Overloaded{
+            [&](WindowBounds::Current) -> optional<int> {
+                // 'range: ["current", _]' means the current document, which is always offset 0.
+                return 0;
+            },
+            [&](WindowBounds::Unbounded) -> optional<int> {
+                // Find the leftmost document whose sortBy field evaluates to a numeric value.
+
+                // Start from the beginning, or the hint, whichever is higher.
+                // Note that the hint may no longer be a valid offset, if some documents were
+                // released from the cache.
+                int start = getMinCachedOffset();
+                if (hint) {
+                    start = std::max(hint->first, start);
+                }
+
+                for (int i = start;; ++i) {
+                    auto doc = (*this)[i];
+                    if (!doc) {
+                        return boost::none;
+                    }
+                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                    if (v.numeric()) {
+                        return i;
+                    }
+                }
+            },
+            [&](const Value& delta) -> optional<int> {
+                Value threshold = decimalAdd(base, delta);
+
+                // Start from the beginning, or the hint, whichever is higher.
+                // Note that the hint may no longer be a valid offset, if some documents were
+                // released from the cache.
+                int start = getMinCachedOffset();
+                if (hint) {
+                    start = std::max(hint->first, start);
+                }
+
+                boost::optional<Document> doc;
+                for (int i = start; (doc = (*this)[i]); ++i) {
+                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                    if (!lessThan(v, threshold)) {
+                        // This is the first doc we've scanned that crossed the threshold.
+                        return i;
+                    }
+                }
+                // We scanned every document in the partition, and none crossed the
+                // threshold. So the window must be shifted so far to the right that no
+                // documents fall in it.
+                return boost::none;
+            },
+        },
+        range.lower);
+
+    if (!lower)
+        return boost::none;
+
+    // 'upper' is the largest offset in the partition that's within the upper bound of the window.
+    optional<int> upper = stdx::visit(
+        visit_helper::Overloaded{
+            [&](WindowBounds::Current) -> optional<int> {
+                // 'range: [_, "current"]' means the current document, which is offset 0.
+                return 0;
+            },
+            [&](WindowBounds::Unbounded) -> optional<int> {
+                // Find the rightmost document whose sortBy field evaluates to a numeric value.
+
+                // We know that the current document, the lower bound, and the hint (if present)
+                // are all numeric, so start scanning from whichever is highest.
+                int start = std::max(0, *lower);
+                if (hint) {
+                    start = std::max(hint->second, start);
+                }
+
+                boost::optional<Document> doc;
+                for (int i = start; (doc = (*this)[i]); ++i) {
+                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                    if (!v.numeric()) {
+                        // The previously scanned doc is the rightmost numeric one. Since we start
+                        // from '0', 'hint', or 'lower', which are all numeric, we should never hit
+                        // this case on the first iteration.
+                        tassert(5429412,
+                                "Failed to find the rightmost numeric document, "
+                                "while computing window bounds",
+                                i != start);
+                        return i - 1;
+                    }
+                }
+                return getMaxCachedOffset();
+            },
+            [&](const Value& delta) -> optional<int> {
+                // Pull in documents until the sortBy value crosses 'base + delta'.
+                tassert(5429406, "Range-based bounds are specified as a number", delta.numeric());
+                Value threshold = decimalAdd(base, delta);
+
+                // If there's no hint, start scanning from the lower bound.
+                // If there is a hint, start from whichever is greater: lower bound or hint.
+                // Usually the hint is greater, but with bounds like [0, 0] the new lower bound
+                // will be greater than the old upper bound.
+                int start = *lower;
+                if (hint) {
+                    start = std::max(hint->second, start);
+                }
+
+                for (int i = start;; ++i) {
+                    auto doc = (*this)[i];
+                    if (!doc) {
+                        // We scanned every document in the partition, and none crossed the upper
+                        // bound. So the upper bound contains everything up to the end of the
+                        // partition.
+                        return getMaxCachedOffset();
+                    }
+                    Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
+                    if (lessThan(threshold, v)) {
+                        // This doc exceeded the upper bound.
+                        // The previously scanned doc (if any) is the greatest in-bounds one.
+                        if (i == start) {
+                            // This case can happen, for example, at the beginning of a partition
+                            // when the window is 'range: [-100, -5]'. There can be documents
+                            // within the lower bound of -100, but none within the upper bound of
+                            // -5.
+                            return boost::none;
+                        } else {
+                            return i - 1;
+                        }
+                    }
+                }
+            },
+        },
+        range.upper);
+
+    if (!upper)
+        return boost::none;
+
+    return std::pair{*lower, *upper};
+}
+
+optional<std::pair<int, int>> PartitionIterator::getEndpointsDocumentBased(
+    const WindowBounds& bounds, const optional<std::pair<int, int>>& hint = boost::none) {
     tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
     auto docBounds = stdx::get<WindowBounds::DocumentBased>(bounds.bounds);
-    boost::optional<int> lowerBound = numericBound(docBounds.lower);
-    boost::optional<int> upperBound = numericBound(docBounds.upper);
+    optional<int> lowerBound = numericBound(docBounds.lower);
+    optional<int> upperBound = numericBound(docBounds.upper);
     tassert(5423302,
             "Bounds should never be inverted",
             !lowerBound || !upperBound || lowerBound <= upperBound);
 
     // Pull documents into the cache until it contains the whole window.
+    // We want to know whether the window reaches the end of the partition.
     if (upperBound) {
         // For a right-bounded window we only need to pull in documents up to the bound.
         (*this)[*upperBound];
     } else {
         // For a right-unbounded window we need to pull in the whole partition. operator[] reports
         // end of partition by returning boost::none instead of a document.
-        for (int i = 0; (*this)[i]; ++i) {
-        }
+        cacheWholePartition();
     }
 
     // Valid offsets into the cache are any 'i' such that '_cache[_currentCacheIndex + i]' is valid.
     // We know the cache is nonempty because it contains the current document.
-    int cacheOffsetMin = -_currentCacheIndex;
-    int cacheOffsetMax = cacheOffsetMin + _cache.size() - 1;
+    int cacheOffsetMin = getMinCachedOffset();
+    int cacheOffsetMax = getMaxCachedOffset();
 
     // The window can only be empty if the bounds are shifted completely out of the partition.
     if (lowerBound && lowerBound > cacheOffsetMax)
@@ -212,6 +426,14 @@ boost::optional<std::pair<int, int>> PartitionIterator::getEndpoints(const Windo
     int upperOffset = upperBound ? clamp(*upperBound) : cacheOffsetMax;
 
     return {{lowerOffset, upperOffset}};
+}
+
+optional<std::pair<int, int>> PartitionIterator::getEndpoints(
+    const WindowBounds& bounds, const optional<std::pair<int, int>>& hint = boost::none) {
+    if (!stdx::holds_alternative<WindowBounds::DocumentBased>(bounds.bounds)) {
+        return getEndpointsRangeBased(bounds, hint);
+    }
+    return getEndpointsDocumentBased(bounds, hint);
 }
 
 void PartitionIterator::getNextDocument() {

@@ -95,7 +95,7 @@ public:
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _iterator(expCtx.get(), pSource, std::move(partitionBy)) {}
+          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy) {}
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return StageConstraints(StreamType::kBlocking,

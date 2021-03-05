@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"

@@ -56,7 +56,8 @@ public:
      * Creates an appropriate WindowFunctionExec that is capable of evaluating the window function
      * over the given bounds, both found within the WindowFunctionStatement.
      */
-    static std::unique_ptr<WindowFunctionExec> create(PartitionIterator* iter,
+    static std::unique_ptr<WindowFunctionExec> create(ExpressionContext* expCtx,
+                                                      PartitionIterator* iter,
                                                       const WindowFunctionStatement& functionStmt,
                                                       const boost::optional<SortPattern>& sortBy);
 
@@ -91,22 +92,8 @@ protected:
  */
 class WindowFunctionExecRemovable : public WindowFunctionExec {
 public:
-    WindowFunctionExecRemovable(PartitionIterator* iter,
-                                boost::intrusive_ptr<Expression> input,
-                                std::unique_ptr<WindowFunctionState> function)
-        : WindowFunctionExec(
-              PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential)),
-          _input(std::move(input)),
-          _function(std::move(function)) {}
-
-    Value getNext() {
-        if (!_initialized) {
-            this->initialize();
-            _initialized = true;
-            return _function->getValue();
-        }
-        processDocumentsToUpperBound();
-        removeDocumentsUnderLowerBound();
+    Value getNext() override {
+        update();
         return _function->getValue();
     }
 
@@ -118,15 +105,14 @@ public:
         return _function->getApproximateSize() + _memUsageBytes;
     }
 
-
 protected:
-    boost::intrusive_ptr<Expression> _input;
-    std::unique_ptr<WindowFunctionState> _function;
-    // Keep track of values in the window function that will need to be removed later.
-    std::queue<Value> _values;
-    // In one of two states: either the initial window has not been populated or we are sliding and
-    // accumulating/removing values.
-    bool _initialized = false;
+    WindowFunctionExecRemovable(PartitionIterator* iter,
+                                PartitionAccessor::Policy policy,
+                                boost::intrusive_ptr<Expression> input,
+                                std::unique_ptr<WindowFunctionState> function)
+        : WindowFunctionExec(PartitionAccessor(iter, policy)),
+          _input(std::move(input)),
+          _function(std::move(function)) {}
 
     void addValue(Value v) {
         _function->add(v);
@@ -134,14 +120,31 @@ protected:
         _memUsageBytes += v.getApproximateSize();
     }
 
+    void removeValue() {
+        tassert(5429400, "Tried to remove more values than we added", !_values.empty());
+        auto v = _values.front();
+        _function->remove(v);
+        _values.pop();
+        _memUsageBytes -= v.getApproximateSize();
+    }
+
+    boost::intrusive_ptr<Expression> _input;
+    std::unique_ptr<WindowFunctionState> _function;
+    // Keep track of values in the window function that will need to be removed later.
+    std::queue<Value> _values;
+
     // Track the byte size of the values being stored by this class. Does not include the constant
     // size objects being held or the overhead of the data structures.
     size_t _memUsageBytes = 0;
 
 private:
-    virtual void processDocumentsToUpperBound() = 0;
-    virtual void removeDocumentsUnderLowerBound() = 0;
-    virtual void initialize() = 0;
+    /**
+     * This method notifies the executor that the underlying PartitionIterator
+     * '_iter' has been advanced one time since the last call to initialize() or
+     * update(). It should determine how the window has changed (which documents have
+     * entered it? which have left it?) and call addValue(), removeValue() as needed.
+     */
+    virtual void update() = 0;
 };
 
 }  // namespace mongo

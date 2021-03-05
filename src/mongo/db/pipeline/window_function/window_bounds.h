@@ -94,7 +94,7 @@ struct WindowBounds {
     }
 
     /**
-     * Check if these bounds are unbounded on both ends.
+     * Checks whether these bounds are unbounded on both ends.
      * This case is special because it means you don't need a sortBy to interpret the bounds:
      * the bounds include every document (in the current partition).
      */

@@ -52,8 +52,8 @@ public:
         WindowBounds bounds,
         boost::optional<TimeUnit> timeUnit = boost::none) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter =
-            std::make_unique<PartitionIterator>(getExpCtx().get(), _docSource.get(), boost::none);
+        _iter = std::make_unique<PartitionIterator>(
+            getExpCtx().get(), _docSource.get(), boost::none, boost::none);
 
         auto position = ExpressionFieldPath::parse(
             getExpCtx().get(), positionPath, getExpCtx()->variablesParseState);

@@ -38,7 +38,10 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
     boost::intrusive_ptr<Expression> input,
     std::unique_ptr<WindowFunctionState> function,
     WindowBounds::DocumentBased bounds)
-    : WindowFunctionExecRemovable(iter, std::move(input), std::move(function)) {
+    : WindowFunctionExecRemovable(iter,
+                                  PartitionAccessor::Policy::kDefaultSequential,
+                                  std::move(input),
+                                  std::move(function)) {
     stdx::visit(
         visit_helper::Overloaded{
             [](const WindowBounds::Unbounded&) {
@@ -73,9 +76,15 @@ void WindowFunctionExecRemovableDocument::initialize() {
             break;
         }
     }
+    _initialized = true;
 }
 
-void WindowFunctionExecRemovableDocument::processDocumentsToUpperBound() {
+void WindowFunctionExecRemovableDocument::update() {
+    if (!_initialized) {
+        initialize();
+        return;
+    }
+
     // If there is no upper bound, the whole partition is loaded by initialize.
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
@@ -83,9 +92,7 @@ void WindowFunctionExecRemovableDocument::processDocumentsToUpperBound() {
             addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         }
     }
-}
 
-void WindowFunctionExecRemovableDocument::removeDocumentsUnderLowerBound() {
     // For a positive lower bound the first pass loads the correct window, so subsequent passes
     // must always remove a document if there is a document left to remove.
     // For a negative lower bound we can start removing every time only after we have seen
