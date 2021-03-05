@@ -687,6 +687,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
     auto descriptor =
         collection->getIndexCatalog()->findIndexByName(opCtx, ixn->index.identifier.catalogName);
+    tassert(5483200,
+            str::stream() << "failed to find index in catalog named: "
+                          << ixn->index.identifier.catalogName,
+            descriptor);
     auto accessMethod = collection->getIndexCatalog()->getEntry(descriptor)->accessMethod();
     auto intervals =
         makeIntervalsFromIndexBounds(ixn->bounds,
