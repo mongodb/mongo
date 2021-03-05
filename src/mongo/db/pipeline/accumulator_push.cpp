@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_push.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -43,8 +44,7 @@ using boost::intrusive_ptr;
 using std::vector;
 
 REGISTER_ACCUMULATOR(push, genericParseSingleExpressionAccumulator<AccumulatorPush>);
-REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
-    push, window_function::ExpressionFromAccumulator<AccumulatorPush>::parse);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(push, AccumulatorPush, WindowFunctionPush);
 
 const char* AccumulatorPush::getOpName() const {
     return "$push";

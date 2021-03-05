@@ -22,7 +22,8 @@ const nDocsPerTicker = 10;
 seedWithTickerData(coll, nDocsPerTicker);
 
 // Run the suite of partition and bounds tests against the $avg function.
-testAccumAgainstGroup(coll, "$avg", nDocsPerTicker);
+// TODO SERVER-53713 Enable removable testing.
+testAccumAgainstGroup(coll, "$avg", null, true);
 
 // Test a combination of two different runnning averages.
 let results =
@@ -45,8 +46,9 @@ for (let index = 0; index < results.length; index++) {
         coll: coll,
         partitionKey: {ticker: results[index].ticker},
         accum: "$avg",
-        lower: 0,
-        upper: results[index].partIndex
+        bounds: ["unbounded", 0],
+        indexInPartition: results[index].partIndex,
+        defaultValue: null
     });
     assert.eq(groupRes, results[index].runningAvg);
 
@@ -55,8 +57,9 @@ for (let index = 0; index < results.length; index++) {
         coll: coll,
         partitionKey: {ticker: results[index].ticker},
         accum: "$avg",
-        lower: 0,
-        upper: results[index].partIndex + 3
+        bounds: ["unbounded", 3],
+        indexInPartition: results[index].partIndex,
+        defaultValue: null
     });
     assert.eq(groupRes, results[index].runningAvgLead);
 }
