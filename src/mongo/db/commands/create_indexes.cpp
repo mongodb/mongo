@@ -137,7 +137,8 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
 
             uassert(ErrorCodes::BadValue,
                     "Can't hide index on system collection",
-                    !ns.isSystem() || indexSpec[IndexDescriptor::kHiddenFieldName].eoo());
+                    !(ns.isSystem() && !ns.isTimeseriesBucketsCollection()) ||
+                        indexSpec[IndexDescriptor::kHiddenFieldName].eoo());
         }
 
         indexSpecs.push_back(std::move(indexSpec));

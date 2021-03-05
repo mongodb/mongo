@@ -108,6 +108,15 @@ const runTest = function(keyForCreate, hint) {
     assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide2');
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
     assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
+
+    // Check that we are able to create the index as hidden.
+    assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide3', hidden: true}),
+                         'failed to create index: ' + tojson(keyForCreate));
+    assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
+    assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide3');
+    assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide2');
 };
 
 runTest({[metaFieldName]: 1}, {meta: 1});
