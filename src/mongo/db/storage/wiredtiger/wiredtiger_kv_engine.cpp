@@ -2367,7 +2367,11 @@ StatusWith<Timestamp> WiredTigerKVEngine::pinOldestTimestamp(
           "roundUpIfTooOld"_attr = roundUpIfTooOld,
           "currOldestTs"_attr = oldest);
 
-    Timestamp previousTimestamp = _oldestTimestampPinRequests[requestingServiceName];
+    const Timestamp previousTimestamp = [&]() -> Timestamp {
+        auto tsIt = _oldestTimestampPinRequests.find(requestingServiceName);
+        return tsIt != _oldestTimestampPinRequests.end() ? tsIt->second : Timestamp::min();
+    }();
+
     auto swPinnedTimestamp =
         _pinOldestTimestamp(lock, requestingServiceName, requestedTimestamp, roundUpIfTooOld);
     if (!swPinnedTimestamp.isOK()) {
