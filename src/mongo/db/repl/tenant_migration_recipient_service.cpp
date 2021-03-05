@@ -1279,22 +1279,11 @@ OpTime TenantMigrationRecipientService::Instance::_getOplogResumeApplyingDonorOp
                     str::stream() << "Unable to parse opTime from tenant migration oplog entry: "
                                   << redact(oplogObj) << ", error: " << swDonorOpTime.getStatus(),
                     swDonorOpTime.isOK());
-            if (swDonorOpTime.getValue() < startApplyingDonorOpTime) {
-                break;
-            }
-            LOGV2_DEBUG(5272302,
-                        1,
-                        "Found an optime to resume oplog application from",
-                        "opTime"_attr = swDonorOpTime.getValue());
             return swDonorOpTime.getValue();
         }
         result = oplogIter->next();
     }
-    LOGV2_DEBUG(5272304,
-                1,
-                "Resuming oplog application from startApplyingDonorOpTime",
-                "opTime"_attr = startApplyingDonorOpTime);
-    return startApplyingDonorOpTime;
+    return OpTime();
 }
 
 Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseCloner(WithLock lk) {
@@ -1887,8 +1876,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        invariant(_stateDoc.getStartApplyingDonorOpTime());
 
                        OpTime beginApplyingAfterOpTime;
-                       bool isResuming = false;
+                       Timestamp resumeBatchingTs;
                        if (_isCloneCompletedMarkerSet(lk)) {
+                           // We are retrying from failure. Find the point at which we should resume
+                           // oplog batching and oplog application.
                            const auto startApplyingDonorOpTime =
                                *_stateDoc.getStartApplyingDonorOpTime();
                            const auto cloneFinishedRecipientOptime =
@@ -1897,9 +1888,23 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            // We avoid holding the mutex while scanning the local oplog which
                            // acquires the RSTL in IX mode. This is to allow us to be interruptable
                            // via a concurrent stepDown which acquires the RSTL in X mode.
-                           beginApplyingAfterOpTime = _getOplogResumeApplyingDonorOptime(
+                           const auto resumeOpTime = _getOplogResumeApplyingDonorOptime(
                                startApplyingDonorOpTime, cloneFinishedRecipientOptime);
-                           isResuming = beginApplyingAfterOpTime > startApplyingDonorOpTime;
+                           if (!resumeOpTime.isNull()) {
+                               // It's possible we've applied retryable writes no-op oplog entries
+                               // with donor opTimes earlier than 'startApplyingDonorOpTime'. In
+                               // this case, we resume batching from a timestamp earlier than the
+                               // 'beginApplyingAfterOpTime'.
+                               resumeBatchingTs = resumeOpTime.getTimestamp();
+                           }
+                           beginApplyingAfterOpTime =
+                               std::max(resumeOpTime, startApplyingDonorOpTime);
+                           LOGV2_DEBUG(5394601,
+                                       1,
+                                       "Resuming oplog application from previous tenant "
+                                       "migration attempt",
+                                       "startApplyingDonorOpTime"_attr = beginApplyingAfterOpTime,
+                                       "resumeBatchingOpTime"_attr = resumeOpTime);
                            lk.lock();
                        } else {
                            beginApplyingAfterOpTime = *_stateDoc.getStartApplyingDonorOpTime();
@@ -1917,7 +1922,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                                                 _donorOplogBuffer.get(),
                                                                 **_scopedExecutor,
                                                                 _writerPool.get(),
-                                                                isResuming);
+                                                                resumeBatchingTs);
 
                        // Start the cloner.
                        auto clonerFuture = _startTenantAllDatabaseCloner(lk);
