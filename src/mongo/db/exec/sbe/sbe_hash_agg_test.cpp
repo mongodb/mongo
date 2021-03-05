@@ -28,7 +28,7 @@
  */
 
 /**
- * This file contains tests for sbe::FilterStage.
+ * This file contains tests for sbe::HashAggStage.
  */
 
 #include "mongo/platform/basic.h"
@@ -82,6 +82,7 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
                    collMaxSlot,
                    stage_builder::makeFunction(
                        "collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
+            boost::none,
             kEmptyPlanNodeId);
 
         auto outSlot = generateSlotId();
@@ -135,6 +136,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
             makeEM(hashAggSlot,
                    stage_builder::makeFunction(
                        "collAddToSet", std::move(collExpr), makeE<EVariable>(scanSlot))),
+            boost::none,
             kEmptyPlanNodeId);
 
         return std::make_pair(hashAggSlot, std::move(hashAggStage));
@@ -181,6 +183,102 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
     // Assert that the results array does not contain more than one element.
     resultsEnumerator.advance();
     ASSERT_TRUE(resultsEnumerator.atEnd());
+}
+
+TEST_F(HashAggStageTest, HashAggCollationTest) {
+    using namespace std::literals;
+    for (auto useCollator : {false, true}) {
+
+        BSONArrayBuilder bab1;
+        bab1.append("A").append("a").append("b").append("c").append("B").append("a");
+        auto [inputTag, inputVal] = stage_builder::makeValue(bab1.arr());
+        value::ValueGuard inputGuard{inputTag, inputVal};
+
+        BSONArrayBuilder bab2;
+        if (useCollator) {
+            // Collator groups the values as: ["A", "a", "a"], ["B", "b"], ["c"].
+            bab2.append(3).append(2).append(1);
+        } else {
+            // No Collator groups the values as: ["a", "a"], ["A"], ["B"], ["b"], ["c"].
+            bab2.append(2).append(1).append(1).append(1).append(1);
+        }
+        auto [expectedTag, expectedVal] = stage_builder::makeValue(bab2.arr());
+        value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+        auto collatorSlot = generateSlotId();
+
+        auto makeStageFn = [this, collatorSlot, useCollator](value::SlotId scanSlot,
+                                                             std::unique_ptr<PlanStage> scanStage) {
+            // Build a HashAggStage to make sure HashAgg groups use collator correctly.
+            auto countsSlot = generateSlotId();
+
+            auto hashAggStage =
+                makeS<HashAggStage>(std::move(scanStage),
+                                    makeSV(scanSlot),
+                                    makeEM(countsSlot,
+                                           stage_builder::makeFunction(
+                                               "sum",
+                                               makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                                value::bitcastFrom<int64_t>(1)))),
+                                    boost::optional<value::SlotId>{useCollator, collatorSlot},
+                                    kEmptyPlanNodeId);
+
+            return std::make_pair(countsSlot, std::move(hashAggStage));
+        };
+
+        auto ctx = makeCompileCtx();
+
+        // Setup collator and insert it into the ctx.
+        auto collator = std::make_unique<CollatorInterfaceMock>(
+            CollatorInterfaceMock::MockType::kToLowerString);
+        value::OwnedValueAccessor collatorAccessor;
+        ctx->pushCorrelated(collatorSlot, &collatorAccessor);
+        collatorAccessor.reset(value::TypeTags::collator,
+                               value::bitcastFrom<CollatorInterface*>(collator.get()));
+
+        // Generate a mock scan from `input` with a single output slot.
+        inputGuard.reset();
+        auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
+
+        // Call the `makeStage` function to create the HashAggStage, passing in the mock scan
+        // subtree and the subtree's output slot.
+        auto [outputSlot, stage] = makeStageFn(scanSlot, std::move(scanStage));
+
+        // Prepare the tree and get the `SlotAccessor` for the output slot.
+        auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
+
+        // Get all the results produced.
+        auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
+        value::ValueGuard resultsGuard{resultsTag, resultsVal};
+
+        // Sort results for stable compare, since the counts could come out in any order
+        using valuePair = std::pair<value::TypeTags, value::Value>;
+        std::vector<valuePair> resultsContents;
+        auto resultsView = value::getArrayView(resultsVal);
+        for (size_t i = 0; i < resultsView->size(); i++) {
+            resultsContents.push_back(resultsView->getAt(i));
+        }
+        std::sort(resultsContents.begin(),
+                  resultsContents.end(),
+                  [](const valuePair& lhs, const valuePair& rhs) -> bool {
+                      auto [lhsTag, lhsVal] = lhs;
+                      auto [rhsTag, rhsVal] = rhs;
+                      auto [compareTag, compareVal] =
+                          value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+                      ASSERT_EQ(compareTag, value::TypeTags::NumberInt32);
+                      return compareVal == 1;
+                  });
+
+        auto [sortedResultsTag, sortedResultsVal] = value::makeNewArray();
+        value::ValueGuard sortedResultsGuard{sortedResultsTag, sortedResultsVal};
+        auto sortedResultsView = value::getArrayView(sortedResultsVal);
+        for (auto [tag, val] : resultsContents) {
+            auto [tagCopy, valCopy] = copyValue(tag, val);
+            sortedResultsView->push_back(tagCopy, valCopy);
+        }
+
+        assertValuesEqual(sortedResultsTag, sortedResultsVal, expectedTag, expectedVal);
+    }
 }
 
 }  // namespace mongo::sbe

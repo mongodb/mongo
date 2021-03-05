@@ -43,6 +43,7 @@ public:
                   value::SlotVector outerProjects,
                   value::SlotVector innerCond,
                   value::SlotVector innerProjects,
+                  boost::optional<value::SlotId> collatorSlot,
                   PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -70,11 +71,12 @@ private:
     const value::SlotVector _outerProjects;
     const value::SlotVector _innerCond;
     const value::SlotVector _innerProjects;
+    const boost::optional<value::SlotId> _collatorSlot;
 
     // All defined values from the outer side (i.e. they come from the hash table).
     value::SlotAccessorMap _outOuterAccessors;
 
-    // Accessors of input codition values (keys) that are being inserted into the hash table.
+    // Accessors of input condition values (keys) that are being inserted into the hash table.
     std::vector<value::SlotAccessor*> _inOuterKeyAccessors;
 
     // Accessors of output keys.
@@ -86,15 +88,16 @@ private:
     // Accessors of output projections.
     std::vector<std::unique_ptr<HashProjectAccessor>> _outOuterProjectAccessors;
 
-    // Accessors of input codition values (keys) that are being inserted into the hash table.
+    // Accessors of input condition values (keys) that are being inserted into the hash table.
     std::vector<value::SlotAccessor*> _inInnerKeyAccessors;
+
+    // Accessor for collator. Only set if collatorSlot provided during construction.
+    value::SlotAccessor* _collatorAccessor = nullptr;
 
     // Key used to probe inside the hash table.
     value::MaterializedRow _probeKey;
 
-    // TODO SERVER-54025: Update HashJoinStage so that it's mechanism for matching outer keys and
-    // inner keys is collation-aware.
-    TableType _ht;
+    boost::optional<TableType> _ht;
     TableType::iterator _htIt;
     TableType::iterator _htItEnd;
 

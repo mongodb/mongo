@@ -1237,6 +1237,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
 
+    auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
+
     // Designate outputs.
     PlanStageSlots outputs(reqs, &_slotIdGenerator);
     if (reqs.has(kRecordId)) {
@@ -1252,6 +1254,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                         outerProjectSlots,
                                                         innerCondSlots,
                                                         innerProjectSlots,
+                                                        collatorSlot,
                                                         root->nodeId());
 
     // If there are more than 2 children, iterate all remaining children and hash
@@ -1271,6 +1274,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                        projectSlots,
                                                        innerCondSlots,
                                                        innerProjectSlots,
+                                                       collatorSlot,
                                                        root->nodeId());
     }
 
