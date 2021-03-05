@@ -22,10 +22,10 @@ const nDocsPerTicker = 10;
 seedWithTickerData(coll, nDocsPerTicker);
 
 // Run the suite of partition and bounds tests against the $min function.
-testAccumAgainstGroup(coll, "$min", nDocsPerTicker);
+testAccumAgainstGroup(coll, "$min");
 
 // Run the suite of partition and bounds tests against the $max function.
-testAccumAgainstGroup(coll, "$max", nDocsPerTicker);
+testAccumAgainstGroup(coll, "$max");
 
 // Test the behavior of min/max over a non-numeric field. Note that $min and $max order values by
 // type per the BSON spec, so there will always be a value to return.

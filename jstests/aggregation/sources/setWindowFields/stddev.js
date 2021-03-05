@@ -22,9 +22,9 @@ const nDocsPerTicker = 10;
 seedWithTickerData(coll, nDocsPerTicker);
 
 // Run the suite of partition and bounds tests against the $stdDevPop function.
-testAccumAgainstGroup(coll, "$stdDevPop", nDocsPerTicker);
+testAccumAgainstGroup(coll, "$stdDevPop");
 // Run the suite of partition and bounds tests against the $stdDevSamp function.
-testAccumAgainstGroup(coll, "$stdDevSamp", nDocsPerTicker);
+testAccumAgainstGroup(coll, "$stdDevSamp");
 
 // Test that $stdDevPop and $stdDevSamp return null for windows which do not contain numeric values.
 let results =

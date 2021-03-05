@@ -111,12 +111,18 @@ private:
 
 class WindowFunctionStdDevPop final : public WindowFunctionStdDev {
 public:
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionStdDevPop>(expCtx);
+    }
     explicit WindowFunctionStdDevPop(ExpressionContext* const expCtx)
         : WindowFunctionStdDev(expCtx, false) {}
 };
 
 class WindowFunctionStdDevSamp final : public WindowFunctionStdDev {
 public:
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionStdDevSamp>(expCtx);
+    }
     explicit WindowFunctionStdDevSamp(ExpressionContext* const expCtx)
         : WindowFunctionStdDev(expCtx, true) {}
 };

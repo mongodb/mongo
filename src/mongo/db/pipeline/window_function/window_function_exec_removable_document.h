@@ -56,6 +56,7 @@ public:
 
     void reset() final {
         _function->reset();
+        _values = std::queue<Value>();
         _initialized = false;
     }
 
