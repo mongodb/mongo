@@ -54,7 +54,7 @@ struct KillCursorsCmd {
         }
 
         auto cursorManager = CursorManager::get(opCtx);
-        return cursorManager->killCursor(opCtx, id, true /* shouldAudit */);
+        return cursorManager->killCursor(opCtx, id);
     }
 };
 KillCursorsCmdBase<KillCursorsCmd> cmdKillCursors;

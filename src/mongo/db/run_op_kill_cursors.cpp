@@ -78,7 +78,7 @@ bool killCursorIfAuthorized(OperationContext* opCtx, CursorId id) {
     // Release the pin so that the cursor can be killed.
     pin.getValue().release();
 
-    Status killStatus = cursorManager->killCursor(opCtx, id, true /* shouldAudit */);
+    Status killStatus = cursorManager->killCursor(opCtx, id);
     massert(28697,
             killStatus.reason(),
             killStatus.code() == ErrorCodes::OK || killStatus.code() == ErrorCodes::CursorNotFound);

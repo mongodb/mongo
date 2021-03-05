@@ -140,7 +140,7 @@ public:
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
-    Status killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
+    Status killCursor(OperationContext* opCtx, CursorId id);
 
     /**
      * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns
