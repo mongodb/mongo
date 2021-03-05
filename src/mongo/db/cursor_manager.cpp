@@ -132,7 +132,7 @@ void CursorManager::set(ServiceContext* svcCtx, std::unique_ptr<CursorManager> n
 std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](CursorManager& mgr, CursorId id) {
-        uassertStatusOK(mgr.killCursor(opCtx, id, true));
+        uassertStatusOK(mgr.killCursor(opCtx, id));
         LOGV2(20528,
               "killing cursor: {id} as part of killing session(s)",
               "Killing cursor as part of killing session(s)",
@@ -446,13 +446,10 @@ void CursorManager::deregisterAndDestroyCursor(
     cursor->dispose(opCtx);
 }
 
-Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit) {
+Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
-        if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), {}, id, ErrorCodes::CursorNotFound);
-        }
         return {ErrorCodes::CursorNotFound, str::stream() << "Cursor id not found: " << id};
     }
     auto cursor = it->second;
@@ -466,17 +463,9 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id, bool shou
             cursor->_operationUsingCursor->getServiceContext()->killOperation(
                 lk, cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
         }
-
-        if (shouldAudit) {
-            audit::logKillCursorsAuthzCheck(opCtx->getClient(), cursor->nss(), id, ErrorCodes::OK);
-        }
         return Status::OK();
     }
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(cursor);
-
-    if (shouldAudit) {
-        audit::logKillCursorsAuthzCheck(opCtx->getClient(), cursor->nss(), id, ErrorCodes::OK);
-    }
 
     deregisterAndDestroyCursor(std::move(lockedPartition), opCtx, std::move(ownedCursor));
     return Status::OK();

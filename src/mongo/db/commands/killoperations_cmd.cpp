@@ -40,7 +40,7 @@ public:
         auto cursorManager = CursorManager::get(opCtx);
         for (auto& cursorId : cursorManager->getCursorsForOpKeys(opKeys)) {
             LOGV2(4664802, "Attempting to kill cursor", "cursorId"_attr = cursorId);
-            auto status = cursorManager->killCursor(opCtx, cursorId, true /* shouldAudit */);
+            auto status = cursorManager->killCursor(opCtx, cursorId);
 
             if (!status.isOK()) {
                 LOGV2(
