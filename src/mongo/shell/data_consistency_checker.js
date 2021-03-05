@@ -178,14 +178,16 @@ var {DataConsistencyChecker} = (function() {
             return {docsWithDifferentContents, docsMissingOnFirst, docsMissingOnSecond};
         }
 
-        static getCollectionDiffUsingSessions(sourceSession,
-                                              syncingSession,
-                                              dbName,
-                                              collNameOrUUID) {
+        static getCollectionDiffUsingSessions(
+            sourceSession, syncingSession, dbName, collNameOrUUID, readAtClusterTime) {
             const sourceDB = sourceSession.getDatabase(dbName);
             const syncingDB = syncingSession.getDatabase(dbName);
 
             const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
+            if (readAtClusterTime !== undefined) {
+                commandObj.readConcern = {level: "snapshot", atClusterTime: readAtClusterTime};
+            }
+
             const sourceCursor = new DBCommandCursor(sourceDB, sourceDB.runCommand(commandObj));
             const syncingCursor = new DBCommandCursor(syncingDB, syncingDB.runCommand(commandObj));
             const diff = this.getDiff(sourceCursor, syncingCursor);
