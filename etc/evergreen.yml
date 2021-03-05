@@ -327,6 +327,7 @@ variables:
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
+  - enterprise-windows
   - enterprise-windows-suggested
   - enterprise-windows-compile-all
   - enterprise-windows-debug-unoptimized
@@ -352,6 +353,7 @@ variables:
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
+  - enterprise-windows
   - enterprise-windows-suggested
   - enterprise-windows-required
 
@@ -405,6 +407,7 @@ variables:
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
   - enterprise-ubuntu2004-64
+  - enterprise-windows
   - enterprise-windows-suggested
   - windows
 
@@ -9997,7 +10000,6 @@ buildvariants:
       - windows-64-vs2019-large
   - name: .concurrency .common
   - name: disk_wiredtiger
-  - name: free_monitoring
   - name: .jscore .common !.auth
   - name: jsonSchema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
