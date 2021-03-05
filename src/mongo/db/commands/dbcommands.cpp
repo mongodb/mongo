@@ -78,6 +78,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
@@ -114,20 +115,120 @@ using std::unique_ptr;
 namespace {
 
 /**
- * Returns true if 'ns' refers to a time-series collection.
+ * Returns time-series options if 'ns' refers to a time-series collection.
  */
-bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
+boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
+                                                        const NamespaceString& ns) {
     auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
     if (!viewCatalog) {
-        return false;
+        return {};
     }
 
     auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
     if (!view) {
-        return false;
+        return {};
     }
 
-    return bool(view->timeseries());
+    // Return a copy of the time-series options so that we don't refer to the internal state of
+    // 'viewCatalog' once it goes out of scope.
+    return view->timeseries();
+}
+
+/**
+ * Returns an index key with field names mapped to the bucket collection schema.
+ */
+BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
+                                   const CollMod& origCmd,
+                                   const BSONObj& origKey) {
+    auto timeField = timeseriesOptions.getTimeField();
+    auto metaField = timeseriesOptions.getMetaField();
+
+    BSONObjBuilder builder;
+    for (const auto& elem : origKey) {
+        // Determine if the index requested on the time field is ascending or descending.
+        // The final index spec will be subjected to a more complete validation in
+        // index_key_validate::validateKeyPattern().
+        if (elem.fieldNameStringData() == timeField) {
+            uassert(
+                ErrorCodes::IndexNotFound,
+                str::stream() << "Invalid index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Indexes on the time field must be ascending or descending "
+                                 "(numbers only): "
+                              << elem,
+                elem.isNumber());
+            if (elem.number() >= 0) {
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+            } else {
+                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+            }
+            continue;
+        }
+
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << "Invalid index spec for time-series collection: "
+                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                              << ". Index must be on the '" << timeField << "' field: " << elem,
+                metaField);
+
+        if (elem.fieldNameStringData() == *metaField) {
+            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
+            continue;
+        }
+
+        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
+            builder.appendAs(elem,
+                             str::stream()
+                                 << BucketUnpacker::kBucketMetaFieldName << "."
+                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
+            continue;
+        }
+
+        uasserted(ErrorCodes::IndexNotFound,
+                  str::stream() << "Invalid index spec for time-series collection: "
+                                << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
+                                << ". Index must be either on the '" << *metaField << "' or '"
+                                << timeField << "' fields: " << elem);
+    }
+    return builder.obj();
+}
+
+/**
+ * Returns a CollMod on the underlying buckets collection of the time-series collection.
+ * Returns null if 'origCmd' is not for a time-series collection.
+ */
+std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
+                                                      const CollMod& origCmd) {
+    const auto& origNs = origCmd.getNamespace();
+
+    auto timeseriesOptions = getTimeseriesOptions(opCtx, origNs);
+
+    // Return early with null if we are not working with a time-series collection.
+    if (!timeseriesOptions) {
+        return {};
+    }
+
+    // TODO(SERVER-54639): Map index specs to bucket collection using helper function.
+    auto index = origCmd.getIndex();
+    if (index && index->getKeyPattern()) {
+        index->setKeyPattern(
+            makeTimeseriesIndexSpecKey(*timeseriesOptions, origCmd, *index->getKeyPattern()));
+    }
+
+    auto ns = origNs.makeTimeseriesBucketsNamespace();
+    auto cmd = std::make_unique<CollMod>(ns);
+    cmd->setIndex(index);
+    cmd->setValidator(origCmd.getValidator());
+    cmd->setValidationLevel(origCmd.getValidationLevel());
+    cmd->setValidationAction(origCmd.getValidationAction());
+    cmd->setViewOn(origCmd.getViewOn());
+    cmd->setPipeline(origCmd.getPipeline());
+    cmd->setRecordPreImages(origCmd.getRecordPreImages());
+    cmd->setClusteredIndex(origCmd.getClusteredIndex());
+
+    return cmd;
 }
 
 class CmdDropDatabase : public DropDatabaseCmdVersion1Gen<CmdDropDatabase> {
@@ -772,8 +873,7 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
-        auto cmd = requestParser.request();
-        auto ns = cmd.getNamespace();
+        const auto* cmd = &requestParser.request();
 
         // If the target namespace refers to a time-series collection, we will redirect the
         // collection modification request to the underlying bucket collection.
@@ -785,11 +885,16 @@ public:
         //   relationship.
         // - It disallows hiding/unhiding indexes on the time-series collection due to a
         //   restriction on system collections. TODO(SERVER-54646): Update this comment.
-        if (isTimeseries(opCtx, ns)) {
-            ns = ns.makeTimeseriesBucketsNamespace();
+        //
+        // 'timeseriesCmd' is null if the request namespace does not refer to a time-series
+        // collection. Otherwise, transforms the user time-series index request to one on the
+        // underlying bucket.
+        auto timeseriesCmd = makeTimeseriesCollModCommand(opCtx, requestParser.request());
+        if (timeseriesCmd) {
+            cmd = timeseriesCmd.get();
         }
 
-        uassertStatusOK(collMod(opCtx, ns, cmd.toBSON(BSONObj()), &result));
+        uassertStatusOK(collMod(opCtx, cmd->getNamespace(), cmd->toBSON(BSONObj()), &result));
         return true;
     }
 

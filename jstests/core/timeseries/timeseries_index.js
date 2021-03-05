@@ -97,6 +97,17 @@ const runTest = function(keyForCreate, hint) {
     assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
     assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
+
+    // Check that we are able to hide and unhide the index by key.
+    assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide2'}),
+                         'failed to create index: ' + tojson(keyForCreate));
+    assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.commandWorked(coll.hideIndex(keyForCreate), 'failed to hide index: hide2');
+    assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
+    assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide2');
+    assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
 };
 
 runTest({[metaFieldName]: 1}, {meta: 1});
@@ -134,6 +145,7 @@ assert.commandWorked(coll.insert(doc, {ordered: false}), 'failed to insert doc: 
 // Reject index keys that do not include the metadata field.
 assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}), ErrorCodes.CannotCreateIndex);
 assert.commandFailedWithCode(coll.dropIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
+assert.commandFailedWithCode(coll.hideIndex({not_metadata: 1}), ErrorCodes.IndexNotFound);
 
 // Index names are not transformed. dropIndexes passes the request along to the buckets collection,
 // which in this case does not possess the index by that name.
