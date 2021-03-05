@@ -58,5 +58,29 @@ boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
 StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON);
 
+/**
+ * Maps the buckets collection index spec 'bucketsIndexSpecBSON' to the index schema of the
+ * time-series collection using the information provided in 'timeseriesOptions'.
+ *
+ * If 'bucketsIndexSpecBSON' does not match a valid time-series index format, then an empty BSONObj
+ * is returned.
+ *
+ * Conversion Example:
+ * On a time-series collection with 'tm' time field and 'mm' metadata field,
+ * we may see a compound index on the underlying bucket collection mapped from:
+ * {
+ *     'meta.tag1': 1,
+ *     'control.min.tm': 1,
+ *     'control.max.tm': 1
+ * }
+ * to an index on the time-series collection:
+ * {
+ *     'mm.tag1': 1,
+ *     'tm': 1
+ * }
+ */
+BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& timeseriesOptions,
+                                                     const BSONObj& bucketsIndexSpecBSON);
+
 }  // namespace timeseries
 }  // namespace mongo

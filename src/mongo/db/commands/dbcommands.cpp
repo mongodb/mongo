@@ -116,87 +116,6 @@ using std::unique_ptr;
 namespace {
 
 /**
- * Returns time-series options if 'ns' refers to a time-series collection.
- */
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& ns) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
-    if (!viewCatalog) {
-        return {};
-    }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
-    if (!view) {
-        return {};
-    }
-
-    // Return a copy of the time-series options so that we don't refer to the internal state of
-    // 'viewCatalog' once it goes out of scope.
-    return view->timeseries();
-}
-
-/**
- * Returns an index key with field names mapped to the bucket collection schema.
- */
-BSONObj makeTimeseriesIndexSpecKey(const TimeseriesOptions& timeseriesOptions,
-                                   const CollMod& origCmd,
-                                   const BSONObj& origKey) {
-    auto timeField = timeseriesOptions.getTimeField();
-    auto metaField = timeseriesOptions.getMetaField();
-
-    BSONObjBuilder builder;
-    for (const auto& elem : origKey) {
-        // Determine if the index requested on the time field is ascending or descending.
-        // The final index spec will be subjected to a more complete validation in
-        // index_key_validate::validateKeyPattern().
-        if (elem.fieldNameStringData() == timeField) {
-            uassert(
-                ErrorCodes::IndexNotFound,
-                str::stream() << "Invalid index spec for time-series collection: "
-                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                              << ". Indexes on the time field must be ascending or descending "
-                                 "(numbers only): "
-                              << elem,
-                elem.isNumber());
-            if (elem.number() >= 0) {
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
-            } else {
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
-            }
-            continue;
-        }
-
-        uassert(ErrorCodes::IndexNotFound,
-                str::stream() << "Invalid index spec for time-series collection: "
-                              << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                              << ". Index must be on the '" << timeField << "' field: " << elem,
-                metaField);
-
-        if (elem.fieldNameStringData() == *metaField) {
-            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
-            continue;
-        }
-
-        if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
-            builder.appendAs(elem,
-                             str::stream()
-                                 << BucketUnpacker::kBucketMetaFieldName << "."
-                                 << elem.fieldNameStringData().substr(metaField->size() + 1));
-            continue;
-        }
-
-        uasserted(ErrorCodes::IndexNotFound,
-                  str::stream() << "Invalid index spec for time-series collection: "
-                                << redact(origCmd.toBSON({}))  // 'origKey' is included in 'origCmd'
-                                << ". Index must be either on the '" << *metaField << "' or '"
-                                << timeField << "' fields: " << elem);
-    }
-    return builder.obj();
-}
-
-/**
  * Returns a CollMod on the underlying buckets collection of the time-series collection.
  * Returns null if 'origCmd' is not for a time-series collection.
  */
@@ -204,18 +123,24 @@ std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
                                                       const CollMod& origCmd) {
     const auto& origNs = origCmd.getNamespace();
 
-    auto timeseriesOptions = getTimeseriesOptions(opCtx, origNs);
+    auto timeseriesOptions = timeseries::getTimeseriesOptions(opCtx, origNs);
 
     // Return early with null if we are not working with a time-series collection.
     if (!timeseriesOptions) {
         return {};
     }
 
-    // TODO(SERVER-54639): Map index specs to bucket collection using helper function.
     auto index = origCmd.getIndex();
     if (index && index->getKeyPattern()) {
-        index->setKeyPattern(
-            makeTimeseriesIndexSpecKey(*timeseriesOptions, origCmd, *index->getKeyPattern()));
+        auto bucketsIndexSpecWithStatus = timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(
+            *timeseriesOptions, *index->getKeyPattern());
+
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
+                              << " Command request: " << redact(origCmd.toBSON({})),
+                bucketsIndexSpecWithStatus.isOK());
+
+        index->setKeyPattern(std::move(bucketsIndexSpecWithStatus.getValue()));
     }
 
     auto ns = origNs.makeTimeseriesBucketsNamespace();
