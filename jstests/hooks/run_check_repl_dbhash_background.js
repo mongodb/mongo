@@ -246,7 +246,7 @@ function checkReplDbhashBackgroundThread(hosts) {
                           ". Primary info: " + tojsononeline(primaryInfo) +
                           ". Secondary info: " + tojsononeline(secondaryInfo));
                     const diff = DataConsistencyChecker.getCollectionDiffUsingSessions(
-                        primarySession, secondarySession, dbName, primaryInfo.uuid);
+                        primarySession, secondarySession, dbName, primaryInfo.uuid, clusterTime);
 
                     result.push({
                         primary: primaryInfo,
