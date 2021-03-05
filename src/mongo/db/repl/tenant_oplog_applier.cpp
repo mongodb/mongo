@@ -67,7 +67,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        ThreadPool* writerPool,
-                                       const bool isResuming)
+                                       Timestamp resumeBatchingTs)
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogApplier_") + tenantId),
       _migrationUuid(migrationUuid),
       _tenantId(tenantId),
@@ -75,7 +75,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
       _writerPool(writerPool),
-      _isResuming(isResuming) {}
+      _resumeBatchingTs(resumeBatchingTs) {}
 
 TenantOplogApplier::~TenantOplogApplier() {
     shutdown();
@@ -105,13 +105,13 @@ OpTime TenantOplogApplier::getBeginApplyingOpTime_forTest() const {
     return _beginApplyingAfterOpTime;
 }
 
+Timestamp TenantOplogApplier::getResumeBatchingTs_forTest() const {
+    return _resumeBatchingTs;
+}
+
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
-    Timestamp resumeTs;
-    if (_isResuming) {
-        resumeTs = _beginApplyingAfterOpTime.getTimestamp();
-    }
     _oplogBatcher =
-        std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor, resumeTs);
+        std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor, _resumeBatchingTs);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;

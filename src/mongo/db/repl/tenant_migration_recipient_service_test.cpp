@@ -1755,7 +1755,10 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplogEntry) {
     const UUID migrationUUID = UUID::gen();
-    const OpTime clonerFinishedOpTime(Timestamp(2, 1), 1);
+    // Recipient opTimes
+    const OpTime clonerFinishedOpTime(Timestamp(1, 1), 1);
+    // Donor opTimes
+    const OpTime earlierThanResumeOpTime(Timestamp(2, 1), 1);
     const OpTime resumeOpTime(Timestamp(3, 1), 1);
     const OpTime dataConsistentOpTime(Timestamp(4, 1), 1);
 
@@ -1792,7 +1795,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     // Create and insert two tenant migration no-op entries into the oplog. The oplog applier should
     // resume from the no-op entry with the most recent donor opTime.
     const auto insertNss = NamespaceString("tenantA_foo.bar");
-    const auto earlierOplogBson = makeOplogEntry(clonerFinishedOpTime,
+    const auto earlierOplogBson = makeOplogEntry(earlierThanResumeOpTime,
                                                  OpTypeEnum::kInsert,
                                                  insertNss,
                                                  UUID::gen(),
@@ -1861,9 +1864,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
           "test"_attr = _agent.getTestName());
     instance->waitUntilMigrationReachesConsistentState(opCtx.get());
 
-    // The oplog applier should have started applying at the 'resumeOpTime'.
+    // The oplog applier should have started batching and applying at the donor opTime equal to
+    // 'resumeOpTime'.
     const auto oplogApplier = getTenantOplogApplier(instance.get());
     ASSERT_EQUALS(resumeOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
+    ASSERT_EQUALS(resumeOpTime.getTimestamp(), oplogApplier->getResumeBatchingTs_forTest());
 
     // Stop the oplog applier.
     instance->stopOplogApplier_forTest();
@@ -1873,8 +1878,10 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
-TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApplyingOpTime) {
+TEST_F(TenantMigrationRecipientServiceTest,
+       OplogApplierResumesBatchingAndApplyingAtDifferentTimestamps) {
     const UUID migrationUUID = UUID::gen();
+    // Donor opTimes
     const OpTime startApplyingOpTime(Timestamp(2, 1), 1);
     const OpTime dataConsistentOpTime(Timestamp(4, 1), 1);
 
@@ -1915,10 +1922,12 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     // - (1) An oplog entry with opTime earlier than 'cloneFinishedRecipientOpTime'.
     // - (2) An oplog entry with opTime greater than 'cloneFinishedRecipientOpTime'.
     // - (3) A no-op oplog entry with an inner donor oplog entry as the 'o2' field. The donor opTime
-    //       is less than the 'startApplyingDonorOpTime'.
+    //       is less than the 'startApplyingDonorOpTime'. We will resume batching from this
+    //       timestamp.
     // - (4) A no-op oplog entry with an inner oplog entry as the 'o2' field but no
-    //       'fromTenantMigrate' field. These oplog entries do not satisfy the conditions for the
-    //       oplog applier to resume from so we default to resuming from 'startDonorApplyingOpTime'.
+    //       'fromTenantMigrate' field. This oplog entry do not satisfy the conditions for the
+    //       oplog applier to resume applying from so we default to apply
+    //       from 'startDonorApplyingOpTime'.
     const auto insertNss = NamespaceString("tenantA_foo.bar");
     const auto beforeStartApplyingOpTime = OpTime(Timestamp(1, 1), 1);
     const auto entryBeforeStartApplyingOpTime = makeOplogEntry(
@@ -1976,7 +1985,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
                                              insertNss,
                                              collUuid,
                                              entryAfterStartApplyingOpTime,
-                                             boost::none /* o2 */));
+                                             boost::none /* migrationUUID */));
     for (auto entry : oplogEntries) {
         auto opTime = entry.getOpTime();
         ASSERT_OK(storage->insertDocument(
@@ -2017,8 +2026,155 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
           "test"_attr = _agent.getTestName());
     instance->waitUntilMigrationReachesConsistentState(opCtx.get());
 
-    // The oplog applier starts applying from the first opTime after the 'beginApplyingOpTime'.
     const auto oplogApplier = getTenantOplogApplier(instance.get());
+    // Resume batching from the first migration no-op oplog entry. In this test, this is before
+    // the 'startApplyingDonorOpTime'.
+    ASSERT_EQUALS(beforeStartApplyingOpTime.getTimestamp(),
+                  oplogApplier->getResumeBatchingTs_forTest());
+    // The oplog applier starts applying from the donor opTime equal to 'beginApplyingOpTime'.
+    ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
+
+    // Stop the oplog applier.
+    instance->stopOplogApplier_forTest();
+    // Wait for task completion.  Since we're using a test function to cancel the applier,
+    // the actual result is not critical.
+    ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApplyingOpTime) {
+    const UUID migrationUUID = UUID::gen();
+    // Donor opTimes
+    const OpTime startApplyingOpTime(Timestamp(2, 1), 1);
+    const OpTime dataConsistentOpTime(Timestamp(4, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, startApplyingOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    // We skip cloning here as a way to simulate that the recipient service has detected an existing
+    // migration on startup and will attempt to resume oplog fetching from the appropriate optime.
+    updateStateDocToCloningFinished(initialStateDocument,
+                                    OpTime(Timestamp(10, 1), 1) /* cloneFinishedRecipientOpTime
+                                                                 */
+                                    ,
+                                    dataConsistentOpTime /* dataConsistentStopDonorOpTime */,
+                                    startApplyingOpTime /* startApplyingDonorOpTime */,
+                                    startApplyingOpTime /* startFetchingDonorOpTime */);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+
+    {
+        FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+    }
+
+    // Create and insert the following into the oplog:
+    // - (1) An oplog entry with opTime earlier than 'cloneFinishedRecipientOpTime'.
+    // - (2) An oplog entry with opTime greater than 'cloneFinishedRecipientOpTime'.
+    // - (3) A no-op oplog entry with an inner oplog entry as the 'o2' field but no
+    //       'fromTenantMigrate' field. This oplog entry do not satisfy the conditions for the
+    //       oplog applier to resume applying from so we default to applying and batching
+    //       from the start of the buffer collection.
+    const auto insertNss = NamespaceString("tenantA_foo.bar");
+    const auto afterStartApplyingOpTime = OpTime(Timestamp(3, 1), 1);
+    const auto entryAfterStartApplyingOpTime = makeOplogEntry(
+                                                   afterStartApplyingOpTime,
+                                                   OpTypeEnum::kInsert,
+                                                   insertNss,
+                                                   UUID::gen(),
+                                                   BSON("doc"
+                                                        << "after startApplyingDonorOpTime"),
+                                                   boost::none /* o2 */)
+                                                   .getEntry()
+                                                   .toBSON();
+    auto storage = StorageInterface::get(opCtx->getServiceContext());
+    const auto oplogNss = NamespaceString::kRsOplogNamespace;
+    const auto collUuid = UUID::gen();
+    std::vector<DurableOplogEntry> oplogEntries;
+    std::vector<MutableOplogEntry> noOpEntries;
+    // (1)
+    oplogEntries.push_back(makeOplogEntry(OpTime(Timestamp(9, 1), 1),
+                                          OpTypeEnum::kInsert,
+                                          insertNss,
+                                          collUuid,
+                                          BSON("doc"
+                                               << "before clonerFinishedOpTime"),
+                                          boost::none /* o2 */)
+                               .getEntry());
+    // (2)
+    oplogEntries.push_back(makeOplogEntry(OpTime(Timestamp(11, 1), 1),
+                                          OpTypeEnum::kInsert,
+                                          insertNss,
+                                          collUuid,
+                                          BSON("doc"
+                                               << "after clonerFinishedOpTime"),
+                                          boost::none /* o2 */)
+                               .getEntry());
+    // (3)
+    const auto laterOpTime = OpTime(Timestamp(13, 1), 1);
+    const auto noOpEntry = makeNoOpOplogEntry(laterOpTime,
+                                              insertNss,
+                                              collUuid,
+                                              entryAfterStartApplyingOpTime,
+                                              boost::none /* migrationUUID */);
+
+    for (auto entry : oplogEntries) {
+        auto opTime = entry.getOpTime();
+        ASSERT_OK(storage->insertDocument(
+            opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));
+    }
+    ASSERT_OK(storage->insertDocument(opCtx.get(),
+                                      oplogNss,
+                                      {noOpEntry.toBSON(), laterOpTime.getTimestamp()},
+                                      laterOpTime.getTerm()));
+
+    // Hang before starting the oplog applier.
+    const auto hangAfterStartingOplogApplier =
+        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
+    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
+                                                                      0,
+                                                                      BSON("action"
+                                                                           << "hang"));
+    hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
+
+    auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
+                                                   OpTypeEnum::kInsert,
+                                                   NamespaceString("tenantA_foo.bar"),
+                                                   UUID::gen(),
+                                                   BSON("doc" << 3),
+                                                   boost::none /* o2 */);
+
+    auto oplogFetcher = getDonorOplogFetcher(instance.get());
+    // Feed the oplog fetcher the last doc required for the recipient to be considered consistent.
+    oplogFetcher->receiveBatch(
+        1, {dataConsistentOplogEntry.getEntry().toBSON()}, dataConsistentOpTime.getTimestamp());
+
+    // Allow the service to continue.
+    hangAfterStartingOplogApplier->setMode(FailPoint::off);
+    LOGV2(5394602,
+          "Waiting for recipient service to reach consistent state",
+          "suite"_attr = _agent.getSuiteName(),
+          "test"_attr = _agent.getTestName());
+    instance->waitUntilMigrationReachesConsistentState(opCtx.get());
+
+    const auto oplogApplier = getTenantOplogApplier(instance.get());
+    // There is no oplog entry to resume batching from, so we treat it as if we are resuming
+    // oplog application from the start. The 'resumeBatchingTs' will be a null timestamp.
+    ASSERT_EQUALS(Timestamp(), oplogApplier->getResumeBatchingTs_forTest());
+    // The oplog applier starts applying from the donor opTime equal to 'beginApplyingOpTime'.
     ASSERT_EQUALS(startApplyingOpTime, oplogApplier->getBeginApplyingOpTime_forTest());
 
     // Stop the oplog applier.

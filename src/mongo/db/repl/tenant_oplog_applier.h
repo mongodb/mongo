@@ -77,7 +77,7 @@ public:
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
                        ThreadPool* writerPool,
-                       const bool isResuming = false);
+                       Timestamp resumeBatchingTs = Timestamp());
 
     virtual ~TenantOplogApplier();
 
@@ -94,6 +94,11 @@ public:
      * Returns the optime the applier will start applying from. Used for testing.
      */
     OpTime getBeginApplyingOpTime_forTest() const;
+
+    /**
+     * Returns the timestamp the applier will resume batching from. Used for testing.
+     */
+    Timestamp getResumeBatchingTs_forTest() const;
 
 private:
     Status _doStartup_inlock() noexcept final;
@@ -153,12 +158,15 @@ private:
     std::vector<OpTimePair> _opTimeMapping;       // (M)
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
-    ThreadPool* const _writerPool;                                        // (S)
+    ThreadPool* const _writerPool;  // (S)
+    // The timestamp to resume batching from. A null timestamp indicates that the oplog applier
+    // is starting fresh (not a retry), and will start batching from the beginning of the oplog
+    // buffer.
+    const Timestamp _resumeBatchingTs;                                    // (R)
     std::map<OpTime, SharedPromise<OpTimePair>> _opTimeNotificationList;  // (M)
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
     bool _applyLoopApplyingBatch = false;                                 // (M)
-    const bool _isResuming;                                               // (R)
 };
 
 /**
