@@ -357,7 +357,9 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const St
     }
     // If the command has errored, assert that it satisfies the IDL-defined requirements on a
     // command error reply.
-    if (!status.isOK()) {
+    // Only validate error reply in test mode so that we don't expose users to errors if we
+    // construct an invalid error reply.
+    if (!status.isOK() && getTestCommandsEnabled()) {
         try {
             ErrorReply::parse(IDLParserErrorContext("appendCommandStatusNoThrow"),
                               result.asTempObj());
