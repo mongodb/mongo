@@ -22,8 +22,15 @@ BuildRequires: /usr/bin/pathfix.py, python3-devel
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
+%define python_pkg python3
+%else
+%define python_pkg python2
+%endif
+
 %if 0%{?suse_version}
 %define timezone_pkg timezone
+%define python_pkg python
 %else
 %define timezone_pkg tzdata
 %endif
