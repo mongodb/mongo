@@ -1140,7 +1140,7 @@ public:
         // remove the child's EvalFrame from the stack.
         tassert(5273405,
                 "Eval frame's input slot is not defined",
-                static_cast<bool>(_context->evalStack.topFrame().data().inputSlot));
+                _context->evalStack.topFrame().data().inputSlot);
         auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
         auto [filterSlot, filterStage] = [&]() {
             auto [expr, stage] = _context->evalStack.popFrame();
@@ -1183,7 +1183,7 @@ public:
 
         tassert(5273406,
                 "Eval frame's input slot is not defined",
-                static_cast<bool>(_context->evalStack.topFrame().data().inputSlot));
+                _context->evalStack.topFrame().data().inputSlot);
         auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
 
         // Move the children's outputs off of the evalStack into a vector in preparation for
@@ -1249,12 +1249,8 @@ public:
         // The $expr expression must by applied to the current $$ROOT document, so make sure that
         // an input slot associated with the current frame is the same slot as the input slot for
         // the entire match expression we're translating
-        tassert(5273407,
-                "Match expression's input slot is not defined",
-                static_cast<bool>(_context->inputSlot));
-        tassert(5273408,
-                "Eval frame's input slot is not defined",
-                static_cast<bool>(frame.data().inputSlot));
+        tassert(5273407, "Match expression's input slot is not defined", _context->inputSlot);
+        tassert(5273408, "Eval frame's input slot is not defined", frame.data().inputSlot);
         tassert(5273409,
                 "Eval frame for $expr is not computed over expression's input slot",
                 *frame.data().inputSlot == *_context->inputSlot);

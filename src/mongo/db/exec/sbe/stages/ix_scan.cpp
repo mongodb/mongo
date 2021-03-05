@@ -197,9 +197,8 @@ void IndexScanStage::open(bool reOpen) {
 
     if (_open) {
         tassert(5071006, "reopened IndexScanStage but reOpen=false", reOpen);
-        tassert(5071007, "IndexScanStage is open but _coll is not held", _coll.has_value());
-        tassert(
-            5071008, "IndexScanStage is open but don't have _cursor", static_cast<bool>(_cursor));
+        tassert(5071007, "IndexScanStage is open but _coll is not held", _coll);
+        tassert(5071008, "IndexScanStage is open but don't have _cursor", _cursor);
     } else {
         tassert(5071009, "first open to IndexScanStage but reOpen=true", !reOpen);
         if (!_coll) {
