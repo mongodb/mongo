@@ -237,7 +237,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                 }
 
                 // Disallow index hiding/unhiding on system collections.
-                if (nss.isSystem()) {
+                // Bucket collections, which hold data for user-created time-series collections, do
+                // not have this restriction.
+                if (nss.isSystem() && !nss.isTimeseriesBucketsCollection()) {
                     return Status(ErrorCodes::BadValue, "Can't hide index on system collection");
                 }
 
