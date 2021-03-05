@@ -99,9 +99,10 @@ secondaries.forEach(disableFailPoint);
 const newPrimary = replSet.getPrimary();
 assert.eq(secondary, newPrimary);
 
-// Ensure new primary is writable.
+// Ensure new primary is writable, and wait until the write has been replicated to all nodes, to
+// allow rollback (should it occur), to complete.
 jsTestLog('New primary should be writable after draining is complete');
-assert.commandWorked(newPrimary.getDB("foo").flag.insert({sentinel: 1}));
+assert.commandWorked(newPrimary.getDB("foo").flag.insert({sentinel: 1}, {writeConcern: {w: 3}}));
 // Check that all writes reached the secondary's op queue prior to
 // stepping down the original primary and got applied.
 assert.eq(newPrimary.getDB("foo").foo.find().itcount(), numDocuments);
