@@ -74,6 +74,7 @@
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
@@ -315,7 +316,7 @@ enum class LeafTraversalMode {
  *             coscan
  */
 EvalExprStagePair generatePathTraversal(EvalStage inputStage,
-                                        sbe::value::SlotId inputSlot,
+                                        sbe::value::SlotId inputDocumentSlot,
                                         const FieldRef& fp,
                                         FieldIndex level,
                                         PlanNodeId planNodeId,
@@ -329,78 +330,98 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     invariant(level < fp.numParts());
 
     const bool isLeafField = (level == fp.numParts() - 1u);
+    const bool needsArrayCheck = isLeafField && mode == LeafTraversalMode::kArrayAndItsElements;
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
-    // to 'fieldSlot'.
+    // to 'inputSlot'.
     auto fieldName = fp.getPart(level);
-    auto fieldSlot{slotIdGenerator->generate()};
-    auto fromBranch =
-        makeProject(std::move(inputStage),
-                    planNodeId,
-                    fieldSlot,
-                    sbe::makeE<sbe::EFunction>("getField"_sd,
-                                               sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
-                                                           sbe::makeE<sbe::EConstant>(fieldName))));
+    auto inputSlot = slotIdGenerator->generate();
+    auto fromBranch = makeProject(
+        std::move(inputStage),
+        planNodeId,
+        inputSlot,
+        makeFunction("getField", makeVariable(inputDocumentSlot), makeConstant(fieldName)));
 
     if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
         // 'makePredicate' in this mode must return valid state, not just plain boolean value. So
         // there is no need to wrap it in '_context->stateHelper.makePredicateCombinator'.
-        return makePredicate(fieldSlot, std::move(fromBranch));
+        return makePredicate(inputSlot, std::move(fromBranch));
     }
 
-    // Generate the 'in' branch for the TraverseStage that we're about to construct.
-    auto [innerExpr, innerBranch] = isLeafField
-        // Base case: Evaluate the predicate. Predicate returns boolean value, we need to convert it
-        // to state using '_context->stateHelper.makePredicateCombinator'.
-        ? stateHelper.makePredicateCombinator(makePredicate(fieldSlot, EvalStage{}))
-        // Recursive case.
-        : generatePathTraversal(EvalStage{},
-                                fieldSlot,
-                                fp,
-                                level + 1,
-                                planNodeId,
-                                slotIdGenerator,
-                                frameIdGenerator,
-                                makePredicate,
-                                mode,
-                                stateHelper);
+    // Input slot for the inner branch of traverse stage is the same as the input slot holding the
+    // array.
+    auto innerInputSlot = inputSlot;
+    auto traverseInputSlot = inputSlot;
 
-    auto isInputArray = [&]() -> boost::optional<sbe::value::SlotId> {
-        if (stateHelper.stateContainsValue() || !isLeafField) {
-            auto slot = slotIdGenerator->generate();
-            fromBranch =
-                makeProject(std::move(fromBranch),
-                            planNodeId,
-                            slot,
-                            makeFillEmptyFalse(makeFunction("isArray", makeVariable(fieldSlot))));
-            return slot;
-        }
-        return {};
-    }();
+    // Some of MQL expressions need to check predicate not only for each of the array elements, but
+    // also for the whole array. Predicate tree is located in the inner branch of the traverse stage
+    // created below. To avoid generating predicate tree two times, we force traverse to be executed
+    // two times: first to iterate array elements and second to run the predicate tree against whole
+    // array.
+    // To achive this, we create union stage in the 'from' branch of traverse. This union stage
+    // sets the input slot of the traverse stage - 'traverseInputSlot'. Union returns ADVANCED
+    // two times, forcing traverse to be executed two times with different inputs:
+    //  - First time union returns ADVANCED, 'traverseInputSlot' is set to the input array, stored
+    //    in 'inputSlot'. Traverse stage iterates over array elements (if any) and checks the
+    //    predicate for each of them.
+    //  - Second time union returns ADVANCED, 'traverseInputSlot' is set to Nothing. In this case,
+    //    traverse stage executes predicate only once.
+    // Since 'from' branch of traverse has union stage, we save current 'fromBranch' to use for
+    // loop join stage later.
+    EvalStage innerBranch;
+    EvalStage loopJoinFromBranch;
+    if (needsArrayCheck) {
+        loopJoinFromBranch = std::move(fromBranch);
 
-    if (stateHelper.stateContainsValue()) {
-        tassert(5442101, "isInputArray must be set", isInputArray.has_value());
-        // The expression below checks if input is an array. In this case it returns initial state.
-        // This value will be the first one to be stored in 'traverseOutputSlot'. On the subsequent
-        // iterations 'traverseOutputSlot' is updated according to fold expression.
-        // If input is not array, expression below simply assigns state from the predicate to the
-        // 'innerResultSlot'.
-        // If state does not containy any value apart from boolean, we do not need to perform this
-        // check.
-        innerExpr =
-            makeLocalBind(frameIdGenerator,
-                          [&](sbe::EVariable state) {
-                              return sbe::makeE<sbe::EIf>(
-                                  makeVariable(*isInputArray),
-                                  stateHelper.makeInitialState(stateHelper.getBool(state.clone())),
-                                  state.clone());
-                          },
-                          innerExpr.extractExpr());
+        auto buildUnionBranch = [&](std::unique_ptr<sbe::EExpression> arrayExpr) {
+            auto currentArraySlot = slotIdGenerator->generate();
+            auto branch = makeProject(makeLimitCoScanStage(planNodeId),
+                                      planNodeId,
+                                      currentArraySlot,
+                                      std::move(arrayExpr));
+            return std::make_pair(sbe::makeSV(currentArraySlot), std::move(branch));
+        };
+
+        auto [checkArrayElementsSlots, checkArrayElementsStage] =
+            buildUnionBranch(makeVariable(inputSlot));
+
+        auto [checkWholeArraySlots, checkWholeArrayStage] =
+            buildUnionBranch(makeConstant(sbe::value::TypeTags::Nothing, 0));
+
+        traverseInputSlot = slotIdGenerator->generate();
+        fromBranch = makeUnion(
+            makeVector(std::move(checkArrayElementsStage), std::move(checkWholeArrayStage)),
+            makeVector(std::move(checkArrayElementsSlots), std::move(checkWholeArraySlots)),
+            sbe::makeSV(traverseInputSlot),
+            planNodeId);
     }
 
-    auto innerResultSlot = slotIdGenerator->generate();
-    innerBranch =
-        makeProject(std::move(innerBranch), planNodeId, innerResultSlot, innerExpr.extractExpr());
+    boost::optional<sbe::value::SlotId> isTraverseInputArraySlot;
+    if (needsArrayCheck || !isLeafField || stateHelper.stateContainsValue()) {
+        isTraverseInputArraySlot = slotIdGenerator->generate();
+        fromBranch = makeProject(
+            std::move(fromBranch),
+            planNodeId,
+            *isTraverseInputArraySlot,
+            makeFillEmptyFalse(makeFunction("isArray", makeVariable(traverseInputSlot))));
+    }
+
+    // If current input to the traverse stage is an array, this means that we are currently
+    // checking the predicate against each of the array elements. 'traverseInputSlot', holding
+    // current array element, should be passed to the predicate.
+    // If current input to the traverse stage is not an array, this could mean two things:
+    //  - Value in the 'inputSlot' is not the array
+    //  - We are checking the predicate against the whole array
+    // In both cases, 'inputSlot' should be passed to the predicate.
+    if (needsArrayCheck) {
+        innerInputSlot = slotIdGenerator->generate();
+        innerBranch = makeProject(std::move(innerBranch),
+                                  planNodeId,
+                                  innerInputSlot,
+                                  sbe::makeE<sbe::EIf>(makeVariable(*isTraverseInputArraySlot),
+                                                       makeVariable(traverseInputSlot),
+                                                       makeVariable(inputSlot)));
+    }
 
     // For the non leaf nodes we insert a filter that allows the nested getField only for objects.
     // But only if the outer value is an array. This is relevant in this example: given 2 documents
@@ -412,14 +433,57 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     // this is not allowed and we shouldn't try to do a nesting path traversal of the array
     // elements, unless an element is an object.
     if (!isLeafField) {
-        tassert(5442102, "isInputArray must be set", isInputArray.has_value());
-        innerBranch = makeFilter<true>(
-            std::move(innerBranch),
-            sbe::makeE<sbe::EIf>(makeVariable(*isInputArray),
-                                 makeFunction("isObject", makeVariable(fieldSlot)),
-                                 makeConstant(sbe::value::TypeTags::Boolean, true)),
-            planNodeId);
+        innerBranch =
+            makeFilter<false>(std::move(innerBranch),
+                              makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                           makeNot(makeVariable(*isTraverseInputArraySlot)),
+                                           makeFunction("isObject", makeVariable(innerInputSlot))),
+                              planNodeId);
     }
+
+    // Generate the 'in' branch for the TraverseStage that we're about to construct.
+    EvalExpr innerExpr;
+    std::tie(innerExpr, innerBranch) = isLeafField
+        // Base case: Evaluate the predicate. Predicate returns boolean value, we need to convert it
+        // to state using 'stateHelper.makePredicateCombinator'.
+        ? stateHelper.makePredicateCombinator(makePredicate(innerInputSlot, std::move(innerBranch)))
+        // Recursive case.
+        : generatePathTraversal(std::move(innerBranch),
+                                innerInputSlot,
+                                fp,
+                                level + 1,
+                                planNodeId,
+                                slotIdGenerator,
+                                frameIdGenerator,
+                                makePredicate,
+                                mode,
+                                stateHelper);
+
+    if (stateHelper.stateContainsValue()) {
+        // The expression below checks if input is an array. In this case it returns initial state.
+        // This value will be the first one to be stored in 'traverseOutputSlot'. On the subsequent
+        // iterations 'traverseOutputSlot' is updated according to fold expression.
+        // If input is not array, expression below simply assigns state from the predicate to the
+        // 'innerResultSlot'.
+        // If state does not containy any value apart from boolean, we do not need to perform this
+        // check.
+        innerExpr =
+            makeLocalBind(frameIdGenerator,
+                          [&](sbe::EVariable state) {
+                              return sbe::makeE<sbe::EIf>(
+                                  makeVariable(*isTraverseInputArraySlot),
+                                  stateHelper.makeInitialState(stateHelper.getBool(state.clone())),
+                                  state.clone());
+                          },
+                          innerExpr.extractExpr());
+    }
+
+    sbe::value::SlotId innerResultSlot;
+    std::tie(innerResultSlot, innerBranch) =
+        projectEvalExpr(std::move(innerExpr),
+                        std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
+                        planNodeId,
+                        slotIdGenerator);
 
     // Generate the traverse stage for the current nested level. There are several cases covered
     // during this phase:
@@ -435,7 +499,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     auto outputStage = stateHelper.makeTraverseCombinator(
         std::move(fromBranch),
         std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
-        fieldSlot,
+        traverseInputSlot,
         traverseOutputSlot,
         innerResultSlot,
         planNodeId,
@@ -443,32 +507,61 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
     // If traverse stage was not executed at all (empty input array), 'traverseOutputSlot' contains
     // Nothing. In this case we have not found matching element, so we simply return false value.
-    auto resultExpr = makeFunction(
-        "fillEmpty", sbe::makeE<sbe::EVariable>(traverseOutputSlot), stateHelper.makeState(false));
+    auto resultExpr =
+        makeFunction("fillEmpty", makeVariable(traverseOutputSlot), stateHelper.makeState(false));
 
-    if (isLeafField && mode == LeafTraversalMode::kArrayAndItsElements) {
-        // For the last level, if 'mode' == kArrayAndItsElements and getField() returns an array we
-        // need to apply the predicate both to the elements of the array _and_ to the array itself.
-        // By itself, TraverseStage only applies the predicate to the elements of the array. Thus,
-        // for the last level, we add a ProjectStage so that we also apply the predicate to the
-        // array itself. (For cases where getField() doesn't return an array, this additional
-        // ProjectStage is effectively a no-op.)
-        EvalExpr outputExpr;
-        std::tie(outputExpr, outputStage) = makePredicate(fieldSlot, std::move(outputStage));
-
-        // If during an array traversal we have found matching element, simply return 'outputSlot'.
-        // Otherwise, we must check if the whole array matches the predicate.
-        resultExpr = stateHelper.mergeStates(
-            std::move(resultExpr),
-            stateHelper.makeState(sbe::makeE<sbe::EPrimBinary>(
-                sbe::EPrimBinary::logicAnd,
-                makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                    "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlot)))),
-                outputExpr.extractExpr())),
-            frameIdGenerator);
+    if (!needsArrayCheck) {
+        return {std::move(resultExpr), std::move(outputStage)};
     }
 
-    return {std::move(resultExpr), std::move(outputStage)};  // NOLINT(bugprone-use-after-move)
+    auto outputSlot = slotIdGenerator->generate();
+    outputStage =
+        makeProject(std::move(outputStage), planNodeId, outputSlot, std::move(resultExpr));
+
+    // In case predicate needs to be checked both for each of the array elements and for whole
+    // array, traverse stage created above will return ADVANCED two times. To handle that, we
+    // construct the following tree:
+    //
+    //   nlj
+    //   left
+    //       <'inputStage' and extracting current field value into 'inputSlot'>
+    //   right
+    //       limit 1
+    //       filter {!isTraverseInputArraySlot || outputSlot}
+    //       <traverse stage created above>
+    //
+    // Let iterate over each part of the tree:
+    //  - Loop join stage is created to hold all stages which usually go into the 'from' branch of
+    //    traverse stage. This includes 'inputStage' and project stage to extract current field
+    //    value.
+    //  - Filter stage ensures that tree below it returns ADVANCED only if the predicate matched
+    //    one of the array elements or the whole array.
+    //  - Limit-1 stage ensures short-circuiting. If one of the array elements matched the
+    //    predicate, filter stage below it returns ADVANCED and we do not execute the predicate
+    //    for the whole array.
+    //
+    // To better understand the predicate of the filter stage, let us take a look how the resulting
+    // tree behaves for various 'inputSlot' values. 'inputSlot' can be:
+    //  - Array. In this case traverse stage will be executed twice:
+    //   1. 'isTraverseInputArraySlot = true', filter will pass only if 'outputSlot = true', which
+    //      means predicate returned true for one of the array elements.
+    //   2. 'isTraverseInputArray = false' (since second time traverse input is Nothing), filter
+    //      will always pass. Even though predicate may not match the whole array, we need to return
+    //      something to the stage above us.
+    // - Not array. In this case traverse stage will be executed once:
+    //   1. 'isTraverseInputArray = false', filter will always pass.
+    //   2. Will never happen because of limit-1 stage on top.
+    outputStage = makeFilter<false>(std::move(outputStage),
+                                    makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                 makeNot(makeVariable(*isTraverseInputArraySlot)),
+                                                 stateHelper.getBool(outputSlot)),
+                                    planNodeId);
+
+    outputStage = makeLimitSkip(std::move(outputStage), planNodeId, 1);
+
+    outputStage = makeLoopJoin(std::move(loopJoinFromBranch), std::move(outputStage), planNodeId);
+
+    return {outputSlot, std::move(outputStage)};
 }
 
 /**
@@ -1379,10 +1472,6 @@ public:
             auto makePredicate = [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal](
                                      sbe::value::SlotId inputSlot,
                                      EvalStage inputStage) -> EvalExprStagePair {
-                // Copy the ArraySet because the the sbe EConstant assmumes ownership and the
-                // makePredicate function can be invoked multiple times in 'generateTraverse'.
-                auto [equalitiesTag, equalitiesVal] = sbe::value::copyValue(arrSetTag, arrSetVal);
-
                 // We have to match nulls and undefined if a 'null' is present in equalities.
                 auto inputExpr = !hasNull
                     ? makeVariable(inputSlot)
@@ -1390,8 +1479,9 @@ public:
                                            makeConstant(sbe::value::TypeTags::Null, 0),
                                            makeVariable(inputSlot));
 
+                arrSetGuard.reset();
                 return {makeIsMember(std::move(inputExpr),
-                                     sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
+                                     sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
                                      _context->env),
                         std::move(inputStage)};
             };
@@ -1465,8 +1555,6 @@ public:
                 // short-circuiting OR between a filter stage that checks membership of the field
                 // being traversed in the equalities and the regex traverse stage
                 if (equalities.size() > 0) {
-                    auto [equalitiesTag, equalitiesVal] =
-                        sbe::value::copyValue(arrSetTag, arrSetVal);
                     std::vector<EvalExprStagePair> branches;
 
                     // We have to match nulls and undefined if a 'null' is present in equalities.
@@ -1476,9 +1564,10 @@ public:
                                                makeConstant(sbe::value::TypeTags::Null, 0),
                                                makeVariable(inputSlot));
 
+                    arrSetGuard.reset();
                     branches.emplace_back(
                         makeIsMember(std::move(inputExpr),
-                                     sbe::makeE<sbe::EConstant>(equalitiesTag, equalitiesVal),
+                                     sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
                                      _context->env),
                         EvalStage{});
                     branches.emplace_back(regexOutputSlot, std::move(regexStage));

@@ -320,6 +320,16 @@ EvalStage makeTraverse(EvalStage outer,
                        boost::optional<size_t> nestedArraysDepth,
                        const sbe::value::SlotVector& lexicalEnvironment = {});
 
+EvalStage makeLimitSkip(EvalStage input,
+                        PlanNodeId planNodeId,
+                        boost::optional<long long> limit,
+                        boost::optional<long long> skip = boost::none);
+
+EvalStage makeUnion(std::vector<EvalStage> inputStages,
+                    std::vector<sbe::value::SlotVector> inputVals,
+                    sbe::value::SlotVector outputVals,
+                    PlanNodeId planNodeId);
+
 using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
     EvalExpr expr,
     EvalStage stage,

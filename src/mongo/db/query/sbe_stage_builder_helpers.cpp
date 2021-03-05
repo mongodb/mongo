@@ -379,6 +379,29 @@ EvalStage makeTraverse(EvalStage outer,
             std::move(outSlots)};
 }
 
+EvalStage makeLimitSkip(EvalStage input,
+                        PlanNodeId planNodeId,
+                        boost::optional<long long> limit,
+                        boost::optional<long long> skip) {
+    return EvalStage{
+        sbe::makeS<sbe::LimitSkipStage>(std::move(input.stage), limit, skip, planNodeId),
+        std::move(input.outSlots)};
+}
+
+EvalStage makeUnion(std::vector<EvalStage> inputStages,
+                    std::vector<sbe::value::SlotVector> inputVals,
+                    sbe::value::SlotVector outputVals,
+                    PlanNodeId planNodeId) {
+    std::vector<std::unique_ptr<sbe::PlanStage>> branches;
+    branches.reserve(inputStages.size());
+    for (auto& inputStage : inputStages) {
+        branches.emplace_back(std::move(inputStage.stage));
+    }
+    return EvalStage{sbe::makeS<sbe::UnionStage>(
+                         std::move(branches), std::move(inputVals), outputVals, planNodeId),
+                     outputVals};
+}
+
 EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
                                 BranchFn branchFn,
                                 PlanNodeId planNodeId,
