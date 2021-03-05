@@ -851,7 +851,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto indexKeys = outputs.extractIndexKeySlots();
         tassert(5184302,
                 "SORT_MERGE must receive index key slots as input from its child stages",
-                indexKeys.has_value());
+                indexKeys);
 
         for (const auto& part : sortPattern) {
             auto partPath = part.fieldPath->fullPath();

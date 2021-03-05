@@ -101,8 +101,7 @@ void flattenExecTree(const PlanStage* root, std::vector<const PlanStage*>* flatt
         // Only add the winning plan from a MultiPlanStage.
         auto mps = static_cast<const MultiPlanStage*>(root);
         auto bestPlanIdx = mps->bestPlanIdx();
-        tassert(
-            3420001, "Trying to explain MultiPlanStage without best plan", bestPlanIdx.has_value());
+        tassert(3420001, "Trying to explain MultiPlanStage without best plan", bestPlanIdx);
         const auto winningStage = mps->getChildren()[*bestPlanIdx].get();
         flattenExecTree(winningStage, flattened);
         return;
@@ -629,9 +628,7 @@ MultiPlanStage* getMultiPlanStage(PlanStage* root) {
 const boost::optional<size_t> getWinningPlanIdx(PlanStage* root) {
     if (auto mps = getMultiPlanStage(root); mps) {
         auto planIdx = mps->bestPlanIdx();
-        tassert(3420008,
-                "Trying to get stats of a MultiPlanStage without winning plan",
-                planIdx.has_value());
+        tassert(3420008, "Trying to get stats of a MultiPlanStage without winning plan", planIdx);
         return planIdx;
     }
     return {};
@@ -743,9 +740,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
     }
     auto bestPlanIdx = mps->bestPlanIdx();
 
-    tassert(3420009,
-            "Trying to get stats of a MultiPlanStage without winning plan",
-            bestPlanIdx.has_value());
+    tassert(3420009, "Trying to get stats of a MultiPlanStage without winning plan", bestPlanIdx);
 
     const auto mpsStats = mps->getStats();
     // Get the stats from the trial period for all the plans.

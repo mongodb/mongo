@@ -172,8 +172,8 @@ void ScanStage::open(bool reOpen) {
 
     if (_open) {
         tassert(5071001, "reopened ScanStage but reOpen=false", reOpen);
-        tassert(5071002, "ScanStage is open but _coll is not held", _coll.has_value());
-        tassert(5071003, "ScanStage is open but don't have _cursor", static_cast<bool>(_cursor));
+        tassert(5071002, "ScanStage is open but _coll is not held", _coll);
+        tassert(5071003, "ScanStage is open but don't have _cursor", _cursor);
     } else {
         tassert(5071004, "first open to ScanStage but reOpen=true", !reOpen);
         if (!_coll) {
