@@ -1,4 +1,11 @@
-// Test listCollections with unauthorized views.
+/**
+ * Test listCollections with unauthorized views.
+ *
+ * @tags: [
+ *   requires_sharding,
+ * ]
+ */
+
 (function() {
 "use strict";
 

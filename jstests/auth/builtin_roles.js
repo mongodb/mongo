@@ -1,4 +1,10 @@
-// Check that builtin roles contain valid permissions.
+/**
+ * Check that builtin roles contain valid permissions.
+ *
+ * @tags: [
+ *   requires_sharding,
+ * ]
+ */
 
 (function() {
 'use strict';

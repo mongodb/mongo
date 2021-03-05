@@ -1,4 +1,11 @@
-// Test nameOnly option of listCollections
+/**
+ * Test nameOnly option of listCollections
+ *
+ * @tags: [
+ *   requires_sharding,
+ * ]
+ */
+
 (function() {
 "use strict";
 
