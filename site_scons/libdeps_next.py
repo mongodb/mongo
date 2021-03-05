@@ -51,7 +51,7 @@ automatically added when missing.
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-from collections import OrderedDict
+from collections import defaultdict
 from functools import partial
 import enum
 import copy
@@ -642,13 +642,59 @@ def _get_sorted_direct_libdeps(node):
     return direct_sorted
 
 
-def _libdeps_visit(n, tsorted, marked, walking=None, debug=False):
-    if walking is None:
-        walking = set()
+class LibdepsVisitationMark(enum.IntEnum):
+    UNMARKED = 0
+    MARKED_PRIVATE = 1
+    MARKED_PUBLIC = 2
 
-    if n.target_node in marked:
-        return marked, tsorted
 
+def _libdeps_visit_private(n, marked, walking, debug=False):
+    if marked[n.target_node] >= LibdepsVisitationMark.MARKED_PRIVATE:
+        return
+
+    if n.target_node in walking:
+        raise DependencyCycleError(n.target_node)
+
+    walking.add(n.target_node)
+
+    try:
+        for child in _get_sorted_direct_libdeps(n.target_node):
+            _libdeps_visit_private(child, marked, walking)
+
+        marked[n.target_node] = LibdepsVisitationMark.MARKED_PRIVATE
+
+    except DependencyCycleError as e:
+        if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
+            e.cycle_nodes.insert(0, n.target_node)
+        raise
+
+    finally:
+        walking.remove(n.target_node)
+
+
+def _libdeps_visit(n, tsorted, marked, walking, debug=False):
+    # The marked dictionary tracks which sorts of visitation a node
+    # has received. Values for a given node can be UNMARKED/absent,
+    # MARKED_PRIVATE, or MARKED_PUBLIC. These are to be interpreted as
+    # follows:
+    #
+    # 0/UNMARKED: Node is not not marked.
+    #
+    # MARKED_PRIVATE: Node has only been explored as part of looking
+    # for cycles under a LIBDEPS_PRIVATE edge.
+    #
+    # MARKED_PUBLIC: Node has been explored and any of its transiive
+    # dependencies have been incorporated into `tsorted`.
+    #
+    # The __libdeps_visit_private function above will only mark things
+    # at with MARKED_PRIVATE, while __libdeps_visit will mark things
+    # MARKED_PUBLIC.
+    if marked[n.target_node] == LibdepsVisitationMark.MARKED_PUBLIC:
+        return
+
+    # The walking set is used for cycle detection. We record all our
+    # predecessors in our depth-first search, and if we observe one of
+    # our predecessors as a child, we know we have a cycle.
     if n.target_node in walking:
         raise DependencyCycleError(n.target_node)
 
@@ -658,11 +704,32 @@ def _libdeps_visit(n, tsorted, marked, walking=None, debug=False):
         print(f"    * {n.dependency_type} => {n.listed_name}")
 
     try:
-        for child in _get_sorted_direct_libdeps(n.target_node):
-            if child.dependency_type != deptype.Private:
-                marked, tsorted = _libdeps_visit(child, tsorted, marked, walking=walking)
+        children = _get_sorted_direct_libdeps(n.target_node)
 
-        marked.add(n.target_node)
+        # We first walk all of our public dependencies so that we can
+        # put full marks on anything that is in our public transitive
+        # graph. We then do a second walk into any private nodes to
+        # look for cycles. While we could do just one walk over the
+        # children, it is slightly faster to do two passes, since if
+        # the algorithm walks into a private edge early, it would do a
+        # lot of non-productive (except for cycle checking) walking
+        # and marking, but if another public path gets into that same
+        # subtree, then it must walk and mark it again to raise it to
+        # the public mark level. Whereas, if the algorithm first walks
+        # the whole public tree, then those are all productive marks
+        # and add to tsorted, and then the private walk will only need
+        # to examine those things that are only reachable via private
+        # edges.
+
+        for child in children:
+            if child.dependency_type != deptype.Private:
+                _libdeps_visit(child, tsorted, marked, walking, debug)
+
+        for child in children:
+            if child.dependency_type == deptype.Private:
+                _libdeps_visit_private(child, marked, walking, debug)
+
+        marked[n.target_node] = LibdepsVisitationMark.MARKED_PUBLIC
 
         if getattr(n.target_node.attributes, "needs_link", True):
             tsorted.append(n.target_node)
@@ -672,7 +739,8 @@ def _libdeps_visit(n, tsorted, marked, walking=None, debug=False):
             e.cycle_nodes.insert(0, n.target_node)
         raise
 
-    return marked, tsorted
+    finally:
+        walking.remove(n.target_node)
 
 
 def _get_libdeps(node, debug=False):
@@ -680,9 +748,6 @@ def _get_libdeps(node, debug=False):
 
     Computes the dependencies if they're not already cached.
     """
-
-    tsorted = []
-    marked = set()
 
     cache = getattr(node.attributes, Constants.LibdepsCached, None)
     if cache is not None:
@@ -695,17 +760,17 @@ def _get_libdeps(node, debug=False):
     if debug:
         print(f"  Edges:")
 
+    tsorted = []
+
+    marked = defaultdict(lambda: LibdepsVisitationMark.UNMARKED)
+    walking = set()
+
     for child in _get_sorted_direct_libdeps(node):
-        if child.dependency_type == deptype.Interface:
-            tsorted.append(child.target_node)
-            if debug:
-                print(f"    * {child.dependency_type} => {child.target_node}")
-        else:
-            _, tsorted = _libdeps_visit(child, tsorted, marked, debug=debug)
-
+        if child.dependency_type != deptype.Interface:
+            _libdeps_visit(child, tsorted, marked, walking, debug=debug)
     tsorted.reverse()
-    setattr(node.attributes, Constants.LibdepsCached, tsorted)
 
+    setattr(node.attributes, Constants.LibdepsCached, tsorted)
     return tsorted
 
 
