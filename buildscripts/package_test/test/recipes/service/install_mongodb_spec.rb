@@ -45,17 +45,29 @@ else
   end
 end
 
-if os[:arch] == 'x86_64' and 
-  ((os[:name] == 'ubuntu' and os[:release].split('.')[0].to_i > 12) or 
-    (os[:family] == 'redhat' and os[:release].split('.')[0].to_i >= 7) or 
-    (os[:name] == 'debian' and os[:release].split('.')[0].to_i >= 10) or
-    (os[:name] == 'amazon'))
-  describe command("install_compass") do
-    its('exit_status') { should eq 0 }
+if os[:arch] == 'x86_64'
+  # install_compass does not run Amazon Linux but *does* run on Amazon Linux 2,
+  # but the 'redhat' family includes both, apparently. We need to specifically
+  # exclude Amazon Linux from the set of allowed distributions here because the
+  # version strings would otherwise pass it.
+  if ((os[:family] == 'redhat' and os[:name] != "amazon" and os[:release].split('.')[0].to_i >= 7) or
+      (os[:name] == 'ubuntu' and os[:release].split('.')[0].to_i >= 16) or
+      (os[:name] == 'debian' and os[:release].split('.')[0].to_i >= 9) or
+      (os[:name] == 'amazon' and os[:release].split('.')[0].to_i == 2))
+    describe command("install_compass") do
+      its('exit_status') { should eq 0 }
+      its('stderr') { should eq '' }
+    end
+  else
+    describe command("install_compass") do
+      its('exit_status') { should eq 1 }
+      its('stderr') { should match /You are using an unsupported Linux distribution/ }
+    end
   end
 else
   describe command("install_compass") do
-    its('stdout') { should match /open a ticket on the SERVER project/ }
+    its('exit_status') { should eq 1 }
+    its('stderr') { should match /Sorry, MongoDB Compass is only supported on 64-bit Intel platforms./ }
   end
 end
 
