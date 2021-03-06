@@ -106,7 +106,7 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
             "countWritesDuringCriticalSection": 0,
             "totalCriticalSectionTimeElapsed": undefined,
             "donorState": undefined,
-            "opStatus": "actively running",
+            "opStatus": "running",
         });
     });
 
@@ -127,7 +127,7 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
             "oplogEntriesApplied": undefined,
             "totalApplyTimeElapsed": undefined,
             "recipientState": undefined,
-            "opStatus": "actively running",
+            "opStatus": "running",
         });
     });
 
@@ -139,7 +139,7 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         "totalOperationTimeElapsed": undefined,
         "remainingOperationTimeEstimated": undefined,
         "coordinatorState": undefined,
-        "opStatus": "actively running",
+        "opStatus": "running",
     });
 }
 
