@@ -29,12 +29,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/getmore_command_gen.h"
+#include "mongo/db/query/getmore_request.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
@@ -74,13 +73,13 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd), _cmd(GetMoreCommand::parse({"getMore"}, request.body)) {
-            APIParameters::uassertNoApiParameters(request.body);
-        }
+            : CommandInvocation(cmd),
+              _request(uassertStatusOK(
+                  GetMoreRequest::parseFromBSON(request.getDatabase().toString(), request.body))) {}
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(_cmd.getDbName(), _cmd.getCollection());
+            return _request.nss;
         }
 
         bool supportsWriteConcern() const override {
@@ -93,28 +92,20 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
-                                                      ns(),
-                                                      _cmd.getCommandParameter(),
-                                                      _cmd.getTerm().is_initialized()));
+                                                      _request.nss,
+                                                      _request.cursorid,
+                                                      _request.term.is_initialized()));
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) override {
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
             auto bob = reply->getBodyBuilder();
-            auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, _cmd));
+            auto response = uassertStatusOK(ClusterFind::runGetMore(opCtx, _request));
             response.addToBSON(CursorResponse::ResponseType::SubsequentResponse, &bob);
-
-            if (getTestCommandsEnabled()) {
-                validateResult(bob.asTempObj());
-            }
         }
 
-        void validateResult(const BSONObj& replyObj) {
-            CursorGetMoreReply::parse({"CursorGetMoreReply"}, replyObj.removeField("ok"));
-        }
-
-        const GetMoreCommand _cmd;
+        const GetMoreRequest _request;
     };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

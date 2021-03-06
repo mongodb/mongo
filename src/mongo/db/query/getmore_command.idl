@@ -50,7 +50,6 @@ commands:
       batchSize:
         type: safeInt64
         optional: true
-        validator: {gte: 0}
       maxTimeMS:
         description: "The awaitData timeout."
         type: safeInt64
