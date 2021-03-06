@@ -57,7 +57,7 @@
 #include "mongo/db/operation_time_tracker.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/stats/api_version_metrics.h"
@@ -1331,18 +1331,17 @@ DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss
     }
     uassertStatusOK(statusGetDb);
 
-    boost::optional<std::int64_t> batchSize;
+    GetMoreCommand getMoreCmd(cursorId, nss.coll().toString());
+    getMoreCmd.setDbName(nss.db());
     if (ntoreturn) {
-        batchSize = ntoreturn;
+        getMoreCmd.setBatchSize(ntoreturn);
     }
-
-    GetMoreRequest getMoreRequest(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
 
     // Set the upconverted getMore as the CurOp command object.
     CurOp::get(opCtx)->setGenericOpRequestDetails(
-        opCtx, nss, nullptr, getMoreRequest.toBSON(), dbm->msg().operation());
+        opCtx, nss, nullptr, getMoreCmd.toBSON({}), dbm->msg().operation());
 
-    auto cursorResponse = ClusterFind::runGetMore(opCtx, getMoreRequest);
+    auto cursorResponse = ClusterFind::runGetMore(opCtx, getMoreCmd);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
         return replyToQuery(ResultFlag_CursorNotFound, nullptr, 0, 0);
     }
