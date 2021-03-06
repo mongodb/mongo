@@ -39,6 +39,7 @@
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
@@ -75,21 +76,6 @@ public:
         return Future<void>::makeReady();
     }
 } onInsertAlwaysReady;
-
-class ScopedServerParameterChange {
-public:
-    ScopedServerParameterChange(int* param, int newValue) : _param(param), _originalValue(*_param) {
-        *param = newValue;
-    }
-
-    ~ScopedServerParameterChange() {
-        *_param = _originalValue;
-    }
-
-private:
-    int* const _param;
-    const int _originalValue;
-};
 
 class ReshardingDonorOplogIterTest : public ShardServerTestFixture {
 public:
@@ -207,7 +193,7 @@ private:
     const NamespaceString _crudNss{"test.foo"};
     const UUID _uuid{UUID::gen()};
 
-    ScopedServerParameterChange _iteratorBatchSize{&resharding::gReshardingBatchLimitOperations, 1};
+    RAIIServerParameterControllerForTest controller{"reshardingBatchLimitOperations", 1};
 };
 
 TEST_F(ReshardingDonorOplogIterTest, BasicExhaust) {

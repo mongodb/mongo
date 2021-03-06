@@ -110,6 +110,12 @@ public:
 
     virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
 
+    virtual void appendSupportingRoundtrip(OperationContext* opCtx,
+                                           BSONObjBuilder& b,
+                                           const std::string& name) {
+        append(opCtx, b, name);
+    }
+
     virtual Status set(const BSONElement& newValueElement) = 0;
 
     virtual Status setFromString(const std::string& str) = 0;

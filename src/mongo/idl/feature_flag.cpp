@@ -96,6 +96,13 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
     }
 }
 
+void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opCtx,
+                                                           BSONObjBuilder& b,
+                                                           const std::string& name) {
+    bool enabled = _storage.isEnabledAndIgnoreFCV();
+    b.append(name, enabled);
+}
+
 Status FeatureFlagServerParameter::set(const BSONElement& newValueElement) {
     bool newValue;
 

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/server_parameter_with_storage.h"
 #include "mongo/idl/server_parameter_with_storage_test_gen.h"
 #include "mongo/unittest/unittest.h"
@@ -263,6 +264,41 @@ TEST(IDLServerParameterWithStorage, exportedDefaults) {
     ASSERT_EQ(test::kStdIntDeclaredDefault, 42);
     ASSERT_EQ(test::kStartupIntWithExpressionsDefault, 100);
     ASSERT_EQ(test::kUgly_complicated_name_spDefault, true);
+}
+
+// Test that the RAIIServerParameterControllerForTest works correctly on IDL-generated types.
+TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
+    // Test int
+    auto* stdIntDeclared = getServerParameter("stdIntDeclared");
+    ASSERT_OK(stdIntDeclared->setFromString("42"));
+    ASSERT_EQ(test::gStdIntDeclared.load(), 42);
+    {
+        RAIIServerParameterControllerForTest controller("stdIntDeclared", 10);
+        ASSERT_EQ(test::gStdIntDeclared.load(), 10);
+    }
+    ASSERT_EQ(test::gStdIntDeclared.load(), 42);
+
+    // Test bool
+    auto* uglyComplicated = getServerParameter("ugly complicated-name.sp");
+    ASSERT_OK(uglyComplicated->setFromString("false"));
+    ASSERT_EQ(test::gUglyComplicatedNameSp, false);
+    {
+        RAIIServerParameterControllerForTest controller("ugly complicated-name.sp", true);
+        ASSERT_EQ(test::gUglyComplicatedNameSp, true);
+    }
+    ASSERT_EQ(test::gUglyComplicatedNameSp, false);
+
+    // Test string
+    auto* startupString = getServerParameter("startupString");
+    const auto coolStartupString = "Cool startup string";
+    ASSERT_OK(startupString->setFromString(coolStartupString));
+    ASSERT_EQ(test::gStartupString, coolStartupString);
+    {
+        const auto badStartupString = "Bad startup string";
+        RAIIServerParameterControllerForTest controller("startupString", badStartupString);
+        ASSERT_EQ(test::gStartupString, badStartupString);
+    }
+    ASSERT_EQ(test::gStartupString, coolStartupString);
 }
 
 }  // namespace
