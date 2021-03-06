@@ -59,6 +59,12 @@ struct GetMoreRequest {
                    boost::optional<repl::OpTime> lastKnownCommittedOpTime);
 
     /**
+     * Construct a GetMoreRequest from the command specification and db name.
+     */
+    static StatusWith<GetMoreRequest> parseFromBSON(const std::string& dbname,
+                                                    const BSONObj& cmdObj);
+
+    /**
      * Serializes this object into a BSON representation. Fields that are not set will not be
      * part of the the serialized object.
      */

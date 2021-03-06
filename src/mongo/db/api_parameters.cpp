@@ -64,17 +64,6 @@ APIParameters APIParameters::fromBSON(const BSONObj& cmdObj) {
         APIParametersFromClient::parse("APIParametersFromClient"_sd, cmdObj));
 }
 
-void APIParameters::uassertNoApiParameters(const BSONObj& bsonObject) {
-    for (const auto& fieldName :
-         std::vector<StringData>{APIParametersFromClient::kApiVersionFieldName,
-                                 APIParametersFromClient::kApiStrictFieldName,
-                                 APIParametersFromClient::kApiDeprecationErrorsFieldName}) {
-        uassert(4937600,
-                str::stream() << "Cannot pass in API parameter field " << fieldName,
-                !bsonObject.hasField(fieldName));
-    }
-}
-
 void APIParameters::appendInfo(BSONObjBuilder* builder) const {
     if (_apiVersion) {
         builder->append(kAPIVersionFieldName, *_apiVersion);
