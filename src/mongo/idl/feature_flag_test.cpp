@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/idl/feature_flag_test_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -180,6 +181,30 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_FALSE(
         feature_flags::gFeatureFlagSpoon.isEnabled(serverGlobalParams.featureCompatibility));
 }
+
+// Test that the RAIIServerParameterControllerForTest works correctly on a feature flag.
+TEST_F(FeatureFlagTest, RAIIFeatureFlagController) {
+    // Set false feature flag to true
+    ASSERT_OK(_featureFlagBlender->setFromString("false"));
+    {
+        RAIIServerParameterControllerForTest controller("featureFlagBlender", true);
+        ASSERT_TRUE(
+            feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+    }
+    ASSERT_FALSE(
+        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+
+    // Set true feature flag to false
+    ASSERT_OK(_featureFlagBlender->setFromString("true"));
+    {
+        RAIIServerParameterControllerForTest controller("featureFlagBlender", false);
+        ASSERT_FALSE(
+            feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+    }
+    ASSERT_TRUE(
+        feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
+}
+
 
 }  // namespace
 }  // namespace mongo

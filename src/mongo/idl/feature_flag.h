@@ -98,6 +98,13 @@ public:
     void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final;
 
     /**
+     * Encode the feature flag value into a BSON object, discarding the version.
+     */
+    void appendSupportingRoundtrip(OperationContext* opCtx,
+                                   BSONObjBuilder& b,
+                                   const std::string& name) override;
+
+    /**
      * Update the underlying value using a BSONElement
      *
      * Allows setting non-basic values (e.g. vector<string>)

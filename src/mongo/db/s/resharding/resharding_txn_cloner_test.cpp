@@ -50,6 +50,7 @@
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -60,21 +61,6 @@
 
 namespace mongo {
 namespace {
-
-class ScopedServerParameterChange {
-public:
-    ScopedServerParameterChange(int* param, int newValue) : _param(param), _originalValue(*_param) {
-        *param = newValue;
-    }
-
-    ~ScopedServerParameterChange() {
-        *_param = _originalValue;
-    }
-
-private:
-    int* const _param;
-    const int _originalValue;
-};
 
 class ReshardingTxnClonerTest : public ShardServerTestFixture {
     void setUp() {
@@ -376,8 +362,7 @@ private:
         return HostAndPort(str::stream() << shardId << ":123");
     }
 
-    ScopedServerParameterChange _txnClonerBatchSize{
-        &resharding::gReshardingTxnClonerProgressBatchSize, 1};
+    RAIIServerParameterControllerForTest controller{"reshardingTxnClonerProgressBatchSize", 1};
 };
 
 TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
