@@ -230,12 +230,14 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName)
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
-    command.maxTimeMS = kMaxTimeMS;
+    const shouldBlock = !testCase.isLinearizableRead;
+    if (shouldBlock) {
+        command.maxTimeMS = kMaxTimeMS;
+    }
 
     const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
-        const shouldBlock = !testCase.isLinearizableRead;
         runCommand(
             db, command, shouldBlock ? ErrorCodes.MaxTimeMSExpired : null, testCase.isTransaction);
         checkTenantMigrationAccessBlocker(node, tenantId, {numBlockedReads: shouldBlock ? 1 : 0});
