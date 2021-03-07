@@ -1392,8 +1392,8 @@ void ExecCommandDatabase::_initiateCommand() {
         // to all config servers.
         LastError::get(opCtx->getClient()).disable();
         Command::generateHelpResponse(opCtx, replyBuilder, *command);
-        iassert(Status{ErrorCodes::SkipCommandExecution,
-                       "Skipping command execution for help request"});
+        iassert(Status(ErrorCodes::SkipCommandExecution,
+                       "Skipping command execution for help request"));
     }
 
     _impersonationSessionGuard.emplace(opCtx);
