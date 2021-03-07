@@ -260,7 +260,7 @@ void ExecCommandClient::_prologue() {
             auto body = result->getBodyBuilder();
             body.append("help", "help for: {} {}"_format(c->getName(), c->help()));
             CommandHelpers::appendSimpleCommandStatus(body, true, "");
-            iassert(Status{ErrorCodes::SkipCommandExecution, "Already served help command"});
+            iassert(Status(ErrorCodes::SkipCommandExecution, "Already served help command"));
         }
 
         uassert(ErrorCodes::FailedToParse,
@@ -273,7 +273,7 @@ void ExecCommandClient::_prologue() {
     } catch (const DBException& e) {
         auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(body, e.toStatus());
-        iassert(Status{ErrorCodes::SkipCommandExecution, "Failed to check authorization"});
+        iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to check authorization"));
     }
 
     // attach tracking
@@ -486,7 +486,7 @@ void ParseAndRunCommand::_parseCommand() {
                                                    {ErrorCodes::CommandNotFound, errorMsg});
         globalCommandRegistry()->incrementUnknownCommands();
         appendRequiredFieldsToResponse(opCtx, &builder);
-        iassert(Status{ErrorCodes::SkipCommandExecution, errorMsg});
+        iassert(Status(ErrorCodes::SkipCommandExecution, errorMsg));
     }
 
     _rec->setCommand(command);
@@ -574,7 +574,7 @@ void ParseAndRunCommand::_parseCommand() {
     if (!readConcernParseStatus.isOK()) {
         auto builder = replyBuilder->getBodyBuilder();
         CommandHelpers::appendCommandStatusNoThrow(builder, readConcernParseStatus);
-        iassert(Status{ErrorCodes::SkipCommandExecution, "Failed to parse read concern"});
+        iassert(Status(ErrorCodes::SkipCommandExecution, "Failed to parse read concern"));
     }
 }
 

@@ -323,6 +323,15 @@ inline void fassertNoTraceWithLocation(int msgid,
 
 namespace error_details {
 
+inline const Status& makeStatus(const Status& s) {
+    return s;
+}
+
+template <typename T>
+const Status& makeStatus(const StatusWith<T>& sw) {
+    return sw.getStatus();
+}
+
 // This function exists so that uassert/massert can take plain int literals rather than requiring
 // ErrorCodes::Error wrapping.
 template <typename StringLike>
@@ -436,6 +445,29 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
     }
 }
 
+#define MONGO_BASE_ASSERT_VA_FAILED(fail_func, ...)                                              \
+    do {                                                                                         \
+        [&]() MONGO_COMPILER_COLD_FUNCTION {                                                     \
+            fail_func(::mongo::error_details::makeStatus(__VA_ARGS__), MONGO_SOURCE_LOCATION()); \
+        }();                                                                                     \
+        MONGO_COMPILER_UNREACHABLE;                                                              \
+    } while (false)
+
+#define MONGO_BASE_ASSERT_VA_4(fail_func, code, msg, cond)         \
+    do {                                                           \
+        if (MONGO_unlikely(!(cond)))                               \
+            MONGO_BASE_ASSERT_VA_FAILED(fail_func, (code), (msg)); \
+    } while (false)
+
+#define MONGO_BASE_ASSERT_VA_2(fail_func, statusExpr)                              \
+    do {                                                                           \
+        if (const auto& stLocal_ = (statusExpr); MONGO_unlikely(!stLocal_.isOK())) \
+            MONGO_BASE_ASSERT_VA_FAILED(fail_func, stLocal_);                      \
+    } while (false)
+
+#define MONGO_BASE_ASSERT_VA_DISPATCH(...) \
+    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_BASE_ASSERT_VA_, __VA_ARGS__))(__VA_ARGS__))
+
 /**
  * `iassert` is provided as an alternative for `uassert` variants (e.g., `uassertStatusOK`)
  * to support cases where we expect a failure, the failure is recoverable, or accounting for the
@@ -444,61 +476,18 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
  * interface (i.e., `iassert(...)`) for all possible assertion variants, and use function
  * overloading to expand type support as needed.
  */
-#define iassert(...) ::mongo::iassertWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
-
-void iassertWithLocation(SourceLocationHolder loc, const Status& status);
-
-inline void iassertWithLocation(SourceLocationHolder loc, int msgid, std::string msg, bool expr) {
-    if (MONGO_unlikely(!expr))
-        iassertWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), std::move(msg)));
-}
-
-template <typename T>
-void iassertWithLocation(SourceLocationHolder loc, const StatusWith<T>& sw) {
-    iassertWithLocation(std::move(loc), sw.getStatus());
-}
+#define iassert(...) MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::iassertFailed, __VA_ARGS__)
+#define iasserted(...) MONGO_BASE_ASSERT_VA_FAILED(::mongo::iassertFailed, __VA_ARGS__)
+MONGO_COMPILER_NORETURN void iassertFailed(const Status& status, SourceLocation loc);
 
 /**
  * "tripwire/test assert". Like uassert, but with a deferred-fatality tripwire that gets
  * checked prior to normal shutdown. Used to ensure that this assertion will both fail the
  * operation and also cause a test suite failure.
  */
-#define tassert(...) ::mongo::tassertWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
-
-MONGO_COMPILER_NORETURN void tassertFailedWithLocation(SourceLocationHolder loc,
-                                                       const Status& status);
-
-#define tasserted(...) ::mongo::tassertFailedWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
-
-MONGO_COMPILER_NORETURN inline void tassertFailedWithLocation(SourceLocationHolder loc,
-                                                              int msgid,
-                                                              const std::string& msg) {
-    tassertFailedWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), msg));
-}
-
-void tassertWithLocation(SourceLocationHolder loc, const Status& status);
-
-inline void tassertWithLocation(SourceLocationHolder loc, Status&& status) {
-    tassertWithLocation(std::move(loc), status);
-}
-
-inline void tassertWithLocation(SourceLocationHolder loc,
-                                int msgid,
-                                const std::string& msg,
-                                bool expr) {
-    if (MONGO_unlikely(!expr))
-        tassertWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), msg));
-}
-
-template <typename T>
-inline void tassertWithLocation(SourceLocationHolder loc, const StatusWith<T>& sw) {
-    tassertWithLocation(std::move(loc), sw.getStatus());
-}
-
-template <typename T>
-inline void tassertWithLocation(SourceLocationHolder loc, StatusWith<T>&& sw) {
-    tassertWithLocation(std::move(loc), sw);
-}
+#define tassert(...) MONGO_BASE_ASSERT_VA_DISPATCH(::mongo::tassertFailed, __VA_ARGS__)
+#define tasserted(...) MONGO_BASE_ASSERT_VA_FAILED(::mongo::tassertFailed, __VA_ARGS__)
+MONGO_COMPILER_NORETURN void tassertFailed(const Status& status, SourceLocation loc);
 
 /**
  * Return true if tripwire conditions have occurred.
@@ -682,7 +671,4 @@ Status exceptionToStatus() noexcept;
 
 #define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);
 
-#define MONGO_UNREACHABLE_TASSERT(msgid) \
-    ::mongo::tassertFailedWithLocation(  \
-        MONGO_SOURCE_LOCATION(),         \
-        Status(ErrorCodes::Error(msgid), "Hit a MONGO_UNREACHABLE_TASSERT!"));
+#define MONGO_UNREACHABLE_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNREACHABLE_TASSERT!")

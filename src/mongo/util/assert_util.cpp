@@ -273,25 +273,23 @@ MONGO_COMPILER_NOINLINE void msgassertedWithLocation(const Status& status,
     error_details::throwExceptionForStatus(status);
 }
 
-void iassertWithLocation(SourceLocationHolder loc, const Status& status) {
-    if (status.isOK())
-        return;
-    LOGV2_DEBUG(4892201, 3, "Internal assertion", "error"_attr = status, "location"_attr = loc);
+void iassertFailed(const Status& status, SourceLocation loc) {
+    LOGV2_DEBUG(4892201,
+                3,
+                "Internal assertion",
+                "error"_attr = status,
+                "location"_attr = SourceLocationHolder(std::move(loc)));
     error_details::throwExceptionForStatus(status);
 }
 
-void tassertFailedWithLocation(SourceLocationHolder loc, const Status& status) {
+void tassertFailed(const Status& status, SourceLocation loc) {
     assertionCount.condrollover(assertionCount.tripwire.addAndFetch(1));
-    LOGV2(
-        TRIPWIRE_ASSERTION_ID, "Tripwire assertion", "error"_attr = status, "location"_attr = loc);
+    LOGV2(TRIPWIRE_ASSERTION_ID,
+          "Tripwire assertion",
+          "error"_attr = status,
+          "location"_attr = SourceLocationHolder(std::move(loc)));
     breakpoint();
     error_details::throwExceptionForStatus(status);
-}
-
-void tassertWithLocation(SourceLocationHolder loc, const Status& status) {
-    if (status.isOK())
-        return;
-    tassertFailedWithLocation(std::move(loc), status);
 }
 
 bool haveTripwireAssertionsOccurred() {
