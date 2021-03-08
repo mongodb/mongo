@@ -653,7 +653,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (!fromMigrate) {
             shardObserveDeleteOp(opCtx,
                                  nss,
-                                 documentKey.getId(),
+                                 documentKey.getShardKeyAndId(),
                                  opTime.writeOpTime,
                                  opTime.prePostImageOpTime,
                                  inMultiDocumentTransaction);
