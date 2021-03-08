@@ -356,14 +356,11 @@ private:
                                               PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                               InternalPlanner::FORWARD,
                                               InternalPlanner::IXSCAN_FETCH);
-        } else if (collection->isCapped()) {
+        } else if (collection->isCapped() || collection->isClustered()) {
             exec = InternalPlanner::collectionScan(
                 opCtx, nss.ns(), &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else {
-            LOGV2(20455,
-                  "Can't find _id index for namespace: {namespace}",
-                  "Can't find _id index for namespace",
-                  "namespace"_attr = nss);
+            LOGV2(20455, "Can't find _id index for namespace", "namespace"_attr = nss);
             return "no _id _index";
         }
 
