@@ -1665,11 +1665,29 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """))
 
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
+
     def test_access_checks_negative(self):
         # type: () -> None
         """Negative access_check test cases."""
 
-        # check is not a sequence
+        # check and privilege are present
         self.assert_parse_fail(
             textwrap.dedent("""
         commands:
@@ -1680,13 +1698,46 @@ class TestParser(testcase.IDLTestcase):
                 namespace: ignored
                 access_check:
                     simple:
-                        check:
-                            - one
-                            - two
+                        check: foo
+                        privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EITHER_CHECK_OR_PRIVILEGE)
+
+        # simple: true fails
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple: true
                 fields:
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # simple empty fails
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple: {}
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EITHER_CHECK_OR_PRIVILEGE)
 
 
 if __name__ == '__main__':

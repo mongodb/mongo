@@ -124,6 +124,8 @@ ERROR_ID_VARIANT_STRUCTS = "ID0081"
 ERROR_ID_NO_VARIANT_ENUM = "ID0082"
 ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS = "ID0083"
 ERROR_ID_UNKOWN_ENUM_VALUE = "ID0084"
+ERROR_ID_EITHER_CHECK_OR_PRIVILEGE = "ID0085"
+ERROR_ID_DUPLICATE_ACTION_TYPE = "ID0086"
 
 
 class IDLError(Exception):
@@ -922,6 +924,21 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_UNKOWN_ENUM_VALUE,
                         "Cannot find enum value '%s' in enum '%s'." % (enum_value, enum_name))
+
+    def add_either_check_or_privilege(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about specifing both a check and a privilege or neither."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_EITHER_CHECK_OR_PRIVILEGE,
+            "Must specify either a 'check' and a 'privilege' in an access_check, not both.")
+
+    def add_duplicate_action_types(self, location, name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about specifying an action type twice in the same list."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_DUPLICATE_ACTION_TYPE,
+                        "Cannot specify an action_type '%s' more then once" % (name))
 
 
 def _assert_unique_error_messages():

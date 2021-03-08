@@ -557,9 +557,31 @@ def resolve_enum_value(ctxt, syntax_enum, name):
         if value.value == name:
             return value
 
-    ctxt.add_unknown_enum_value(syntax_enum, "AccessCheck", name)
+    ctxt.add_unknown_enum_value(syntax_enum, syntax_enum.name, name)
 
     return None
+
+
+def _bind_enum_value(ctxt, parsed_spec, location, enum_name, enum_value):
+    # type: (errors.ParserContext, syntax.IDLSpec, common.SourceLocation, str, str) -> str
+
+    # Look up the enum for "enum_name" in the symbol table
+    access_check_enum = parsed_spec.symbols.resolve_type_from_name(ctxt, location, "access_check",
+                                                                   enum_name)
+
+    if access_check_enum is None:
+        # Resolution failed, we've recorded an error.
+        return None
+
+    if not isinstance(access_check_enum, syntax.Enum):
+        ctxt.add_unknown_type_error(location, enum_name, "enum")
+        return None
+
+    syntax_enum = resolve_enum_value(ctxt, cast(syntax.Enum, access_check_enum), enum_value)
+    if not syntax_enum:
+        return None
+
+    return syntax_enum.name
 
 
 def _bind_single_check(ctxt, parsed_spec, access_check):
@@ -569,23 +591,40 @@ def _bind_single_check(ctxt, parsed_spec, access_check):
     ast_access_check = ast.AccessCheck(access_check.file_name, access_check.line,
                                        access_check.column)
 
-    # Look up the enum for "AccessCheck" in the symbol table
-    access_check_enum = parsed_spec.symbols.resolve_type_from_name(
-        ctxt, access_check, "access_check.simple", "AccessCheck")
+    assert bool(access_check.check) != bool(access_check.privilege)
 
-    if access_check_enum is None:
-        # Resolution failed, we've recorded an error.
-        return None
+    if access_check.check:
+        ast_access_check.check = _bind_enum_value(ctxt, parsed_spec, access_check, "AccessCheck",
+                                                  access_check.check)
+        if not ast_access_check.check:
+            return None
+    else:
+        privilege = access_check.privilege
+        ast_privilege = ast.Privilege(privilege.file_name, privilege.line, privilege.column)
 
-    if not isinstance(access_check_enum, syntax.Enum):
-        ctxt.add_unknown_type_error(access_check, "AccessCheck", "enum")
-        return None
+        ast_privilege.resource_pattern = _bind_enum_value(ctxt, parsed_spec, privilege, "MatchType",
+                                                          privilege.resource_pattern)
+        if not ast_privilege.resource_pattern:
+            return None
 
-    enum_value = resolve_enum_value(ctxt, cast(syntax.Enum, access_check_enum), access_check.check)
-    if not enum_value:
-        return None
+        ast_privilege.action_type = []
+        at_names = []
+        for at in privilege.action_type:
+            at_names.append(at)
+            bound_at = _bind_enum_value(ctxt, parsed_spec, privilege, "ActionType", at)
+            if not bound_at:
+                return None
 
-    ast_access_check.check = enum_value.name
+            ast_privilege.action_type.append(bound_at)
+
+        at_names_set = set(at_names)
+        if len(at_names_set) != len(at_names):
+            for name in at_names_set:
+                if at_names.count(name) > 1:
+                    ctxt.add_duplicate_action_types(ast_privilege, name)
+                    return None
+
+        ast_access_check.privilege = ast_privilege
 
     return ast_access_check
 

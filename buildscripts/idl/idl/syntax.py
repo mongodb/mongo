@@ -527,6 +527,19 @@ class Struct(common.SourceLocation):
         super(Struct, self).__init__(file_name, line, column)
 
 
+class Privilege(common.SourceLocation):
+    """IDL privilege information."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct an Privilege."""
+
+        self.resource_pattern = None  # type: str
+        self.action_type = None  # type: List[str]
+
+        super(Privilege, self).__init__(file_name, line, column)
+
+
 class AccessCheck(common.SourceLocation):
     """IDL access check information."""
 
@@ -535,6 +548,7 @@ class AccessCheck(common.SourceLocation):
         """Construct an AccessCheck."""
 
         self.check = None  # type: str
+        self.privilege = None  # type: Privilege
 
         super(AccessCheck, self).__init__(file_name, line, column)
 

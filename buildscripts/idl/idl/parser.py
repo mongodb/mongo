@@ -682,17 +682,41 @@ def _parse_enum(ctxt, spec, name, node):
     spec.symbols.add_enum(ctxt, idl_enum)
 
 
+def _parse_privilege(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.Privilege
+    """Parse a access check section in a struct in the IDL file."""
+
+    if not ctxt.is_mapping_node(node, "privilege"):
+        return None
+
+    privilege = syntax.Privilege(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+
+    _generic_parser(
+        ctxt, node, "privilege", privilege, {
+            "resource_pattern": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "action_type": _RuleDesc('scalar_or_sequence', _RuleDesc.REQUIRED),
+        })
+
+    return privilege
+
+
 def _parse_privilege_or_check(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.AccessCheck
     """Parse a access check section in a struct in the IDL file."""
 
     access_check = syntax.AccessCheck(ctxt.file_name, node.start_mark.line, node.start_mark.column)
 
-    _generic_parser(ctxt, node, "privilege_or_check", access_check, {
-        "check": _RuleDesc('scalar'),
-    })
+    _generic_parser(
+        ctxt, node, "privilege_or_check", access_check, {
+            "check": _RuleDesc('scalar'),
+            "privilege": _RuleDesc('mapping', mapping_parser_func=_parse_privilege),
+        })
 
-    # TODO (SERVER-54521) - validate only one of check or privilege
+    if (access_check.check is None
+            and access_check.privilege is None) or (access_check.check is not None
+                                                    and access_check.privilege is not None):
+        ctxt.add_either_check_or_privilege(access_check)
+        return None
 
     return access_check
 
