@@ -128,7 +128,7 @@ private:
  * ServiceContext. Generally speaking, OperationId is used for forming maps of OperationContexts and
  * directing metaoperations like killop.
  */
-using OperationId = uint32_t;
+using OperationId = uint64_t;
 
 /**
  * Users may provide an OperationKey when sending a command request as a stable token by which to
