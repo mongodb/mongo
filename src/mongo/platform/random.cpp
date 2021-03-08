@@ -69,8 +69,10 @@ namespace mongo {
 
 namespace {
 
-template <size_t N>
+template <size_t Bytes>
 struct Buffer {
+    static constexpr size_t kArraySize = Bytes / sizeof(uint64_t);
+
     uint64_t pop() {
         return arr[--avail];
     }
@@ -84,7 +86,7 @@ struct Buffer {
         avail = arr.size();
     }
 
-    std::array<uint64_t, N> arr;
+    std::array<uint64_t, kArraySize> arr;
     size_t avail = 0;
 };
 
@@ -205,7 +207,7 @@ public:
 
 private:
     Source _source;
-    Buffer<16> _buffer;
+    Buffer<4096> _buffer;
 };
 
 SecureUrbg::SecureUrbg() : _state{std::make_unique<State>()} {}
