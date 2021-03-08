@@ -140,8 +140,8 @@ public:
     static constexpr StringData kExclude = "exclude"_sd;
     static constexpr StringData kTimeFieldName = "timeField"_sd;
     static constexpr StringData kMetaFieldName = "metaField"_sd;
-    static constexpr StringData kControlMaxFieldName = "control.max."_sd;
-    static constexpr StringData kControlMinFieldName = "control.min."_sd;
+    static constexpr StringData kControlMaxFieldNamePrefix = "control.max."_sd;
+    static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);

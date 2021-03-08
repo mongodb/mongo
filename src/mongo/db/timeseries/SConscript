@@ -28,17 +28,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='bucket_catalog_test',
-    source=[
-        'bucket_catalog_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
-        'bucket_catalog',
-    ],
-)
-
 env.Library(
     target='timeseries_index_schema_conversion_functions',
     source=[
@@ -52,5 +41,18 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/views/views',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_timeseries_test',
+    source=[
+        'bucket_catalog_test.cpp',
+        'timeseries_index_schema_conversion_functions_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        'bucket_catalog',
+        'timeseries_index_schema_conversion_functions',
     ],
 )

@@ -81,11 +81,23 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
             // The time-series index on the 'timeField' is converted into a compound time index on
             // the buckets collection for more efficient querying of buckets.
             if (elem.number() >= 0) {
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
+                builder.appendAs(
+                    elem,
+                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
+                                  << timeField);
+                builder.appendAs(
+                    elem,
+                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
+                                  << timeField);
             } else {
-                builder.appendAs(elem, str::stream() << "control.max." << timeField);
-                builder.appendAs(elem, str::stream() << "control.min." << timeField);
+                builder.appendAs(
+                    elem,
+                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
+                                  << timeField);
+                builder.appendAs(
+                    elem,
+                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
+                                  << timeField);
             }
             continue;
         }
@@ -128,8 +140,10 @@ BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& ti
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
-    const std::string controlMinTimeField = str::stream() << "control.min." << timeField;
-    const std::string controlMaxTimeField = str::stream() << "control.max." << timeField;
+    const std::string controlMinTimeField = str::stream()
+        << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix << timeField;
+    const std::string controlMaxTimeField = str::stream()
+        << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix << timeField;
 
     BSONObjBuilder builder;
     for (const auto& elem : bucketsIndexSpecBSON) {
