@@ -184,6 +184,11 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         estSize += UpdateOpEntry::kUpsertFieldName.size() + boolSize;
         estSize += UpdateOpEntry::kMultiFieldName.size() + boolSize;
 
+        // Add the size of 'upsertSupplied' field if present.
+        if (auto upsertSupplied = item.getUpdate().getUpsertSupplied()) {
+            estSize += UpdateOpEntry::kUpsertSuppliedFieldName.size() + boolSize;
+        }
+
         // Add the sizes of the 'q' and 'u' fields.
         estSize += (UpdateOpEntry::kQFieldName.size() + item.getUpdate().getQ().objsize() +
                     UpdateOpEntry::kUFieldName.size() + item.getUpdate().getU().objsize());
@@ -191,6 +196,11 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
         // Add the size of the 'c' field if present.
         if (auto constants = item.getUpdate().getC()) {
             estSize += UpdateOpEntry::kCFieldName.size() + item.getUpdate().getC()->objsize();
+        }
+
+        // Add the size of 'hint' field if present.
+        if (auto hint = item.getUpdate().getHint(); !hint.isEmpty()) {
+            estSize += UpdateOpEntry::kHintFieldName.size() + hint.objsize();
         }
 
         // Finally, add the constant updateOp overhead size.
@@ -211,6 +221,11 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
 
         // Add the size of the 'limit' field.
         estSize += DeleteOpEntry::kMultiFieldName.size() + intSize;
+
+        // Add the size of 'hint' field if present.
+        if (auto hint = item.getDelete().getHint(); !hint.isEmpty()) {
+            estSize += DeleteOpEntry::kHintFieldName.size() + hint.objsize();
+        }
 
         // Add the size of the 'q' field, plus the constant deleteOp overhead size.
         estSize += kEstDeleteOverheadBytes +
