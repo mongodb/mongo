@@ -38,13 +38,24 @@
 #include "mongo/db/api_parameters_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+namespace {
+
+const char kCollectionField[] = "collection";
+const char kBatchSizeField[] = "batchSize";
+const char kAwaitDataTimeoutField[] = "maxTimeMS";
+const char kTermField[] = "term";
+const char kLastKnownCommittedOpTimeField[] = "lastKnownCommittedOpTime";
+
+}  // namespace
+
+const char GetMoreRequest::kGetMoreCommandName[] = "getMore";
 
 GetMoreRequest::GetMoreRequest() : cursorid(0), batchSize(0) {}
 
@@ -80,54 +91,29 @@ Status GetMoreRequest::isValid() const {
     return Status::OK();
 }
 
-// static
-StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbname,
-                                                         const BSONObj& cmdObj) try {
-    for (const auto& fieldName :
-         std::vector<StringData>{APIParametersFromClient::kApiVersionFieldName,
-                                 APIParametersFromClient::kApiStrictFieldName,
-                                 APIParametersFromClient::kApiDeprecationErrorsFieldName}) {
-        uassert(4937600,
-                str::stream() << "Cannot pass in API parameter field " << fieldName,
-                !cmdObj.hasField(fieldName));
-    }
-
-    auto parsed = GetMoreCommand::parse({"getMore"}, cmdObj);
-    auto maxTimeMS = parsed.getMaxTimeMS();
-
-    GetMoreRequest request(
-        NamespaceString(dbname, parsed.getCollection()),
-        parsed.getCommandParameter(),
-        parsed.getBatchSize(),
-        // Treat maxTimeMS=0 the same as none.
-        (maxTimeMS && *maxTimeMS) ? boost::optional<Milliseconds>(*maxTimeMS) : boost::none,
-        parsed.getTerm() ? boost::optional<long long>(*parsed.getTerm()) : boost::none,
-        parsed.getLastKnownCommittedOpTime());
-
-    Status validStatus = request.isValid();
-    if (!validStatus.isOK()) {
-        return validStatus;
-    }
-
-    return request;
-} catch (const DBException& exc) {
-    return exc.toStatus();
-}
-
 BSONObj GetMoreRequest::toBSON() const {
-    auto cmd = GetMoreCommand(cursorid);
-    cmd.setDbName(nss.db());
-    cmd.setCollection(nss.coll());
-    cmd.setBatchSize(batchSize);
-    cmd.setLastKnownCommittedOpTime(lastKnownCommittedOpTime);
-    if (term) {
-        cmd.setTerm(static_cast<int64_t>(*term));
-    }
-    if (awaitDataTimeout) {
-        cmd.setMaxTimeMS(durationCount<Milliseconds>(*awaitDataTimeout));
+    BSONObjBuilder builder;
+
+    builder.append(kGetMoreCommandName, cursorid);
+    builder.append(kCollectionField, nss.coll());
+
+    if (batchSize) {
+        builder.append(kBatchSizeField, *batchSize);
     }
 
-    return cmd.toBSON({});
+    if (awaitDataTimeout) {
+        builder.append(kAwaitDataTimeoutField, durationCount<Milliseconds>(*awaitDataTimeout));
+    }
+
+    if (term) {
+        builder.append(kTermField, *term);
+    }
+
+    if (lastKnownCommittedOpTime) {
+        lastKnownCommittedOpTime->append(&builder, kLastKnownCommittedOpTimeField);
+    }
+
+    return builder.obj();
 }
 
 }  // namespace mongo
