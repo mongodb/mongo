@@ -1846,7 +1846,7 @@ functions:
         # for tasks that don't support the one we set here. A better plan would be
         # to support install-action for Ninja builds directly.
         # TODO: https://jira.mongodb.org/browse/SERVER-48203
-        extra_args="--install-action=hardlink"
+        extra_args="--install-action=${task_install_action|hardlink}"
 
         # By default, limit link jobs to one quarter of our overall -j
         # concurrency unless locally overridden. We do this because in
@@ -1899,8 +1899,8 @@ functions:
 
         ${compile_env|} $python ./buildscripts/scons.py                                     \
             ${compile_flags|} ${task_compile_flags|} ${task_compile_flags_extra|}           \
-            ${scons_cache_args|} $extra_args MONGO_VERSION=${version}                       \
-            ${patch_compile_flags|} ${targets} || exit_status=$?
+            ${scons_cache_args|} $extra_args                                                \
+            ${targets} MONGO_VERSION=${version} ${patch_compile_flags|} || exit_status=$?
 
         chmod -R ugo+w ./src
         ls -la src/mongo/stdx/sigaltstack_location_test.cpp || true
@@ -3387,33 +3387,31 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
+        task_install_action:
+            default
         task_compile_flags: >-
           --ninja
         targets:
-          generate-ninja
+          build.ninja
     - command: shell.exec
       params:
         working_dir: src
         shell: bash
         script: |
-          set -o errexit
-          set -o verbose
-
           ${activate_virtualenv}
-          python -m pip install ninja
           if [ "Windows_NT" = "$OS" ]; then
             vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
-            echo "ninja install-core" >> msvc.bat
-            cmd /C msvc.bat
-          else
-            ninja install-core
+            cd "$vcvars" && cmd /K "vcvarsall.bat amd64 && cd ${workdir}\src"
           fi
+          python -m pip install ninja
+          ninja install-core
 
 - name: compile_ninja_next
   commands:
     - func: "scons compile"
       vars:
+        task_install_action:
+            default
         task_compile_flags: >-
           --build-tools=next
           --ninja
@@ -3424,24 +3422,21 @@ tasks:
         working_dir: src
         shell: bash
         script: |
-          set -o errexit
-          set -o verbose
-
           ${activate_virtualenv}
-          python -m pip install ninja
           if [ "Windows_NT" = "$OS" ]; then
             vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
-            echo "ninja install-core" >> msvc.bat
-            cmd /C msvc.bat
-          else
-            ninja install-core
+            cd "$vcvars" && cmd /K "vcvarsall.bat amd64 && cd ${workdir}\src"
           fi
+          python -m pip install ninja
+          ninja install-core
+
 
 - name: compile_build_tools_next
   commands:
     - func: "scons compile"
       vars:
+        task_install_action:
+            default
         task_compile_flags: >-
           --build-tools=next
         targets:
