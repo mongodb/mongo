@@ -485,7 +485,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             results->valid = false;
         }
 
-        // Checks to ensure isInRecordIdOrder() is being used properly.
+        // RecordStores are required to return records in RecordId order.
         if (prevRecordId.isValid()) {
             invariant(prevRecordId < record->id);
         }

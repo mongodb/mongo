@@ -48,9 +48,6 @@ public:
     bool supportsCappedCollections() const final {
         return true;
     }
-    bool supportsCheckpoints() const final {
-        return false;
-    }
     bool isDurable() const final {
         return false;
     }

@@ -183,10 +183,6 @@ public:
 
     virtual Status compact(OperationContext* opCtx) final;
 
-    virtual bool isInRecordIdOrder() const override {
-        return true;
-    }
-
     virtual void validate(OperationContext* opCtx,
                           ValidateResults* results,
                           BSONObjBuilder* output);
