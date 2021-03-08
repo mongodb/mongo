@@ -231,6 +231,8 @@ public:
 
         _registry->onShutdown();
 
+        Grid::get(operationContext())->clearForUnitTests();
+
         ShardServerTestFixture::tearDown();
     }
 
