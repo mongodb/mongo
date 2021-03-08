@@ -30,13 +30,10 @@
 #include <memory>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer_impl.h"
-#include "mongo/db/op_observer_registry.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/repl/primary_only_service_op_observer.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_interface.h"
@@ -294,36 +291,14 @@ std::ostream& operator<<(std::ostream& os, const TestService::State& state) {
     return os;
 }
 
-class PrimaryOnlyServiceTest : public ServiceContextMongoDTest {
+class PrimaryOnlyServiceTest : public PrimaryOnlyServiceMongoDTest {
 public:
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<TestService>(serviceContext);
+    }
+
     void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        auto serviceContext = getServiceContext();
-
-        WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
-
-        {
-            auto opCtx = cc().makeOperationContext();
-            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
-            ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-
-            repl::createOplog(opCtx.get());
-            // Set up OpObserver so that repl::logOp() will store the oplog entry's optime in
-            // ReplClientInfo.
-            OpObserverRegistry* opObserverRegistry =
-                dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
-            opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
-            opObserverRegistry->addObserver(
-                std::make_unique<PrimaryOnlyServiceOpObserver>(serviceContext));
-
-
-            _registry = PrimaryOnlyServiceRegistry::get(getServiceContext());
-            std::unique_ptr<TestService> service =
-                std::make_unique<TestService>(getServiceContext());
-            _registry->registerService(std::move(service));
-            _registry->onStartup(opCtx.get());
-        }
-        stepUp();
+        PrimaryOnlyServiceMongoDTest::setUp();
 
         _service = _registry->lookupServiceByName("TestService");
         ASSERT(_service);
@@ -350,28 +325,9 @@ public:
         ServiceContextMongoDTest::tearDown();
     }
 
-    void stepDown() {
-        _registry->onStepDown();
-    }
-
     void stepUp() {
         auto opCtx = cc().makeOperationContext();
-        auto replCoord = ReplicationCoordinator::get(getServiceContext());
-
-        // Advance term
-        _term++;
-
-        ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
-        ASSERT_OK(replCoord->updateTerm(opCtx.get(), _term));
-        replCoord->setMyLastAppliedOpTimeAndWallTime(
-            OpTimeAndWallTime(OpTime(Timestamp(1, 1), _term), Date_t()));
-
-        _registry->onStepUpComplete(opCtx.get(), _term);
-    }
-
-
-    void shutdown() {
-        _registry->onShutdown();
+        PrimaryOnlyServiceMongoDTest::stepUp(opCtx.get());
     }
 
     std::shared_ptr<executor::TaskExecutor> makeTestExecutor() {
@@ -392,9 +348,6 @@ public:
     }
 
 protected:
-    PrimaryOnlyServiceRegistry* _registry;
-    PrimaryOnlyService* _service;
-    long long _term = 0;
     std::shared_ptr<executor::TaskExecutor> _testExecutor;
 };
 
