@@ -29,31 +29,53 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/accumulator.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
 
-/**
- * A WindowFunctionState is a mutable, removable accumulator.
- *
- * Implementations must ensure that 'remove()' undoes 'add()' when called in FIFO order.
- * For example:
- *     'add(x); add(y); remove(x)' == 'add(y)'
- *     'add(a); add(b); add(z); remove(a); remove(b)' == 'add(z)'
- */
-class WindowFunctionState {
+class WindowFunctionAddToSet final : public WindowFunctionState {
 public:
-    WindowFunctionState(ExpressionContext* const expCtx) : _expCtx(expCtx) {}
-    virtual ~WindowFunctionState() = default;
-    virtual void add(Value) = 0;
-    virtual void remove(Value) = 0;
-    virtual Value getValue() const = 0;
-    virtual void reset() = 0;
+    static inline const Value kDefault = Value{std::vector<Value>()};
 
-protected:
-    ExpressionContext* _expCtx;
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionAddToSet>(expCtx);
+    }
+
+    explicit WindowFunctionAddToSet(ExpressionContext* const expCtx)
+        : WindowFunctionState(expCtx),
+          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
+
+    void add(Value value) override {
+        _values.insert(std::move(value));
+    }
+
+    /**
+     * This should only remove the first/lowest element in the window.
+     */
+    void remove(Value value) override {
+        auto iter = _values.find(std::move(value));
+        tassert(
+            5423800, "Can't remove from an empty WindowFunctionAddToSet", iter != _values.end());
+        _values.erase(iter);
+    }
+
+    void reset() override {
+        _values.clear();
+    }
+
+    Value getValue() const override {
+        std::vector<Value> output;
+        if (_values.empty())
+            return kDefault;
+        for (auto it = _values.begin(); it != _values.end(); it = _values.upper_bound(*it)) {
+            output.push_back(*it);
+        }
+
+        return Value(output);
+    }
+
+private:
+    ValueMultiset _values;
 };
 
 }  // namespace mongo
