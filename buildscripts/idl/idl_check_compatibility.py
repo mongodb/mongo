@@ -267,16 +267,14 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
     if new_field.optional and not old_field.optional:
         ctxt.add_new_reply_field_optional_error(cmd_name, new_field.name, new_idl_file_path)
 
-    if old_field.validator:
-        # Not implemented.
-        ctxt.add_reply_field_contains_validator_error(cmd_name, old_field.name, old_idl_file_path)
-        ctxt.errors.dump_errors()
-        sys.exit(1)
     if new_field.validator:
-        # Not implemented.
-        ctxt.add_reply_field_contains_validator_error(cmd_name, new_field.name, new_idl_file_path)
-        ctxt.errors.dump_errors()
-        sys.exit(1)
+        if old_field.validator:
+            if new_field.validator != old_field.validator:
+                ctxt.add_reply_field_validators_not_equal_error(cmd_name, new_field.name,
+                                                                new_idl_file_path)
+        else:
+            ctxt.add_reply_field_contains_validator_error(cmd_name, new_field.name,
+                                                          new_idl_file_path)
 
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)

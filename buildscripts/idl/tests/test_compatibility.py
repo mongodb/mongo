@@ -83,20 +83,6 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
                 ["src"])
 
-        # Test that when old command has a reply field that contains a validator, the script aborts.
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(dir_path, "compatibility_test_fail/abort/reply_field_contains_validator"),
-                path.join(dir_path, "compatibility_test_fail/abort/reply_field_no_validator"),
-                ["src"])
-
-        # Test that when new command has a reply field that contains a validator, the script aborts.
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(dir_path, "compatibility_test_fail/abort/reply_field_no_validator"),
-                path.join(dir_path, "compatibility_test_fail/abort/reply_field_contains_validator"),
-                ["src"])
-
     # pylint: disable=too-many-locals,too-many-statements
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
@@ -106,7 +92,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 90)
+        self.assertTrue(error_collection.count() == 92)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -671,6 +657,18 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_variant_struct_recursive_error),
             "newCommandTypeVariantStructRecursive")
+        new_reply_field_contains_validator_error = error_collection.get_error_by_command_name(
+            "newReplyFieldValidator")
+        self.assertTrue(new_reply_field_contains_validator_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR)
+        self.assertRegex(str(new_reply_field_contains_validator_error), "newReplyFieldValidator")
+
+        reply_field_validators_not_equal_error = error_collection.get_error_by_command_name(
+            "replyFieldValidatorsNotEqual")
+        self.assertTrue(reply_field_validators_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL)
+        self.assertRegex(
+            str(reply_field_validators_not_equal_error), "replyFieldValidatorsNotEqual")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""
