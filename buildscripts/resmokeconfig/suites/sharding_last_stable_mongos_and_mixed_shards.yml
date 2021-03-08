@@ -184,3 +184,6 @@ executor:
           shardMixedBinVersions: true
           skipCheckingUUIDsConsistentAcrossCluster: true
       nodb: ''
+  archive:
+    tests:
+      - jstests/sharding/zbigMapReduce.js
