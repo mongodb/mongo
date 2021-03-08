@@ -29,10 +29,7 @@
 #ifndef RANDOM_GENERATOR_H
 #define RANDOM_GENERATOR_H
 
-#include <algorithm>
-#include <cstddef>
 #include <random>
-#include <string>
 
 namespace test_harness {
 
@@ -44,7 +41,7 @@ class random_generator {
     void operator=(random_generator const &) = delete;
 
     static random_generator &
-    get_instance()
+    instance()
     {
         static random_generator _instance;
         return _instance;

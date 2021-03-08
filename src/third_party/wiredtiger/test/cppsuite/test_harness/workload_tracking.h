@@ -1,9 +1,37 @@
+/*-
+ * Public Domain 2014-present MongoDB, Inc.
+ * Public Domain 2008-2014 WiredTiger, Inc.
+ *
+ * This is free and unencumbered software released into the public domain.
+ *
+ * Anyone is free to copy, modify, publish, use, compile, sell, or
+ * distribute this software, either in source code form or as a compiled
+ * binary, for any purpose, commercial or non-commercial, and by any
+ * means.
+ *
+ * In jurisdictions that recognize copyright laws, the author or authors
+ * of this software dedicate any and all copyright interest in the
+ * software to the public domain. We make this dedication for the benefit
+ * of the public at large and to the detriment of our heirs and
+ * successors. We intend this dedication to be an overt act of
+ * relinquishment in perpetuity of all present and future rights to this
+ * software under copyright law.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #ifndef WORKLOAD_TRACKING_H
 #define WORKLOAD_TRACKING_H
 
-/* Default schema for tracking table
- * key_format : Collection name / Key
- * value_format : Operation type / Value / Timestamp
+/*
+ * Default schema for tracking table key_format : Collection name / Key value_format : Operation
+ * type / Value / Timestamp
  */
 #define DEFAULT_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(Si)
 #define DEFAULT_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(iSi)
@@ -17,32 +45,21 @@ enum class tracking_operation { CREATE, INSERT };
 class workload_tracking {
 
     public:
-    workload_tracking(WT_CONNECTION *conn, const std::string &collection_name)
-        : _collection_name(collection_name), _conn(conn), _timestamp(0U)
+    workload_tracking(const std::string &collection_name)
+        : _collection_name(collection_name), _timestamp(0U)
     {
-    }
-
-    ~workload_tracking()
-    {
-        if (_session != nullptr) {
-            if (_session->close(_session, NULL) != 0)
-                /* Failing to close session is not blocking. */
-                debug_info(
-                  "Failed to close session, shutting down uncleanly", _trace_level, DEBUG_ERROR);
-            _session = nullptr;
-        }
     }
 
     int
     load(const std::string &table_schema = DEFAULT_TRACKING_TABLE_SCHEMA)
     {
-        /* Open session. */
-        testutil_check(_conn->open_session(_conn, NULL, NULL, &_session));
+        WT_SESSION *session;
 
         /* Create tracking collection. */
-        testutil_check(_session->create(_session, _collection_name.c_str(), table_schema.c_str()));
+        session = connection_manager::instance().create_session();
+        testutil_check(session->create(session, _collection_name.c_str(), table_schema.c_str()));
         testutil_check(
-          _session->open_cursor(_session, _collection_name.c_str(), NULL, NULL, &_cursor));
+          session->open_cursor(session, _collection_name.c_str(), NULL, NULL, &_cursor));
         debug_info("Tracking collection created", _trace_level, DEBUG_INFO);
 
         return (0);
@@ -69,10 +86,8 @@ class workload_tracking {
     }
 
     private:
-    WT_CONNECTION *_conn = nullptr;
     const std::string _collection_name;
     WT_CURSOR *_cursor = nullptr;
-    WT_SESSION *_session = nullptr;
     uint64_t _timestamp;
 };
 } // namespace test_harness

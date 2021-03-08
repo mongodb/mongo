@@ -29,15 +29,14 @@
 #ifndef WORKLOAD_GENERATOR_H
 #define WORKLOAD_GENERATOR_H
 
-#include "api_const.h"
 #include "random_generator.h"
-#include "debug_utils.h"
-#include "thread_manager.h"
 #include "workload_tracking.h"
 
 namespace test_harness {
-/* Class that can execute operations based on a given configuration. */
-class workload_generator {
+/*
+ * Class that can execute operations based on a given configuration.
+ */
+class workload_generator : public component {
     public:
     workload_generator(configuration *configuration, bool enable_tracking)
         : _configuration(configuration), _enable_tracking(enable_tracking)
@@ -47,22 +46,8 @@ class workload_generator {
     ~workload_generator()
     {
         delete _workload_tracking;
-
-        if (_session != nullptr) {
-            if (_session->close(_session, NULL) != 0)
-                /* Failing to close session is not blocking. */
-                debug_info(
-                  "Failed to close session, shutting down uncleanly", _trace_level, DEBUG_ERROR);
-            _session = nullptr;
-        }
-
-        if (_conn != nullptr) {
-            if (_conn->close(_conn, NULL) != 0)
-                /* Failing to close connection is not blocking. */
-                debug_info(
-                  "Failed to close connection, shutting down uncleanly", _trace_level, DEBUG_ERROR);
-            _conn = nullptr;
-        }
+        for (auto &it : _workers)
+            delete it;
     }
 
     /*
@@ -76,38 +61,32 @@ class workload_generator {
      *      - Insert m key/value pairs in each collection. Values are random strings which size is
      * defined by the configuration.
      */
-    int
-    load(const std::string &home = DEFAULT_DIR)
+    void
+    load()
     {
         WT_CURSOR *cursor;
+        WT_SESSION *session;
         int64_t collection_count, key_count, value_size;
-        std::string collection_name;
+        std::string collection_name, home;
 
         cursor = nullptr;
         collection_count = key_count = value_size = 0;
         collection_name = "";
 
-        /* Create the working dir. */
-        testutil_make_work_dir(home.c_str());
-
-        /* Open connection. */
-        testutil_check(wiredtiger_open(home.c_str(), NULL, CONNECTION_CREATE, &_conn));
-
         /* Create the activity tracker if required. */
         if (_enable_tracking) {
-            _workload_tracking = new workload_tracking(_conn, TRACKING_COLLECTION);
+            _workload_tracking = new workload_tracking(TRACKING_COLLECTION);
             _workload_tracking->load();
         }
 
-        /* Open session. */
-        testutil_check(_conn->open_session(_conn, NULL, NULL, &_session));
+        /* Get a session. */
+        session = connection_manager::instance().create_session();
 
         /* Create n collections as per the configuration and store each collection name. */
         testutil_check(_configuration->get_int(COLLECTION_COUNT, collection_count));
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
-            testutil_check(
-              _session->create(_session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
+            testutil_check(session->create(session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
             if (_enable_tracking)
                 testutil_check(
                   _workload_tracking->save(tracking_operation::CREATE, collection_name, "", ""));
@@ -123,25 +102,23 @@ class workload_generator {
             /* WiredTiger lets you open a cursor on a collection using the same pointer. When a
              * session is closed, WiredTiger APIs close the cursors too. */
             testutil_check(
-              _session->open_cursor(_session, collection_name.c_str(), NULL, NULL, &cursor));
+              session->open_cursor(session, collection_name.c_str(), NULL, NULL, &cursor));
             for (size_t j = 0; j < key_count; ++j) {
                 /* Generation of a random string value using the size defined in the test
                  * configuration. */
                 std::string generated_value =
-                  random_generator::random_generator::get_instance().generate_string(value_size);
+                  random_generator::random_generator::instance().generate_string(value_size);
                 testutil_check(
                   insert(cursor, collection_name, j, generated_value.c_str(), _enable_tracking));
             }
         }
         debug_info("Load stage done", _trace_level, DEBUG_INFO);
-        return (0);
     }
 
     /* Do the work of the main part of the workload. */
-    int
+    void
     run()
     {
-
         WT_SESSION *session;
         int64_t duration_seconds, read_threads;
 
@@ -150,52 +127,42 @@ class workload_generator {
 
         testutil_check(_configuration->get_int(DURATION_SECONDS, duration_seconds));
         testutil_check(_configuration->get_int(READ_THREADS, read_threads));
-
         /* Generate threads to execute read operations on the collections. */
         for (int i = 0; i < read_threads; ++i) {
-            testutil_check(_conn->open_session(_conn, NULL, NULL, &session));
-            thread_context *tc =
-              new thread_context(session, _collection_names, thread_operation::READ);
+            thread_context *tc = new thread_context(_collection_names, thread_operation::READ);
+            _workers.push_back(tc);
             _thread_manager.add_thread(tc, &execute_operation);
         }
+    }
 
-        /*
-         * Spin until duration seconds has expired. If the call to run() returns we destroy the test
-         * and the workload generator.
-         */
-        std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
-        _thread_manager.finish();
-        debug_info("Run stage done", _trace_level, DEBUG_INFO);
-        return 0;
+    void
+    finish()
+    {
+        debug_info("Workload generator stage done", _trace_level, DEBUG_INFO);
+        for (const auto &it : _workers) {
+            it->finish();
+        }
+        _thread_manager.join();
     }
 
     /* Workload threaded operations. */
     static void
     execute_operation(thread_context &context)
     {
-        thread_operation operation;
+        WT_SESSION *session;
 
-        operation = context.get_thread_operation();
+        session = connection_manager::instance().create_session();
 
-        if (context.get_session() == nullptr) {
-            testutil_die(DEBUG_ABORT, "system: execute_operation : Session is NULL");
-        }
-
-        switch (operation) {
-        case thread_operation::INSERT:
-            /* Sleep until it is implemented. */
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            break;
+        switch (context.get_thread_operation()) {
         case thread_operation::READ:
-            read_operation(context);
+            read_operation(context, session);
             break;
         case thread_operation::REMOVE:
-            /* Sleep until it is implemented. */
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            break;
+        case thread_operation::INSERT:
         case thread_operation::UPDATE:
             /* Sleep until it is implemented. */
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            while (context.is_running())
+                std::this_thread::sleep_for(std::chrono::seconds(1));
             break;
         default:
             testutil_die(DEBUG_ABORT, "system: thread_operation is unknown : %d",
@@ -206,22 +173,24 @@ class workload_generator {
 
     /* Basic read operation that walks a cursors across all collections. */
     static void
-    read_operation(thread_context &context)
+    read_operation(thread_context &context, WT_SESSION *session)
     {
         WT_CURSOR *cursor;
+        WT_DECL_RET;
         std::vector<WT_CURSOR *> cursors;
 
         /* Get a cursor for each collection in collection_names. */
         for (const auto &it : context.get_collection_names()) {
-            testutil_check(context.get_session()->open_cursor(
-              context.get_session(), it.c_str(), NULL, NULL, &cursor));
+            testutil_check(session->open_cursor(session, it.c_str(), NULL, NULL, &cursor));
             cursors.push_back(cursor);
         }
 
         while (context.is_running()) {
             /* Walk each cursor. */
-            for (const auto &it : cursors)
-                it->next(it);
+            for (const auto &it : cursors) {
+                if ((ret = it->next(it)) != 0)
+                    it->reset(it);
+            }
         }
     }
 
@@ -277,10 +246,9 @@ class workload_generator {
     private:
     std::vector<std::string> _collection_names;
     configuration *_configuration = nullptr;
-    WT_CONNECTION *_conn = nullptr;
     bool _enable_tracking = false;
-    WT_SESSION *_session = nullptr;
     thread_manager _thread_manager;
+    std::vector<thread_context *> _workers;
     workload_tracking *_workload_tracking;
 };
 } // namespace test_harness

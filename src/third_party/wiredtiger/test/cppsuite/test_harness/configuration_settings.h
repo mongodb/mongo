@@ -29,14 +29,9 @@
 #ifndef CONFIGURATION_SETTINGS_H
 #define CONFIGURATION_SETTINGS_H
 
-#include <stdexcept>
-#include <string>
-
 extern "C" {
 #include "test_util.h"
 }
-
-#include "wt_internal.h"
 
 namespace test_harness {
 class configuration {
