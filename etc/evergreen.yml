@@ -1678,6 +1678,7 @@ functions:
     - command: timeout.update
       params:
         exec_timeout_secs: 10800  # 3 hours
+        timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -1728,6 +1729,7 @@ functions:
     - command: timeout.update
       params:
         exec_timeout_secs: 10800  # 3 hours
+        timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -2163,6 +2165,7 @@ functions:
     - command: timeout.update
       params:
         exec_timeout_secs: 10800  # 3 hours
+        timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -2213,6 +2216,7 @@ functions:
     - command: timeout.update
       params:
         exec_timeout_secs: 10800  # 3 hours
+        timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
@@ -2264,6 +2268,7 @@ functions:
     - command: timeout.update
       params:
         exec_timeout_secs: 10800  # 3 hours
+        timeout_secs: 10800  # 3 hours
 
     - command: generate.tasks
       params:
