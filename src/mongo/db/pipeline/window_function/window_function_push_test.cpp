@@ -31,7 +31,7 @@
 
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/pipeline/window_function/window_function_push.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
