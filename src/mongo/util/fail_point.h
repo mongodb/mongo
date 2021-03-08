@@ -39,6 +39,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancelation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
@@ -206,7 +207,9 @@ private:
         void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
                                          const CancelationToken& token) {
             auto alreadyCounted = AlreadyCounted{false};
-            while (MONGO_unlikely(_shouldFail(alreadyCounted, nullptr)) && !token.isCanceled()) {
+            while (MONGO_unlikely(_shouldFail(alreadyCounted, nullptr))) {
+                uassert(
+                    ErrorCodes::Interrupted, "Failpoint has been canceled", !token.isCanceled());
                 interruptible->sleepFor(_kWaitGranularity);
                 alreadyCounted = AlreadyCounted{true};
             }
@@ -513,7 +516,8 @@ public:
 
     /**
      * Like `pauseWhileSet`, but will also unpause as soon as the cancellation token is canceled.
-     * This method does not generate any cancellation related error by itself, it only waits.
+     * This method will throw if the token is canceled, to match the behavior when the
+     * Interruptible* is interrupted.
      */
     void pauseWhileSetAndNotCanceled(Interruptible* interruptible, const CancelationToken& token) {
         _impl()->pauseWhileSetAndNotCanceled(interruptible, token);

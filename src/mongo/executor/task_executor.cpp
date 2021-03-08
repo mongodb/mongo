@@ -95,8 +95,12 @@ ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
 
     // Fail point to make this method to wait until the token is canceled.
     if (!token.isCanceled()) {
-        pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
-            Interruptible::notInterruptible(), token);
+        try {
+            pauseScheduleCallWithCancelTokenUntilCanceled.pauseWhileSetAndNotCanceled(
+                Interruptible::notInterruptible(), token);
+        } catch (ExceptionFor<ErrorCodes::Interrupted>&) {
+            // Swallow the interrupted exception that arrives from canceling a failpoint.
+        }
     }
 
     auto scheduleStatus = wrapCallbackHandleWithCancelToken(
