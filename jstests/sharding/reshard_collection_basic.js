@@ -207,6 +207,10 @@ assert.commandFailedWithCode(mongos.adminCommand({
 }),
                              ErrorCodes.BadValue);
 
+jsTestLog("Fail if attempting insert to an unsharded 'system.resharding.' collection");
+assert.commandFailedWithCode(mongos.getDB('test').system.resharding.mycoll.insert({_id: 1, a: 1}),
+                             ErrorCodes.NamespaceNotSharded);
+
 /**
  * Success cases
  */

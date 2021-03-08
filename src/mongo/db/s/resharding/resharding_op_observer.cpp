@@ -66,6 +66,26 @@ boost::optional<Timestamp> parseNewMinFetchTimestampValue(const BSONObj& obj) {
     }
 }
 
+void assertCanExtractShardKeyFromDocs(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      std::vector<InsertStatement>::const_iterator begin,
+                                      std::vector<InsertStatement>::const_iterator end) {
+    const auto metadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
+    // A user can manually create a 'db.system.resharding.' collection that isn't guaranteed to be
+    // sharded outside of running reshardCollection.
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Temporary resharding collection " << nss.toString()
+                          << " is not sharded",
+            metadata && metadata->isSharded());
+
+    auto chunkManager = *metadata->getChunkManager();
+    const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
+
+    for (auto it = begin; it != end; ++it) {
+        shardKeyPattern.extractShardKeyFromDocThrows(it->doc);
+    }
+}
+
 boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     // We recalculate the pin by looking at all documents inside the resharding donor
     // collection. The caller may or may not be in a transaction. If the caller is in a transaction,
@@ -179,16 +199,7 @@ void ReshardingOpObserver::onInserts(OperationContext* opCtx,
     }
 
     if (nss.isTemporaryReshardingCollection()) {
-        const auto metadata =
-            CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
-        invariant(metadata && metadata->isSharded());
-
-        auto chunkManager = *metadata->getChunkManager();
-        const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
-
-        for (auto it = begin; it != end; ++it) {
-            shardKeyPattern.extractShardKeyFromDocThrows(it->doc);
-        }
+        assertCanExtractShardKeyFromDocs(opCtx, nss, begin, end);
     }
 }
 
@@ -217,14 +228,8 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
                 observer->onReshardingParticipantTransition(newCoordinatorDoc);
             });
     } else if (args.nss.isTemporaryReshardingCollection()) {
-        const auto metadata =
-            CollectionShardingRuntime::get(opCtx, args.nss)->getCurrentMetadataIfKnown();
-        invariant(metadata && metadata->isSharded());
-
-        auto chunkManager = *metadata->getChunkManager();
-        const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
-
-        shardKeyPattern.extractShardKeyFromDocThrows(args.updateArgs.updatedDoc);
+        const std::vector<InsertStatement> updateDoc{InsertStatement{args.updateArgs.updatedDoc}};
+        assertCanExtractShardKeyFromDocs(opCtx, args.nss, updateDoc.begin(), updateDoc.end());
     }
 }
 
