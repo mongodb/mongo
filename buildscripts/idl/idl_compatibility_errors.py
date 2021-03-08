@@ -97,6 +97,7 @@ ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_NOT_VARIANT = "ID0053"
 ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT = "ID0054"
 ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET = "ID0055"
 ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET = "ID0056"
+ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL = "ID0057"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -768,9 +769,18 @@ class IDLCompatibilityContext(object):
     def add_reply_field_contains_validator_error(self, command_name: str, field_name: str,
                                                  file: str) -> None:
         """Add an error about the reply field containing a validator."""
-        self._add_error(ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR, command_name, (
-            "'%s' has a reply field '%s' that contains a validator; compatibility checking for reply field "
-            "validators isn't implemented yet") % (command_name, field_name), file)
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_CONTAINS_VALIDATOR, command_name,
+            ("The new version of the command '%s' has a reply field '%s' that contains a validator "
+             " while the old version does not") % (command_name, field_name), file)
+
+    def add_reply_field_validators_not_equal_error(self, command_name: str, field_name: str,
+                                                   file: str) -> None:
+        """Add an error about the reply field containing a validator."""
+        self._add_error(
+            ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL, command_name,
+            ("Validator for reply field '%s' in old command '%s' is not equal to the validator in"
+             "the new version of the reply field") % (command_name, field_name), file)
 
     def add_reply_field_type_invalid_error(self, command_name: str, field_name: str,
                                            file: str) -> None:

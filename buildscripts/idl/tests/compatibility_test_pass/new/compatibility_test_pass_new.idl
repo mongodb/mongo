@@ -233,17 +233,17 @@ structs:
             supersetField:
                 type: intToIntString
 
-    OldCommandTypeValidatorStruct:
+    OldValidatorStruct:
         description: "This struct contains a field where the old version contains a validator while
                       the new version does not"
         fields:
-            oldCommandTypeValidatorField:
+            oldValidatorField:
                 type: int
 
-    CommandTypeValidatorsEqualStruct:
+    ValidatorsEqualStruct:
         description: "This struct contains a field where the new and old validator are exactly equal"
         fields:
-            commandTypeValidatorsEqualField:
+            validatorsEqualField:
                 type: double
                 validator:
                     lt: 0.0
@@ -573,7 +573,7 @@ commands:
                       that is present in the old type"
         command_name: oldCommandTypeValidator
         namespace: type
-        type: OldCommandTypeValidatorStruct
+        type: OldValidatorStruct
         cpp_name: oldCommandTypeValidator
         strict: true
         api_version: "1"
@@ -584,7 +584,7 @@ commands:
                       that is exactly equal to the old type validator"
         command_name: commandTypeValidatorsEqual
         namespace: type
-        type: CommandTypeValidatorsEqualStruct
+        type: ValidatorsEqualStruct
         cpp_name: commandTypeValidatorsEqual
         strict: true
         api_version: "1"
@@ -1060,3 +1060,23 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    oldReplyFieldValidator:
+        description: "new command passes because it contains a reply field that does not contain a validator
+                      that is present in the old reply field"
+        command_name: oldReplyFieldValidator
+        namespace: ignored
+        cpp_name: oldReplyFieldValidator
+        strict: true
+        api_version: "1"
+        reply_type: OldValidatorStruct
+
+    replyFieldValidatorsEqual:
+        description: "new command passes because it contains a reply field that contains a validator
+                      that is exactly equal to the old reply field validator"
+        command_name: replyFieldValidatorsEqual
+        namespace: ignored
+        cpp_name: replyFieldValidatorsEqual
+        strict: true
+        api_version: "1"
+        reply_type: ValidatorsEqualStruct

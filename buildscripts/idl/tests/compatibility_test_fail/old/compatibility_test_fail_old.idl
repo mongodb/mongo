@@ -307,17 +307,17 @@ structs:
             notSupersetField:
                 type: intStringToInt
 
-    NewCommandTypeValidatorStruct:
+    NewValidatorStruct:
         description: "This struct contains a field where the new version contains a validator while
                       the old version does not"
         fields:
-            newCommandTypeValidatorField:
+            newValidatorField:
                 type: int
 
-    CommandTypeValidatorsNotEqualStruct:
+    ValidatorsNotEqualStruct:
         description: "This struct contains a field where the new and old validators are not exactly equal"
         fields:
-            commandTypeValidatorsNotEqualField:
+            validatorsNotEqualField:
                 type: double
                 validator:
                     lt: 0.0
@@ -710,7 +710,7 @@ commands:
                       that is not present in the old type"
         command_name: newCommandTypeValidator
         namespace: type
-        type: NewCommandTypeValidatorStruct
+        type: NewValidatorStruct
         cpp_name: newCommandTypeValidator
         strict: true
         api_version: "1"
@@ -721,7 +721,7 @@ commands:
                       that is not exactly equal to the old type validator"
         command_name: commandTypeValidatorsNotEqual
         namespace: type
-        type: CommandTypeValidatorsNotEqualStruct
+        type: ValidatorsNotEqualStruct
         cpp_name: commandTypeValidatorsNotEqual
         strict: true
         api_version: "1"
@@ -1356,3 +1356,23 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    newReplyFieldValidator:
+        description: "new command fails because it contains a reply field that contains a validator
+                      that is not present in the old reply field"
+        command_name: newReplyFieldValidator
+        namespace: ignored
+        cpp_name: newReplyFieldValidator
+        strict: true
+        api_version: "1"
+        reply_type: NewValidatorStruct
+
+    replyFieldValidatorsNotEqual:
+        description: "new command fails because it contains a reply field that contains a validator
+                      that is not exactly equal to the old reply field validator"
+        command_name: replyFieldValidatorsNotEqual
+        namespace: ignored
+        cpp_name: replyFieldValidatorsNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: ValidatorsNotEqualStruct
