@@ -36,6 +36,13 @@ assert.commandFailedWithCode(
         {find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "majority"}}),
     ErrorCodes.NotYetInitialized);
 
+// The changes from SERVER-49159 cause the error code for the following reads to be
+// NotPrimaryOrSecondary, but that ticket has not been backported to 4.2, so in a mixed version
+// replica set, a node running the 4.2 binary will instead return InvalidOptions.
+const expectedCodes = jsTest.options().useRandomBinVersionsWithinReplicaSet
+    ? [ErrorCodes.NotPrimaryOrSecondary, ErrorCodes.InvalidOptions]
+    : [ErrorCodes.NotPrimaryOrSecondary];
+
 // Nodes don't process $clusterTime metadata when in an unreadable state, so this read will fail
 // because the logical clock's latest value is less than the given afterClusterTime timestamp.
 jsTestLog("afterClusterTime readConcern should fail with NotYetInitialized.");
@@ -45,7 +52,7 @@ assert.commandFailedWithCode(localDB.runCommand({
     maxTimeMS: 60000,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotPrimaryOrSecondary);
+                             expectedCodes);
 
 jsTestLog("oplog query should fail with NotYetInitialized.");
 assert.commandFailedWithCode(localDB.runCommand({
@@ -58,6 +65,6 @@ assert.commandFailedWithCode(localDB.runCommand({
     term: 1,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotPrimaryOrSecondary);
+                             expectedCodes);
 rst.stopSet();
 }());
