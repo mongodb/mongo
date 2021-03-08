@@ -26,67 +26,44 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef THREAD_CONTEXT_H
-#define THREAD_CONTEXT_H
+#ifndef COMPONENT_H
+#define COMPONENT_H
 
 namespace test_harness {
-/* Define the different thread operations. */
-enum class thread_operation {
-    INSERT,
-    UPDATE,
-    READ,
-    REMOVE,
-    CHECKPOINT,
-    TIMESTAMP,
-    MONITOR,
-    COMPONENT
-};
-
-/* Container class for a thread and any data types it may need to interact with the database. */
-class thread_context {
+/*
+ * A component is a class that defines 3 unique stages in its life-cycle, the stages must be run in
+ * the following order: load, run, finish.
+ */
+class component {
     public:
-    thread_context(std::vector<std::string> collection_names, thread_operation type)
-        : _collection_names(collection_names), _running(false), _type(type)
+    /*
+     * The load function should perform all tasks required to setup the component for the main phase
+     * of the test. An example operation performed in the load phase would be populating a database.
+     */
+    virtual void
+    load()
     {
+        _running = true;
     }
 
-    thread_context(thread_operation type) : _running(false), _type(type) {}
+    /*
+     * The run phase encompasses all operations that occur during the primary phase of the workload.
+     */
+    virtual void run() = 0;
 
-    void
+    /*
+     * The finish phase is a cleanup phase. Created objects are destroyed here and any final testing
+     * requirements can be performed in this phase. An example could be the verification of the
+     * database, or checking some relevant statistics.
+     */
+    virtual void
     finish()
     {
         _running = false;
     }
 
-    const std::vector<std::string> &
-    get_collection_names() const
-    {
-        return _collection_names;
-    }
-
-    thread_operation
-    get_thread_operation() const
-    {
-        return _type;
-    }
-
-    bool
-    is_running() const
-    {
-        return _running;
-    }
-
-    void
-    set_running(bool running)
-    {
-        _running = running;
-    }
-
-    private:
-    const std::vector<std::string> _collection_names;
-    bool _running;
-    const thread_operation _type;
+    protected:
+    volatile bool _running;
 };
 } // namespace test_harness
-
 #endif

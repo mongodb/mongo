@@ -25,6 +25,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#ifndef TEST_UTIL_H
+#define TEST_UTIL_H
+
 #include "wt_internal.h"
 
 #ifdef _WIN32
@@ -279,3 +282,5 @@ WT_THREAD_RET thread_append(void *);
 
 extern const char *progname;
 const char *testutil_set_progname(char *const *);
+
+#endif
