@@ -29,6 +29,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+/* Required to build using older versions of g++. */
+#include <cinttypes>
 #include <vector>
 #include <mutex>
 
