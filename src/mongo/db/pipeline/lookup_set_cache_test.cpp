@@ -207,4 +207,39 @@ TEST(LookupSetCacheTest, CachedValuesDontRespectCollation) {
     ASSERT_EQ(2U, fooResult->size());
 }
 
+TEST(LookupSetCacheTest, DocumentWithStorageCachePopulated) {
+    LookupSetCache cache(defaultComparator);
+
+    // Use a BSONObj backed Document so that the Document's hot storage isn't populated at
+    // initialization.
+    BSONObj input = BSON("a" << 1);
+    const auto doc1 = Document(input);
+    const auto sizeOfDoc1Before = doc1.getApproximateSize();
+    auto key = Value("foo"_sd);
+
+    // Insert a cache entry and verify that both the key and the document are accounted for in the
+    // cache size.
+    cache.insert(key, doc1);
+    ASSERT_EQ(cache.getMemoryUsage(), sizeOfDoc1Before + key.getApproximateSize());
+
+
+    // A second document with the same key should require additional memory usage to store the
+    // document, but not the key.
+    auto prevCacheSize = cache.getMemoryUsage();
+    const auto doc2 = Document({{"a", 2}});
+    cache.insert(key, doc2);
+    ASSERT_EQ(cache.getMemoryUsage(), prevCacheSize + doc2.getApproximateSize());
+
+    // Calling serializeForSorter() should grow the overall document size. Verify that growing the
+    // size of the 'Document' object does not have impact on the size stored in 'cache'.
+    prevCacheSize = cache.getMemoryUsage();
+    BufBuilder builder;
+    doc1.serializeForSorter(builder);
+    ASSERT_LT(sizeOfDoc1Before, doc1.getApproximateSize());
+    ASSERT_EQ(prevCacheSize, cache.getMemoryUsage());
+
+    cache.evictOne();
+    ASSERT_EQ(cache.getMemoryUsage(), 0);
+}
+
 }  // namespace mongo
