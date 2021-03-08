@@ -60,16 +60,21 @@ using boost::multi_index::sequenced;
  */
 class LookupSetCache {
 public:
-    using Cached = std::pair<Value, std::vector<Document>>;
+    struct Cached {
+        Value key;
+        std::vector<Document> docs;
+
+        // This includes the size of both key and the documents.
+        size_t approxCacheEntrySize = 0;
+    };
 
     // boost::multi_index_container provides a system for implementing a cache. Here, we create
-    // a container of std::pair<Value, std::vector<Document>>, that is both sequenced, and has a
-    // unique index on the Value. From this, we are able to evict the least-recently-used member,
-    // and maintain key uniqueness.
+    // a container of 'Cached', that is both sequenced, and has a unique index on the 'Cached::key'.
+    // From this, we are able to evict the least-recently-used member, and maintain key uniqueness.
     using IndexedContainer =
         multi_index_container<Cached,
                               indexed_by<sequenced<>,
-                                         hashed_unique<member<Cached, Value, &Cached::first>,
+                                         hashed_unique<member<Cached, Value, &Cached::key>,
                                                        ValueComparator::Hasher,
                                                        ValueComparator::EqualTo>>>;
 
@@ -81,7 +86,7 @@ public:
     explicit LookupSetCache(const ValueComparator& comparator)
         : _container(boost::make_tuple(IndexedContainer::nth_index<0>::type::ctor_args(),
                                        boost::make_tuple(0,
-                                                         member<Cached, Value, &Cached::first>(),
+                                                         member<Cached, Value, &Cached::key>(),
                                                          comparator.getHasher(),
                                                          comparator.getEqualTo()))) {}
 
@@ -102,12 +107,12 @@ public:
         auto it = _container.begin();
         std::advance(it, middle);
         const auto keySize = key.getApproximateSize();
-        const auto docSize = doc.getApproximateSize();
+        auto cacheEntrySizeIncreaseBy = doc.getApproximateSize();
 
         // Find the cache entry, or create one if it doesn't exist yet.
-        auto insertionResult = _container.insert(it, {std::move(key), {}});
+        auto insertionResult = _container.insert(it, {std::move(key), {}, 0});
         if (insertionResult.second) {
-            _memoryUsage += keySize;
+            cacheEntrySizeIncreaseBy += keySize;
         } else {
             // We did not insert due to a duplicate key. Update the cached doc, moving it to the
             // middle of the cache.
@@ -115,11 +120,11 @@ public:
         }
 
         // Add the doc to the cache entry.
-        _container.modify(insertionResult.first,
-                          [&doc](std::pair<Value, std::vector<Document>>& entry) {
-                              entry.second.push_back(std::move(doc));
-                          });
-        _memoryUsage += docSize;
+        _container.modify(insertionResult.first, [&doc, cacheEntrySizeIncreaseBy](Cached& entry) {
+            entry.docs.push_back(std::move(doc));
+            entry.approxCacheEntrySize += cacheEntrySizeIncreaseBy;
+        });
+        _memoryUsage += cacheEntrySizeIncreaseBy;
     }
 
     /**
@@ -130,17 +135,10 @@ public:
             return;
         }
 
-        const Cached& pair = _container.back();
+        const auto cacheEntrySize = _container.back().approxCacheEntrySize;
+        invariant(cacheEntrySize <= _memoryUsage);
+        _memoryUsage -= cacheEntrySize;
 
-        size_t keySize = pair.first.getApproximateSize();
-        invariant(keySize <= _memoryUsage);
-        _memoryUsage -= keySize;
-
-        for (auto&& elem : pair.second) {
-            size_t valueSize = static_cast<size_t>(elem.getApproximateSize());
-            invariant(valueSize <= _memoryUsage);
-            _memoryUsage -= valueSize;
-        }
         _container.erase(std::prev(_container.end()));
     }
 
@@ -186,9 +184,13 @@ public:
             boost::multi_index::get<0>(_container)
                 .relocate(boost::multi_index::get<0>(_container).begin(),
                           boost::multi_index::project<0>(_container, it));
-            return &it->second;
+            return &it->docs;
         }
         return nullptr;
+    }
+
+    auto getMemoryUsage() const {
+        return _memoryUsage;
     }
 
 private:
