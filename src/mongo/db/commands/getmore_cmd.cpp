@@ -34,6 +34,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
@@ -48,7 +49,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/read_concern.h"
@@ -88,21 +89,21 @@ static const ReadConcernSupportResult kSupportsReadConcernResult{
  * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the lsid of 'cursor'.
  */
-void validateLSID(OperationContext* opCtx, const GetMoreRequest& request, ClientCursor* cursor) {
+void validateLSID(OperationContext* opCtx, int64_t cursorId, ClientCursor* cursor) {
     uassert(50736,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was not created in a session, in session "
                           << *opCtx->getLogicalSessionId(),
             !opCtx->getLogicalSessionId() || cursor->getSessionId());
 
     uassert(50737,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was created in session " << *cursor->getSessionId()
                           << ", without an lsid",
             opCtx->getLogicalSessionId() || !cursor->getSessionId());
 
     uassert(50738,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was created in session " << *cursor->getSessionId()
                           << ", in session " << *opCtx->getLogicalSessionId(),
             !opCtx->getLogicalSessionId() || !cursor->getSessionId() ||
@@ -113,23 +114,21 @@ void validateLSID(OperationContext* opCtx, const GetMoreRequest& request, Client
  * Validates that the txnNumber of 'opCtx' matches that of 'cursor'. This must be called after
  * authenticating, so that it is safe to report the txnNumber of 'cursor'.
  */
-void validateTxnNumber(OperationContext* opCtx,
-                       const GetMoreRequest& request,
-                       ClientCursor* cursor) {
+void validateTxnNumber(OperationContext* opCtx, int64_t cursorId, ClientCursor* cursor) {
     uassert(50739,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was not created in a transaction, in transaction "
                           << *opCtx->getTxnNumber(),
             !opCtx->getTxnNumber() || cursor->getTxnNumber());
 
     uassert(50740,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was created in transaction " << *cursor->getTxnNumber()
                           << ", without a txnNumber",
             opCtx->getTxnNumber() || !cursor->getTxnNumber());
 
     uassert(50741,
-            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+            str::stream() << "Cannot run getMore on cursor " << cursorId
                           << ", which was created in transaction " << *cursor->getTxnNumber()
                           << ", in transaction " << *opCtx->getTxnNumber(),
             !opCtx->getTxnNumber() || !cursor->getTxnNumber() ||
@@ -192,7 +191,7 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
  */
 void setUpOperationDeadline(OperationContext* opCtx,
                             const ClientCursor& cursor,
-                            const GetMoreRequest& request,
+                            const GetMoreCommand& cmd,
                             bool disableAwaitDataFailpointActive) {
 
     // We assume that cursors created through a DBDirectClient are always used from their
@@ -205,7 +204,7 @@ void setUpOperationDeadline(OperationContext* opCtx,
         if (cursor.isAwaitData() && !disableAwaitDataFailpointActive) {
             awaitDataState(opCtx).waitForInsertsDeadline =
                 opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                request.awaitDataTimeout.value_or(Seconds{1});
+                Milliseconds{cmd.getMaxTimeMS().value_or(1000)};
         } else if (cursor.getLeftoverMaxTimeMicros() < Microseconds::max()) {
             opCtx->setDeadlineAfterNowBy(cursor.getLeftoverMaxTimeMicros(),
                                          ErrorCodes::MaxTimeMSExpired);
@@ -218,12 +217,12 @@ void setUpOperationDeadline(OperationContext* opCtx,
  */
 void setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                           const ClientCursor& cursor,
-                                          const GetMoreRequest& request,
+                                          const GetMoreCommand& cmd,
                                           bool disableAwaitDataFailpointActive) {
     applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
     opCtx->setWriteConcern(cursor.getWriteConcernOptions());
     APIParameters::get(opCtx) = cursor.getAPIParameters();
-    setUpOperationDeadline(opCtx, cursor, request, disableAwaitDataFailpointActive);
+    setUpOperationDeadline(opCtx, cursor, cmd, disableAwaitDataFailpointActive);
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
     // that if the 'getMore' command itself has a 'comment' field, we give precedence to it.
@@ -258,9 +257,14 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd),
-              _request(uassertStatusOK(
-                  GetMoreRequest::parseFromBSON(request.getDatabase().toString(), request.body))) {}
+            : CommandInvocation(cmd), _cmd(GetMoreCommand::parse({"getMore"}, request.body)) {
+            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace for getMore: " << nss.ns(),
+                    nss.isValid());
+
+            APIParameters::uassertNoApiParameters(request.body);
+        }
 
     private:
         bool supportsWriteConcern() const override {
@@ -280,14 +284,14 @@ public:
         }
 
         NamespaceString ns() const override {
-            return _request.nss;
+            return NamespaceString(_cmd.getDbName(), _cmd.getCollection());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
-                                                      _request.nss,
-                                                      _request.cursorid,
-                                                      _request.term.is_initialized()));
+                                                      ns(),
+                                                      _cmd.getCommandParameter(),
+                                                      _cmd.getTerm().is_initialized()));
         }
 
         /**
@@ -302,7 +306,7 @@ public:
          */
         bool generateBatch(OperationContext* opCtx,
                            ClientCursor* cursor,
-                           const GetMoreRequest& request,
+                           const GetMoreCommand& cmd,
                            const bool isTailable,
                            CursorResponseBuilder* nextBatch,
                            std::uint64_t* numResults,
@@ -315,7 +319,7 @@ public:
             BSONObj obj;
             PlanExecutor::ExecState state;
             try {
-                while (!FindCommon::enoughForGetMore(request.batchSize.value_or(0), *numResults) &&
+                while (!FindCommon::enoughForGetMore(cmd.getBatchSize().value_or(0), *numResults) &&
                        PlanExecutor::ADVANCED == (state = exec->getNext(&obj, nullptr))) {
                     // If adding this object will cause us to exceed the message size limit, then we
                     // stash it for later.
@@ -348,7 +352,7 @@ public:
                               "getMore command executor error",
                               "error"_attr = exception.toStatus(),
                               "stats"_attr = redact(stats),
-                              "cmd"_attr = request.toBSON());
+                              "cmd"_attr = cmd.toBSON({}));
 
                 exception.addContext("Executor error during getMore");
                 throw;
@@ -390,16 +394,18 @@ public:
             // the stats twice.
             boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock;
             boost::optional<AutoStatsTracker> statsTracker;
+            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            int64_t cursorId = _cmd.getCommandParameter();
 
             if (cursorPin->getExecutor()->lockPolicy() ==
                 PlanExecutor::LockPolicy::kLocksInternally) {
-                if (!_request.nss.isCollectionlessCursorNamespace()) {
+                if (!nss.isCollectionlessCursorNamespace()) {
                     statsTracker.emplace(
                         opCtx,
-                        _request.nss,
+                        nss,
                         Top::LockType::NotLocked,
                         AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_request.nss.db()));
+                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
                 }
             } else {
                 invariant(cursorPin->getExecutor()->lockPolicy() ==
@@ -426,14 +432,14 @@ public:
 
                 statsTracker.emplace(
                     opCtx,
-                    _request.nss,
+                    nss,
                     Top::LockType::ReadLocked,
                     AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_request.nss.db()));
+                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
 
                 // Check whether we are allowed to read from this node after acquiring our locks.
                 uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(
-                    opCtx, _request.nss, true));
+                    opCtx, nss, true));
             }
 
             // A user can only call getMore on their own cursor. If there were multiple users
@@ -442,7 +448,7 @@ public:
             auto authzSession = AuthorizationSession::get(opCtx->getClient());
             if (!authzSession->isCoauthorizedWith(cursorPin->getAuthenticatedUsers())) {
                 uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "cursor id " << _request.cursorid
+                          str::stream() << "cursor id " << cursorId
                                         << " was not created by the authenticated user");
             }
 
@@ -450,23 +456,23 @@ public:
             if (!authzSession->isAuthorizedForPrivileges(cursorPin->getOriginatingPrivileges())) {
                 uasserted(ErrorCodes::Unauthorized,
                           str::stream()
-                              << "not authorized for getMore with cursor id " << _request.cursorid);
+                              << "not authorized for getMore with cursor id " << cursorId);
             }
 
-            if (_request.nss != cursorPin->nss()) {
+            if (nss != cursorPin->nss()) {
                 uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "Requested getMore on namespace '" << _request.nss.ns()
+                          str::stream() << "Requested getMore on namespace '" << nss.ns()
                                         << "', but cursor belongs to a different namespace "
                                         << cursorPin->nss().ns());
             }
 
             // Ensure the lsid and txnNumber of the getMore match that of the originating command.
-            validateLSID(opCtx, _request, cursorPin.getCursor());
-            validateTxnNumber(opCtx, _request, cursorPin.getCursor());
+            validateLSID(opCtx, cursorId, cursorPin.getCursor());
+            validateTxnNumber(opCtx, cursorId, cursorPin.getCursor());
 
-            if (_request.nss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
+            if (nss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
                 uasserted(ErrorCodes::CommandFailed,
-                          str::stream() << "getMore on " << _request.nss.ns()
+                          str::stream() << "getMore on " << nss.ns()
                                         << " rejected due to active fail point rsStopGetMoreCmd");
             }
 
@@ -475,7 +481,7 @@ public:
                 invariant(cursorPin->isTailable());
             }
 
-            if (_request.awaitDataTimeout && !cursorPin->isAwaitData()) {
+            if (_cmd.getMaxTimeMS() && !cursorPin->isAwaitData()) {
                 uasserted(ErrorCodes::BadValue,
                           "cannot set maxTimeMS on getMore command for a non-awaitData cursor");
             }
@@ -488,7 +494,7 @@ public:
             // repeatedly release and re-acquire the collection readLock at regular intervals until
             // the failpoint is released. This is done in order to avoid deadlocks caused by the
             // pinned-cursor failpoints in this file (see SERVER-21997).
-            std::function<void()> dropAndReacquireReadLockIfLocked = [&readLock, opCtx, this]() {
+            std::function<void()> dropAndReacquireReadLockIfLocked = [&readLock, opCtx, nss]() {
                 if (!readLock) {
                     // This function is a no-op if 'readLock' is not held in the first place.
                     return;
@@ -497,7 +503,7 @@ public:
                 // Make sure an interrupted operation does not prevent us from reacquiring the lock.
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 readLock.reset();
-                readLock.emplace(opCtx, _request.nss);
+                readLock.emplace(opCtx, nss);
             };
             if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -505,7 +511,7 @@ public:
                     opCtx,
                     "waitAfterPinningCursorBeforeGetMoreBatch",
                     dropAndReacquireReadLockIfLocked,
-                    _request.nss);
+                    nss);
             }
 
             const bool disableAwaitDataFailpointActive =
@@ -513,7 +519,7 @@ public:
 
             // Inherit properties like readConcern and maxTimeMS from our originating cursor.
             setUpOperationContextStateForGetMore(
-                opCtx, *cursorPin.getCursor(), _request, disableAwaitDataFailpointActive);
+                opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
 
             if (!cursorPin->isAwaitData()) {
                 opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
@@ -579,7 +585,7 @@ public:
 
             // Mark this as an AwaitData operation if appropriate.
             if (cursorPin->isAwaitData() && !disableAwaitDataFailpointActive) {
-                auto lastKnownCommittedOpTime = _request.lastKnownCommittedOpTime;
+                auto lastKnownCommittedOpTime = _cmd.getLastKnownCommittedOpTime();
                 if (opCtx->isExhaust() && cursorPin->getLastKnownCommittedOpTime()) {
                     // Use the commit point of the last batch for exhaust cursors.
                     lastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
@@ -610,12 +616,12 @@ public:
                     data["shouldNotdropLock"].booleanSafe()
                         ? []() {} /*empty function*/
                         : saveAndRestoreStateWithReadLockReacquisition,
-                    _request.nss);
+                    nss);
             });
 
             const auto shouldSaveCursor = generateBatch(opCtx,
                                                         cursorPin.getCursor(),
-                                                        _request,
+                                                        _cmd,
                                                         cursorPin->isTailable(),
                                                         &nextBatch,
                                                         &numResults,
@@ -642,7 +648,7 @@ public:
             }
 
             if (shouldSaveCursor) {
-                respondWithId = _request.cursorid;
+                respondWithId = cursorId;
 
                 exec->saveState();
                 exec->detachFromOperationContext();
@@ -658,7 +664,7 @@ public:
                 curOp->debug().cursorExhausted = true;
             }
 
-            nextBatch.done(respondWithId, _request.nss.ns());
+            nextBatch.done(respondWithId, nss.ns());
 
             // Increment this metric once we have generated a response and we know it will return
             // documents.
@@ -686,15 +692,17 @@ public:
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
             auto curOp = CurOp::get(opCtx);
-            curOp->debug().cursorid = _request.cursorid;
+            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            int64_t cursorId = _cmd.getCommandParameter();
+            curOp->debug().cursorid = cursorId;
 
             // The presence of a term in the request indicates that this is an internal replication
             // oplog read request.
-            if (_request.term && _request.nss == NamespaceString::kRsOplogNamespace) {
+            if (_cmd.getTerm() && nss == NamespaceString::kRsOplogNamespace) {
                 // Validate term before acquiring locks.
                 auto replCoord = repl::ReplicationCoordinator::get(opCtx);
                 // Note: updateTerm returns ok if term stayed the same.
-                uassertStatusOK(replCoord->updateTerm(opCtx, *_request.term));
+                uassertStatusOK(replCoord->updateTerm(opCtx, *_cmd.getTerm()));
 
                 // If the term field is present in an oplog request, it means this is an oplog
                 // getMore for replication oplog fetching because the term field is only allowed for
@@ -709,7 +717,7 @@ public:
             }
 
             auto cursorManager = CursorManager::get(opCtx);
-            auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, _request.cursorid));
+            auto cursorPin = uassertStatusOK(cursorManager->pinCursor(opCtx, cursorId));
 
             // Get the read concern level here in case the cursor is exhausted while iterating.
             const auto isLinearizableReadConcern = cursorPin->getReadConcernArgs().getLevel() ==
@@ -737,9 +745,18 @@ public:
                     opCtx,
                     "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch");
             }
+
+            if (getTestCommandsEnabled()) {
+                validateResult(reply);
+            }
         }
 
-        const GetMoreRequest _request;
+        void validateResult(rpc::ReplyBuilderInterface* reply) {
+            auto ret = reply->getBodyBuilder().asTempObj();
+            CursorGetMoreReply::parse({"CursorGetMoreReply"}, ret.removeField("ok"));
+        }
+
+        const GetMoreCommand _cmd;
     };
 
     bool maintenanceOk() const override {
