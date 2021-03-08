@@ -172,8 +172,6 @@ def remove_skipped_commands(command_sets: Dict[str, Set[str]]):
         "testDeprecationInVersion2",
         # Idl specifies the command_name as hello.
         "isMaster",
-        # TODO(SERVER-53149): remove getMore.
-        "getMore"
     }
 
     for key in command_sets.keys():
