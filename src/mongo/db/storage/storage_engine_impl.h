@@ -101,8 +101,6 @@ public:
     virtual StatusWith<std::vector<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
-    virtual bool supportsCheckpoints() const override;
-
     virtual bool isDurable() const override;
 
     virtual bool isEphemeral() const override;

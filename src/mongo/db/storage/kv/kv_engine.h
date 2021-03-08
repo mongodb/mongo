@@ -213,13 +213,6 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
 
-    /**
-     * Returns whether the KVEngine supports checkpoints.
-     */
-    virtual bool supportsCheckpoints() const {
-        return false;
-    }
-
     virtual void checkpoint() {}
 
     virtual bool isDurable() const = 0;

@@ -209,11 +209,6 @@ public:
     virtual bool supportsCappedCollections() const = 0;
 
     /**
-     * Returns whether the storage engine supports checkpoints.
-     */
-    virtual bool supportsCheckpoints() const = 0;
-
-    /**
      * Returns whether the engine supports a journalling concept or not.
      */
     virtual bool isDurable() const = 0;

@@ -83,7 +83,6 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
-    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
@@ -134,7 +133,6 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
-    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -185,7 +183,6 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
-    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -237,7 +234,6 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
         ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
     }
 
-    std::sort(locs, locs + nToInsert);  // inserted records may not be in RecordId order
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 

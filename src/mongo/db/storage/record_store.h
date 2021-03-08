@@ -118,6 +118,7 @@ public:
     /**
      * Moves forward and returns the new data or boost::none if there is no more data.
      * Continues returning boost::none once it reaches EOF unlike stl iterators.
+     * Returns records in RecordId order.
      */
     virtual boost::optional<Record> next() = 0;
 
@@ -473,19 +474,6 @@ public:
      */
     virtual Status compact(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
-    }
-
-    /**
-     * Does the RecordStore cursor retrieve its document in RecordId Order?
-     *
-     * If a subclass overrides the default value to true, the RecordStore cursor must retrieve
-     * its documents in RecordId order.
-     *
-     * This enables your storage engine to run collection validation in the
-     * background.
-     */
-    virtual bool isInRecordIdOrder() const {
-        return false;
     }
 
     /**
