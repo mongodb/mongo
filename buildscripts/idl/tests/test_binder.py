@@ -2384,6 +2384,19 @@ class TestBinder(testcase.IDLTestcase):
                     kIsAuthenticated :  "is_authenticated"
                     kIsCoAuthorized :  "is_coauthorized"
 
+            ActionType:
+                description: "test"
+                type: string
+                values:
+                    addShard :  "addShard"
+                    serverStatus :  "serverStatus"
+
+            MatchType:
+                description: "test"
+                type: string
+                values:
+                    matchClusterResource :  "cluster"
+
         structs:
             reply:
                 description: foo
@@ -2422,6 +2435,24 @@ class TestBinder(testcase.IDLTestcase):
                 reply_type: reply
             """))
 
+        # Test simple with privilege
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: cluster
+                            action_type: addShard
+                fields:
+                    foo: string
+                reply_type: reply
+            """))
+
     def test_access_check_negative(self):
         # type: () -> None
         """Negative access check tests."""
@@ -2443,6 +2474,18 @@ class TestBinder(testcase.IDLTestcase):
                     kIsAuthenticated :  "is_authenticated"
                     kIsCoAuthorized :  "is_coauthorized"
 
+            ActionType:
+                description: "test"
+                type: string
+                values:
+                    addShard :  "addShard"
+                    serverStatus :  "serverStatus"
+
+            MatchType:
+                description: "test"
+                type: string
+                values:
+                    matchClusterResource :  "cluster"
         structs:
             reply:
                 description: foo
@@ -2466,6 +2509,81 @@ class TestBinder(testcase.IDLTestcase):
                     foo: string
                 reply_type: reply
             """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+
+        # Test simple with bad access check with privilege
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: foo
+                            action_type: addShard
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+
+        # Test simple with bad access check with privilege
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: cluster
+                            action_type: foo
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_UNKOWN_ENUM_VALUE)
+
+        # Test simple with access check and privileges
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: cluster
+                            action_type: [addShard, serverStatus]
+                fields:
+                    foo: string
+                reply_type: reply
+            """))
+
+        # Test simple with privilege with duplicate action_type
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: ""
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: cluster
+                            action_type: [addShard, addShard]
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_DUPLICATE_ACTION_TYPE)
 
 
 if __name__ == '__main__':

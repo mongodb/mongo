@@ -189,6 +189,13 @@ public:
         return H::combine(std::move(h), rp._ns, rp._matchType);
     }
 
+    /**
+     * Returns a pattern for IDL generated code to use.
+     */
+    static ResourcePattern forAuthorizationContract(MatchTypeEnum e) {
+        return ResourcePattern(e);
+    }
+
 private:
     // AuthorizationContract works directly with MatchTypeEnum. Users should not be concerned with
     // how a ResourcePattern was constructed.

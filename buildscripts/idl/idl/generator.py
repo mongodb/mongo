@@ -2244,9 +2244,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         checks = ",".join(
             [("AccessCheckEnum::" + ac.check) for ac in struct.access_checks if ac.check])
 
+        privilege_list = [ac.privilege for ac in struct.access_checks if ac.privilege]
+        privileges = ",".join([
+            "Privilege(ResourcePattern::forAuthorizationContract(MatchTypeEnum::%s), ActionSet{%s})"
+            % (p.resource_pattern, ",".join(["ActionType::" + at for at in p.action_type]))
+            for p in privilege_list
+        ])
+
         self._writer.write_line(
-            'mongo::AuthorizationContract %s::kAuthorizationContract = AuthorizationContract(std::initializer_list<AccessCheckEnum>{%s}, std::initializer_list<Privilege>{});'
-            % (common.title_case(struct.cpp_name), checks))
+            'mongo::AuthorizationContract %s::kAuthorizationContract = AuthorizationContract(std::initializer_list<AccessCheckEnum>{%s}, std::initializer_list<Privilege>{%s});'
+            % (common.title_case(struct.cpp_name), checks, privileges))
 
         self._writer.write_empty_line()
 
