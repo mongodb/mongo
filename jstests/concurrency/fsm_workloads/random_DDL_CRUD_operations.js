@@ -76,17 +76,34 @@ var $config = (function() {
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
             while (tid === this.tid)
                 tid = Random.randInt(this.threadCount);
-            const srcColl = db[threadCollectionName(collName, tid)];
+            const srcCollName = threadCollectionName(collName, tid);
+            const srcColl = db[srcCollName];
             const numInitialDocs = srcColl.countDocuments({});
             // Rename collection
-            const destFullNs = threadCollectionName(collName, new Date().getTime());
+            const destCollName = threadCollectionName(collName, new Date().getTime());
             try {
                 jsTestLog('rename tid:' + tid + ' currentTid: ' + this.tid);
-                assertAlways.commandWorked(srcColl.renameCollection(destFullNs));
+                assertAlways.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 if (e.code && e.code === ErrorCodes.NamespaceNotFound) {
-                    // TODO SERVER-54847: throw if ther is no renameCollection.start in changelog.
-                    // The srcColl might've been dropped right before renaming it.
+                    // It is fine for a rename operation to throw NamespaceNotFound BEFORE starting
+                    // (e.g. if the collection was previously dropped). Checking the changelog to
+                    // assert that no such exception was thrown AFTER a rename started.
+                    const dbName = db.getName();
+                    let config = db.getSiblingDB('config');
+                    let countRenames = config.changelog
+                                           .find({
+                                               what: 'renameCollection.start',
+                                               details: {
+                                                   source: dbName + srcCollName,
+                                                   destination: dbName + destCollName
+                                               }
+                                           })
+                                           .itcount();
+                    assert.eq(0,
+                              countRenames,
+                              'NamespaceNotFound exception thrown during rename from ' +
+                                  srcCollName + ' to ' + destCollName);
                     return;
                 }
                 throw e;
