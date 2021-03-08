@@ -483,6 +483,21 @@ TEST(FailPoint, PauseWhileSetInterruptibility) {
     failPoint.setMode(FailPoint::off);
 }
 
+TEST(FailPoint, PauseWhileSetCancelability) {
+    FailPoint failPoint("testFP");
+    failPoint.setMode(FailPoint::alwaysOn);
+
+    CancelationSource cs;
+    CancelationToken ct = cs.token();
+    cs.cancel();
+
+    ASSERT_THROWS_CODE(failPoint.pauseWhileSetAndNotCanceled(Interruptible::notInterruptible(), ct),
+                       DBException,
+                       ErrorCodes::Interrupted);
+
+    failPoint.setMode(FailPoint::off);
+}
+
 TEST(FailPoint, WaitForFailPointTimeout) {
     FailPoint failPoint("testFP");
     failPoint.setMode(FailPoint::alwaysOn);
