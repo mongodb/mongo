@@ -135,7 +135,7 @@ protected:
 
     void appendDonorFieldsToReshardingFields(ReshardingFields& fields,
                                              const BSONObj& reshardingKey) {
-        fields.setDonorFields(TypeCollectionDonorFields(reshardingKey));
+        fields.setDonorFields(TypeCollectionDonorFields(kTemporaryReshardingNss, reshardingKey));
     }
 
     void appendRecipientFieldsToReshardingFields(
@@ -156,9 +156,9 @@ protected:
                                                     const UUID& existingUUID,
                                                     const BSONObj& reshardingKey,
                                                     const ReshardingDocument& reshardingDoc) {
-        ASSERT_EQ(reshardingDoc.get_id(), reshardingUUID);
-        ASSERT_EQ(reshardingDoc.getNss(), nss);
-        ASSERT_EQ(reshardingDoc.getExistingUUID(), existingUUID);
+        ASSERT_EQ(reshardingDoc.getReshardingUUID(), reshardingUUID);
+        ASSERT_EQ(reshardingDoc.getSourceNss(), nss);
+        ASSERT_EQ(reshardingDoc.getSourceUUID(), existingUUID);
         ASSERT_BSONOBJ_EQ(reshardingDoc.getReshardingKey().toBSON(), reshardingKey);
     }
 
@@ -168,12 +168,12 @@ protected:
                                                const ReshardingDonorDocument& donorDoc) {
         assertCommonDocFieldsMatchReshardingFields<ReshardingDonorDocument>(
             nss,
-            reshardingFields.getUuid(),
+            reshardingFields.getReshardingUUID(),
             existingUUID,
             reshardingFields.getDonorFields()->getReshardingKey().toBSON(),
             donorDoc);
-        ASSERT(donorDoc.getState() == DonorStateEnum::kPreparingToDonate);
-        ASSERT(donorDoc.getMinFetchTimestamp() == boost::none);
+        ASSERT(donorDoc.getMutableState().getState() == DonorStateEnum::kPreparingToDonate);
+        ASSERT(donorDoc.getMutableState().getMinFetchTimestamp() == boost::none);
     }
 
     void assertRecipientDocMatchesReshardingFields(
@@ -181,13 +181,14 @@ protected:
         const ReshardingFields& reshardingFields,
         const ReshardingRecipientDocument& recipientDoc) {
         assertCommonDocFieldsMatchReshardingFields<ReshardingRecipientDocument>(
-            reshardingFields.getRecipientFields()->getOriginalNamespace(),
-            reshardingFields.getUuid(),
-            reshardingFields.getRecipientFields()->getExistingUUID(),
+            reshardingFields.getRecipientFields()->getSourceNss(),
+            reshardingFields.getReshardingUUID(),
+            reshardingFields.getRecipientFields()->getSourceUUID(),
             metadata.getShardKeyPattern().toBSON(),
             recipientDoc);
 
-        ASSERT(recipientDoc.getState() == RecipientStateEnum::kAwaitingFetchTimestamp);
+        ASSERT(recipientDoc.getMutableState().getState() ==
+               RecipientStateEnum::kAwaitingFetchTimestamp);
         ASSERT(!recipientDoc.getFetchTimestamp());
 
         auto donorShardIds = reshardingFields.getRecipientFields()->getDonorShardIds();

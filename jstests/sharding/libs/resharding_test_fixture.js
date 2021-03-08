@@ -502,7 +502,7 @@ var ReshardingTest = class {
     /** @private */
     _checkCoordinatorPostState(expectedErrorCode) {
         assert.eq([],
-                  this._st.config.reshardingOperations.find({nss: this._ns}).toArray(),
+                  this._st.config.reshardingOperations.find({ns: this._ns}).toArray(),
                   "expected config.reshardingOperations to be empty, but found it wasn't");
 
         assert.eq([],

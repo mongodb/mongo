@@ -67,7 +67,7 @@ bool allParticipantsInStateGTE(WithLock lk,
                                TState expectedState,
                                const std::vector<TParticipant>& participants) {
     for (const auto& shard : participants) {
-        if (shard.getState() < expectedState) {
+        if (shard.getMutableState().getState() < expectedState) {
             return false;
         }
     }
@@ -103,7 +103,7 @@ bool stateTransistionsComplete(WithLock lk,
 template <class TParticipant>
 Status getStatusFromAbortReasonWithShardInfo(const TParticipant& participant,
                                              StringData participantType) {
-    return getStatusFromAbortReason(participant)
+    return getStatusFromAbortReason(participant.getMutableState())
         .withContext("{} shard {} reached an unrecoverable error"_format(
             participantType, participant.getId().toString()));
 }
@@ -123,13 +123,13 @@ boost::optional<Status> getAbortReasonIfExists(
     }
 
     for (const auto& donorShard : updatedStateDoc.getDonorShards()) {
-        if (donorShard.getState() == DonorStateEnum::kError) {
+        if (donorShard.getMutableState().getState() == DonorStateEnum::kError) {
             return getStatusFromAbortReasonWithShardInfo(donorShard, "Donor"_sd);
         }
     }
 
     for (const auto& recipientShard : updatedStateDoc.getRecipientShards()) {
-        if (recipientShard.getState() == RecipientStateEnum::kError) {
+        if (recipientShard.getMutableState().getState() == RecipientStateEnum::kError) {
             return getStatusFromAbortReasonWithShardInfo(recipientShard, "Recipient"_sd);
         }
     }
@@ -142,7 +142,8 @@ bool allParticipantsDoneWithAbortReason(WithLock lk,
                                         TState expectedState,
                                         const std::vector<TParticipant>& participants) {
     for (const auto& shard : participants) {
-        if (!(shard.getState() == expectedState && shard.getAbortReason().is_initialized())) {
+        if (!(shard.getMutableState().getState() == expectedState &&
+              shard.getMutableState().getAbortReason().is_initialized())) {
             return false;
         }
     }

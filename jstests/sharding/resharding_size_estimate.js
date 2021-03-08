@@ -78,7 +78,8 @@ reshardingTest.withReshardingInBackground(
             let donorShards = doc.donorShards;
             for (let i = 0; i < donorShards.length; i++) {
                 if (donorShards[i].id === shardName) {
-                    return donorShards[i].cloneSizeInfo;
+                    const {bytesToClone, documentsToClone} = donorShards[i].mutableState;
+                    return {bytesToClone, documentsToClone};
                 }
             }
             assert(false, 'could not find ' + shardName + ' in donorShards.');
@@ -87,7 +88,7 @@ reshardingTest.withReshardingInBackground(
         let coordinatorDoc = {};
         assert.soon(() => {
             coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                nss: inputCollection.getFullName()
+                ns: inputCollection.getFullName()
             });
             return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
         });
@@ -108,22 +109,24 @@ reshardingTest.withReshardingInBackground(
         assert.eq(s1Estimate.documentsToClone, numDocumentsPerShard);
 
         const verifyApproximateCopySizeForRecipients = (doc, s0Estimate, s1Estimate) => {
-            const approxCopySize = doc.approxCopySize;
-            assert(approxCopySize !== undefined,
-                   "Unable to find 'approxCopySize' in the coordinator document");
+            const {approxBytesToCopy, approxDocumentsToCopy} = doc;
+            assert(approxBytesToCopy !== undefined,
+                   "Unable to find 'approxBytesToCopy' in the coordinator document");
+            assert(approxDocumentsToCopy !== undefined,
+                   "Unable to find 'approxDocumentsToCopy' in the coordinator document");
 
             const numRecipients = doc.recipientShards.length;
             assert.neq(numRecipients, 0, "Unexpected number of recipients");
 
             const expectedApproxDocumentsToCopy =
                 (s0Estimate.documentsToClone + s1Estimate.documentsToClone) / numRecipients;
-            assert.eq(approxCopySize.approxDocumentsToCopy,
+            assert.eq(approxDocumentsToCopy,
                       expectedApproxDocumentsToCopy,
                       "Unexpected value for 'approxDocumentsToCopy' in the coordinator document");
 
             const expectedApproxBytesToCopy =
                 (s0Estimate.bytesToClone + s1Estimate.bytesToClone) / numRecipients;
-            assert.eq(approxCopySize.approxBytesToCopy,
+            assert.eq(approxBytesToCopy,
                       expectedApproxBytesToCopy,
                       "Unexpected value for 'approxBytesToCopy' in the coordinator document");
         };

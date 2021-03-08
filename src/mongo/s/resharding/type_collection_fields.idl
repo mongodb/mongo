@@ -38,7 +38,16 @@ imports:
 structs:
     TypeCollectionDonorFields:
         description: "Resharding-related fields specific to donor shards."
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
+            tempNs:
+                cpp_name: tempReshardingNss
+                type: namespacestring
+                description: "The namespace of the temporary resharding collection that exists on
+                              recipient shards."
             reshardingKey:
                 type: KeyPattern
 
@@ -47,23 +56,37 @@ structs:
         inline_chained_structs: true
         chained_structs:
             FetchTimestamp: FetchTimestampStruct
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             donorShardIds:
                 type: array<shard_id>
-            existingUUID:
+            sourceUUID:
+                cpp_name: sourceUUID
                 type: uuid
-            originalNamespace:
+                description: "The UUID of the original collection being resharded."
+            sourceNs:
+                cpp_name: sourceNss
                 type: namespacestring
+                description: "The namespace of the collection being resharded."
 
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections
                       document."
         inline_chained_structs: true
         chained_structs:
-            AbortReason: AbortReasonStruct 
+            AbortReason: AbortReasonStruct
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             uuid:
+                cpp_name: reshardingUUID
                 type: uuid
+                description: "A unique identifier for the resharding operation."
             state:
                 type: CoordinatorState
                 default: kUnused

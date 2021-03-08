@@ -44,7 +44,7 @@ using ReshardingFields = TypeCollectionReshardingFields;
 template <class Service, class StateMachine, class ReshardingDocument>
 boost::optional<std::shared_ptr<StateMachine>> tryGetReshardingStateMachine(
     OperationContext* opCtx, const UUID& reshardingUUID) {
-    auto instanceId = BSON(ReshardingDocument::k_idFieldName << reshardingUUID);
+    auto instanceId = BSON(ReshardingDocument::kReshardingUUIDFieldName << reshardingUUID);
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
     auto service = registry->lookupServiceByName(Service::kServiceName);
     return StateMachine::lookup(opCtx, service, instanceId);
@@ -60,6 +60,7 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
 
 ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     OperationContext* opCtx,
+    const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields);
 

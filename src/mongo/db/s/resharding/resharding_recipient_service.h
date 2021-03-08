@@ -133,6 +133,8 @@ public:
                                     const ReshardingRecipientDocument& recipientDoc);
 
 private:
+    RecipientStateMachine(const ReshardingRecipientDocument& recipientDoc);
+
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -153,17 +155,26 @@ private:
 
     void _renameTemporaryReshardingCollection();
 
-    // Transitions the state on-disk and in-memory to 'endState'.
-    void _transitionState(RecipientStateEnum endState,
-                          boost::optional<Timestamp> fetchTimestamp = boost::none,
-                          boost::optional<Status> abortReason = boost::none);
+    // Transitions the on-disk and in-memory state to 'newState'.
+    void _transitionState(RecipientStateEnum newState);
+
+    void _transitionState(RecipientShardContext&& newRecipientCtx,
+                          boost::optional<Timestamp>&& fetchTimestamp);
+
+    // Transitions the on-disk and in-memory state to RecipientStateEnum::kCreatingCollection.
+    void _transitionToCreatingCollection(Timestamp fetchTimestamp);
+
+    // Transitions the on-disk and in-memory state to RecipientStateEnum::kError.
+    void _transitionToError(Status abortReason);
 
     void _updateCoordinator();
 
-    // Updates the recipient document on-disk and in-memory with the 'replacementDoc.'
-    void _updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc);
+    // Updates the mutable portion of the on-disk and in-memory recipient document with
+    // 'newRecipientCtx' and 'fetchTimestamp'.
+    void _updateRecipientDocument(RecipientShardContext&& newRecipientCtx,
+                                  boost::optional<Timestamp>&& fetchTimestamp);
 
-    // Removes the local recipient document from disk and clears the in-memory state.
+    // Removes the local recipient document from disk.
     void _removeRecipientDocument();
 
     // Removes any docs from the oplog applier progress and txn applier progress collections that
@@ -180,12 +191,15 @@ private:
     // (abort resharding).
     void _onAbortOrStepdown(WithLock, Status status);
 
-    // The in-memory representation of the underlying document in
+    // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.recipient.
-    ReshardingRecipientDocument _recipientDoc;
+    const CommonReshardingMetadata _metadata;
+    const std::vector<ShardId> _donorShardIds;
 
-    // The id both for the resharding operation and for the primary-only-service instance.
-    const UUID _id;
+    // The in-memory representation of the mutable portion of the document in
+    // config.localReshardingOperations.recipient.
+    RecipientShardContext _recipientCtx;
+    boost::optional<Timestamp> _fetchTimestamp;
 
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
     std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
@@ -200,7 +214,7 @@ private:
     std::vector<ExecutorFuture<void>> _oplogFetcherFutures;
 
     // Protects the promises below
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("RecipientStateMachine::_mutex");
 
     boost::optional<ReshardingCriticalSection> _critSec;
 

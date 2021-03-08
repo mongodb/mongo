@@ -142,7 +142,6 @@ protected:
 
     std::shared_ptr<ReshardingDonorService::DonorStateMachine> getStateMachineInstace(
         OperationContext* opCtx, ReshardingDonorDocument initialState) {
-        auto instanceId = BSON(ReshardingDonorDocument::k_idFieldName << initialState.get_id());
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(ReshardingDonorService::kServiceName);
         return ReshardingDonorService::DonorStateMachine::getOrCreate(
@@ -150,7 +149,7 @@ protected:
     }
 
     std::vector<BSONObj> getOplogWritesForDonorDocument(const ReshardingDonorDocument& doc) {
-        auto reshardNs = doc.getNss().toString();
+        auto reshardNs = doc.getSourceNss().toString();
         DBDirectClient client(operationContext());
         auto result = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
                                    BSON("ns" << reshardNs));
@@ -191,13 +190,19 @@ protected:
 
 TEST_F(ReshardingDonorServiceTest,
        ShouldWriteFinalOpLogEntryAfterTransitionToPreparingToBlockWrites) {
-    ReshardingDonorDocument doc(DonorStateEnum::kPreparingToBlockWrites);
+    DonorShardContext donorCtx;
+    donorCtx.setState(DonorStateEnum::kPreparingToBlockWrites);
+
+    ReshardingDonorDocument doc(std::move(donorCtx));
     CommonReshardingMetadata metadata(kReshardingUUID,
                                       mongo::NamespaceString(kReshardNs),
                                       kExistingUUID,
+                                      kTemporaryReshardingNss,
                                       KeyPattern(kReshardingKeyPattern));
     doc.setCommonReshardingMetadata(metadata);
-    doc.getMinFetchTimestampStruct().setMinFetchTimestamp(Timestamp{0xf00});
+    doc.getMutableState().setMinFetchTimestamp(Timestamp(10, 1));
+    doc.getMutableState().setBytesToClone(1000);
+    doc.getMutableState().setDocumentsToClone(5);
 
     auto donorStateMachine = getStateMachineInstace(operationContext(), doc);
     ASSERT(donorStateMachine);
@@ -227,7 +232,7 @@ TEST_F(ReshardingDonorServiceTest,
         ASSERT(o2.hasField("reshardingUUID"));
         auto actualReshardingUUIDBson = o2.getField("reshardingUUID");
         auto actualReshardingUUID = UUID::parse(actualReshardingUUIDBson);
-        ASSERT_EQUALS(doc.get_id(), actualReshardingUUID);
+        ASSERT_EQUALS(doc.getReshardingUUID(), actualReshardingUUID);
 
         ASSERT(oplog.hasField("ui"));
         auto actualUiBson = oplog.getField("ui");

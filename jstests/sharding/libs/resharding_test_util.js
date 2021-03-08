@@ -7,8 +7,9 @@ var ReshardingTestUtil = (function() {
      * 'abortReason.code'.
      */
     const shardDoneAbortingWithCode = function(shardEntry, errorCode) {
-        return shardEntry["abortReason"] && shardEntry["abortReason"]["code"] &&
-            shardEntry["abortReason"]["code"] === errorCode && shardEntry["state"] === "done";
+        return shardEntry.mutableState.abortReason &&
+            shardEntry.mutableState.abortReason.code === errorCode &&
+            shardEntry.mutableState.state === "done";
     };
 
     /**
@@ -20,12 +21,12 @@ var ReshardingTestUtil = (function() {
      * config.reshardingOperations.recipientShards[shardName] for recipients and
      * config.reshardingOperations.donorShards[shardName] for donors.
      */
-    const assertAllParticipantsReportAbortToCoordinator = function(configsvr, nss, errCode) {
+    const assertAllParticipantsReportAbortToCoordinator = function(configsvr, ns, errCode) {
         const reshardingOperationsCollection =
             configsvr.getCollection("config.reshardingOperations");
         assert.soon(
             () => {
-                const coordinatorDoc = reshardingOperationsCollection.findOne({nss});
+                const coordinatorDoc = reshardingOperationsCollection.findOne({ns});
                 assert(coordinatorDoc);
                 // Iterate over both the recipientShards and donorShards and check that every shard
                 // entry is in state 'done' and contains an abortReason with the errCode.
@@ -52,28 +53,31 @@ var ReshardingTestUtil = (function() {
      * assertDonorAbortsLocally instead.
      */
     const assertParticipantAbortsLocally = function(
-        shardConn, shardName, nss, abortReason, participantType) {
+        shardConn, shardName, ns, abortReason, participantType) {
         const localOpsCollection =
             shardConn.getCollection(`config.localReshardingOperations.${participantType}`);
 
         assert.soon(
             () => {
-                return localOpsCollection.findOne(
-                           {nss, state: "done", "abortReason.code": abortReason}) !== null;
+                return localOpsCollection.findOne({
+                    ns,
+                    "mutableState.state": "done",
+                    "mutableState.abortReason.code": abortReason,
+                }) !== null;
             },
             () => {
                 return participantType + " shard " + shardName +
                     " never transitioned to an done state with abortReason " + abortReason + ": " +
-                    tojson(localDonorOpsCollection.findOne());
+                    tojson(localOpsCollection.findOne());
             });
     };
 
-    const assertRecipientAbortsLocally = function(shardConn, shardName, nss, abortReason) {
-        return assertParticipantAbortsLocally(shardConn, shardName, nss, abortReason, "recipient");
+    const assertRecipientAbortsLocally = function(shardConn, shardName, ns, abortReason) {
+        return assertParticipantAbortsLocally(shardConn, shardName, ns, abortReason, "recipient");
     };
 
-    const assertDonorAbortsLocally = function(shardConn, shardName, nss, abortReason) {
-        return assertParticipantAbortsLocally(shardConn, shardName, nss, abortReason, "donor");
+    const assertDonorAbortsLocally = function(shardConn, shardName, ns, abortReason) {
+        return assertParticipantAbortsLocally(shardConn, shardName, ns, abortReason, "donor");
     };
 
     return {

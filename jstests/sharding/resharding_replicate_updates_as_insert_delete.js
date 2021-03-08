@@ -55,7 +55,7 @@ reshardingTest.withReshardingInBackground(  //
         // assert.soon(() => tempColl.findOne(docToUpdate) !== null);
         assert.soon(() => {
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                nss: testColl.getFullName()
+                ns: testColl.getFullName()
             });
 
             return coordinatorDoc !== null && coordinatorDoc.state === "applying";

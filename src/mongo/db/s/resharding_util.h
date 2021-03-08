@@ -91,32 +91,7 @@ void emplaceMinFetchTimestampIfExists(ClassWithMinFetchTimestamp& c,
         invariant(minFetchTimestamp == alreadyExistingMinFetchTimestamp);
     }
 
-    MinFetchTimestamp minFetchTimestampStruct;
-    minFetchTimestampStruct.setMinFetchTimestamp(std::move(minFetchTimestamp));
-    c.setMinFetchTimestampStruct(std::move(minFetchTimestampStruct));
-}
-
-/**
- * Emplaces the 'strictConsistencyTimestamp' onto the ClassWithStrictConsistencyTimestamp if the
- * timestamp has been emplaced inside the boost::optional.
- */
-template <class ClassWithStrictConsistencyTimestamp>
-void emplaceStrictConsistencyTimestampIfExists(
-    ClassWithStrictConsistencyTimestamp& c, boost::optional<Timestamp> strictConsistencyTimestamp) {
-    if (!strictConsistencyTimestamp) {
-        return;
-    }
-
-    invariant(!strictConsistencyTimestamp->isNull());
-
-    if (auto alreadyExistingStrictConsistencyTimestamp = c.getStrictConsistencyTimestamp()) {
-        invariant(strictConsistencyTimestamp == alreadyExistingStrictConsistencyTimestamp);
-    }
-
-    StrictConsistencyTimestamp strictConsistencyTimestampStruct;
-    strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(
-        std::move(strictConsistencyTimestamp));
-    c.setStrictConsistencyTimestampStruct(std::move(strictConsistencyTimestampStruct));
+    c.setMinFetchTimestamp(std::move(minFetchTimestamp));
 }
 
 /**
@@ -173,11 +148,9 @@ DonorShardEntry makeDonorShard(ShardId shardId,
 /**
  * Helper method to construct a RecipientShardEntry with the fields specified.
  */
-RecipientShardEntry makeRecipientShard(
-    ShardId shardId,
-    RecipientStateEnum recipientState,
-    boost::optional<Timestamp> strictConsistencyTimestamp = boost::none,
-    boost::optional<Status> abortReason = boost::none);
+RecipientShardEntry makeRecipientShard(ShardId shardId,
+                                       RecipientStateEnum recipientState,
+                                       boost::optional<Status> abortReason = boost::none);
 
 /**
  * Gets the UUID for 'nss' from the 'cm'

@@ -72,7 +72,7 @@ TEST(CollectionType, AllFieldsPresent) {
     const auto reshardingUuid = UUID::gen();
 
     ReshardingFields reshardingFields;
-    reshardingFields.setUuid(reshardingUuid);
+    reshardingFields.setReshardingUUID(reshardingUuid);
 
     CollectionType coll(BSON(CollectionType::kNssFieldName
                              << "db.coll" << CollectionType::kEpochFieldName << oid
@@ -99,7 +99,7 @@ TEST(CollectionType, AllFieldsPresent) {
     ASSERT_EQUALS(coll.getDropped(), false);
     ASSERT_EQUALS(coll.getUuid(), uuid);
     ASSERT(coll.getReshardingFields()->getState() == CoordinatorStateEnum::kUnused);
-    ASSERT(coll.getReshardingFields()->getUuid() == reshardingUuid);
+    ASSERT(coll.getReshardingFields()->getReshardingUUID() == reshardingUuid);
 }
 
 TEST(CollectionType, MissingDefaultCollationParses) {

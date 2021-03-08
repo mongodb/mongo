@@ -26,8 +26,8 @@
 # it in the license file.
 #
 
-# This file defines the format of documents stored in config.localReshardingOperations on the donor
-# shard for a resharding operation.
+# This file defines the format of documents stored in config.localReshardingOperations.donor on the
+# donor shard for a resharding operation.
 
 global:
     cpp_namespace: "mongo"
@@ -41,9 +41,12 @@ structs:
         inline_chained_structs: true
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
-            MinFetchTimestamp: MinFetchTimestampStruct
-            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
-            state: DonorState
+            # We intentionally have the mutable state nested in a subobject to make it easy to
+            # overwrite with a single $set.
+            mutableState: DonorShardContext

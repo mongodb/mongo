@@ -72,7 +72,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
         reshardingFields, kShardIds, kExistingUUID, kOriginalNss);
 
     auto recipientDoc = resharding::constructRecipientDocumentFromReshardingFields(
-        opCtx, metadata, reshardingFields);
+        opCtx, kTemporaryReshardingNss, metadata, reshardingFields);
     assertRecipientDocMatchesReshardingFields(metadata, reshardingFields, recipientDoc);
 }
 

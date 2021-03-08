@@ -200,8 +200,8 @@ protected:
         DatabaseType db(kNss.db().toString(), kShardList[0].getName(), true, env.dbVersion);
 
         TypeCollectionReshardingFields reshardingFields;
-        reshardingFields.setUuid(UUID::gen());
-        reshardingFields.setDonorFields(TypeCollectionDonorFields{BSON("y" << 1)});
+        reshardingFields.setReshardingUUID(UUID::gen());
+        reshardingFields.setDonorFields(TypeCollectionDonorFields{env.tempNss, BSON("y" << 1)});
         reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
         CollectionType coll(kNss, env.version.epoch(), Date_t::now(), UUID::gen());

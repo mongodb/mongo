@@ -123,8 +123,8 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                 // Remove the coordinator document.
                 return BatchedCommandRequest::buildDeleteOp(
                     NamespaceString::kConfigReshardingOperationsNamespace,
-                    BSON("_id" << coordinatorDoc.get_id()),  // query
-                    false                                    // multi
+                    BSON("_id" << coordinatorDoc.getReshardingUUID()),  // query
+                    false                                               // multi
                 );
             default: {
                 // Partially update the coordinator document.
@@ -148,10 +148,18 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                                           *abortReason);
                     }
 
-                    if (auto approxCopySize = coordinatorDoc.getApproxCopySize()) {
-                        // If the approxCopySize exists, include it in the update.
-                        setBuilder.append(ReshardingCoordinatorDocument::kApproxCopySizeFieldName,
-                                          approxCopySize->toBSON());
+                    if (auto approxBytesToCopy = coordinatorDoc.getApproxBytesToCopy()) {
+                        // If the approxBytesToCopy exists, include it in the update.
+                        setBuilder.append(
+                            ReshardingCoordinatorDocument::kApproxBytesToCopyFieldName,
+                            *approxBytesToCopy);
+                    }
+
+                    if (auto approxDocumentsToCopy = coordinatorDoc.getApproxDocumentsToCopy()) {
+                        // If the approxDocumentsToCopy exists, include it in the update.
+                        setBuilder.append(
+                            ReshardingCoordinatorDocument::kApproxDocumentsToCopyFieldName,
+                            *approxDocumentsToCopy);
                     }
 
                     if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
@@ -163,7 +171,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 
                 return BatchedCommandRequest::buildUpdateOp(
                     NamespaceString::kConfigReshardingOperationsNamespace,
-                    BSON("_id" << coordinatorDoc.get_id()),
+                    BSON("_id" << coordinatorDoc.getReshardingUUID()),
                     updateBuilder.obj(),
                     false,  // upsert
                     false   // multi
@@ -204,7 +212,7 @@ TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
     auto donorShardIds = extractShardIds(coordinatorDoc.getDonorShards());
     TypeCollectionRecipientFields recipientFields(
-        std::move(donorShardIds), coordinatorDoc.getExistingUUID(), coordinatorDoc.getNss());
+        std::move(donorShardIds), coordinatorDoc.getSourceUUID(), coordinatorDoc.getSourceNss());
     emplaceFetchTimestampIfExists(recipientFields, coordinatorDoc.getFetchTimestamp());
     return recipientFields;
 }
@@ -218,9 +226,11 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
     switch (nextState) {
         case CoordinatorStateEnum::kInitializing: {
             // Append 'reshardingFields' to the config.collections entry for the original nss
-            TypeCollectionReshardingFields originalEntryReshardingFields(coordinatorDoc.get_id());
+            TypeCollectionReshardingFields originalEntryReshardingFields(
+                coordinatorDoc.getReshardingUUID());
             originalEntryReshardingFields.setState(coordinatorDoc.getState());
-            TypeCollectionDonorFields donorField(coordinatorDoc.getReshardingKey());
+            TypeCollectionDonorFields donorField(coordinatorDoc.getTempReshardingNss(),
+                                                 coordinatorDoc.getReshardingKey());
             originalEntryReshardingFields.setDonorFields(donorField);
 
             return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
@@ -238,7 +248,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             // 'state' field and add the 'recipientFields' to the 'reshardingFields' section.
             auto recipientFields = constructRecipientFields(coordinatorDoc);
             BSONObj setFields =
-                BSON("uuid" << coordinatorDoc.get_id() << "key"
+                BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
                             << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
                             << newCollectionEpoch.get() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
@@ -292,7 +302,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
 
     auto request = BatchedCommandRequest::buildUpdateOp(
         CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << coordinatorDoc.getNss().ns()),  // query
+        BSON(CollectionType::kNssFieldName << coordinatorDoc.getSourceNss().ns()),  // query
         writeOp,
         false,  // upsert
         false   // multi
@@ -410,9 +420,9 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
     // exist, so cannot pass a value for expectedNumModified
     const auto chunksQuery = [&]() {
         if (newCollectionTimestamp) {
-            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getExistingUUID());
+            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getSourceUUID());
         } else {
-            return BSON(ChunkType::ns(coordinatorDoc.getNss().ns()));
+            return BSON(ChunkType::ns(coordinatorDoc.getSourceNss().ns()));
         }
     }();
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
@@ -431,8 +441,8 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
         TagsType::ConfigNS,
         BatchedCommandRequest::buildDeleteOp(
             TagsType::ConfigNS,
-            BSON(ChunkType::ns(coordinatorDoc.getNss().ns())),  // query
-            true                                                // multi
+            BSON(ChunkType::ns(coordinatorDoc.getSourceNss().ns())),  // query
+            true                                                      // multi
             ),
         txnNumber);
 }
@@ -447,7 +457,7 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
     // newCollectionEpoch.
     const auto chunksQuery = [&]() {
         if (newCollectionTimestamp) {
-            return BSON(ChunkType::collectionUUID() << coordinatorDoc.get_id());
+            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getReshardingUUID());
         } else {
             return BSON(ChunkType::ns(coordinatorDoc.getTempReshardingNss().ns()));
         }
@@ -456,7 +466,7 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
         if (newCollectionTimestamp) {
             return BSON("$set" << BSON("lastmodEpoch" << newCollectionEpoch));
         } else {
-            return BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns() << "lastmodEpoch"
+            return BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns() << "lastmodEpoch"
                                             << newCollectionEpoch));
         }
     }();
@@ -472,10 +482,10 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
 
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
-        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
-        BSON("$set" << BSON("ns" << coordinatorDoc.getNss().ns())),      // update
-        false,                                                           // upsert
-        true                                                             // multi
+        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),    // query
+        BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns())),  // update
+        false,                                                             // upsert
+        true                                                               // multi
     );
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
@@ -577,7 +587,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         // metadata.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
-            updatedCoordinatorDoc.getNss(),
+            updatedCoordinatorDoc.getSourceNss(),
             extractShardIds(updatedCoordinatorDoc.getDonorShards()),
             std::move(changeMetadataFunc));
     } else if (participantsToNotify == ParticipantsToNotifyEnum::kRecipients) {
@@ -596,7 +606,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         // shards would not apply.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
-            updatedCoordinatorDoc.getNss(),
+            updatedCoordinatorDoc.getSourceNss(),
             extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
     }
@@ -612,13 +622,13 @@ CollectionType createTempReshardingCollectionType(
     CollectionType collType(coordinatorDoc.getTempReshardingNss(),
                             chunkVersion.epoch(),
                             opCtx->getServiceContext()->getPreciseClockSource()->now(),
-                            coordinatorDoc.get_id());
+                            coordinatorDoc.getReshardingUUID());
     collType.setKeyPattern(coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
     collType.setUnique(false);
     collType.setTimestamp(chunkVersion.getTimestamp());
 
-    TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.get_id());
+    TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.getReshardingUUID());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
 
     auto recipientFields = constructRecipientFields(coordinatorDoc);
@@ -631,7 +641,7 @@ CollectionType createTempReshardingCollectionType(
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc) {
     auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, coordinatorDoc.getNss(), repl::ReadConcernLevel::kMajorityReadConcern);
+        opCtx, coordinatorDoc.getSourceNss(), repl::ReadConcernLevel::kMajorityReadConcern);
     const auto collation = originalCollType.getDefaultCollation();
 
     executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
@@ -646,7 +656,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                           str::stream()
                               << "Only one resharding operation is allowed to be active at a "
                                  "time, aborting resharding op for "
-                              << coordinatorDoc.getNss());
+                              << coordinatorDoc.getSourceNss());
             }
 
             throw;
@@ -676,9 +686,9 @@ std::vector<DonorShardEntry> constructDonorShardEntries(const std::set<ShardId>&
                    donorShardIds.end(),
                    std::back_inserter(donorShards),
                    [](const ShardId& shardId) -> DonorShardEntry {
-                       DonorShardEntry entry{shardId};
-                       entry.setState(DonorStateEnum::kUnused);
-                       return entry;
+                       DonorShardContext donorCtx;
+                       donorCtx.setState(DonorStateEnum::kUnused);
+                       return DonorShardEntry{shardId, std::move(donorCtx)};
                    });
     return donorShards;
 }
@@ -690,9 +700,9 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
                    recipientShardIds.end(),
                    std::back_inserter(recipientShards),
                    [](const ShardId& shardId) -> RecipientShardEntry {
-                       RecipientShardEntry entry{shardId};
-                       entry.setState(RecipientStateEnum::kUnused);
-                       return entry;
+                       RecipientShardContext recipientCtx;
+                       recipientCtx.setState(RecipientStateEnum::kUnused);
+                       return RecipientShardEntry{shardId, std::move(recipientCtx)};
                    });
     return recipientShards;
 }
@@ -701,7 +711,7 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-            opCtx, coordinatorDoc.getNss()));
+            opCtx, coordinatorDoc.getSourceNss()));
 
     std::set<ShardId> donorShardIds;
     cm.getAllShardIds(&donorShardIds);
@@ -722,7 +732,7 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
                 ReshardedChunk::parse(IDLParserErrorContext("ReshardedChunk"), obj);
             if (version.getTimestamp()) {
                 initialChunks.emplace_back(
-                    coordinatorDoc.get_id(),
+                    coordinatorDoc.getReshardingUUID(),
                     ChunkRange{reshardedChunk.getMin(), reshardedChunk.getMax()},
                     version,
                     reshardedChunk.getRecipientShardId());
@@ -743,7 +753,7 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         cm.forEachChunk([&](const auto& chunk) {
             // TODO SERVER-49526 Change the range to refer to the new shard key pattern.
             if (version.getTimestamp()) {
-                initialChunks.emplace_back(coordinatorDoc.get_id(),
+                initialChunks.emplace_back(coordinatorDoc.getReshardingUUID(),
                                            ChunkRange{chunk.getMin(), chunk.getMax()},
                                            version,
                                            chunk.getShardId());
@@ -910,15 +920,15 @@ ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
 
 void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
     const ReshardingCoordinatorDocument& doc) {
-    invariant(doc.get_id() == _coordinatorDoc.get_id());
+    invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());
 
     LOGV2_INFO(5343001,
                "Transitioned resharding coordinator state",
                "newState"_attr = CoordinatorState_serializer(doc.getState()),
                "oldState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
-               "ns"_attr = doc.getNss(),
-               "collectionUUID"_attr = doc.getCommonReshardingMetadata().getExistingUUID(),
-               "reshardingUUID"_attr = doc.get_id());
+               "namespace"_attr = doc.getSourceNss(),
+               "collectionUUID"_attr = doc.getSourceUUID(),
+               "reshardingUUID"_attr = doc.getReshardingUUID());
 
     _coordinatorDoc = doc;
 }
@@ -997,7 +1007,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         })
         .then([this, executor] {
             _tellAllParticipantsToRefresh(
-                createFinishReshardCollectionCommand(_coordinatorDoc.getNss()), executor);
+                createFinishReshardCollectionCommand(_coordinatorDoc.getSourceNss()), executor);
         })
         .then([this, self = shared_from_this(), executor] {
             // The shared_ptr maintaining the ReshardingCoordinatorService Instance object gets
@@ -1014,7 +1024,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 }
             }
 
-            auto nss = _coordinatorDoc.getNss();
+            auto nss = _coordinatorDoc.getSourceNss();
 
             LOGV2(4956902,
                   "Resharding failed",
@@ -1082,8 +1092,8 @@ boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::re
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
     ReshardingMetrics::ReporterOptions options(
         ReshardingMetrics::ReporterOptions::Role::kCoordinator,
-        _coordinatorDoc.get_id(),
-        _coordinatorDoc.getNss(),
+        _coordinatorDoc.getReshardingUUID(),
+        _coordinatorDoc.getSourceNss(),
         _coordinatorDoc.getReshardingKey().toBSON(),
         false);
     return ReshardingMetrics::get(cc().getServiceContext())->reportForCurrentOp(options);
@@ -1149,12 +1159,23 @@ void emplaceApproxBytesToCopyIfExists(ReshardingCoordinatorDocument& coordinator
         return;
     }
 
-    if (auto alreadyExistingApproxCopySize = coordinatorDoc.getApproxCopySize()) {
-        invariant(approxCopySize->toBSON().woCompare(alreadyExistingApproxCopySize->toBSON()) == 0,
-                  "Expected the existing and the new values for approxCopySize to be equal");
+    invariant(bool(coordinatorDoc.getApproxBytesToCopy()) ==
+                  bool(coordinatorDoc.getApproxDocumentsToCopy()),
+              "Expected approxBytesToCopy and approxDocumentsToCopy to either both be set or to"
+              " both be unset");
+
+    if (auto alreadyExistingApproxBytesToCopy = coordinatorDoc.getApproxBytesToCopy()) {
+        invariant(approxCopySize->getApproxBytesToCopy() == *alreadyExistingApproxBytesToCopy,
+                  "Expected the existing and the new values for approxBytesToCopy to be equal");
     }
 
-    coordinatorDoc.setApproxCopySize(std::move(approxCopySize));
+    if (auto alreadyExistingApproxDocumentsToCopy = coordinatorDoc.getApproxDocumentsToCopy()) {
+        invariant(approxCopySize->getApproxDocumentsToCopy() ==
+                      *alreadyExistingApproxDocumentsToCopy,
+                  "Expected the existing and the new values for approxDocumentsToCopy to be equal");
+    }
+
+    coordinatorDoc.setReshardingApproxCopySizeStruct(std::move(*approxCopySize));
 }
 
 ReshardingApproxCopySize computeApproxCopySize(ReshardingCoordinatorDocument& coordinatorDoc) {
@@ -1166,9 +1187,12 @@ ReshardingApproxCopySize computeApproxCopySize(ReshardingCoordinatorDocument& co
     // Compute the aggregate for the number of documents and bytes to copy.
     long aggBytesToCopy = 0, aggDocumentsToCopy = 0;
     for (auto donor : coordinatorDoc.getDonorShards()) {
-        if (const auto cloneSizeInfo = donor.getCloneSizeInfo(); cloneSizeInfo) {
-            aggBytesToCopy += cloneSizeInfo->getBytesToClone().get_value_or(0);
-            aggDocumentsToCopy += cloneSizeInfo->getDocumentsToClone().get_value_or(0);
+        if (const auto bytesToClone = donor.getMutableState().getBytesToClone()) {
+            aggBytesToCopy += *bytesToClone;
+        }
+
+        if (const auto documentsToClone = donor.getMutableState().getDocumentsToClone()) {
+            aggDocumentsToCopy += *documentsToClone;
         }
     }
 
@@ -1341,7 +1365,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
         _coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
         nssToRefresh = _coordinatorDoc.getTempReshardingNss();
     } else {
-        nssToRefresh = _coordinatorDoc.getNss();
+        nssToRefresh = _coordinatorDoc.getSourceNss();
     }
 
     sharding_util::tellShardsToRefreshCollection(
@@ -1353,7 +1377,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefres
     auto opCtx = cc().makeOperationContext();
     auto donorIds = extractShardIds(_coordinatorDoc.getDonorShards());
     sharding_util::tellShardsToRefreshCollection(
-        opCtx.get(), donorIds, _coordinatorDoc.getNss(), **executor);
+        opCtx.get(), donorIds, _coordinatorDoc.getSourceNss(), **executor);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(

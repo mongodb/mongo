@@ -147,10 +147,10 @@ public:
             coll.setDefaultCollation(collation);
 
             TypeCollectionReshardingFields reshardingFields;
-            reshardingFields.setUuid(uuid);
+            reshardingFields.setReshardingUUID(uuid);
             TypeCollectionRecipientFields recipientFields;
-            recipientFields.setOriginalNamespace(origNss);
-            recipientFields.setExistingUUID(uuid);
+            recipientFields.setSourceNss(origNss);
+            recipientFields.setSourceUUID(uuid);
             // Populating the set of donor shard ids isn't necessary to test the functionality of
             // creating the temporary resharding collection.
             recipientFields.setDonorShardIds({});

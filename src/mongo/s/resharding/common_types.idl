@@ -92,36 +92,103 @@ enums:
 
 structs:
     CommonReshardingMetadata:
-        description: "Metadata shared across all node types for a resharding operation."
+        description: "Immutable metadata shared across all node types for a resharding operation."
         generate_comparison_operators: false
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             _id:
+                cpp_name: reshardingUUID
                 type: uuid
                 description: "A unique identifier for the resharding operation."
-            nss:
+            ns:
+                cpp_name: sourceNss
                 type: namespacestring
                 description: "The namespace of the collection being resharded."
-            existingUUID:
+            ui:
+                cpp_name: sourceUUID
                 type: uuid
                 description: "The UUID of the original collection being resharded."
+            tempNs:
+                cpp_name: tempReshardingNss
+                type: namespacestring
+                description: "The namespace of the temporary resharding collection that exists on
+                              recipient shards."
             reshardingKey:
                 type: KeyPattern
                 description: "The index specification document to use as the new shard key."
 
-    MinFetchTimestamp:
+    AbortReason:
         description: "Not meant to be used directly. Only use internal fields."
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
+        # practical effect because this type is only meant to be used as a chained struct with
+        # inline_chained_structs:true and only the strictness setting of the wrapping struct type
+        # applies.
+        strict: false
         fields:
+            abortReason:
+                type: object_owned
+                description: "The error that caused the node to abort the resharding operation. In
+                              this case, the node may be a donor shard, recipient shard, or the
+                              coordinator itself."
+                optional: true
+
+    DonorShardContext:
+        description: "Mutable state for a donor shard tracked both locally by a donor shard and
+                      remotely by the resharding coordinator."
+        inline_chained_structs: true
+        chained_structs:
+            AbortReason: AbortReasonStruct
+        generate_comparison_operators: false
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
+        fields:
+            state:
+                type: DonorState
+                default: kUnused
             minFetchTimestamp:
                 type: timestamp
-                description: "Timestamp after which a donor shard has guaranteed that oplog
+                description: "Timestamp after which this donor shard has guaranteed that oplog
                               entries contain recipient shard information."
                 optional: true
+            bytesToClone:
+                type: long
+                description: "Number of bytes on this donor shard in the collection being
+                              resharded."
+                optional: true
+            documentsToClone:
+                type: long
+                description: "Number of documents on this donor shard in the collection being
+                              resharded."
+                optional: true
+
+    RecipientShardContext:
+        description: "Mutable state for a recipient shard tracked both locally by a recipient shard
+                      and remotely by the resharding coordinator."
+        inline_chained_structs: true
+        chained_structs:
+            AbortReason: AbortReasonStruct
+        generate_comparison_operators: false
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
+        fields:
+            state:
+                type: RecipientState
+                default: kUnused
 
     FetchTimestamp:
         description: "Not meant to be used directly. Only use internal fields."
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
+        # practical effect because this type is only meant to be used as a chained struct with
+        # inline_chained_structs:true and only the strictness setting of the wrapping struct type
+        # applies.
+        strict: false
         fields:
             fetchTimestamp:
                 type: timestamp
@@ -129,39 +196,13 @@ structs:
                               retrieve documents from donor shards."
                 optional: true
 
-    StrictConsistencyTimestamp:
-        description: "Not meant to be used directly. Only use internal fields."
-        strict: true
-        fields:
-            strictConsistencyTimestamp:
-                type: timestamp
-                description: "Timestamp after which all writes to a particular recipient shard for
-                              the original resharding collection will be executed as distributed
-                              transactions."
-                optional: true
-    
-    AbortReason:
-        description: "Not meant to be used directly. Only use internal fields."
-        fields:
-            abortReason:
-                type: object_owned
-                description: "The error that caused the node to abort the resharding operation. In
-                             this case, the node may be a donor shard, recipient shard, or the
-                             coordinator itself." 
-                optional: true 
-
-    ReshardingCloneSize:
-        description: "Not meant to be used directly. Only use internal fields."
-        fields:
-            bytesToClone:
-                type: long
-                optional: true
-            documentsToClone:
-                type: long
-                optional: true
-
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."
+        # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
+        # practical effect because this type is only meant to be used as a chained struct with
+        # inline_chained_structs:true and only the strictness setting of the wrapping struct type
+        # applies.
+        strict: false
         fields:
             approxDocumentsToCopy:
                 type: long
@@ -172,6 +213,9 @@ structs:
 
     ReshardingSourceId:
         description: "Identifier for a shard involved in a particular resharding operation."
+        # Use strict:true because this type is used as the structure for the _id value in documents
+        # and requires being an exact match.
+        strict: true
         fields:
             reshardingUUID:
                 type: uuid

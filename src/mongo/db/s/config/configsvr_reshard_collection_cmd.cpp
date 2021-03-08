@@ -119,16 +119,18 @@ public:
                 nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
             auto coordinatorDoc =
-                ReshardingCoordinatorDocument(std::move(tempReshardingNss),
-                                              std::move(CoordinatorStateEnum::kUnused),
+                ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
                                               {},   // donorShards
                                               {});  // recipientShards
 
             // Generate the resharding metadata for the ReshardingCoordinatorDocument.
             auto reshardingUUID = UUID::gen();
             auto existingUUID = getCollectionUUIDFromChunkManger(ns(), cm);
-            auto commonMetadata = CommonReshardingMetadata(
-                std::move(reshardingUUID), ns(), std::move(existingUUID), request().getKey());
+            auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
+                                                           ns(),
+                                                           std::move(existingUUID),
+                                                           std::move(tempReshardingNss),
+                                                           request().getKey());
             coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
             coordinatorDoc.setZones(request().getZones());
             coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
