@@ -1272,14 +1272,13 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
         return {Future<void>::makeReady()};
     }
 
-    auto opCtx = cc().makeOperationContext();
-    _tenantAllDatabaseCloner =
-        std::make_unique<TenantAllDatabaseCloner>(_sharedData.get(),
-                                                  _client->getServerHostAndPort(),
-                                                  _client.get(),
-                                                  repl::StorageInterface::get(opCtx.get()),
-                                                  _writerPool.get(),
-                                                  _tenantId);
+    _tenantAllDatabaseCloner = std::make_unique<TenantAllDatabaseCloner>(
+        _sharedData.get(),
+        _client->getServerHostAndPort(),
+        _client.get(),
+        repl::StorageInterface::get(cc().getServiceContext()),
+        _writerPool.get(),
+        _tenantId);
     LOGV2_DEBUG(4881100,
                 1,
                 "Starting TenantAllDatabaseCloner",
@@ -1309,7 +1308,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
         return SemiFuture<void>::makeReady();
     }
 
-    auto opCtx = cc().makeOperationContext();
     {
         stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
         auto lastVisibleMajorityCommittedDonorOpTime =
@@ -1318,7 +1316,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
         _stateDoc.setDataConsistentStopDonorOpTime(lastVisibleMajorityCommittedDonorOpTime);
     }
     _stateDoc.setCloneFinishedRecipientOpTime(
-        repl::ReplicationCoordinator::get(opCtx.get())->getMyLastAppliedOpTime());
+        repl::ReplicationCoordinator::get(cc().getServiceContext())->getMyLastAppliedOpTime());
 
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
@@ -1727,13 +1725,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            // If our state is initialized and we haven't fulfilled the
                            // '_stateDocPersistedPromise' yet, it means we are restarting the future
                            // chain due to recipient failover.
-                           auto opCtx = cc().makeOperationContext();
                            _stateDoc.setNumRestartsDueToRecipientFailure(
                                _stateDoc.getNumRestartsDueToRecipientFailure() + 1);
                            const auto stateDoc = _stateDoc;
                            lk.unlock();
                            // Update the state document outside the mutex to avoid a deadlock in the
                            // case of a concurrent stepdown.
+                           auto opCtx = cc().makeOperationContext();
                            uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(
                                opCtx.get(), stateDoc));
                            return SemiFuture<void>::makeReady();
