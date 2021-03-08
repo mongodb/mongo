@@ -1447,6 +1447,23 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='primary_only_service_test_fixture',
+    source=[
+        'primary_only_service_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/op_observer_impl',
+        'primary_only_service',
+        'repl_coordinator_interface',
+        'replmocks',
+        'wait_for_majority_service',
+    ],
+)
+
 if wiredtiger:
 
     env.Library(
@@ -1602,6 +1619,7 @@ if wiredtiger:
             'oplog_interface_remote',
             'optime',
             'primary_only_service',
+            'primary_only_service_test_fixture',
             'repl_coordinator_impl',
             'repl_server_parameters',
             'replica_set_messages',
