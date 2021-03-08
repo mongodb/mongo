@@ -478,10 +478,12 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
             andMatchExpr->add(std::make_unique<InternalExprLTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
+                              << path,
                 rhs));
             andMatchExpr->add(std::make_unique<InternalExprGTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
+                              << path,
                 rhs));
 
             if (path == bucketSpec.timeField) {
@@ -492,17 +494,20 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         }
         case MatchExpression::GT: {
             return std::make_unique<InternalExprGTMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
+                              << path,
                 rhs);
         }
         case MatchExpression::GTE: {
             return std::make_unique<InternalExprGTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
+                              << path,
                 rhs);
         }
         case MatchExpression::LT: {
             auto controlPred = std::make_unique<InternalExprLTMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
+                              << path,
                 rhs);
             if (path == bucketSpec.timeField) {
                 auto andMatchExpr = std::make_unique<AndMatchExpression>();
@@ -517,7 +522,8 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         }
         case MatchExpression::LTE: {
             auto controlPred = std::make_unique<InternalExprLTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldName << path,
+                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
+                              << path,
                 rhs);
             if (path == bucketSpec.timeField) {
                 auto andMatchExpr = std::make_unique<AndMatchExpression>();
