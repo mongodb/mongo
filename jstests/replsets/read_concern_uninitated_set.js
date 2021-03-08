@@ -29,6 +29,11 @@ assert.commandFailedWithCode(
         {find: "test", filter: {}, maxTimeMS: 60000, readConcern: {level: "majority"}}),
     ErrorCodes.NotYetInitialized);
 
+// TODO SERVER-47568: Only expect NotPrimaryOrSecondary.
+const expectedCodes = jsTest.options().useRandomBinVersionsWithinReplicaSet
+    ? [ErrorCodes.NotYetInitialized, ErrorCodes.NotPrimaryOrSecondary]
+    : [ErrorCodes.NotYetInitialized];
+
 jsTestLog("afterClusterTime readConcern should fail with NotYetInitialized.");
 assert.commandFailedWithCode(localDB.runCommand({
     find: "test",
@@ -36,7 +41,7 @@ assert.commandFailedWithCode(localDB.runCommand({
     maxTimeMS: 60000,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotYetInitialized);
+                             expectedCodes);
 
 jsTestLog("oplog query should fail with NotYetInitialized.");
 assert.commandFailedWithCode(localDB.runCommand({
@@ -49,6 +54,6 @@ assert.commandFailedWithCode(localDB.runCommand({
     term: 1,
     readConcern: {afterClusterTime: Timestamp(1, 1)}
 }),
-                             ErrorCodes.NotYetInitialized);
+                             expectedCodes);
 rst.stopSet();
 }());
