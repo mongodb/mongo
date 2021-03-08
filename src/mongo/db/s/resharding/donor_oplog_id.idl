@@ -39,6 +39,9 @@ structs:
         description: >-
             Represents the set of timestamps that belong to an operation from the donor shard.
         generate_comparison_operators: true
+        # Use strict:true because this type is used as the structure for the _id value in documents
+        # and requires being an exact match.
+        strict: true
         fields:
             clusterTime:
                 type: timestamp

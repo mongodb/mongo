@@ -86,7 +86,8 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
         // exception. This is safe because PrimaryOnlyService::onStepUp() will have constructed a
         // new instance of the resharding state machine.
         auto dupeKeyInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
-        invariant(dupeKeyInfo->getDuplicatedKeyValue().binaryEqual(BSON("_id" << doc.get_id())));
+        invariant(dupeKeyInfo->getDuplicatedKeyValue().binaryEqual(
+            BSON("_id" << doc.getReshardingUUID())));
     }
 }
 
@@ -118,7 +119,7 @@ void processAbortReasonNoDonorMachine(OperationContext* opCtx,
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         NamespaceString::kConfigReshardingOperationsNamespace,
-        BSON("_id" << reshardingFields.getUuid() << "donorShards.id" << shardId),
+        BSON("_id" << reshardingFields.getReshardingUUID() << "donorShards.id" << shardId),
         BSON("$set" << updateBuilder.done()),
         false /* upsert */,
         ShardingCatalogClient::kMajorityWriteConcern));
@@ -154,7 +155,7 @@ void processAbortReasonNoRecipientMachine(OperationContext* opCtx,
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         NamespaceString::kConfigReshardingOperationsNamespace,
-        BSON("_id" << reshardingFields.getUuid() << "recipientShards.id" << shardId),
+        BSON("_id" << reshardingFields.getReshardingUUID() << "recipientShards.id" << shardId),
         BSON("$set" << updateBuilder.done()),
         false /* upsert */,
         ShardingCatalogClient::kMajorityWriteConcern));
@@ -171,7 +172,7 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
     if (auto donorStateMachine = tryGetReshardingStateMachine<ReshardingDonorService,
                                                               DonorStateMachine,
                                                               ReshardingDonorDocument>(
-            opCtx, reshardingFields.getUuid())) {
+            opCtx, reshardingFields.getReshardingUUID())) {
         donorStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
         return;
     }
@@ -218,7 +219,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
     if (auto recipientStateMachine = tryGetReshardingStateMachine<ReshardingRecipientService,
                                                                   RecipientStateMachine,
                                                                   ReshardingRecipientDocument>(
-            opCtx, reshardingFields.getUuid())) {
+            opCtx, reshardingFields.getReshardingUUID())) {
         recipientStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
         return;
     }
@@ -247,7 +248,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
     }
 
     auto recipientDoc =
-        constructRecipientDocumentFromReshardingFields(opCtx, metadata, reshardingFields);
+        constructRecipientDocumentFromReshardingFields(opCtx, nss, metadata, reshardingFields);
     createReshardingStateMachine<ReshardingRecipientService,
                                  RecipientStateMachine,
                                  ReshardingRecipientDocument>(opCtx, recipientDoc);
@@ -291,12 +292,17 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields) {
-    auto donorDoc = ReshardingDonorDocument(DonorStateEnum::kPreparingToDonate);
+    DonorShardContext donorCtx;
+    donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
+    auto donorDoc = ReshardingDonorDocument{std::move(donorCtx)};
+
+    auto sourceUUID = getCollectionUUIDFromChunkManger(nss, *metadata.getChunkManager());
     auto commonMetadata =
-        CommonReshardingMetadata(reshardingFields.getUuid(),
+        CommonReshardingMetadata(reshardingFields.getReshardingUUID(),
                                  nss,
-                                 getCollectionUUIDFromChunkManger(nss, *metadata.getChunkManager()),
+                                 sourceUUID,
+                                 reshardingFields.getDonorFields()->getTempReshardingNss(),
                                  reshardingFields.getDonorFields()->getReshardingKey().toBSON());
     donorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
@@ -305,21 +311,26 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
 
 ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     OperationContext* opCtx,
+    const NamespaceString& nss,
     const CollectionMetadata& metadata,
     const ReshardingFields& reshardingFields) {
     // The recipient state machines are created before the donor shards are prepared to donate but
     // will remain idle until the donor shards are prepared to donate.
     invariant(!reshardingFields.getRecipientFields()->getFetchTimestamp());
 
-    auto recipientDoc =
-        ReshardingRecipientDocument(RecipientStateEnum::kAwaitingFetchTimestamp,
-                                    reshardingFields.getRecipientFields()->getDonorShardIds());
+    RecipientShardContext recipientCtx;
+    recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
-    auto commonMetadata =
-        CommonReshardingMetadata(reshardingFields.getUuid(),
-                                 reshardingFields.getRecipientFields()->getOriginalNamespace(),
-                                 reshardingFields.getRecipientFields()->getExistingUUID(),
-                                 metadata.getShardKeyPattern().toBSON());
+    auto recipientDoc = ReshardingRecipientDocument{
+        std::move(recipientCtx), reshardingFields.getRecipientFields()->getDonorShardIds()};
+
+    auto sourceNss = reshardingFields.getRecipientFields()->getSourceNss();
+    auto sourceUUID = reshardingFields.getRecipientFields()->getSourceUUID();
+    auto commonMetadata = CommonReshardingMetadata(reshardingFields.getReshardingUUID(),
+                                                   sourceNss,
+                                                   sourceUUID,
+                                                   nss,
+                                                   metadata.getShardKeyPattern().toBSON());
     recipientDoc.setCommonReshardingMetadata(std::move(commonMetadata));
 
     return recipientDoc;

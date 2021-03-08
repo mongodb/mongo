@@ -134,8 +134,8 @@ bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollecti
             "decision persisted",
             recipientFields);
 
-    const auto& originalUUID = recipientFields->getExistingUUID();
-    const auto& reshardingUUID = reshardingFields->getUuid();
+    const auto& originalUUID = recipientFields->getSourceUUID();
+    const auto& reshardingUUID = reshardingFields->getReshardingUUID();
 
     if (currentCollectionUUID == originalUUID) {
         // This shard must be both a donor and recipient. Neither the drop or renameCollection have

@@ -79,7 +79,7 @@ protected:
             auto collType = getDefaultCollectionType(epoch, shardKeyPattern);
 
             TypeCollectionReshardingFields reshardingFields;
-            reshardingFields.setUuid(reshardingUUID);
+            reshardingFields.setReshardingUUID(reshardingUUID);
             collType.setReshardingFields(std::move(reshardingFields));
 
             std::vector<BSONObj> aggResult;
@@ -137,7 +137,7 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());
     ASSERT_EQ(4, cm.numChunks());
-    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getUuid());
+    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getReshardingUUID());
 }
 
 TEST_F(CatalogCacheRefreshTest, NoLoadIfShardNotMarkedStaleInOperationContext) {
@@ -863,7 +863,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());
     ASSERT_EQ(2, cm.numChunks());
-    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getUuid());
+    ASSERT_EQ(reshardingUUID, cm.getReshardingFields()->getReshardingUUID());
     ASSERT_EQ(version, cm.getVersion());
     ASSERT_EQ(version, cm.getVersion({"0"}));
     ASSERT_EQ(expectedDestShardVersion, cm.getVersion({"1"}));
@@ -874,13 +874,13 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
     const UUID reshardingUUID = UUID::gen();
 
     TypeCollectionReshardingFields reshardingFields;
-    reshardingFields.setUuid(reshardingUUID);
+    reshardingFields.setReshardingUUID(reshardingUUID);
 
     auto initialRoutingInfo(
         makeChunkManager(kNss, shardKeyPattern, nullptr, true, {}, reshardingFields));
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
-    ASSERT_EQ(reshardingUUID, initialRoutingInfo.getReshardingFields()->getUuid());
+    ASSERT_EQ(reshardingUUID, initialRoutingInfo.getReshardingFields()->getReshardingUUID());
 
     setupNShards(2);
 

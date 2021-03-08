@@ -57,7 +57,7 @@ reshardingTest.withReshardingInBackground(
         });
 
         let coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-            nss: sourceCollection.getFullName()
+            ns: sourceCollection.getFullName()
         });
 
         assert.neq(null, coordinatorDoc);
@@ -68,7 +68,7 @@ reshardingTest.withReshardingInBackground(
 
         assert.soon(() => {
             coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                nss: sourceCollection.getFullName()
+                ns: sourceCollection.getFullName()
             });
 
             return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;

@@ -41,6 +41,10 @@ imports:
 structs:
     ReshardingTxnClonerProgress:
         description: "Used for storing the progress made by the resharding transaction cloner."
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             _id:
                 type: ReshardingSourceId
@@ -51,4 +55,3 @@ structs:
                 description: >-
                     The minimum point where the resharding transaction cloner can start without
                     missing any config.transactions entries it needs to process.
-

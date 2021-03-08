@@ -40,6 +40,10 @@ imports:
 structs:
     ReshardingOplogApplierProgress:
         description: "Used for storing the progress made by the resharding oplog applier."
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             _id:
                 type: ReshardingSourceId
@@ -50,4 +54,3 @@ structs:
                 description: >-
                     The minimum point where the resharding oplog applier can start without missing
                     any oplog it needs to process.
-

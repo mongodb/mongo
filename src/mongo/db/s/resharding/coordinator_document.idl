@@ -39,35 +39,30 @@ structs:
     DonorShardEntry:
         description: "Represents a donor shard for a particular resharding operation on the
                       coordinator."
-        inline_chained_structs: true
-        chained_structs:
-            MinFetchTimestamp: MinFetchTimestampStruct
-            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             id: shard_id
-            state:
-                type: DonorState
-                optional: true
-            cloneSizeInfo:
-                type: ReshardingCloneSize
-                optional: true
+            # We intentionally have the mutable state nested in a subobject to make it easy to
+            # overwrite with a single $set.
+            mutableState: DonorShardContext
 
     RecipientShardEntry:
         description: "Represents a recipient shard for a particular resharding operation on the
                       coordinator."
-        inline_chained_structs: true
-        chained_structs:
-            StrictConsistencyTimestamp: StrictConsistencyTimestampStruct
-            AbortReason: AbortReasonStruct
         generate_comparison_operators: false
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
             id: shard_id
-            state:
-                type: RecipientState
-                optional: true
+            # We intentionally have the mutable state nested in a subobject to make it easy to
+            # overwrite with a single $set.
+            mutableState: RecipientShardContext
 
     ReshardingCoordinatorDocument:
         description: "Represents a resharding operation on the coordinator."
@@ -75,14 +70,14 @@ structs:
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
             FetchTimestamp: FetchTimestampStruct
+            ReshardingApproxCopySize: ReshardingApproxCopySizeStruct
             AbortReason: AbortReasonStruct
         generate_comparison_operators: false
-        strict: true
+        # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
+        # required for resharding because durable state from all resharding operations is cleaned up
+        # before the upgrade or downgrade can complete.
+        strict: false
         fields:
-            tempReshardingNss:
-                type: namespacestring
-                description: "The namespace of the temporary resharding collection that exists on
-                            recipient shards."
             state: CoordinatorState
             donorShards:
                 type: array<DonorShardEntry>
@@ -93,10 +88,6 @@ structs:
             zones:
                 type: array<object_owned>
                 description: "The zones associated with the new shard key."
-                optional: true
-            approxCopySize:
-                type: ReshardingApproxCopySize
-                description: "The approximate data that each recipient clones for this operation."
                 optional: true
             presetReshardedChunks:
                 type: array<object_owned>

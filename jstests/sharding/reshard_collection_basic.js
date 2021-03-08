@@ -89,27 +89,23 @@ let verifyTemporaryReshardingCollectionExistsWithCorrectOptions = (expectedRecip
 
 let verifyAllShardingCollectionsRemoved = (tempReshardingCollName) => {
     assert.eq(0, mongos.getDB(kDbName)[tempReshardingCollName].find().itcount());
-    assert.eq(0, mongosConfig.reshardingOperations.find({nss: ns}).itcount());
+    assert.eq(0, mongosConfig.reshardingOperations.find({ns}).itcount());
     assert.eq(0, mongosConfig.collections.find({reshardingFields: {$exists: true}}).itcount());
+    assert.eq(
+        0,
+        st.rs0.getPrimary().getDB('config').localReshardingOperations.donor.find({ns}).itcount());
     assert.eq(0,
               st.rs0.getPrimary()
                   .getDB('config')
-                  .localReshardingOperations.donor.find({nss: ns})
+                  .localReshardingOperations.recipient.find({ns})
                   .itcount());
-    assert.eq(0,
-              st.rs0.getPrimary()
-                  .getDB('config')
-                  .localReshardingOperations.recipient.find({nss: ns})
-                  .itcount());
+    assert.eq(
+        0,
+        st.rs1.getPrimary().getDB('config').localReshardingOperations.donor.find({ns}).itcount());
     assert.eq(0,
               st.rs1.getPrimary()
                   .getDB('config')
-                  .localReshardingOperations.donor.find({nss: ns})
-                  .itcount());
-    assert.eq(0,
-              st.rs1.getPrimary()
-                  .getDB('config')
-                  .localReshardingOperations.recipient.find({nss: ns})
+                  .localReshardingOperations.recipient.find({ns})
                   .itcount());
 };
 

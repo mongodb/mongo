@@ -68,9 +68,9 @@ protected:
         RecipientStateEnum recipientState,
         boost::optional<Timestamp> timestamp = boost::none,
         boost::optional<Status> abortReason = boost::none) {
-        return {makeRecipientShard(ShardId{"s1"}, recipientState, timestamp, abortReason),
-                makeRecipientShard(ShardId{"s2"}, recipientState, timestamp, abortReason),
-                makeRecipientShard(ShardId{"s3"}, recipientState, timestamp, abortReason)};
+        return {makeRecipientShard(ShardId{"s1"}, recipientState, abortReason),
+                makeRecipientShard(ShardId{"s2"}, recipientState, abortReason),
+                makeRecipientShard(ShardId{"s3"}, recipientState, abortReason)};
     }
 };
 
@@ -144,7 +144,6 @@ TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
         {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kCloning)},
         {makeRecipientShard(ShardId{"s2"},
                             RecipientStateEnum::kError,
-                            boost::none,  // timestamp
                             Status{ErrorCodes::InternalError, "We gotta abort"})},
         {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kApplying)}};
     auto coordinatorDoc = makeCoordinatorDocWithRecipientsAndDonors(recipientShards, donorShards);
@@ -169,18 +168,9 @@ TEST_F(ReshardingCoordinatorObserverTest, participantsDoneAborting) {
     // All participants have an abortReason, but not all are in state kDone yet.
     auto donorShards = makeMockDonorsInState(DonorStateEnum::kDone, Timestamp(1, 1), abortReason);
     std::vector<RecipientShardEntry> recipientShards0{
-        {makeRecipientShard(ShardId{"s1"},
-                            RecipientStateEnum::kError,
-                            boost::none,  // timestamp
-                            abortReason)},
-        {makeRecipientShard(ShardId{"s2"},
-                            RecipientStateEnum::kDone,
-                            boost::none,  // timestamp
-                            abortReason)},
-        {makeRecipientShard(ShardId{"s3"},
-                            RecipientStateEnum::kDone,
-                            boost::none,  // timestamp
-                            abortReason)}};
+        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kError, abortReason)},
+        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kDone, abortReason)},
+        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kDone, abortReason)}};
     auto coordinatorDoc0 =
         makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards, abortReason);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);

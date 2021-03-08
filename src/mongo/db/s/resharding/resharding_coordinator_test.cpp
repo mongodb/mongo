@@ -85,11 +85,10 @@ protected:
     ReshardingCoordinatorDocument makeCoordinatorDoc(
         CoordinatorStateEnum state, boost::optional<Timestamp> fetchTimestamp = boost::none) {
         CommonReshardingMetadata meta(
-            _reshardingUUID, _originalNss, UUID::gen(), _newShardKey.toBSON());
-        ReshardingCoordinatorDocument doc(_tempNss,
-                                          state,
-                                          {DonorShardEntry(ShardId("shard0000"))},
-                                          {RecipientShardEntry(ShardId("shard0001"))});
+            _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
+        ReshardingCoordinatorDocument doc(state,
+                                          {DonorShardEntry(ShardId("shard0000"), {})},
+                                          {RecipientShardEntry(ShardId("shard0001"), {})});
         doc.setCommonReshardingMetadata(meta);
         emplaceFetchTimestampIfExists(doc, std::move(fetchTimestamp));
         return doc;
@@ -112,7 +111,7 @@ protected:
         }
 
         CollectionType collType(
-            coordinatorDoc.getNss(), std::move(epoch), lastUpdated, std::move(uuid));
+            coordinatorDoc.getSourceNss(), std::move(epoch), lastUpdated, std::move(uuid));
         collType.setKeyPattern(shardKey);
         collType.setUnique(false);
         if (reshardingFields)
@@ -196,10 +195,10 @@ protected:
         client.insert(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
                       coordinatorDoc.toBSON());
 
-        TypeCollectionReshardingFields reshardingFields(coordinatorDoc.get_id());
+        TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
         reshardingFields.setState(coordinatorDoc.getState());
-        reshardingFields.setDonorFields(
-            TypeCollectionDonorFields(coordinatorDoc.getReshardingKey()));
+        reshardingFields.setDonorFields(TypeCollectionDonorFields(
+            coordinatorDoc.getTempReshardingNss(), coordinatorDoc.getReshardingKey()));
 
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
@@ -235,13 +234,14 @@ protected:
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
-                                  Query(BSON("nss" << expectedCoordinatorDoc.getNss().ns())));
+                                  Query(BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns())));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserErrorContext("ReshardingCoordinatorTest"), doc);
 
-        ASSERT_EQUALS(coordinatorDoc.get_id(), expectedCoordinatorDoc.get_id());
-        ASSERT_EQUALS(coordinatorDoc.getNss(), expectedCoordinatorDoc.getNss());
+        ASSERT_EQUALS(coordinatorDoc.getReshardingUUID(),
+                      expectedCoordinatorDoc.getReshardingUUID());
+        ASSERT_EQUALS(coordinatorDoc.getSourceNss(), expectedCoordinatorDoc.getSourceNss());
         ASSERT_EQUALS(coordinatorDoc.getTempReshardingNss(),
                       expectedCoordinatorDoc.getTempReshardingNss());
         ASSERT_EQUALS(coordinatorDoc.getReshardingKey().toBSON().woCompare(
@@ -284,14 +284,14 @@ protected:
                              onDiskDonorShards.end(),
                              [shardId](DonorShardEntry d) { return d.getId() == shardId; });
             ASSERT(onDiskIt != onDiskDonorShards.end());
-            if (it->getMinFetchTimestamp()) {
-                ASSERT(onDiskIt->getMinFetchTimestamp());
-                ASSERT_EQUALS(onDiskIt->getMinFetchTimestamp().get(),
-                              it->getMinFetchTimestamp().get());
+            if (it->getMutableState().getMinFetchTimestamp()) {
+                ASSERT(onDiskIt->getMutableState().getMinFetchTimestamp());
+                ASSERT_EQUALS(onDiskIt->getMutableState().getMinFetchTimestamp().get(),
+                              it->getMutableState().getMinFetchTimestamp().get());
             } else {
-                ASSERT(!onDiskIt->getMinFetchTimestamp());
+                ASSERT(!onDiskIt->getMutableState().getMinFetchTimestamp());
             }
-            ASSERT(onDiskIt->getState() == it->getState());
+            ASSERT(onDiskIt->getMutableState().getState() == it->getMutableState().getState());
         }
 
         auto expectedRecipientShards = expectedCoordinatorDoc.getRecipientShards();
@@ -304,14 +304,7 @@ protected:
                              onDiskRecipientShards.end(),
                              [shardId](RecipientShardEntry r) { return r.getId() == shardId; });
             ASSERT(onDiskIt != onDiskRecipientShards.end());
-            if (it->getStrictConsistencyTimestamp()) {
-                ASSERT(onDiskIt->getStrictConsistencyTimestamp());
-                ASSERT_EQUALS(onDiskIt->getStrictConsistencyTimestamp().get(),
-                              it->getStrictConsistencyTimestamp().get());
-            } else {
-                ASSERT(!onDiskIt->getStrictConsistencyTimestamp());
-            }
-            ASSERT(onDiskIt->getState() == it->getState());
+            ASSERT(onDiskIt->getMutableState().getState() == it->getMutableState().getState());
         }
     }
 
@@ -344,7 +337,8 @@ protected:
 
         ASSERT(onDiskEntry.getReshardingFields());
         auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();
-        ASSERT(onDiskReshardingFields.getUuid() == expectedReshardingFields->getUuid());
+        ASSERT(onDiskReshardingFields.getReshardingUUID() ==
+               expectedReshardingFields->getReshardingUUID());
         ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields->getState());
 
         ASSERT(onDiskReshardingFields.getDonorFields());
@@ -394,12 +388,13 @@ protected:
         ASSERT(onDiskEntry.getReshardingFields());
 
         auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();
-        ASSERT_EQUALS(onDiskReshardingFields.getUuid(), expectedReshardingFields.getUuid());
+        ASSERT_EQUALS(onDiskReshardingFields.getReshardingUUID(),
+                      expectedReshardingFields.getReshardingUUID());
         ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields.getState());
 
         ASSERT(onDiskReshardingFields.getRecipientFields());
-        ASSERT_EQUALS(onDiskReshardingFields.getRecipientFields()->getOriginalNamespace(),
-                      expectedReshardingFields.getRecipientFields()->getOriginalNamespace());
+        ASSERT_EQUALS(onDiskReshardingFields.getRecipientFields()->getSourceNss(),
+                      expectedReshardingFields.getRecipientFields()->getSourceNss());
 
         if (expectedReshardingFields.getRecipientFields()->getFetchTimestamp()) {
             ASSERT(onDiskReshardingFields.getRecipientFields()->getFetchTimestamp());
@@ -472,9 +467,11 @@ protected:
 
         // Check the resharding fields and allowMigrations in the config.collections entry for the
         // original collection
-        TypeCollectionReshardingFields expectedReshardingFields(expectedCoordinatorDoc.get_id());
+        TypeCollectionReshardingFields expectedReshardingFields(
+            expectedCoordinatorDoc.getReshardingUUID());
         expectedReshardingFields.setState(expectedCoordinatorDoc.getState());
-        TypeCollectionDonorFields donorField(expectedCoordinatorDoc.getReshardingKey());
+        TypeCollectionDonorFields donorField(expectedCoordinatorDoc.getTempReshardingNss(),
+                                             expectedCoordinatorDoc.getReshardingKey());
         expectedReshardingFields.setDonorFields(donorField);
         if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
             AbortReason abortReasonStruct;
@@ -518,10 +515,12 @@ protected:
             auto opCtx = operationContext();
             DBDirectClient client(opCtx);
 
-            TypeCollectionReshardingFields reshardingFields(expectedCoordinatorDoc.get_id());
+            TypeCollectionReshardingFields reshardingFields(
+                expectedCoordinatorDoc.getReshardingUUID());
             reshardingFields.setState(expectedCoordinatorDoc.getState());
             reshardingFields.setDonorFields(
-                TypeCollectionDonorFields(expectedCoordinatorDoc.getReshardingKey()));
+                TypeCollectionDonorFields(expectedCoordinatorDoc.getTempReshardingNss(),
+                                          expectedCoordinatorDoc.getReshardingKey()));
 
             auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
                 expectedCoordinatorDoc,
@@ -618,7 +617,7 @@ protected:
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace.ns(),
-                                  Query(BSON("nss" << expectedCoordinatorDoc.getNss().ns())));
+                                  Query(BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns())));
         ASSERT(doc.isEmpty());
 
         // Check that the resharding fields are removed from the config.collections entry and

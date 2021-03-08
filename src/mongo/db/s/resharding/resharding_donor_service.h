@@ -101,6 +101,8 @@ public:
                                     const ReshardingDonorDocument& donorDoc);
 
 private:
+    DonorStateMachine(const ReshardingDonorDocument& donorDoc);
+
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
 
@@ -121,36 +123,41 @@ private:
     // or NamespaceNotFound.
     void _dropOriginalCollection();
 
-    // Transitions the state on-disk and in-memory to 'endState'.
-    void _transitionState(DonorStateEnum endState,
-                          boost::optional<Timestamp> minFetchTimestamp = boost::none,
-                          boost::optional<Status> abortReason = boost::none);
+    // Transitions the on-disk and in-memory state to 'newState'.
+    void _transitionState(DonorStateEnum newState);
 
-    void _transitionStateAndUpdateCoordinator(
-        DonorStateEnum endState,
-        boost::optional<Timestamp> minFetchTimestamp = boost::none,
-        boost::optional<Status> abortReason = boost::none,
-        boost::optional<ReshardingCloneSize> cloneSizeEstimate = boost::none);
+    void _transitionState(DonorShardContext&& newDonorCtx);
 
-    // Updates the donor document on-disk and in-memory with the 'replacementDoc.'
-    void _updateDonorDocument(ReshardingDonorDocument&& replacementDoc);
+    // Transitions the on-disk and in-memory state to DonorStateEnum::kDonatingInitialData.
+    void _transitionToDonatingInitialData(Timestamp minFetchTimestamp,
+                                          int64_t bytesToClone,
+                                          int64_t documentsToClone);
 
-    // Removes the local donor document from disk and clears the in-memory state.
+    // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
+    void _transitionToError(Status abortReason);
+
+    void _updateCoordinator();
+
+    // Updates the mutable portion of the on-disk and in-memory donor document with 'newDonorCtx'.
+    void _updateDonorDocument(DonorShardContext&& newDonorCtx);
+
+    // Removes the local donor document from disk.
     void _removeDonorDocument();
 
     // Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
     // (abort resharding).
     void _onAbortOrStepdown(WithLock lk, Status status);
 
-    // The in-memory representation of the underlying document in
+    // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
-    ReshardingDonorDocument _donorDoc;
+    const CommonReshardingMetadata _metadata;
 
-    // The id both for the resharding operation and for the primary-only-service instance.
-    const UUID _id;
+    // The in-memory representation of the mutable portion of the document in
+    // config.localReshardingOperations.donor.
+    DonorShardContext _donorCtx;
 
     // Protects the promises below
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingDonor::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
 
     boost::optional<ReshardingCriticalSection> _critSec;
 

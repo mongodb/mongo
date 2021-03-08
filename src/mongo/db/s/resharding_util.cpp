@@ -90,22 +90,22 @@ DonorShardEntry makeDonorShard(ShardId shardId,
                                DonorStateEnum donorState,
                                boost::optional<Timestamp> minFetchTimestamp,
                                boost::optional<Status> abortReason) {
-    DonorShardEntry entry(shardId);
-    entry.setState(donorState);
-    emplaceMinFetchTimestampIfExists(entry, minFetchTimestamp);
-    emplaceAbortReasonIfExists(entry, abortReason);
-    return entry;
+    DonorShardContext donorCtx;
+    donorCtx.setState(donorState);
+    emplaceMinFetchTimestampIfExists(donorCtx, minFetchTimestamp);
+    emplaceAbortReasonIfExists(donorCtx, abortReason);
+
+    return DonorShardEntry{std::move(shardId), std::move(donorCtx)};
 }
 
 RecipientShardEntry makeRecipientShard(ShardId shardId,
                                        RecipientStateEnum recipientState,
-                                       boost::optional<Timestamp> strictConsistencyTimestamp,
                                        boost::optional<Status> abortReason) {
-    RecipientShardEntry entry(shardId);
-    entry.setState(recipientState);
-    emplaceStrictConsistencyTimestampIfExists(entry, strictConsistencyTimestamp);
-    emplaceAbortReasonIfExists(entry, abortReason);
-    return entry;
+    RecipientShardContext recipientCtx;
+    recipientCtx.setState(recipientState);
+    emplaceAbortReasonIfExists(recipientCtx, abortReason);
+
+    return RecipientShardEntry{std::move(shardId), std::move(recipientCtx)};
 }
 
 UUID getCollectionUUIDFromChunkManger(const NamespaceString& originalNss, const ChunkManager& cm) {
@@ -185,7 +185,7 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
 
     auto maxMinFetchTimestamp = Timestamp::min();
     for (auto& donor : donorShards) {
-        auto donorFetchTimestamp = donor.getMinFetchTimestamp();
+        auto donorFetchTimestamp = donor.getMutableState().getMinFetchTimestamp();
         uassert(4957300,
                 "All donors must have a minFetchTimestamp, but donor {} does not."_format(
                     donor.getId()),
