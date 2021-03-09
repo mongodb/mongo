@@ -122,6 +122,14 @@ public:
         }
 
         /**
+         * Returns a Future that will be resolved when a migration has called the run() method and
+         * instantiated the CancelationSource.
+         */
+        SharedSemiFuture<void> getMigrationCancelableFuture() const {
+            return _migrationCancelablePromise.getFuture();
+        }
+
+        /**
          * Returns a Future that will be resolved when the donor has majority-committed the write to
          * insert the donor state doc for the migration.
          */
@@ -252,6 +260,10 @@ public:
 
         // The latest majority-committed migration state.
         DurableState _durableState;
+
+        // Promise that is resolved when run() has been called and the CancelationSource has been
+        // instantiated.
+        SharedPromise<void> _migrationCancelablePromise;
 
         // Promise that is resolved when the donor has majority-committed the write to insert the
         // donor state doc for the migration.
