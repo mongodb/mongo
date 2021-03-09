@@ -15,10 +15,9 @@
  *     store.
  */
 static int
-__hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, uint32_t this_btree_id)
+__hs_verify_id(
+  WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_CURSOR_BTREE *ds_cbt, uint32_t this_btree_id)
 {
-    WT_CURSOR *hs_cursor;
-    WT_CURSOR_BTREE *hs_cbt;
     WT_DECL_ITEM(prev_key);
     WT_DECL_RET;
     WT_ITEM key;
@@ -27,11 +26,13 @@ __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, uint32_t this_
     uint32_t btree_id;
     int cmp;
 
-    hs_cursor = session->hs_cursor;
-    hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
     WT_CLEAR(key);
 
     WT_ERR(__wt_scr_alloc(session, 0, &prev_key));
+
+#ifndef HAVE_DIAGNOSTIC
+    WT_UNUSED(this_btree_id);
+#endif
 
     /*
      * If using standard cursors, we need to skip the non-globally visible tombstones in the data
@@ -46,27 +47,18 @@ __hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, uint32_t this_
      * verify. When we return after moving to a new key the caller is responsible for keeping the
      * cursor there or deciding they're done.
      */
-    for (; ret == 0; ret = __wt_hs_cursor_next(session, hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &btree_id, &key, &hs_start_ts, &hs_counter));
-
+    for (; ret == 0; ret = hs_cursor->next(hs_cursor)) {
         /*
          * If the btree id does not match the preview one, we're done. It is up to the caller to set
          * up for the next tree and call us, if they choose. For a full history store walk, the
          * caller sends in WT_BTREE_ID_INVALID and this function will set and use the first btree id
          * it finds and will return once it walks off that tree, leaving the cursor set to the first
          * key of that new tree.
+         *
+         * We should never cross the btree id, assert if we do so.
          */
-        if (btree_id != this_btree_id)
-            break;
-
-        /*
-         * If the stop time pair on the tombstone in the history store is already globally visible
-         * we can skip it.
-         */
-        if (__wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw)) {
-            WT_STAT_CONN_INCR(session, cursor_next_hs_tombstone);
-            continue;
-        }
+        WT_ERR(hs_cursor->get_key(hs_cursor, &btree_id, &key, &hs_start_ts, &hs_counter));
+        WT_ASSERT(session, btree_id == this_btree_id);
 
         /*
          * If we have already checked against this key, keep going to the next key. We only need to
@@ -114,22 +106,14 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session)
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE ds_cbt;
     WT_DECL_RET;
-    WT_ITEM hs_key;
     uint32_t btree_id;
-    int exact;
 
-    hs_cursor = session->hs_cursor;
+    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
+    F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     btree_id = S2BT(session)->id;
 
-    /*
-     * We are required to position the history store cursor. Set it to the first record of our btree
-     * in the history store.
-     */
-    memset(&hs_key, 0, sizeof(hs_key));
-    hs_cursor->set_key(hs_cursor, btree_id, &hs_key, 0, 0);
-    ret = __wt_hs_cursor_search_near(session, hs_cursor, &exact);
-    if (ret == 0 && exact < 0)
-        ret = __wt_hs_cursor_next(session, hs_cursor);
+    hs_cursor->set_key(hs_cursor, 1, btree_id);
+    WT_ERR(__wt_curhs_search_near_after(session, hs_cursor));
 
     /*
      * If we positioned the cursor there is something to verify.
@@ -141,9 +125,12 @@ __wt_hs_verify_one(WT_SESSION_IMPL *session)
     if (ret == 0) {
         __wt_btcur_init(session, &ds_cbt);
         __wt_btcur_open(&ds_cbt);
-        ret = __hs_verify_id(session, &ds_cbt, btree_id);
+        ret = __hs_verify_id(session, hs_cursor, &ds_cbt, btree_id);
         WT_TRET(__wt_btcur_close(&ds_cbt, false));
     }
+
+err:
+    WT_TRET(hs_cursor->close(hs_cursor));
     return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
@@ -173,10 +160,10 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
     btree_id = WT_BTREE_ID_INVALID;
     uri_data = NULL;
 
+    WT_RET(__wt_curhs_open(session, NULL, &hs_cursor));
+    F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
-    WT_ERR(__wt_hs_cursor_open(session));
-    hs_cursor = session->hs_cursor;
-    WT_ERR_NOTFOUND_OK(__wt_hs_cursor_next(session, hs_cursor), true);
+    WT_ERR_NOTFOUND_OK(hs_cursor->next(hs_cursor), true);
     stop = ret == WT_NOTFOUND ? true : false;
     ret = 0;
 
@@ -198,17 +185,16 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
         }
         WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
-        ret = __hs_verify_id(session, (WT_CURSOR_BTREE *)ds_cursor, btree_id);
+        ret = __hs_verify_id(session, hs_cursor, (WT_CURSOR_BTREE *)ds_cursor, btree_id);
         if (ret == WT_NOTFOUND)
             stop = true;
         WT_TRET(ds_cursor->close(ds_cursor));
         WT_ERR_NOTFOUND_OK(ret, false);
     }
 err:
-    WT_TRET(__wt_hs_cursor_close(session));
-
     __wt_scr_free(session, &buf);
     WT_ASSERT(session, key.mem == NULL && key.memsize == 0);
     __wt_free(session, uri_data);
+    WT_TRET(hs_cursor->close(hs_cursor));
     return (ret);
 }

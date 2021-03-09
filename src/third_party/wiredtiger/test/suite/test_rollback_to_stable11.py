@@ -37,7 +37,7 @@ def timestamp_str(t):
     return '%x' % t
 
 # test_rollback_to_stable11.py
-# Test the rollback to stable is retrieving the proper hs update.
+# Test the rollback to stable is retrieving the proper history store update.
 class test_rollback_to_stable11(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 

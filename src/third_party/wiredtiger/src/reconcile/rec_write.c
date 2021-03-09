@@ -133,8 +133,7 @@ __reconcile_save_evict_state(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t fla
      */
     if (LF_ISSET(WT_REC_EVICT)) {
         mod->last_eviction_id = oldest_id;
-        if (S2C(session)->txn_global.has_pinned_timestamp)
-            __wt_txn_pinned_timestamp(session, &mod->last_eviction_timestamp);
+        __wt_txn_pinned_timestamp(session, &mod->last_eviction_timestamp);
         mod->last_evict_pass_gen = S2C(session)->cache->evict_pass_gen;
     }
 
@@ -2290,8 +2289,6 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     if (i == r->multi_next)
         return (0);
 
-    WT_RET(__wt_hs_cursor_open(session));
-
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
         if (multi->supd != NULL) {
             WT_ERR(__wt_hs_insert_updates(session, r->page, multi));
@@ -2303,7 +2300,6 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         }
 
 err:
-    WT_TRET(__wt_hs_cursor_close(session));
     return (ret);
 }
 

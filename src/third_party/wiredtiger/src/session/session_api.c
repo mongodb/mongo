@@ -542,6 +542,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, co
 {
     WT_DECL_RET;
 
+    /* We should not open other cursors when there are open history store cursors in the session. */
+    WT_ASSERT(session, strcmp(uri, WT_HS_URI) == 0 || session->hs_cursor_counter == 0);
+
     /* We do not cache any subordinate tables/files cursors. */
     if (owner == NULL) {
         if ((ret = __wt_cursor_cache_get(session, uri, NULL, cfg, cursorp)) == 0)

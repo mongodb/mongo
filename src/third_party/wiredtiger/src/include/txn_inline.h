@@ -498,8 +498,16 @@ __wt_txn_pinned_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *pinned_tsp)
     wt_timestamp_t checkpoint_ts, pinned_ts;
     bool include_checkpoint_txn;
 
+    *pinned_tsp = WT_TS_NONE;
+
     btree = S2BT_SAFE(session);
     txn_global = &S2C(session)->txn_global;
+
+    /*
+     * There is no need to go further if no pinned timestamp has been set yet.
+     */
+    if (!txn_global->has_pinned_timestamp)
+        return;
 
     *pinned_tsp = pinned_ts = txn_global->pinned_timestamp;
 
@@ -570,12 +578,9 @@ __wt_txn_visible_all(WT_SESSION_IMPL *session, uint64_t id, wt_timestamp_t times
         return (true);
 
     /* If no oldest timestamp has been supplied, updates have to stay in cache. */
-    if (S2C(session)->txn_global.has_pinned_timestamp) {
-        __wt_txn_pinned_timestamp(session, &pinned_ts);
-        return (timestamp <= pinned_ts);
-    }
+    __wt_txn_pinned_timestamp(session, &pinned_ts);
 
-    return (false);
+    return (pinned_ts != WT_TS_NONE && timestamp <= pinned_ts);
 }
 
 /*
@@ -1039,8 +1044,8 @@ retry:
     /* If there's no visible update in the update chain or ondisk, check the history store file. */
     if (F_ISSET(S2C(session), WT_CONN_HS_OPEN) && !F_ISSET(session->dhandle, WT_DHANDLE_HS)) {
         __wt_timing_stress(session, WT_TIMING_STRESS_HS_SEARCH);
-        WT_RET(__wt_hs_find_upd(session, key, cbt->iface.value_format, recno, cbt->upd_value, false,
-          &cbt->upd_value->buf));
+        WT_RET(__wt_hs_find_upd(session, S2BT(session)->id, key, cbt->iface.value_format, recno,
+          cbt->upd_value, &cbt->upd_value->buf));
     }
 
     /*
