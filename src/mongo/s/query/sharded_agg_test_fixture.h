@@ -97,7 +97,14 @@ public:
 
         // Mock the expected config server queries.
         expectGetDatabase(nss);
-        expectCollectionAndChunksAggregation(nss, epoch, UUID::gen(), shardKey, chunkDistribution);
+        expectGetCollection(nss, epoch, UUID::gen(), shardKey);
+        expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
+            std::vector<BSONObj> response;
+            for (auto&& chunk : chunkDistribution) {
+                response.push_back(chunk.toConfigBSON());
+            }
+            return response;
+        }());
 
         const auto cm = future.default_timed_get();
         ASSERT(cm->isSharded());
