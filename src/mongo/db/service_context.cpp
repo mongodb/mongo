@@ -267,21 +267,9 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     } else {
         makeBaton(opCtx.get());
     }
-
     {
         stdx::lock_guard<Client> lk(*client);
-
-        // If we have a previous operation context, it's not worth crashing the process in
-        // production. However, we do want to prevent it from doing more work and complain loudly.
-        auto lastOpCtx = client->getOperationContext();
-        if (lastOpCtx) {
-            killOperation(lk, lastOpCtx, ErrorCodes::Error(4946800));
-            uasserted(
-                4946801,
-                "Client has attempted to create a new OperationContext, but it already has one");
-        }
-
-        client->_setOperationContext(opCtx.get());
+        client->setOperationContext(opCtx.get());
     }
 
     {
@@ -398,7 +386,7 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     // Assigning a new opCtx to the client must never precede the destruction of any existing opCtx
     // that references the client.
     invariant(client->getOperationContext() == opCtx);
-    client->_setOperationContext({});
+    client->resetOperationContext();
 
     if (client->session()) {
         _numCurrentOps.subtractAndFetch(1);
