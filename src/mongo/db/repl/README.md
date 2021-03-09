@@ -685,11 +685,11 @@ transactions metrics, and clear our txnResources.
 
 ### Aborting a Single Replica Set Transaction
 
-The process for aborting a multi-document transaction is simpler than committing since none of the
-operations are visible at this point. We abort the storage transaction, update the
-`sessionTxnRecord` in the transactions table, and write an abort oplog entry. Finally, we change
-our local `txnState` to `kAbortedWithoutPrepare`. We now log any transactions metrics and reset the
-in memory state of the `TransactionParticipant`.
+The process for aborting a multi-document transaction is simpler than committing. We abort the
+storage transaction and change our local `txnState` to `kAbortedWithoutPrepare`. We then log any
+transactions metrics and reset the in memory state of the `TransactionParticipant`. None of the
+transaction operations are visible at this point, so we don't need to write an abort oplog entry
+or update the transactions table.
 
 Note that transactions can abort for reasons outside of the `abortTransaction` command. For example,
 we abort non-prepared transactions that encounter write conflicts or state transitions.
