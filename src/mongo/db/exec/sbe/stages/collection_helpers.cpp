@@ -31,12 +31,15 @@
 
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
+
 namespace mongo::sbe {
 
-NamespaceString acquireCollection(OperationContext* opCtx,
-                                  CollectionUUID collUuid,
-                                  const LockAcquisitionCallback& lockAcquisitionCallback,
-                                  boost::optional<AutoGetCollectionForReadMaybeLockFree>& coll) {
+std::pair<NamespaceString, uint64_t> acquireCollection(
+    OperationContext* opCtx,
+    CollectionUUID collUuid,
+    const LockAcquisitionCallback& lockAcquisitionCallback,
+    boost::optional<AutoGetCollectionForReadMaybeLockFree>& coll) {
     tassert(5071012, "cannot restore 'coll' if already held", !coll.has_value());
     // The caller is expected to hold the appropriate db_raii object to give us a consistent view of
     // the catalog, so the UUID must still exist.
@@ -54,12 +57,13 @@ NamespaceString acquireCollection(OperationContext* opCtx,
             str::stream() << "expected CollectionPtr for: " << *collName,
             static_cast<bool>(coll->getCollection()));
 
-    return *collName;
+    return {*collName, CollectionCatalog::get(opCtx)->getEpoch()};
 }
 
 void restoreCollection(OperationContext* opCtx,
                        const NamespaceString& collName,
                        CollectionUUID collUuid,
+                       uint64_t catalogEpoch,
                        const LockAcquisitionCallback& lockAcquisitionCallback,
                        boost::optional<AutoGetCollectionForReadMaybeLockFree>& coll) {
     tassert(5071011, "cannot restore 'coll' if already held", !coll.has_value());
@@ -76,6 +80,10 @@ void restoreCollection(OperationContext* opCtx,
     if (collName != coll->getNss()) {
         PlanYieldPolicy::throwCollectionRenamedError(collName, coll->getNss(), collUuid);
     }
+
+    uassert(ErrorCodes::QueryPlanKilled,
+            "the catalog was closed and reopened",
+            CollectionCatalog::get(opCtx)->getEpoch() == catalogEpoch);
 
     if (lockAcquisitionCallback) {
         lockAcquisitionCallback(opCtx, *coll);

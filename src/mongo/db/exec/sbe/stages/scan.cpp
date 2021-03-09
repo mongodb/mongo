@@ -97,7 +97,8 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _seekKeyAccessor = ctx.getAccessor(*_seekKeySlot);
     }
 
-    _collName = acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
+    std::tie(_collName, _catalogEpoch) =
+        acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
 }
 
 value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -133,7 +134,7 @@ void ScanStage::doRestoreState() {
         return;
     }
 
-    restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+    restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -180,7 +181,8 @@ void ScanStage::open(bool reOpen) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(5071005, "ScanStage is not open but have _cursor", !_cursor);
-            restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+            restoreCollection(
+                _opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
         }
     }
 
@@ -410,7 +412,7 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
         uassert(4822817, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
     }
 
-    _collName = acquireCollection(_opCtx, _collUuid, nullptr, _coll);
+    std::tie(_collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid, nullptr, _coll);
 }
 
 value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -446,7 +448,7 @@ void ParallelScanStage::doRestoreState() {
         return;
     }
 
-    restoreCollection(_opCtx, _collName, _collUuid, nullptr, _coll);
+    restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, nullptr, _coll);
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -479,7 +481,7 @@ void ParallelScanStage::open(bool reOpen) {
         // we're being opened after 'close()'. we need to re-acquire '_coll' in this case and
         // make some validity checks (the collection has not been dropped, renamed, etc.).
         tassert(5071013, "ParallelScanStage is not open but have _cursor", !_cursor);
-        restoreCollection(_opCtx, _collName, _collUuid, nullptr, _coll);
+        restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, nullptr, _coll);
     }
 
     const auto& collection = _coll->getCollection();

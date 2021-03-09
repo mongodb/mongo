@@ -82,6 +82,7 @@ private:
     const bool _forward;
 
     NamespaceString _collName;
+    uint64_t _catalogEpoch;
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
@@ -170,6 +171,7 @@ private:
     const value::SlotVector _vars;
 
     NamespaceString _collName;
+    uint64_t _catalogEpoch;
 
     std::shared_ptr<ParallelState> _state;
 

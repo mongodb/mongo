@@ -1,6 +1,11 @@
 /*
  * This test makes sure 'find' and 'getMore' commands fail correctly during rollback.
- * @tags: [requires_majority_read_concern]
+ *
+ * @tags: [
+ *   # The 'getMoreHangAfterPinCursor' failpoint is not present in 4.4.
+ *   requires_fcv_49,
+ *   requires_majority_read_concern,
+ * ]
  */
 (function() {
 "use strict";
@@ -14,14 +19,22 @@ const collName = "coll";
 // Set up Rollback Test.
 let rollbackTest = new RollbackTest();
 
-// Insert a document to be read later.
-assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert({}));
+// Insert documents to be read later.
+assert.commandWorked(rollbackTest.getPrimary().getDB(dbName)[collName].insert([{}, {}, {}]));
 
 let rollbackNode = rollbackTest.transitionToRollbackOperations();
 
+// Open a cursor on 'rollbackNode' which returns partial results, but will remain open and idle
+// during the rollback process.
+const findCmdRes =
+    assert.commandWorked(rollbackNode.getDB(dbName).runCommand({"find": collName, batchSize: 2}));
+assert.eq(2, findCmdRes.cursor.firstBatch.length, findCmdRes);
+const idleCursorId = findCmdRes.cursor.id;
+assert.neq(0, idleCursorId, findCmdRes);
+
 setFailPoint(rollbackNode, "rollbackHangAfterTransitionToRollback");
 
-setFailPoint(rollbackNode, "GetMoreHangBeforeReadLock");
+setFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 const joinGetMoreThread = startParallelShell(() => {
     db.getMongo().setSecondaryOk();
@@ -59,7 +72,7 @@ reconnect(rollbackNode.getDB(dbName));
 // Wait for rollback to hang.
 checkLog.contains(rollbackNode, "rollbackHangAfterTransitionToRollback fail point enabled.");
 
-clearFailPoint(rollbackNode, "GetMoreHangBeforeReadLock");
+clearFailPoint(rollbackNode, "getMoreHangAfterPinCursor");
 
 jsTestLog("Wait for 'getMore' thread to join.");
 joinGetMoreThread();
@@ -94,6 +107,12 @@ assert(replMetrics.stateTransition.userOperationsRunning,
 assert(replMetrics.stateTransition.userOperationsKilled,
        () => "Response should have a 'stateTransition.userOperationsKilled' field: " +
            tojson(replMetrics));
+
+// Run a getMore against the idle cursor that remained open throughout the rollback. The getMore
+// should fail since the cursor has been invalidated by the rollback.
+assert.commandFailedWithCode(
+    rollbackNode.getDB(dbName).runCommand({"getMore": idleCursorId, collection: collName}),
+    ErrorCodes.QueryPlanKilled);
 
 // Check the replica set.
 rollbackTest.stop();
