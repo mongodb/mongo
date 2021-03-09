@@ -82,7 +82,9 @@ set_goenv() {
 }
 
 print_ldflags() {
-    VersionStr="$(git describe)"
+    # VersionStr="$(git describe)"
+    # SPLUNK
+    VersionStr="3.6.17-linux-splunk-v4"
     Gitspec="$(git rev-parse HEAD)"
     importpath="github.com/mongodb/mongo-tools/common/options"
     echo "-X ${importpath}.VersionStr=${VersionStr} -X ${importpath}.Gitspec=${Gitspec}"

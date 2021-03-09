@@ -537,7 +537,7 @@ functions:
 
         ### SPLUNK
         #sed -i.bak "s/built-without-version-string/3.6.17-SERVER-42525-splunk/" common/options/options.go
-        sed -i.bak "s/built-without-version-string/3.6.17-linux-splunk-v3/" common/options/options.go
+        sed -i.bak "s/built-without-version-string/3.6.17-linux-splunk-v4/" common/options/options.go
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
         # Move the vendor source to make compatible with gccgo
@@ -884,7 +884,7 @@ functions:
         # We get the raw version string (r1.2.3-45-gabcdef) from git
         ### MONGO_VERSION=$(git describe)
         ### SPLUNK
-        MONGO_VERSION=3.6.17-linux-splunk-v3
+        MONGO_VERSION=3.6.17-linux-splunk-v4
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
         ### SPLUNK Get rid of the below block
