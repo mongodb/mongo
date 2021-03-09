@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <cmath>
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
@@ -429,6 +430,146 @@ TEST(Accumulators, PushRespectsMaxMemoryConstraint) {
             Value("This is a large string. Certainly we must be over 20 bytes by now"_sd), false),
         AssertionException,
         ErrorCodes::ExceededMemoryLimit);
+}
+
+/* ------------------------- AccumulatorCorvariance(Samp/Pop) -------------------------- */
+
+// Calculate covariance using the offline algorithm.
+double offlineCovariance(const std::vector<Value>& input, bool isSamp) {
+    // Edge cases return 0 though 'input' should not be empty. Empty input is tested elsewhere.
+    if (input.size() <= 1)
+        return 0;
+
+    double adjustedN = isSamp ? input.size() - 1 : input.size();
+    double meanX = 0;
+    double meanY = 0;
+    double cXY = 0;
+
+    for (auto&& value : input) {
+        meanX += value.getArray()[0].coerceToDouble();
+        meanY += value.getArray()[1].coerceToDouble();
+    }
+    meanX /= input.size();
+    meanY /= input.size();
+
+    for (auto&& value : input) {
+        cXY += (value.getArray()[0].coerceToDouble() - meanX) *
+            (value.getArray()[1].coerceToDouble() - meanY);
+    }
+
+    return cXY / adjustedN;
+}
+
+// Test the accumulator-output covariance (using an online algorithm:
+// https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online) is equal to the
+// covariance calculated based on the offline algorithm (cov(x,y) = Σ((xi-avg(x))*(yi-avg(y)))/n)).
+// If 'result' is given, the covariance should also be tested against the given result.
+template <typename AccName>
+static void assertCovariance(ExpressionContext* const expCtx,
+                             const std::vector<Value>& input,
+                             boost::optional<double> result = boost::none) {
+    auto accum = AccName::create(expCtx);
+    for (auto&& val : input) {
+        accum->process(val, false);
+    }
+    double onlineCov = accum->getValue(false).coerceToDouble();
+    double offlineCov =
+        offlineCovariance(input, std::is_same_v<AccName, AccumulatorCovarianceSamp>);
+
+    ASSERT_LTE(fabs(onlineCov - offlineCov), 1e-10);
+    if (result) {
+        ASSERT_LTE(fabs(onlineCov - *result), 1e-5);
+    }
+}
+
+TEST(Accumulators, CovarianceEdgeCases) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // The sample covariance of variables of single value should be undefined.
+    const std::vector<Value> singlePoint = {
+        Value(std::vector<Value>({Value(0), Value(1)})),
+    };
+
+    const std::vector<Value> nanPoints = {
+        Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
+                                  Value(numeric_limits<double>::quiet_NaN())})),
+        Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
+                                  Value(numeric_limits<double>::quiet_NaN())})),
+    };
+
+    assertExpectedResults<AccumulatorCovariancePop>(
+        &expCtx,
+        {
+            {{}, Value(BSONNULL)},
+            {singlePoint, Value(0.0)},
+            {nanPoints, Value(numeric_limits<double>::quiet_NaN())},
+        },
+        true /* Covariance accumulator can't be merged */);
+
+    assertExpectedResults<AccumulatorCovarianceSamp>(
+        &expCtx,
+        {
+            {{}, Value(BSONNULL)},
+            {singlePoint, Value(BSONNULL)},
+            {nanPoints, Value(numeric_limits<double>::quiet_NaN())},
+        },
+        true /* Covariance accumulator can't be merged */);
+}
+
+TEST(Accumulators, PopulationCovariance) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // Some doubles as input.
+    const std::vector<Value> multiplePoints = {
+        Value(std::vector<Value>({Value(0), Value(1.5)})),
+        Value(std::vector<Value>({Value(1.4), Value(2.5)})),
+        Value(std::vector<Value>({Value(4.7), Value(3.6)})),
+    };
+
+    // Test both offline and online corvariance algorithm with a given result.
+    assertCovariance<AccumulatorCovariancePop>(&expCtx, multiplePoints, 1.655556);
+}
+
+TEST(Accumulators, SampleCovariance) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // Some doubles as input.
+    std::vector<Value> multiplePoints = {
+        Value(std::vector<Value>({Value(0), Value(1.5)})),
+        Value(std::vector<Value>({Value(1.4), Value(2.5)})),
+        Value(std::vector<Value>({Value(4.7), Value(3.6)})),
+    };
+
+    // Test both offline and online corvariance algorithm with a given result.
+    assertCovariance<AccumulatorCovarianceSamp>(&expCtx, multiplePoints, 2.483334);
+}
+
+std::vector<Value> generateRandomVariables() {
+    auto seed = Date_t::now().asInt64();
+    LOGV2(5424001, "Generated new seed is {seed}", "seed"_attr = seed);
+
+    std::vector<Value> output;
+    PseudoRandom prng(seed);
+    const int variableSize = prng.nextInt32(1000) + 2;
+
+    for (int i = 0; i < variableSize; i++) {
+        std::vector<Value> newXY;
+        newXY.push_back(Value(prng.nextCanonicalDouble()));
+        newXY.push_back(Value(prng.nextCanonicalDouble()));
+        output.push_back(Value(newXY));
+    }
+
+    return output;
+}
+
+TEST(Accumulators, CovarianceWithRandomVariables) {
+    auto expCtx = ExpressionContextForTest{};
+
+    // Some randomly generated variables as input.
+    std::vector<Value> randomVariables = generateRandomVariables();
+
+    assertCovariance<AccumulatorCovariancePop>(&expCtx, randomVariables, boost::none);
+    assertCovariance<AccumulatorCovarianceSamp>(&expCtx, randomVariables, boost::none);
 }
 
 /* ------------------------- AccumulatorMergeObjects -------------------------- */

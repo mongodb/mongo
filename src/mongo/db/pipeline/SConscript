@@ -118,6 +118,7 @@ env.Library(
         'accumulation_statement.cpp',
         'accumulator_add_to_set.cpp',
         'accumulator_avg.cpp',
+        'accumulator_covariance.cpp',
         'accumulator_first.cpp',
         'accumulator_js_reduce.cpp',
         'accumulator_last.cpp',
