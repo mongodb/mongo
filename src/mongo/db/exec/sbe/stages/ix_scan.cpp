@@ -105,7 +105,8 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
         _seekKeyHiAccessor = ctx.getAccessor(*_seekKeySlotHigh);
     }
 
-    _collName = acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
+    std::tie(_collName, _catalogEpoch) =
+        acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
 
     auto indexCatalog = _coll->getCollection()->getIndexCatalog();
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
@@ -146,7 +147,7 @@ void IndexScanStage::doSaveState() {
 }
 
 void IndexScanStage::restoreCollectionAndIndex() {
-    restoreCollection(_opCtx, _collName, _collUuid, _lockAcquisitionCallback, _coll);
+    restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
     auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",

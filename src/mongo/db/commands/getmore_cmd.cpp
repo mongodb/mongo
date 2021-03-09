@@ -71,7 +71,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
-MONGO_FAIL_POINT_DEFINE(GetMoreHangBeforeReadLock);
+MONGO_FAIL_POINT_DEFINE(getMoreHangAfterPinCursor);
 
 // The timeout when waiting for linearizable read concern on a getMore command.
 static constexpr int kLinearizableReadConcernTimeout = 15000;
@@ -411,13 +411,6 @@ public:
                 invariant(cursorPin->getExecutor()->lockPolicy() ==
                           PlanExecutor::LockPolicy::kLockExternally);
 
-                if (MONGO_unlikely(GetMoreHangBeforeReadLock.shouldFail())) {
-                    LOGV2(20477,
-                          "GetMoreHangBeforeReadLock fail point enabled. Blocking until fail "
-                          "point is disabled");
-                    GetMoreHangBeforeReadLock.pauseWhileSet(opCtx);
-                }
-
                 // Lock the backing collection by using the executor's namespace. Note that it may
                 // be different from the cursor's namespace. One such possible scenario is when
                 // getMore() is executed against a view. Technically, views are pipelines and under
@@ -722,6 +715,13 @@ public:
                 repl::ReadConcernLevel::kLinearizableReadConcern;
 
             acquireLocksAndIterateCursor(opCtx, reply, cursorManager, cursorPin, curOp);
+
+            if (MONGO_unlikely(getMoreHangAfterPinCursor.shouldFail())) {
+                LOGV2(20477,
+                      "getMoreHangAfterPinCursor fail point enabled. Blocking until fail "
+                      "point is disabled");
+                getMoreHangAfterPinCursor.pauseWhileSet(opCtx);
+            }
 
             if (isLinearizableReadConcern) {
                 // waitForLinearizableReadConcern performs a NoOp write and waits for that write

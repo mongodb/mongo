@@ -111,6 +111,7 @@ private:
     const boost::optional<value::SlotId> _seekKeySlotHigh;
 
     NamespaceString _collName;
+    uint64_t _catalogEpoch;
 
     LockAcquisitionCallback _lockAcquisitionCallback;
 

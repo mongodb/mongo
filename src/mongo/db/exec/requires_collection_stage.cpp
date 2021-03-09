@@ -81,7 +81,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     }
 
     uassert(ErrorCodes::QueryPlanKilled,
-            str::stream() << "The catalog was closed and reopened",
+            "the catalog was closed and reopened",
             getCatalogEpoch() == _catalogEpoch);
 
     doRestoreStateRequiresCollection();
