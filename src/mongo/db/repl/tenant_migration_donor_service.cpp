@@ -374,6 +374,9 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     if (!_decisionPromise.getFuture().isReady()) {
         _decisionPromise.setError(status);
     }
+    if (!_migrationCancelablePromise.getFuture().isReady()) {
+        _migrationCancelablePromise.setError(status);
+    }
 }
 
 ExecutorFuture<void>
@@ -797,6 +800,12 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     pauseTenantMigrationBeforeEnteringFutureChain.pauseWhileSet();
 
     _abortMigrationSource = CancelationSource(serviceToken);
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (!_migrationCancelablePromise.getFuture().isReady()) {
+            _migrationCancelablePromise.emplaceValue();
+        }
+    }
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());
     auto scopedOutstandingMigrationCounter =
@@ -975,6 +984,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                             // in calls to WaitForMajorityService::waitUntilMajority.
                             return _waitForMajorityWriteConcern(executor, std::move(opTime))
                                 .then([this, self = shared_from_this()] {
+                                    stdx::lock_guard<Latch> lg(_mutex);
                                     // If interrupt is called at some point during execution, it is
                                     // possible that interrupt() will fulfill the promise before we
                                     // do.
@@ -1010,6 +1020,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                         return _waitForMajorityWriteConcern(executor, std::move(opTime))
                             .then([this, self = shared_from_this()] {
+                                stdx::lock_guard<Latch> lg(_mutex);
                                 // If interrupt is called at some point during execution, it is
                                 // possible that interrupt() will fulfill the promise before we do.
                                 if (!_decisionPromise.getFuture().isReady()) {

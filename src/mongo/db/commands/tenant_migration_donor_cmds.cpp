@@ -269,8 +269,9 @@ public:
 
             const auto& donor = donorPtr.get().get();
 
-            // Ensure that we only are able to run donorAbortMigration after the donor inserts a
-            // majority committed state document for the migration.
+            // Ensure that we only are able to run donorAbortMigration after the donor has called
+            // run() and has inserted a majority committed state document for the migration.
+            donor->getMigrationCancelableFuture().get(opCtx);
             donor->getInitialDonorStateDurableFuture().get(opCtx);
             donor->onReceiveDonorAbortMigration();
             donor->getDecisionFuture().get(opCtx);
