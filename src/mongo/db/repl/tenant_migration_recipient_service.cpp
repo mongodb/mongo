@@ -407,8 +407,12 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
     }
 
     auto getWaitOpTimeFuture = [&]() {
-        stdx::lock_guard lk(_mutex);
-
+        stdx::unique_lock lk(_mutex);
+        // In the event of a donor failover, it is possible that a new donor has stepped up and
+        // initiated this 'recipientSyncData' cmd. Make sure the recipient is not in the middle of
+        // restarting the oplog applier to retry the future chain.
+        opCtx->waitForConditionOrInterrupt(
+            _restartOplogApplierCondVar, lk, [&] { return !_isRestartingOplogApplier; });
         if (_dataSyncCompletionPromise.getFuture().isReady()) {
             // When the data sync is done, we reset _tenantOplogApplier, so just throw the data sync
             // completion future result.
@@ -1652,6 +1656,8 @@ void TenantMigrationRecipientService::Instance::_cleanupOnDataSyncCompletion(Sta
     std::unique_ptr<ThreadPool> savedWriterPool;
     {
         stdx::lock_guard lk(_mutex);
+        _isRestartingOplogApplier = false;
+        _restartOplogApplierCondVar.notify_all();
 
         _cancelRemainingWork(lk);
 
@@ -2030,6 +2036,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        {
                            stdx::lock_guard lk(_mutex);
                            uassertStatusOK(_tenantOplogApplier->startup());
+                           _isRestartingOplogApplier = false;
+                           _restartOplogApplierCondVar.notify_all();
                        }
                        _stopOrHangOnFailPoint(
                            &fpAfterStartingOplogApplierMigrationRecipientInstance);
@@ -2050,9 +2058,19 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            _dataConsistentPromise.emplaceValue(
                                _stateDoc.getDataConsistentStopDonorOpTime().get());
                        }
+                   })
+                   .then([this, self = shared_from_this()] {
+                       _stopOrHangOnFailPoint(&fpAfterDataConsistentMigrationRecipientInstance);
+                       stdx::lock_guard lk(_mutex);
+                       // wait for oplog applier to complete/stop.
+                       // The oplog applier does not exit normally; it must be shut down externally,
+                       // e.g. by recipientForgetMigration.
+                       return _tenantOplogApplier->getNotificationForOpTime(OpTime::max());
                    });
            })
-        .until([this, self = shared_from_this()](Status status) {
+        .until([this, self = shared_from_this()](
+                   StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
+            auto status = applierStatus.getStatus();
             stdx::unique_lock lk(_mutex);
             if (_taskState.isInterrupted()) {
                 status = _taskState.getInterruptStatus();
@@ -2063,7 +2081,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 if (!_taskState.isRunning()) {
                     _taskState.setState(TaskState::kRunning);
                 }
-                _taskState.clearInterruptStatus();
+                _isRestartingOplogApplier = true;
                 // Clean up the async components before retrying the future chain.
                 _oplogFetcherStatus = boost::none;
                 std::unique_ptr<OplogFetcher> savedDonorOplogFetcher;
@@ -2088,15 +2106,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(_recipientService->getInstanceCleanupExecutor(), token)
         .semi()
-        .thenRunOn(**_scopedExecutor)
-        .then([this, self = shared_from_this()] {
-            _stopOrHangOnFailPoint(&fpAfterDataConsistentMigrationRecipientInstance);
-            stdx::lock_guard lk(_mutex);
-            // wait for oplog applier to complete/stop.
-            // The oplog applier does not exit normally; it must be shut down externally,
-            // e.g. by recipientForgetMigration.
-            return _tenantOplogApplier->getNotificationForOpTime(OpTime::max());
-        })
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this, self = shared_from_this()](
                           StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
