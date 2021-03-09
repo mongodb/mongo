@@ -61,10 +61,6 @@ void sendCommandToParticipants(OperationContext* opCtx,
     const auto allShardIds = shardRegistry->getAllShardIds(opCtx);
 
     for (const auto& shardId : allShardIds) {
-        if (shardId == selfShardId) {
-            continue;
-        }
-
         auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
         const auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -158,11 +154,7 @@ void RenameCollectionCoordinator::_renameShardedCollection(OperationContext* opC
             "Source and destination collections must be on the same database.",
             _nss.db() == _toNss.db());
 
-    // Rename the collection locally and clear the cache
-    validateAndRunRenameCollection(opCtx, _nss, _toNss, {_dropTarget, _stayTemp});
-    shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, _nss).ignore();
-
-    // Rename the collection locally on all other shards
+    // Rename the collection locally on all shards (including the primary)
     ShardsvrRenameCollectionParticipant renameCollParticipantRequest(_nss);
     renameCollParticipantRequest.setDbName(_nss.db());
     renameCollParticipantRequest.setDropTarget(_dropTarget);
@@ -222,26 +214,9 @@ SemiFuture<void> RenameCollectionCoordinator::runImpl(
 
             sharding_ddl_util::checkShardedRenamePreconditions(opCtx, _toNss, _dropTarget);
 
-            // Acquire source/target critical sections
-            sharding_ddl_util::acquireCriticalSection(opCtx, _nss);
-            sharding_ddl_util::acquireCriticalSection(opCtx, _toNss);
-
             {
-                // Release critical sections both in case of rename success/failure
-                ON_BLOCK_EXIT([&] {
-                    sharding_ddl_util::releaseCriticalSection(opCtx, _nss);
-                    sharding_ddl_util::releaseCriticalSection(opCtx, _toNss);
-                });
-
                 if (sourceIsSharded) {
-                    auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, _nss);
                     _renameShardedCollection(opCtx);
-                    deleteRangeDeletionTasks(opCtx, _toNss);
-                    for (auto& task : rangeDeletionTasks) {
-                        task.setId(UUID::gen());
-                        task.setNss(_toNss);
-                    }
-                    storeRangeDeletionTasks(opCtx, rangeDeletionTasks);
                 } else {
                     _renameUnshardedCollection(opCtx);
                 }
