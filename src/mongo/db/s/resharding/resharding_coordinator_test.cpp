@@ -198,7 +198,9 @@ protected:
         TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
         reshardingFields.setState(coordinatorDoc.getState());
         reshardingFields.setDonorFields(TypeCollectionDonorFields(
-            coordinatorDoc.getTempReshardingNss(), coordinatorDoc.getReshardingKey()));
+            coordinatorDoc.getTempReshardingNss(),
+            coordinatorDoc.getReshardingKey(),
+            resharding::extractShardIds(coordinatorDoc.getRecipientShards())));
 
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
@@ -470,8 +472,10 @@ protected:
         TypeCollectionReshardingFields expectedReshardingFields(
             expectedCoordinatorDoc.getReshardingUUID());
         expectedReshardingFields.setState(expectedCoordinatorDoc.getState());
-        TypeCollectionDonorFields donorField(expectedCoordinatorDoc.getTempReshardingNss(),
-                                             expectedCoordinatorDoc.getReshardingKey());
+        TypeCollectionDonorFields donorField(
+            expectedCoordinatorDoc.getTempReshardingNss(),
+            expectedCoordinatorDoc.getReshardingKey(),
+            resharding::extractShardIds(expectedCoordinatorDoc.getRecipientShards()));
         expectedReshardingFields.setDonorFields(donorField);
         if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
             AbortReason abortReasonStruct;
@@ -518,9 +522,10 @@ protected:
             TypeCollectionReshardingFields reshardingFields(
                 expectedCoordinatorDoc.getReshardingUUID());
             reshardingFields.setState(expectedCoordinatorDoc.getState());
-            reshardingFields.setDonorFields(
-                TypeCollectionDonorFields(expectedCoordinatorDoc.getTempReshardingNss(),
-                                          expectedCoordinatorDoc.getReshardingKey()));
+            reshardingFields.setDonorFields(TypeCollectionDonorFields(
+                expectedCoordinatorDoc.getTempReshardingNss(),
+                expectedCoordinatorDoc.getReshardingKey(),
+                resharding::extractShardIds(expectedCoordinatorDoc.getRecipientShards())));
 
             auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
                 expectedCoordinatorDoc,

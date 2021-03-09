@@ -201,7 +201,10 @@ protected:
 
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setReshardingUUID(UUID::gen());
-        reshardingFields.setDonorFields(TypeCollectionDonorFields{env.tempNss, BSON("y" << 1)});
+        reshardingFields.setDonorFields(TypeCollectionDonorFields{
+            env.tempNss,
+            BSON("y" << 1),
+            {ShardId{kShardList[0].getName()}, ShardId{kShardList[1].getName()}}});
         reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
         CollectionType coll(kNss, env.version.epoch(), Date_t::now(), UUID::gen());

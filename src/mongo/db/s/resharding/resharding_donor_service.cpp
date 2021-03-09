@@ -142,6 +142,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     const ReshardingDonorDocument& donorDoc)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _metadata{donorDoc.getCommonReshardingMetadata()},
+      _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()} {}
 
 ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
@@ -373,10 +374,7 @@ void ReshardingDonorService::DonorStateMachine::
         try {
             Timer latency;
 
-            const auto recipients =
-                getRecipientShards(rawOpCtx, _metadata.getSourceNss(), _metadata.getSourceUUID());
-
-            for (const auto& recipient : recipients) {
+            for (const auto& recipient : _recipientShardIds) {
                 auto oplog = generateOplogEntry(recipient);
                 writeConflictRetry(
                     rawOpCtx,
@@ -403,7 +401,7 @@ void ReshardingDonorService::DonorStateMachine::
                             "Committed oplog entries to temporarily block writes for resharding",
                             "namespace"_attr = _metadata.getSourceNss(),
                             "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                            "numRecipients"_attr = recipients.size(),
+                            "numRecipients"_attr = _recipientShardIds.size(),
                             "duration"_attr = duration_cast<Milliseconds>(latency.elapsed()));
                 ensureFulfilledPromise(lg, _finalOplogEntriesWritten);
             }

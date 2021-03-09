@@ -151,6 +151,7 @@ private:
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
     const CommonReshardingMetadata _metadata;
+    const std::vector<ShardId> _recipientShardIds;
 
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.donor.

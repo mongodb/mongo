@@ -50,6 +50,8 @@ structs:
                               recipient shards."
             reshardingKey:
                 type: KeyPattern
+            recipientShardIds:
+                type: array<shard_id>
 
     TypeCollectionRecipientFields:
         description: "Resharding-related fields specific to recipient shards."

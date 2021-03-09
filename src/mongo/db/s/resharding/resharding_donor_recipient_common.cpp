@@ -261,18 +261,28 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
 void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
     auto coordinatorState = reshardingFields.getState();
 
-    if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
+    if (coordinatorState < CoordinatorStateEnum::kPreparingToDonate) {
+        // Prior to the state CoordinatorStateEnum::kPreparingToDonate, the source collection's
+        // config.collections entry won't have "donorFields". Additionally, the temporary resharding
+        // collection's config.collections entry won't exist yet.
+        uassert(5498100,
+                fmt::format("reshardingFields must not contain donorFields or recipientFields when"
+                            " the coordinator is in state {}. Got reshardingFields {}",
+                            CoordinatorState_serializer(reshardingFields.getState()),
+                            reshardingFields.toBSON().toString()),
+                !reshardingFields.getDonorFields() && !reshardingFields.getRecipientFields());
+    } else if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
         // Prior to the state CoordinatorStateEnum::kDecisionPersisted, only the source
         // collection's config.collections entry should have donorFields, and only the
         // temporary resharding collection's entry should have recipientFields.
         uassert(5274201,
-                fmt::format("reshardingFields must contain either donorFields or recipientFields "
-                            "(and not both) when the "
-                            "coordinator is in state {}. Got reshardingFields {}",
+                fmt::format("reshardingFields must contain exactly one of donorFields and"
+                            " recipientFields when the coordinator is in state {}. Got"
+                            " reshardingFields {}",
                             CoordinatorState_serializer(reshardingFields.getState()),
                             reshardingFields.toBSON().toString()),
-                reshardingFields.getDonorFields().is_initialized() ^
-                    reshardingFields.getRecipientFields().is_initialized());
+                bool(reshardingFields.getDonorFields()) !=
+                    bool(reshardingFields.getRecipientFields()));
     } else {
         // At and after state CoordinatorStateEnum::kDecisionPersisted, the temporary
         // resharding collection's config.collections entry has been removed, and so the
@@ -295,7 +305,8 @@ ReshardingDonorDocument constructDonorDocumentFromReshardingFields(
     DonorShardContext donorCtx;
     donorCtx.setState(DonorStateEnum::kPreparingToDonate);
 
-    auto donorDoc = ReshardingDonorDocument{std::move(donorCtx)};
+    auto donorDoc = ReshardingDonorDocument{
+        std::move(donorCtx), reshardingFields.getDonorFields()->getRecipientShardIds()};
 
     auto sourceUUID = getCollectionUUIDFromChunkManger(nss, *metadata.getChunkManager());
     auto commonMetadata =

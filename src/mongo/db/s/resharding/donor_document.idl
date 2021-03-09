@@ -50,3 +50,6 @@ structs:
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: DonorShardContext
+            recipientShards:
+                type: array<shard_id>
+                description: "The list of recipient shards that are replicating from this donor."

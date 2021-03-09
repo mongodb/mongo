@@ -192,25 +192,12 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 }
 
 /**
- * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries.
- */
-template <class T>
-std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntries) {
-    std::vector<ShardId> shardIds(participantShardEntries.size());
-    std::transform(participantShardEntries.begin(),
-                   participantShardEntries.end(),
-                   shardIds.begin(),
-                   [](auto& shardEntry) { return shardEntry.getId(); });
-    return shardIds;
-}
-
-/**
  * Creates reshardingFields.recipientFields for the resharding operation. Note: these should not
  * change once the operation has begun.
  */
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
-    auto donorShardIds = extractShardIds(coordinatorDoc.getDonorShards());
+    auto donorShardIds = resharding::extractShardIds(coordinatorDoc.getDonorShards());
     TypeCollectionRecipientFields recipientFields(
         std::move(donorShardIds), coordinatorDoc.getSourceUUID(), coordinatorDoc.getSourceNss());
     emplaceFetchTimestampIfExists(recipientFields, coordinatorDoc.getFetchTimestamp());
@@ -229,15 +216,37 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             TypeCollectionReshardingFields originalEntryReshardingFields(
                 coordinatorDoc.getReshardingUUID());
             originalEntryReshardingFields.setState(coordinatorDoc.getState());
-            TypeCollectionDonorFields donorField(coordinatorDoc.getTempReshardingNss(),
-                                                 coordinatorDoc.getReshardingKey());
-            originalEntryReshardingFields.setDonorFields(donorField);
 
             return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
                                        << originalEntryReshardingFields.toBSON()
                                        << CollectionType::kUpdatedAtFieldName
                                        << opCtx->getServiceContext()->getPreciseClockSource()->now()
                                        << CollectionType::kAllowMigrationsFieldName << false));
+        }
+        case CoordinatorStateEnum::kPreparingToDonate: {
+            TypeCollectionDonorFields donorFields(
+                coordinatorDoc.getTempReshardingNss(),
+                coordinatorDoc.getReshardingKey(),
+                resharding::extractShardIds(coordinatorDoc.getRecipientShards()));
+
+            BSONObjBuilder updateBuilder;
+            {
+                BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+                {
+                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
+                                          TypeCollectionReshardingFields::kStateFieldName,
+                                      CoordinatorState_serializer(nextState));
+
+                    setBuilder.append(CollectionType::kReshardingFieldsFieldName + "." +
+                                          TypeCollectionReshardingFields::kDonorFieldsFieldName,
+                                      donorFields.toBSON());
+
+                    setBuilder.append(CollectionType::kUpdatedAtFieldName,
+                                      opCtx->getServiceContext()->getPreciseClockSource()->now());
+                }
+            }
+
+            return updateBuilder.obj();
         }
         case CoordinatorStateEnum::kDecisionPersisted: {
             // Update the config.collections entry for the original nss to reflect
@@ -588,7 +597,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getSourceNss(),
-            extractShardIds(updatedCoordinatorDoc.getDonorShards()),
+            resharding::extractShardIds(updatedCoordinatorDoc.getDonorShards()),
             std::move(changeMetadataFunc));
     } else if (participantsToNotify == ParticipantsToNotifyEnum::kRecipients) {
         // Bump the recipient shard versions for the temporary resharding namespace along with
@@ -596,7 +605,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getTempReshardingNss(),
-            extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
+            resharding::extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
     } else if (participantsToNotify ==
                ParticipantsToNotifyEnum::kAllParticipantsPostDecisionPersisted) {
@@ -607,7 +616,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getSourceNss(),
-            extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
+            resharding::extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
     }
 }
@@ -1354,7 +1363,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
-    auto recipientIds = extractShardIds(_coordinatorDoc.getRecipientShards());
+    auto recipientIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
 
     NamespaceString nssToRefresh;
     // Refresh the temporary namespace if the coordinator is in state 'kError' just in case the
@@ -1375,7 +1384,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
-    auto donorIds = extractShardIds(_coordinatorDoc.getDonorShards());
+    auto donorIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
     sharding_util::tellShardsToRefreshCollection(
         opCtx.get(), donorIds, _coordinatorDoc.getSourceNss(), **executor);
 }
@@ -1384,8 +1393,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     const BSONObj& refreshCmd, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
 
-    auto donorShardIds = extractShardIds(_coordinatorDoc.getDonorShards());
-    auto recipientShardIds = extractShardIds(_coordinatorDoc.getRecipientShards());
+    auto donorShardIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
+    auto recipientShardIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
