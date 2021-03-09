@@ -135,7 +135,8 @@ protected:
 
     void appendDonorFieldsToReshardingFields(ReshardingFields& fields,
                                              const BSONObj& reshardingKey) {
-        fields.setDonorFields(TypeCollectionDonorFields(kTemporaryReshardingNss, reshardingKey));
+        fields.setDonorFields(
+            TypeCollectionDonorFields(kTemporaryReshardingNss, reshardingKey, kShardIds));
     }
 
     void appendRecipientFieldsToReshardingFields(

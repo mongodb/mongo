@@ -78,6 +78,19 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc);
 
+/**
+ * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries.
+ */
+template <class T>
+std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntries) {
+    std::vector<ShardId> shardIds(participantShardEntries.size());
+    std::transform(participantShardEntries.begin(),
+                   participantShardEntries.end(),
+                   shardIds.begin(),
+                   [](auto& shardEntry) { return shardEntry.getId(); });
+    return shardIds;
+}
+
 }  // namespace resharding
 
 class ServiceContext;

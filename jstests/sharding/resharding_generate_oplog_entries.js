@@ -44,7 +44,11 @@ function simulateResharding() {
     let donorReshardingFields = {
         "uuid": uuid,
         "state": "preparing-to-donate",
-        "donorFields": {"tempNs": tempReshardingNss, "reshardingKey": {y: 1}}
+        "donorFields": {
+            "tempNs": tempReshardingNss,
+            "reshardingKey": {y: 1},
+            "recipientShardIds": [st.shard0.shardName, st.shard1.shardName],
+        },
     };
     assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(
         {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));

@@ -123,7 +123,8 @@ protected:
         } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{
                 constructTemporaryReshardingNss(kNss.db(), existingUuid),
-                KeyPattern{BSON("newKey" << 1)}};
+                KeyPattern{BSON("newKey" << 1)},
+                {kThisShard, kOtherShard}};
             reshardingFields.setDonorFields(std::move(donorFields));
         }
 

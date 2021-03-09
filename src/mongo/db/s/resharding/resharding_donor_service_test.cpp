@@ -193,7 +193,7 @@ TEST_F(ReshardingDonorServiceTest,
     DonorShardContext donorCtx;
     donorCtx.setState(DonorStateEnum::kPreparingToBlockWrites);
 
-    ReshardingDonorDocument doc(std::move(donorCtx));
+    ReshardingDonorDocument doc(std::move(donorCtx), kRecipientShards);
     CommonReshardingMetadata metadata(kReshardingUUID,
                                       mongo::NamespaceString(kReshardNs),
                                       kExistingUUID,
