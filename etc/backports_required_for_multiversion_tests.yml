@@ -100,6 +100,8 @@ all:
     test_file: jstests/replsets/rollback_reconstructs_transactions_prepared_before_stable.js
   - ticket: SERVER-54366
     test_file: jstests/replsets/force_shutdown_primary.js
+  - ticket: SERVER-52953
+    test_file: jstests/core/geo_near_point_query.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
