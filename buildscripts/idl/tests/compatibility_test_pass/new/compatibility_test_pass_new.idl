@@ -358,6 +358,12 @@ structs:
                 type:
                     variant: [bsonSerializationTypeAnyAllowed, StructFieldTypeRecursiveReplyTwo]
 
+    ArrayTypeStruct:
+        description: "Struct with ArrayType field."
+        fields:
+            ArrayCommandParameter:
+                type: array<string>
+
 commands:
     testCommand:
         description: "new passing test command, there was no change from the old version"
@@ -1123,3 +1129,17 @@ commands:
                 privilege:
                     resource_pattern: resourcePattern
                     action_type: [actionTypeThree, actionTypeOne]
+
+    ArrayCommand:
+        description: "new command will pass because the command type and the field type are of
+                      ArrayType of a type that is compatible with the old command."
+        command_name: arrayCommand
+        namespace: type
+        type: array<ArrayTypeStruct>
+        cpp_name: arrayCommand
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<ArrayTypeStruct>
+        reply_type: ArrayTypeStruct

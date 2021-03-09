@@ -83,6 +83,40 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
                 ["src"])
 
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_parameter_no_array"),
+                path.join(
+                    dir_path,
+                    "compatibility_test_fail/abort/missing_array/command_parameter_with_array"),
+                ["src"])
+
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(
+                    dir_path,
+                    "compatibility_test_fail/abort/missing_array/command_parameter_with_array"),
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_parameter_no_array"),
+                ["src"])
+
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_type_no_array"),
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_type_with_array"),
+                ["src"])
+
+        with self.assertRaises(SystemExit):
+            idl_check_compatibility.check_compatibility(
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_type_with_array"),
+                path.join(dir_path,
+                          "compatibility_test_fail/abort/missing_array/command_type_no_array"),
+                ["src"])
+
     # pylint: disable=too-many-locals,too-many-statements
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
@@ -92,7 +126,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 97)
+        self.assertTrue(error_collection.count() == 100)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -574,6 +608,20 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL)
         self.assertRegex(
             str(command_type_validators_not_equal_error), "commandTypeValidatorsNotEqual")
+        array_command_type_error = error_collection.get_error_by_command_name(
+            "arrayCommandTypeError")
+        self.assertTrue(array_command_type_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_NOT_STRUCT)
+        self.assertRegex(str(array_command_type_error), "ArrayTypeStruct")
+        array_command_param_type_two_errors = error_collection.get_all_errors_by_command_name(
+            "arrayCommandParameterTypeError")
+        self.assertTrue(len(array_command_param_type_two_errors) == 2)
+        self.assertTrue(array_command_param_type_two_errors[0].error_id ==
+                        idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND_PARAMETER)
+        self.assertRegex(str(array_command_param_type_two_errors[0]), "ArrayCommandParameter")
+        self.assertTrue(array_command_param_type_two_errors[1].error_id ==
+                        idl_compatibility_errors.ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER)
+        self.assertRegex(str(array_command_param_type_two_errors[1]), "fieldOne")
 
         new_param_variant_not_superset_error = error_collection.get_error_by_command_name(
             "newParamVariantNotSuperset")

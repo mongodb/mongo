@@ -101,6 +101,7 @@ ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL = "ID0057"
 ERROR_ID_CHECK_NOT_EQUAL = "ID0058"
 ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL = "ID0059"
 ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET = "ID0060"
+ERROR_ID_TYPE_NOT_ARRAY = "ID0061"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -830,6 +831,20 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET, command_name,
                         ("'%s' has new action types that are not a subset of the old action types")
                         % (command_name), file)
+
+    def add_type_not_array_error(self, symbol: str, command_name: str, symbol_name: str,
+                                 new_type: str, old_type: str, file: str) -> None:
+        # pylint: disable=too-many-arguments
+        """
+        Add an error about type not being an ArrayType when it should be.
+
+        This is a general error for each case where ArrayType is missing from (command type,
+        command parameter type).
+        """
+        self._add_error(
+            ERROR_ID_TYPE_NOT_ARRAY, command_name,
+            "The command '%s' has %s: '%s' with new type '%s' while the older type was '%s'." %
+            (command_name, symbol, symbol_name, new_type, old_type), file)
 
 
 def _assert_unique_error_messages() -> None:

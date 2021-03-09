@@ -256,6 +256,27 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
                 cmd_name, field_name, new_field_type.name, old_field_type.name, new_idl_file_path)
 
 
+def check_array_type(ctxt: IDLCompatibilityContext, symbol: str,
+                     old_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+                     new_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
+                     cmd_name: str, symbol_name: str, old_idl_file_path: str,
+                     new_idl_file_path: str) -> bool:
+    """Check compatibility between old and new ArrayTypes."""
+    # pylint: disable=too-many-arguments,too-many-branches
+    old_is_array = isinstance(old_type, syntax.ArrayType)
+    new_is_array = isinstance(new_type, syntax.ArrayType)
+    if not old_is_array and not new_is_array:
+        return False
+
+    if not old_is_array or not new_is_array:
+        ctxt.add_type_not_array_error(symbol, cmd_name, symbol_name, new_type.name, old_type.name,
+                                      new_idl_file_path if old_is_array else old_idl_file_path)
+        ctxt.errors.dump_errors()
+        sys.exit(1)
+
+    return True
+
+
 def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                       new_field: syntax.Field, cmd_name: str, old_idl_file: syntax.IDLParsedSpec,
                       new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
@@ -278,6 +299,11 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
 
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
+
+    if check_array_type(ctxt, "reply_field", old_field_type, new_field_type, cmd_name, 'type',
+                        old_idl_file_path, new_idl_file_path):
+        old_field_type = old_field_type.element_type
+        new_field_type = new_field_type.element_type
 
     check_reply_field_type(ctxt, old_field_type, new_field_type, cmd_name, old_field.name,
                            old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
@@ -405,6 +431,13 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext,
                                 is_command_parameter: bool):
     """Check compatibility between old and new command parameter type or command type."""
     # pylint: disable=too-many-arguments,too-many-branches
+    if check_array_type(ctxt, "command_parameter" if is_command_parameter else "command_namespace",
+                        old_type, new_type, cmd_name,
+                        param_name if is_command_parameter else "type", old_idl_file_path,
+                        new_idl_file_path):
+        old_type = old_type.element_type
+        new_type = new_type.element_type
+
     if old_type is None:
         ctxt.add_command_or_param_type_invalid_error(cmd_name, old_idl_file_path, param_name,
                                                      is_command_parameter)
@@ -581,7 +614,7 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
         old_error_reply_struct = old_idl_file.spec.symbols.get_struct("ErrorReply")
 
         if old_error_reply_struct is None:
-            ctxt.add_missing_error_reply_error(old_basic_types_path)
+            ctxt.add_missing_error_reply_struct_error(old_basic_types_path)
         else:
             with open(new_basic_types_path) as new_file:
                 new_idl_file = parser.parse(new_file, new_basic_types_path,
@@ -592,7 +625,7 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
 
                 new_error_reply_struct = new_idl_file.spec.symbols.get_struct("ErrorReply")
                 if new_error_reply_struct is None:
-                    ctxt.add_missing_error_reply_error(new_basic_types_path)
+                    ctxt.add_missing_error_reply_struct_error(new_basic_types_path)
                 else:
                     check_reply_fields(ctxt, old_error_reply_struct, new_error_reply_struct, "n/a",
                                        old_idl_file, new_idl_file, old_basic_types_path,
@@ -711,7 +744,7 @@ def main():
     args = arg_parser.parse_args()
 
     error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, [])
-    if error_coll.errors.has_errors():
+    if error_coll.has_errors():
         sys.exit(1)
 
     old_basic_types_path = os.path.join(args.old_idl_dir, "mongo/idl/basic_types.idl")

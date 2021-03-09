@@ -339,6 +339,12 @@ structs:
             stableRequiredTypeField:
                 type: string
 
+    ArrayTypeStruct:
+        description: "Struct with ArrayType field."
+        fields:
+            ArrayCommandParameter:
+                type: array<string>
+
     StructCommandParameterTypeRecursive:
         description: "This param struct type contains a field that is not compatible between the
                       old and new versions"
@@ -1459,3 +1465,31 @@ commands:
                 privilege:
                     resource_pattern: resourcePattern
                     action_type: [actionType, actionTypeThree]
+
+    ArrayCommandTypeError:
+        description: "new command will fail because the command type is an ArrayType of a type that
+                      that isn't compatible with the old command."
+        command_name: arrayCommandTypeError
+        namespace: type
+        type: array<string>
+        cpp_name: arrayCommandTypeError
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<ArrayTypeStruct>
+        reply_type: ArrayTypeStruct
+
+    ArrayCommandParameterTypeError:
+        description: "new command will fail because the command paramter type are of ArrayType of a
+                      type that is incompatible with the old command paramter type."
+        command_name: arrayCommandParameterTypeError
+        namespace: type
+        type: array<ArrayTypeStruct>
+        cpp_name: arrayCommandParameterTypeError
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<StructType>
+        reply_type: ArrayTypeStruct
