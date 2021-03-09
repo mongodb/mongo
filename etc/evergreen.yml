@@ -1019,6 +1019,7 @@ functions:
           --build-variant ${build_variant}             \
           --evg-alias '${alias|}'                      \
           --timeout ${timeout_secs|0}                  \
+          --exec-timeout ${exec_timeout_secs|0}        \
           --out-file task_timeout_expansions.yml
 
   "update task timeout expansions": &update_task_timeout_expansions
@@ -9983,6 +9984,7 @@ buildvariants:
     push_name: windows
     push_arch: x86_64-enterprise
     test_flags: *windows_common_test_excludes
+    exec_timeout_secs: 14400 # 3 hour timeout
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -10945,7 +10947,7 @@ buildvariants:
     # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
     gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    timeout_secs: 10800 # 3 hour timeout
+    exec_timeout_secs: 14400 # 4 hour timeout
     use_scons_cache: false
   tasks:
     - name: compile_test_and_package_serial_TG
@@ -12419,6 +12421,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+    exec_timeout_secs: 14400 # 3 hour timeout
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -12490,6 +12493,7 @@ buildvariants:
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
+    exec_timeout_secs: 14400 # 3 hour timeout
     test_flags: >-
         --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
         --mongodSetParameters="{

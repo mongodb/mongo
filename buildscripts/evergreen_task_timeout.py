@@ -20,7 +20,19 @@ DEFAULT_NON_REQUIRED_BUILD_TIMEOUT = timedelta(hours=2)
 UNITTESTS_TIMEOUT = timedelta(minutes=12)
 
 SPECIFIC_TASK_OVERRIDES = {
-    "linux-64-debug": {"auth": timedelta(minutes=60), },
+    "linux-64-debug": {"auth": timedelta(minutes=60)},
+    "enterprise-windows-all-feature-flags-suggested": {
+        "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
+        "replica_sets_update_v1_oplog_jscore_passthrough": timedelta(hours=2, minutes=30),
+    },
+    "enterprise-windows-suggested": {
+        "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
+        "replica_sets_update_v1_oplog_jscore_passthrough": timedelta(hours=2, minutes=30),
+    },
+    "windows-debug-suggested": {
+        "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
+        "replica_sets_update_v1_oplog_jscore_passthrough": timedelta(hours=2, minutes=30),
+    },
 
     # unittests outliers
     # repeated execution runs a suite 10 times
@@ -56,33 +68,40 @@ def _has_override(variant: str, task_name: str) -> bool:
     return variant in SPECIFIC_TASK_OVERRIDES and task_name in SPECIFIC_TASK_OVERRIDES[variant]
 
 
-def determine_timeout(task_name: str, variant: str, timeout: Optional[timedelta] = None,
-                      evg_alias: str = '') -> timedelta:
+def determine_timeout(task_name: str, variant: str, idle_timeout: Optional[timedelta] = None,
+                      exec_timeout: Optional[timedelta] = None, evg_alias: str = '') -> timedelta:
     """
     Determine what exec timeout should be used.
 
     :param task_name: Name of task being run.
     :param variant: Name of build variant being run.
-    :param timeout: Override to use for timeout or 0 if no override.
+    :param idle_timeout: Idle timeout if specified.
+    :param exec_timeout: Override to use for exec_timeout or 0 if no override.
     :param evg_alias: Evergreen alias running the task.
     :return: Exec timeout to use for running task.
     """
+    determined_timeout = DEFAULT_NON_REQUIRED_BUILD_TIMEOUT
 
-    if timeout and timeout.total_seconds() != 0:
-        return timeout
+    if exec_timeout and exec_timeout.total_seconds() != 0:
+        determined_timeout = exec_timeout
 
-    if task_name == UNITTEST_TASK and not _has_override(variant, task_name):
-        return UNITTESTS_TIMEOUT
+    elif task_name == UNITTEST_TASK and not _has_override(variant, task_name):
+        determined_timeout = UNITTESTS_TIMEOUT
 
-    if evg_alias == COMMIT_QUEUE_ALIAS:
-        return COMMIT_QUEUE_TIMEOUT
+    elif evg_alias == COMMIT_QUEUE_ALIAS:
+        determined_timeout = COMMIT_QUEUE_TIMEOUT
 
-    if _has_override(variant, task_name):
-        return SPECIFIC_TASK_OVERRIDES[variant][task_name]
+    elif _has_override(variant, task_name):
+        determined_timeout = SPECIFIC_TASK_OVERRIDES[variant][task_name]
 
-    if _is_required_build_variant(variant):
-        return DEFAULT_REQUIRED_BUILD_TIMEOUT
-    return DEFAULT_NON_REQUIRED_BUILD_TIMEOUT
+    elif _is_required_build_variant(variant):
+        determined_timeout = DEFAULT_REQUIRED_BUILD_TIMEOUT
+
+    # The timeout needs to be at least as large as the idle timeout.
+    if idle_timeout and determined_timeout.total_seconds() < idle_timeout.total_seconds():
+        return idle_timeout
+
+    return determined_timeout
 
 
 def output_timeout(timeout: timedelta, output_file: Optional[str]) -> None:
@@ -113,12 +132,17 @@ def main():
     parser.add_argument("--evg-alias", dest="evg_alias", required=True,
                         help="Evergreen alias used to trigger build.")
     parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use (in sec).")
+    parser.add_argument("--exec-timeout", dest="exec_timeout", type=int,
+                        help="Exec timeout ot use (in sec).")
     parser.add_argument("--out-file", dest="outfile", help="File to write configuration to.")
 
     options = parser.parse_args()
 
     timeout_override = timedelta(seconds=options.timeout) if options.timeout else None
-    timeout = determine_timeout(options.task, options.variant, timeout_override, options.evg_alias)
+    exec_timeout_override = timedelta(
+        seconds=options.exec_timeout) if options.exec_timeout else None
+    timeout = determine_timeout(options.task, options.variant, timeout_override,
+                                exec_timeout_override, options.evg_alias)
     output_timeout(timeout, options.outfile)
 
 
