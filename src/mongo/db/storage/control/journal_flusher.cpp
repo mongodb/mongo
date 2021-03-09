@@ -77,6 +77,15 @@ void JournalFlusher::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
     LOGV2_DEBUG(4584701, 1, "starting {name} thread", "name"_attr = name());
 
+    // The thread must not run and access the service context to create an opCtx while unit test
+    // infrastructure is still being set up and expects sole access to the service context (there is
+    // no conurrency control on the service context during this phase).
+    if (_disablePeriodicFlushes) {
+        stdx::unique_lock<Latch> lk(_stateMutex);
+        _flushJournalNowCV.wait(lk,
+                                [&] { return _flushJournalNow || _needToPause || _shuttingDown; });
+    }
+
     // Initialize the thread's opCtx.
     _uniqueCtx.emplace(tc->makeOperationContext());
 
