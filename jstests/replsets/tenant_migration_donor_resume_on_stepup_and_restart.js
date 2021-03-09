@@ -43,9 +43,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, donorRestarted) {
     donorRst.startSet();
     donorRst.initiate();
 
-    // TODO SERVER-52719: Remove 'enableRecipientTesting: false'.
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         donorRst.stopSet();
@@ -125,9 +123,6 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         name: "recipientRst",
         nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
-                // TODO SERVER-52719: Remove the failpoint
-                // 'returnResponseOkForRecipientSyncDataCmd'.
-                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }
@@ -209,9 +204,6 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
         name: "recipientRst",
         nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
-                // TODO SERVER-52719: Remove the failpoint
-                // 'returnResponseOkForRecipientSyncDataCmd'.
-                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }
@@ -311,9 +303,6 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
         name: "recipientRst",
         nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
-                // TODO SERVER-52719: Remove the failpoint
-                // 'returnResponseOkForRecipientSyncDataCmd'.
-                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }

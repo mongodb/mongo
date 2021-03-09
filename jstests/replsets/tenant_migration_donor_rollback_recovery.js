@@ -30,10 +30,9 @@ const recipientRst = new ReplSetTest({
     nodes: 1,
     nodeOptions: Object.assign(migrationX509Options.recipient, {
         setParameter: {
-            // TODO SERVER-52719: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: 1,
+            tenantMigrationDisableX509Auth: true,
         }
     })
 });
@@ -72,6 +71,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: 1,
+                tenantMigrationDisableX509Auth: true,
             }
         })
     });

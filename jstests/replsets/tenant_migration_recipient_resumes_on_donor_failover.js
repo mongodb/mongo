@@ -79,7 +79,10 @@ function runTest(failPoint) {
               `the recipient should start with 'donorPrimary' as the sync source`);
     let configRecipientNs = recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS);
     let recipientDoc = configRecipientNs.find({"_id": migrationUuid}).toArray();
-    assert.eq(recipientDoc[0].state, "started", recipientDoc[0]);
+    const expectedMigrationState = (failPoint === "fpAfterDataConsistentMigrationRecipientInstance")
+        ? "consistent"
+        : "started";
+    assert.eq(recipientDoc[0].state, expectedMigrationState, recipientDoc[0]);
     assert.eq(recipientDoc[0].numRestartsDueToDonorConnectionFailure, 0, recipientDoc[0]);
 
     jsTestLog("Stopping the donor primary");
@@ -123,5 +126,8 @@ if (testEnabled) {
     // Test case where donor is shutdown after cloning has finished but before the donor is notified
     // that the recipient is in the consistent state.
     runTest('fpAfterStartingOplogApplierMigrationRecipientInstance');
+    // Test case where donor is shutdown after the recipient responds to the first
+    // 'RecipientSyncData' cmd, indicating that the data is consistent.
+    runTest('fpAfterDataConsistentMigrationRecipientInstance');
 }
 })();
