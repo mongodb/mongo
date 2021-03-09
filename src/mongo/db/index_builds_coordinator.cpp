@@ -2799,6 +2799,9 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
         const auto kProjectionName = IndexDescriptor::kPathProjectionFieldName;
         const auto pathProjectionSpec = spec.getObjectField(kProjectionName);
         static const auto kWildcardKeyPattern = BSON("$**" << 1);
+        // It's illegal for the user to explicitly specify an empty wildcardProjection for creating
+        // a {"$**":1} index, and specify any wildcardProjection for a {"field.$**": 1} index. If
+        // the projection is empty, then it means that there is no projection to normalize.
         if (pathProjectionSpec.isEmpty()) {
             return spec;
         }

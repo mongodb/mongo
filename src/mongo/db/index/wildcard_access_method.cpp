@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"
@@ -43,7 +44,15 @@ WildcardAccessMethod::WildcardAccessMethod(IndexCatalogEntry* wildcardState,
               _descriptor->pathProjection(),
               _indexCatalogEntry->getCollator(),
               getSortedDataInterface()->getKeyStringVersion(),
-              getSortedDataInterface()->getOrdering()) {}
+              getSortedDataInterface()->getOrdering()) {
+    // Normalize the 'wildcardProjection' index option to facilitate its comparison as part of
+    // index signature.
+    if (!_descriptor->pathProjection().isEmpty()) {
+        auto* projExec = getWildcardProjection()->exec();
+        wildcardState->descriptor()->_setNormalizedPathProjection(
+            projExec->serializeTransformation(boost::none).toBson());
+    }
+}
 
 bool WildcardAccessMethod::shouldMarkIndexAsMultikey(size_t numberOfKeys,
                                                      const KeyStringSet& multikeyMetadataKeys,
