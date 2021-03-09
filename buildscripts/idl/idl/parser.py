@@ -122,6 +122,10 @@ def _generic_parser(
                 if ctxt.is_scalar_sequence(second_node, first_name):
                     syntax_node.__dict__[first_name] = rule_desc.sequence_parser_func(
                         ctxt, second_node)
+            elif rule_desc.node_type == "sequence_mapping":
+                if ctxt.is_sequence_mapping(second_node, first_name):
+                    syntax_node.__dict__[first_name] = rule_desc.sequence_parser_func(
+                        ctxt, second_node)
             elif rule_desc.node_type == "scalar_or_mapping":
                 if ctxt.is_scalar_or_mapping_node(second_node, first_name):
                     syntax_node.__dict__[first_name] = rule_desc.mapping_parser_func(
@@ -702,7 +706,7 @@ def _parse_privilege(ctxt, node):
 
 def _parse_privilege_or_check(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.AccessCheck
-    """Parse a access check section in a struct in the IDL file."""
+    """Parse a privilege section in an access_check in the IDL file."""
 
     access_check = syntax.AccessCheck(ctxt.file_name, node.start_mark.line, node.start_mark.column)
 
@@ -721,6 +725,12 @@ def _parse_privilege_or_check(ctxt, node):
     return access_check
 
 
+def _parse_complex_sequence(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.SequenceNode) -> List[syntax.AccessCheck]
+    """Parse a variant field type's alternative types."""
+    return [_parse_privilege_or_check(ctxt, child) for child in node.value]
+
+
 def _parse_access_checks(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> syntax.AccessChecks
     """Parse an access check section in a struct in the IDL file."""
@@ -732,9 +742,15 @@ def _parse_access_checks(ctxt, node):
         ctxt, node, "access_check", access_checks, {
             "none": _RuleDesc('bool_scalar'),
             "simple": _RuleDesc('mapping', mapping_parser_func=_parse_privilege_or_check),
+            "complex": _RuleDesc('sequence_mapping', sequence_parser_func=_parse_complex_sequence),
         })
 
-    # TODO(SERVER-54523) - validate only one of none, simple or complex is set
+    if ctxt.errors.has_errors():
+        return None
+
+    if (bool(access_checks.none) + bool(access_checks.simple) + bool(access_checks.complex)) != 1:
+        ctxt.add_empty_access_check(access_checks)
+        return None
 
     return access_checks
 

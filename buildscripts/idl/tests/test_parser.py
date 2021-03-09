@@ -1674,6 +1674,28 @@ class TestParser(testcase.IDLTestcase):
                 api_version: 1
                 namespace: ignored
                 access_check:
+                    complex:
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
+
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
                     simple:
                         privilege:
                             resource_pattern: foo
@@ -1738,6 +1760,105 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_EITHER_CHECK_OR_PRIVILEGE)
+
+        # duplicate access_check - none and simple
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    none: true
+                    simple:
+                        privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
+
+        # duplicate access_check - none and complex
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    none: true
+                    complex:
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
+
+        # duplicate access_check - simple and complex
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    simple:
+                        privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                    complex:
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
+
+        # duplicate access_check - none, simple and complex
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    none: true
+                    simple:
+                        privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                    complex:
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - privilege:
+                            resource_pattern: foo
+                            action_type: foo
+                        - check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_EMPTY_ACCESS_CHECK)
 
 
 if __name__ == '__main__':

@@ -126,6 +126,9 @@ ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS = "ID0083"
 ERROR_ID_UNKOWN_ENUM_VALUE = "ID0084"
 ERROR_ID_EITHER_CHECK_OR_PRIVILEGE = "ID0085"
 ERROR_ID_DUPLICATE_ACTION_TYPE = "ID0086"
+ERROR_ID_DUPLICATE_ACCESS_CHECK = "ID0087"
+ERROR_ID_DUPLICATE_PRIVILEGE = "ID0088"
+ERROR_ID_EMPTY_ACCESS_CHECK = "ID0089"
 
 
 class IDLError(Exception):
@@ -301,6 +304,16 @@ class ParserContext(object):
         if self._is_node_type(node, node_name, "sequence"):
             for seq_node in node.value:
                 if not self.is_scalar_node(seq_node, node_name):
+                    return False
+            return True
+        return False
+
+    def is_sequence_mapping(self, node, node_name):
+        # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool
+        """Return True if this YAML node is a Sequence of Mappings."""
+        if self._is_node_type(node, node_name, "sequence"):
+            for seq_node in node.value:
+                if not self.is_mapping_node(seq_node, node_name):
                     return False
             return True
         return False
@@ -939,6 +952,30 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_DUPLICATE_ACTION_TYPE,
                         "Cannot specify an action_type '%s' more then once" % (name))
+
+    def add_duplicate_access_check(self, location, name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about specifying an access check twice in the same list."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_DUPLICATE_ACCESS_CHECK,
+                        "Cannot specify an access_check '%s' more then once" % (name))
+
+    def add_duplicate_privilege(self, location, resource_pattern, action_type):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about specifying a privilege twice in the same list."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_DUPLICATE_PRIVILEGE,
+            "Cannot specify the pair of resource_pattern '%s' and action_type '%s' more then once" %
+            (resource_pattern, action_type))
+
+    def add_empty_access_check(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about specifying one of none, simple or complex in an access check."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_EMPTY_ACCESS_CHECK,
+            "Must one and only one of either a 'none', 'simple', or 'complex' in an access_check.")
 
 
 def _assert_unique_error_messages():
