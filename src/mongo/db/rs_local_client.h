@@ -70,10 +70,6 @@ public:
                                                boost::optional<long long> limit,
                                                const boost::optional<BSONObj>& hint = boost::none);
 
-    Status runAggregation(OperationContext* opCtx,
-                          const AggregateCommand& aggRequest,
-                          std::function<bool(const std::vector<BSONObj>& batch)> callback);
-
 private:
     /**
      * Checks if an OpTime was set on the current Client (ie if the current operation performed a
