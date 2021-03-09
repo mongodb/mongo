@@ -36,6 +36,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/unittest/unittest.h"
 
@@ -119,6 +120,18 @@ TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfFeatureFlagDisabled) {
     // By default, the unit test will have the feature flag disabled.
     ASSERT_THROWS_CODE(
         Pipeline::parse(std::vector<BSONObj>({spec}), getExpCtx()), AssertionException, 16436);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesEmptyInputCorrectly) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
+        {$sum: '$pop', window: {documents: ["unbounded", 0]}}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    const auto mock = DocumentSourceMock::createForTest(getExpCtx());
+    parsedStage->setSource(mock.get());
+    ASSERT_EQ((int)DocumentSource::GetNextResult::ReturnStatus::kEOF,
+              (int)parsedStage->getNext().getStatus());
 }
 
 }  // namespace

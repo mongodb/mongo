@@ -279,8 +279,14 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     if (_eof)
         return DocumentSource::GetNextResult::makeEOF();
 
+    auto curDoc = _iterator[0];
+    // The only way we hit this case is if there are no documents, since otherwise _eof will be set.
+    if (!curDoc) {
+        _eof = true;
+        return DocumentSource::GetNextResult::makeEOF();
+    }
+
     // Populate the output document with the result from each window function.
-    auto curDoc = _iterator[0].get();
     MutableDocument addFieldsSpec;
     for (auto&& [fieldName, function] : _executableOutputs) {
         addFieldsSpec.addField(fieldName, function->getNext());
@@ -303,7 +309,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
     auto projExec = projection_executor::AddFieldsProjectionExecutor::create(
         pExpCtx, addFieldsSpec.freeze().toBson());
 
-    return projExec->applyProjection(curDoc);
+    return projExec->applyProjection(*curDoc);
 }
 
 }  // namespace mongo
