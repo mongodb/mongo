@@ -601,6 +601,30 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
     return ctxt.errors
 
 
+def check_security_access_check(
+        ctxt: IDLCompatibilityContext, old_access_checks: syntax.AccessChecks,
+        new_access_checks: syntax.AccessChecks, cmd_name: str, new_idl_file_path: str) -> None:
+    """Check the compatibility between security access checks of the old and new command."""
+    if old_access_checks is not None and new_access_checks is not None:
+        old_simple_check = old_access_checks.simple
+        new_simple_check = new_access_checks.simple
+        if old_simple_check is not None and new_simple_check is not None:
+            if old_simple_check.check != new_simple_check.check:
+                ctxt.add_check_not_equal_error(cmd_name, old_simple_check.check,
+                                               new_simple_check.check, new_idl_file_path)
+
+            else:
+                old_privilege = old_simple_check.privilege
+                new_privilege = new_simple_check.privilege
+                if old_privilege is not None and new_privilege is not None:
+                    if old_privilege.resource_pattern != new_privilege.resource_pattern:
+                        ctxt.add_resource_pattern_not_equal_error(
+                            cmd_name, old_privilege.resource_pattern,
+                            new_privilege.resource_pattern, new_idl_file_path)
+                    if not set(new_privilege.action_type).issubset(old_privilege.action_type):
+                        ctxt.add_new_action_types_not_subset_error(cmd_name, new_idl_file_path)
+
+
 def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                         import_directories: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new IDL commands."""
@@ -668,6 +692,9 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     check_reply_fields(ctxt, old_reply, new_reply, old_cmd.command_name,
                                        old_idl_file, new_idl_file, old_idl_file_path,
                                        new_idl_file_path)
+
+                    check_security_access_check(ctxt, old_cmd.access_check, new_cmd.access_check,
+                                                old_cmd.command_name, new_idl_file_path)
 
     ctxt.errors.dump_errors()
     return ctxt.errors

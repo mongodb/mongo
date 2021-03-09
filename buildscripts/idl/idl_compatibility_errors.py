@@ -98,6 +98,9 @@ ERROR_ID_NEW_COMMAND_TYPE_NOT_VARIANT = "ID0054"
 ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET = "ID0055"
 ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET = "ID0056"
 ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL = "ID0057"
+ERROR_ID_CHECK_NOT_EQUAL = "ID0058"
+ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL = "ID0059"
+ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET = "ID0060"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -807,6 +810,26 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_REPLY_FIELD_TYPE_INVALID, command_name,
                         ("'%s' has a reply field or sub-field '%s' that has an invalid type") %
                         (command_name, field_name), file)
+
+    def add_check_not_equal_error(self, command_name: str, old_check: str, new_check: str,
+                                  file: str) -> None:
+        """Add an error about the command access_check check not being equal."""
+        self._add_error(ERROR_ID_CHECK_NOT_EQUAL, command_name,
+                        ("'%s' has a new check '%s' that is not equal to the old check '%s'") %
+                        (command_name, new_check, old_check), file)
+
+    def add_resource_pattern_not_equal_error(self, command_name: str, old_resource_pattern: str,
+                                             new_resource_pattern: str, file: str) -> None:
+        """Add an error about the command access_check resource_pattern not being equal."""
+        self._add_error(ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL, command_name, (
+            "'%s' has a new resource pattern '%s' that is not equal to the old resource pattern '%s'"
+        ) % (command_name, new_resource_pattern, old_resource_pattern), file)
+
+    def add_new_action_types_not_subset_error(self, command_name: str, file: str) -> None:
+        """Add an error about the command access_check check not being equal."""
+        self._add_error(ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET, command_name,
+                        ("'%s' has new action types that are not a subset of the old action types")
+                        % (command_name), file)
 
 
 def _assert_unique_error_messages() -> None:

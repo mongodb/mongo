@@ -1080,3 +1080,46 @@ commands:
         strict: true
         api_version: "1"
         reply_type: ValidatorsEqualStruct
+
+    simpleCheckEqual:
+        description: "new command passes because its simple check is equal to
+                      the old check"
+        command_name: simpleCheckEqual
+        namespace: ignored
+        cpp_name: simpleCheckEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                check: check
+
+    simplePrivilegeEqual:
+        description: "new command passes because its simple privilege is equal to
+                      the old privilege"
+        command_name: simplePrivilegeEqual
+        namespace: ignored
+        cpp_name: simplePrivilegeEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeThree, actionTypeOne, actionTypeTwo]
+
+    newSimpleActionTypeSubset:
+        description: "new command passes because its simple privilege action_type is a subset
+                      of the old privilege action_type"
+        command_name: newSimpleActionTypeSubset
+        namespace: ignored
+        cpp_name: newSimpleActionTypeSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeThree, actionTypeOne]
