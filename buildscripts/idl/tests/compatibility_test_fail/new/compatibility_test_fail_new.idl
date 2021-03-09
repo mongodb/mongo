@@ -1388,3 +1388,74 @@ commands:
         strict: true
         api_version: "1"
         reply_type: ValidatorsNotEqualStruct
+
+    simpleCheckNotEqual:
+        description: "new command fails because its simple check is not equal to
+                      the old check"
+        command_name: simpleCheckNotEqual
+        namespace: ignored
+        cpp_name: simpleCheckNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                check: new
+
+    simpleCheckNotEqualTwo:
+        description: "new command fails because it has a privilege while the old command
+                      has a check"
+        command_name: simpleCheckNotEqualTwo
+        namespace: ignored
+        cpp_name: simpleCheckNotEqualTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: resourcePattern
+                    action_type: actionType
+
+    simpleCheckNotEqualThree:
+        description: "new command fails because its simple check is not equal to
+                      the old check"
+        command_name: simpleCheckNotEqualThree
+        namespace: ignored
+        cpp_name: simpleCheckNotEqualThree
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                check: None
+
+    simpleResourcePatternNotEqual:
+        description: "new command fails because its simple privilege resource_pattern is not
+                      equal to the old resource_pattern"
+        command_name: simpleResourcePatternNotEqual
+        namespace: ignored
+        cpp_name: simpleResourcePatternNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: new
+                    action_type: actionType
+
+    newSimpleActionTypesNotSubset:
+        description: "new command fails because its simple privilege resource_pattern is not
+                      equal to the old resource_pattern"
+        command_name: newSimpleActionTypesNotSubset
+        namespace: ignored
+        cpp_name: newSimpleActionTypesNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionType, actionTypeThree]

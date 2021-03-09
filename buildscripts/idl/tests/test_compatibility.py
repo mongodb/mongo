@@ -92,7 +92,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 92)
+        self.assertTrue(error_collection.count() == 97)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -669,6 +669,38 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_REPLY_FIELD_VALIDATORS_NOT_EQUAL)
         self.assertRegex(
             str(reply_field_validators_not_equal_error), "replyFieldValidatorsNotEqual")
+
+        simple_check_not_equal_error = error_collection.get_error_by_command_name(
+            "simpleCheckNotEqual")
+        self.assertTrue(simple_check_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_CHECK_NOT_EQUAL)
+        self.assertRegex(str(simple_check_not_equal_error), "simpleCheckNotEqual")
+
+        simple_check_not_equal_error_two = error_collection.get_error_by_command_name(
+            "simpleCheckNotEqualTwo")
+        self.assertTrue(simple_check_not_equal_error_two.error_id ==
+                        idl_compatibility_errors.ERROR_ID_CHECK_NOT_EQUAL)
+        self.assertRegex(str(simple_check_not_equal_error_two), "simpleCheckNotEqualTwo")
+
+        simple_check_not_equal_error_three = error_collection.get_error_by_command_name(
+            "simpleCheckNotEqualThree")
+        self.assertTrue(simple_check_not_equal_error_three.error_id ==
+                        idl_compatibility_errors.ERROR_ID_CHECK_NOT_EQUAL)
+        self.assertRegex(str(simple_check_not_equal_error_three), "simpleCheckNotEqualThree")
+
+        simple_resource_pattern_not_equal_error = error_collection.get_error_by_command_name(
+            "simpleResourcePatternNotEqual")
+        self.assertTrue(simple_resource_pattern_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL)
+        self.assertRegex(
+            str(simple_resource_pattern_not_equal_error), "simpleResourcePatternNotEqual")
+
+        new_simple_action_types_not_subset_error = error_collection.get_error_by_command_name(
+            "newSimpleActionTypesNotSubset")
+        self.assertTrue(new_simple_action_types_not_subset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET)
+        self.assertRegex(
+            str(new_simple_action_types_not_subset_error), "newSimpleActionTypesNotSubset")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""
