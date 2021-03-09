@@ -1622,7 +1622,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/burn_in_tags_gen/burn_in_tags_gen-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Burn_in_tags Task Config - Execution ${execution}
     - command: generate.tasks
       params:
@@ -1675,7 +1675,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
@@ -1726,7 +1726,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
@@ -2162,7 +2162,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
@@ -2213,7 +2213,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
         optional: true
 
@@ -2266,7 +2266,7 @@ functions:
         remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${name}_gen-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Task Config - Execution ${execution}
 
     - command: timeout.update
@@ -2366,7 +2366,7 @@ functions:
         bucket: mciuploads
         permissions: private
         visibility: signed
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Generated Tests - Execution ${execution}
 
   "run idl tests":
@@ -2802,7 +2802,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: gcov intermediate files - Execution ${execution}
       optional: true
 
@@ -2828,7 +2828,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Jepsen mongod Logs - ${execution}
       optional: true
 
@@ -2849,7 +2849,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
@@ -2894,7 +2894,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Core Dumps - Execution ${execution}
       optional: true
 
@@ -2995,7 +2995,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Unit tests - Execution ${execution}
       optional: true
 
@@ -3107,7 +3107,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Hang Analyzer Output - Execution ${execution}
       optional: true
 
@@ -3134,7 +3134,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Disk Stats - Execution ${execution}
       optional: true
 
@@ -3160,7 +3160,7 @@ functions:
       remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: System Resource Info - Execution ${execution}
       optional: true
 
@@ -3368,7 +3368,7 @@ tasks:
         remote_file: ${mongo_binaries}
         bucket: mciuploads
         permissions: public-read
-        content_type: ${content_type|application/gzip}
+        content_type: application/gzip
         display_name: Binaries
 
     - command: s3.put
@@ -4133,7 +4133,7 @@ tasks:
       remote_file: ${project}/${build_variant}/${revision}/burn_in_tests_gen/burn_in_tests_gen-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Burn_in_tests Task Config - Execution ${execution}
   - command: generate.tasks
     params:
@@ -4195,7 +4195,7 @@ tasks:
       remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       optional: true
       display_name: Generated Multiversion Resmoke.py Suite Config - Execution ${execution}
 
@@ -4207,7 +4207,7 @@ tasks:
       remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
-      content_type: ${content_type|application/gzip}
+      content_type: application/gzip
       display_name: Burn_in_tests Task Config - Execution ${execution}
 
   - command: generate.tasks
