@@ -3694,5 +3694,20 @@ TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
     verifyContract(ac, AccessCheckSimplePrivilege::kAuthorizationContract);
 }
 
+TEST(IDLAccessCheck, TestComplexAccessCheck) {
+    AuthorizationContract ac;
+    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
+    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
+
+    ac.addPrivilege(Privilege(ResourcePattern::forDatabaseName("test"), ActionType::trafficRecord));
+
+    ac.addPrivilege(Privilege(ResourcePattern::forAnyResource(), ActionType::splitVector));
+
+    ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
+    ac.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
+
+    verifyContract(ac, AccessCheckComplexPrivilege::kAuthorizationContract);
+}
+
 }  // namespace
 }  // namespace mongo

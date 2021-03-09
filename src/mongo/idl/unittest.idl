@@ -1066,6 +1066,28 @@ commands:
                     action_type: [addShard, serverStatus]
         reply_type: OkReply
 
+
+    AccessCheckComplexPrivilege:
+        description: A versioned API command with access_check complex
+        command_name: AccessCheckComplexPrivilegeCommandName
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: cluster
+                    action_type: [addShard, serverStatus]
+                - privilege:
+                    resource_pattern: database
+                    action_type: trafficRecord
+                - privilege:
+                    resource_pattern: any
+                    action_type: splitVector
+                - check: is_authenticated
+                - check: is_authorized_to_parse_namespace_element
+        reply_type: OkReply
+
     # Test that we correctly generate C++ base classes for versioned API commands with different
     # key names, command names, and C++ names.
     APIVersion1CommandIDLName:

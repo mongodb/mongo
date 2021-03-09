@@ -629,9 +629,44 @@ def _bind_single_check(ctxt, parsed_spec, access_check):
     return ast_access_check
 
 
+def _validate_check_uniqueness(ctxt, access_checks):
+    # type: (errors.ParserContext, List[ast.AccessCheck]) -> bool
+    """Validate there is no duplication among checks."""
+    checks_set = set()
+    for ac in access_checks:
+        if not ac.check:
+            continue
+
+        if ac.check in checks_set:
+            ctxt.add_duplicate_access_check(ac, ac.check)
+            return False
+
+        checks_set.add(ac.check)
+
+    privs_set = set()
+    for ac in access_checks:
+        if not ac.privilege:
+            continue
+
+        priv = ac.privilege
+
+        # Produce pairs of resource_pattern and action type, then de-dup them
+        for at in priv.action_type:
+            priv_tuple = (priv.resource_pattern, at)
+            if priv_tuple in privs_set:
+                ctxt.add_duplicate_access_check(ac, ac.check)
+                return False
+
+            privs_set.add(priv_tuple)
+
+    return True
+
+
 def _bind_access_check(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> Optional[List[ast.AccessCheck]]
     """Bind the access_check field in a command."""
+    # pylint: disable=too-many-return-statements
+
     if not command.access_check:
         return None
 
@@ -646,6 +681,19 @@ def _bind_access_check(ctxt, parsed_spec, command):
             return None
 
         return [ast_access_check]
+
+    if access_check.complex:
+        checks = []  # List[ast.AccessCheck]
+        for ac in access_check.complex:
+            ast_access_check = _bind_single_check(ctxt, parsed_spec, ac)
+            if not ast_access_check:
+                return None
+            checks.append(ast_access_check)
+
+        if not _validate_check_uniqueness(ctxt, checks):
+            return None
+
+        return checks
 
     return None
 

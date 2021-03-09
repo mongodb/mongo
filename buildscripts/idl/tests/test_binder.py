@@ -2453,6 +2453,28 @@ class TestBinder(testcase.IDLTestcase):
                 reply_type: reply
             """))
 
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    complex:
+                        - privilege:
+                            resource_pattern: cluster
+                            action_type: addShard
+                        - privilege:
+                            resource_pattern: cluster
+                            action_type: serverStatus
+                        - check: is_authenticated
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
+
     def test_access_check_negative(self):
         # type: () -> None
         """Negative access check tests."""
@@ -2584,6 +2606,46 @@ class TestBinder(testcase.IDLTestcase):
                     foo: string
                 reply_type: reply
             """), idl.errors.ERROR_ID_DUPLICATE_ACTION_TYPE)
+
+        # complex with duplicate check
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    complex:
+                        - check: is_authenticated
+                        - check: is_authenticated
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK)
+
+        # complex with duplicate priv
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                access_check:
+                    complex:
+                        - privilege:
+                            resource_pattern: cluster
+                            action_type: addShard
+                        - privilege:
+                            resource_pattern: cluster
+                            action_type: [addShard, serverStatus]
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK)
 
 
 if __name__ == '__main__':
