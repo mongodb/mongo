@@ -236,7 +236,7 @@ Status _createTimeseries(OperationContext* opCtx,
 
 
         // If possible, cluster time-series buckets collections by _id.
-        const bool useClusteredIdIndex =
+        const bool useClusteredIdIndex = gTimeseriesBucketsCollectionClusterById &&
             opCtx->getServiceContext()->getStorageEngine()->supportsClusteredIdIndex();
         auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds();
         if (useClusteredIdIndex) {
