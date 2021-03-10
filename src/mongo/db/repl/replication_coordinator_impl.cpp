@@ -497,7 +497,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
             "for information on how to recover from this. Got \"{error}\" while parsing "
             "{config}",
             "Locally stored replica set configuration does not parse; See "
-            "hhttp://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
+            "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
             "for information on how to recover from this",
             "error"_attr = status,
             "config"_attr = cfg.getValue());
