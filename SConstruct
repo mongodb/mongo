@@ -2528,12 +2528,8 @@ if not env.TargetOSIs('windows') and (env.ToolchainIs('GCC', 'clang')):
     # setting it for both C and C++ by setting both of CFLAGS and
     # CXXFLAGS.
 
-    arm_march_flag = "armv8-a"
-    if get_option('use-hardware-crc32') == "on":
-        arm_march_flag += "+crc"
-
     default_targeting_flags_for_architecture = {
-        "aarch64"    : { "-march=" : arm_march_flag, "-mtune=" : "generic"                        },
+        "aarch64"    : { "-march=" : "armv8.2-a",    "-mtune=" : "generic"                        },
         "i386"       : { "-march=" : "nocona",       "-mtune=" : "generic"                        },
         "ppc64le"    : { "-mcpu="  : "power8",       "-mtune=" : "power8", "-mcmodel=" : "medium" },
         "s390x"      : { "-march=" : "z196",         "-mtune=" : "zEC12"                          },

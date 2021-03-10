@@ -124,7 +124,7 @@ platforms:
   - name: ubuntu1804-arm64
     driver:
       image_id: ami-01ac7d9c1179d7b74
-      instance_type: a1.medium
+      instance_type: m6g.medium
   - name: ubuntu2004-x86-64
     driver:
       image_id: ami-068663a3c619dd892
@@ -133,7 +133,7 @@ platforms:
   - name: ubuntu2004-arm64
     driver:
       image_id: ami-00579fbb15b954340
-      instance_type: a1.medium
+      instance_type: m6g.medium
 
 transport:
   ssh_key: ~/.ssh/kitchen.pem
