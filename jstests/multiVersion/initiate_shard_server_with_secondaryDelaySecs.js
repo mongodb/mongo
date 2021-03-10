@@ -2,6 +2,8 @@
  * Tests that new shard servers using the 'latest' binary in 'lastLTSFCV' are able to use the
  * 'secondaryDelaySecs' field. Once the shard is added to a sharded cluster, it must abide by
  * the FCV restrictions of that cluster.
+ *
+ * TODO SERVER-55128: Remove this test once 5.0 becomes 'lastLTS'.
  */
 
 (function() {
