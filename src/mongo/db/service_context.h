@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -121,13 +122,6 @@ private:
     stdx::unique_lock<Client> _lk;
     Client* _client = nullptr;
 };
-
-/**
- * Every OperationContext is expected to have a unique OperationId within the domain of its
- * ServiceContext. Generally speaking, OperationId is used for forming maps of OperationContexts and
- * directing metaoperations like killop.
- */
-using OperationId = uint32_t;
 
 /**
  * Users may provide an OperationKey when sending a command request as a stable token by which to
@@ -692,6 +686,10 @@ private:
     std::vector<ClientObserverHolder> _clientObservers;
     ClientSet _clients;
 
+    /**
+     * Managing classes for our issued operation IDs.
+     */
+    std::shared_ptr<UniqueOperationIdRegistry> _opIdRegistry;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 
     /**
@@ -717,9 +715,6 @@ private:
 
     // protected by _mutex
     std::vector<KillOpListenerInterface*> _killOpListeners;
-
-    // Counter for assigning operation ids.
-    AtomicWord<OperationId> _nextOpId{1};
 
     // When the catalog is restarted, the generation goes up by one each time.
     AtomicWord<uint64_t> _catalogGeneration{0};
