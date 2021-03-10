@@ -141,7 +141,7 @@ variables:
   name: libfuzzertests!
   execution_tasks:
   - compile_and_archive_libfuzzertests
-  - run_libfuzzertests
+  - fetch_and_run_libfuzzertests
 
 - &compile_task_group_template
   name: compile_task_group_template
@@ -162,18 +162,7 @@ variables:
   - func: "save hang analyzer debugger files"
   - func: "save disk statistics"
   - func: "save system resource information"
-  - command: shell.exec
-    type: setup
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        ./buildscripts/merge_corpus.sh
-  - func: "archive new corpus"
-  - func: "upload new corpus"
+  - func: "save libfuzzertest corpora"
   - func: "remove files"
     vars:
       files: >-
@@ -549,21 +538,25 @@ functions:
     params:
       aws_key: ${s3_access_key_id}
       aws_secret: ${s3_secret_access_key}
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
       bucket: fuzzer-artifacts
-      local_file: src/corpus.tgz
+      extract_to: src/corpora
+      remote_file: ${mongo_fuzzer_corpus}
 
-  "extract corpus": &extract_corpus
-    command: archive.auto_extract
+  "fetch legacy corpus": &fetch_legacy_corpus
+    command: s3.get
     params:
-        path: src/corpus.tgz
-        destination: src/corpus
+      aws_key: ${s3_access_key_id}
+      aws_secret: ${s3_secret_access_key}
+      bucket: fuzzer-artifacts
+      # Extract the legacy corpora to the merge directory to synthesize together until we burn in.
+      extract_to: src/corpora-merged
+      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
 
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
     params:
-      target: corpus.tgz
-      source_dir: src/corpus
+      target: corpora.tgz
+      source_dir: src/corpora-merged
       include:
         - "**"
 
@@ -572,14 +565,28 @@ functions:
     params:
       aws_key: ${s3_access_key_id}
       aws_secret: ${s3_secret_access_key}
-      local_file: corpus.tgz
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
       bucket: fuzzer-artifacts
-      permissions: private
-      visibility: signed
       content_type: ${content_type|application/gzip}
       display_name: "Fuzzer Tests Corpus Tar Archive"
+      local_file: corpora.${ext|tgz}
       optional: true
+      permissions: private
+      remote_file: ${mongo_fuzzer_corpus}
+      visibility: signed
+
+  "upload new corpus for mciuploads": &upload_new_corpus_mciuploads
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      bucket: mciuploads
+      content_type: ${content_type|application/gzip}
+      display_name: Input Corpora
+      local_file: corpora.${ext|tgz}
+      optional: true
+      permissions: private
+      remote_file: ${mongo_fuzzer_corpus_mciuploads}
+      visibility: signed
 
   "get buildnumber": &get_buildnumber
     command: keyval.inc
@@ -1109,6 +1116,10 @@ functions:
         value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
       - key: mongo_shell_debugsymbols
         value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-debugsymbols-${build_id}.${ext|tgz}
+      - key: mongo_fuzzer_corpus_mciuploads
+        value: ${project}/${build_variant}/${revision}/libfuzzer-corpora/corpora-${build_id}.${ext|tgz}
+      - key: mongo_fuzzer_corpus
+        value: corpora-${project}-${build_variant}.${ext|tgz}
       - key: skip_tests
         value: skip_test-${build_id}
 
@@ -3130,6 +3141,11 @@ functions:
   - *tar_disk_statistics
   - *archive_disk_statistics
 
+  "save libfuzzertest corpora":
+  - *archive_new_corpus
+  - *upload_new_corpus
+  - *upload_new_corpus_mciuploads
+
   ### Process & archive system resource artifacts ###
   "tar system resource information": &tar_system_resource_information
     command: archive.targz_pack
@@ -3568,6 +3584,7 @@ tasks:
       vars:
         targets: archive-fuzzertests
         compiling_for_test: true
+    # Store the fuzzer executable, which we use to generate and run fuzzer inputs.
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3580,11 +3597,11 @@ tasks:
         content_type: application/tar
         display_name: "LibFuzzer Tests"
 
-## run_libfuzzertests - run libfuzzertests ##
-- name: run_libfuzzertests
+## fetch_and_run_libfuzzertests - get input corpora from s3 and run libfuzzertests ##
+- name: fetch_and_run_libfuzzertests
   commands:
     - func: "fetch corpus"
-    - func: "extract corpus"
+    - func: "fetch legacy corpus"
     - func: "run tests"
       vars:
         resmoke_args: --suites=libfuzzer
@@ -8440,7 +8457,7 @@ task_groups:
   name: compile_archive_and_run_libfuzzertests_TG
   tasks:
   - compile_and_archive_libfuzzertests
-  - run_libfuzzertests
+  - fetch_and_run_libfuzzertests
 
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_TG

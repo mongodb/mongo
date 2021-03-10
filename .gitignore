@@ -200,3 +200,8 @@ resmoke.ini
 
 # UndoDB Recordings
 *.undo
+
+# libfuzzer artifacts
+default.profraw
+/corpora
+/corpora-merged
