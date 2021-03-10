@@ -144,7 +144,6 @@ env.CppUnitTest(
         'parser/sbe_parser_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_hash_agg_test.cpp',
-        'sbe_hash_join_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
         'sbe_math_builtins_test.cpp',
