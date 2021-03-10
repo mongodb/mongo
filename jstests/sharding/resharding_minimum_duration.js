@@ -75,7 +75,7 @@ function runTest(reshardingTest, namespace, minimumReshardingDuration) {
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
 
-const durations = [5000, 10000, 20000];  // 5, 10, and 20 seconds
+const durations = [0, 5000, 10000, 20000];  // 0, 5, 10, and 20 seconds
 durations.forEach(minimumReshardingDuration =>
                       runTest(reshardingTest,
                               `reshardingDb.coll${minimumReshardingDuration}`,

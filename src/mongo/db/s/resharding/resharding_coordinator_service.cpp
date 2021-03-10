@@ -951,9 +951,6 @@ ExecutorFuture<void> waitForMinimumOperationDuration(
     const auto elapsed =
         ReshardingMetrics::get(cc().getServiceContext())->getOperationElapsedTime().get();
 
-    if (elapsed >= minDuration)
-        return ExecutorFuture<void>(executor);
-
     // As `ReshardingMetrics` may use a different clock source, the following is to estimate the
     // time on the executor clock source when the operation was started. This estimation also allows
     // logging both `startedOn` and `resumedOn` using a single clock source.
