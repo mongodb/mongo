@@ -410,6 +410,7 @@ functions:
   "remove files": &remove_files
     command: shell.exec
     params:
+      shell: bash
       script: |
         if [ -z "${files}" ]; then
           exit 0
@@ -426,6 +427,7 @@ functions:
     command: shell.exec
     type: test
     params:
+      shell: bash
       working_dir: src
       silent: true
       script: |
@@ -442,6 +444,7 @@ functions:
     params:
       working_dir: src
       silent: true
+      shell: bash
       script: |
         # Create the Evergreen API credentials
         cat > .selected_tests.yml <<END_OF_CREDS
@@ -509,6 +512,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         ${decompress|tar xzvf} mongo-binaries.tgz
@@ -517,6 +521,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         mongo_binary=dist-test/bin/mongo${exe}
@@ -587,6 +592,7 @@ functions:
     params:
       background: true
       system_log: true
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -617,6 +623,7 @@ functions:
       working_dir: src
       background: true
       system_log: true
+      shell: bash
       script: |
         ${activate_virtualenv}
         $python buildscripts/collect_resource_info.py -o system_resource_info.json -i 5
@@ -628,6 +635,7 @@ functions:
     params:
       background: true
       system_log: true
+      shell: bash
       script: |
         proc_list="(java|lein|mongo|python|_test$|_test\.exe$)"
         if [ "Windows_NT" = "$OS" ]; then
@@ -680,6 +688,7 @@ functions:
     params:
       working_dir: src
       silent: true
+      shell: bash
       script: |
         cat > mci.buildlogger <<END_OF_CREDS
         slavename='${slave}'
@@ -706,6 +715,7 @@ functions:
     params:
       working_dir: src
       silent: true
+      shell: bash
       script: |
         set -o errexit
 
@@ -721,6 +731,7 @@ functions:
     command: shell.exec
     params:
       silent: true
+      shell: bash
       script: |
         set -o errexit
 
@@ -813,6 +824,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -908,6 +920,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -1213,6 +1226,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -1303,6 +1317,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o verbose
 
@@ -1597,6 +1612,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
 
@@ -1606,6 +1622,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -1658,6 +1675,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
 
@@ -1717,6 +1735,7 @@ functions:
     type: setup
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o verbose
         if [ -f run_tests_infrastructure_failure ]; then
@@ -1750,6 +1769,7 @@ functions:
       type: setup
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o verbose
           if [ -f run_tests_infrastructure_failure ]; then
@@ -1761,6 +1781,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -1867,6 +1888,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -1936,6 +1958,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
 
@@ -1953,6 +1976,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
@@ -1965,6 +1989,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           ${activate_virtualenv}
@@ -1972,6 +1997,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
 
@@ -1984,6 +2010,7 @@ functions:
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
         working_dir: src/jepsen-mongodb
+        shell: bash
         script: |
           set -o verbose
 
@@ -2045,6 +2072,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src/jepsen-mongodb
+        shell: bash
         script: |
           set -o verbose
           # Jepsen system failure if file exists.
@@ -2057,6 +2085,7 @@ functions:
       params:
         silent: true
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           echo "const AWS_KMS_SECRET_ID = '${aws_kms_access_key_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
@@ -2086,6 +2115,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
 
@@ -2136,6 +2166,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -2190,6 +2221,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -2278,6 +2310,7 @@ functions:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -2289,6 +2322,7 @@ functions:
       type: test
       params:
         working_dir: src/jstestfuzz
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -2320,6 +2354,7 @@ functions:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o verbose
           set -o errexit
@@ -2394,6 +2429,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -2409,6 +2445,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -2420,6 +2457,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -2429,6 +2467,7 @@ functions:
   "cleanup environment":
     command: shell.exec
     params:
+      shell: bash
       script: |
         set -o verbose
 
@@ -2439,6 +2478,7 @@ functions:
     command: shell.exec
     params:
       silent: true
+      shell: bash
       script: |
         process_kill_list="(^cl\.exe$|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes and other system daemons
@@ -2655,6 +2695,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         client_logs=$(ls crud*.log fsm*.log 2> /dev/null)
         if [ ! -z "$client_logs" ]; then
@@ -2683,6 +2724,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         if [ -d /data/thrift ]; then
           rm -rf /data/thrift
@@ -2697,6 +2739,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set +o errexit
         if [ -d "./build" ]; then
@@ -2806,6 +2849,7 @@ functions:
     command: shell.exec
     params:
       working_dir: "src"
+      shell: bash
       script: |
         # Find all core files and move to src
         core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
@@ -2981,6 +3025,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o verbose
 
@@ -3005,6 +3050,7 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      shell: bash
       script: |
         proc="resmoke.py"
         if [ "Windows_NT" = "$OS" ]; then
@@ -3177,6 +3223,7 @@ functions:
   "attach wiki page":
     - command: shell.exec
       params:
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3475,6 +3522,7 @@ tasks:
       timeout_secs: 3600 # 1 hour timeout for no output
       params:
         working_dir: "src"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3628,6 +3676,7 @@ tasks:
   commands:
     - command: shell.exec
       params:
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3688,6 +3737,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: "src/build"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3736,6 +3786,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: "src/build"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3761,6 +3812,7 @@ tasks:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o verbose
           set -o errexit
@@ -3774,6 +3826,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: "src/build"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3831,6 +3884,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: "src/build"
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3868,6 +3922,7 @@ tasks:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -3988,12 +4043,13 @@ tasks:
     type: test
     params:
       working_dir: src
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
 
         ${activate_virtualenv}
-        find buildscripts etc jstests -name '*.y*ml' -exec yamllint -c etc/yamllint_config.yml {} +
+        ./buildscripts/yamllinters.sh
 
 - name: lint_errorcodes
   commands:
@@ -7398,6 +7454,7 @@ tasks:
     params:
       working_dir: src
       silent: true
+      shell: bash
       script: |
         # Create the Evergreen API credentials
         cat > .restconfig.json <<END_OF_CREDS
@@ -7413,6 +7470,7 @@ tasks:
     type: test
     params:
       working_dir: src/
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -7429,6 +7487,7 @@ tasks:
     type: setup
     params:
       working_dir: src/src/mongo/db/repl/tla_plus
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -7491,6 +7550,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           set -o errexit
           set -o verbose
@@ -7645,6 +7705,7 @@ tasks:
     - command: shell.exec
       params:
         working_dir: src
+        shell: bash
         script: |
           . ./notary_env.sh
 
@@ -7715,6 +7776,7 @@ tasks:
       type: test
       params:
         working_dir: src
+        shell: bash
         script: |
           . ./notary_env.sh
 
