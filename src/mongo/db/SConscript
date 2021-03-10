@@ -250,6 +250,16 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='operation_id_test',
+    source=[
+        'operation_id_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+    ],
+)
+
 env.Library(
     target='index_names',
     source=[
@@ -507,6 +517,7 @@ env.Library(
         'multi_key_path_tracker.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',
+        'operation_id.cpp',
         'service_context.cpp',
         'server_recovery.cpp',
         'unclean_shutdown.cpp',

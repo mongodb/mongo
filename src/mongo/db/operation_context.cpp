@@ -79,9 +79,12 @@ MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 }  // namespace
 
-OperationContext::OperationContext(Client* client, unsigned int opId)
+OperationContext::OperationContext(Client* client, OperationId opId)
+    : OperationContext(client, OperationIdSlot(opId)) {}
+
+OperationContext::OperationContext(Client* client, OperationIdSlot&& opIdSlot)
     : _client(client),
-      _opId(opId),
+      _opId(std::move(opIdSlot)),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
