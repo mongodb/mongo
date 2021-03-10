@@ -375,7 +375,7 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
                                          const ReplSetConfig& newConfig,
                                          ServiceContext* ctx) {
-    Status status = newConfig.validate();
+    Status status = newConfig.validateAllowingSplitHorizonIP();
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
@@ -426,10 +426,12 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
-Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
-                                 const ReplSetConfig& newConfig,
-                                 bool force) {
-    Status status = newConfig.validate();
+Status _validateConfigForReconfig(const ReplSetConfig& oldConfig,
+                                  const ReplSetConfig& newConfig,
+                                  bool force,
+                                  bool allowSplitHorizonIP) {
+    Status status =
+        allowSplitHorizonIP ? newConfig.validateAllowingSplitHorizonIP() : newConfig.validate();
     if (!status.isOK()) {
         return status;
     }
@@ -468,11 +470,23 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
     return Status::OK();
 }
 
+Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+                                 const ReplSetConfig& newConfig,
+                                 bool force) {
+    return _validateConfigForReconfig(oldConfig, newConfig, force, false);
+}
+
+Status validateConfigForOplogReconfig(const ReplSetConfig& oldConfig,
+                                      const ReplSetConfig& newConfig) {
+    return _validateConfigForReconfig(oldConfig, newConfig, true, true);
+}
+
+
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
     const ReplSetConfig& newConfig,
     ServiceContext* ctx) {
-    Status status = newConfig.validate();
+    Status status = newConfig.validateAllowingSplitHorizonIP();
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }

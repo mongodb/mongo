@@ -190,6 +190,14 @@ Status ReplSetConfig::_initialize(bool forInitiate,
 }
 
 Status ReplSetConfig::validate() const {
+    return _validate(false);
+}
+
+Status ReplSetConfig::validateAllowingSplitHorizonIP() const {
+    return _validate(true);
+}
+
+Status ReplSetConfig::_validate(bool allowSplitHorizonIP) const {
     if (getMembers().size() > kMaxMembers || getMembers().empty()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Replica set configuration contains " << getMembers().size()
@@ -220,7 +228,7 @@ Status ReplSetConfig::validate() const {
         const MemberConfig& memberI = getMembers()[i];
 
         // Check that no horizon mappings contain IP addresses
-        if (!disableSplitHorizonIPCheck) {
+        if (!disableSplitHorizonIPCheck && !allowSplitHorizonIP) {
             for (auto&& mapping : memberI.getHorizonMappings()) {
                 // Ignore the default horizon -- this can be an IP
                 if (mapping.first == SplitHorizon::kDefaultHorizon) {
