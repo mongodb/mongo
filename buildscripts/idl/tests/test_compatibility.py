@@ -288,7 +288,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_type_enum_not_subset_error = error_collection.get_error_by_command_name(
             "newReplyFieldTypeEnumNotSubset")
         self.assertTrue(new_reply_field_type_enum_not_subset_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_type_enum_not_subset_error), "newReplyFieldTypeEnumNotSubset")
 
@@ -308,14 +308,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_type_bson_not_subset_error = error_collection.get_error_by_command_name(
             "newReplyFieldTypeBsonNotSubset")
         self.assertTrue(new_reply_field_type_bson_not_subset_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_type_bson_not_subset_error), "newReplyFieldTypeBsonNotSubset")
 
         new_reply_field_type_bson_not_subset_two_error = error_collection.get_error_by_command_name(
             "newReplyFieldTypeBsonNotSubsetTwo")
         self.assertTrue(new_reply_field_type_bson_not_subset_two_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_type_bson_not_subset_two_error),
             "newReplyFieldTypeBsonNotSubsetTwo")
@@ -392,7 +392,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_type_struct_two_error = error_collection.get_error_by_command_name(
             "newReplyFieldTypeStructRecursiveTwo")
         self.assertTrue(new_reply_field_type_struct_two_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_type_struct_two_error), "newReplyFieldTypeStructRecursiveTwo")
 
@@ -530,7 +530,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_variant_recursive_error = error_collection.get_error_by_command_name(
             "replyFieldVariantRecursive")
         self.assertTrue(new_reply_field_variant_recursive_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(str(new_reply_field_variant_recursive_error), "replyFieldVariantRecursive")
 
         new_reply_field_variant_struct_not_subset_error = error_collection.get_error_by_command_name(
@@ -544,7 +544,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         new_reply_field_variant_struct_recursive_error = error_collection.get_error_by_command_name(
             "replyFieldVariantStructRecursive")
         self.assertTrue(new_reply_field_variant_struct_recursive_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_NOT_SUBSET)
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
         self.assertRegex(
             str(new_reply_field_variant_struct_recursive_error), "replyFieldVariantStructRecursive")
 

@@ -123,7 +123,7 @@ def check_subset(ctxt: IDLCompatibilityContext, cmd_name: str, field_name: str, 
     # pylint: disable=too-many-arguments
     """Check if sub_list is a subset of the super_list and log an error if not."""
     if not set(sub_list).issubset(super_list):
-        ctxt.add_command_not_subset_error(cmd_name, field_name, type_name, file_path)
+        ctxt.add_reply_field_not_subset_error(cmd_name, field_name, type_name, file_path)
 
 
 def check_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
