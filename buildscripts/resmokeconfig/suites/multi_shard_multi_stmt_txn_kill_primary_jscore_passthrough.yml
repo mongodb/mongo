@@ -234,7 +234,7 @@ selector:
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/views/views_all_commands.js
 
-  # Fails with implicit sessions because it will use multiple sessions on the same Mongo connection.
+  # TODO SERVER-54945 dropDatabase is not resilient to stepdowns on sharded cluster
   - jstests/core/dropdb.js
 
   # Committing a transaction when the server is fsync locked fails.

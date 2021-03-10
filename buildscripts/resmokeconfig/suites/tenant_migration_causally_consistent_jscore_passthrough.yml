@@ -171,6 +171,7 @@ selector:
   - assumes_read_preference_unchanged
   - does_not_support_causal_consistency
   - requires_collstats
+  - tenant_migration_incompatible
 
 executor:
   archive:
