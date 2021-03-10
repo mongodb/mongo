@@ -252,6 +252,12 @@ public:
     Status validate() const;
 
     /**
+     * Performs basic consistency checks on the replica set configuration, but does not fail on
+     * IP addresses in split horizon configuration
+     */
+    Status validateAllowingSplitHorizonIP() const;
+
+    /**
      * Checks if this configuration can satisfy the given write concern.
      *
      * Things that are taken into consideration include:
@@ -548,6 +554,11 @@ private:
      * Sets the required fields of the IDL object.
      */
     void _setRequiredFields();
+
+    /**
+     * Performs basic consistency checks on the replica set configuration.
+     */
+    Status _validate(bool allowSplitHorizonIP) const;
 
     /**
      * Common code used by constructors

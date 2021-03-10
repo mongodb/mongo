@@ -3431,7 +3431,10 @@ Status ReplicationCoordinatorImpl::doReplSetReconfig(OperationContext* opCtx,
     BSONObj newConfigObj = newConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
 
-    Status validateStatus = validateConfigForReconfig(oldConfig, newConfig, force);
+    bool isManualReconfig = opCtx->getClient()->hasRemote();
+    Status validateStatus = isManualReconfig
+        ? validateConfigForReconfig(oldConfig, newConfig, force)
+        : validateConfigForOplogReconfig(oldConfig, newConfig);
     if (!validateStatus.isOK()) {
         LOGV2_ERROR(21420,
                     "replSetReconfig got {error} while validating {newConfig}",

@@ -100,6 +100,16 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  bool force);
 
 /**
+ * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
+ * initiated by the current node (identified via "externalState"). Ignores an error condition
+ * when an IP address exists in split horizon configuration
+ *
+ * Returns an indicative error on validation failure.
+ */
+Status validateConfigForOplogReconfig(const ReplSetConfig& oldConfig,
+                                      const ReplSetConfig& newConfig);
+
+/**
  * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
  * reasponse.
  *
