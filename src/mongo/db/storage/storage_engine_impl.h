@@ -379,8 +379,7 @@ private:
                          bool forRepair,
                          Timestamp minVisibleTs);
 
-    Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
-                                       std::vector<NamespaceString>& toDrop);
+    Status _dropCollectionsNoTimestamp(OperationContext* opCtx, const std::vector<UUID>& toDrop);
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection

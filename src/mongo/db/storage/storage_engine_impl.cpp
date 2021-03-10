@@ -753,7 +753,7 @@ Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
         }
     }
 
-    std::vector<NamespaceString> toDrop = catalog->getAllCollectionNamesFromDb(opCtx, db);
+    std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(db);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible
@@ -766,7 +766,7 @@ Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
  * to drop all collections, regardless of the error status.
  */
 Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
-                                                      std::vector<NamespaceString>& toDrop) {
+                                                      const std::vector<UUID>& toDrop) {
     // On primaries, this method will be called outside of any `TimestampBlock` state meaning the
     // "commit timestamp" will not be set. For this case, this method needs no special logic to
     // avoid timestamping the upcoming writes.
@@ -789,8 +789,8 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
     Status firstError = Status::OK();
     WriteUnitOfWork untimestampedDropWuow(opCtx);
     auto collectionCatalog = CollectionCatalog::get(opCtx);
-    for (auto& nss : toDrop) {
-        auto coll = collectionCatalog->lookupCollectionByNamespace(opCtx, nss);
+    for (auto& uuid : toDrop) {
+        auto coll = collectionCatalog->lookupCollectionByUUID(opCtx, uuid);
 
         // No need to remove the indexes from the IndexCatalog because eliminating the Collection
         // will have the same effect.
@@ -799,7 +799,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
         while (ii->more()) {
             const IndexCatalogEntry* ice = ii->next();
 
-            audit::logDropIndex(&cc(), ice->descriptor()->indexName(), nss);
+            audit::logDropIndex(&cc(), ice->descriptor()->indexName(), coll->ns());
 
             catalog::removeIndex(opCtx,
                                  ice->descriptor()->indexName(),
@@ -809,7 +809,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                  ice->getSharedIdent());
         }
 
-        audit::logDropCollection(&cc(), nss);
+        audit::logDropCollection(&cc(), coll->ns());
 
         Status result = catalog::dropCollection(
             opCtx, coll->ns(), coll->getCatalogId(), coll->getSharedIdent());
