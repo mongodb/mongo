@@ -40,6 +40,7 @@
 
 static const char *home;
 
+/*! [col-store decl] */
 typedef struct {
     uint16_t hour;
     uint16_t pressure;
@@ -52,6 +53,8 @@ typedef struct {
     char day[5];
     char country[5];
 } WEATHER;
+
+/*! [col-store decl] */
 
 static void update_celsius_to_fahrenheit(WT_SESSION *session);
 static void print_all_columns(WT_SESSION *session);
@@ -116,6 +119,7 @@ update_celsius_to_fahrenheit(WT_SESSION *session)
 
     printf("Converting temperature from celsius to fahrenheit.\n");
 
+    /*! [col-store temperature] */
     error_check(session->open_cursor(session, "colgroup:weather:temperature", NULL, NULL, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {
         error_check(cursor->get_value(cursor, &temp));
@@ -131,6 +135,7 @@ update_celsius_to_fahrenheit(WT_SESSION *session)
     }
     scan_end_check(ret == WT_NOTFOUND);
     error_check(cursor->close(cursor));
+    /*! [col-store temperature] */
 }
 
 static void
@@ -258,6 +263,8 @@ find_min_and_max_temp(
     uint16_t hour;
     uint8_t temp;
 
+    /*! [col-store join] */
+
     /* Open cursors needed by the join. */
     error_check(
       session->open_cursor(session, "join:table:weather(hour,temp)", NULL, NULL, &join_cursor));
@@ -314,6 +321,8 @@ find_min_and_max_temp(
         *max_temp = WT_MAX(*max_temp, temp);
     }
 
+    /*! [col-store join] */
+
     /*
      * If WT_NOTFOUND is hit at this point, it is because we have traversed through all temperature
      * records, hence we return 0 to the calling function to signal success. Otherwise an internal
@@ -341,7 +350,7 @@ average_data(WT_SESSION *session, char *country_average)
     uint8_t feels_like_temp, humidity, temp, wind;
     const char *country, *day;
 
-    /* Open a cursor to search for the location, currently RUS. */
+    /* Open a cursor to search for the location. */
     error_check(session->open_cursor(session, "index:weather:country", NULL, NULL, &loc_cursor));
     loc_cursor->set_key(loc_cursor, country_average);
     ret = loc_cursor->search(loc_cursor);
@@ -397,6 +406,7 @@ average_data(WT_SESSION *session, char *country_average)
       country_average, rec_arr[0], rec_arr[1], rec_arr[2], rec_arr[3], rec_arr[4]);
 }
 
+/*! [col-store main] */
 int
 main(int argc, char *argv[])
 {
@@ -416,7 +426,8 @@ main(int argc, char *argv[])
     /* Establishing a session. */
     error_check(conn->open_session(conn, NULL, NULL, &session));
 
-    /* Create a table with columns and colgroup. */
+    /*! [col-store create columns] */
+    /* Create a table with columns and colgroups. */
     error_check(session->create(session, TABLE_NAME,
       "key_format=r,value_format=" WT_UNCHECKED_STRING(
         HHHHBBBB5S5S) ",columns=(id,hour,pressure,loc_lat,"
@@ -428,6 +439,7 @@ main(int argc, char *argv[])
     /* Create the colgroups */
     error_check(session->create(session, "colgroup:weather:day_time", "columns=(hour,day)"));
     error_check(session->create(session, "colgroup:weather:temperature", "columns=(temp)"));
+    /*! [col-store create columns] */
     error_check(session->create(
       session, "colgroup:weather:humidity_pressure", "columns=(pressure,humidity)"));
     error_check(session->create(session, "colgroup:weather:wind", "columns=(wind)"));
@@ -513,3 +525,5 @@ main(int argc, char *argv[])
     error_check(conn->close(conn, NULL));
     return (EXIT_SUCCESS);
 }
+
+/*! [col-store main] */
