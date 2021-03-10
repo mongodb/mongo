@@ -283,7 +283,7 @@ add_option('experimental-optimization',
     action="append",
     choices=experimental_optimization_choices,
     const=experimental_optimization_choices[0],
-    default=[],
+    default=['+sandybridge'],
     help='Enable experimental optimizations',
     nargs='?',
     type='choice'
@@ -2539,10 +2539,14 @@ if not env.TargetOSIs('windows') and (env.ToolchainIs('GCC', 'clang')):
         "s390x"      : { "-march=" : "z196",         "-mtune=" : "zEC12"                          },
     }
 
+    # If we are enabling vectorization in sandybridge mode, we'd
+    # rather not hit the 256 wide vector instructions because the
+    # heavy versions can cause clock speed reductions.
     if "sandybridge" in selected_experimental_optimizations:
         default_targeting_flags_for_architecture["x86_64"] = {
-            "-march=" : "sandybridge",
-            "-mtune=" : "generic",
+            "-march="                : "sandybridge",
+            "-mtune="                : "generic",
+            "-mprefer-vector-width=" : "128",
         }
 
     default_targeting_flags = default_targeting_flags_for_architecture.get(env['TARGET_ARCH'])
