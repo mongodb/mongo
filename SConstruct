@@ -273,6 +273,7 @@ add_option('opt',
 )
 
 experimental_optimizations = [
+    'O3',
     'builtin-memcmp',
     'fnsi',
     'sandybridge',
@@ -2483,7 +2484,7 @@ if env.TargetOSIs('posix'):
         env.Append( LINKFLAGS=["-fprofile-arcs", "-ftest-coverage", "-fprofile-update=single"] )
 
     if optBuild and not optBuildForSize:
-        env.Append( CCFLAGS=["-O2"] )
+        env.Append( CCFLAGS=["-O3" if "O3" in selected_experimental_optimizations else "-O2"] )
     elif optBuild and optBuildForSize:
         env.Append( CCFLAGS=["-Os"] )
     else:
