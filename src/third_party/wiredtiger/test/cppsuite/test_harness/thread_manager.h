@@ -29,6 +29,8 @@
 #ifndef THREAD_MANAGER_H
 #define THREAD_MANAGER_H
 
+#include <thread>
+
 #include "thread_context.h"
 
 namespace test_harness {
@@ -37,36 +39,57 @@ class thread_manager {
     public:
     ~thread_manager()
     {
-        for (auto *worker : _workers) {
-            /* Make sure the worker is done before deleting it. */
-            worker->finish();
-            delete worker;
+        for (auto &it : _workers) {
+            if (it != nullptr && it->joinable()) {
+                debug_info(
+                  "You should've called join on the thread manager", _trace_level, DEBUG_ERROR);
+                it->join();
+            }
+            delete it;
+            it = nullptr;
         }
+        _workers.clear();
     }
 
+    /*
+     * Generic function to create threads that take contexts, typically these will be static
+     * functions.
+     */
     template <typename Callable>
     void
     add_thread(thread_context *tc, Callable &&fct)
     {
         tc->set_running(true);
         std::thread *t = new std::thread(fct, std::ref(*tc));
-        tc->set_thread(t);
-        _workers.push_back(tc);
+        _workers.push_back(t);
     }
 
+    /*
+     * Generic function to create threads that do not take thread contexts but take a single
+     * argument, typically these threads are calling non static member function of classes.
+     */
+    template <typename Callable, typename Args>
     void
-    finish()
+    add_thread(Callable &&fct, Args &&args)
     {
-        for (auto *worker : _workers) {
-            if (worker == nullptr)
-                debug_info("finish : worker is NULL", _trace_level, DEBUG_ERROR);
-            else
-                worker->finish();
+        std::thread *t = new std::thread(fct, args);
+        _workers.push_back(t);
+    }
+
+    /*
+     * Complete the operations for all threads.
+     */
+    void
+    join()
+    {
+        for (const auto &it : _workers) {
+            if (it->joinable())
+                it->join();
         }
     }
 
     private:
-    std::vector<thread_context *> _workers;
+    std::vector<std::thread *> _workers;
 };
 } // namespace test_harness
 

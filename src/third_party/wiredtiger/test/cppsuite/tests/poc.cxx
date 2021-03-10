@@ -27,49 +27,28 @@
  */
 
 #include <iostream>
-#include <cstdlib>
+#include <string>
 
-#include "test_harness/test_harness.h"
-#include "test_harness/workload_generator.h"
-#include "test_harness/runtime_monitor.h"
+#include "test_harness/debug_utils.h"
+#include "test_harness/test.h"
 
 class poc_test : public test_harness::test {
     public:
-    poc_test(const std::string &config, int64_t trace_level, bool enable_tracking) : test(config)
+    poc_test(const std::string &config, int64_t trace_level, bool enable_tracking) : test(config, enable_tracking)
     {
         test_harness::_trace_level = trace_level;
-        _wl = new test_harness::workload_generator(_configuration, enable_tracking);
-        _rm = new test_harness::runtime_monitor();
     }
 
-    ~poc_test()
-    {
-        delete _wl;
-        _wl = nullptr;
-        delete _rm;
-        _rm = nullptr;
-    }
-
-    int
+    void
     run()
     {
-        int return_code = _wl->load();
-        if (return_code != 0)
-            return (return_code);
-
-        return_code = _wl->run();
-        return (return_code);
+        test::run();
     }
-
-    private:
-    test_harness::runtime_monitor *_rm = nullptr;
-    test_harness::workload_generator *_wl = nullptr;
 };
 
-const std::string poc_test::test::_name = "poc_test";
-const std::string poc_test::test::_default_config =
-  "collection_count=2,key_count=5,value_size=20,"
-  "read_threads=1,duration_seconds=1";
+const std::string poc_test::test::name = "poc_test";
+const std::string poc_test::test::default_config = "collection_count=2,key_count=5,value_size=20,"
+                "read_threads=1,duration_seconds=1";
 
 int
 main(int argc, char *argv[])
@@ -101,16 +80,11 @@ main(int argc, char *argv[])
 
     // Check if default configuration should be used
     if (cfg.empty())
-        cfg = poc_test::test::_default_config;
+        cfg = poc_test::test::default_config;
 
     std::cout << "Configuration\t:" << cfg << std::endl;
     std::cout << "Tracel level\t:" << trace_level << std::endl;
 
-    error_code = poc_test(cfg, trace_level, true).run();
-
-    if (error_code == 0)
-        std::cout << "SUCCESS" << std::endl;
-    else
-        std::cerr << "FAILED (Error code: " << error_code << ")" << std::endl;
-    return error_code;
+    poc_test(cfg, trace_level, true).run();
+    return (0);
 }

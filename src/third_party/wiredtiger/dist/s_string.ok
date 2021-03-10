@@ -170,6 +170,7 @@ GetFileSizeEx
 GetLastError
 GetModuleHandleExW
 GetProcAddress
+Getters
 Google
 HFS
 HHHH
