@@ -51,6 +51,7 @@ static const std::vector<StringData> kCpuKeys{
     "btime"_sd, "cpu"_sd, "ctxt"_sd, "processes"_sd, "procs_blocked"_sd, "procs_running"_sd};
 
 static const std::vector<StringData> kMemKeys{
+    "MemAvailable"_sd,
     "MemTotal"_sd,
     "MemFree"_sd,
     "Cached"_sd,
