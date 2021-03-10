@@ -103,6 +103,7 @@ env.Library(
         'cluster_commands.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/address_restriction',
         '$BUILD_DIR/mongo/db/auth/auth',

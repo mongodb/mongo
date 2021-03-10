@@ -249,6 +249,22 @@ Status initFindCommand(int ntoskip,
 
 }  // namespace
 
+Status validateGetMoreCollectionName(StringData collectionName) {
+    if (collectionName.empty()) {
+        return Status(ErrorCodes::InvalidNamespace, "Collection names cannot be empty");
+    }
+    if (collectionName[0] == '.') {
+        return Status(ErrorCodes::InvalidNamespace,
+                      "Collection names cannot start with '.': " + collectionName);
+    }
+    if (collectionName.find('\0') != std::string::npos) {
+        return Status(ErrorCodes::InvalidNamespace,
+                      "Collection names cannot have embedded null characters");
+    }
+
+    return Status::OK();
+}
+
 Status validateFindCommand(const FindCommand& findCommand) {
     // Min and Max objects must have the same fields.
     if (!findCommand.getMin().isEmpty() && !findCommand.getMax().isEmpty()) {

@@ -28,6 +28,8 @@
 
 global:
   cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/query/query_request_helper.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -47,9 +49,11 @@ commands:
     fields:
       collection:
         type: string
+        validator: { callback: "query_request_helper::validateGetMoreCollectionName" }
       batchSize:
         type: safeInt64
         optional: true
+        validator: {gte: 0}
       maxTimeMS:
         description: "The awaitData timeout."
         type: safeInt64
