@@ -103,9 +103,11 @@ bool supportsDocLocking() {
 }
 
 ServiceContext::ServiceContext()
-    : _tickSource(std::make_unique<SystemTickSource>()),
+    : _opIdRegistry(UniqueOperationIdRegistry::create()),
+      _tickSource(std::make_unique<SystemTickSource>()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
       _preciseClockSource(std::make_unique<SystemClockSource>()) {}
+
 
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
@@ -248,12 +250,21 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 }
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = std::make_unique<OperationContext>(client, _nextOpId.fetchAndAdd(1));
+    auto opCtx = std::make_unique<OperationContext>(client, _opIdRegistry->acquireSlot());
+
     if (client->session()) {
         _numCurrentOps.addAndFetch(1);
     }
 
+    auto numOpsGuard = makeGuard([&] {
+        if (client->session()) {
+            _numCurrentOps.subtractAndFetch(1);
+        }
+    });
+
     onCreate(opCtx.get(), _clientObservers);
+    auto onCreateGuard = makeGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
+
     if (!opCtx->lockState()) {
         opCtx->setLockState(std::make_unique<LockerNoop>());
     }
@@ -267,14 +278,23 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     } else {
         makeBaton(opCtx.get());
     }
+
+    auto batonGuard = makeGuard([&] { opCtx->getBaton()->detach(); });
+
     {
         stdx::lock_guard<Client> lk(*client);
         client->setOperationContext(opCtx.get());
     }
 
+    numOpsGuard.dismiss();
+    onCreateGuard.dismiss();
+    batonGuard.dismiss();
+
     {
         stdx::lock_guard lk(_mutex);
-        _clientByOperationId.emplace(opCtx->getOpID(), client);
+        bool clientByOperationContextInsertionSuccessful =
+            _clientByOperationId.insert({opCtx->getOpID(), client}).second;
+        invariant(clientByOperationContextInsertionSuccessful);
     }
 
     return UniqueOperationContext(opCtx.release());

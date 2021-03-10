@@ -81,8 +81,11 @@ const auto kNoWaiterThread = stdx::thread::id();
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
+    : OperationContext(client, OperationIdSlot(opId)) {}
+
+OperationContext::OperationContext(Client* client, OperationIdSlot&& opIdSlot)
     : _client(client),
-      _opId(opId),
+      _opId(std::move(opIdSlot)),
       _elapsedTime(client ? client->getServiceContext()->getTickSource()
                           : SystemTickSource::get()) {}
 
@@ -395,7 +398,7 @@ void OperationContext::setOperationKey(OperationKey opKey) {
     invariant(!_opKey);
 
     _opKey.emplace(std::move(opKey));
-    OperationKeyManager::get(_client).add(*_opKey, _opId);
+    OperationKeyManager::get(_client).add(*_opKey, _opId.getId());
 }
 
 void OperationContext::releaseOperationKey() {
