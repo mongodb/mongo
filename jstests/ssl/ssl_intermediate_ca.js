@@ -60,8 +60,7 @@ runTest(VALID_CA, INVALID_CA);
 
 // Validate we can make a chain with intermediate certs in ca file instead of key file
 if (determineSSLProvider() === 'apple') {
-    // TODO SERVER-52923
-    print("Skipping test with Apple pending SERVER-52923");
+    print("Skipping test as this configuration is not supported on OSX");
     return;
 }
 
