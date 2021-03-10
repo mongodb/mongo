@@ -275,38 +275,46 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
     return splitNor;
 }
 
-std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>>
-splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
-                                     const std::set<std::string>& fields) {
-    if (expression::isIndependentOf(*expr, fields)) {
-        // 'expr' does not depend upon 'fields', so it can be completely moved.
+/**
+ * Attempt to split 'expr' into two MatchExpressions according to 'shouldSplitOut', which describes
+ * the conditions under which its argument can be split from 'expr'. Returns two pointers, where
+ * each new MatchExpression contains a portion of 'expr'. The first contains the parts of 'expr'
+ * which satisfy 'shouldSplitOut', and the second are the remaining parts of 'expr'.
+ */
+std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionByFunction(
+    unique_ptr<MatchExpression> expr,
+    const std::set<std::string>& fields,
+    expression::ShouldSplitExprFunc shouldSplitOut) {
+    if (shouldSplitOut(*expr, fields)) {
+        // 'expr' satisfies our split condition and can be completely split out.
         return {std::move(expr), nullptr};
     }
+
     if (expr->getCategory() != MatchExpression::MatchCategory::kLogical) {
-        // 'expr' is a leaf, and was not independent of 'fields'.
+        // 'expr' is a leaf and cannot be split out.
         return {nullptr, std::move(expr)};
     }
 
-    std::vector<unique_ptr<MatchExpression>> reliant;
-    std::vector<unique_ptr<MatchExpression>> separate;
+    std::vector<unique_ptr<MatchExpression>> splitOut;
+    std::vector<unique_ptr<MatchExpression>> remaining;
 
     switch (expr->matchType()) {
         case MatchExpression::AND: {
             auto andExpr = checked_cast<AndMatchExpression*>(expr.get());
             for (size_t i = 0; i < andExpr->numChildren(); i++) {
-                auto children =
-                    splitMatchExpressionByWithoutRenames(andExpr->releaseChild(i), fields);
+                auto children = splitMatchExpressionByFunction(
+                    andExpr->releaseChild(i), fields, shouldSplitOut);
 
                 invariant(children.first || children.second);
 
                 if (children.first) {
-                    separate.push_back(std::move(children.first));
+                    splitOut.push_back(std::move(children.first));
                 }
                 if (children.second) {
-                    reliant.push_back(std::move(children.second));
+                    remaining.push_back(std::move(children.second));
                 }
             }
-            return {createAndOfNodes(&separate), createAndOfNodes(&reliant)};
+            return {createAndOfNodes(&splitOut), createAndOfNodes(&remaining)};
         }
         case MatchExpression::NOR: {
             // We can split a $nor because !(x | y) is logically equivalent to !x & !y.
@@ -320,18 +328,18 @@ splitMatchExpressionByWithoutRenames(unique_ptr<MatchExpression> expr,
             auto norExpr = checked_cast<NorMatchExpression*>(expr.get());
             for (size_t i = 0; i < norExpr->numChildren(); i++) {
                 auto child = norExpr->releaseChild(i);
-                if (expression::isIndependentOf(*child, fields)) {
-                    separate.push_back(std::move(child));
+                if (shouldSplitOut(*child, fields)) {
+                    splitOut.push_back(std::move(child));
                 } else {
-                    reliant.push_back(std::move(child));
+                    remaining.push_back(std::move(child));
                 }
             }
-            return {createNorOfNodes(&separate), createNorOfNodes(&reliant)};
+            return {createNorOfNodes(&splitOut), createNorOfNodes(&remaining)};
         }
         case MatchExpression::OR:
         case MatchExpression::INTERNAL_SCHEMA_XOR:
         case MatchExpression::NOT: {
-            // If we aren't independent, we can't safely split.
+            // We haven't satisfied the split condition, so 'expr' belongs in the remaining match.
             return {nullptr, std::move(expr)};
         }
         default: { MONGO_UNREACHABLE; }
@@ -429,11 +437,22 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
     MONGO_UNREACHABLE;
 }
 
+bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots) {
+    auto depsTracker = DepsTracker{};
+    expr.addDependencies(&depsTracker);
+    return std::all_of(
+        depsTracker.fields.begin(), depsTracker.fields.end(), [&roots](auto&& field) {
+            auto fieldRef = FieldRef{field};
+            return !fieldRef.empty() && roots.find(fieldRef.getPart(0).toString()) != roots.end();
+        });
+}
+
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(
     unique_ptr<MatchExpression> expr,
     const std::set<std::string>& fields,
-    const StringMap<std::string>& renames) {
-    auto splitExpr = splitMatchExpressionByWithoutRenames(std::move(expr), fields);
+    const StringMap<std::string>& renames,
+    ShouldSplitExprFunc func /*= isIndependentOf */) {
+    auto splitExpr = splitMatchExpressionByFunction(std::move(expr), fields, func);
     if (splitExpr.first) {
         applyRenamesToExpression(splitExpr.first.get(), renames);
     }
@@ -485,6 +504,5 @@ bool isPathPrefixOf(StringData first, StringData second) {
 
     return second.startsWith(first) && second[first.size()] == '.';
 }
-
 }  // namespace expression
 }  // namespace mongo

@@ -190,6 +190,13 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
                                       maxMemoryUsageBytes);
 }
 
+// Optimize the section of the pipeline before the $_internalUnpackBucket stage.
+void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    auto prefix = Pipeline::SourceContainer(container->begin(), itr);
+    Pipeline::optimizeContainer(&prefix);
+    container->erase(container->begin(), itr);
+    container->splice(itr, prefix);
+}
 }  // namespace
 
 void BucketUnpacker::reset(BSONObj&& bucket) {
@@ -566,6 +573,16 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     return nullptr;
 }
 
+std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
+DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
+    boost::intrusive_ptr<DocumentSourceMatch> match) {
+    if (auto&& metaField = _bucketUnpacker.bucketSpec().metaField) {
+        return std::move(*match).extractMatchOnFieldsAndRemainder(
+            {*metaField}, {{*metaField, BucketUnpacker::kBucketMetaFieldName.toString()}});
+    }
+    return {nullptr, match};
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -600,20 +617,27 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Optimize the pipeline after the $unpackBucket.
     optimizeEndOfPipeline(itr, container);
 
-    // Attempt to map predicates on bucketed fields to predicates on the control field.
     if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
-        if (auto match = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression())) {
-            // Optimize the newly created MatchExpression.
-            auto optimized = MatchExpression::optimize(std::move(match));
-            BSONObjBuilder bob;
-            optimized->serialize(&bob);
+        // Attempt to push predicates on the metaField past $_internalUnpackBucket.
+        auto [metaMatch, remainingMatch] = splitMatchOnMetaAndRename(nextMatch);
 
-            // Because we insert any possible $match first before performing other
-            // $_internalUnpackBucket optimizations, it is not necessary to call
-            // optimizeContainer() here to allow for the newly inserted stage to engage in further
-            // optimizations with its neighbors, as this $match is already in the optimal place for
-            // predicate pushdown.
-            container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+        // 'metaMatch' is safe to move before $_internalUnpackBucket.
+        if (metaMatch) {
+            container->insert(itr, metaMatch);
+        }
+
+        // The old $match can be removed and potentially replaced with 'remainingMatch'.
+        container->erase(std::next(itr));
+        if (remainingMatch) {
+            container->insert(std::next(itr), remainingMatch);
+
+            // Attempt to map predicates on bucketed fields to predicates on the control field.
+            if (auto match =
+                    createPredicatesOnBucketLevelField(remainingMatch->getMatchExpression())) {
+                BSONObjBuilder bob;
+                match->serialize(&bob);
+                container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+            }
         }
     }
 
@@ -623,6 +647,9 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         !project.isEmpty()) {
         internalizeProject(project, isInclusion);
     }
+
+    // Optimize the prefix of the pipeline, now that all optimizations have been completed.
+    optimizePrefix(itr, container);
 
     return container->end();
 }

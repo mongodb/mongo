@@ -34,6 +34,7 @@
 #include <utility>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/util/intrusive_counter.h"
@@ -187,7 +188,24 @@ public:
      * z: "baz"}} and {$match: {a: "foo"}}.
      */
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-    splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames);
+    splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames) &&;
+
+    /**
+     * Attempt to split this $match into two stages, where the first is ONLY dependent upon paths
+     * from 'fields', and where applying them in sequence is equivalent to applying this stage once.
+     *
+     * Will return two intrusive_ptrs to new $match stages, where the first pointer is dependent on
+     * 'fields' and the second is the remainder. Either pointer may be null, so be sure to check the
+     * return value.
+     *
+     * The 'renames' structure maps from a field to an alias that should be used in the dependent
+     * portion of the match. For example, suppose that we split by fields "a" with the rename "a" =>
+     * "c". The match {$match: {a: "foo", b: "bar", z: "baz"}} will split into {$match: {c: "foo"}}
+     * and {$match: {b: "bar", z: "baz"}}.
+     */
+    std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
+    extractMatchOnFieldsAndRemainder(const std::set<std::string>& fields,
+                                     const StringMap<std::string>& renames) &&;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
@@ -206,6 +224,11 @@ protected:
     BSONObj _predicate;
 
 private:
+    std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
+    splitSourceByFunc(const std::set<std::string>& fields,
+                      const StringMap<std::string>& renames,
+                      expression::ShouldSplitExprFunc func) &&;
+
     std::unique_ptr<MatchExpression> _expression;
 
     bool _isTextQuery;
