@@ -128,11 +128,11 @@ void removeCollMetadataFromConfig(OperationContext* opCtx, const CollectionType&
         ? NamespaceStringOrUUID(nss.db().toString(), coll.getUuid())
         : NamespaceStringOrUUID(nss);
 
+    deleteCollection(opCtx, nss);
+
     deleteChunks(opCtx, nssOrUUID);
 
     removeTagsMetadataFromConfig(opCtx, nss);
-
-    deleteCollection(opCtx, nss);
 }
 
 bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss) {
