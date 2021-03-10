@@ -97,9 +97,11 @@ void setGlobalServiceContext(ServiceContext::UniqueServiceContext&& serviceConte
 }
 
 ServiceContext::ServiceContext()
-    : _tickSource(std::make_unique<SystemTickSource>()),
+    : _opIdRegistry(UniqueOperationIdRegistry::create()),
+      _tickSource(std::make_unique<SystemTickSource>()),
       _fastClockSource(std::make_unique<SystemClockSource>()),
       _preciseClockSource(std::make_unique<SystemClockSource>()) {}
+
 
 ServiceContext::~ServiceContext() {
     stdx::lock_guard<Latch> lk(_mutex);
@@ -234,12 +236,21 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 }
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = std::make_unique<OperationContext>(client, _nextOpId.fetchAndAdd(1));
+    auto opCtx = std::make_unique<OperationContext>(client, _opIdRegistry->acquireSlot());
+
     if (client->session()) {
         _numCurrentOps.addAndFetch(1);
     }
 
+    auto numOpsGuard = makeGuard([&] {
+        if (client->session()) {
+            _numCurrentOps.subtractAndFetch(1);
+        }
+    });
+
     onCreate(opCtx.get(), _clientObservers);
+    auto onCreateGuard = makeGuard([&] { onDestroy(opCtx.get(), _clientObservers); });
+
     if (!opCtx->lockState()) {
         opCtx->setLockState(std::make_unique<LockerNoop>());
     }
@@ -254,25 +265,34 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
         makeBaton(opCtx.get());
     }
 
+    auto batonGuard = makeGuard([&] { opCtx->getBaton()->detach(); });
+
     {
         stdx::lock_guard<Client> lk(*client);
 
         // If we have a previous operation context, it's not worth crashing the process in
-        // production. However, we do want to prevent it from doing more work and complain loudly.
+        // production. However, we do want to prevent it from doing more work and complain
+        // loudly.
         auto lastOpCtx = client->getOperationContext();
         if (lastOpCtx) {
             killOperation(lk, lastOpCtx, ErrorCodes::Error(4946800));
-            tasserted(
-                4946801,
-                "Client has attempted to create a new OperationContext, but it already has one");
+            tasserted(4946801,
+                      "Client has attempted to create a new OperationContext, but it already "
+                      "has one");
         }
 
         client->_setOperationContext(opCtx.get());
     }
 
+    numOpsGuard.dismiss();
+    onCreateGuard.dismiss();
+    batonGuard.dismiss();
+
     {
         stdx::lock_guard lk(_mutex);
-        _clientByOperationId.emplace(opCtx->getOpID(), client);
+        bool clientByOperationContextInsertionSuccessful =
+            _clientByOperationId.insert({opCtx->getOpID(), client}).second;
+        invariant(clientByOperationContextInsertionSuccessful);
     }
 
     return UniqueOperationContext(opCtx.release());
