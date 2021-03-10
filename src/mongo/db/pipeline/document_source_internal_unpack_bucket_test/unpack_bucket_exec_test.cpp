@@ -59,7 +59,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeAllMeasurementFields) {
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}",
          "{meta: {'m1': 9, 'm2': 9, 'm3': 9}, data: {_id: {'0':3, '1':4}, time: {'0':3, '1':4}, "
-         "a:{'0':1, '1':2}, b:{'1':1}}}}"},
+         "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
     unpack->setSource(source.get());
     // The first result exists and is as expected.
@@ -105,7 +105,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackExcludeASingleField) {
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}",
          "{meta: {m1: 9, m2: 9, m3: 9}, data: {_id: {'0':3, '1':4}, time: {'0':3, '1':4}, "
-         "a:{'0':1, '1':2}, b:{'1':1}}}}"},
+         "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
     unpack->setSource(source.get());
     // The first result exists and is as expected.
@@ -150,7 +150,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyInclude) {
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}",
          "{meta: {m1: 9, m2: 9, m3: 9}, data: {_id: {'0':3, '1':4}, time: {'0':3, '1':4}, "
-         "a:{'0':1, '1':2}, b:{'1':1}}}}"},
+         "a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
     unpack->setSource(source.get());
 
@@ -185,7 +185,67 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyExclude) {
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
          "a:{'0':1, '1':2}, b:{'1':1}}}",
          "{meta: {m1: 9, m2: 9, m3: 9}, data: {_id: {'0':3, '1':4}, time: {'0':3, '1':4}, "
-         "a:{'0':1, '1':2}, b:{'1':1}}}}"},
+         "a:{'0':1, '1':2}, b:{'1':1}}}"},
+        expCtx);
+    unpack->setSource(source.get());
+
+    auto next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(next.getDocument(),
+                       Document(fromjson("{time: 1, myMeta: {m1: 999, m2: 9999}, _id: 1, a: 1}")));
+
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson("{time: 2, myMeta: {m1: 999, m2: 9999}, _id: 2, a: 2, b: 1}")));
+
+    // Second bucket
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson("{time: 3, myMeta: {m1: 9, m2: 9, m3: 9}, _id: 3, a: 1}")));
+
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    ASSERT_DOCUMENT_EQ(
+        next.getDocument(),
+        Document(fromjson("{time: 4, myMeta: {m1: 9, m2: 9, m3: 9}, _id: 4, a: 2, b: 1}")));
+
+    next = unpack->getNext();
+    ASSERT_TRUE(next.isEOF());
+}
+
+TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmptyExclude) {
+    auto expCtx = getExpCtx();
+    auto spec =
+        BSON("$_internalUnpackBucket"
+             << BSON(DocumentSourceInternalUnpackBucket::kTimeFieldName
+                     << kUserDefinedTimeName << DocumentSourceInternalUnpackBucket::kMetaFieldName
+                     << kUserDefinedMetaName));
+    auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
+
+    auto source = DocumentSourceMock::createForTest(
+        {
+            R"({
+    meta: {'m1': 999, 'm2': 9999},
+    data: {
+        _id: {'0':1, '1':2},
+        time: {'0':1, '1':2},
+        a:{'0':1, '1':2},
+        b:{'1':1}
+    }
+})",
+            R"({
+    meta: {m1: 9, m2: 9, m3: 9},
+    data: {
+        _id: {'0':3, '1':4},
+        time: {'0':3, '1':4},
+        a:{'0':1, '1':2},
+        b:{'1':1}
+    }
+})"},
         expCtx);
     unpack->setSource(source.get());
 
@@ -264,7 +324,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeWithDollarPrefix) {
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'0':1, '1':2}, time: {'0':1, '1':2}, "
          "$a:{'0':1, '1':2}, b:{'1':1}}}",
          "{meta: {m1: 9, m2: 9, m3: 9}, data: {_id: {'0':3, '1':4}, time: {'0':3, '1':4}, "
-         "$a:{'0':1, '1':2}, b:{'1':1}}}}"},
+         "$a:{'0':1, '1':2}, b:{'1':1}}}"},
         expCtx);
     unpack->setSource(source.get());
     // The first result exists and is as expected.
@@ -705,14 +765,6 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsAdditionalFields) {
                            getExpCtx()),
                        AssertionException,
                        5346506);
-}
-
-TEST_F(InternalUnpackBucketExecTest, ParserRejectsMissingIncludeField) {
-    ASSERT_THROWS(DocumentSourceInternalUnpackBucket::createFromBson(
-                      fromjson("{$_internalUnpackBucket: {timeField: 'foo', metaField: 'bar'}}")
-                          .firstElement(),
-                      getExpCtx()),
-                  AssertionException);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsMissingTimeField) {

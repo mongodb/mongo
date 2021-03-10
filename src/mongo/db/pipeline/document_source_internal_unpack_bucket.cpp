@@ -243,6 +243,9 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
             // _timeFieldIter can be placed accordingly in the materialized measurement.
             continue;
         }
+
+        // Includes a field when '_unpackerBehavior' is 'kInclude' and it's found in 'fieldSet' or
+        // _unpackerBehavior is 'kExclude' and it's not found in 'fieldSet'.
         auto found = _spec.fieldSet.find(colName.toString()) != _spec.fieldSet.end();
         if ((_unpackerBehavior == Behavior::kInclude) == found) {
             _fieldIters.push_back({colName.toString(), BSONObjIterator{elem.Obj()}});
@@ -291,7 +294,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             "$_internalUnpackBucket specification must be an object",
             specElem.type() == Object);
 
-    BucketUnpacker::Behavior unpackerBehavior;
+    // If neither "include" nor "exclude" is specified, the default is "exclude": [] and
+    // if that's the case, no field will be added to 'bucketSpec.fieldSet' in the for-loop below.
+    BucketUnpacker::Behavior unpackerBehavior = BucketUnpacker::Behavior::kExclude;
     BucketSpec bucketSpec;
     auto hasIncludeExclude = false;
     std::vector<std::string> fields;
@@ -334,11 +339,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                           << "unrecognized parameter to $_internalUnpackBucket: " << fieldName);
         }
     }
-
-    // Check that none of the required arguments are missing.
-    uassert(5346507,
-            "The $_internalUnpackBucket stage requires an include/exclude parameter",
-            hasIncludeExclude);
 
     uassert(5346508,
             "The $_internalUnpackBucket stage requires a timeField parameter",
