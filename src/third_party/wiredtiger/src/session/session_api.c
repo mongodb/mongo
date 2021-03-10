@@ -201,7 +201,6 @@ __session_clear(WT_SESSION_IMPL *session)
      *
      * For these reasons, be careful when clearing the session structure.
      */
-    __wt_txn_clear_timestamp_queues(session);
     memset(session, 0, WT_SESSION_CLEAR_SIZE);
 
     WT_INIT_LSN(&session->bg_sync_lsn);

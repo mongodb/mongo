@@ -535,11 +535,6 @@ connection_stats = [
     TxnStat('txn_checkpoint_time_recent', 'transaction checkpoint most recent time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_checkpoint_time_total', 'transaction checkpoint total time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_commit', 'transactions committed'),
-    TxnStat('txn_durable_queue_empty', 'durable timestamp queue insert to empty'),
-    TxnStat('txn_durable_queue_head', 'durable timestamp queue inserts to head'),
-    TxnStat('txn_durable_queue_inserts', 'durable timestamp queue inserts total'),
-    TxnStat('txn_durable_queue_len', 'durable timestamp queue length'),
-    TxnStat('txn_durable_queue_walked', 'durable timestamp queue entries walked'),
     TxnStat('txn_fail_cache', 'transaction failures due to history store'),
     TxnStat('txn_pinned_checkpoint_range', 'transaction range of IDs currently pinned by a checkpoint', 'no_clear,no_scale'),
     TxnStat('txn_pinned_range', 'transaction range of IDs currently pinned', 'no_clear,no_scale'),
@@ -553,11 +548,6 @@ connection_stats = [
     TxnStat('txn_prepare_rollback', 'prepared transactions rolled back'),
     TxnStat('txn_prepared_updates_count', 'Number of prepared updates'),
     TxnStat('txn_query_ts', 'query timestamp calls'),
-    TxnStat('txn_read_queue_empty', 'read timestamp queue insert to empty'),
-    TxnStat('txn_read_queue_head', 'read timestamp queue inserts to head'),
-    TxnStat('txn_read_queue_inserts', 'read timestamp queue inserts total'),
-    TxnStat('txn_read_queue_len', 'read timestamp queue length'),
-    TxnStat('txn_read_queue_walked', 'read timestamp queue entries walked'),
     TxnStat('txn_rollback', 'transactions rolled back'),
     TxnStat('txn_rts', 'rollback to stable calls'),
     TxnStat('txn_rts_pages_visited', 'rollback to stable pages visited'),
@@ -572,6 +562,7 @@ connection_stats = [
     TxnStat('txn_set_ts_stable_upd', 'set timestamp stable updates'),
     TxnStat('txn_sync', 'transaction sync calls'),
     TxnStat('txn_timestamp_oldest_active_read', 'transaction read timestamp of the oldest active reader', 'no_clear,no_scale'),
+    TxnStat('txn_walk_sessions', 'transaction walk of concurrent sessions'),
 
     ##########################################
     # Yield statistics
