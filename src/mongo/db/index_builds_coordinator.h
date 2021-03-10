@@ -445,8 +445,8 @@ public:
      * complete collation spec in cases where the index spec specifies a collation, and will add
      * the collection-default collation, if present, in cases where collation is omitted. If the
      * index spec omits the collation and the collection does not have a default, the collation
-     * field is omitted from the spec. This function also converts 'wildcardProjection' and
-     * 'partialFilterExpression' to canonical form in any cases where they exist.
+     * field is omitted from the spec. This function also converts the 'wildcardProjection' to
+     * canonical form in any cases where it exists.
      *
      * If 'collection' is null, no changes are made to the input specs.
      *
