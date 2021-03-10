@@ -2757,7 +2757,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
         return indexSpecs;
     }
 
-    // Normalize the specs' collations, wildcard projections, and partial filters as applicable.
+    // Normalize the specs' collations, wildcard projections, and any other fields as applicable.
     auto normalSpecs = normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
     // Remove any index specifications which already exist in the catalog.
@@ -2791,20 +2791,12 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     auto normalSpecs =
         uassertStatusOK(collection->addCollationDefaultsToIndexSpecsForCreate(opCtx, indexSpecs));
 
-    // If the index spec has a partialFilterExpression, we normalize it by parsing to an optimized,
-    // sorted MatchExpression tree, re-serialize it to BSON, and add it back into the index spec.
-    const auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, collection->ns());
-    std::transform(normalSpecs.begin(), normalSpecs.end(), normalSpecs.begin(), [&](auto& spec) {
-        const auto kPartialFilterName = IndexDescriptor::kPartialFilterExprFieldName;
-        auto partialFilterExpr = spec.getObjectField(kPartialFilterName);
-        if (partialFilterExpr.isEmpty()) {
-            return spec;
-        }
-        // Parse, optimize and sort the MatchExpression to reduce it to its normalized form.
-        // Serialize the normalized filter back into the index spec before returning.
-        auto partialFilter = MatchExpressionParser::parseAndNormalize(partialFilterExpr, expCtx);
-        return spec.addField(BSON(kPartialFilterName << partialFilter->serialize()).firstElement());
-    });
+    // We choose not to normalize the spec's partialFilterExpression at this point, if it exists.
+    // Doing so often reduces the legibility of the filter to the end-user, and makes it difficult
+    // for clients to validate (via the listIndexes output) whether a given partialFilterExpression
+    // is equivalent to the filter that they originally submitted. Omitting this normalization does
+    // not impact our internal index comparison semantics, since we compare based on the parsed
+    // MatchExpression trees rather than the serialized BSON specs. See SERVER-54357.
 
     // If any of the specs describe wildcard indexes, normalize the wildcard projections if present.
     // This will change all specs of the form {"a.b.c": 1} to normalized form {a: {b: {c : 1}}}.

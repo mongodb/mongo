@@ -42,11 +42,11 @@ assert.commandFailed(
 assert.commandFailed(coll.createIndex(
     {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
-// Only top-level $and is permitted, but by normalizing the input filter we absorb the child $and.
-assert.commandWorked(coll.createIndex({x: 1}, {
+// Only top-level $and is permitted in a partial filter expression.
+assert.commandFailedWithCode(coll.createIndex({x: 1}, {
     partialFilterExpression: {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
-}));
-assert.commandWorked(coll.dropIndexes());
+}),
+                             ErrorCodes.CannotCreateIndex);
 
 for (var i = 0; i < 10; i++) {
     assert.commandWorked(coll.insert({x: i, a: i}));
