@@ -32,6 +32,7 @@
 #include <set>
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 
 namespace mongo {
 
@@ -204,6 +205,16 @@ public:
      */
     std::pair<BSONObj, bool> extractOrBuildProjectToInternalize(
         Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const;
+
+    /**
+     * Attempts to split 'match' into two stages, where the first is dependent only on the metaField
+     * and the second is the remainder, so that applying them in sequence is equivalent to applying
+     * 'match' once. Will return two intrusive_ptrs to new $match stages. Either pointer may be
+     * null. If the first is non-null, it will have the metaField renamed from the user defined name
+     * to 'kBucketMetaFieldName'.
+     */
+    std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
+    splitMatchOnMetaAndRename(boost::intrusive_ptr<DocumentSourceMatch> match);
 
     /**
      * Takes a predicate after $_internalUnpackBucket on a bucketed field as an argument and

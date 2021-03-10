@@ -169,7 +169,7 @@ splitMatchByModifiedFields(const boost::intrusive_ptr<DocumentSourceMatch>& matc
                 semantic_analysis::extractModifiedDependencies(depsTracker.fields, preservedPaths);
         }
     }
-    return match->splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
+    return std::move(*match).splitSourceBy(modifiedPaths, modifiedPathsRet.renames);
 }
 
 /**

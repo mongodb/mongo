@@ -382,9 +382,22 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields,
-                                   const StringMap<std::string>& renames) {
+                                   const StringMap<std::string>& renames) && {
+    return std::move(*this).splitSourceByFunc(fields, renames, expression::isIndependentOf);
+}
+
+pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
+DocumentSourceMatch::extractMatchOnFieldsAndRemainder(const std::set<std::string>& fields,
+                                                      const StringMap<std::string>& renames) && {
+    return std::move(*this).splitSourceByFunc(fields, renames, expression::isOnlyDependentOn);
+}
+
+pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
+DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
+                                       const StringMap<std::string>& renames,
+                                       expression::ShouldSplitExprFunc func) && {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
-        expression::splitMatchExpressionBy(std::move(_expression), fields, renames));
+        expression::splitMatchExpressionBy(std::move(_expression), fields, renames, func));
 
     invariant(newExpr.first || newExpr.second);
 

@@ -216,12 +216,15 @@ TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,
     pipeline->optimizePipeline();
     ASSERT_EQ(pipeline->getSources().size(), 3U);
 
-    auto stages = pipeline->serializeToBson();
+    // To get the optimized $match from the pipeline, we have to serialize with explain.
+    auto stages = pipeline->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner);
     ASSERT_EQ(stages.size(), 3U);
 
-    ASSERT_BSONOBJ_EQ(stages[0], fromjson("{$match: {'control.max.b': {$_internalExprGt: 1}}}"));
-    ASSERT_BSONOBJ_EQ(stages[1], unpackBucketObj);
-    ASSERT_BSONOBJ_EQ(stages[2], matchObj);
+    ASSERT_BSONOBJ_EQ(stages[0].getDocument().toBson(),
+                      fromjson("{$match: {'control.max.b': {$_internalExprGt: 1}}}"));
+    ASSERT_BSONOBJ_EQ(stages[1].getDocument().toBson(), unpackBucketObj);
+    ASSERT_BSONOBJ_EQ(stages[2].getDocument().toBson(),
+                      fromjson("{$match: {$and: [{b: {$gt: 1}}, {a: {$not: {$eq: 5}}}]}}"));
 }
 
 TEST_F(InternalUnpackBucketPredicateMappingOptimizationTest,

@@ -93,6 +93,11 @@ bool isSplittableBy(const MatchExpression& expr, const std::set<std::string>& pa
 bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet);
 
 /**
+ * Determine if 'expr' is reliant only upon paths rooted in 'roots'.
+ */
+bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots);
+
+/**
  * Returns whether the path represented by 'first' is an prefix of the path represented by 'second'.
  * Equality is not considered a prefix. For example:
  *
@@ -111,15 +116,19 @@ bool isPathPrefixOf(StringData first, StringData second);
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 
+using ShouldSplitExprFunc =
+    std::function<bool(const MatchExpression&, const std::set<std::string>&)>;
+
 /**
- * Attempt to split 'expr' into two MatchExpressions, where the first is not reliant upon any
- * path from 'fields', such that applying the matches in sequence is equivalent to applying
- * 'expr'. Takes ownership of 'expr'.
+ * Attempt to split 'expr' into two MatchExpressions according to 'func'. 'func' describes the
+ * conditions under which its argument can be split from 'expr'. Returns two pointers, where each
+ * new MatchExpression contains a portion of 'expr'. The first contains the parts of 'expr' which
+ * satisfy 'func', and the second are the remaining parts of 'expr', such that applying the matches
+ * in sequence is equivalent to applying 'expr'. If 'expr' cannot be split, returns {nullptr, expr}.
+ * If 'expr' can be entirely split, returns {expr, nullptr}. Takes ownership of 'expr'.
  *
- * If 'expr' cannot be split, returns {nullptr, expr}. If 'expr' is entirely independent of
- * 'fields', returns {expr, nullptr}. If 'expr' is partially dependent on 'fields', and partially
- * independent, returns {exprLeft, exprRight}, where each new MatchExpression contains a portion of
- * 'expr'.
+ * For example, the default behavior is to split 'match' into two where the first is not reliant
+ * upon any path from 'fields', and the second is the remainder.
  *
  * Any paths which should be renamed are encoded in 'renames', which maps from path names in 'expr'
  * to the new values of those paths. If the return value is {exprLeft, exprRight} or {exprLeft,
@@ -132,7 +141,8 @@ void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "
 std::pair<std::unique_ptr<MatchExpression>, std::unique_ptr<MatchExpression>>
 splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
                        const std::set<std::string>& fields,
-                       const StringMap<std::string>& renames);
+                       const StringMap<std::string>& renames,
+                       ShouldSplitExprFunc func = isIndependentOf);
 
 /**
  * Applies the renames specified in 'renames' to 'expr'. 'renames' maps from path names in 'expr'
@@ -141,6 +151,5 @@ splitMatchExpressionBy(std::unique_ptr<MatchExpression> expr,
  * {new: {$gt: 3}}.
  */
 void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string>& renames);
-
 }  // namespace expression
 }  // namespace mongo
