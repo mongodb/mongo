@@ -59,6 +59,11 @@ static constexpr auto kNaturalSortField = "$natural";
 static constexpr auto kShardVersionField = "shardVersion";
 
 /**
+ * Assert that collectionName is valid.
+ */
+Status validateGetMoreCollectionName(StringData collectionName);
+
+/**
  * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
  * value) or if there is a bad combination of options (e.g. awaitData is illegal without
  * tailable).

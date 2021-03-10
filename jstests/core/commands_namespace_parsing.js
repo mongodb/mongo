@@ -48,6 +48,7 @@ function assertFailsWithInvalidNamespacesForField(
 
     const dbCmd = isAdminCommand ? db.adminCommand : db.runCommand;
     for (let cmd of cmds) {
+        jsTestLog(`running ${tojson(cmd)}`);
         assert.commandFailedWithCode(dbCmd.apply(db, [cmd]), ErrorCodes.InvalidNamespace);
     }
 }
