@@ -19,7 +19,8 @@
         nodes: [
             {rsConfig: {_id: 10}},
             {rsConfig: {_id: 11, arbiterOnly: true}},
-        ]
+        ],
+        nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
     });
     replSetA.startSet({dbpath: "$set-A-$node"});
     replSetA.initiate();

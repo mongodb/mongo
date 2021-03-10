@@ -13,7 +13,8 @@
         name: name,
         nodes: [
             {rsConfig: {_id: 10}},
-        ]
+        ],
+        nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
     });
     replSetA.startSet({dbpath: "$set-A-$node"});
     replSetA.initiate();
@@ -22,7 +23,8 @@
         name: name,
         nodes: [
             {rsConfig: {_id: 20}},
-        ]
+        ],
+        nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
     });
     replSetB.startSet({dbpath: "$set-B-$node"});
     replSetB.initiate();

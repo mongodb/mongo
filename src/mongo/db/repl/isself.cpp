@@ -47,6 +47,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/scopeguard.h"
@@ -79,6 +80,8 @@
 
 namespace mongo {
 namespace repl {
+
+MONGO_FAIL_POINT_DEFINE(failIsSelfCheck);
 
 OID instanceId;
 
@@ -159,6 +162,12 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 }  // namespace
 
 bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
+    if (MONGO_FAIL_POINT(failIsSelfCheck)) {
+        log() << "failIsSelfCheck failpoint activated, returning false from isSelf; hostAndPort: "
+              << hostAndPort;
+        return false;
+    }
+
     // Fastpath: check if the host&port in question is bound to one
     // of the interfaces on this machine.
     // No need for ip match if the ports do not match
