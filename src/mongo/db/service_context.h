@@ -35,6 +35,7 @@
 
 #include "mongo/base/global_initializer_registerer.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -582,6 +583,11 @@ private:
     ClientSet _clients;
 
     /**
+     * Managing classes for our issued operation IDs.
+     */
+    std::shared_ptr<UniqueOperationIdRegistry> _opIdRegistry;
+
+    /**
      * The registered OpObserver.
      */
     std::unique_ptr<OpObserver> _opObserver;
@@ -604,9 +610,6 @@ private:
 
     // protected by _mutex
     std::vector<KillOpListenerInterface*> _killOpListeners;
-
-    // Counter for assigning operation ids.
-    AtomicWord<unsigned> _nextOpId{1};
 
     bool _startupComplete = false;
     stdx::condition_variable _startupCompleteCondVar;

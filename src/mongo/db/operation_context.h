@@ -36,6 +36,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_id.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -52,7 +53,6 @@
 
 namespace mongo {
 
-class Client;
 class CurOp;
 class ProgressMeter;
 class ServiceContext;
@@ -78,7 +78,12 @@ class OperationContext : public Interruptible, public Decorable<OperationContext
     OperationContext& operator=(const OperationContext&) = delete;
 
 public:
-    OperationContext(Client* client, unsigned int opId);
+    /**
+     * Creates an op context with no unique operation ID tracking - prefer using the OperationIdSlot
+     * CTOR if possible to avoid OperationId collisions.
+     */
+    OperationContext(Client* client, OperationId opId);
+    OperationContext(Client* client, OperationIdSlot&& opIdSlot);
     virtual ~OperationContext();
 
     bool shouldParticipateInFlowControl() const {
@@ -164,8 +169,8 @@ public:
     /**
      * Returns the operation ID associated with this operation.
      */
-    unsigned int getOpID() const {
-        return _opId;
+    OperationId getOpID() const {
+        return _opId.getId();
     }
 
     /**
@@ -463,7 +468,7 @@ private:
 
     Client* const _client;
 
-    const unsigned int _opId;
+    const OperationIdSlot _opId;
 
     boost::optional<LogicalSessionId> _lsid;
     boost::optional<TxnNumber> _txnNumber;
