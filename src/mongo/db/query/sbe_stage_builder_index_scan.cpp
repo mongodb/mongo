@@ -233,15 +233,20 @@ makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                     "Generated interval [lowKey, highKey]",
                     "lowKey"_attr = lowKey,
                     "highKey"_attr = highKey);
-        // For high keys use the opposite rule as a normal seek because a forward scan should end
-        // after the key if inclusive, and before if exclusive.
-        const auto inclusive = forward != highKeyInclusive;
-        result.push_back({std::make_unique<KeyString::Value>(
-                              IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                                  lowKey, version, ordering, forward, lowKeyInclusive)),
-                          std::make_unique<KeyString::Value>(
-                              IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
-                                  highKey, version, ordering, forward, inclusive))});
+        // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
+        // index scan. The logic for computing a "discriminator" for an "end" key is reversed, which
+        // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
+        // end key.
+        result.push_back(
+            {std::make_unique<KeyString::Value>(
+                 IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+                     lowKey, version, ordering, forward, lowKeyInclusive)),
+             std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
+                 highKey,
+                 version,
+                 ordering,
+                 forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
+                                             : KeyString::Discriminator::kExclusiveAfter))});
     }
     return result;
 }

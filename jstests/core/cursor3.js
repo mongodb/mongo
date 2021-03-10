@@ -1,8 +1,5 @@
 // Test inequality bounds combined with ordering for a single-field index.
 // BUG 1079 (fixed)
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 testNum = 1;
 

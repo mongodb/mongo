@@ -257,6 +257,19 @@ public:
                                                             bool isForward,
                                                             bool inclusive);
 
+    /**
+     * Encodes the BSON Key into a KeyString object to pass in to SortedDataInterface::seek()
+     * or SortedDataInterface::setEndPosition().
+     *
+     * This funcition is similar to IndexEntryComparison::makeKeyStringFromBSONKeyForSeek()
+     * but allows you to pick your own KeyString::Discriminator based on wether or not the
+     * resulting KeyString is for the start key or end key of a seek.
+     */
+    static KeyString::Value makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                                     KeyString::Version version,
+                                                     Ordering ord,
+                                                     KeyString::Discriminator discrim);
+
 private:
     // Ordering is used in comparison() to compare BSONElements
     const Ordering _order;

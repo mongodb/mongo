@@ -167,12 +167,20 @@ KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(const BSO
                                                                        Ordering ord,
                                                                        bool isForward,
                                                                        bool inclusive) {
+    return makeKeyStringFromBSONKey(bsonKey,
+                                    version,
+                                    ord,
+                                    isForward == inclusive
+                                        ? KeyString::Discriminator::kExclusiveBefore
+                                        : KeyString::Discriminator::kExclusiveAfter);
+}
+
+KeyString::Value IndexEntryComparison::makeKeyStringFromBSONKey(const BSONObj& bsonKey,
+                                                                KeyString::Version version,
+                                                                Ordering ord,
+                                                                KeyString::Discriminator discrim) {
     BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
-    KeyString::Builder builder(version,
-                               finalKey,
-                               ord,
-                               isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
-                                                      : KeyString::Discriminator::kExclusiveAfter);
+    KeyString::Builder builder(version, finalKey, ord, discrim);
     return builder.getValueCopy();
 }
 
