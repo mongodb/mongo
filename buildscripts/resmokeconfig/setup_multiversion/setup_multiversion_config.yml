@@ -107,16 +107,6 @@ evergreen_buildvariants:
     platform: amazon2
     architecture: x86_64
 
-  - name: rhel62
-    edition: targeted
-    platform: rhel62
-    architecture: x86_64
-
-  - name: enterprise-rhel-62-64-bit
-    edition: enterprise
-    platform: rhel62
-    architecture: x86_64
-
   - name: rhel70
     edition: targeted
     platform: rhel70
