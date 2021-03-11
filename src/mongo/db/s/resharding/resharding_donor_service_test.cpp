@@ -44,6 +44,7 @@
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding_util.h"
@@ -352,6 +353,8 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     auto opCtx = makeOperationContext();
 
     {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx.get());
         CollectionOptions options;
         options.uuid = doc.getSourceUUID();
         resharding::data_copy::ensureCollectionExists(opCtx.get(), doc.getSourceNss(), options);
@@ -385,6 +388,8 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnError) {
     {
         CollectionOptions options;
         options.uuid = doc.getSourceUUID();
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx.get());
         resharding::data_copy::ensureCollectionExists(opCtx.get(), doc.getSourceNss(), options);
     }
 

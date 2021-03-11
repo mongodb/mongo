@@ -30,12 +30,14 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -138,7 +140,13 @@ protected:
      * the specified initial documents.
      */
     void createShardedCollection(const std::vector<BSONObj>& initialDocs) {
-        ASSERT(_client->createCollection(kNss.ns()));
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(operationContext());
+            uassertStatusOK(createCollection(
+                operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+        }
+
         const auto uuid = [&] {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
             return autoColl.getCollection()->uuid();
@@ -175,7 +183,7 @@ protected:
                         ShardId("dummyShardId")));
         }();
 
-        _client->createIndex(kNss.ns(), kShardKeyPattern);
+        client()->createIndex(kNss.ns(), kShardKeyPattern);
         insertDocsInShardedCollection(initialDocs);
     }
 
@@ -361,7 +369,12 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
 }
 
 TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
-    ASSERT(client()->createCollection(kNss.ns()));
+    {
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext());
+        uassertStatusOK(createCollection(
+            operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+    }
 
     MigrationChunkClonerSourceLegacy cloner(
         createMoveChunkRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200))),

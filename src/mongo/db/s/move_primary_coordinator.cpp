@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/s/move_primary_coordinator.h"
 
 #include "mongo/db/auth/authorization_session.h"
@@ -37,7 +39,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/shard_metadata_util.h"

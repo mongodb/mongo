@@ -32,12 +32,13 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
+
 class IndexConsistency;
 class CollectionCatalog;
+
 class CollectionImpl final : public Collection {
 public:
     explicit CollectionImpl(OperationContext* opCtx,

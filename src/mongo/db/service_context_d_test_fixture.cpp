@@ -108,6 +108,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 }
 
 ServiceContextMongoDTest::~ServiceContextMongoDTest() {
+    CollectionShardingStateFactory::clear(getServiceContext());
+
     {
         auto opCtx = getClient()->makeOperationContext();
         Lock::GlobalLock glk(opCtx.get(), MODE_X);
@@ -135,8 +137,6 @@ void ServiceContextMongoDTest::tearDown() {
         }
         IndexBuildsCoordinator::get(opCtx)->shutdown(opCtx);
     }
-
-    CollectionShardingStateFactory::clear(getServiceContext());
 
     ServiceContextTest::tearDown();
 }

@@ -32,14 +32,13 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
-
-class OperationContext;
 
 /**
  * A decoration on OperationContext representing per-operation shard version metadata sent to mongod
@@ -70,17 +69,21 @@ public:
     static bool isOperationVersioned(OperationContext* opCtx);
 
     /**
-     * Requests on a sharded collection that are broadcast without a shardVersion should not cause
-     * the collection to be created on a shard that does not know about the collection already,
-     * since the collection options will not be propagated. Such requests specify to disallow
-     * collection creation, which is saved here.
+     * Instantiating this object on the stack indicates to the storage execution subsystem that it
+     * is allowed to create a collection in this context and that the caller is responsible for
+     * notifying the shard Sharding sybsystem of the collection creation.
+     *
+     * DO NOT add any new usages of this class without including someone from the Sharding Team on
+     * the code review.
      */
-    void setAllowImplicitCollectionCreation(const BSONElement& allowImplicitCollectionCreationElem);
+    class ScopedAllowImplicitCollectionCreate_UNSAFE {
+    public:
+        ScopedAllowImplicitCollectionCreate_UNSAFE(OperationContext* opCtx);
+        ~ScopedAllowImplicitCollectionCreate_UNSAFE();
 
-    /**
-     * Specifies whether the request is allowed to create database/collection implicitly.
-     */
-    bool allowImplicitCollectionCreation() const;
+    private:
+        OperationContext* const _opCtx;
+    };
 
     /**
      * Parses shardVersion and databaseVersion from 'cmdObj' and stores the results in this object
@@ -181,8 +184,10 @@ public:
     boost::optional<Status> resetShardingOperationFailedStatus();
 
 private:
+    friend class ShardServerOpObserver;  // For access to _allowCollectionCreation below
+
     // Specifies whether the request is allowed to create database/collection implicitly
-    bool _allowImplicitCollectionCreation{true};
+    bool _allowCollectionCreation{false};
 
     // The OperationShardingState class supports storing shardVersions for multiple namespaces (and
     // databaseVersions for multiple databases), even though client code has not been written yet to

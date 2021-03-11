@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/auth/authorization_checks.h"
 
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
-namespace mongo::auth {
-
+namespace mongo {
+namespace auth {
 namespace {
 
 // Checks if this connection has the privileges necessary to create or modify the view 'viewNs'
@@ -66,7 +69,6 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
 }
 
 }  // namespace
-
 
 Status checkAuthForFind(AuthorizationSession* authSession,
                         const NamespaceString& ns,
@@ -268,7 +270,6 @@ Status checkAuthForCollMod(AuthorizationSession* authSession,
     return Status::OK();
 }
 
-
 StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,
                                                       const NamespaceString& nss,
                                                       const AggregateCommand& request,
@@ -315,4 +316,5 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
     return privileges;
 }
 
-}  // namespace mongo::auth
+}  // namespace auth
+}  // namespace mongo

@@ -55,9 +55,9 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
@@ -315,6 +315,8 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
             hangBeforeCreateIndexesCollectionCreate.pauseWhileSet();
         }
 
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
         auto createStatus =
             createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
 

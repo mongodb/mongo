@@ -64,7 +64,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
@@ -78,13 +77,12 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
-#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
-
 namespace {
+
 MONGO_FAIL_POINT_DEFINE(throwWCEDuringTxnCollCreate);
 MONGO_FAIL_POINT_DEFINE(hangBeforeLoggingCreateCollection);
 MONGO_FAIL_POINT_DEFINE(hangAndFailAfterCreateCollectionReservesOpTime);
@@ -640,17 +638,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
-    uassert(CannotImplicitlyCreateCollectionInfo(nss),
-            "request doesn't allow collection to be created implicitly",
-            serverGlobalParams.clusterRole != ClusterRole::ShardServer ||
-                OperationShardingState::get(opCtx).allowImplicitCollectionCreation() ||
-                options.temp);
-
     auto coordinator = repl::ReplicationCoordinator::get(opCtx);
     bool canAcceptWrites =
         (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
         coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
-
 
     CollectionOptions optionsWithUUID = options;
     bool generatedUUID = false;

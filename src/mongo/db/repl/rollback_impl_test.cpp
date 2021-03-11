@@ -45,6 +45,7 @@
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/repl/rollback_test_fixture.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -56,10 +57,9 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
+namespace mongo {
+namespace repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
 
 NamespaceString kOplogNSS("local.oplog.rs");
 NamespaceString nss("test.coll");
@@ -164,6 +164,8 @@ protected:
         // Create a new collection in the storage interface.
         CollectionOptions options;
         options.uuid = uuid;
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
         ASSERT_OK(_storageInterface->createCollection(opCtx, nss, options));
 
         // Initialize a mock collection.
@@ -2068,4 +2070,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsMultipleUpdateOpsForSameName
     assertRollbackInfoContainsObjectForUUID(uuid, obj1);
     assertRollbackInfoContainsObjectForUUID(uuid, obj2);
 }
+
 }  // namespace
+}  // namespace repl
+}  // namespace mongo

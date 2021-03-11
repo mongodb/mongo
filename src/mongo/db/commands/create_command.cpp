@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -253,6 +254,8 @@ public:
                 cmd.setIdIndex(idIndexSpec);
             }
 
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
             uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));
             return reply;
         }

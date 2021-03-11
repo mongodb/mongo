@@ -45,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding_util.h"
@@ -213,7 +214,10 @@ public:
             if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                 ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
             }
-            invariant(dbRaii.getDb()->createCollection(_opCtx, nss));
+
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(_opCtx);
+            ASSERT(dbRaii.getDb()->createCollection(_opCtx, nss));
             wunit.commit();
         });
     }
@@ -254,7 +258,6 @@ public:
                     ShardId destinedRecipient) {
         create(outputCollectionNss);
         create(dataCollectionNss);
-
         _fetchTimestamp = repl::StorageInterface::get(_svcCtx)->getLatestOplogTimestamp(_opCtx);
 
         AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);

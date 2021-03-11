@@ -492,7 +492,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                          const ShardsvrShardCollectionRequest& request,
                                          const ShardId& dbPrimaryShardId,
                                          bool mustTakeDistLock) {
-    CreateCollectionResponse shardCollectionResponse;
     // Fast check for whether the collection is already sharded without taking any locks
     if (auto createCollectionResponseOpt =
             checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
@@ -537,6 +536,8 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
             feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
                 serverGlobalParams.featureCompatibility);
     }
+
+    CreateCollectionResponse shardCollectionResponse;
 
     {
         pauseShardCollectionBeforeCriticalSection.pauseWhileSet();
@@ -619,8 +620,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
         targetState = calculateTargetState(opCtx, nss, request);
 
-        shardCollectionResponse.setCollectionUUID(targetState->uuid);
-
         splitPolicy =
             InitialSplitPolicy::calculateOptimizationStrategy(opCtx,
                                                               targetState->shardKeyPattern,
@@ -641,6 +640,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         // There must be at least one chunk.
         invariant(initialChunks.chunks.size());
 
+        shardCollectionResponse.setCollectionUUID(targetState->uuid);
         shardCollectionResponse.setCollectionVersion(
             initialChunks.chunks[initialChunks.chunks.size() - 1].getVersion());
 
@@ -673,7 +673,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
           "namespace"_attr = nss,
           "initialCollectionVersion"_attr = initialChunks.collVersion());
 
-
     ShardingLogging::get(opCtx)->logChange(
         opCtx,
         "shardCollection.end",
@@ -692,7 +691,7 @@ CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const BSONObj& cmdObj,
                                                bool requestFromCSRS) {
     auto request = ShardsvrShardCollectionRequest::parse(
-        IDLParserErrorContext("_shardsvrShardCollection"), cmdObj);
+        IDLParserErrorContext("shardCollectionLegacy"), cmdObj);
     if (!request.getCollation())
         request.setCollation(BSONObj());
     if (!request.getCollation()->isEmpty()) {

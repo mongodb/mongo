@@ -153,6 +153,9 @@ public:
             operationContext(),
             NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
             BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext());
         uassertStatusOK(createCollection(operationContext(),
                                          kAppliedToNs.db().toString(),
                                          BSON("create" << kAppliedToNs.coll())));

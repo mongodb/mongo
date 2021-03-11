@@ -1559,7 +1559,6 @@ void ExecCommandDatabase::_initiateCommand() {
         _execContext->behaviors->advanceConfigOpTimeFromRequestMetadata(opCtx);
     }
 
-    oss.setAllowImplicitCollectionCreation(allowImplicitCollectionCreationField);
     _scoped = _execContext->behaviors->scopedOperationCompletionShardingActions(opCtx);
 
     // This may trigger the maxTimeAlwaysTimeOut failpoint.

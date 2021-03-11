@@ -41,7 +41,6 @@
 
 namespace mongo {
 namespace shardkeyutil {
-
 namespace {
 
 constexpr StringData kCheckShardingIndexCmdName = "checkShardingIndex"_sd;

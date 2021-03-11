@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/cloner.h"
-#include "mongo/db/cloner_gen.h"
 
 #include <algorithm>
 
@@ -46,6 +45,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/cloner_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -59,6 +59,7 @@
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/logv2/log.h"
@@ -412,10 +413,15 @@ Status Cloner::_createCollectionsForDb(
 
             CollectionOptions collectionOptions = uassertStatusOK(
                 CollectionOptions::parse(options, CollectionOptions::ParseKind::parseForStorage));
-            Status createStatus = db->userCreateNS(
-                opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
-            if (!createStatus.isOK()) {
-                return createStatus;
+
+            {
+                OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                    unsafeCreateCollection(opCtx);
+                Status createStatus = db->userCreateNS(
+                    opCtx, nss, collectionOptions, createDefaultIndexes, params.idIndexSpec);
+                if (!createStatus.isOK()) {
+                    return createStatus;
+                }
             }
 
             wunit.commit();

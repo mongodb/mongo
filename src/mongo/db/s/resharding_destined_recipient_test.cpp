@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -181,23 +182,28 @@ protected:
 
     ReshardingEnv setupReshardingEnv(OperationContext* opCtx, bool refreshTempNss) {
         DBDirectClient client(opCtx);
-        client.createCollection(kNss.ns());
-        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        ASSERT(client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns()));
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            opCtx);
+        Status status = createCollection(
+            operationContext(), kNss.db().toString(), BSON("create" << kNss.coll()));
+        if (status != ErrorCodes::NamespaceExists) {
+            uassertStatusOK(status);
+        }
 
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         env.version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
         env.dbVersion = DatabaseVersion(UUID::gen());
-
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",
                                         NamespaceString::kTemporaryReshardingCollectionPrefix,
                                         env.sourceUuid.toString()));
 
-        client.createCollection(env.tempNss.ns());
-
-        DatabaseType db(kNss.db().toString(), kShardList[0].getName(), true, env.dbVersion);
+        uassertStatusOK(createCollection(
+            operationContext(), env.tempNss.db().toString(), BSON("create" << env.tempNss.coll())));
 
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setReshardingUUID(UUID::gen());
@@ -212,7 +218,8 @@ protected:
         coll.setUnique(false);
         coll.setAllowMigrations(false);
 
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(db);
+        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
+            DatabaseType(kNss.db().toString(), kShardList[0].getName(), true, env.dbVersion));
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             kNss, coll, createChunks(env.version.epoch(), kShardKey), reshardingFields);
         _mockCatalogCacheLoader->setCollectionRefreshValues(

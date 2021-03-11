@@ -468,6 +468,7 @@ env.CppUnitTest(
         'dist_lock_catalog_mock.cpp',
         'dist_lock_catalog_replset_test.cpp',
         'dist_lock_manager_replset_test.cpp',
+        'implicit_collection_creation_test.cpp',
         'metadata_manager_test.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'migration_destination_manager_test.cpp',
