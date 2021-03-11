@@ -112,6 +112,37 @@ void checkIfReceivedDonorAbortMigration(const CancelationToken& serviceToken,
             !instanceToken.isCanceled() || serviceToken.isCanceled());
 }
 
+template <class Promise>
+void setPromiseFromStatusIfNotReady(WithLock lk, Promise& promise, Status status) {
+    if (promise.getFuture().isReady()) {
+        return;
+    }
+
+    if (status.isOK()) {
+        promise.emplaceValue();
+    } else {
+        promise.setError(status);
+    }
+}
+
+template <class Promise>
+void setPromiseErrorIfNotReady(WithLock lk, Promise& promise, Status status) {
+    if (promise.getFuture().isReady()) {
+        return;
+    }
+
+    promise.setError(status);
+}
+
+template <class Promise>
+void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
+    if (promise.getFuture().isReady()) {
+        return;
+    }
+
+    promise.emplaceValue();
+}
+
 }  // namespace
 
 // Note this index is required on both the donor and recipient in a tenant migration, since each
@@ -360,29 +391,17 @@ void TenantMigrationDonorService::Instance::onReceiveDonorAbortMigration() {
 
 void TenantMigrationDonorService::Instance::onReceiveDonorForgetMigration() {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
-        _receiveDonorForgetMigrationPromise.emplaceValue();
-    }
+    setPromiseOkIfNotReady(lg, _receiveDonorForgetMigrationPromise);
 }
 
 void TenantMigrationDonorService::Instance::interrupt(Status status) {
     stdx::lock_guard<Latch> lg(_mutex);
     // Resolve any unresolved promises to avoid hanging.
-    if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
-        _initialDonorStateDurablePromise.setError(status);
-    }
-    if (!_receiveDonorForgetMigrationPromise.getFuture().isReady()) {
-        _receiveDonorForgetMigrationPromise.setError(status);
-    }
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
-    }
-    if (!_decisionPromise.getFuture().isReady()) {
-        _decisionPromise.setError(status);
-    }
-    if (!_migrationCancelablePromise.getFuture().isReady()) {
-        _migrationCancelablePromise.setError(status);
-    }
+    setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
+    setPromiseErrorIfNotReady(lg, _receiveDonorForgetMigrationPromise, status);
+    setPromiseErrorIfNotReady(lg, _completionPromise, status);
+    setPromiseErrorIfNotReady(lg, _decisionPromise, status);
+    setPromiseErrorIfNotReady(lg, _migrationCancelablePromise, status);
 }
 
 ExecutorFuture<void>
@@ -706,9 +725,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
             _durableState.state = _stateDoc.getState();
             switch (_durableState.state) {
                 case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
-                    if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
-                        _initialDonorStateDurablePromise.emplaceValue();
-                    }
+                    setPromiseOkIfNotReady(lg, _initialDonorStateDurablePromise);
                     break;
                 case TenantMigrationDonorStateEnum::kDataSync:
                 case TenantMigrationDonorStateEnum::kBlocking:
@@ -830,9 +847,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     _abortMigrationSource = CancelationSource(serviceToken);
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (!_migrationCancelablePromise.getFuture().isReady()) {
-            _migrationCancelablePromise.emplaceValue();
-        }
+        setPromiseOkIfNotReady(lg, _migrationCancelablePromise);
     }
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());
@@ -1036,10 +1051,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                                     // If interrupt is called at some point during execution, it is
                                     // possible that interrupt() will fulfill the promise before we
                                     // do.
-                                    if (!_decisionPromise.getFuture().isReady()) {
-                                        // Fulfill the promise since we have made a decision.
-                                        _decisionPromise.emplaceValue();
-                                    }
+                                    setPromiseOkIfNotReady(lg, _decisionPromise);
                                 });
                         });
                 });
@@ -1057,10 +1069,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 _serviceContext, _tenantId);
             if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
                 stdx::lock_guard<Latch> lg(_mutex);
-                if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
-                    // Fulfill the promise since the state doc failed to insert.
-                    _initialDonorStateDurablePromise.setError(status);
-                }
+                // Fulfill the promise since the state doc failed to insert.
+                setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
                 return ExecutorFuture<void>(**executor, status);
             } else {
@@ -1074,10 +1084,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                                 stdx::lock_guard<Latch> lg(_mutex);
                                 // If interrupt is called at some point during execution, it is
                                 // possible that interrupt() will fulfill the promise before we do.
-                                if (!_decisionPromise.getFuture().isReady()) {
-                                    // Fulfill the promise since we have made a decision.
-                                    _decisionPromise.emplaceValue();
-                                };
+                                setPromiseOkIfNotReady(lg, _decisionPromise);
                             });
                     });
             }
@@ -1158,16 +1165,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "expireAt"_attr = _stateDoc.getExpireAt(),
                   "status"_attr = status);
 
-            if (_completionPromise.getFuture().isReady()) {
-                // interrupt() was called before we got here
-                return;
-            }
-
-            if (status.isOK()) {
-                _completionPromise.emplaceValue();
-            } else {
-                _completionPromise.setError(status);
-            }
+            setPromiseFromStatusIfNotReady(lg, _completionPromise, status);
         })
         .semi();
 }
