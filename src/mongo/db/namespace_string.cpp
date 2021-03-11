@@ -93,6 +93,8 @@ const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString
                                                                  "system.indexBuilds");
 const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::kConfigDb,
                                                                "rangeDeletions");
+const NamespaceString NamespaceString::kRangeDeletionForRenameNamespace(NamespaceString::kConfigDb,
+                                                                        "rangeDeletionsForRename");
 const NamespaceString NamespaceString::kConfigReshardingOperationsNamespace(
     NamespaceString::kConfigDb, "reshardingOperations");
 

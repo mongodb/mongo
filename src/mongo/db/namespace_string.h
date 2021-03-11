@@ -141,6 +141,9 @@ public:
     // Namespace for pending range deletions.
     static const NamespaceString kRangeDeletionNamespace;
 
+    // Namespace containing pending range deletions snapshots for rename operations.
+    static const NamespaceString kRangeDeletionForRenameNamespace;
+
     // Namespace for the coordinator's resharding operation state.
     static const NamespaceString kConfigReshardingOperationsNamespace;
 

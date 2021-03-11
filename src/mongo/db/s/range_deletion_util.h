@@ -76,10 +76,27 @@ SharedSemiFuture<void> removeDocumentsInRange(
     Seconds delayForActiveQueriesOnSecondariesToComplete,
     Milliseconds delayBetweenBatches);
 
-std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
-                                                               const NamespaceString& nss);
-void storeRangeDeletionTasks(OperationContext* opCtx, std::vector<RangeDeletionTask>& tasks);
+/**
+ * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
+ * - Associates tasks to the target collection
+ * - Stores tasks in `config.rangeDeletionsForRename`
+ */
+void snapshotRangeDeletionsForRename(OperationContext* opCtx,
+                                     const NamespaceString& fromNss,
+                                     const NamespaceString& toNss);
 
-void deleteRangeDeletionTasks(OperationContext* opCtx, const NamespaceString& nss);
+/**
+ * Copies `config.rangeDeletionsForRename` tasks for the specified namespace to
+ * `config.rangeDeletions`.
+ */
+void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * - Deletes range deletion tasks for the FROM namespace from `config.rangeDeletions`.
+ * - Deletes range deletion tasks for the TO namespace from `config.rangeDeletionsForRename`
+ */
+void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
+                                       const NamespaceString& fromNss,
+                                       const NamespaceString& toNss);
 
 }  // namespace mongo
