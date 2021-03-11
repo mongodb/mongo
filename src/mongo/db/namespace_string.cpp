@@ -118,6 +118,9 @@ const NamespaceString NamespaceString::kReshardingApplierProgressNamespace(
 const NamespaceString NamespaceString::kReshardingTxnClonerProgressNamespace(
     NamespaceString::kConfigDb, "localReshardingOperations.recipient.progress_txn_cloner");
 
+const NamespaceString NamespaceString::kCollectionCriticalSectionsNamespace(
+    NamespaceString::kConfigDb, "collection_critical_sections");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

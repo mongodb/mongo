@@ -48,6 +48,7 @@ env.Library(
         'active_shard_collection_registry.cpp',
         'chunk_move_write_concern_options.cpp',
         'chunk_splitter.cpp',
+        'collection_critical_section_document.idl',
         'collection_sharding_runtime.cpp',
         'collection_sharding_state_factory_shard.cpp',
         'config_server_op_observer.cpp',
