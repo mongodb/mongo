@@ -1317,13 +1317,11 @@ const operations = [
                 // Debug builds may perform extra reads of the _mdb_catalog.
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
-                // The first time doing a capped delete, we don't know what the _cappedFirstRecord
-                // should be so we cannot seek to it.
-                assert.eq(profileDoc.cursorSeeks, 0);
+                assert.eq(profileDoc.cursorSeeks, 1);
             } else {
                 assert.gte(profileDoc.docBytesRead, 29);
                 assert.gte(profileDoc.docUnitsRead, 1);
-                assert.gte(profileDoc.cursorSeeks, 0);
+                assert.gte(profileDoc.cursorSeeks, 1);
             }
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
@@ -1353,14 +1351,11 @@ const operations = [
                 // Debug builds may perform extra reads of the _mdb_catalog.
                 assert.eq(profileDoc.docBytesRead, 261);
                 assert.eq(profileDoc.docUnitsRead, 9);
-                // Each capped delete seeks twice if it knows what record to start at. Once at the
-                // start of the delete process and then once again to reposition itself at the first
-                // record to delete after it figures out how many documents must be deleted.
-                assert.eq(profileDoc.cursorSeeks, 18);
+                assert.eq(profileDoc.cursorSeeks, 9);
             } else {
                 assert.gte(profileDoc.docBytesRead, 261);
                 assert.gte(profileDoc.docUnitsRead, 9);
-                assert.gte(profileDoc.cursorSeeks, 18);
+                assert.gte(profileDoc.cursorSeeks, 9);
             }
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);

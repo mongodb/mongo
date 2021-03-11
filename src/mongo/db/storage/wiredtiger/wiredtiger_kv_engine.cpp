@@ -1476,17 +1476,11 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.isReadOnly = _readOnly;
     params.tracksSizeAdjustments = true;
 
-    params.cappedMaxSize = -1;
-    if (options.capped) {
-        if (options.cappedSize) {
-            params.cappedMaxSize = options.cappedSize;
-        } else {
-            params.cappedMaxSize = kDefaultCappedSizeBytes;
-        }
+    if (NamespaceString::oplog(ns)) {
+        // The oplog collection must have a size provided.
+        invariant(options.cappedSize > 0);
+        params.oplogMaxSize = options.cappedSize;
     }
-    params.cappedMaxDocs = -1;
-    if (options.capped && options.cappedMaxDocs)
-        params.cappedMaxDocs = options.cappedMaxDocs;
 
     std::unique_ptr<WiredTigerRecordStore> ret;
     ret = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);
@@ -1622,9 +1616,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     // Temporary collections do not need to reconcile collection size/counts.
     params.tracksSizeAdjustments = false;
     params.isReadOnly = false;
-
-    params.cappedMaxSize = -1;
-    params.cappedMaxDocs = -1;
 
     std::unique_ptr<WiredTigerRecordStore> rs;
     rs = std::make_unique<StandardWiredTigerRecordStore>(this, opCtx, params);

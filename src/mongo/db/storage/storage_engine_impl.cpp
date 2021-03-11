@@ -321,14 +321,14 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
         invariant(rs);
     }
 
-    auto uuid = _catalog->getCollectionOptions(opCtx, catalogId).uuid.get();
+    auto options = _catalog->getCollectionOptions(opCtx, catalogId);
 
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
-    auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
+    auto collection = collectionFactory->make(opCtx, nss, catalogId, options, std::move(rs));
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, uuid, std::move(collection));
+        catalog.registerCollection(opCtx, options.uuid.get(), std::move(collection));
     });
 }
 

@@ -54,13 +54,7 @@ public:
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore(
         const std::string& ns, const CollectionOptions& options) = 0;
 
-    static const int64_t kDefaultCapedSizeBytes = 16 * 1024 * 1024;
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(
-        int64_t cappedSizeBytes = kDefaultCapedSizeBytes, int64_t cappedMaxDocs = -1) = 0;
-
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
-                                                              int64_t cappedSizeBytes,
-                                                              int64_t cappedMaxDocs) = 0;
+    virtual std::unique_ptr<RecordStore> newOplogRecordStore() = 0;
 
     virtual KVEngine* getEngine() = 0;
 };

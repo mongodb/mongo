@@ -65,12 +65,7 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
 
 TEST(RecordStoreTestHarness, SeekNearOplog) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
-
-    // Use a large enough cappedMaxSize so that the limit is not reached by doing the inserts within
-    // the test itself.
-    const int64_t cappedMaxSize = 10 * 1024;  // 10KB
-    std::unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.foo", cappedMaxSize, -1));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -234,10 +229,8 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
 TEST(RecordStoreTestHarness, OplogInsertOutOfOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
-    const int64_t cappedMaxSize = 10 * 1024;  // Large enough to not exceed.
-    std::unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.rs", cappedMaxSize, -1));
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
@@ -281,8 +274,7 @@ TEST(RecordStoreTestHarness, SeekNearOnNonOplog) {
 
 TEST(RecordStoreTestHarness, OplogOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(
-        harnessHelper->newCappedRecordStore("local.oplog.rs", 100000, -1));
+    std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
 
     RecordId id1;
 

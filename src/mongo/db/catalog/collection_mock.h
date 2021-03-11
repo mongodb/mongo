@@ -236,6 +236,10 @@ public:
         std::abort();
     }
 
+    Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) {
+        std::abort();
+    }
+
     bool getRecordPreImages() const {
         std::abort();
     }
@@ -245,6 +249,14 @@ public:
     }
 
     bool isCapped() const {
+        std::abort();
+    }
+
+    long long getCappedMaxDocs() const {
+        std::abort();
+    }
+
+    long long getCappedMaxSize() const {
         std::abort();
     }
 
@@ -259,11 +271,11 @@ public:
         std::abort();
     }
 
-    uint64_t numRecords(OperationContext* opCtx) const {
+    long long numRecords(OperationContext* opCtx) const {
         std::abort();
     }
 
-    uint64_t dataSize(OperationContext* opCtx) const {
+    long long dataSize(OperationContext* opCtx) const {
         std::abort();
     }
 

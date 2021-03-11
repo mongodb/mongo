@@ -274,7 +274,13 @@ public:
      */
     virtual long long numRecords(OperationContext* opCtx) const = 0;
 
-    virtual bool isCapped() const = 0;
+    /**
+     * Storage engines can manage oplog truncation internally as opposed to having higher layers
+     * manage it for them.
+     */
+    virtual bool selfManagedOplogTruncation() const {
+        return false;
+    }
 
     virtual void setCappedCallback(CappedCallback*) {
         MONGO_UNREACHABLE;
@@ -527,11 +533,11 @@ public:
                                         long long dataSize) = 0;
 
     /**
-     * used to support online change oplog size.
+     * Storage engines can choose whether to support changing the oplog size online.
      */
-    virtual Status updateCappedSize(OperationContext* opCtx, long long cappedSize) {
+    virtual Status updateOplogSize(long long newOplogSize) {
         return Status(ErrorCodes::CommandNotSupported,
-                      "this storage engine does not support updateCappedSize");
+                      "This storage engine does not support updateOplogSize");
     }
 
     /**

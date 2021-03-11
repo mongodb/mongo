@@ -106,8 +106,7 @@ public:
         bool isCapped;
         KeyFormat keyFormat;
         bool isEphemeral;
-        int64_t cappedMaxSize;
-        int64_t cappedMaxDocs;
+        boost::optional<int64_t> oplogMaxSize;
         CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;
         bool isReadOnly;
@@ -131,7 +130,9 @@ public:
 
     virtual long long numRecords(OperationContext* opCtx) const;
 
-    virtual bool isCapped() const;
+    virtual bool selfManagedOplogTruncation() const {
+        return true;
+    }
 
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = nullptr,
@@ -204,15 +205,12 @@ public:
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const override;
 
-    Status updateCappedSize(OperationContext* opCtx, long long cappedSize) final;
+    Status updateOplogSize(long long newOplogSize) final;
 
     void setCappedCallback(CappedCallback* cb) {
         stdx::lock_guard<Latch> lk(_cappedCallbackMutex);
         _cappedCallback = cb;
     }
-
-    int64_t cappedMaxDocs() const;
-    int64_t cappedMaxSize() const;
 
     const std::string& getURI() const {
         return _uri;
@@ -291,7 +289,6 @@ private:
                           size_t nRecords);
 
     RecordId _nextId(OperationContext* opCtx);
-    bool cappedAndNeedDelete() const;
     RecordData _getData(const WiredTigerCursor& cursor) const;
 
 
@@ -301,16 +298,6 @@ private:
      * initializing the value instead of all at once during startup.
      */
     void _initNextIdIfNeeded(OperationContext* opCtx);
-
-    /**
-     * Position the cursor at the first key. The previously known first key is
-     * provided, as well as an indicator that this is being positioned for
-     * use by a truncate call.
-     */
-    void _positionAtFirstRecordId(OperationContext* opCtx,
-                                  WT_CURSOR* cursor,
-                                  const RecordId& firstKey,
-                                  bool forTruncate) const;
 
     /**
      * Adjusts the record count and data size metadata for this record store, respectively. These
@@ -332,15 +319,6 @@ private:
     void _changeNumRecords(OperationContext* opCtx, int64_t diff);
     void _increaseDataSize(OperationContext* opCtx, int64_t amount);
 
-    /**
-     * Delete records from this record store as needed while _cappedMaxSize or _cappedMaxDocs is
-     * exceeded.
-     *
-     * _inlock version to be called once a lock has been acquired.
-     */
-    int64_t _cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted);
-    int64_t _cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
-
     const std::string _uri;
     const uint64_t _tableId;  // not persisted
 
@@ -356,22 +334,14 @@ private:
     const bool _isLogged;
     // True if the namespace of this record store starts with "local.oplog.", and false otherwise.
     const bool _isOplog;
-    int64_t _cappedMaxSize;
-    const int64_t _cappedMaxSizeSlack;  // when to start applying backpressure
-    const int64_t _cappedMaxDocs;
-    RecordId _cappedFirstRecord;
-    AtomicWord<long long> _cappedSleep;
-    AtomicWord<long long> _cappedSleepMS;
+    boost::optional<int64_t> _oplogMaxSize;
+    RecordId _oplogFirstRecord;
 
-    // guards _cappedCallback and _shuttingDown
+    // Guards _cappedCallback and _shuttingDown.
     mutable Mutex _cappedCallbackMutex =
         MONGO_MAKE_LATCH("WiredTigerRecordStore::_cappedCallbackMutex");
     CappedCallback* _cappedCallback;
     bool _shuttingDown;
-
-    // See comment in ::cappedDeleteAsNeeded
-    int _cappedDeleteCheckCount;
-    mutable stdx::timed_mutex _cappedDeleterMutex;
 
     // Protects initialization of the _nextIdNum.
     mutable Mutex _initNextIdMutex = MONGO_MAKE_LATCH("WiredTigerRecordStore::_initNextIdMutex");
