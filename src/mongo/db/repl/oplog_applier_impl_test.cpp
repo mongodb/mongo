@@ -1481,7 +1481,9 @@ TEST_F(OplogApplierImplTest, OplogApplicationThreadFuncAddsMultipleWorkerMultike
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncDoesNotAddWorkerMultikeyPathInfoOnCreateIndex) {
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
 
     {
         auto op = makeCreateCollectionOplogEntry(
@@ -1937,11 +1939,13 @@ TEST_F(OplogApplierImplTest,
 
 TEST_F(OplogApplierImplTest,
        OplogApplicationThreadFuncSkipsIndexCreationOnNamespaceNotFoundDuringInitialSync) {
+    ASSERT_OK(
+        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     BSONObj emptyDoc;
     TestApplyOplogGroupApplier oplogApplier(
         nullptr, nullptr, OplogApplier::Options(OplogApplication::Mode::kInitialSync));
-    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
-    NamespaceString badNss("local." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
+    NamespaceString nss("test." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    NamespaceString badNss("test." + _agent.getSuiteName() + "_" + _agent.getTestName() + "bad");
     auto doc1 = BSON("_id" << 1);
     auto keyPattern = BSON("a" << 1);
     auto doc3 = BSON("_id" << 3);
@@ -1981,7 +1985,7 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnUpdate) {
     ASSERT_EQ(status.code(), 16755);
 }
 
-TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
+TEST_F(IdempotencyTest, Geo2dsphereIndex) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
     ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
@@ -1992,10 +1996,6 @@ TEST_F(IdempotencyTest, Geo2dsphereIndexFailedOnIndexing) {
 
     auto ops = {indexOp, dropIndexOp, insertOp};
     testOpsAreIdempotent(ops);
-
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
-    ASSERT_EQ(status.code(), 16755);
 }
 
 TEST_F(IdempotencyTest, Geo2dIndex) {
@@ -2066,10 +2066,6 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
 
     auto ops = {indexOp1, dropIndexOp, indexOp2};
     testOpsAreIdempotent(ops);
-
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
-    ASSERT_EQ(status.code(), ErrorCodes::IndexOptionsConflict);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
@@ -2100,10 +2096,6 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExi
 
     auto ops = {indexOp, dropIndexOp, insertOp};
     testOpsAreIdempotent(ops);
-
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
-    ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
@@ -2134,10 +2126,6 @@ TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenText
 
     auto ops = {indexOp, dropIndexOp, insertOp};
     testOpsAreIdempotent(ops);
-
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    auto status = runOpsInitialSync(ops);
-    ASSERT_EQ(status.code(), 17261);
 }
 
 TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
@@ -2275,6 +2263,13 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
 
     auto ops = {collModOp, dropIndexOp};
     testOpsAreIdempotent(ops);
+}
+
+DEATH_TEST_F(IdempotencyTest, CannotCreateIndexForApplyOpsOnPrimary, "invariant") {
+    ASSERT_OK(runOpInitialSync(createCollection(kUuid)));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj(), kUuid);
+    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
+    auto status = runOpsInitialSync({indexOp});
 }
 
 TEST_F(OplogApplierImplTest, FailOnDropFCVCollection) {

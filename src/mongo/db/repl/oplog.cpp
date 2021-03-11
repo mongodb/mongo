@@ -219,12 +219,13 @@ void createIndexForApplyOps(OperationContext* opCtx,
         }
     }
 
-    // TODO(SERVER-48593): Add invariant on shouldRelaxIndexConstraints(opCtx, indexNss) and
-    // set constraints to kRelax.
-    const auto constraints =
-        ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss)
-        ? IndexBuildsManager::IndexConstraints::kRelax
-        : IndexBuildsManager::IndexConstraints::kEnforce;
+    // This function should not be used outside oplog application. We should be able to always set
+    // the index build constraints to kRelax.
+    invariant(ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss),
+              str::stream() << "Unexpected result from shouldRelaxIndexConstraints - ns: "
+                            << indexNss << "; uuid: " << indexCollection->uuid()
+                            << "; original index spec: " << indexSpec);
+    const auto constraints = IndexBuildsManager::IndexConstraints::kRelax;
 
     // Run single-phase builds synchronously with oplog batch application. This enables them to
     // stop using ghost timestamps. Single phase builds are only used for empty collections, and

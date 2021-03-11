@@ -420,7 +420,7 @@ TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     std::vector<OplogEntry> entries;
     bool onInsertsCalledNss1 = false;
     bool onInsertsCalledNss2 = false;
-    // Despite the odd one in the middle, all the others should be grouped into a single inserrt.
+    // Despite the odd one in the middle, all the others should be grouped into a single insert.
     entries.push_back(makeInsertOplogEntry(1, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(2, nss1, uuid1));
     entries.push_back(makeInsertOplogEntry(3, nss1, uuid1));

@@ -772,6 +772,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/executor/network_interface_mock',
         'isself',
+        'oplog',
         'oplog_buffer_blocking_queue',
         'repl_coordinator_interface',
         'repl_settings',

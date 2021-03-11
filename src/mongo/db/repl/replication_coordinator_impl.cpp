@@ -84,6 +84,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
@@ -2955,7 +2956,7 @@ bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState_UNSAFE() const {
 
 bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* opCtx,
                                                              const NamespaceString& ns) {
-    if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+    if (ReplSettings::shouldRecoverFromOplogAsStandalone() || tenantMigrationRecipientInfo(opCtx)) {
         return true;
     }
     return !canAcceptWritesFor(opCtx, ns);
