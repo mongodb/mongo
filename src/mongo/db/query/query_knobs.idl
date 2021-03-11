@@ -378,3 +378,15 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+
+  internalQueryExplainSizeThresholdBytes:
+    description: "Number of bytes after which explain should start truncating portions of its
+    output."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryExplainSizeThresholdBytes"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 10 * 1024 * 1024
+    validator:
+        gt: 0
+        lte: { expr: BSONObjMaxInternalSize }
