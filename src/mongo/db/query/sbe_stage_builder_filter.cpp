@@ -482,7 +482,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 void generatePredicate(MatchExpressionVisitorContext* context,
                        const FieldRef* path,
                        MakePredicateFn makePredicate,
-                       LeafTraversalMode mode = LeafTraversalMode::kArrayAndItsElements,
+                       LeafTraversalMode mode,
                        bool useCombinator = true) {
     auto& frame = context->evalStack.topFrame();
 
@@ -721,7 +721,23 @@ void generateComparison(MatchExpressionVisitorContext* context,
                 std::move(inputStage)};
     };
 
-    generatePredicate(context, expr->fieldRef(), std::move(makePredicate));
+    // A 'kArrayAndItsElements' traversal mode matches the following semantics: when the path we are
+    // comparing is a path to an array, the comparison is considered true if it evaluates to true
+    // for the array itself or for any of the array's elements.
+    // However, we use 'kArrayElementsOnly' for the general case, because the comparison with the
+    // array will almost always be false. There are two exceptions:
+    // 1) when the 'rhs' operand is an array and
+    // 2) when the 'rhs' operand is MinKey or MaxKey.
+    // In the former case, the comparison we would skip by using 'kArrayElementsOnly' mode is an
+    // array-to-array comparison that can return true. In the latter case, we are avoiding a
+    // potential bug where traversing the path to the empty array ([]) would prevent _any_
+    // comparison, meaning a comparison like {$gt: MinKey} would return false.
+    const auto& rhs = expr->getData();
+    const auto checkWholeArray = rhs.type() == BSONType::Array || rhs.type() == BSONType::MinKey ||
+        rhs.type() == BSONType::MaxKey;
+    const auto traversalMode = checkWholeArray ? LeafTraversalMode::kArrayAndItsElements
+                                               : LeafTraversalMode::kArrayElementsOnly;
+    generatePredicate(context, expr->fieldRef(), std::move(makePredicate), traversalMode);
 }
 
 /**
@@ -809,7 +825,8 @@ void generateBitTest(MatchExpressionVisitorContext* context,
                 std::move(inputStage)};
     };
 
-    generatePredicate(context, expr->fieldRef(), std::move(makePredicate));
+    generatePredicate(
+        context, expr->fieldRef(), std::move(makePredicate), LeafTraversalMode::kArrayElementsOnly);
 }
 
 // Each logical expression child is evaluated in a separate EvalFrame. Set up a new EvalFrame with a
@@ -1275,7 +1292,10 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+        generatePredicate(_context,
+                          expr->fieldRef(),
+                          std::move(makePredicate),
+                          LeafTraversalMode::kDoNotTraverseLeaf);
     }
 
     void visit(const ExprMatchExpression* matchExpr) final {
@@ -1334,6 +1354,7 @@ public:
 
         auto arrSet = sbe::value::getArraySetView(arrSetVal);
 
+        auto hasArray = false;
         auto hasNull = false;
         for (auto&& equality : equalities) {
             auto [tagView, valView] = sbe::bson::convertFrom(true,
@@ -1341,13 +1362,16 @@ public:
                                                              equality.rawdata() + equality.size(),
                                                              equality.fieldNameSize() - 1);
 
-            if (tagView == sbe::value::TypeTags::Null) {
-                hasNull = true;
-            }
+            hasNull |= tagView == sbe::value::TypeTags::Null;
+            hasArray |= sbe::value::isArray(tagView);
+
             // An ArraySet assumes ownership of it's values so we have to make a copy here.
             auto [tag, val] = sbe::value::copyValue(tagView, valView);
             arrSet->push_back(tag, val);
         }
+
+        const auto traversalMode = hasArray ? LeafTraversalMode::kArrayAndItsElements
+                                            : LeafTraversalMode::kArrayElementsOnly;
 
         // If the InMatchExpression doesn't carry any regex patterns, we can just check if the value
         // in bound to the inputSlot is a member of the equalities set.
@@ -1372,7 +1396,7 @@ public:
                         std::move(inputStage)};
             };
 
-            generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+            generatePredicate(_context, expr->fieldRef(), std::move(makePredicate), traversalMode);
             return;
         } else {
             // If the InMatchExpression contains regex patterns, then we need to handle a regex-only
@@ -1476,10 +1500,7 @@ public:
 
                 return {regexOutputSlot, std::move(regexStage)};
             };
-            generatePredicate(_context,
-                              expr->fieldRef(),
-                              std::move(makePredicate),
-                              LeafTraversalMode::kArrayAndItsElements);
+            generatePredicate(_context, expr->fieldRef(), std::move(makePredicate), traversalMode);
         }
     }
     // The following are no-ops. The internal expr comparison match expression are produced
@@ -1556,7 +1577,10 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+        generatePredicate(_context,
+                          expr->fieldRef(),
+                          std::move(makePredicate),
+                          LeafTraversalMode::kArrayElementsOnly);
     }
 
     void visit(const NorMatchExpression* expr) final {
@@ -1611,7 +1635,10 @@ public:
             return {std::move(resultExpr), std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+        generatePredicate(_context,
+                          expr->fieldRef(),
+                          std::move(makePredicate),
+                          LeafTraversalMode::kArrayElementsOnly);
     }
 
     void visit(const SizeMatchExpression* expr) final {
@@ -1631,7 +1658,10 @@ public:
                     std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+        const auto traversalMode = expr->typeSet().hasType(BSONType::Array)
+            ? LeafTraversalMode::kDoNotTraverseLeaf
+            : LeafTraversalMode::kArrayElementsOnly;
+        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate), traversalMode);
     }
 
     void visit(const WhereMatchExpression* expr) final {
@@ -1647,7 +1677,10 @@ public:
             return {std::move(whereExpr), std::move(inputStage)};
         };
 
-        generatePredicate(_context, expr->fieldRef(), std::move(makePredicate));
+        generatePredicate(_context,
+                          expr->fieldRef(),
+                          std::move(makePredicate),
+                          LeafTraversalMode::kDoNotTraverseLeaf);
     }
 
     void visit(const WhereNoOpMatchExpression* expr) final {}
