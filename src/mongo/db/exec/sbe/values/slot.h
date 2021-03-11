@@ -349,7 +349,8 @@ private:
 };
 
 /**
- * This class holds values in a buffer. The most common usage is a sort and hash agg plan stages.
+ * This class holds values in a buffer. The most common usage is a sort and hash agg plan stages. A
+ * materialized row must only be used to store owned (deep) value copies.
  */
 class MaterializedRow {
 public:
@@ -417,6 +418,10 @@ public:
 
     size_t size() const {
         return _count;
+    }
+
+    bool isEmpty() {
+        return _count == 0 ? true : false;
     }
 
     void resize(size_t count) {
@@ -507,6 +512,33 @@ private:
     size_t _count{0};
 };
 
+
+/**
+ * Provides a view of a slot inside a single MaterializedRow.
+ */
+class MaterializedSingleRowAccessor final : public SlotAccessor {
+public:
+    /**
+     * Constructs an accessor that gives a view of the value at the given 'slot' of a
+     * given single row.
+     */
+    MaterializedSingleRowAccessor(MaterializedRow& row, size_t slot) : _row(row), _slot(slot) {}
+
+    std::pair<TypeTags, Value> getViewOfValue() const override {
+        return _row.getViewOfValue(_slot);
+    }
+    std::pair<TypeTags, Value> copyOrMoveValue() override {
+        return _row.copyOrMoveValue(_slot);
+    }
+    void reset(bool owned, TypeTags tag, Value val) {
+        _row.reset(_slot, owned, tag, val);
+    }
+
+private:
+    MaterializedRow& _row;
+    const size_t _slot;
+};
+
 struct MaterializedRowEq {
     using ComparatorType = StringData::ComparatorInterface*;
 
@@ -529,6 +561,37 @@ struct MaterializedRowEq {
 
 private:
     const ComparatorType _comparator = nullptr;
+};
+
+struct MaterializedRowLess {
+public:
+    MaterializedRowLess(const std::vector<value::SortDirection>& sortDirs) {
+        _sortDirs.reserve(sortDirs.size());
+        for (auto&& dir : sortDirs) {
+            // Store directions 'Ascending' as -1 and 'Descending' as 1 so that we can compare the
+            // result of 'compareValue()' on the two pairs of tags & vals directly to the sort
+            // direction.
+            _sortDirs.push_back(dir == value::SortDirection::Ascending ? -1 : 1);
+        }
+    }
+
+    bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
+        for (size_t idx = 0; idx < lhs.size(); ++idx) {
+            auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
+            auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
+            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+
+            if (tag != value::TypeTags::NumberInt32 ||
+                value::bitcastTo<int32_t>(val) != _sortDirs[idx]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+private:
+    std::vector<int8_t> _sortDirs;
 };
 
 struct MaterializedRowHasher {

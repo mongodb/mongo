@@ -8,7 +8,7 @@
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
  *
- * TODO SERVER-50737: Remove tag once SBE supports 'AND_SORTED'.
+ * TODO SERVER-55011: Investigate failure and remove tag after SBE supports AND_SORTED.
  * @tags: [
  *   sbe_incompatible,
  * ]

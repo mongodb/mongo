@@ -1,13 +1,11 @@
 // Tests that the $planCacheStats aggregation metadata source returns the "shard" and "host" field
 // for each plan cache entry when appropriate.
 //
-// TODO SERVER-50737: remove sbe_incompatible tag
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
-//   does_not_support_stepdowns,
-//   sbe_incompatible,
+//   does_not_support_stepdowns
 // ]
 (function() {
 "use strict";

@@ -39,6 +39,7 @@
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
+#include "mongo/db/exec/sbe/stages/merge_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
@@ -1218,12 +1219,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto andHashNode = static_cast<const AndHashNode*>(root);
 
-    invariant(andHashNode->children.size() >= 2);
+    tassert(5073711, "need at least two children for AND_HASH", andHashNode->children.size() >= 2);
 
     auto childReqs = reqs.copy().set(kResult).set(kRecordId);
 
-    auto innerChild = andHashNode->children[0];
-    auto outerChild = andHashNode->children[1];
+    auto outerChild = andHashNode->children[0];
+    auto innerChild = andHashNode->children[1];
 
     auto [outerStage, outerOutputs] = build(outerChild, childReqs);
     auto outerIdSlot = outerOutputs.get(kRecordId);
@@ -1232,6 +1233,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto outerProjectSlots = sbe::makeSV(outerResultSlot);
 
     auto [innerStage, innerOutputs] = build(innerChild, childReqs);
+    tassert(5073712, "innerOutputs must contain kRecordId slot", innerOutputs.has(kRecordId));
+    tassert(5073713, "innerOutputs must contain kResult slot", innerOutputs.has(kResult));
     auto innerIdSlot = innerOutputs.get(kRecordId);
     auto innerResultSlot = innerOutputs.get(kResult);
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
@@ -1261,6 +1264,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // join together.
     for (size_t i = 2; i < andHashNode->children.size(); i++) {
         auto [stage, outputs] = build(andHashNode->children[i], childReqs);
+        tassert(5073714, "outputs must contain kRecordId slot", outputs.has(kRecordId));
+        tassert(5073715, "outputs must contain kResult slot", outputs.has(kResult));
         auto idSlot = outputs.get(kRecordId);
         auto resultSlot = outputs.get(kResult);
         auto condSlots = sbe::makeSV(idSlot);
@@ -1279,6 +1284,79 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     return {std::move(hashJoinStage), std::move(outputs)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildAndSorted(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    auto andSortedNode = static_cast<const AndSortedNode*>(root);
+
+    // Need at least two children.
+    tassert(
+        5073706, "need at least two children for AND_SORTED", andSortedNode->children.size() >= 2);
+
+    auto childReqs = reqs.copy().set(kResult).set(kRecordId);
+
+    auto outerChild = andSortedNode->children[0];
+    auto innerChild = andSortedNode->children[1];
+
+    auto [outerStage, outerOutputs] = build(outerChild, childReqs);
+    auto outerIdSlot = outerOutputs.get(kRecordId);
+    auto outerResultSlot = outerOutputs.get(kResult);
+
+    auto outerKeySlots = sbe::makeSV(outerIdSlot);
+    auto outerProjectSlots = sbe::makeSV(outerResultSlot);
+
+    auto [innerStage, innerOutputs] = build(innerChild, childReqs);
+    tassert(5073707, "innerOutputs must contain kRecordId slot", innerOutputs.has(kRecordId));
+    tassert(5073708, "innerOutputs must contain kResult slot", innerOutputs.has(kResult));
+    auto innerIdSlot = innerOutputs.get(kRecordId);
+    auto innerResultSlot = innerOutputs.get(kResult);
+
+    auto innerKeySlots = sbe::makeSV(innerIdSlot);
+    auto innerProjectSlots = sbe::makeSV(innerResultSlot);
+
+    PlanStageSlots outputs(reqs, &_slotIdGenerator);
+    if (reqs.has(kRecordId)) {
+        outputs.set(kRecordId, innerIdSlot);
+    }
+    if (reqs.has(kResult)) {
+        outputs.set(kResult, innerResultSlot);
+    }
+
+    std::vector<sbe::value::SortDirection> sortDirs(outerKeySlots.size(),
+                                                    sbe::value::SortDirection::Ascending);
+
+    auto mergeJoinStage = sbe::makeS<sbe::MergeJoinStage>(std::move(outerStage),
+                                                          std::move(innerStage),
+                                                          outerKeySlots,
+                                                          outerProjectSlots,
+                                                          innerKeySlots,
+                                                          innerProjectSlots,
+                                                          sortDirs,
+                                                          root->nodeId());
+
+    // If there are more than 2 children, iterate all remaining children and merge
+    // join together.
+    for (size_t i = 2; i < andSortedNode->children.size(); i++) {
+        auto [stage, outputs] = build(andSortedNode->children[i], childReqs);
+        tassert(5073709, "outputs must contain kRecordId slot", outputs.has(kRecordId));
+        tassert(5073710, "outputs must contain kResult slot", outputs.has(kResult));
+        auto idSlot = outputs.get(kRecordId);
+        auto resultSlot = outputs.get(kResult);
+        auto keySlots = sbe::makeSV(idSlot);
+        auto projectSlots = sbe::makeSV(resultSlot);
+
+        mergeJoinStage = sbe::makeS<sbe::MergeJoinStage>(std::move(stage),
+                                                         std::move(mergeJoinStage),
+                                                         keySlots,
+                                                         projectSlots,
+                                                         innerKeySlots,
+                                                         innerProjectSlots,
+                                                         sortDirs,
+                                                         root->nodeId());
+    }
+
+    return {std::move(mergeJoinStage), std::move(outputs)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
@@ -1569,6 +1647,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
             {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
             {STAGE_AND_HASH, &SlotBasedStageBuilder::buildAndHash},
+            {STAGE_AND_SORTED, &SlotBasedStageBuilder::buildAndSorted},
             {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
             {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
 

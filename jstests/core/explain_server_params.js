@@ -1,8 +1,6 @@
 // Tests server parameter information shown by explain.
-// TODO SERVER-50737 remove sbe_incompatible tag
 // @tags: [
 //   requires_fcv_49,
-//   sbe_incompatible,
 //   does_not_support_stepdowns
 // ]
 
