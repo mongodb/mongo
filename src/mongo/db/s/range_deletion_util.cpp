@@ -411,8 +411,6 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
     });
 }
 
-}  // namespace
-
 std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext* opCtx,
                                                                const NamespaceString& nss) {
     std::vector<RangeDeletionTask> tasks;
@@ -428,17 +426,51 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
     return tasks;
 }
 
-void storeRangeDeletionTasks(OperationContext* opCtx, std::vector<RangeDeletionTask>& tasks) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    for (const auto& deletionTask : tasks) {
-        store.add(opCtx, deletionTask);
+}  // namespace
+
+void snapshotRangeDeletionsForRename(OperationContext* opCtx,
+                                     const NamespaceString& fromNss,
+                                     const NamespaceString& toNss) {
+    auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
+    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionForRenameNamespace);
+    for (auto& task : rangeDeletionTasks) {
+        task.setNss(toNss);  // Associate task to the new namespace
+        store.add(opCtx, task);
     }
 }
 
-void deleteRangeDeletionTasks(OperationContext* opCtx, const NamespaceString& nss) {
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const NamespaceString& nss) {
+    PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
+        NamespaceString::kRangeDeletionForRenameNamespace);
+    PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
+        NamespaceString::kRangeDeletionNamespace);
+
     const auto query = QUERY(RangeDeletionTask::kNssFieldName << nss.ns());
-    store.remove(opCtx, query);
+
+    // Remove eventual leftovers from a previously uncompleted restore
+    rangeDeletionsStore.remove(opCtx, query);
+
+    rangeDeletionsForRenameStore.forEach(opCtx, query, [&](const RangeDeletionTask& deletionTask) {
+        auto task = deletionTask;
+        task.setId(UUID::gen());  // Assign a new id to prevent duplicate key errors
+        rangeDeletionsStore.add(opCtx, task);
+        return true;
+    });
+}
+
+void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
+                                       const NamespaceString& fromNss,
+                                       const NamespaceString& toNss) {
+    // Delete range deletion tasks associated to the source collection
+    PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
+        NamespaceString::kRangeDeletionNamespace);
+    rangeDeletionsStore.remove(opCtx, QUERY(RangeDeletionTask::kNssFieldName << fromNss.ns()));
+
+    // Delete already restored snapshots associated to the target collection
+    PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
+        NamespaceString::kRangeDeletionForRenameNamespace);
+    rangeDeletionsForRenameStore.remove(opCtx,
+                                        QUERY(RangeDeletionTask::kNssFieldName << toNss.ns()));
 }
 
 

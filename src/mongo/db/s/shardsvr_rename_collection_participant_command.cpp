@@ -109,19 +109,15 @@ public:
             dropCollectionLocally(opCtx, toNss);
 
             try {
-                auto rangeDeletionTasks = getPersistentRangeDeletionTasks(opCtx, fromNss);
+                snapshotRangeDeletionsForRename(opCtx, fromNss, toNss);
 
                 // Rename the collection locally and clear the cache
                 validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
                 uassertStatusOK(
                     shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, fromNss));
 
-                deleteRangeDeletionTasks(opCtx, toNss);
-                for (auto& task : rangeDeletionTasks) {
-                    task.setId(UUID::gen());
-                    task.setNss(toNss);
-                }
-                storeRangeDeletionTasks(opCtx, rangeDeletionTasks);
+                restoreRangeDeletionTasksForRename(opCtx, toNss);
+                deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 // It's ok for a participant shard to have no knowledge about a collection
                 LOGV2_DEBUG(
