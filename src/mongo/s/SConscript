@@ -177,6 +177,7 @@ env.Library(
         'request_types/wait_for_fail_point.idl',
         'resharded_chunk.idl',
         'resharding/common_types.idl',
+        'resharding/resharding_feature_flag.idl',
         'resharding/resume_token.idl',
         'resharding/type_collection_fields.idl',
         'shard_id.cpp',
