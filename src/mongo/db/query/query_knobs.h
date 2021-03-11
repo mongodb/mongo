@@ -156,4 +156,7 @@ extern AtomicBool internalQueryProhibitBlockingMergeOnMongoS;
 extern AtomicInt32 internalQueryMaxPushBytes;
 
 extern AtomicInt32 internalQueryMaxAddToSetBytes;
+
+// The number of bytes after which explain should start truncating portions of its output.
+extern AtomicInt32 internalQueryExplainSizeThresholdBytes;
 }  // namespace mongo

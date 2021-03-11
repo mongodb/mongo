@@ -136,4 +136,17 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxAddToSetBytes, int, 100 * 1024 * 1
         }
         return Status::OK();
     });
+
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryExplainSizeThresholdBytes, int, 10 * 1024 * 1024)
+    ->withValidator([](const int& newVal) {
+        if (newVal <= 0) {
+            return Status(ErrorCodes::BadValue,
+                          "internalQueryExplainSizeThresholdBytes must be positive");
+        } else if (newVal > BSONObjMaxInternalSize) {
+            return Status(ErrorCodes::BadValue,
+                          "internalQueryExplainSizeThresholdBytes cannot exceed max BSON size");
+        } else {
+            return Status::OK();
+        }
+    });
 }  // namespace mongo
