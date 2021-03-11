@@ -38,7 +38,7 @@ namespace {
 
 class ClusterValidateDBMetadataTest : public ClusterCommandTestFixture {
 protected:
-    const BSONObj kCommand{fromjson("{validateDBMetadata: 1}")};
+    const BSONObj kCommand{fromjson("{validateDBMetadata: 1, apiParameters: {version: '1'}}")};
 
     void expectInspectRequest(int shardIndex, InspectionCallback cb) override {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {

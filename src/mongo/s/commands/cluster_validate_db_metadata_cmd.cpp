@@ -42,93 +42,95 @@
 namespace mongo {
 namespace {
 
-class ValidateDBMetadataCmd : public BasicCommand {
-public:
-    ValidateDBMetadataCmd() : BasicCommand("validateDBMetadata") {}
+class ValidateDBMetadataCmd : public TypedCommand<ValidateDBMetadataCmd> {
+    using _TypedCommandInvocationBase =
+        typename TypedCommand<ValidateDBMetadataCmd>::InvocationBase;
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbname).ns();
-    }
+public:
+    using Request = ValidateDBMetadata;
+    using Reply = ValidateDBMetadataReply;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const override {
+    bool maintenanceOk() const {
+        // The db metadata maybe stale or incorrect while the node is in recovery mode, so we
+        // disallow the command.
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::validate);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
+    class Invocation : public _TypedCommandInvocationBase {
+    public:
+        using _TypedCommandInvocationBase::_TypedCommandInvocationBase;
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            assertUserCanRunValidate(opCtx, request());
+        }
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& output) override {
-        auto shardResponses = scatterGatherUnversionedTargetAllShards(
-            opCtx,
-            dbName,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kNotIdempotent);
+        Reply typedRun(OperationContext* opCtx) {
+            auto shardResponses = scatterGatherUnversionedTargetAllShards(
+                opCtx,
+                request().getDbName(),
+                applyReadWriteConcern(
+                    opCtx,
+                    this,
+                    CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
+                ReadPreferenceSetting::get(opCtx),
+                Shard::RetryPolicy::kIdempotent);
 
-        bool hasMoreErrors = false;
-        std::vector<ErrorReplyElement> apiVersionErrorsToReturn;
-        ValidateDBMetadataSizeTracker sizeTracker;
-        for (auto&& shardRes : shardResponses) {
-            // Re-throw errors from any shard.
-            auto shardOutput = uassertStatusOK(shardRes.swResponse).data;
-            uassertStatusOK(getStatusFromCommandResult(shardOutput));
+            bool hasMoreErrors = false;
+            std::vector<ErrorReplyElement> apiVersionErrorsToReturn;
+            ValidateDBMetadataSizeTracker sizeTracker;
+            for (auto&& shardRes : shardResponses) {
+                // Re-throw errors from any shard.
+                auto shardOutput = uassertStatusOK(shardRes.swResponse).data;
+                uassertStatusOK(getStatusFromCommandResult(shardOutput));
 
-            auto apiVersionErrors =
-                shardOutput[ValidateDBMetadataReply::kApiVersionErrorsFieldName];
-            tassert(5287400,
-                    "The 'apiVersionErrors' field returned from shards should be an array ",
-                    apiVersionErrors && apiVersionErrors.type() == Array);
-            for (auto&& error : apiVersionErrors.Array()) {
-                tassert(5287401,
-                        "The array element in 'apiVersionErrors' should be object",
-                        error.type() == Object);
-                ErrorReplyElement apiVersionError = ErrorReplyElement::parse(
-                    IDLParserErrorContext("ErrorReplyElement"), error.Obj());
+                auto apiVersionErrors =
+                    shardOutput[ValidateDBMetadataReply::kApiVersionErrorsFieldName];
+                tassert(5287400,
+                        "The 'apiVersionErrors' field returned from shards should be an array ",
+                        apiVersionErrors && apiVersionErrors.type() == Array);
+                for (auto&& error : apiVersionErrors.Array()) {
+                    tassert(5287401,
+                            "The array element in 'apiVersionErrors' should be object",
+                            error.type() == Object);
+                    ErrorReplyElement apiVersionError = ErrorReplyElement::parse(
+                        IDLParserErrorContext("ErrorReplyElement"), error.Obj());
 
-                // Ensure that the final output doesn't exceed max BSON size.
-                apiVersionError.setShard(StringData(shardRes.shardId.toString()));
-                if (!sizeTracker.incrementAndCheckOverflow(apiVersionError)) {
+                    // Ensure that the final output doesn't exceed max BSON size.
+                    apiVersionError.setShard(StringData(shardRes.shardId.toString()));
+                    if (!sizeTracker.incrementAndCheckOverflow(apiVersionError)) {
+                        hasMoreErrors = true;
+                        break;
+                    }
+
+                    apiVersionErrorsToReturn.push_back(std::move(apiVersionError));
+                }
+                if (hasMoreErrors ||
+                    shardOutput.getField(ValidateDBMetadataReply::kHasMoreErrorsFieldName)
+                        .trueValue()) {
                     hasMoreErrors = true;
                     break;
                 }
-
-                apiVersionErrorsToReturn.push_back(std::move(apiVersionError));
             }
-            if (hasMoreErrors ||
-                shardOutput.getField(ValidateDBMetadataReply::kHasMoreErrorsFieldName)
-                    .trueValue()) {
-                hasMoreErrors = true;
-                break;
+
+            ValidateDBMetadataReply reply;
+            reply.setApiVersionErrors(std::move(apiVersionErrorsToReturn));
+            if (hasMoreErrors) {
+                reply.setHasMoreErrors(true);
             }
-        }
 
-        ValidateDBMetadataReply reply;
-        reply.setApiVersionErrors(std::move(apiVersionErrorsToReturn));
-        if (hasMoreErrors) {
-            reply.setHasMoreErrors(true);
+            return reply;
         }
-        reply.serialize(&output);
-        return true;
-    }
-
+    };
 } validateDBMetadataCmd;
-
 }  // namespace
 }  // namespace mongo

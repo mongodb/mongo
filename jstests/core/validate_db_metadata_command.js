@@ -1,8 +1,7 @@
 /**
  * Tests the validateDBMetaData commands with various input parameters.
  * @tags: [
- *   requires_fcv_49,
- *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_fcv_49
  * ]
  */
 (function() {
@@ -29,7 +28,8 @@ const coll1 = testDB.coll1;
         const currentDB = db.getSiblingDB(listDBOutput.name);
         for (let collInfo of currentDB.getCollectionInfos()) {
             if (collInfo.type == "collection" && !collInfo.name.startsWith("system")) {
-                assert.commandWorked(currentDB[collInfo.name].dropIndexes());
+                assert.commandWorked(
+                    currentDB.runCommand({dropIndexes: collInfo.name, index: "*"}));
             }
         }
     }
@@ -136,8 +136,10 @@ assert.commandWorked(testDB.createCollection(
 
 validate({apiStrict: true, error: true});
 
-// Drop the collection with validation rules.
-assert(testDB.validatorColl.drop());
+// Drop the collection with validation rules. By not using the 'coll.drop()' shell helper, we can
+// avoid implicit collection creation in certain passthrough suites. This should increase the
+// coverage of this test on sharded clusters.
+assert.commandWorked(testDB.runCommand({drop: "validatorColl"}));
 
 //
 // Validates the metadata across all the databases and collections after creating a time-series

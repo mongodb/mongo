@@ -6097,7 +6097,6 @@ var authCommandsLib = {
               collection: "test",
               apiParameters: {version: "1", strict: true}
           },
-          skipSharded: true,
           setup: function(db) {
               assert.commandWorked(db.getSiblingDB(firstDbName).createCollection("test"));
               assert.commandWorked(db.getSiblingDB(secondDbName).createCollection("test"));
@@ -6114,24 +6113,23 @@ var authCommandsLib = {
                   privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}]
               },
               {
-                  // Need to have permission on firstDBName to be able to the command on the db.
+                  // Need to only have permission on secondDbName to be able to the command against
+                  // the db.
                   runOnDb: firstDbName,
                   privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}],
-                  expectAuthzFailure: true
               },
               {
                   runOnDb: firstDbName,
                   privileges: [
-                      {resource: {db: firstDbName, collection: ""}, actions: ["validate"]},
-                      {resource: {db: secondDbName, collection: ""}, actions: ["validate"]}
-                  ]
+                      {resource: {db: firstDbName, collection: ""}, actions: ["validate"]}
+                  ],
+                  expectAuthzFailure: true
               },
           ]
       },
       {
           testname: "validate_db_metadata_command_all_dbs",
           command: {validateDBMetadata: 1, apiParameters: {version: "1", strict: true}},
-          skipSharded: true,
           setup: function(db) {
               assert.commandWorked(db.getSiblingDB(firstDbName).createCollection("test"));
               assert.commandWorked(db.getSiblingDB(secondDbName).createCollection("test"));
@@ -6145,10 +6143,11 @@ var authCommandsLib = {
                   // Since the command didn't specify a 'db', it validates all dbs and hence require
                   // permission to run on all dbs.
                   runOnDb: secondDbName,
-                  privileges: [{resource: {db: secondDbName, collection: ""}, actions: ["validate"]}],
-                  expectAuthzFailure: true
+                  privileges: [{resource: {db: "", collection: ""}, actions: ["validate"]}],
               },
               {
+                  // An exhaustive list on all databases is still not good enough for running to
+                  // command on all dbs.
                   runOnDb: secondDbName,
                   privileges: [
                       {resource: {db: "admin", collection: ""}, actions: ["validate"]},
@@ -6156,7 +6155,8 @@ var authCommandsLib = {
                       {resource: {db: "local", collection: ""}, actions: ["validate"]},
                       {resource: {db: firstDbName, collection: ""}, actions: ["validate"]},
                       {resource: {db: secondDbName, collection: ""}, actions: ["validate"]}
-                  ]
+                  ],
+                  expectAuthzFailure: true
               },
           ]
       },

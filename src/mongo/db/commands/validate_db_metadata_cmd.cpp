@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -45,14 +44,6 @@
 #include "mongo/logv2/log.h"
 namespace mongo {
 namespace {
-void assertUserCanRunValidateOnDb(OperationContext* opCtx, StringData dbName) {
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to run validateDBMetadata command on database '"
-                          << dbName << "'",
-            AuthorizationSession::get(opCtx->getClient())
-                ->isAuthorizedForActionsOnNamespace(NamespaceString(dbName), ActionType::validate));
-}
-
 void overrideAPIParams(OperationContext* opCtx, const APIParamsForCmd& params) {
     APIParameters apiParameters;
     apiParameters.setAPIVersion(params.getVersion());
@@ -107,9 +98,7 @@ public:
             return NamespaceString(request().getDbName());
         }
         void doCheckAuthorization(OperationContext* opCtx) const final {
-            // Note that we need to do addditional authorization checks if 'db' field is not
-            // specified. This is done while iterating through the indiviual databases.
-            assertUserCanRunValidateOnDb(opCtx, request().getDbName());
+            assertUserCanRunValidate(opCtx, request());
         }
 
         Reply typedRun(OperationContext* opCtx) {
@@ -135,8 +124,6 @@ public:
                 : collectionCatalog->getAllDbNames();
 
             for (const auto& dbName : dbNames) {
-                assertUserCanRunValidateOnDb(opCtx, dbName);
-
                 AutoGetDb autoDb(opCtx, dbName, LockMode::MODE_IS);
                 if (!autoDb.getDb()) {
                     continue;
