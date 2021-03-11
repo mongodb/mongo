@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/validate_db_metadata_gen.h"
 
 namespace mongo {
@@ -47,4 +48,14 @@ struct ValidateDBMetadataSizeTracker {
 private:
     size_t currentSize = 0;
 };
+
+void assertUserCanRunValidate(OperationContext* opCtx, const ValidateDBMetadata& request) {
+    const auto resource = request.getDb() ? ResourcePattern::forDatabaseName(*request.getDb())
+                                          : ResourcePattern::forAnyNormalResource();
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to run validateDBMetadata command on resource: '"
+                          << resource.toString() << "'",
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(resource, ActionType::validate));
+}
 }  // namespace mongo

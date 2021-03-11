@@ -1171,6 +1171,10 @@ protected:
         return _request;
     }
 
+    const OpMsgRequest& unparsedRequest() const {
+        return _opMsgRequest;
+    }
+
 private:
     static RequestType _parseRequest(OperationContext* opCtx,
                                      const Command* command,
