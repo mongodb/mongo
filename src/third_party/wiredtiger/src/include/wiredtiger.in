@@ -78,11 +78,9 @@ struct __wt_file_system;    typedef struct __wt_file_system WT_FILE_SYSTEM;
 struct __wt_item;	    typedef struct __wt_item WT_ITEM;
 struct __wt_modify;	    typedef struct __wt_modify WT_MODIFY;
 struct __wt_session;	    typedef struct __wt_session WT_SESSION;
-#if !defined(SWIG)
 #if !defined(DOXYGEN)
 struct __wt_storage_source; typedef struct __wt_storage_source WT_STORAGE_SOURCE;
 struct __wt_location_handle; typedef struct __wt_location_handle WT_LOCATION_HANDLE;
-#endif
 #endif
 
 #if defined(SWIGJAVA)
@@ -2566,8 +2564,8 @@ struct __wt_connection {
 	int __F(set_file_system)(
 	    WT_CONNECTION *connection, WT_FILE_SYSTEM *fs, const char *config);
 
-#if !defined(SWIG)
 #if !defined(DOXYGEN)
+#if !defined(SWIG)
 	/*!
 	 * Add a storage source implementation.
 	 *
@@ -2584,6 +2582,7 @@ struct __wt_connection {
 	 */
 	int __F(add_storage_source)(WT_CONNECTION *connection, const char *name,
 	    WT_STORAGE_SOURCE *storage_source, const char *config);
+#endif
 
 	/*!
 	 * Get a storage source implementation.
@@ -2599,7 +2598,6 @@ struct __wt_connection {
 	 */
 	int __F(get_storage_source)(WT_CONNECTION *connection, const char *name,
 	    WT_STORAGE_SOURCE **storage_sourcep);
-#endif
 #endif
 
 	/*!
@@ -4425,6 +4423,7 @@ struct __wt_file_system {
 	 */
 	int (*terminate)(WT_FILE_SYSTEM *file_system, WT_SESSION *session);
 };
+#endif /* !defined(SWIG) */
 
 /*! WT_FILE_HANDLE::fadvise flags: no longer need */
 #define	WT_FILE_HANDLE_DONTNEED	1
@@ -4711,9 +4710,7 @@ struct __wt_file_handle {
 	int (*fh_write)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	    wt_off_t offset, size_t length, const void *buf);
 };
-#endif /* !defined(SWIG) */
 
-#if !defined(SWIG)
 #if !defined(DOXYGEN)
 /* This interface is not yet public. */
 
@@ -4919,7 +4916,6 @@ struct __wt_storage_source {
 	int (*terminate)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session);
 };
 #endif
-#endif /* !defined(SWIG) */
 
 /*!
  * Entry point to an extension, called when the extension is loaded.
