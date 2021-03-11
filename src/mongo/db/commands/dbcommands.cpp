@@ -208,15 +208,10 @@ public:
             }
 
             Status status = dropDatabase(opCtx, dbName.toString());
-            DropDatabaseReply reply;
-            if (status == ErrorCodes::NamespaceNotFound) {
-                reply.setInfo("database does not exist"_sd);
-            } else {
+            if (status != ErrorCodes::NamespaceNotFound) {
                 uassertStatusOK(status);
-                reply.setDropped(request().getDbName());
             }
-
-            return reply;
+            return {};
         }
     };
 } cmdDropDatabase;

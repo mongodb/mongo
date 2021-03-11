@@ -17,9 +17,7 @@ var $config = (function() {
             var myDB = db.getSiblingDB(this.uniqueDBName);
             assertAlways.commandWorked(myDB.createCollection(collName));
 
-            var res = myDB.dropDatabase();
-            assertAlways.commandWorked(res);
-            assertAlways.eq(this.uniqueDBName, res.dropped);
+            assertAlways.commandWorked(myDB.dropDatabase());
         }
     };
 

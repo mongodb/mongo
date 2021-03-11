@@ -64,7 +64,7 @@ void dropDatabaseFromShard(OperationContext* opCtx, const ShardId& shardId, Stri
 
 }  // namespace
 
-DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
+void dropDatabaseLegacy(OperationContext* opCtx, StringData dbName) {
     auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
         opCtx, dbName, "dropDatabase", DistLockManager::kDefaultLockTimeout));
 
@@ -77,9 +77,7 @@ DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName)
         dbType =
             catalogClient->getDatabase(opCtx, dbName, repl::ReadConcernLevel::kMajorityReadConcern);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        DropDatabaseReply reply;
-        reply.setInfo("database does not exist"_sd);
-        return reply;
+        return;
     }
 
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
@@ -131,10 +129,6 @@ DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName)
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "dropDatabase", dbName, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
-
-    DropDatabaseReply reply;
-    reply.setDropped(dbName);
-    return reply;
 }
 
 }  // namespace mongo

@@ -113,11 +113,8 @@ public:
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-        auto reply = dropDatabaseLegacy(opCtx, dbname);
-        if (!reply.getDropped()) {
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        }
-        reply.serialize(&result);
+        dropDatabaseLegacy(opCtx, dbname);
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return true;
     }
 } configsvrDropDatabaseCmd;
