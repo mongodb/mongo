@@ -1867,8 +1867,10 @@ functions:
           extra_args="$extra_args --cache-debug=scons_cache.log"
         fi
 
-        # Enable performance debugging
-        extra_args="$extra_args --debug=time"
+        # Conditionally enable scons time debugging
+        if [ "${show_scons_timings|true}" = "true" ]; then
+          extra_args="$extra_args --debug=time"
+        fi
 
         # Build packages where the upload tasks expect them
         if [ -n "${git_project_directory|}" ]; then
@@ -11845,6 +11847,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     scons_cache_scope: shared
     scons_cache_mode: all
+    show_scons_timings: false
   tasks:
   - name: clang_tidy_TG
 
