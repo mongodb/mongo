@@ -99,8 +99,6 @@ public:
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
-        params.cappedMaxSize = -1;
-        params.cappedMaxDocs = -1;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;

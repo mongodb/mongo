@@ -124,8 +124,6 @@ public:
         params.isCapped = false;
         params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
         params.isEphemeral = false;
-        params.cappedMaxSize = -1;
-        params.cappedMaxDocs = -1;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.isReadOnly = false;
@@ -136,14 +134,7 @@ public:
         return std::move(ret);
     }
 
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedSizeBytes,
-                                                              int64_t cappedMaxDocs) final {
-        return newCappedRecordStore("a.b", cappedSizeBytes, cappedMaxDocs);
-    }
-
-    virtual std::unique_ptr<RecordStore> newCappedRecordStore(const std::string& ns,
-                                                              int64_t cappedMaxSize,
-                                                              int64_t cappedMaxDocs) {
+    virtual std::unique_ptr<RecordStore> newOplogRecordStore() {
         WiredTigerRecoveryUnit* ru =
             dynamic_cast<WiredTigerRecoveryUnit*>(_engine.newRecoveryUnit());
         OperationContextNoop opCtx(ru);
@@ -153,6 +144,7 @@ public:
         CollectionOptions options;
         options.capped = true;
 
+        const std::string ns = NamespaceString::kRsOplogNamespace.toString();
         StatusWith<std::string> result =
             WiredTigerRecordStore::generateCreateString(kWiredTigerEngineName, ns, options, "");
         ASSERT_TRUE(result.isOK());
@@ -172,8 +164,8 @@ public:
         params.isCapped = true;
         params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
-        params.cappedMaxSize = cappedMaxSize;
-        params.cappedMaxDocs = cappedMaxDocs;
+        // Large enough not to exceed capped limits.
+        params.oplogMaxSize = 1024 * 1024 * 1024;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.isReadOnly = false;
@@ -266,8 +258,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
         params.isEphemeral = false;
-        params.cappedMaxSize = -1;
-        params.cappedMaxDocs = -1;
         params.cappedCallback = nullptr;
         params.sizeStorer = &ss;
         params.isReadOnly = false;

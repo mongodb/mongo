@@ -122,18 +122,6 @@ MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
-// For a capped collection, the number of documents that can be removed directly, rather than via a
-// truncate.  The value has been determined somewhat by experimentation, but there's no clear win
-// for all situations.  Setting it to a lower number makes individual remove calls happen, rather
-// than truncate, only when small numbers of documents are inserted at a time. Making it larger
-// makes larger chunks of documents inserted at time follow the remove path in preference to the
-// truncate path.  Using direct removes is more likely to be a benefit when inserts are spread over
-// many capped collections, since avoiding a truncate avoids having to get a second cursor, which
-// may not be already cached in the current session. The benefit becomes less pronounced if the
-// capped collections are more actively used, or are used in small number of sessions, as multiple
-// cursors will be available in the needed session caches.
-static int kCappedDocumentRemoveLimit = 3;
-
 class WiredTigerRecordStore::OplogStones::InsertChange final : public RecoveryUnit::Change {
 public:
     InsertChange(OplogStones* oplogStones,
@@ -211,10 +199,10 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* opCtx, WiredTi
     stdx::lock_guard<Latch> reclaimLk(_oplogReclaimMutex);
     stdx::lock_guard<Latch> lk(_mutex);
 
-    invariant(rs->isCapped());
-    invariant(rs->cappedMaxSize() > 0);
+    invariant(rs->_isCapped && rs->_isOplog);
+    invariant(rs->_oplogMaxSize && *rs->_oplogMaxSize > 0);
     invariant(rs->keyFormat() == KeyFormat::Long);
-    unsigned long long maxSize = rs->cappedMaxSize();
+    long long maxSize = *rs->_oplogMaxSize;
 
     // The minimum oplog stone size should be BSONObjMaxInternalSize.
     const unsigned int oplogStoneSize =
@@ -287,7 +275,7 @@ bool WiredTigerRecordStore::OplogStones::hasExcessStones_inlock() const {
     }
 
     // check that oplog stones is at capacity
-    if (totalBytes <= _rs->cappedMaxSize()) {
+    if (totalBytes <= *_rs->_oplogMaxSize) {
         return false;
     }
 
@@ -856,18 +844,17 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
                     getGlobalReplSettings().usingReplSets() ||
                         repl::ReplSettings::shouldRecoverFromOplogAsStandalone())),
       _isOplog(NamespaceString::oplog(params.ns)),
-      _cappedMaxSize(params.cappedMaxSize),
-      _cappedMaxSizeSlack(std::min(params.cappedMaxSize / 10, int64_t(16 * 1024 * 1024))),
-      _cappedMaxDocs(params.cappedMaxDocs),
-      _cappedSleep(0),
-      _cappedSleepMS(0),
+      _oplogMaxSize(params.oplogMaxSize),
       _cappedCallback(params.cappedCallback),
       _shuttingDown(false),
-      _cappedDeleteCheckCount(0),
       _sizeStorer(params.sizeStorer),
       _tracksSizeAdjustments(params.tracksSizeAdjustments),
       _kvEngine(kvEngine) {
     invariant(getIdent().size() > 0);
+
+    if (_oplogMaxSize) {
+        invariant(_isOplog, str::stream() << "Namespace " << params.ns);
+    }
 
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(
                                ctx, _uri, kMinimumRecordStoreVersion, kMaximumRecordStoreVersion)
@@ -880,14 +867,6 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         } else {
             fassertFailedNoTrace(34433);
         }
-    }
-
-    if (_isCapped) {
-        invariant(_cappedMaxSize > 0);
-        invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
-    } else {
-        invariant(_cappedMaxSize == -1);
-        invariant(_cappedMaxDocs == -1);
     }
 
     if (!params.isReadOnly) {
@@ -1014,20 +993,6 @@ long long WiredTigerRecordStore::numRecords(OperationContext* opCtx) const {
     return _sizeInfo->numRecords.load();
 }
 
-bool WiredTigerRecordStore::isCapped() const {
-    return _isCapped;
-}
-
-int64_t WiredTigerRecordStore::cappedMaxDocs() const {
-    invariant(_isCapped);
-    return _cappedMaxDocs;
-}
-
-int64_t WiredTigerRecordStore::cappedMaxSize() const {
-    invariant(_isCapped);
-    return _cappedMaxSize;
-}
-
 int64_t WiredTigerRecordStore::storageSize(OperationContext* opCtx,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel) const {
@@ -1101,10 +1066,6 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
         _initNextIdIfNeeded(opCtx);
     }
 
-    // Deletes should never occur on a capped collection because truncation uses
-    // WT_SESSION::truncate().
-    invariant(!isCapped());
-
     WiredTigerCursor cursor(_uri, _tableId, true, opCtx);
     cursor.assertInActiveTxn();
     WT_CURSOR* c = cursor.get();
@@ -1131,281 +1092,8 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     _increaseDataSize(opCtx, -old_length);
 }
 
-bool WiredTigerRecordStore::cappedAndNeedDelete() const {
-    if (!_isCapped)
-        return false;
-
-    if (_sizeInfo->dataSize.load() >= _cappedMaxSize)
-        return true;
-
-    if ((_cappedMaxDocs != -1) && (_sizeInfo->numRecords.load() > _cappedMaxDocs))
-        return true;
-
-    return false;
-}
-
-int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx,
-                                                     const RecordId& justInserted) {
-    if (!_tracksSizeAdjustments) {
-        return 0;
-    }
-
-    // If the collection does not need size adjustment, then we are in replication recovery and
-    // replaying operations we've already played. This may occur after rollback or after a shutdown.
-    // Any inserts beyond the stable timestamp have been undone, but any documents deleted from
-    // capped collections did not come back due to being performed in an untimestamped side
-    // transaction. Additionally, the SizeStorer's information reflects the state of the collection
-    // before rollback/shutdown, post capped deletions.
-    //
-    // If we have a RecordStore whose size we know accurately as of the stable timestamp, rather
-    // than as of the top of the oplog, then we must actually perform capped deletions because they
-    // have not previously been accounted for. The collection will be marked as needing size
-    // adjustment when enterring this function.
-    //
-    // One edge case to consider is where we need to delete a document that we insert as part of
-    // replication recovery. If we don't mark the collection for size adjustment then we will not
-    // perform the capped deletions as expected. In that case, the collection is guaranteed to be
-    // empty at the stable timestamp and thus guaranteed to be marked for size adjustment.
-    if (!sizeRecoveryState(getGlobalServiceContext()).collectionNeedsSizeAdjustment(getIdent())) {
-        return 0;
-    }
-
-    invariant(!_oplogStones);
-
-    // We only want to do the checks occasionally as they are expensive.
-    // This variable isn't thread safe, but has loose semantics anyway.
-    dassert(!_isOplog || _cappedMaxDocs == -1);
-
-    if (!cappedAndNeedDelete())
-        return 0;
-
-    // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-    stdx::unique_lock<stdx::timed_mutex> lock(_cappedDeleterMutex, stdx::defer_lock);
-
-    if (_cappedMaxDocs != -1) {
-        lock.lock();  // Max docs has to be exact, so have to check every time.
-    } else {
-        if (!lock.try_lock()) {
-            // Someone else is deleting old records. Apply back-pressure if too far behind,
-            // otherwise continue.
-            if ((_sizeInfo->dataSize.load() - _cappedMaxSize) < _cappedMaxSizeSlack)
-                return 0;
-
-            // Don't wait forever: we're in a transaction, we could block eviction.
-            Date_t before = Date_t::now();
-            bool gotLock = lock.try_lock_for(stdx::chrono::milliseconds(200));
-            auto delay =
-                stdx::chrono::milliseconds(durationCount<Milliseconds>(Date_t::now() - before));
-            _cappedSleep.fetchAndAdd(1);
-            _cappedSleepMS.fetchAndAdd(delay.count());
-            if (!gotLock)
-                return 0;
-
-            // If we already waited, let someone else do cleanup unless we are significantly
-            // over the limit.
-            if ((_sizeInfo->dataSize.load() - _cappedMaxSize) < (2 * _cappedMaxSizeSlack))
-                return 0;
-        }
-    }
-
-    return _cappedDeleteAsNeeded_inlock(opCtx, justInserted);
-}
-
 Timestamp WiredTigerRecordStore::getPinnedOplog() const {
     return _kvEngine->getPinnedOplog();
-}
-
-void WiredTigerRecordStore::_positionAtFirstRecordId(OperationContext* opCtx,
-                                                     WT_CURSOR* cursor,
-                                                     const RecordId& firstRecordId,
-                                                     bool forTruncate) const {
-    // Use the previous first RecordId, if available, to navigate to the current first RecordId. The
-    // straightforward algorithm of resetting the cursor and advancing to the first element will be
-    // slow for capped collections since there may be many tombstones to traverse at the beginning
-    // of the table.
-    if (!firstRecordId.isNull()) {
-        CursorKey key = makeCursorKey(firstRecordId);
-        setKey(cursor, &key);
-        // Truncate does not require its cursor to be explicitly positioned.
-        if (!forTruncate) {
-            int cmp = 0;
-            int ret = wiredTigerPrepareConflictRetry(
-                opCtx, [&] { return cursor->search_near(cursor, &cmp); });
-            invariantWTOK(ret);
-
-            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-            metricsCollector.incrementOneCursorSeek();
-
-            // This is (or was) the first recordId, so it should never be the case that we have a
-            // RecordId before that.
-            invariant(cmp >= 0);
-        }
-    } else {
-        invariantWTOK(WT_READ_CHECK(cursor->reset(cursor)));
-        int ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
-        invariantWTOK(ret);
-    }
-}
-
-int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* opCtx,
-                                                            const RecordId& justInserted) {
-    // we do this in a side transaction in case it aborts
-    WiredTigerRecoveryUnit* realRecoveryUnit =
-        checked_cast<WiredTigerRecoveryUnit*>(opCtx->releaseRecoveryUnit().release());
-    invariant(realRecoveryUnit);
-    WiredTigerSessionCache* sc = realRecoveryUnit->getSessionCache();
-    WriteUnitOfWork::RecoveryUnitState const realRUstate =
-        opCtx->setRecoveryUnit(std::make_unique<WiredTigerRecoveryUnit>(sc),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-
-    WT_SESSION* session = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
-
-    int64_t dataSize = _sizeInfo->dataSize.load();
-    int64_t numRecords = _sizeInfo->numRecords.load();
-
-    int64_t sizeOverCap = (dataSize > _cappedMaxSize) ? dataSize - _cappedMaxSize : 0;
-    int64_t sizeSaved = 0;
-    int64_t docsOverCap = 0, docsRemoved = 0;
-    if (_cappedMaxDocs != -1 && numRecords > _cappedMaxDocs)
-        docsOverCap = numRecords - _cappedMaxDocs;
-
-    try {
-        WriteUnitOfWork wuow(opCtx);
-
-        WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
-        WT_CURSOR* truncateEnd = curwrap.get();
-        RecordId newestIdToDelete;
-        int ret = 0;
-        bool positioned = false;  // Mark if the cursor is on the first key
-        RecordId savedFirstKey;
-
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-
-        // If we know where the first record is, go to it
-        if (_cappedFirstRecord != RecordId()) {
-            CursorKey key = makeCursorKey(_cappedFirstRecord);
-            setKey(truncateEnd, &key);
-            ret = wiredTigerPrepareConflictRetry(opCtx,
-                                                 [&] { return truncateEnd->search(truncateEnd); });
-            metricsCollector.incrementOneCursorSeek();
-
-            if (ret == 0) {
-                positioned = true;
-                savedFirstKey = _cappedFirstRecord;
-            }
-        }
-
-        // Advance the cursor truncateEnd until we find a suitable end point for our truncate
-        while ((sizeSaved < sizeOverCap || docsRemoved < docsOverCap) && (docsRemoved < 20000) &&
-               (positioned || (ret = wiredTigerPrepareConflictRetry(opCtx, [&] {
-                                   return truncateEnd->next(truncateEnd);
-                               })) == 0)) {
-            positioned = false;
-
-            newestIdToDelete = getKey(truncateEnd);
-            // don't go past the record we just inserted
-            if (newestIdToDelete >= justInserted)  // TODO: use oldest uncommitted instead
-                break;
-
-            WT_ITEM old_value;
-            invariantWTOK(truncateEnd->get_value(truncateEnd, &old_value));
-            metricsCollector.incrementOneDocRead(old_value.size);
-
-            ++docsRemoved;
-            sizeSaved += old_value.size;
-
-            stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
-            if (_shuttingDown)
-                break;
-
-            if (_cappedCallback) {
-                uassertStatusOK(_cappedCallback->aboutToDeleteCapped(
-                    opCtx,
-                    newestIdToDelete,
-                    RecordData(static_cast<const char*>(old_value.data), old_value.size)));
-            }
-        }
-
-        if (ret != WT_NOTFOUND) {
-            invariantWTOK(ret);
-        }
-
-        if (docsRemoved > 0) {
-            // if we scanned to the end of the collection or past our insert, go back one
-            if (ret == WT_NOTFOUND || newestIdToDelete >= justInserted) {
-                ret = wiredTigerPrepareConflictRetry(
-                    opCtx, [&] { return truncateEnd->prev(truncateEnd); });
-            }
-            invariantWTOK(ret);
-
-            RecordId firstRemainingId;
-            ret = truncateEnd->next(truncateEnd);
-            if (ret != WT_NOTFOUND) {
-                invariantWTOK(ret);
-                firstRemainingId = getKey(truncateEnd);
-            }
-            invariantWTOK(truncateEnd->prev(truncateEnd));  // put the cursor back where it was
-
-            // Consider a direct removal, without the overhead of opening a second cursor, if we
-            // are removing a small number of records.  In the oplog case, always use truncate
-            // since we typically have a second oplog cursor cached.
-            if (docsRemoved <= kCappedDocumentRemoveLimit) {
-                RecordId firstRecordId = savedFirstKey;
-                int toRemove = docsRemoved;
-
-                // Remember the key that was removed between calls to remove, that saves time in
-                // navigating to the next record.
-                while (toRemove > 0) {
-                    _positionAtFirstRecordId(opCtx, truncateEnd, firstRecordId, false);
-                    if (--toRemove > 0) {
-                        firstRecordId = getKey(truncateEnd);
-                    }
-                    WT_ITEM old_value;
-                    ret = truncateEnd->get_value(truncateEnd, &old_value);
-                    invariantWTOK(wiredTigerCursorRemove(opCtx, truncateEnd));
-                    metricsCollector.incrementOneDocWritten(old_value.size);
-                }
-                ret = 0;
-            } else {
-                WiredTigerCursor startWrap(_uri, _tableId, true, opCtx);
-                WT_CURSOR* truncateStart = startWrap.get();
-
-                // Position the start cursor at the first record, even if we don't have a saved
-                // first key.  This is equivalent to using a NULL cursor argument to
-                // WT_SESSION->truncate, but in that case, truncate will need to open its own
-                // cursor.  Since we already have a cursor, we can use it here to make the whole
-                // operation faster.
-                _positionAtFirstRecordId(opCtx, truncateStart, savedFirstKey, true);
-                ret = session->truncate(session, nullptr, truncateStart, truncateEnd, nullptr);
-                // We do not count the truncate operation in the write metrics because truncate
-                // is very efficient. We do count the reads performed above (that determine the
-                // number of documents to delete) because reading at the beginning of a capped
-                // collection is the most expensive part due to the data almost always being out of
-                // cache. By counting the read operations but not the truncate operation we are able
-                // to represent the cost of this operation most accurately.
-            }
-
-            invariantWTOK(ret);
-            _changeNumRecords(opCtx, -docsRemoved);
-            _increaseDataSize(opCtx, -sizeSaved);
-            wuow.commit();
-            // Save the key for the next round
-            _cappedFirstRecord = firstRemainingId;
-        }
-    } catch (const WriteConflictException&) {
-        opCtx->releaseRecoveryUnit();
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
-        LOGV2(22398, "got conflict truncating capped, ignoring");
-        return 0;
-    } catch (...) {
-        opCtx->releaseRecoveryUnit();
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
-        throw;
-    }
-
-    opCtx->releaseRecoveryUnit();
-    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(realRecoveryUnit), realRUstate);
-    return docsRemoved;
 }
 
 bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) {
@@ -1520,7 +1208,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogStones->firstRecord = stone->lastRecord;
-            _cappedFirstRecord = stone->lastRecord;
+            _oplogFirstRecord = stone->lastRecord;
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(
                 22400, 1, "Caught WriteConflictException while truncating oplog entries, retrying");
@@ -1551,15 +1239,9 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     dassert(opCtx->lockState()->isWriteLocked());
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
 
-    // We are kind of cheating on capped collections since we write all of them at once ....
-    // Simplest way out would be to just block vector writes for everything except oplog ?
     int64_t totalLength = 0;
     for (size_t i = 0; i < nRecords; i++)
         totalLength += records[i].data.size();
-
-    // caller will retry one element at a time
-    if (_isCapped && totalLength > _cappedMaxSize)
-        return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
 
     WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
     curwrap.assertInActiveTxn();
@@ -1630,8 +1312,6 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     if (_oplogStones) {
         _oplogStones->updateCurrentStoneAfterInsertOnCommit(
             opCtx, totalLength, highestIdRecord, nRecords);
-    } else {
-        _cappedDeleteAsNeeded(opCtx, highestIdRecord.id);
     }
 
     return Status::OK();
@@ -1687,9 +1367,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
     invariant(_keyFormat == KeyFormat::Long);
     dassert(opCtx->lockState()->isReadLocked());
 
-    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
-
-    if (_cappedFirstRecord == RecordId()) {
+    if (_oplogFirstRecord == RecordId()) {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
         auto sessRaii = cache->getSession();
         WT_CURSOR* cursor =
@@ -1704,10 +1382,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         }
         invariantWTOK(ret);
 
-        _cappedFirstRecord = getKey(cursor);
+        _oplogFirstRecord = getKey(cursor);
     }
 
-    return {Timestamp(static_cast<unsigned long long>(_cappedFirstRecord.asLong()))};
+    return {Timestamp(static_cast<unsigned long long>(_oplogFirstRecord.asLong()))};
 }
 
 Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
@@ -1797,10 +1475,6 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     invariantWTOK(ret);
 
     _increaseDataSize(opCtx, len - old_length);
-    if (!_oplogStones) {
-        _cappedDeleteAsNeeded(opCtx, id);
-    }
-
     return Status::OK();
 }
 
@@ -1951,13 +1625,6 @@ void WiredTigerRecordStore::validate(OperationContext* opCtx,
 void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
                                               BSONObjBuilder* result,
                                               double scale) const {
-    result->appendBool("capped", _isCapped);
-    if (_isCapped) {
-        result->appendNumber("max", static_cast<long long>(_cappedMaxDocs));
-        result->appendNumber("maxSize", static_cast<long long>(_cappedMaxSize / scale));
-        result->appendNumber("sleepCount", _cappedSleep.load());
-        result->appendNumber("sleepMS", _cappedSleepMS.load());
-    }
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
     WT_SESSION* s = session->getSession();
     BSONObjBuilder bob(result->subobjStart(_engineName));
@@ -2519,10 +2186,10 @@ bool WiredTigerRecordStoreCursorBase::restore() {
         return true;  // Landed right where we left off.
 
     if (_rs._isCapped) {
-        // Doc was deleted either by _cappedDeleteAsNeeded() or cappedTruncateAfter().
-        // It is important that we error out in this case so that consumers don't
-        // silently get 'holes' when scanning capped collections. We don't make
-        // this guarantee for normal collections so it is ok to skip ahead in that case.
+        // Document was removed by capped collection operations. It is important that we error out
+        // in this case so that consumers don't silently get 'holes' when scanning capped
+        // collections. We don't make this guarantee for normal collections so it is ok to skip
+        // ahead in that case.
         _eof = true;
         return false;
     }
@@ -2620,14 +2287,17 @@ RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
     }
 }
 
-Status WiredTigerRecordStore::updateCappedSize(OperationContext* opCtx, long long cappedSize) {
-    if (_cappedMaxSize == cappedSize) {
+Status WiredTigerRecordStore::updateOplogSize(long long newOplogSize) {
+    invariant(_isOplog && _oplogMaxSize);
+
+    if (*_oplogMaxSize == newOplogSize) {
         return Status::OK();
     }
-    _cappedMaxSize = cappedSize;
-    if (_oplogStones) {
-        _oplogStones->adjust(cappedSize);
-    }
+
+    _oplogMaxSize = newOplogSize;
+
+    invariant(_oplogStones);
+    _oplogStones->adjust(newOplogSize);
     return Status::OK();
 }
 

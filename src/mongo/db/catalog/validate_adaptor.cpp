@@ -556,8 +556,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 
     const auto fastCount = _validateState->getCollection()->numRecords(opCtx);
-    if (_validateState->shouldEnforceFastCount() &&
-        fastCount != static_cast<uint64_t>(_numRecords)) {
+    if (_validateState->shouldEnforceFastCount() && fastCount != _numRecords) {
         results->errors.push_back(str::stream() << "fast count (" << fastCount
                                                 << ") does not match number of records ("
                                                 << _numRecords << ") for collection '"

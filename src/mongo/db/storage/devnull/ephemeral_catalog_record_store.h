@@ -52,8 +52,6 @@ public:
                                          StringData identName,
                                          std::shared_ptr<void>* dataInOut,
                                          bool isCapped = false,
-                                         int64_t cappedMaxSize = -1,
-                                         int64_t cappedMaxDocs = -1,
                                          CappedCallback* cappedCallback = nullptr);
 
     virtual const char* name() const;
@@ -94,7 +92,7 @@ public:
 
     virtual void appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* result,
-                                   double scale) const;
+                                   double scale) const {}
 
     virtual int64_t storageSize(OperationContext* opCtx,
                                 BSONObjBuilder* extraInfo = nullptr,
@@ -159,14 +157,9 @@ private:
     StatusWith<RecordId> extractAndCheckLocForOplog(WithLock, const char* data, int len) const;
 
     RecordId allocateLoc(WithLock);
-    bool cappedAndNeedDelete(WithLock, OperationContext* opCtx) const;
-    void cappedDeleteAsNeeded(WithLock lk, OperationContext* opCtx);
     void deleteRecord(WithLock lk, OperationContext* opCtx, const RecordId& dl);
 
-    // TODO figure out a proper solution to metadata
     const bool _isCapped;
-    const int64_t _cappedMaxSize;
-    const int64_t _cappedMaxDocs;
     CappedCallback* _cappedCallback;
 
     // This is the "persistent" data.

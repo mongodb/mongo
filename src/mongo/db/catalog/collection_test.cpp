@@ -42,6 +42,12 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
+#define ASSERT_ID_EQ(EXPR, ID)                        \
+    [](boost::optional<Record> record, RecordId id) { \
+        ASSERT(record);                               \
+        ASSERT_EQ(record->id, id);                    \
+    }((EXPR), (ID));
+
 namespace {
 
 using namespace mongo;
@@ -322,6 +328,327 @@ TEST_F(CatalogTestFixture, CollectionPtrYieldable) {
 
     coll.reset();
     ASSERT_FALSE(coll);
+}
+
+TEST_F(CatalogTestFixture, IsNotCapped) {
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollectionForRead acfr(operationContext(), nss);
+    const CollectionPtr& coll = acfr.getCollection();
+    ASSERT(!coll->isCapped());
+}
+
+TEST_F(CatalogTestFixture, CappedDeleteRecord) {
+    // Insert a document into a capped collection that has a maximum document size of 1.
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedMaxDocs = 1;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT_EQUALS(0, coll->numRecords(operationContext()));
+
+    BSONObj firstDoc = BSON("_id" << 1);
+    BSONObj secondDoc = BSON("_id" << 2);
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(firstDoc), nullptr));
+        wuow.commit();
+    }
+
+    ASSERT_EQUALS(1, coll->numRecords(operationContext()));
+
+    // Inserting the second document will remove the first one.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(secondDoc), nullptr));
+        wuow.commit();
+    }
+
+    ASSERT_EQUALS(1, coll->numRecords(operationContext()));
+
+    auto cursor = coll->getRecordStore()->getCursor(operationContext());
+    auto record = cursor->next();
+    ASSERT(record);
+    ASSERT(record->data.toBson().woCompare(secondDoc) == 0);
+    ASSERT(!cursor->next());
+}
+
+TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
+    // Insert multiple records at once, requiring multiple deletes.
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedMaxDocs = 10;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+
+    ASSERT_EQUALS(0, coll->numRecords(operationContext()));
+
+    const int nToInsertFirst = options.cappedMaxDocs / 2;
+    const int nToInsertSecond = options.cappedMaxDocs;
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < nToInsertFirst; i++) {
+            BSONObj doc = BSON("_id" << i);
+            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+        }
+        wuow.commit();
+    }
+
+    ASSERT_EQUALS(nToInsertFirst, coll->numRecords(operationContext()));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = nToInsertFirst; i < nToInsertFirst + nToInsertSecond; i++) {
+            BSONObj doc = BSON("_id" << i);
+            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+        }
+        wuow.commit();
+    }
+
+    ASSERT_EQUALS(options.cappedMaxDocs, coll->numRecords(operationContext()));
+
+    const int firstExpectedId = nToInsertFirst + nToInsertSecond - options.cappedMaxDocs;
+
+    int numSeen = 0;
+    auto cursor = coll->getRecordStore()->getCursor(operationContext());
+    while (auto record = cursor->next()) {
+        const BSONObj expectedDoc = BSON("_id" << firstExpectedId + numSeen);
+        ASSERT(record->data.toBson().woCompare(expectedDoc) == 0);
+        numSeen++;
+    }
+}
+
+TEST_F(CatalogTestFixture, CappedVisibilityEmptyInitialState) {
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    auto doInsert = [&](OperationContext* opCtx) -> RecordId {
+        std::string data = "data";
+        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+    };
+
+    auto longLivedClient = getServiceContext()->makeClient("longLived");
+    auto longLivedOpCtx = longLivedClient->makeOperationContext();
+    WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
+
+    // Collection is really empty.
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(), true)->next());
+    ASSERT(!rs->getCursor(longLivedOpCtx.get(), false)->next());
+
+    RecordId lowestHiddenId = doInsert(longLivedOpCtx.get());
+    RecordId otherId;
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+
+        // Can't see uncommitted write from other operation.
+        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+
+        ASSERT(!rs->getCursor(operationContext(), true)->next());
+        ASSERT(!rs->getCursor(operationContext(), false)->next());
+
+        otherId = doInsert(operationContext());
+
+        // Can read own writes.
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
+
+        wuow.commit();
+    }
+
+    // longLivedOpCtx is still on old snapshot so it can't see otherId yet.
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+    ASSERT(!rs->getCursor(longLivedOpCtx.get())->seekExact(otherId));
+
+    // Make all documents visible and let longLivedOp get a new snapshot.
+    longLivedWUOW.commit();
+
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(otherId), otherId);
+}
+
+TEST_F(CatalogTestFixture, CappedVisibilityNonEmptyInitialState) {
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    auto doInsert = [&](OperationContext* opCtx) -> RecordId {
+        std::string data = "data";
+        return uassertStatusOK(rs->insertRecord(opCtx, data.c_str(), data.size(), Timestamp()));
+    };
+
+    auto longLivedClient = getServiceContext()->makeClient("longLived");
+    auto longLivedOpCtx = longLivedClient->makeOperationContext();
+
+    RecordId initialId;
+    {
+        WriteUnitOfWork wuow(longLivedOpCtx.get());
+        initialId = doInsert(longLivedOpCtx.get());
+        wuow.commit();
+    }
+
+    WriteUnitOfWork longLivedWUOW(longLivedOpCtx.get());
+
+    // Can see initial doc.
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), initialId);
+
+    RecordId lowestHiddenId = doInsert(longLivedOpCtx.get());
+
+    // Collection still looks like it only has a single doc to iteration but not seekExact.
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(initialId), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+
+    RecordId otherId;
+    {
+        WriteUnitOfWork wuow(operationContext());
+
+        // Can only see committed writes from other operation.
+        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(initialId), initialId);
+        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), initialId);
+
+        otherId = doInsert(operationContext());
+
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
+
+        wuow.commit();
+
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), true)->next(), initialId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext(), false)->next(), otherId);
+        ASSERT_ID_EQ(rs->getCursor(operationContext())->seekExact(otherId), otherId);
+        ASSERT(!rs->getCursor(operationContext())->seekExact(lowestHiddenId));
+    }
+
+    // longLivedOpCtx is still on old snapshot so it can't see otherId yet.
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+    ASSERT(!rs->getCursor(longLivedOpCtx.get())->seekExact(otherId));
+
+    // This makes all documents visible and lets longLivedOpCtx get a new snapshot.
+    longLivedWUOW.commit();
+
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), true)->next(), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get(), false)->next(), otherId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(initialId), initialId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(lowestHiddenId), lowestHiddenId);
+    ASSERT_ID_EQ(rs->getCursor(longLivedOpCtx.get())->seekExact(otherId), otherId);
+}
+
+TEST_F(CatalogTestFixture, CappedCursorRollover) {
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedMaxDocs = 5;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    // First insert 3 documents.
+    const int numToInsertFirst = 3;
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = 0; i < numToInsertFirst; ++i) {
+            const BSONObj doc = BSON("_id" << i);
+            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+        }
+        wuow.commit();
+    }
+
+    // Setup the cursor that should rollover.
+    auto otherClient = getServiceContext()->makeClient("otherClient");
+    auto otherOpCtx = otherClient->makeOperationContext();
+    auto cursor = rs->getCursor(otherOpCtx.get());
+    ASSERT(cursor->next());
+    cursor->save();
+    otherOpCtx->recoveryUnit()->abandonSnapshot();
+
+    // Insert 10 documents which causes a rollover.
+    {
+        WriteUnitOfWork wuow(operationContext());
+        for (int i = numToInsertFirst; i < numToInsertFirst + 10; ++i) {
+            const BSONObj doc = BSON("_id" << i);
+            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+        }
+        wuow.commit();
+    }
+
+    // Cursor should now be dead.
+    ASSERT_FALSE(cursor->restore());
+    ASSERT(!cursor->next());
+}
+
+TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
+    NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.capped = true;
+    ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
+
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    RecordStore* rs = coll->getRecordStore();
+
+    RecordId recordId;
+    {
+        WriteUnitOfWork wuow(operationContext());
+        std::string data = "data";
+        StatusWith<RecordId> res =
+            rs->insertRecord(operationContext(), data.c_str(), data.size(), Timestamp());
+        ASSERT_OK(res.getStatus());
+        recordId = res.getValue();
+        wuow.commit();
+    }
+
+    auto cursor = rs->getCursor(operationContext());
+
+    // See that things work if you yield before you first call next().
+    cursor->save();
+    operationContext()->recoveryUnit()->abandonSnapshot();
+
+    ASSERT_TRUE(cursor->restore());
+
+    auto record = cursor->next();
+    ASSERT(record);
+    ASSERT_EQ(recordId, record->id);
+
+    ASSERT(!cursor->next());
 }
 
 }  // namespace

@@ -75,28 +75,16 @@ RecordId extractRecordId(const std::string& keyStr) {
 RecordStore::RecordStore(StringData ns,
                          StringData ident,
                          bool isCapped,
-                         int64_t cappedMaxSize,
-                         int64_t cappedMaxDocs,
                          CappedCallback* cappedCallback,
                          VisibilityManager* visibilityManager)
     : mongo::RecordStore(ns, ident),
       _isCapped(isCapped),
-      _cappedMaxSize(cappedMaxSize),
-      _cappedMaxDocs(cappedMaxDocs),
       _ident(getIdent().data(), getIdent().size()),
       _prefix(createKey(_ident, std::numeric_limits<int64_t>::min())),
       _postfix(createKey(_ident, std::numeric_limits<int64_t>::max())),
       _cappedCallback(cappedCallback),
       _isOplog(NamespaceString::oplog(ns)),
-      _visibilityManager(visibilityManager) {
-    if (_isCapped) {
-        invariant(_cappedMaxSize > 0);
-        invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
-    } else {
-        invariant(_cappedMaxSize == -1);
-        invariant(_cappedMaxDocs == -1);
-    }
-}
+      _visibilityManager(visibilityManager) {}
 
 const char* RecordStore::name() const {
     return kEngineName;
@@ -108,10 +96,6 @@ long long RecordStore::dataSize(OperationContext* opCtx) const {
 
 long long RecordStore::numRecords(OperationContext* opCtx) const {
     return static_cast<long long>(_numRecords.load());
-}
-
-bool RecordStore::isCapped() const {
-    return _isCapped;
 }
 
 void RecordStore::setCappedCallback(CappedCallback* cb) {
@@ -147,14 +131,6 @@ void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
 Status RecordStore::insertRecords(OperationContext* opCtx,
                                   std::vector<Record>* inOutRecords,
                                   const std::vector<Timestamp>& timestamps) {
-    int64_t totalSize = 0;
-    for (auto& record : *inOutRecords)
-        totalSize += record.data.size();
-
-    // Caller will retry one element at a time.
-    if (_isCapped && totalSize > _cappedMaxSize)
-        return Status(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
-
     auto ru = RecoveryUnit::get(opCtx);
     StringStore* workingCopy(ru->getHead());
     {
@@ -178,7 +154,6 @@ Status RecordStore::insertRecords(OperationContext* opCtx,
         }
     }
     ru->makeDirty();
-    _cappedDeleteAsNeeded(opCtx, workingCopy);
     return Status::OK();
 }
 
@@ -194,7 +169,6 @@ Status RecordStore::updateRecord(OperationContext* opCtx,
         invariant(it != workingCopy->end());
         workingCopy->update(StringStore::value_type{key, std::string(data, len)});
     }
-    _cappedDeleteAsNeeded(opCtx, workingCopy);
     RecoveryUnit::get(opCtx)->makeDirty();
 
     return Status::OK();
@@ -285,16 +259,6 @@ void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, boo
     wuow.commit();
 }
 
-void RecordStore::appendCustomStats(OperationContext* opCtx,
-                                    BSONObjBuilder* result,
-                                    double scale) const {
-    result->appendBool("capped", _isCapped);
-    if (_isCapped) {
-        result->appendNumber("max", static_cast<long long>(_cappedMaxDocs));
-        result->appendNumber("maxSize", static_cast<long long>(_cappedMaxSize / scale));
-    }
-}
-
 void RecordStore::updateStatsAfterRepair(OperationContext* opCtx,
                                          long long numRecords,
                                          long long dataSize) {
@@ -348,55 +312,6 @@ int64_t RecordStore::_nextRecordId(OperationContext* opCtx) {
     return _highestRecordId.fetchAndAdd(1);
 }
 
-bool RecordStore::_cappedAndNeedDelete(OperationContext* opCtx, StringStore* workingCopy) {
-    if (!_isCapped)
-        return false;
-
-    if (dataSize(opCtx) > _cappedMaxSize)
-        return true;
-
-    if ((_cappedMaxDocs != -1) && numRecords(opCtx) > _cappedMaxDocs)
-        return true;
-    return false;
-}
-
-void RecordStore::_cappedDeleteAsNeeded(OperationContext* opCtx, StringStore* workingCopy) {
-    if (!_isCapped)
-        return;
-
-    // Create the lowest key for this identifier and use lower_bound() to get to the first one.
-    auto recordIt = workingCopy->lower_bound(_prefix);
-
-    // Ensure only one thread at a time can do deletes, otherwise they'll conflict.
-    stdx::lock_guard<Latch> cappedDeleterLock(_cappedDeleterMutex);
-
-    while (_cappedAndNeedDelete(opCtx, workingCopy)) {
-
-        stdx::lock_guard<Latch> cappedCallbackLock(_cappedCallbackMutex);
-        RecordId rid = RecordId(extractRecordId(recordIt->first));
-
-        if (_isOplog && _visibilityManager->isFirstHidden(rid)) {
-            // We have a record that hasn't been committed yet, so we shouldn't truncate anymore
-            // until it gets committed.
-            return;
-        }
-
-        if (_cappedCallback) {
-            RecordData rd = RecordData(recordIt->second.c_str(), recordIt->second.length());
-            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(opCtx, rid, rd));
-        }
-
-        SizeAdjuster adjuster(opCtx, this);
-        invariant(numRecords(opCtx) > 0, str::stream() << numRecords(opCtx));
-
-        // Don't need to increment the iterator because the iterator gets revalidated and placed on
-        // the next item after the erase.
-        workingCopy->erase(recordIt->first);
-        auto ru = RecoveryUnit::get(opCtx);
-        ru->makeDirty();
-    }
-}
-
 RecordStore::Cursor::Cursor(OperationContext* opCtx,
                             const RecordStore& rs,
                             VisibilityManager* visibilityManager)
@@ -407,6 +322,11 @@ RecordStore::Cursor::Cursor(OperationContext* opCtx,
 }
 
 boost::optional<Record> RecordStore::Cursor::next() {
+    // Capped iterators die on invalidation rather than advancing.
+    if (_rs._isCapped && _lastMoveWasRestore) {
+        return boost::none;
+    }
+
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {
@@ -547,6 +467,11 @@ RecordStore::ReverseCursor::ReverseCursor(OperationContext* opCtx,
 }
 
 boost::optional<Record> RecordStore::ReverseCursor::next() {
+    // Capped iterators die on invalidation rather than advancing.
+    if (_rs._isCapped && _lastMoveWasRestore) {
+        return boost::none;
+    }
+
     _savedPosition = boost::none;
     StringStore* workingCopy(RecoveryUnit::get(opCtx)->getHead());
     if (_needFirstSeek) {

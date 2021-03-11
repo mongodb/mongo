@@ -191,7 +191,7 @@ public:
         virtual std::shared_ptr<Collection> make(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  RecordId catalogId,
-                                                 CollectionUUID uuid,
+                                                 const CollectionOptions& options,
                                                  std::unique_ptr<RecordStore> rs) const = 0;
     };
 
@@ -510,11 +510,15 @@ public:
      */
     virtual bool isClustered() const = 0;
 
+    virtual Status updateCappedSize(OperationContext* opCtx, long long newCappedSize) = 0;
+
     //
     // Stats
     //
 
     virtual bool isCapped() const = 0;
+    virtual long long getCappedMaxDocs() const = 0;
+    virtual long long getCappedMaxSize() const = 0;
 
     /**
      * Returns a pointer to a capped callback object.
@@ -531,9 +535,9 @@ public:
      */
     virtual std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const = 0;
 
-    virtual uint64_t numRecords(OperationContext* const opCtx) const = 0;
+    virtual long long numRecords(OperationContext* const opCtx) const = 0;
 
-    virtual uint64_t dataSize(OperationContext* const opCtx) const = 0;
+    virtual long long dataSize(OperationContext* const opCtx) const = 0;
 
 
     /**

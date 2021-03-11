@@ -114,6 +114,13 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     result->appendNumber("freeStorageSize",
                          static_cast<long long>(recordStore->freeStorageSize(opCtx)) / scale);
 
+    const bool isCapped = collection->isCapped();
+    result->appendBool("capped", isCapped);
+    if (isCapped) {
+        result->appendNumber("max", collection->getCappedMaxDocs());
+        result->appendNumber("maxSize", collection->getCappedMaxSize() / scale);
+    }
+
     recordStore->appendCustomStats(opCtx, result, scale);
 
     const IndexCatalog* indexCatalog = collection->getIndexCatalog();

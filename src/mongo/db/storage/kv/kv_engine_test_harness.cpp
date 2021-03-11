@@ -242,13 +242,15 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     std::string ident = "abc";
     auto ns = NamespaceString("mydb.mycoll");
 
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(
-            engine->createRecordStore(opCtx.get(), "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx.get(), "catalog", "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx.get(), "catalog", "catalog", options));
+        rs = engine->getRecordStore(opCtx.get(), "catalog", "catalog", options);
         uow.commit();
     }
 
@@ -257,8 +259,8 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
-        collection = std::make_unique<CollectionImpl>(
-            opCtx.get(), ns, RecordId(0), UUID::gen(), std::move(rs));
+        collection =
+            std::make_unique<CollectionImpl>(opCtx.get(), ns, RecordId(0), options, std::move(rs));
         uow.commit();
     }
 
@@ -1484,13 +1486,16 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
     std::string ident = "abc";
     auto ns = NamespaceString("mydb.mycoll");
 
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+
     std::unique_ptr<RecordStore> rs;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
-        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", CollectionOptions()));
-        rs = engine->getRecordStore(opCtx, "catalog", "catalog", CollectionOptions());
+        ASSERT_OK(engine->createRecordStore(opCtx, "catalog", "catalog", options));
+        rs = engine->getRecordStore(opCtx, "catalog", "catalog", options);
         uow.commit();
     }
 
@@ -1500,7 +1505,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
         collection =
-            std::make_unique<CollectionImpl>(opCtx, ns, RecordId(0), UUID::gen(), std::move(rs));
+            std::make_unique<CollectionImpl>(opCtx, ns, RecordId(0), options, std::move(rs));
         uow.commit();
     }
 

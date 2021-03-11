@@ -56,39 +56,6 @@ public:
 
 const char* ns = "a.b";
 
-class Capped : public ClientBase {
-public:
-    virtual void run() {
-        // Skip the test if the storage engine doesn't support capped collections.
-        if (!getGlobalServiceContext()->getStorageEngine()->supportsCappedCollections()) {
-            return;
-        }
-
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient client(&opCtx);
-        for (int pass = 0; pass < 3; pass++) {
-            client.createCollection(ns, 1024 * 1024, true, 999);
-            for (int j = 0; j < pass * 3; j++)
-                client.insert(ns, BSON("x" << j));
-
-            // test truncation of a capped collection
-            if (pass) {
-                BSONObj info;
-                BSONObj cmd = BSON("captrunc"
-                                   << "b"
-                                   << "n" << 1 << "inc" << true);
-                // cout << cmd.toString() << endl;
-                bool ok = client.runCommand("a", cmd, info);
-                // cout << info.toString() << endl;
-                verify(ok);
-            }
-
-            verify(client.dropCollection(ns));
-        }
-    }
-};
-
 class InsertMany : ClientBase {
 public:
     virtual void run() {
@@ -194,7 +161,6 @@ class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("directclient") {}
     void setupTests() {
-        add<Capped>();
         add<InsertMany>();
         add<BadNSCmd>();
         add<BadNSQuery>();

@@ -63,12 +63,5 @@ TEST(RecordStoreTestHarness, Namespace) {
     }
 }
 
-// Call isCapped() on a non-capped collection and verify the result is false.
-TEST(RecordStoreTestHarness, IsNotCapped) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
-    ASSERT(!rs->isCapped());
-}
-
 }  // namespace
 }  // namespace mongo
