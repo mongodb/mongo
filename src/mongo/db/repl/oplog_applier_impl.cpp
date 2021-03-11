@@ -150,7 +150,7 @@ protected:
     }
 
     void _recordDurable(const OpTimeAndWallTime& newOpTimeAndWallTime) {
-        // We have to use setMyLastDurableOpTimeAndWallTimeFoward since this thread races with
+        // We have to use setMyLastDurableOpTimeAndWallTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
         _replCoord->setMyLastDurableOpTimeAndWallTimeForward(newOpTimeAndWallTime);
     }
