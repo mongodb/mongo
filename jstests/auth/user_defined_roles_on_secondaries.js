@@ -88,12 +88,10 @@ m0.getDB("db1").createRole({
 rstest.add();
 rstest.reInitiate();
 
-// This write will have to wait on the initial sync to complete before progressing.
-assert.soonNoExcept(() => {
-    assert.commandWorked(rstest.getPrimary().getDB("db1")["aCollection"].insert(
-        {a: "afterSecondNodeAdded"}, {writeConcern: {w: 2, wtimeout: 60 * 1000}}));
-    return true;
-});
+// Do a write after the node has completed initial sync.
+rstest.awaitSecondaryNodes();
+assert.commandWorked(rstest.getPrimary().getDB("db1")["aCollection"].insert(
+    {a: "afterSecondNodeAdded"}, {writeConcern: {w: 2}}));
 
 rstest.getPrimary().getDB("db1").createRole({
     role: "r3",
