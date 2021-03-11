@@ -58,6 +58,13 @@ TEST(CommandParsers, BadHintType) {
         parseHint(hint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
 }
 
+TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
+    BSONObj arrayHint = BSON("hint" << BSON_ARRAY("invalid"
+                                                  << "hint"));
+    ASSERT_THROWS_CODE(
+        parseHint(arrayHint.firstElement()), AssertionException, ErrorCodes::FailedToParse);
+}
+
 TEST(CommandParsers, SerializeNonEmptyHint) {
     auto hint = BSON("x" << 1);
     BSONObjBuilder bob;
