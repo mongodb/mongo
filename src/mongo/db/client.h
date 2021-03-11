@@ -49,6 +49,7 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/invariant.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -187,6 +188,10 @@ public:
         return _connectionId == 0;
     }
 
+    const auto& getUUID() const {
+        return _uuid;
+    }
+
     /**
      * Used to mark system operations that are allowed to be killed by the stepdown process. This
      * should only be called once per Client and only from system connections. The Client should be
@@ -297,6 +302,8 @@ private:
     // Whether this client used { helloOk: true } when opening its connection, indicating that
     // it supports the hello command.
     bool _supportsHello = false;
+
+    UUID _uuid;
 };
 
 /**
