@@ -62,19 +62,6 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-ChunkManager getShardedCollectionRoutingInfoWithRefreshAndFlush(const NamespaceString& nss) {
-    auto opCtx = cc().makeOperationContext();
-
-    auto swRoutingInfo = Grid::get(opCtx.get())
-                             ->catalogCache()
-                             ->getShardedCollectionRoutingInfoWithRefresh(opCtx.get(), nss);
-    auto routingInfo = uassertStatusOK(swRoutingInfo);
-
-    CatalogCacheLoader::get(opCtx.get()).waitForCollectionFlush(opCtx.get(), nss);
-
-    return routingInfo;
-}
-
 Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss,
                                     const CollectionUUID& sourceUUID) {
     auto opCtx = cc().makeOperationContext();
@@ -98,8 +85,8 @@ Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss,
                 opCtx.get(),
                 sourceNss,
                 sourceUUID,
-                {},
                 BSON("msg" << msg),
+                boost::none,
                 boost::none,
                 boost::none,
                 boost::none,
@@ -129,22 +116,59 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<void>& sp, Status error) 
         sp.setError(error);
     }
 }
+
+class ExternalStateImpl : public ReshardingDonorService::DonorStateMachineExternalState {
+public:
+    ShardId myShardId(ServiceContext* serviceContext) const override {
+        return ShardingState::get(serviceContext)->shardId();
+    }
+
+    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+    }
+
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
+    }
+
+    void updateCoordinatorDocument(OperationContext* opCtx,
+                                   const BSONObj& query,
+                                   const BSONObj& update) override {
+        auto catalogClient = Grid::get(opCtx)->catalogClient();
+        uassertStatusOK(catalogClient->updateConfigDocument(
+            opCtx,
+            NamespaceString::kConfigReshardingOperationsNamespace,
+            query,
+            update,
+            false, /* upsert */
+            ShardingCatalogClient::kMajorityWriteConcern));
+    }
+};
+
 }  // namespace
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
     BSONObj initialState) const {
-    return std::make_shared<DonorStateMachine>(std::move(initialState));
+    return std::make_shared<DonorStateMachine>(std::move(initialState),
+                                               std::make_unique<ExternalStateImpl>());
 }
 
-ReshardingDonorService::DonorStateMachine::DonorStateMachine(const BSONObj& donorDoc)
-    : DonorStateMachine(ReshardingDonorDocument::parse({"DonorStateMachine"}, donorDoc)) {}
+ReshardingDonorService::DonorStateMachine::DonorStateMachine(
+    const BSONObj& donorDoc, std::unique_ptr<DonorStateMachineExternalState> externalState)
+    : DonorStateMachine(ReshardingDonorDocument::parse({"DonorStateMachine"}, donorDoc),
+                        std::move(externalState)) {}
 
 ReshardingDonorService::DonorStateMachine::DonorStateMachine(
-    const ReshardingDonorDocument& donorDoc)
+    const ReshardingDonorDocument& donorDoc,
+    std::unique_ptr<DonorStateMachineExternalState> externalState)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
-      _donorCtx{donorDoc.getMutableState()} {}
+      _donorCtx{donorDoc.getMutableState()},
+      _externalState{std::move(externalState)} {
+    invariant(_externalState);
+}
 
 ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
@@ -308,8 +332,11 @@ void ReshardingDonorService::DonorStateMachine::
     // donor shards causes them to create the config.cache.chunks collection. Without this refresh,
     // the {atClusterTime: <fetchTimestamp>} read on the config.cache.chunks namespace would fail
     // with a SnapshotUnavailable error response.
-    std::ignore =
-        getShardedCollectionRoutingInfoWithRefreshAndFlush(_metadata.getTempReshardingNss());
+    {
+        auto opCtx = cc().makeOperationContext();
+        _externalState->refreshCatalogCache(opCtx.get(), _metadata.getTempReshardingNss());
+        _externalState->waitForCollectionFlush(opCtx.get(), _metadata.getTempReshardingNss());
+    }
 
     Timestamp minFetchTimestamp =
         generateMinFetchTimestamp(_metadata.getSourceNss(), _metadata.getSourceUUID());
@@ -576,7 +603,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
         .thenRunOn(**executor)
         .then([this] {
             auto opCtx = cc().makeOperationContext();
-            auto shardId = ShardingState::get(opCtx.get())->shardId();
+            auto shardId = _externalState->myShardId(opCtx->getServiceContext());
 
             BSONObjBuilder updateBuilder;
             {
@@ -588,15 +615,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
                 }
             }
 
-            uassertStatusOK(Grid::get(opCtx.get())
-                                ->catalogClient()
-                                ->updateConfigDocument(
-                                    opCtx.get(),
-                                    NamespaceString::kConfigReshardingOperationsNamespace,
-                                    _makeQueryForCoordinatorUpdate(shardId, _donorCtx.getState()),
-                                    updateBuilder.done(),
-                                    false /* upsert */,
-                                    ShardingCatalogClient::kMajorityWriteConcern));
+            _externalState->updateCoordinatorDocument(
+                opCtx.get(),
+                _makeQueryForCoordinatorUpdate(shardId, _donorCtx.getState()),
+                updateBuilder.done());
         });
 }
 

@@ -37,7 +37,7 @@
 
 namespace mongo {
 
-class ReshardingDonorService final : public repl::PrimaryOnlyService {
+class ReshardingDonorService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ReshardingDonorService"_sd;
 
@@ -46,6 +46,8 @@ public:
     ~ReshardingDonorService() = default;
 
     class DonorStateMachine;
+
+    class DonorStateMachineExternalState;
 
     StringData getServiceName() const override {
         return kServiceName;
@@ -71,7 +73,8 @@ public:
 class ReshardingDonorService::DonorStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
-    explicit DonorStateMachine(const BSONObj& donorDoc);
+    explicit DonorStateMachine(const BSONObj& donorDoc,
+                               std::unique_ptr<DonorStateMachineExternalState> externalState);
 
     ~DonorStateMachine();
 
@@ -101,7 +104,8 @@ public:
                                     const ReshardingDonorDocument& donorDoc);
 
 private:
-    DonorStateMachine(const ReshardingDonorDocument& donorDoc);
+    DonorStateMachine(const ReshardingDonorDocument& donorDoc,
+                      std::unique_ptr<DonorStateMachineExternalState> externalState);
 
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
@@ -160,6 +164,8 @@ private:
     // config.localReshardingOperations.donor.
     DonorShardContext _donorCtx;
 
+    const std::unique_ptr<DonorStateMachineExternalState> _externalState;
+
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
 
@@ -176,6 +182,30 @@ private:
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
     SharedPromise<void> _completionPromise;
+};
+
+/**
+ * Represents the interface that DonorStateMachine uses to interact with the rest of the sharding
+ * codebase.
+ *
+ * In particular, DonorStateMachine must not directly use CatalogCacheLoader, Grid, ShardingState,
+ * or ShardingCatalogClient. DonorStateMachine must instead access those types through the
+ * DonorStateMachineExternalState interface. Having it behind an interface makes it more
+ * straightforward to unit test DonorStateMachine.
+ */
+class ReshardingDonorService::DonorStateMachineExternalState {
+public:
+    virtual ~DonorStateMachineExternalState() = default;
+
+    virtual ShardId myShardId(ServiceContext* serviceContext) const = 0;
+
+    virtual void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) = 0;
+
+    virtual void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) = 0;
+
+    virtual void updateCoordinatorDocument(OperationContext* opCtx,
+                                           const BSONObj& query,
+                                           const BSONObj& update) = 0;
 };
 
 }  // namespace mongo
