@@ -97,7 +97,8 @@ Client::Client(std::string desc, ServiceContext* serviceContext, transport::Sess
       _session(std::move(session)),
       _desc(std::move(desc)),
       _connectionId(_session ? _session->id() : 0),
-      _prng(generateSeed(_desc)) {}
+      _prng(generateSeed(_desc)),
+      _uuid(UUID::gen()) {}
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());

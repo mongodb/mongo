@@ -2306,6 +2306,7 @@ if wiredtiger:
         source=[
             'catalog_raii_test.cpp',
             'client_strand_test.cpp',
+            'client_context_test.cpp',
             'collection_index_usage_tracker_test.cpp',
             'commands_test.cpp',
             'curop_test.cpp',
