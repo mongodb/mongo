@@ -59,7 +59,14 @@ mongo_embedded_v1_lib* global_lib_handle;
 
 namespace {
 
-std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
+
+auto& getGlobalTempDir() {
+    static std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
+    if (!globalTempDir) {
+        globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
+    }
+    return globalTempDir;
+}
 
 struct StatusDestructor {
     void operator()(mongo_embedded_v1_status* const p) const noexcept {
@@ -97,10 +104,6 @@ using MongoDBCAPIClientPtr = std::unique_ptr<mongo_embedded_v1_client, ClientDes
 class MongodbCAPITest : public mongo::unittest::Test {
 protected:
     void setUp() {
-        if (!globalTempDir) {
-            globalTempDir = std::make_unique<mongo::unittest::TempDir>("embedded_mongo");
-        }
-
         mongo_embedded_v1_init_params params;
         params.log_flags = MONGO_EMBEDDED_V1_LOG_STDOUT;
         params.log_callback = nullptr;
@@ -112,7 +115,7 @@ protected:
         yaml << YAML::Key << "storage";
         yaml << YAML::Value << YAML::BeginMap;
         yaml << YAML::Key << "dbPath";
-        yaml << YAML::Value << globalTempDir->path();
+        yaml << YAML::Value << getGlobalTempDir()->path();
         yaml << YAML::EndMap;  // storage
 
         yaml << YAML::EndMap;
@@ -743,6 +746,16 @@ int main(const int argc, const char* const* const argv) {
     };
     params.log_user_data = &receivedCallback;
 
+    YAML::Emitter yaml;
+    yaml << YAML::BeginMap;
+    yaml << YAML::Key << "storage";
+    yaml << YAML::Value << YAML::BeginMap;
+    yaml << YAML::Key << "dbPath";
+    yaml << YAML::Value << getGlobalTempDir()->path();
+    yaml << YAML::EndMap;  // storage
+    yaml << YAML::EndMap;
+    params.yaml_config = yaml.c_str();
+
     lib = mongo_embedded_v1_lib_init(&params, nullptr);
     if (lib == nullptr) {
         std::cerr << "mongo_embedded_v1_init() failed with "
@@ -752,7 +765,8 @@ int main(const int argc, const char* const* const argv) {
 
     // Attempt to create an embedded instance to make sure something gets logged. This will probably
     // fail but that's fine.
-    mongo_embedded_v1_instance* instance = mongo_embedded_v1_instance_create(lib, nullptr, nullptr);
+    mongo_embedded_v1_instance* instance =
+        mongo_embedded_v1_instance_create(lib, yaml.c_str(), nullptr);
     if (instance) {
         mongo_embedded_v1_instance_destroy(instance, nullptr);
     }
@@ -770,6 +784,6 @@ int main(const int argc, const char* const* const argv) {
 
     const auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);
 
-    globalTempDir.reset();
+    getGlobalTempDir().reset();
     mongo::quickExit(result);
 }
