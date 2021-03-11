@@ -123,7 +123,8 @@ struct ActiveTransactionHistory {
 };
 
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
-                                                       const LogicalSessionId& lsid) {
+                                                       const LogicalSessionId& lsid,
+                                                       bool fetchOplogEntries) {
     // Storage engine operations require at least Global IS.
     Lock::GlobalLock lk(opCtx, MODE_IS);
 
@@ -156,6 +157,10 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
     if (result.lastTxnRecord->getState()) {
         // When state is given, it must be a transaction, so we don't need to traverse the history.
+        return result;
+    }
+
+    if (!fetchOplogEntries) {
         return result;
     }
 
@@ -2182,13 +2187,23 @@ void TransactionParticipant::Participant::_setNewTxnNumber(OperationContext* opC
 }
 
 void TransactionParticipant::Participant::refreshFromStorageIfNeeded(OperationContext* opCtx) {
+    return _refreshFromStorageIfNeeded(opCtx, true);
+}
+
+void TransactionParticipant::Participant::refreshFromStorageIfNeededNoOplogEntryFetch(
+    OperationContext* opCtx) {
+    return _refreshFromStorageIfNeeded(opCtx, false);
+}
+
+void TransactionParticipant::Participant::_refreshFromStorageIfNeeded(OperationContext* opCtx,
+                                                                      bool fetchOplogEntries) {
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(!opCtx->lockState()->isLocked());
 
     if (p().isValid)
         return;
 
-    auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId());
+    auto activeTxnHistory = fetchActiveTransactionHistory(opCtx, _sessionId(), fetchOplogEntries);
     const auto& lastTxnRecord = activeTxnHistory.lastTxnRecord;
     if (lastTxnRecord) {
         stdx::lock_guard<Client> lg(*opCtx->getClient());

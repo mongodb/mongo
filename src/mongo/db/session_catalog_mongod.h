@@ -121,4 +121,21 @@ private:
     OperationContext* const _opCtx;
 };
 
+/**
+ * Similar to MongoDOperationContextSession, but marks the TransactionParticipant as valid without
+ * loading the retryable write oplog history.  If the last operation was a multi-document
+ * transaction, is equivalent to MongoDOperationContextSession.
+ *
+ * NOTE: Should only be used when reading the oplog history is not possible.
+ */
+class MongoDOperationContextSessionWithoutOplogRead {
+public:
+    MongoDOperationContextSessionWithoutOplogRead(OperationContext* opCtx);
+    ~MongoDOperationContextSessionWithoutOplogRead();
+
+private:
+    OperationContextSession _operationContextSession;
+    OperationContext* const _opCtx;
+};
+
 }  // namespace mongo

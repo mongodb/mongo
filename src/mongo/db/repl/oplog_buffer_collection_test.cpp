@@ -839,6 +839,22 @@ DEATH_TEST_REGEX_F(OplogBufferCollectionTest,
     oplogBuffer.push(_opCtx.get(), oplog.begin(), oplog.end());
 }
 
+TEST_F(OplogBufferCollectionTest, PreloadAllNonBlockingSucceeds) {
+    auto nss = makeNamespace(_agent);
+    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+
+    oplogBuffer.startup(_opCtx.get());
+    const std::vector<BSONObj> oplog = {
+        makeOplogEntry(2),
+        makeOplogEntry(1),
+    };
+    ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    oplogBuffer.preload(_opCtx.get(), oplog.begin(), oplog.end());
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+    ASSERT_NOT_EQUALS(oplogBuffer.getSize(), 0UL);
+    ASSERT_EQUALS(Timestamp(2, 2), oplogBuffer.getLastPushedTimestamp());
+}
+
 
 OplogBufferCollection::Options _makeOptions(std::size_t peekCacheSize) {
     OplogBufferCollection::Options options;

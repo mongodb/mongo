@@ -47,6 +47,7 @@
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/session_update_tracker.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
@@ -515,6 +516,20 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     // forward.
     repl::ReplClientInfo::forClient(opCtx->getClient()).clearLastOp();
 
+    // All the ops will have the same session, so we can retain the scopedSession throughout
+    // the loop, except when invalidated by multi-document transactions. This allows us to
+    // track the statements in a retryable write.
+    boost::optional<MongoDOperationContextSessionWithoutOplogRead> scopedSession;
+
+    // Make sure a partial session doesn't escape.
+    ON_BLOCK_EXIT([this, &scopedSession, &opCtx] {
+        if (scopedSession) {
+            auto txnParticipant = TransactionParticipant::get(opCtx.get());
+            invariant(txnParticipant);
+            txnParticipant.invalidate(opCtx.get());
+        }
+    });
+
     for (auto iter = begin; iter != end; iter++) {
         const auto& entry = *iter->first;
         invariant(!isResumeTokenNoop(entry));
@@ -529,8 +544,9 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
         noopEntry.setOpTime(*iter->second);
         noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-        boost::optional<MongoDOperationContextSession> scopedSession;
         boost::optional<SessionTxnRecord> sessionTxnRecord;
+        std::vector<StmtId> stmtIds;
+        boost::optional<OpTime> prevWriteOpTime = boost::none;
         if (entry.getTxnNumber() && !entry.isPartialTransaction() &&
             (entry.getCommandType() == repl::OplogEntry::CommandType::kCommitTransaction ||
              entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps)) {
@@ -550,7 +566,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         "op"_attr = redact(entry.toBSONForLogging()));
 
             // Check out the session.
-            scopedSession.emplace(opCtx.get());
+            if (!scopedSession)
+                scopedSession.emplace(opCtx.get());
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
             uassert(
                 5351500,
@@ -574,16 +591,80 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Use the same wallclock time as the noop entry.
             sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
             sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
+        } else if (entry.getStatementId() && !SessionUpdateTracker::isTransactionEntry(entry)) {
+            // If it has a statement id but isn't a transaction, it's a retryable write.
+            const auto& sessionId = *entry.getSessionId();
+            const auto& txnNumber = *entry.getTxnNumber();
+            const auto& stmtId = *entry.getStatementId();
+            if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
+                // TODO(SERVER-53510): handle pre and post image no-ops
+                LOGV2_DEBUG(5350903,
+                            2,
+                            "Skipping retryable write no-op",
+                            "entry"_attr = entry.getEntry(),
+                            "sessionId"_attr = sessionId,
+                            "txnNumber"_attr = txnNumber,
+                            "statementId"_attr = stmtId,
+                            "tenant"_attr = _tenantId,
+                            "migrationUuid"_attr = _migrationUuid);
+                continue;
+            }
+            stmtIds.push_back(stmtId);
+
+            LOGV2_DEBUG(5350901,
+                        2,
+                        "Tenant Oplog Applier processing retryable write",
+                        "sessionId"_attr = sessionId,
+                        "txnNumber"_attr = txnNumber,
+                        "statementId"_attr = stmtId,
+                        "tenant"_attr = _tenantId,
+                        "migrationUuid"_attr = _migrationUuid);
+            opCtx->setLogicalSessionId(sessionId);
+            opCtx->setTxnNumber(txnNumber);
+            if (!scopedSession)
+                scopedSession.emplace(opCtx.get());
+            auto txnParticipant = TransactionParticipant::get(opCtx.get());
+            uassert(5350900,
+                    str::stream() << "Tenant oplog application failed to get retryable write "
+                                     "for transaction "
+                                  << txnNumber << " on session " << sessionId,
+                    txnParticipant);
+            // beginOrContinue throws on failure, which will abort the migration. Failure should
+            // only result from out-of-order processing, which should not happen.
+            txnParticipant.beginOrContinue(opCtx.get(),
+                                           txnNumber,
+                                           boost::none /* autocommit */,
+                                           boost::none /* startTransaction */);
+
+            // We should never process the same donor statement twice, except in failover
+            // cases where we'll also have "forgotten" the statement was executed.
+            uassert(5350902,
+                    str::stream() << "Tenant oplog application processed same retryable write "
+                                     "twice for transaction "
+                                  << txnNumber << " statement " << stmtId << " on session "
+                                  << sessionId,
+                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId));
+            prevWriteOpTime = txnParticipant.getLastWriteOpTime();
+
+            // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
+            noopEntry.setSessionId(sessionId);
+            noopEntry.setTxnNumber(txnNumber);
+            noopEntry.setStatementId(stmtId);
+
+            // set fromMigrate on the no-op so the session update tracker recognizes it.
+            noopEntry.setFromMigrate(true);
+
+            // Use the same wallclock time as the noop entry.  The lastWriteOpTime will be filled
+            // in after the no-op is written.
+            sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
         }
 
         // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
         const boost::optional<OpTime> preImageOpTime = boost::none;
         const boost::optional<OpTime> postImageOpTime = boost::none;
-        // TODO(SERVER-53509) Correctly fill in prevWriteOpTime for retryable writes.
-        const boost::optional<OpTime> prevWriteOpTimeInTransaction = boost::none;
         noopEntry.setPreImageOpTime(preImageOpTime);
         noopEntry.setPostImageOpTime(postImageOpTime);
-        noopEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTimeInTransaction);
+        noopEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
 
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
         writeConflictRetry(
@@ -591,10 +672,15 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 WriteUnitOfWork wuow(opCtx.get());
 
                 // Write the noop entry and update config.transactions.
-                repl::logOp(opCtx.get(), &noopEntry);
+                auto oplogOpTime = repl::logOp(opCtx.get(), &noopEntry);
                 if (sessionTxnRecord) {
+                    // We do not need to record the last write op time for migrated transactions, so
+                    // we leave it null for consistency with transactions completed before the
+                    // migration..
+                    if (!opCtx->inMultiDocumentTransaction())
+                        sessionTxnRecord->setLastWriteOpTime(oplogOpTime);
                     TransactionParticipant::get(opCtx.get())
-                        .onWriteOpCompletedOnPrimary(opCtx.get(), {}, *sessionTxnRecord);
+                        .onWriteOpCompletedOnPrimary(opCtx.get(), {stmtIds}, *sessionTxnRecord);
                 }
 
                 wuow.commit();
@@ -607,6 +693,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             invariant(txnParticipant);
             txnParticipant.invalidate(opCtx.get());
             opCtx->resetMultiDocumentTransactionState();
+            scopedSession = boost::none;
         }
     }
 }

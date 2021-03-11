@@ -63,6 +63,12 @@ public:
      */
     boost::optional<std::vector<OplogEntry>> updateSession(const OplogEntry& entry);
 
+    /**
+     * Returns true if the oplog entry represents an operation in a transaction and false otherwise.
+     * No-ops representing migrated transactions are considered transaction operations.
+     */
+    static bool isTransactionEntry(const OplogEntry& entry);
+
 private:
     /**
      * Analyzes the given oplog entry and determines which transactions stored so far needs to be

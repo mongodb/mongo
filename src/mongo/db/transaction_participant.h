@@ -383,6 +383,12 @@ public:
          */
         void refreshFromStorageIfNeeded(OperationContext* opCtx);
 
+        /*
+         * Same as above, but does not retrieve full transaction history and should be called
+         * only when oplog reads are not possible.
+         */
+        void refreshFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx);
+
         /**
          * Starts a new transaction (and if the txnNumber is newer aborts any in-progress
          * transaction on the session), or continues an already active transaction.
@@ -771,6 +777,9 @@ public:
         // Attempt to continue an in-progress multi document transaction at the given transaction
         // number.
         void _continueMultiDocumentTransaction(OperationContext* opCtx, TxnNumber txnNumber);
+
+        // Implementation of public refreshFromStorageIfNeeded methods.
+        void _refreshFromStorageIfNeeded(OperationContext* opCtx, bool fetchOplogEntries);
 
         // Helper that invalidates the session state and activeTxnNumber. Also resets the single
         // transaction stats because the session is no longer valid.

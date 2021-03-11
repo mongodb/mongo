@@ -109,16 +109,21 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
     _size = sizeResult.getValue();
     _sizeIsValid = true;
 
-    auto countResult = _storageInterface->getCollectionCount(opCtx, _nss);
-    fassert(40404, countResult);
-    _count = countResult.getValue();
-
     // We always start from the beginning, with _lastPoppedKey being empty. This is safe because
     // it is always safe to replay old oplog entries in order. We explicitly reset all fields
     // since nothing prevents reusing an OplogBufferCollection, and the underlying collection may
     // have changed since the last time we used this OplogBufferCollection.
     _lastPoppedKey = {};
     _peekCache = std::queue<BSONObj>();
+
+    _updateLastPushedTimestampFromCollection(lk, opCtx);
+}
+
+void OplogBufferCollection::_updateLastPushedTimestampFromCollection(WithLock,
+                                                                     OperationContext* opCtx) {
+    auto countResult = _storageInterface->getCollectionCount(opCtx, _nss);
+    fassert(40404, countResult);
+    _count = countResult.getValue();
 
     if (_count == 0) {
         _lastPushedTimestamp = {};
@@ -154,18 +159,43 @@ void OplogBufferCollection::push(OperationContext* opCtx,
     if (begin == end) {
         return;
     }
-    size_t numDocs = std::distance(begin, end);
-    std::vector<BSONObj> docsToInsert(numDocs);
     stdx::lock_guard<Latch> lk(_mutex);
+    // Make sure timestamp order is correct.
     auto ts = _lastPushedTimestamp;
-    std::transform(begin, end, docsToInsert.begin(), [&ts](const Value& value) {
-        BSONObj doc;
+    std::for_each(begin, end, [&ts](const Value& value) {
         auto previousTimestamp = ts;
-        std::tie(doc, ts) = addIdToDocument(value);
-        invariant(!value.isEmpty());
+        ts = value[kTimestampFieldName].timestamp();
+        invariant(!ts.isNull());
         invariant(ts > previousTimestamp,
                   str::stream() << "ts: " << ts.toString()
                                 << ", previous: " << previousTimestamp.toString());
+    });
+
+    _push(lk, opCtx, begin, end);
+    _lastPushedTimestamp = ts;
+}
+
+void OplogBufferCollection::preload(OperationContext* opCtx,
+                                    Batch::const_iterator begin,
+                                    Batch::const_iterator end) {
+    if (begin == end) {
+        return;
+    }
+    stdx::lock_guard<Latch> lk(_mutex);
+    invariant(_lastPoppedKey.isEmpty());
+    _push(lk, opCtx, begin, end);
+    _updateLastPushedTimestampFromCollection(lk, opCtx);
+}
+
+void OplogBufferCollection::_push(WithLock,
+                                  OperationContext* opCtx,
+                                  Batch::const_iterator begin,
+                                  Batch::const_iterator end) {
+    size_t numDocs = std::distance(begin, end);
+    std::vector<BSONObj> docsToInsert(numDocs);
+    std::transform(begin, end, docsToInsert.begin(), [](const Value& value) {
+        auto [doc, ts] = addIdToDocument(value);
+        invariant(!value.isEmpty());
         return doc;
     });
 
@@ -191,8 +221,6 @@ void OplogBufferCollection::push(OperationContext* opCtx,
     // Since the writes are ordered, it's ok to check just the last writeOp result.
     uassertStatusOK(writeResult.results.back());
 
-
-    _lastPushedTimestamp = ts;
     _count += numDocs;
     if (_sizeIsValid) {
         _size += std::accumulate(begin, end, 0U, [](const size_t& docSize, const Value& value) {

@@ -1124,7 +1124,7 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
             // Wait for enough space.
             _donorOplogBuffer->waitForSpace(opCtx.get(), toApplyDocumentBytes);
             // Buffer retryable writes entries.
-            _donorOplogBuffer->push(
+            _donorOplogBuffer->preload(
                 opCtx.get(), retryableWritesEntries.begin(), retryableWritesEntries.end());
         }
 
