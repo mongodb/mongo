@@ -524,6 +524,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
         '$BUILD_DIR/mongo/db/repl/oplog_interface_local',
+        '$BUILD_DIR/mongo/db/repl/primary_only_service_test_fixture',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',

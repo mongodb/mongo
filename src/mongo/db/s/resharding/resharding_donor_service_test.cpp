@@ -31,220 +31,383 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional.hpp>
+#include <boost/optional/optional_io.hpp>
 
-#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_cache_noop.h"
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/primary_only_service_test_fixture.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/resharding/resharding_coordinator_service.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common_test.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/shard_metadata_util.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
-auto reshardingTempNss(const UUID& existingUUID) {
-    return NamespaceString(fmt::format("db.system.resharding.{}", existingUUID.toString()));
-}
+class OpObserverForTest;
+class PauseDuringStateTransition;
 
-class ReshardingDonorServiceTest : public ReshardingDonorRecipientCommonTest {
-protected:
-    class ThreeRecipientsCatalogClient final : public ShardingCatalogClientMock {
-    public:
-        ThreeRecipientsCatalogClient(UUID existingUUID, std::vector<ShardId> recipients)
-            : _existingUUID(std::move(existingUUID)), _recipients(std::move(recipients)) {}
+class DonorStateTransitionController {
+public:
+    DonorStateTransitionController() = default;
 
-        // Makes one chunk object per shard; the actual key ranges not relevant for the test.
-        // The output is deterministic since this function is also used to provide data to the
-        // catalog cache loader.
-        static std::vector<ChunkType> makeChunks(const NamespaceString& nss,
-                                                 const std::vector<ShardId> shards,
-                                                 const ChunkVersion& chunkVersion) {
-            std::vector<ChunkType> chunks;
-            constexpr auto kKeyDelta = 1000;
-
-            int curKey = 0;
-            for (size_t i = 0; i < shards.size(); ++i, curKey += kKeyDelta) {
-                const auto min = (i == 0) ? BSON("a" << MINKEY) : BSON("a" << curKey);
-                const auto max = (i == shards.size() - 1) ? BSON("a" << MAXKEY)
-                                                          : BSON("a" << curKey + kKeyDelta);
-                chunks.push_back(ChunkType(nss, ChunkRange(min, max), chunkVersion, shards[i]));
-            }
-
-            return chunks;
-        }
-
-        StatusWith<std::vector<ChunkType>> getChunks(
-            OperationContext* opCtx,
-            const BSONObj& filter,
-            const BSONObj& sort,
-            boost::optional<int> limit,
-            repl::OpTime* opTime,
-            repl::ReadConcernLevel readConcern,
-            const boost::optional<BSONObj>& hint) override {
-            auto version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-            return makeChunks(reshardingTempNss(_existingUUID), _recipients, version);
-        }
-
-        StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-            OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
-            auto shardTypes = [this]() {
-                std::vector<ShardType> result;
-                std::transform(
-                    kRecipientShards.begin(),
-                    kRecipientShards.end(),
-                    std::back_inserter(result),
-                    [&](const ShardId& id) { return ShardType(id.toString(), id.toString()); });
-                return result;
-            };
-            return repl::OpTimeWith<std::vector<ShardType>>(shardTypes());
-        }
-
-        UUID _existingUUID;
-        ChunkVersion maxCollVersion = ChunkVersion(0, 0, OID::gen(), boost::none);
-        std::vector<ShardId> _recipients;
-    };
-
-    void setUp() override {
-        _reshardingUUID = UUID::gen();
-
-        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
-        _mockCatalogCacheLoader = mockLoader.get();
-
-        // Must be called prior to setUp so that the catalog cache is wired properly.
-        setCatalogCacheLoader(std::move(mockLoader));
-        ReshardingDonorRecipientCommonTest::setUp();
-
-        mockCatalogCacheLoader(
-            NamespaceString(kReshardNs), reshardingTempNss(kExistingUUID), kRecipientShards);
+    void waitUntilStateIsReached(DonorStateEnum state) {
+        stdx::unique_lock lk(_mutex);
+        _waitUntilUnpausedCond.wait(lk, [this, state] { return _state == state; });
     }
 
-    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
-        return std::make_unique<ThreeRecipientsCatalogClient>(
-            uassertStatusOK(UUID::parse(kExistingUUID.toString())), kRecipientShards);
+private:
+    friend OpObserverForTest;
+    friend PauseDuringStateTransition;
+
+    void setPauseDuringTransition(DonorStateEnum state) {
+        stdx::lock_guard lk(_mutex);
+        _pauseDuringTransition.insert(state);
     }
 
-    std::shared_ptr<ReshardingDonorService::DonorStateMachine> getStateMachineInstace(
-        OperationContext* opCtx, ReshardingDonorDocument initialState) {
-        auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-        auto service = registry->lookupServiceByName(ReshardingDonorService::kServiceName);
-        return ReshardingDonorService::DonorStateMachine::getOrCreate(
-            opCtx, service, initialState.toBSON());
+    void unsetPauseDuringTransition(DonorStateEnum state) {
+        stdx::lock_guard lk(_mutex);
+        _pauseDuringTransition.erase(state);
+        _pauseDuringTransitionCond.notify_all();
     }
 
-    std::vector<BSONObj> getOplogWritesForDonorDocument(const ReshardingDonorDocument& doc) {
-        auto reshardNs = doc.getSourceNss().toString();
-        DBDirectClient client(operationContext());
-        auto result = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                                   BSON("ns" << reshardNs));
-        std::vector<BSONObj> results;
-        while (result->more()) {
-            results.push_back(result->next());
-        }
-        return results;
+    void notifyNewStateAndWaitUntilUnpaused(DonorStateEnum newState) {
+        stdx::unique_lock lk(_mutex);
+        _state = newState;
+        _waitUntilUnpausedCond.notify_all();
+        _pauseDuringTransitionCond.wait(
+            lk, [this, newState] { return _pauseDuringTransition.count(newState) == 0; });
     }
 
-    void mockCatalogCacheLoader(const NamespaceString& nss,
-                                const NamespaceString tempNss,
-                                const std::vector<ShardId>& recipients) {
-        auto version = ChunkVersion(1, 0, OID::gen(), boost::none /* timestamp */);
-        CollectionType coll(nss, version.epoch(), Date_t::now(), UUID::gen());
-        coll.setKeyPattern(BSON("y" << 1));
-        coll.setUnique(false);
-        coll.setAllowMigrations(false);
+    Mutex _mutex = MONGO_MAKE_LATCH("DonorStateTransitionController::_mutex");
+    stdx::condition_variable _pauseDuringTransitionCond;
+    stdx::condition_variable _waitUntilUnpausedCond;
 
-        _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(
-            DatabaseType(nss.toString(), recipients.front(), true, DatabaseVersion(UUID::gen())));
-        _mockCatalogCacheLoader->setCollectionRefreshValues(
-            kTemporaryReshardingNss,
-            coll,
-            ThreeRecipientsCatalogClient::makeChunks(tempNss, recipients, version),
-            boost::none);
-    }
-
-    boost::optional<UUID> _reshardingUUID;
-    boost::optional<UUID> _existingUUID;
-    CatalogCacheLoaderMock* _mockCatalogCacheLoader;
-
-    static const inline auto kRecipientShards =
-        std::vector<ShardId>{ShardId("shard1"), ShardId("shard2"), ShardId("shard3")};
-    static constexpr auto kExpectedO2Type = "reshardFinalOp"_sd;
-    static constexpr auto kReshardNs = "db.foo"_sd;
+    std::set<DonorStateEnum> _pauseDuringTransition;
+    DonorStateEnum _state = DonorStateEnum::kUnused;
 };
 
-TEST_F(ReshardingDonorServiceTest,
-       ShouldWriteFinalOpLogEntryAfterTransitionToPreparingToBlockWrites) {
-    DonorShardContext donorCtx;
-    donorCtx.setState(DonorStateEnum::kPreparingToBlockWrites);
-
-    ReshardingDonorDocument doc(std::move(donorCtx), kRecipientShards);
-    CommonReshardingMetadata metadata(kReshardingUUID,
-                                      mongo::NamespaceString(kReshardNs),
-                                      kExistingUUID,
-                                      kTemporaryReshardingNss,
-                                      KeyPattern(kReshardingKeyPattern));
-    doc.setCommonReshardingMetadata(metadata);
-    doc.getMutableState().setMinFetchTimestamp(Timestamp(10, 1));
-    doc.getMutableState().setBytesToClone(1000);
-    doc.getMutableState().setDocumentsToClone(5);
-
-    auto donorStateMachine = getStateMachineInstace(operationContext(), doc);
-    ASSERT(donorStateMachine);
-
-    const auto expectedRecipients =
-        std::set<ShardId>(kRecipientShards.begin(), kRecipientShards.end());
-    ASSERT(expectedRecipients.size());
-
-    donorStateMachine->awaitFinalOplogEntriesWritten().get();
-
-    const auto oplogs = getOplogWritesForDonorDocument(doc);
-    ASSERT(oplogs.size() == expectedRecipients.size());
-
-    std::set<ShardId> actualRecipients;
-    for (const auto& oplog : oplogs) {
-        LOGV2_INFO(5279502, "verify retrieved oplog document", "document"_attr = oplog);
-
-        ASSERT(oplog.hasField("ns"));
-        auto actualNs = oplog.getStringField("ns");
-        ASSERT_EQUALS(kReshardNs, actualNs);
-
-        ASSERT(oplog.hasField("o2"));
-        auto o2 = oplog.getObjectField("o2");
-        ASSERT(o2.hasField("type"));
-        auto actualType = StringData(o2.getStringField("type"));
-        ASSERT_EQUALS(kExpectedO2Type, actualType);
-        ASSERT(o2.hasField("reshardingUUID"));
-        auto actualReshardingUUIDBson = o2.getField("reshardingUUID");
-        auto actualReshardingUUID = UUID::parse(actualReshardingUUIDBson);
-        ASSERT_EQUALS(doc.getReshardingUUID(), actualReshardingUUID);
-
-        ASSERT(oplog.hasField("ui"));
-        auto actualUiBson = oplog.getField("ui");
-        auto actualUi = UUID::parse(actualUiBson);
-        ASSERT_EQUALS(kExistingUUID, actualUi);
-
-        ASSERT(oplog.hasField("destinedRecipient"));
-        auto actualRecipient = oplog.getStringField("destinedRecipient");
-        actualRecipients.insert(ShardId(actualRecipient));
+class PauseDuringStateTransition {
+public:
+    PauseDuringStateTransition(DonorStateTransitionController* controller, DonorStateEnum state)
+        : _controller{controller}, _state{state} {
+        _controller->setPauseDuringTransition(_state);
     }
 
-    ASSERT(expectedRecipients == actualRecipients);
+    ~PauseDuringStateTransition() {
+        _controller->unsetPauseDuringTransition(_state);
+    }
+
+    void wait() {
+        _controller->waitUntilStateIsReached(_state);
+    }
+
+private:
+    DonorStateTransitionController* const _controller;
+    const DonorStateEnum _state;
+};
+
+class OpObserverForTest : public OpObserverNoop {
+public:
+    OpObserverForTest(std::shared_ptr<DonorStateTransitionController> controller)
+        : _controller{std::move(controller)} {}
+
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
+        if (args.nss != NamespaceString::kDonorReshardingOperationsNamespace) {
+            return;
+        }
+
+        auto doc =
+            ReshardingDonorDocument::parse({"OpObserverForTest"}, args.updateArgs.updatedDoc);
+
+        _controller->notifyNewStateAndWaitUntilUnpaused(doc.getMutableState().getState());
+    }
+
+private:
+    std::shared_ptr<DonorStateTransitionController> _controller;
+};
+
+class ExternalStateForTest : public ReshardingDonorService::DonorStateMachineExternalState {
+public:
+    ShardId myShardId(ServiceContext* serviceContext) const override {
+        return ShardId{"myShardId"};
+    }
+
+    void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
+
+    void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override {}
+
+    void updateCoordinatorDocument(OperationContext* opCtx,
+                                   const BSONObj& query,
+                                   const BSONObj& update) override {}
+};
+
+class ReshardingDonorServiceForTest : public ReshardingDonorService {
+public:
+    explicit ReshardingDonorServiceForTest(ServiceContext* serviceContext)
+        : ReshardingDonorService(serviceContext) {}
+
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        BSONObj initialState) const override {
+        return std::make_shared<DonorStateMachine>(std::move(initialState),
+                                                   std::make_unique<ExternalStateForTest>());
+    }
+};
+
+class ReshardingDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
+public:
+    using DonorStateMachine = ReshardingDonorService::DonorStateMachine;
+
+    std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
+        return std::make_unique<ReshardingDonorServiceForTest>(serviceContext);
+    }
+
+    void setUp() override {
+        repl::PrimaryOnlyServiceMongoDTest::setUp();
+
+        auto serviceContext = getServiceContext();
+        auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
+        repl::DropPendingCollectionReaper::set(
+            serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
+        repl::StorageInterface::set(serviceContext, std::move(storageMock));
+
+        _controller = std::make_shared<DonorStateTransitionController>();
+        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(_controller));
+    }
+
+    DonorStateTransitionController* controller() {
+        return _controller.get();
+    }
+
+    ReshardingDonorDocument makeStateDocument() {
+        DonorShardContext donorCtx;
+        donorCtx.setState(DonorStateEnum::kPreparingToDonate);
+
+        ReshardingDonorDocument doc(
+            std::move(donorCtx),
+            {ShardId{"recipient1"}, ShardId{"recipient2"}, ShardId{"recipient3"}});
+
+        NamespaceString sourceNss("sourcedb.sourcecollection");
+        auto sourceUUID = UUID::gen();
+        auto commonMetadata =
+            CommonReshardingMetadata(UUID::gen(),
+                                     sourceNss,
+                                     sourceUUID,
+                                     constructTemporaryReshardingNss(sourceNss.db(), sourceUUID),
+                                     BSON("newKey" << 1));
+
+        doc.setCommonReshardingMetadata(std::move(commonMetadata));
+        return doc;
+    }
+
+    void notifyRecipientsDoneCloning(OperationContext* opCtx,
+                                     DonorStateMachine& donor,
+                                     const ReshardingDonorDocument& donorDoc) {
+        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kApplying);
+    }
+
+    void notifyToStartBlockingWrites(OperationContext* opCtx,
+                                     DonorStateMachine& donor,
+                                     const ReshardingDonorDocument& donorDoc) {
+        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
+    }
+
+    void notifyReshardingOutcomeDecided(OperationContext* opCtx,
+                                        DonorStateMachine& donor,
+                                        const ReshardingDonorDocument& donorDoc,
+                                        Status outcome) {
+        if (outcome.isOK()) {
+            _onReshardingFieldsChanges(
+                opCtx, donor, donorDoc, CoordinatorStateEnum::kDecisionPersisted);
+        } else {
+            _onReshardingFieldsChanges(
+                opCtx, donor, donorDoc, CoordinatorStateEnum::kError, std::move(outcome));
+        }
+    }
+
+private:
+    void _onReshardingFieldsChanges(OperationContext* opCtx,
+                                    DonorStateMachine& donor,
+                                    const ReshardingDonorDocument& donorDoc,
+                                    CoordinatorStateEnum coordinatorState,
+                                    boost::optional<Status> abortReason = boost::none) {
+        auto reshardingFields = TypeCollectionReshardingFields{donorDoc.getReshardingUUID()};
+        auto donorFields = TypeCollectionDonorFields{donorDoc.getTempReshardingNss(),
+                                                     donorDoc.getReshardingKey(),
+                                                     donorDoc.getRecipientShards()};
+        reshardingFields.setDonorFields(donorFields);
+        reshardingFields.setState(coordinatorState);
+        emplaceAbortReasonIfExists(reshardingFields, std::move(abortReason));
+        donor.onReshardingFieldsChanges(opCtx, reshardingFields);
+    }
+
+    std::shared_ptr<DonorStateTransitionController> _controller;
+};
+
+TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimestamp) {
+    boost::optional<PauseDuringStateTransition> donatingInitialDataTransitionGuard =
+        PauseDuringStateTransition{controller(), DonorStateEnum::kDonatingInitialData};
+
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    donatingInitialDataTransitionGuard->wait();
+    stepDown();
+    donatingInitialDataTransitionGuard.reset();
+
+    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+
+    DBDirectClient client(opCtx.get());
+    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
+                               BSON("ns" << doc.getSourceNss().toString()));
+
+    ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
+    repl::OplogEntry op(cursor->next());
+    ASSERT_FALSE(cursor->more()) << "Found multiple oplog entries for source collection: "
+                                 << op.getEntry() << " and " << cursor->nextSafe();
+
+    ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+        << op.getEntry();
+    ASSERT_EQ(op.getUuid(), doc.getSourceUUID()) << op.getEntry();
+    ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+    ASSERT_FALSE(bool(op.getObject2())) << op.getEntry();
+    ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
+}
+
+TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBlocked) {
+    boost::optional<PauseDuringStateTransition> blockingWritesTransitionGuard =
+        PauseDuringStateTransition{controller(), DonorStateEnum::kBlockingWrites};
+
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+
+    blockingWritesTransitionGuard->wait();
+    stepDown();
+    blockingWritesTransitionGuard.reset();
+
+    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
+              ErrorCodes::InterruptedDueToReplStateChange);
+
+    DBDirectClient client(opCtx.get());
+    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
+                               BSON("ns" << doc.getSourceNss().toString()));
+
+    ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
+    // Skip the first oplog entry returned because it is the no-op from generating the
+    // minFetchTimestamp value.
+    cursor->next();
+
+    for (const auto& recipientShardId : doc.getRecipientShards()) {
+        ASSERT_TRUE(cursor->more()) << "Didn't find finalReshardOp entry for source collection";
+        repl::OplogEntry op(cursor->next());
+
+        ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
+            << op.getEntry();
+        ASSERT_EQ(op.getUuid(), doc.getSourceUUID()) << op.getEntry();
+        ASSERT_EQ(op.getDestinedRecipient(), recipientShardId) << op.getEntry();
+        ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
+        ASSERT_TRUE(bool(op.getObject2())) << op.getEntry();
+        ASSERT_BSONOBJ_BINARY_EQ(*op.getObject2(),
+                                 BSON("type"
+                                      << "reshardFinalOp"
+                                      << "reshardingUUID" << doc.getReshardingUUID()));
+    }
+
+    ASSERT_FALSE(cursor->more()) << "Found extra oplog entry for source collection: "
+                                 << cursor->nextSafe();
+}
+
+TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+
+    {
+        CollectionOptions options;
+        options.uuid = doc.getSourceUUID();
+        resharding::data_copy::ensureCollectionExists(opCtx.get(), doc.getSourceNss(), options);
+    }
+
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+
+    {
+        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+        ASSERT_TRUE(bool(coll));
+        ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+    }
+
+    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+
+    {
+        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+        ASSERT_FALSE(bool(coll));
+    }
+}
+
+TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnError) {
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+
+    {
+        CollectionOptions options;
+        options.uuid = doc.getSourceUUID();
+        resharding::data_copy::ensureCollectionExists(opCtx.get(), doc.getSourceNss(), options);
+    }
+
+    DonorStateMachine::insertStateDocument(opCtx.get(), doc);
+    auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+    notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
+    notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
+
+    {
+        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+        ASSERT_TRUE(bool(coll));
+        ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+    }
+
+    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
+    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
+
+    {
+        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+        ASSERT_TRUE(bool(coll));
+        ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+    }
 }
 
 }  // namespace
