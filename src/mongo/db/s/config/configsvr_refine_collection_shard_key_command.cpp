@@ -113,11 +113,11 @@ public:
                               << "refineCollectionShardKey namespace " << nss << " is not sharded");
             }
 
-            const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
-            const auto proposedKey = request().getKey().getOwned();
+            const ShardKeyPattern oldShardKeyPattern(collType.getKeyPattern());
+            const ShardKeyPattern newShardKeyPattern(request().getKey());
 
             if (SimpleBSONObjComparator::kInstance.evaluate(oldShardKeyPattern.toBSON() ==
-                                                            proposedKey)) {
+                                                            newShardKeyPattern.toBSON())) {
                 repl::ReplClientInfo::forClient(opCtx->getClient())
                     .setLastOpToSystemLastOpTime(opCtx);
                 return;
@@ -131,12 +131,11 @@ public:
 
             // Validate the given shard key (i) extends the current shard key, (ii) has a "useful"
             // index, and (iii) the index in question has no null entries.
-            const auto newShardKeyPattern = ShardKeyPattern(proposedKey);
-
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "refineCollectionShardKey shard key " << proposedKey.toString()
+                    str::stream() << "refineCollectionShardKey shard key "
+                                  << newShardKeyPattern.toString()
                                   << " does not extend the current shard key "
-                                  << collType.getKeyPattern().toString(),
+                                  << oldShardKeyPattern.toString(),
                     oldShardKeyPattern.isExtendedBy(newShardKeyPattern));
 
             // Indexes are loaded using shard versions, so validating the shard key may need to be
@@ -152,7 +151,6 @@ public:
                                   shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                                       opCtx,
                                       nss,
-                                      proposedKey,
                                       newShardKeyPattern,
                                       boost::none,
                                       collType.getUnique(),
@@ -164,7 +162,8 @@ public:
                   "CMD: refineCollectionShardKey",
                   "request"_attr = request().toBSON({}));
 
-            audit::logRefineCollectionShardKey(opCtx->getClient(), nss.ns(), proposedKey);
+            audit::logRefineCollectionShardKey(
+                opCtx->getClient(), nss.ns(), newShardKeyPattern.toBSON());
 
             ShardingCatalogManager::get(opCtx)->refineCollectionShardKey(
                 opCtx, nss, newShardKeyPattern);

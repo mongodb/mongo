@@ -416,7 +416,6 @@ void ReshardingRecipientService::RecipientStateMachine::
                               shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
                                   opCtx.get(),
                                   _metadata.getTempReshardingNss(),
-                                  shardKeyPattern.toBSON(),
                                   shardKeyPattern,
                                   CollationSpec::kSimpleSpec,
                                   false,

@@ -467,7 +467,6 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
         opCtx,
         _nss,
-        _shardKeyPattern->toBSON(),
         *_shardKeyPattern,
         _collation,
         _request.getUnique() ? *_request.getUnique() : false,
