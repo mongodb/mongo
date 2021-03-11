@@ -126,6 +126,13 @@ public:
     // Only currently used by the TenantMigrationRecipientService, so not part of a parent API.
     Timestamp getLastPushedTimestamp() const;
 
+    /**
+     * Like push(), but allows the operations in the batch to be out of order with
+     * respect to themselves and to the buffer. Legal to be called only before reading anything,
+     * or immediately after a clear().
+     */
+    void preload(OperationContext* opCtx, Batch::const_iterator begin, Batch::const_iterator end);
+
     // ---- Testing API ----
     Timestamp getLastPoppedTimestamp_forTest() const;
     std::queue<BSONObj> getPeekCache_forTest() const;
@@ -157,10 +164,23 @@ private:
     bool _pop_inlock(OperationContext* opCtx, Value* value);
 
     /**
+     * Puts documents in collection without checking for order and without updating
+     * _lastPushedTimestamp.
+     */
+    void _push(WithLock,
+               OperationContext* opCtx,
+               Batch::const_iterator begin,
+               Batch::const_iterator end);
+    /**
      * Returns the last document pushed onto the collection. This does not remove the `_id` field
      * of the document. If the collection is empty, this returns boost::none.
      */
     boost::optional<Value> _lastDocumentPushed_inlock(OperationContext* opCtx) const;
+
+    /**
+     * Updates '_lastPushedTimestamp' based on the last document in the collection.
+     */
+    void _updateLastPushedTimestampFromCollection(WithLock, OperationContext* opCtx);
 
     /**
      * Returns the document with the given timestamp, or ErrorCodes::NoSuchKey if not found.

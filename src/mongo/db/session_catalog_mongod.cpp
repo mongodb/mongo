@@ -443,4 +443,16 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
     invariant(!txnParticipant.transactionIsInProgress());
 }
 
+MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(
+    OperationContext* opCtx)
+    : _operationContextSession(opCtx), _opCtx(opCtx) {
+    invariant(!opCtx->getClient()->isInDirectClient());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
+}
+
+MongoDOperationContextSessionWithoutOplogRead::~MongoDOperationContextSessionWithoutOplogRead() =
+    default;
+
 }  // namespace mongo
