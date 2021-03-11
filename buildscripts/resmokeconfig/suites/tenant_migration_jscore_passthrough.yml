@@ -101,6 +101,7 @@ selector:
   - requires_profiling
   # emptycapped command is blocked during tenant migration.
   - requires_emptycapped
+  - tenant_migration_incompatible
 
 executor:
   archive:

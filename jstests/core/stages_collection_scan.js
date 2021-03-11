@@ -1,6 +1,7 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   uses_testing_only_commands,
+//   tenant_migration_incompatible,
 // ]
 
 // Test basic query stage collection scan functionality.
