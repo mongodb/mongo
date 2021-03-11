@@ -6,6 +6,7 @@
 // ]
 //
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
@@ -201,6 +202,8 @@ let assertReshardCollOk = (commandObj, expectedChunks) => {
 let presetReshardedChunks =
     [{recipientShardId: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}];
 const existingZoneName = 'x1';
+
+configureFailPoint(st.configRS.getPrimary(), "reshardingCoordinatorCanEnterCriticalImplicitly");
 
 /**
  * Fail cases

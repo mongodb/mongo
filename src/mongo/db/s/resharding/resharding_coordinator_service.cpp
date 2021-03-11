@@ -69,6 +69,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
+MONGO_FAIL_POINT_DEFINE(reshardingCoordinatorCanEnterCriticalImplicitly);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -863,7 +864,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
 }
 
 ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
-    stdx::lock_guard<Latch> lg(_mutex);
     invariant(_completionPromise.getFuture().isReady());
 }
 
@@ -1035,11 +1035,13 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
                 opCtx.get(), _ctHolder->getStepdownToken());
 
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (status.isOK()) {
-                _completionPromise.emplaceValue();
-            } else {
-                _completionPromise.setError(status);
+            {
+                auto lg = stdx::lock_guard(_fulfillmentMutex);
+                if (status.isOK()) {
+                    _completionPromise.emplaceValue();
+                } else {
+                    _completionPromise.setError(status);
+                }
             }
 
             if (_criticalSectionTimeoutCbHandle) {
@@ -1054,7 +1056,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
             // Schedule cleanup work on the parent executor.
             if (!status.isOK()) {
                 {
-                    stdx::lock_guard<Latch> lg(_mutex);
+                    auto lg = stdx::lock_guard(_fulfillmentMutex);
                     if (!_completionPromise.getFuture().isReady()) {
                         _completionPromise.setError(status);
                     }
@@ -1111,6 +1113,14 @@ boost::optional<BSONObj> ReshardingCoordinatorService::ReshardingCoordinator::re
 std::shared_ptr<ReshardingCoordinatorObserver>
 ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
     return _reshardingCoordinatorObserver;
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical() {
+    auto lg = stdx::lock_guard(_fulfillmentMutex);
+    if (_canEnterCritical.getFuture().isReady())
+        return;
+    LOGV2(5391601, "Marking resharding operation okay to enter critical section");
+    _canEnterCritical.emplaceValue();
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
@@ -1275,9 +1285,20 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
                     opCtx.get(), _ctHolder->getAbortToken());
             }
 
+            LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
+            if (reshardingCoordinatorCanEnterCriticalImplicitly.shouldFail()) {
+                onOkayToEnterCritical();
+            }
+            return _canEnterCritical.getFuture()
+                .thenRunOn(**executor)
+                .then([doc = std::move(coordinatorDocChangedOnDisk)] {
+                    LOGV2(5391603, "Resharding operation is okay to enter critical section");
+                    return doc;
+                });
+        })
+        .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               coordinatorDocChangedOnDisk);
-
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
             const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
