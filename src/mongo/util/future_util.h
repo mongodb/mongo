@@ -163,8 +163,9 @@ private:
                 // loop body is not future-returning. This isn't strictly necessary but it
                 // makes implementation easier.
                 makeExecutorFutureWith(executor, executeLoopBody)
+                    .unsafeToInlineFuture()
                     .getAsync([this, self, resultPromise = std::move(resultPromise)](
-                                  StatusOrStatusWith<ReturnType>&& swResult) mutable {
+                                  auto&& swResult) mutable {
                         if (cancelToken.isCanceled()) {
                             resultPromise.setError(asyncTryCanceledStatus());
                         } else if (shouldStopIteration(swResult)) {
@@ -172,12 +173,10 @@ private:
                         } else {
                             // Retry after a delay.
                             executor->sleepFor(delay.getNext(), cancelToken)
-                                .getAsync([this, self, resultPromise = std::move(resultPromise)](
-                                              Status s) mutable {
-                                    if (s.isOK()) {
-                                        runImpl(std::move(resultPromise));
-                                    }
-                                });
+                                .unsafeToInlineFuture()
+                                .getAsync(
+                                    [this, self, resultPromise = std::move(resultPromise)](
+                                        Status s) mutable { runImpl(std::move(resultPromise)); });
                         }
                     });
             });
@@ -322,8 +321,9 @@ private:
                     // loop body is not Future-returning. This isn't strictly necessary but it
                     // makes implementation easier.
                     makeExecutorFutureWith(executor, executeLoopBody)
+                        .unsafeToInlineFuture()
                         .getAsync([this, self, resultPromise = std::move(resultPromise)](
-                                      StatusOrStatusWith<ReturnType>&& swResult) mutable {
+                                      auto&& swResult) mutable {
                             if (cancelToken.isCanceled()) {
                                 resultPromise.setError(asyncTryCanceledStatus());
                             } else if (shouldStopIteration(swResult)) {
