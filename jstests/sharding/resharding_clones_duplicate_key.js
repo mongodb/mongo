@@ -69,8 +69,8 @@ reshardingTest.withReshardingInBackground(
                                                         inputCollection.getFullName(),
                                                         ErrorCodes.DuplicateKey);
         fp.off();
-        ReshardingTestUtil.assertAllParticipantsReportAbortToCoordinator(
-            configsvr, inputCollection.getFullName(), ErrorCodes.DuplicateKey);
+        ReshardingTestUtil.assertAllParticipantsReportDoneToCoordinator(
+            configsvr, inputCollection.getFullName());
     },
     {expectedErrorCode: ErrorCodes.DuplicateKey});
 

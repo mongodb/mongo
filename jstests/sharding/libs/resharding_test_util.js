@@ -3,25 +3,22 @@
  */
 var ReshardingTestUtil = (function() {
     /**
-     * Returns whether the shard is 'done' aborting the resharding operation with
-     * 'abortReason.code'.
+     * Returns whether the shard is in state 'done'.
      */
-    const shardDoneAbortingWithCode = function(shardEntry, errorCode) {
-        return shardEntry.mutableState.abortReason &&
-            shardEntry.mutableState.abortReason.code === errorCode &&
-            shardEntry.mutableState.state === "done";
+    const shardDone = function(shardEntry) {
+        return shardEntry.mutableState.state === "done";
     };
 
     /**
-     * Confirms all resharding participants eventually write their abortReason with state 'done' to
+     * Confirms all resharding participants eventually report they've reached state 'done' to
      * the main CoordinatorDocument on the configsvr.
      *
-     * Each participant shard should eventually report its abortReason to
-     * its corresponding entry on the CoordinatorDocument -
+     * Each participant shard should eventually report to its corresponding entry on the
+     * CoordinatorDocument -
      * config.reshardingOperations.recipientShards[shardName] for recipients and
      * config.reshardingOperations.donorShards[shardName] for donors.
      */
-    const assertAllParticipantsReportAbortToCoordinator = function(configsvr, ns, errCode) {
+    const assertAllParticipantsReportDoneToCoordinator = function(configsvr, ns) {
         const reshardingOperationsCollection =
             configsvr.getCollection("config.reshardingOperations");
         assert.soon(
@@ -29,10 +26,10 @@ var ReshardingTestUtil = (function() {
                 const coordinatorDoc = reshardingOperationsCollection.findOne({ns});
                 assert(coordinatorDoc);
                 // Iterate over both the recipientShards and donorShards and check that every shard
-                // entry is in state 'done' and contains an abortReason with the errCode.
+                // entry is in state 'done'.
                 for (const shardEntry
                          of [...coordinatorDoc.recipientShards, ...coordinatorDoc.donorShards]) {
-                    if (!shardDoneAbortingWithCode(shardEntry, errCode)) {
+                    if (!shardDone(shardEntry)) {
                         return false;
                     }
                 }
@@ -40,7 +37,7 @@ var ReshardingTestUtil = (function() {
             },
             () => {
                 return "Not all participants reported to the configsvr's CoordinatorDocument" +
-                    " they are done aborting with code " + errCode + ". Got CoordinatorDocument: " +
+                    " they are done. Got CoordinatorDocument: " +
                     tojson(reshardingOperationsCollection.find().toArray());
             });
     };
@@ -51,6 +48,9 @@ var ReshardingTestUtil = (function() {
      *
      * Not exposed to users of ReshardingTestUtil, users should call assertRecipientAbortsLocally or
      * assertDonorAbortsLocally instead.
+     *
+     * Only participants that unrecoverable errors originate from will have an abortReason tied to
+     * their local document along with state 'done'.
      */
     const assertParticipantAbortsLocally = function(
         shardConn, shardName, ns, abortReason, participantType) {
@@ -81,7 +81,7 @@ var ReshardingTestUtil = (function() {
     };
 
     return {
-        assertAllParticipantsReportAbortToCoordinator,
+        assertAllParticipantsReportDoneToCoordinator,
         assertRecipientAbortsLocally,
         assertDonorAbortsLocally
     };

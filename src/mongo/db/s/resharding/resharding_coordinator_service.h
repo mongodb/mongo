@@ -313,13 +313,13 @@ private:
     /**
      * Waits on _reshardingCoordinatorObserver to notify that:
      * 1. All recipient shards have renamed the temporary collection to the original collection
-     *    namespace, and
+     *    namespace or have finished aborting, and
      * 2. All donor shards that were not also recipient shards have dropped the original
-     *    collection.
+     *    collection or have finished aborting.
      *
      * Transitions to 'kDone'.
      */
-    ExecutorFuture<void> _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(
+    ExecutorFuture<void> _awaitAllParticipantShardsDone(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**

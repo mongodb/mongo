@@ -60,10 +60,9 @@ enums:
             kDonatingInitialData: "donating-initial-data"
             kDonatingOplogEntries: "donating-oplog-entries"
             kPreparingToBlockWrites: "preparing-to-block-writes"
-            kBlockingWrites: "blocking-writes"
-            kDropping: "dropping"
-            kDone: "done"
             kError: "error"
+            kBlockingWrites: "blocking-writes"
+            kDone: "done"
 
     RecipientState:
         description: "The current state of a recipient shard for a resharding operation."
@@ -75,10 +74,10 @@ enums:
             kCloning: "cloning"
             kApplying: "applying"
             kSteadyState: "steady-state"
+            kError: "error"
             kStrictConsistency: "strict-consistency"
             kRenaming: "renaming"
             kDone: "done"
-            kError: "error"
 
     ReshardingOperationStatus:
         description: "The status of the current or most recent resharding operation."

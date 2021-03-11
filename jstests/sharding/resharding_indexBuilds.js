@@ -48,6 +48,7 @@ let createIndexFailpoint = configureFailPoint(donor0, "hangIndexBuildBeforeCommi
 createIndexThread.start();
 createIndexFailpoint.wait();
 
+let removeDonorDocFailpoint = configureFailPoint(donor0, "removeDonorDocFailpoint");
 reshardingTest.withReshardingInBackground(
     {
         newShardKeyPattern: {newKey: 1},
@@ -61,12 +62,12 @@ reshardingTest.withReshardingInBackground(
             inputCollection.getFullName(),
             ErrorCodes.BackgroundOperationInProgressForNamespace);
 
+        removeDonorDocFailpoint.off();
+
         // Note: even though the recipient state machine does not exist by the time the donor
         // errors, recipients should still acknowledge they saw the coordinator's abort.
-        ReshardingTestUtil.assertAllParticipantsReportAbortToCoordinator(
-            configsvr,
-            inputCollection.getFullName(),
-            ErrorCodes.BackgroundOperationInProgressForNamespace);
+        ReshardingTestUtil.assertAllParticipantsReportDoneToCoordinator(
+            configsvr, inputCollection.getFullName());
     },
     {expectedErrorCode: ErrorCodes.BackgroundOperationInProgressForNamespace});
 

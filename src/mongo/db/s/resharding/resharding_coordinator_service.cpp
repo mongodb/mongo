@@ -993,7 +993,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisionAndFinishRe
             // The shared_ptr maintaining the ReshardingCoordinatorService Instance object gets
             // deleted from the PrimaryOnlyService's map. Thus, shared_from_this() is necessary to
             // keep 'this' pointer alive for the remaining callbacks.
-            return _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(executor);
+            return _awaitAllParticipantShardsDone(executor);
         })
         .onError([this, self = shared_from_this(), executor](Status status) {
             {
@@ -1088,9 +1088,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_onAbort(
 
     // Wait for all participants to acknowledge the operation reached an unrecoverable
     // error.
-    future_util::withCancellation(
-        _reshardingCoordinatorObserver->awaitAllParticipantsDoneAborting(),
-        _ctHolder->getStepdownToken())
+    future_util::withCancellation(_awaitAllParticipantShardsDone(executor),
+                                  _ctHolder->getStepdownToken())
         .get();
 }
 
@@ -1368,20 +1367,18 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
     return Status::OK();
 };
 
-ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
-    _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void>
+ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsDone(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kDecisionPersisted) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
     std::vector<ExecutorFuture<ReshardingCoordinatorDocument>> futures;
     futures.emplace_back(
-        _reshardingCoordinatorObserver->awaitAllRecipientsRenamedCollection().thenRunOn(
-            **executor));
+        _reshardingCoordinatorObserver->awaitAllRecipientsDone().thenRunOn(**executor));
     futures.emplace_back(
-        _reshardingCoordinatorObserver->awaitAllDonorsDroppedOriginalCollection().thenRunOn(
-            **executor));
+        _reshardingCoordinatorObserver->awaitAllDonorsDone().thenRunOn(**executor));
 
     // We only allow the stepdown token to cancel operations after progressing past
     // kDecisionPersisted.

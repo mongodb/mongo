@@ -92,22 +92,16 @@ public:
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsInStrictConsistency();
 
     /**
-     * Fulfills the '_allRecipientsRenamedCollection' promise when the last recipient writes
+     * Fulfills the '_allRecipientsDone' promise when the last recipient writes
      * that it is in 'done' state.
      */
-    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsRenamedCollection();
+    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsDone();
 
     /**
-     * Fulfills the '_allDonorsDroppedOriginalCollection' promise when the last donor writes that it
+     * Fulfills the '_allDonorsDone' promise when the last donor writes that it
      * is in 'done' state.
      */
-    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllDonorsDroppedOriginalCollection();
-
-    /**
-     * Fulfills the '_allParticipantsDoneAborting' promise when the last recipient or donor writes
-     * that it is in 'kDone' with an abortReason.
-     */
-    SharedSemiFuture<void> awaitAllParticipantsDoneAborting();
+    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllDonorsDone();
 
     /**
      * Checks if all recipients are in steady state. Otherwise, sets an error state so that
@@ -142,11 +136,8 @@ private:
      *  {_allRecipientsFinishedCloning, RecipientStateEnum::kApplying}
      *  {_allRecipientsFinishedApplying, RecipientStateEnum::kSteadyState}
      *  {_allRecipientsReportedStrictConsistencyTimestamp, RecipientStateEnum::kStrictConsistency}
-     *  {_allRecipientsRenamedCollection, RecipientStateEnum::kDone}
-     *  {_allDonorsDroppedOriginalCollection, DonorStateEnum::kDone}
-     *  {_allParticipantsDoneAborting,
-     *                          DonorStateEnum::kDone with abortReason AND
-     *                          RecipientStateEnum::kDone with abortReason}
+     *  {_allRecipientsDone, RecipientStateEnum::kDone}
+     *  {_allDonorsDone, DonorStateEnum::kDone}
      */
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsReportedMinFetchTimestamp;
@@ -157,11 +148,9 @@ private:
 
     SharedPromise<ReshardingCoordinatorDocument> _allRecipientsReportedStrictConsistencyTimestamp;
 
-    SharedPromise<ReshardingCoordinatorDocument> _allRecipientsRenamedCollection;
+    SharedPromise<ReshardingCoordinatorDocument> _allRecipientsDone;
 
-    SharedPromise<ReshardingCoordinatorDocument> _allDonorsDroppedOriginalCollection;
-
-    SharedPromise<void> _allParticipantsDoneAborting;
+    SharedPromise<ReshardingCoordinatorDocument> _allDonorsDone;
 };
 
 }  // namespace mongo
