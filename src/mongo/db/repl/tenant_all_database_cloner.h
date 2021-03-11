@@ -42,7 +42,9 @@ namespace repl {
 class TenantAllDatabaseCloner final : public TenantBaseCloner {
 public:
     struct Stats {
+        size_t databasesToClone{0};
         size_t databasesCloned{0};
+        size_t databasesClonedBeforeFailover{0};
         std::vector<TenantDatabaseCloner::Stats> databaseStats;
 
         std::string toString() const;

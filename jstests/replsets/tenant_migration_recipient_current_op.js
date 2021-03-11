@@ -44,6 +44,17 @@ const migrationOpts = {
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+// Initial inserts to test cloner stats.
+const dbsToClone = ["db0", "db1", "db2"];
+const collsToClone = ["coll0", "coll1"];
+const docs = [...Array(10).keys()].map((i) => ({x: i}));
+for (const db of dbsToClone) {
+    const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
+    for (const coll of collsToClone) {
+        tenantMigrationTest.insertDonorDB(tenantDB, coll, docs);
+    }
+}
+
 // Makes sure the fields that are always expected to exist, such as the donorConnectionString, are
 // correct.
 function checkStandardFieldsOK(res) {
@@ -200,6 +211,33 @@ assert(currOp.cloneFinishedRecipientOpTime, tojson(res));
 assert.eq(currOp.state, migrationStates.kDone, tojson(res));
 assert.eq(currOp.migrationCompleted, true, tojson(res));
 assert(currOp.expireAt, tojson(res));
+
+assert(currOp.hasOwnProperty("databases"));
+assert.eq(0, currOp.databases.databasesClonedBeforeFailover, tojson(res));
+assert.eq(dbsToClone.length, currOp.databases.databasesToClone, tojson(res));
+assert.eq(dbsToClone.length, currOp.databases.databasesCloned, tojson(res));
+for (const db of dbsToClone) {
+    const tenantDB = tenantMigrationTest.tenantDB(kTenantId, db);
+    assert(currOp.databases.hasOwnProperty(tenantDB), tojson(res));
+    const dbStats = currOp.databases[tenantDB];
+    assert.eq(0, dbStats.clonedCollectionsBeforeFailover, tojson(res));
+    assert.eq(collsToClone.length, dbStats.collections, tojson(res));
+    assert.eq(collsToClone.length, dbStats.clonedCollections, tojson(res));
+    assert(dbStats.hasOwnProperty("start"), tojson(res));
+    assert(dbStats.hasOwnProperty("end"), tojson(res));
+    assert.neq(0, dbStats.elapsedMillis, tojson(res));
+    for (const coll of collsToClone) {
+        assert(dbStats.hasOwnProperty(`${tenantDB}.${coll}`), tojson(res));
+        const collStats = dbStats[`${tenantDB}.${coll}`];
+        assert.eq(docs.length, collStats.documentsToCopy, tojson(res));
+        assert.eq(docs.length, collStats.documentsCopied, tojson(res));
+        assert.eq(1, collStats.indexes, tojson(res));
+        assert.eq(collStats.insertedBatches, collStats.receivedBatches, tojson(res));
+        assert(collStats.hasOwnProperty("start"), tojson(res));
+        assert(collStats.hasOwnProperty("end"), tojson(res));
+        assert.neq(0, collStats.elapsedMillis, tojson(res));
+    }
+}
 
 tenantMigrationTest.stop();
 })();
