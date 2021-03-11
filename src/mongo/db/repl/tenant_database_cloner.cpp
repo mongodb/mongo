@@ -220,6 +220,15 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
             _collections.end(),
             lastClonedCollectionUUID,
             [](const auto& collection, const auto& uuid) { return collection.second.uuid < uuid; });
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            if (startingCollection != _collections.end() &&
+                startingCollection->second.uuid == lastClonedCollectionUUID) {
+                _stats.clonedCollectionsBeforeFailover = clonedCollectionUUIDs.size() - 1;
+            } else {
+                _stats.clonedCollectionsBeforeFailover = clonedCollectionUUIDs.size();
+            }
+        }
         _collections.erase(_collections.begin(), startingCollection);
         if (!_collections.empty()) {
             LOGV2(5271601,
@@ -322,6 +331,8 @@ BSONObj TenantDatabaseCloner::Stats::toBSON() const {
 }
 
 void TenantDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
+    builder->appendNumber("clonedCollectionsBeforeFailover",
+                          static_cast<long long>(clonedCollectionsBeforeFailover));
     builder->appendNumber("collections", static_cast<long long>(collections));
     builder->appendNumber("clonedCollections", static_cast<long long>(clonedCollections));
     if (start != Date_t()) {

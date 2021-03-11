@@ -161,6 +161,14 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
         const auto& lastClonedDb = clonedDatabases.back();
         const auto& startingDb =
             std::lower_bound(_databases.begin(), _databases.end(), lastClonedDb);
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            if (startingDb != _databases.end() && *startingDb == lastClonedDb) {
+                _stats.databasesClonedBeforeFailover = clonedDatabases.size() - 1;
+            } else {
+                _stats.databasesClonedBeforeFailover = clonedDatabases.size();
+            }
+        }
         _databases.erase(_databases.begin(), startingDb);
         if (!_databases.empty()) {
             LOGV2(5271502,
@@ -183,6 +191,7 @@ void TenantAllDatabaseCloner::postStage() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.databasesCloned = 0;
+        _stats.databasesToClone = _databases.size();
         _stats.databaseStats.reserve(_databases.size());
         for (const auto& dbName : _databases) {
             _stats.databaseStats.emplace_back();
@@ -256,6 +265,9 @@ BSONObj TenantAllDatabaseCloner::Stats::toBSON() const {
 }
 
 void TenantAllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
+    builder->appendNumber("databasesClonedBeforeFailover",
+                          static_cast<long long>(databasesClonedBeforeFailover));
+    builder->appendNumber("databasesToClone", static_cast<long long>(databasesToClone));
     builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));

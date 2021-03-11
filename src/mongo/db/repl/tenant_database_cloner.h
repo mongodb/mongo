@@ -47,6 +47,7 @@ public:
         Date_t end;
         size_t collections{0};
         size_t clonedCollections{0};
+        size_t clonedCollectionsBeforeFailover{0};
         std::vector<TenantCollectionCloner::Stats> collectionStats;
 
         std::string toString() const;

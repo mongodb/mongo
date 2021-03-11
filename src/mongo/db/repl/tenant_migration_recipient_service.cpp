@@ -353,6 +353,12 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
                          static_cast<long long>(_tenantOplogApplier->getNumOpsApplied()));
     }
 
+    if (_tenantAllDatabaseCloner) {
+        BSONObjBuilder dbsBuilder(bob.subobjStart("databases"));
+        _tenantAllDatabaseCloner->getStats().append(&dbsBuilder);
+        dbsBuilder.doneFast();
+    }
+
     return bob.obj();
 }
 

@@ -392,6 +392,8 @@ TEST_F(TenantAllDatabaseClonerTest, ResumingFromLastClonedDb) {
     auto databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(1u, databases.size());
     ASSERT_EQUALS(_tenantDbAAB, databases[0]);
+
+    ASSERT_EQUALS(1, cloner->getStats().databasesClonedBeforeFailover);
 }
 
 TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllGreater) {
@@ -415,6 +417,8 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllGreater) {
     ASSERT_EQUALS(2u, databases.size());
     ASSERT_EQUALS(_tenantDbAAB, databases[0]);
     ASSERT_EQUALS(_tenantDbABC, databases[1]);
+
+    ASSERT_EQUALS(1, cloner->getStats().databasesClonedBeforeFailover);
 }
 
 TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_SomeGreater) {
@@ -439,6 +443,8 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_SomeGreater) {
     auto databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(1u, databases.size());
     ASSERT_EQUALS(_tenantDbABC, databases[0]);
+
+    ASSERT_EQUALS(2, cloner->getStats().databasesClonedBeforeFailover);
 }
 
 TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllLess) {
@@ -463,6 +469,8 @@ TEST_F(TenantAllDatabaseClonerTest, LastClonedDbDeleted_AllLess) {
     // Nothing to clone.
     auto databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(0u, databases.size());
+
+    ASSERT_EQUALS(3, cloner->getStats().databasesClonedBeforeFailover);
 }
 
 }  // namespace repl
