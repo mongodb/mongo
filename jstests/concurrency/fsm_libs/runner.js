@@ -251,9 +251,7 @@ var runner = (function() {
 
         res.databases.forEach(function(dbInfo) {
             if (!Array.contains(blacklist, dbInfo.name)) {
-                var res = db.getSiblingDB(dbInfo.name).dropDatabase();
-                assert.commandWorked(res);
-                assert.eq(dbInfo.name, res.dropped);
+                assert.commandWorked(db.getSiblingDB(dbInfo.name).dropDatabase());
             }
         });
     }

@@ -27,7 +27,6 @@ function dropDatabases(db, pattern) {
         if (pattern.test(dbInfo.name)) {
             var res = db.getSiblingDB(dbInfo.name).dropDatabase();
             assertAlways.commandWorked(res);
-            assertAlways.eq(dbInfo.name, res.dropped);
         }
     });
 }

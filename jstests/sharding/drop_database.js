@@ -66,7 +66,6 @@ jsTest.log("Test dropping unexistent database");
     // Dropping a database that doesn't exist will result in an info field in the response.
     const res = assert.commandWorked(db.dropDatabase());
     assertDatabaseDropped(db.getName());
-    assert.eq('database does not exist', res.info);
 }
 
 jsTest.log("Test dropping unsharded database");

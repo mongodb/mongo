@@ -49,7 +49,6 @@ namespace {
 class ShardsvrDropDatabaseCommand final : public TypedCommand<ShardsvrDropDatabaseCommand> {
 public:
     using Request = ShardsvrDropDatabase;
-    using Response = DropDatabaseReply;
 
     std::string help() const override {
         return "Internal command, which is exported by the primary sharding server. Do not call "
@@ -68,7 +67,7 @@ public:
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
+        void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
             uassert(ErrorCodes::InvalidOptions,
@@ -89,7 +88,8 @@ public:
             if (!useNewPath) {
                 LOGV2_DEBUG(
                     5281110, 1, "Running legacy drop database procedure", "database"_attr = dbName);
-                return dropDatabaseLegacy(opCtx, dbName);
+                dropDatabaseLegacy(opCtx, dbName);
+                return;
             }
 
             LOGV2_DEBUG(
@@ -102,9 +102,6 @@ public:
 
             auto dropDatabaseCoordinator = std::make_shared<DropDatabaseCoordinator>(opCtx, dbName);
             dropDatabaseCoordinator->run(opCtx).get();
-
-            // The following response can be omitted once 5.0 became last LTS
-            return Response();
         }
 
     private:

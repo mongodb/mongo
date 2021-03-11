@@ -127,9 +127,7 @@ var $config = (function() {
             checkForDuplicateIds(ids, this.opName);
         });
 
-        var res = ownedDB.dropDatabase();
-        assertAlways.commandWorked(res);
-        assertAlways.eq(db.getName() + this.uniqueDBName, res.dropped);
+        assertAlways.commandWorked(ownedDB.dropDatabase());
 
         function checkForDuplicateIds(ids, opName) {
             var indices = new Array(ids.length);

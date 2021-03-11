@@ -32,20 +32,6 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
-structs:
-    DropDatabaseReply:
-        description: "The dropDatabase command's reply"
-        strict: false
-        fields:
-            dropped:
-                description: "The database's name, if it existed and was dropped"
-                type: string
-                optional: true
-            info:
-                description: "May provide information on dropDatabase's outcome"
-                type: string
-                optional: true
-
 commands:
     dropDatabase:
         description: "Parser for the dropDatabase command"
@@ -55,4 +41,4 @@ commands:
         cpp_name: DropDatabase
         strict: true
         api_version: "1"
-        reply_type: DropDatabaseReply
+        reply_type: OkReply

@@ -106,17 +106,10 @@ public:
 
                 const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
                 uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-
-                DropDatabaseReply reply;
-                reply.setDropped(dbName);
-                return reply;
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // If the namespace isn't found, treat the drop as a success but inform about the
-                // failure.
-                DropDatabaseReply reply;
-                reply.setInfo("database does not exist"_sd);
-                return reply;
+                // If the namespace isn't found, treat the drop as a success
             }
+            return {};
         }
     };
 } clusterDropDatabaseCmd;

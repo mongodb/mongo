@@ -35,6 +35,6 @@
 
 namespace mongo {
 
-DropDatabaseReply dropDatabaseLegacy(OperationContext* opCtx, StringData dbName);
+void dropDatabaseLegacy(OperationContext* opCtx, StringData dbName);
 
 }  // namespace mongo
