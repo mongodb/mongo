@@ -42,12 +42,14 @@ HashJoinStage::HashJoinStage(std::unique_ptr<PlanStage> outer,
                              value::SlotVector outerProjects,
                              value::SlotVector innerCond,
                              value::SlotVector innerProjects,
+                             boost::optional<value::SlotId> collatorSlot,
                              PlanNodeId planNodeId)
     : PlanStage("hj"_sd, planNodeId),
       _outerCond(std::move(outerCond)),
       _outerProjects(std::move(outerProjects)),
       _innerCond(std::move(innerCond)),
       _innerProjects(std::move(innerProjects)),
+      _collatorSlot(collatorSlot),
       _probeKey(0) {
     if (_outerCond.size() != _innerCond.size()) {
         uasserted(4822823, "left and right size do not match");
@@ -64,12 +66,20 @@ std::unique_ptr<PlanStage> HashJoinStage::clone() const {
                                            _outerProjects,
                                            _innerCond,
                                            _innerProjects,
+                                           _collatorSlot,
                                            _commonStats.nodeId);
 }
 
 void HashJoinStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _children[1]->prepare(ctx);
+
+    if (_collatorSlot) {
+        _collatorAccessor = getAccessor(ctx, *_collatorSlot);
+        tassert(5402502,
+                "collator accessor should exist if collator slot provided to HashJoinStage",
+                _collatorAccessor != nullptr);
+    }
 
     size_t counter = 0;
     value::SlotSet dupCheck;
@@ -121,6 +131,17 @@ value::SlotAccessor* HashJoinStage::getAccessor(CompileCtx& ctx, value::SlotId s
 void HashJoinStage::open(bool reOpen) {
     auto optTimer(getOptTimer(_opCtx));
 
+    if (_collatorAccessor) {
+        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
+        uassert(5402504, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
+        auto collatorView = value::getCollatorView(collatorVal);
+        const value::MaterializedRowHasher hasher(collatorView);
+        const value::MaterializedRowEq equator(collatorView);
+        _ht.emplace(0, hasher, equator);
+    } else {
+        _ht.emplace();
+    }
+
     _commonStats.opens++;
     _children[0]->open(reOpen);
     // Insert the outer side into the hash table.
@@ -142,15 +163,15 @@ void HashJoinStage::open(bool reOpen) {
             project.reset(idx++, true, tag, val);
         }
 
-        _ht.emplace(std::move(key), std::move(project));
+        _ht->emplace(std::move(key), std::move(project));
     }
 
     _children[0]->close();
 
     _children[1]->open(reOpen);
 
-    _htIt = _ht.end();
-    _htItEnd = _ht.end();
+    _htIt = _ht->end();
+    _htItEnd = _ht->end();
 }
 
 PlanState HashJoinStage::getNext() {
@@ -175,7 +196,7 @@ PlanState HashJoinStage::getNext() {
                 _probeKey.reset(idx++, false, tag, val);
             }
 
-            auto [low, hi] = _ht.equal_range(_probeKey);
+            auto [low, hi] = _ht->equal_range(_probeKey);
             _htIt = low;
             _htItEnd = hi;
             // If _htIt == _htItEnd (i.e. no match) then RIGHT and OUTER joins
@@ -191,6 +212,7 @@ void HashJoinStage::close() {
 
     _commonStats.closes++;
     _children[1]->close();
+    _ht = boost::none;
 }
 
 std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) const {
@@ -206,6 +228,10 @@ const SpecificStats* HashJoinStage::getSpecificStats() const {
 
 std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
+
+    if (_collatorSlot) {
+        DebugPrinter::addIdentifier(ret, *_collatorSlot);
+    }
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 

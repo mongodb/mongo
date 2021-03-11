@@ -38,8 +38,12 @@ namespace sbe {
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            value::SlotVector gbs,
                            value::SlotMap<std::unique_ptr<EExpression>> aggs,
+                           boost::optional<value::SlotId> collatorSlot,
                            PlanNodeId planNodeId)
-    : PlanStage("group"_sd, planNodeId), _gbs(std::move(gbs)), _aggs(std::move(aggs)) {
+    : PlanStage("group"_sd, planNodeId),
+      _gbs(std::move(gbs)),
+      _aggs(std::move(aggs)),
+      _collatorSlot(collatorSlot) {
     _children.emplace_back(std::move(input));
 }
 
@@ -49,11 +53,18 @@ std::unique_ptr<PlanStage> HashAggStage::clone() const {
         aggs.emplace(k, v->clone());
     }
     return std::make_unique<HashAggStage>(
-        _children[0]->clone(), _gbs, std::move(aggs), _commonStats.nodeId);
+        _children[0]->clone(), _gbs, std::move(aggs), _collatorSlot, _commonStats.nodeId);
 }
 
 void HashAggStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
+
+    if (_collatorSlot) {
+        _collatorAccessor = getAccessor(ctx, *_collatorSlot);
+        tassert(5402501,
+                "collator accessor should exist if collator slot provided to HashAggStage",
+                _collatorAccessor != nullptr);
+    }
 
     value::SlotSet dupCheck;
     size_t counter = 0;
@@ -107,8 +118,15 @@ void HashAggStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
-    if (reOpen) {
-        _ht.clear();
+    if (_collatorAccessor) {
+        auto [tag, collatorVal] = _collatorAccessor->getViewOfValue();
+        uassert(5402503, "collatorSlot must be of collator type", tag == value::TypeTags::collator);
+        auto collatorView = value::getCollatorView(collatorVal);
+        const value::MaterializedRowHasher hasher(collatorView);
+        const value::MaterializedRowEq equator(collatorView);
+        _ht.emplace(0, hasher, equator);
+    } else {
+        _ht.emplace();
     }
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
@@ -120,7 +138,7 @@ void HashAggStage::open(bool reOpen) {
             key.reset(idx++, false, tag, val);
         }
 
-        auto [it, inserted] = _ht.try_emplace(std::move(key), value::MaterializedRow{0});
+        auto [it, inserted] = _ht->try_emplace(std::move(key), value::MaterializedRow{0});
         if (inserted) {
             // Copy keys.
             const_cast<value::MaterializedRow&>(it->first).makeOwned();
@@ -138,19 +156,19 @@ void HashAggStage::open(bool reOpen) {
 
     _children[0]->close();
 
-    _htIt = _ht.end();
+    _htIt = _ht->end();
 }
 
 PlanState HashAggStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_htIt == _ht.end()) {
-        _htIt = _ht.begin();
+    if (_htIt == _ht->end()) {
+        _htIt = _ht->begin();
     } else {
         ++_htIt;
     }
 
-    if (_htIt == _ht.end()) {
+    if (_htIt == _ht->end()) {
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -185,7 +203,7 @@ void HashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     _commonStats.closes++;
-    _ht.clear();
+    _ht = boost::none;
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
@@ -214,6 +232,10 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
         first = false;
     });
     ret.emplace_back("`]");
+
+    if (_collatorSlot) {
+        DebugPrinter::addIdentifier(ret, *_collatorSlot);
+    }
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());

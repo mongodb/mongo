@@ -1133,6 +1133,7 @@ public:
             makeLimitTree(std::move(unionWithNullStage.stage), _context->planNodeId, numChildren);
 
         // Create a group stage to aggregate elements into a single array.
+        auto collatorSlot = _context->runtimeEnvironment->getSlotIfExists("collator"_sd);
         auto addToArrayExpr =
             makeFunction("addToArray", sbe::makeE<sbe::EVariable>(unionWithNullSlot));
         auto groupSlot = _context->slotIdGenerator->generate();
@@ -1140,6 +1141,7 @@ public:
             sbe::makeS<sbe::HashAggStage>(std::move(limitNumChildren),
                                           sbe::makeSV(),
                                           sbe::makeEM(groupSlot, std::move(addToArrayExpr)),
+                                          collatorSlot,
                                           _context->planNodeId);
         EvalStage groupEvalStage = {std::move(groupStage), sbe::makeSV(groupSlot)};
 
@@ -1168,6 +1170,7 @@ public:
             std::move(unwindEvalStage.stage),
             sbe::makeSV(),
             sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
+            collatorSlot,
             _context->planNodeId);
 
         // Create a branch stage to select between the branch that produces one null if any eleemnts

@@ -43,6 +43,7 @@ public:
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
                  value::SlotMap<std::unique_ptr<EExpression>> aggs,
+                 boost::optional<value::SlotId> collatorSlot,
                  PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -68,6 +69,7 @@ private:
 
     const value::SlotVector _gbs;
     const value::SlotMap<std::unique_ptr<EExpression>> _aggs;
+    const boost::optional<value::SlotId> _collatorSlot;
 
     value::SlotAccessorMap _outAccessors;
     std::vector<value::SlotAccessor*> _inKeyAccessors;
@@ -76,8 +78,10 @@ private:
     std::vector<std::unique_ptr<HashAggAccessor>> _outAggAccessors;
     std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
 
-    // TODO SERVER-54025: Update HashAggStage so that group-bys are collation-aware.
-    TableType _ht;
+    // Only set if collator slot provided on construction.
+    value::SlotAccessor* _collatorAccessor = nullptr;
+
+    boost::optional<TableType> _ht;
     TableType::iterator _htIt;
 
     vm::ByteCode _bytecode;
