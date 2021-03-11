@@ -309,10 +309,9 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     invariant(bob);
     invariant(topLevelBob);
 
-    // Stop as soon as the BSON object we're building exceeds 10 MB.
-    static const int kMaxStatsBSONSize = 10 * 1024 * 1024;
-    if (topLevelBob->len() > kMaxStatsBSONSize) {
-        bob->append("warning", "stats tree exceeded 10 MB");
+    // Stop as soon as the BSON object we're building exceeds the limit.
+    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
+        bob->append("warning", "stats tree exceeded BSON size limit for explain");
         return;
     }
 
@@ -400,12 +399,11 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->appendBool("isPartial", spec->isPartial);
         bob->append("indexVersion", spec->indexVersion);
 
-        BSONObjBuilder indexBoundsBob;
+        BSONObjBuilder indexBoundsBob(bob->subobjStart("indexBounds"));
         indexBoundsBob.append("startKey", spec->startKey);
         indexBoundsBob.append("startKeyInclusive", spec->startKeyInclusive);
         indexBoundsBob.append("endKey", spec->endKey);
         indexBoundsBob.append("endKeyInclusive", spec->endKeyInclusive);
-        bob->append("indexBounds", indexBoundsBob.obj());
     } else if (STAGE_DELETE == stats.stageType) {
         DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
 
@@ -430,7 +428,8 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
+        if ((topLevelBob->len() + spec->indexBounds.objsize()) >
+            internalQueryExplainSizeThresholdBytes.load()) {
             bob->append("warning", "index bounds omitted due to BSON size limit");
         } else {
             bob->append("indexBounds", spec->indexBounds);
@@ -496,7 +495,8 @@ void Explain::statsToBSON(const PlanStageStats& stats,
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
+        if ((topLevelBob->len() + spec->indexBounds.objsize()) >
+            internalQueryExplainSizeThresholdBytes.load()) {
             bob->append("warning", "index bounds omitted due to BSON size limit");
         } else {
             bob->append("indexBounds", spec->indexBounds);
@@ -598,9 +598,8 @@ void Explain::statsToBSON(const PlanStageStats& stats,
     // the output more readable by saving a level of nesting. Name the field 'inputStage'
     // rather than 'inputStages'.
     if (1 == stats.children.size()) {
-        BSONObjBuilder childBob;
+        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
         statsToBSON(*stats.children[0], verbosity, &childBob, topLevelBob);
-        bob->append("inputStage", childBob.obj());
         return;
     }
 

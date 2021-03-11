@@ -403,3 +403,15 @@ server_parameters:
     cpp_varname: "internalQueryDesugarWhereToFunction"
     cpp_vartype: AtomicWord<bool>
     default: false
+
+  internalQueryExplainSizeThresholdBytes:
+    description: "Number of bytes after which explain should start truncating portions of its
+    output."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryExplainSizeThresholdBytes"
+    cpp_vartype: AtomicWord<int>
+    default:
+      expr: 10 * 1024 * 1024
+    validator:
+        gt: 0
+        lte: { expr: BSONObjMaxInternalSize }
