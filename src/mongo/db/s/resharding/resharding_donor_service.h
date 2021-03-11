@@ -79,7 +79,7 @@ public:
     ~DonorStateMachine();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancellationToken& token) noexcept override;
+                         const CancellationToken& stepdownToken) noexcept override;
 
     void interrupt(Status status) override;
 
@@ -107,25 +107,49 @@ private:
     DonorStateMachine(const ReshardingDonorDocument& donorDoc,
                       std::unique_ptr<DonorStateMachineExternalState> externalState);
 
+    /**
+     * Runs up until the donor is either in state kBlockingWrites or encountered an error.
+     */
+    ExecutorFuture<void> _runUntilBlockingWritesOrErrored(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken) noexcept;
+
+    /**
+     * Notifies the coordinator if the donor is in kBlockingWrites or kError and waits for
+     * _coordinatorHasDecisionPersisted to be fulfilled (success) or for the abortToken to be
+     * canceled (failure or stepdown).
+     */
+    ExecutorFuture<void> _notifyCoordinatorAndAwaitDecision(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken) noexcept;
+
+    /**
+     * Finishes the work left remaining on the donor after the coordinator persists its decision to
+     * abort or complete resharding.
+     */
+    ExecutorFuture<void> _finishReshardingOperation(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& stepdownToken,
+        bool aborted) noexcept;
+
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
 
     void _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData();
 
     ExecutorFuture<void> _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     void _writeTransactionOplogEntryThenTransitionToBlockingWrites();
 
-    ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToDropping(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
     // Drops the original collection and throws if the returned status is not either Status::OK()
     // or NamespaceNotFound.
-    void _dropOriginalCollection();
+    void _dropOriginalCollectionThenTransitionToDone();
 
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(DonorStateEnum newState);
@@ -151,9 +175,15 @@ private:
     // Removes the local donor document from disk.
     void _removeDonorDocument();
 
-    // Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
-    // (abort resharding).
-    void _onAbortOrStepdown(WithLock lk, Status status);
+    // Initializes the _abortSource and generates a token from it to return back the caller. If an
+    // abort was reported prior to the initialization, automatically cancels the _abortSource before
+    // returning the token.
+    //
+    // Should only be called once per lifetime.
+    CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
+
+    // Initiates the cancellation of the resharding operation.
+    void _onAbortEncountered(const Status& abortReason);
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
@@ -169,13 +199,20 @@ private:
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
 
-    // Contains the status with which the operation was aborted.
-    boost::optional<Status> _abortStatus;
+    // Canceled by 2 different sources: (1) This DonorStateMachine when it learns of an
+    // unrecoverable error (2) The primary-only service instance driving this DonorStateMachine that
+    // cancels the parent CancellationSource upon stepdown/failover.
+    boost::optional<CancellationSource> _abortSource;
+
+    // Holds the unrecoverable error reported by the coordinator that caused the entire resharding
+    // operation to fail.
+    boost::optional<Status> _abortReason;
 
     boost::optional<ReshardingCriticalSection> _critSec;
 
     // Each promise below corresponds to a state on the donor state machine. They are listed in
-    // ascending order, such that the first promise below will be the first promise fulfilled.
+    // ascending order, such that the first promise below will be the first promise fulfilled -
+    // fulfillment order is not necessarily maintained if the operation gets aborted.
     SharedPromise<void> _allRecipientsDoneCloning;
 
     SharedPromise<void> _allRecipientsDoneApplying;

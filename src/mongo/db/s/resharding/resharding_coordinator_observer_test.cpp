@@ -59,15 +59,18 @@ protected:
         DonorStateEnum donorState,
         boost::optional<Timestamp> timestamp = boost::none,
         boost::optional<Status> abortReason = boost::none) {
-        return {makeDonorShard(ShardId{"s1"}, donorState, timestamp, abortReason),
+        // The mock state here is simulating only one donor shard having errored locally.
+        return {makeDonorShard(ShardId{"s1"}, donorState, timestamp),
                 makeDonorShard(ShardId{"s2"}, donorState, timestamp, abortReason),
-                makeDonorShard(ShardId{"s3"}, donorState, timestamp, abortReason)};
+                makeDonorShard(ShardId{"s3"}, donorState, timestamp)};
     }
 
     std::vector<RecipientShardEntry> makeMockRecipientsInState(
         RecipientStateEnum recipientState,
         boost::optional<Timestamp> timestamp = boost::none,
         boost::optional<Status> abortReason = boost::none) {
+        // TODO SERVER-55511: Make the mock state here simulate only one recipient shard errored
+        // locally.
         return {makeRecipientShard(ShardId{"s1"}, recipientState, abortReason),
                 makeRecipientShard(ShardId{"s2"}, recipientState, abortReason),
                 makeRecipientShard(ShardId{"s3"}, recipientState, abortReason)};
@@ -160,27 +163,30 @@ TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
 TEST_F(ReshardingCoordinatorObserverTest, participantsDoneAborting) {
     auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
 
-    auto fut = reshardingObserver->awaitAllParticipantsDoneAborting();
+    auto fut = reshardingObserver->awaitAllDonorsDone();
     ASSERT_FALSE(fut.isReady());
 
     auto abortReason = Status{ErrorCodes::InternalError, "We gotta abort"};
 
-    // All participants have an abortReason, but not all are in state kDone yet.
-    auto donorShards = makeMockDonorsInState(DonorStateEnum::kDone, Timestamp(1, 1), abortReason);
-    std::vector<RecipientShardEntry> recipientShards0{
-        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kError, abortReason)},
-        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kDone, abortReason)},
-        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kDone, abortReason)}};
+    // All recipients and donors are done (including the donor who caused the abort) except a single
+    // donor who hasn't seen there was an error yet.
+    auto recipientShards = makeMockRecipientsInState(RecipientStateEnum::kDone, Timestamp(1, 1));
+    std::vector<DonorShardEntry> donorShards0{
+        {makeDonorShard(ShardId{"s1"}, DonorStateEnum::kDone, Timestamp(1, 1), abortReason)},
+        {makeDonorShard(ShardId{"s2"}, DonorStateEnum::kDonatingOplogEntries, Timestamp(1, 1))},
+        {makeDonorShard(ShardId{"s3"}, DonorStateEnum::kDone, Timestamp(1, 1))}};
     auto coordinatorDoc0 =
-        makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards, abortReason);
+        makeCoordinatorDocWithRecipientsAndDonors(recipientShards, donorShards0, abortReason);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     ASSERT_FALSE(fut.isReady());
 
-    // All participants in state kDone with abortReason.
-    auto recipientShards1 =
-        makeMockRecipientsInState(RecipientStateEnum::kDone, boost::none, abortReason);
+    // All participants are done.
+    std::vector<DonorShardEntry> donorShards1{
+        {makeDonorShard(ShardId{"s1"}, DonorStateEnum::kDone, Timestamp(1, 1), abortReason)},
+        {makeDonorShard(ShardId{"s2"}, DonorStateEnum::kDone, Timestamp(1, 1))},
+        {makeDonorShard(ShardId{"s3"}, DonorStateEnum::kDone, Timestamp(1, 1))}};
     auto coordinatorDoc1 =
-        makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards, abortReason);
+        makeCoordinatorDocWithRecipientsAndDonors(recipientShards, donorShards1, abortReason);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_TRUE(fut.isReady());
 

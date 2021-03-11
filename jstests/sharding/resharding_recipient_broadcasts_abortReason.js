@@ -43,7 +43,9 @@ const donor_host = topology.shards[donorShardNames[0]].primary;
 const donor0 = new Mongo(donor_host);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
-const fp = configureFailPoint(donor0, "reshardingDonorFailsBeforePreparingToMirror");
+const failBeforeMirroringFP =
+    configureFailPoint(donor0, "reshardingDonorFailsBeforePreparingToMirror");
+const removeDonorDocFP = configureFailPoint(donor0, "removeDonorDocFailpoint");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -53,20 +55,22 @@ reshardingTest.withReshardingInBackground(
             {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
         ],
     },
-    (tempNs) => {
-        // TODO SERVER-51696: Review if these checks can be made in a cpp unittest instead.
-        // First, wait for the shard to encounter an unrecoverable error and persist it locally.
-        ReshardingTestUtil.assertDonorAbortsLocally(
-            donor0, donorShardNames[0], inputCollection.getFullName(), ErrorCodes.InternalError);
-    },
+    () => {},
     {
         expectedErrorCode: ErrorCodes.InternalError,
-        postDecisionPersistedFn: () => {
-            ReshardingTestUtil.assertAllParticipantsReportAbortToCoordinator(
-                configsvr, inputCollection.getFullName(), ErrorCodes.InternalError);
+        postAbortDecisionPersistedFn: () => {
+            ReshardingTestUtil.assertDonorAbortsLocally(donor0,
+                                                        donorShardNames[0],
+                                                        inputCollection.getFullName(),
+                                                        ErrorCodes.InternalError);
+
+            removeDonorDocFP.off();
+
+            ReshardingTestUtil.assertAllParticipantsReportDoneToCoordinator(
+                configsvr, inputCollection.getFullName());
         }
     });
 
-fp.off();
+failBeforeMirroringFP.off();
 reshardingTest.teardown();
 })();
