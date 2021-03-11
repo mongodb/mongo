@@ -248,7 +248,8 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     auto overridenNames = [stageType]() -> std::vector<StringData> {
         if (stageType == "branch"_sd) {
             return {"thenStage"_sd, "elseStage"_sd};
-        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd) {
+        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd || stageType == "mj"_sd ||
+                   stageType == "hj"_sd) {
             return {"outerStage"_sd, "innerStage"_sd};
         }
         return {};

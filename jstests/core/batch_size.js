@@ -1,8 +1,6 @@
-// TODO SERVER-50737: remove sbe_incompatible tag
 // @tags: [
 //   assumes_balancer_off,
-//   requires_getmore,
-//   sbe_incompatible,
+//   requires_getmore
 // ]
 
 // Test subtleties of batchSize and limit.

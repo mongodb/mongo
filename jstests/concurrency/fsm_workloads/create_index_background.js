@@ -10,9 +10,7 @@
  *
  * @tags: [
  *   assumes_balancer_off,
- *   creates_background_indexes,
- *   # TODO SERVER-50737: Depends on SBE supporting 'AND_SORTED'.
- *   sbe_incompatible,
+ *   creates_background_indexes
  * ]
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos

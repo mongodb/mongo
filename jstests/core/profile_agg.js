@@ -1,4 +1,4 @@
-// TODO SERVER-50737: remove sbe_incompatible tag
+// TODO: SERVER-54840 remove sbe_incompatible tag after fix for large generated plan stage tree
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_profiling,
