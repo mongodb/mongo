@@ -37,6 +37,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/projection_ast_util.h"
+#include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
 namespace {
@@ -47,7 +48,7 @@ void statsToBSON(const QuerySolutionNode* node,
     invariant(topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
-    if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
+    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
         return;
     }
@@ -114,7 +115,8 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("direction", ixn->direction > 0 ? "forward" : "backward");
 
             auto bounds = ixn->bounds.toBSON();
-            if (topLevelBob->len() + bounds.objsize() > kMaxExplainStatsBSONSizeMB) {
+            if (topLevelBob->len() + bounds.objsize() >
+                internalQueryExplainSizeThresholdBytes.load()) {
                 bob->append("warning", "index bounds omitted due to BSON size limit for explain");
             } else {
                 bob->append("indexBounds", bounds);
@@ -180,9 +182,8 @@ void statsToBSON(const QuerySolutionNode* node,
     // the output more readable by saving a level of nesting. Name the field 'inputStage'
     // rather than 'inputStages'.
     if (node->children.size() == 1) {
-        BSONObjBuilder childBob;
+        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
         statsToBSON(node->children[0], &childBob, topLevelBob);
-        bob->append("inputStage", childBob.obj());
         return;
     }
 
@@ -204,7 +205,7 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     invariant(topLevelBob);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
-    if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
+    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
         bob->append("warning", "stats tree exceeded BSON size limit for explain");
         return;
     }
@@ -238,9 +239,8 @@ void statsToBSON(const sbe::PlanStageStats* stats,
     // the output more readable by saving a level of nesting. Name the field 'inputStage'
     // rather than 'inputStages'.
     if (stats->children.size() == 1) {
-        BSONObjBuilder childBob;
+        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
         statsToBSON(stats->children[0].get(), &childBob, topLevelBob);
-        bob->append("inputStage"_sd, childBob.obj());
         return;
     }
 
@@ -257,9 +257,8 @@ void statsToBSON(const sbe::PlanStageStats* stats,
         invariant(overridenNames.size() == stats->children.size());
 
         for (size_t idx = 0; idx < stats->children.size(); ++idx) {
-            BSONObjBuilder childBob;
+            BSONObjBuilder childBob(bob->subobjStart(overridenNames[idx]));
             statsToBSON(stats->children[idx].get(), &childBob, topLevelBob);
-            bob->append(overridenNames[idx], childBob.obj());
         }
         return;
     }
