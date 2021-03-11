@@ -103,7 +103,6 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 
 void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const BSONObj& proposedKey,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
                                                    bool unique,
@@ -116,7 +115,8 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
         bool isUnique = idx["unique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey << " and proposed shard key " << proposedKey
+                              << currentKey << " and proposed shard key "
+                              << shardKeyPattern.toBSON()
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
                 !isUnique || shardKeyPattern.isUniqueIndexCompatible(currentKey));
     }
@@ -127,14 +127,15 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
         BSONObj currentKey = idx["key"].embeddedObject();
         // Check 2.i. and 2.ii.
         if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
-            proposedKey.isPrefixOf(currentKey, SimpleBSONElementComparator::kInstance)) {
+            shardKeyPattern.toBSON().isPrefixOf(currentKey,
+                                                SimpleBSONElementComparator::kInstance)) {
             // We can't currently use hashed indexes with a non-default hash seed
             // Check iv.
             // Note that this means that, for sharding, we only support one hashed index
             // per field per collection.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "can't shard collection " << nss.ns()
-                                  << " with hashed shard key " << proposedKey
+                                  << " with hashed shard key " << shardKeyPattern.toBSON()
                                   << " because the hashed index uses a non-default seed of "
                                   << idx["seed"].numberInt(),
                     !shardKeyPattern.isHashedPattern() || idx["seed"].eoo() ||
@@ -145,12 +146,12 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
     if (hasUsefulIndexForKey && unique) {
-        BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
+        BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << shardKeyPattern.toBSON());
         BSONObj eqQueryResult;
 
         for (const auto& idx : indexes) {
             if (SimpleBSONObjComparator::kInstance.evaluate(idx["key"].embeddedObject() ==
-                                                            proposedKey)) {
+                                                            shardKeyPattern.toBSON())) {
                 eqQueryResult = idx;
                 break;
             }
@@ -164,7 +165,8 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
             BSONObj currKey = eqQueryResult["key"].embeddedObject();
             bool isCurrentID = (currKey.firstElementFieldNameStringData() == "_id");
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "can't shard collection " << nss.ns() << ", " << proposedKey
+                    str::stream() << "can't shard collection " << nss.ns() << ", "
+                                  << shardKeyPattern.toBSON()
                                   << " index not unique, and unique index explicitly specified",
                     isExplicitlyUnique || isCurrentID);
         }
@@ -172,7 +174,7 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 
     if (hasUsefulIndexForKey) {
         // Check 2.iii Make sure that there is a useful, non-multikey index available.
-        behaviors.verifyUsefulNonMultiKeyIndex(nss, proposedKey);
+        behaviors.verifyUsefulNonMultiKeyIndex(nss, shardKeyPattern.toBSON());
         return;
     }
 
@@ -183,7 +185,7 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     //    to call ensureIndex on primary shard, since indexes get copied to receiving shard
     //    whenever a migrate occurs. If the collection has a default collation, explicitly send
     //    the simple collation as part of the createIndex request.
-    behaviors.createShardKeyIndex(nss, proposedKey, defaultCollation, unique);
+    behaviors.createShardKeyIndex(nss, shardKeyPattern.toBSON(), defaultCollation, unique);
 }
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(

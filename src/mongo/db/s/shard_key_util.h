@@ -145,7 +145,6 @@ private:
  */
 void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const NamespaceString& nss,
-                                                   const BSONObj& proposedKey,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
                                                    bool unique,
