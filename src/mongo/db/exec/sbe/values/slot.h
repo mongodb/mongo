@@ -508,11 +508,16 @@ private:
 };
 
 struct MaterializedRowEq {
+    using ComparatorType = StringData::ComparatorInterface*;
+
+    explicit MaterializedRowEq(const ComparatorType comparator = nullptr)
+        : _comparator(comparator) {}
+
     bool operator()(const MaterializedRow& lhs, const MaterializedRow& rhs) const {
         for (size_t idx = 0; idx < lhs.size(); ++idx) {
             auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
             auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
-            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+            auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal, _comparator);
 
             if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
                 return false;
@@ -521,17 +526,27 @@ struct MaterializedRowEq {
 
         return true;
     }
+
+private:
+    const ComparatorType _comparator = nullptr;
 };
 
 struct MaterializedRowHasher {
+    using CollatorType = CollatorInterface*;
+
+    explicit MaterializedRowHasher(const CollatorType collator = nullptr) : _collator(collator) {}
+
     std::size_t operator()(const MaterializedRow& k) const {
         size_t res = hashInit();
         for (size_t idx = 0; idx < k.size(); ++idx) {
             auto [tag, val] = k.getViewOfValue(idx);
-            res = hashCombine(res, hashValue(tag, val));
+            res = hashCombine(res, hashValue(tag, val, _collator));
         }
         return res;
     }
+
+private:
+    const CollatorType _collator = nullptr;
 };
 
 /**
