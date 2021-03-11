@@ -320,6 +320,7 @@ env.Library(
         'config/configsvr_clear_jumbo_flag_command.cpp',
         'config/configsvr_commit_chunk_migration_command.cpp',
         'config/configsvr_commit_move_primary_command.cpp',
+        'config/configsvr_commit_reshard_collection_command.cpp',
         'config/configsvr_control_balancer_command.cpp',
         'config/configsvr_create_database_command.cpp',
         'config/configsvr_drop_collection_command.cpp',

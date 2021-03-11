@@ -87,6 +87,7 @@ let testCases = {
     _configsvrCommitChunkMigration: {skip: "internal command"},
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},
+    _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrDropCollection: {skip: "internal command"},
     _configsvrDropDatabase: {skip: "internal command"},

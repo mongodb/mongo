@@ -29,6 +29,7 @@ var ReshardingTest = class {
         reshardInPlace: reshardInPlace = false,
         minimumOperationDurationMS: minimumOperationDurationMS = undefined,
         criticalSectionTimeoutMS: criticalSectionTimeoutMS = 24 * 60 * 60 * 1000 /* 1 day */,
+        commitImplicitly: commitImplicitly = true,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -47,6 +48,8 @@ var ReshardingTest = class {
         this._minimumOperationDurationMS = minimumOperationDurationMS;
         /** @private */
         this._criticalSectionTimeoutMS = criticalSectionTimeoutMS;
+        /** @private */
+        this._commitImplicitly = commitImplicitly;
 
         // Properties set by setup().
         /** @private */
@@ -104,6 +107,13 @@ var ReshardingTest = class {
             rsOptions: {setParameter: {featureFlagResharding: true}},
             manualAddShard: true,
         });
+
+        if (this._commitImplicitly) {
+            // The failpoint is enabled unless the caller opts out.
+            // This is a temporary situation until reshard can complete on its own.
+            this._canEnterCriticalFailpoint = configureFailPoint(
+                this._st.configRS.getPrimary(), "reshardingCoordinatorCanEnterCriticalImplicitly");
+        }
 
         for (let i = 0; i < this._numShards; ++i) {
             const isDonor = i < this._numDonors;

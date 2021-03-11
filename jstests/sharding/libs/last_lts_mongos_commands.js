@@ -10,6 +10,7 @@ const commandsRemovedFromMongosSinceLastLTS = [];
 const commandsAddedToMongosSinceLastLTS = [
     "abortReshardCollection",
     "cleanupReshardCollection",
+    "commitReshardCollection",
     "reshardCollection",
     "rotateCertificates",
     "testDeprecation",
