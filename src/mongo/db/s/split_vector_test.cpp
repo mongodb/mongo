@@ -31,9 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/split_vector.h"
 
@@ -42,7 +44,6 @@ namespace {
 
 const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kPattern = "_id";
-
 
 void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
@@ -56,11 +57,16 @@ public:
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
-        DBDirectClient dbclient(opCtx);
-        ASSERT_TRUE(dbclient.createCollection(kNss.ns()));
 
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
+            uassertStatusOK(createCollection(
+                operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+        }
         setUnshardedFilteringMetadata(opCtx, kNss);
-        dbclient.createIndex(kNss.ns(), BSON(kPattern << 1));
+        DBDirectClient client(opCtx);
+        client.createIndex(kNss.ns(), BSON(kPattern << 1));
 
         // Insert 100 documents into the collection so the tests can test splitting with different
         // constraints.
@@ -68,9 +74,9 @@ public:
             BSONObjBuilder builder;
             builder.append(kPattern, i);
             BSONObj obj = builder.obj();
-            dbclient.insert(kNss.toString(), obj);
+            client.insert(kNss.toString(), obj);
         }
-        ASSERT_EQUALS(100ULL, dbclient.count(kNss));
+        ASSERT_EQUALS(100ULL, client.count(kNss));
     }
 
     const long long& getDocSizeBytes() {
@@ -295,21 +301,25 @@ public:
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
-        DBDirectClient dbclient(opCtx);
-        ASSERT_TRUE(dbclient.createCollection(kJumboNss.ns()));
 
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
+            uassertStatusOK(createCollection(
+                operationContext(), kJumboNss.db().toString(), BSON("create" << kJumboNss.coll())));
+        }
         setUnshardedFilteringMetadata(opCtx, kJumboNss);
-
-        dbclient.createIndex(kJumboNss.ns(), BSON(kJumboPattern << 1));
+        DBDirectClient client(opCtx);
+        client.createIndex(kJumboNss.ns(), BSON(kJumboPattern << 1));
 
         // Insert 10000 documents into the collection with the same shard key value.
         BSONObjBuilder builder;
         builder.append(kJumboPattern, 1);
         BSONObj obj = builder.obj();
         for (int i = 0; i < 1000; i++) {
-            dbclient.insert(kJumboNss.toString(), obj);
+            client.insert(kJumboNss.toString(), obj);
         }
-        ASSERT_EQUALS(1000ULL, dbclient.count(kJumboNss));
+        ASSERT_EQUALS(1000ULL, client.count(kJumboNss));
     }
 
     const long long& getDocSizeBytes() {
@@ -354,11 +364,17 @@ public:
         ShardServerTestFixture::setUp();
 
         auto opCtx = operationContext();
-        DBDirectClient dbclient(opCtx);
-        ASSERT_TRUE(dbclient.createCollection(kMaxResponseNss.ns()));
 
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
+            uassertStatusOK(createCollection(operationContext(),
+                                             kMaxResponseNss.db().toString(),
+                                             BSON("create" << kMaxResponseNss.coll())));
+        }
         setUnshardedFilteringMetadata(opCtx, kMaxResponseNss);
-        dbclient.createIndex(kMaxResponseNss.ns(), BSON("a" << 1));
+        DBDirectClient client(opCtx);
+        client.createIndex(kMaxResponseNss.ns(), BSON("a" << 1));
 
         for (int i = 0; i < numDocs; ++i) {
             BSONObjBuilder builder;
@@ -366,9 +382,9 @@ public:
             // ensure that our documents are unique.
             builder.append("a", createUniqueHalfMegabyteString(i));
             BSONObj obj = builder.obj();
-            dbclient.insert(kMaxResponseNss.toString(), obj);
+            client.insert(kMaxResponseNss.toString(), obj);
         }
-        ASSERT_EQUALS(numDocs, (int)dbclient.count(kMaxResponseNss));
+        ASSERT_EQUALS(numDocs, (int)client.count(kMaxResponseNss));
     }
 
     std::string createUniqueHalfMegabyteString(int uniqueInt) {

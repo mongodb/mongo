@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,47 +27,42 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-class ScopedGlobalServiceContextForTest {
-public:
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp or after tearDown.
-     */
-    ServiceContext* getServiceContext();
+class ImplicitCollectionCreationTest : public ShardServerTestFixture {};
 
-protected:
-    ScopedGlobalServiceContextForTest();
-    virtual ~ScopedGlobalServiceContextForTest();
-};
+TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
+    NamespaceString nss("ImplicitCreateDisallowedByDefaultDB.TestColl");
+    AutoGetOrCreateDb db(operationContext(), nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_THROWS_CODE(
+        uassertStatusOK(db.getDb()->userCreateNS(operationContext(), nss, CollectionOptions{})),
+        DBException,
+        ErrorCodes::CannotImplicitlyCreateCollection);
+    wuow.commit();
+}
 
-/**
- * Test fixture for tests that require a properly initialized global service context.
- */
-class ServiceContextTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
-public:
-    /**
-     * Returns the default Client for this test.
-     */
-    Client* getClient();
+TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
+    NamespaceString nss("AllowImplicitCollectionCreateDB.TestColl");
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        operationContext());
+    AutoGetOrCreateDb db(operationContext(), nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
+    WriteUnitOfWork wuow(operationContext());
+    ASSERT_OK(db.getDb()->userCreateNS(operationContext(), nss, CollectionOptions{}));
+    wuow.commit();
+}
 
-    ServiceContext::UniqueOperationContext makeOperationContext() {
-        return getClient()->makeOperationContext();
-    }
-
-protected:
-    ServiceContextTest();
-    virtual ~ServiceContextTest();
-
-private:
-    ThreadClient _threadClient;
-};
-
+}  // namespace
 }  // namespace mongo

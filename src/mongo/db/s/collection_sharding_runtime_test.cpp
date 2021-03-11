@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -187,7 +188,7 @@ TEST_F(CollectionShardingRuntimeTest,
 class CollectionShardingRuntimeWithRangeDeleterTest : public CollectionShardingRuntimeTest {
 public:
     void setUp() override {
-        ShardServerTestFixture::setUp();
+        CollectionShardingRuntimeTest::setUp();
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
         // Set up replication coordinator to be primary and have no replication delay.
         auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext());
@@ -200,8 +201,13 @@ public:
         });
         repl::ReplicationCoordinator::set(getServiceContext(), std::move(replCoord));
 
-        DBDirectClient client(operationContext());
-        client.createCollection(kTestNss.ns());
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(operationContext());
+            uassertStatusOK(createCollection(
+                operationContext(), kTestNss.db().toString(), BSON("create" << kTestNss.coll())));
+        }
+
         AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
         _uuid = autoColl.getCollection()->uuid();
     }
@@ -211,7 +217,7 @@ public:
         client.dropCollection(kTestNss.ns());
 
         WaitForMajorityService::get(getServiceContext()).shutDown();
-        ShardServerTestFixture::tearDown();
+        CollectionShardingRuntimeTest::tearDown();
     }
 
     CollectionShardingRuntime& csr() {
@@ -227,7 +233,6 @@ public:
 private:
     UUID _uuid{UUID::gen()};
 };
-
 
 TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
        WaitForCleanReturnsErrorIfMetadataManagerDoesNotExist) {
@@ -339,5 +344,4 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 }
 
 }  // namespace
-
 }  // namespace mongo

@@ -41,6 +41,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 
@@ -456,12 +458,39 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
                                                const CollectionOptions& options,
                                                const BSONObj& idIndex,
                                                const OplogSlot& createOpTime) {
-    // By the time the collection is being created, the caller has already determined whether it is
-    // sharded or unsharded and set it on the CSR. If this method is called with the metadata as
-    // UNKNOWN, this means an internal collection creation, which can only be UNSHARDED
-    auto* csr = CollectionShardingRuntime::get(opCtx, collectionName);
-    if (opCtx->writesAreReplicated() && !csr->getCurrentMetadataIfKnown())
+    // Only the shard primay nodes control the collection creation and secondaries just follow
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    // Collections which are always UNSHARDED have a fixed CSS, which never changes, so we don't
+    // need to do anything
+    if (collectionName.isNamespaceAlwaysUnsharded()) {
+        return;
+    }
+
+    // Temp collections are always UNSHARDED
+    if (options.temp) {
+        CollectionShardingRuntime::get(opCtx, collectionName)
+            ->setFilteringMetadata(opCtx, CollectionMetadata());
+        return;
+    }
+
+    const auto& oss = OperationShardingState::get(opCtx);
+    uassert(CannotImplicitlyCreateCollectionInfo(collectionName),
+            "Implicit collection creation on a sharded cluster must go through the "
+            "CreateCollectionCoordinator",
+            oss._allowCollectionCreation);
+
+    // If the check above passes, this means the caller is responsible to eventially set the shard
+    // version for the collection
+    //
+    // TODO (SERVER-52778): Delete the lines below once all usages of
+    // ScopedAllowImplicitCollectionCreate_UNSAFE have been removed
+    auto* const csr = CollectionShardingRuntime::get(opCtx, collectionName);
+    if (opCtx->writesAreReplicated() && !csr->getCurrentMetadataIfKnown()) {
         csr->setFilteringMetadata(opCtx, CollectionMetadata());
+    }
 }
 
 repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,

@@ -53,6 +53,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -745,6 +746,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
 
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
+
 void validateAndRunRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& source,
                                     const NamespaceString& target,
@@ -786,6 +788,8 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
                   "allowed");
     }
 
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+        opCtx);
     uassertStatusOK(renameCollection(opCtx, source, target, options));
 }
 

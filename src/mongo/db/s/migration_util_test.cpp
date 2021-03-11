@@ -27,14 +27,17 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
@@ -396,10 +399,14 @@ public:
     };
 
     UUID createCollectionAndGetUUID(const NamespaceString& nss) {
-        DBDirectClient client(operationContext());
-        client.createCollection(nss.ns());
+        {
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(operationContext());
+            uassertStatusOK(createCollection(
+                operationContext(), nss.db().toString(), BSON("create" << nss.coll())));
+        }
 
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+        AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
         return autoColl.getCollection()->uuid();
     }
 

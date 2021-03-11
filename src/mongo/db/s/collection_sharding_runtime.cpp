@@ -44,19 +44,6 @@
 namespace mongo {
 namespace {
 
-/**
- * Returns whether the specified namespace is used for sharding-internal purposes only and can never
- * be marked as anything other than UNSHARDED, because the call sites which reference these
- * collections are not prepared to handle StaleConfig errors.
- */
-bool isNamespaceAlwaysUnsharded(const NamespaceString& nss) {
-    // There should never be a case to mark as sharded collections which are on the config server
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer)
-        return true;
-
-    return nss.isNamespaceAlwaysUnsharded();
-}
-
 class UnshardedCollection : public ScopedCollectionDescription::Impl {
 public:
     UnshardedCollection() = default;
@@ -94,8 +81,8 @@ CollectionShardingRuntime::CollectionShardingRuntime(
       _nss(std::move(nss)),
       _rangeDeleterExecutor(std::move(rangeDeleterExecutor)),
       _stateChangeMutex(_nss.toString()),
-      _metadataType(isNamespaceAlwaysUnsharded(_nss) ? MetadataType::kUnsharded
-                                                     : MetadataType::kUnknown) {}
+      _metadataType(_nss.isNamespaceAlwaysUnsharded() ? MetadataType::kUnsharded
+                                                      : MetadataType::kUnknown) {}
 
 CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
@@ -188,7 +175,7 @@ boost::optional<SharedSemiFuture<void>> CollectionShardingRuntime::getCriticalSe
 
 void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
-    invariant(!newMetadata.isSharded() || !isNamespaceAlwaysUnsharded(_nss),
+    invariant(!newMetadata.isSharded() || !_nss.isNamespaceAlwaysUnsharded(),
               str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
 
     auto csrLock = CSRLock::lockExclusive(opCtx, this);
@@ -216,7 +203,7 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
     const auto csrLock = CSRLock::lockExclusive(opCtx, this);
     stdx::lock_guard lk(_metadataManagerLock);
-    if (!isNamespaceAlwaysUnsharded(_nss)) {
+    if (!_nss.isNamespaceAlwaysUnsharded()) {
         LOGV2_DEBUG(4798530,
                     1,
                     "Clearing metadata for collection {namespace}",

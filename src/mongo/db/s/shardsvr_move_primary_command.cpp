@@ -147,7 +147,7 @@ public:
                           << cmdObj,
             opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-        // TODO uncomment the following snippet on SERVER-54507 completion
+        // TODO (SERVER-54507): Uncomment the following snippet:
         // ON_BLOCK_EXIT([opCtx, dbNss]
         // {Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db());});
 

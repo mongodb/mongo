@@ -57,6 +57,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -823,6 +824,8 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         } else {
             // We do not have a collection by this name. Create the collection with the donor's
             // options.
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions collectionOptions = uassertStatusOK(
                 CollectionOptions::parse(collectionOptionsAndIndexes.options,

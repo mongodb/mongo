@@ -213,6 +213,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
             str::stream() << "Not primary while writing to " << ns.ns(),
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                 ->canAcceptWritesFor(opCtx, ns));
+
     CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 }
 
@@ -226,6 +227,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 opCtx,
                 ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns));
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
             uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, defaultCollectionOptions));

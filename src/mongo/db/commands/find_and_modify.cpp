@@ -67,6 +67,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -77,10 +78,9 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
-
-namespace {
 
 /**
  * If the operation succeeded, then returns either a document to return to the client, or
@@ -218,7 +218,7 @@ write_ops::FindAndModifyReply buildResponse(const PlanExecutor* exec,
     return result;
 }
 
-void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
+void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nsString) {
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while running findAndModify command on collection "
                           << nsString.ns(),
@@ -360,7 +360,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryRe
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.db()));
     }
 
-    assertCanWrite(opCtx, nsString);
+    assertCanWrite_inlock(opCtx, nsString);
 
     checkIfTransactionOnCappedColl(collection.getCollection(), inTransaction);
 
@@ -425,7 +425,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUp
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.db()));
     }
 
-    assertCanWrite(opCtx, nsString);
+    assertCanWrite_inlock(opCtx, nsString);
 
     CollectionPtr createdCollection;
     const CollectionPtr* collectionPtr = &autoColl.getCollection();
@@ -434,7 +434,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUp
     // AutoGetCollection Create the collection if it does not exist when performing an upsert
     // because the update stage does not create its own collection
     if (!*collectionPtr && request.getUpsert() && *request.getUpsert()) {
-        assertCanWrite(opCtx, nsString);
+        assertCanWrite_inlock(opCtx, nsString);
 
         createdCollection =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString);
@@ -442,6 +442,8 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUp
         // If someone else beat us to creating the collection, do nothing
         if (!createdCollection) {
             uassertStatusOK(userAllowedCreateNS(nsString));
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
             uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));

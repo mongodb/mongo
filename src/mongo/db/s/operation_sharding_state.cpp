@@ -31,8 +31,6 @@
 
 #include "mongo/db/s/operation_sharding_state.h"
 
-#include "mongo/db/operation_context.h"
-
 namespace mongo {
 namespace {
 
@@ -60,20 +58,8 @@ OperationShardingState& OperationShardingState::get(OperationContext* opCtx) {
 }
 
 bool OperationShardingState::isOperationVersioned(OperationContext* opCtx) {
-    return !(get(opCtx)._shardVersions.empty());
-}
-
-void OperationShardingState::setAllowImplicitCollectionCreation(
-    const BSONElement& allowImplicitCollectionCreationElem) {
-    if (!allowImplicitCollectionCreationElem.eoo()) {
-        _allowImplicitCollectionCreation = allowImplicitCollectionCreationElem.Bool();
-    } else {
-        _allowImplicitCollectionCreation = true;
-    }
-}
-
-bool OperationShardingState::allowImplicitCollectionCreation() const {
-    return _allowImplicitCollectionCreation;
+    const auto& oss = get(opCtx);
+    return !oss._shardVersions.empty();
 }
 
 void OperationShardingState::initializeClientRoutingVersionsFromCommand(NamespaceString nss,
@@ -201,6 +187,23 @@ boost::optional<Status> OperationShardingState::resetShardingOperationFailedStat
     Status failedStatus = Status(*_shardingOperationFailedStatus);
     _shardingOperationFailedStatus = boost::none;
     return failedStatus;
+}
+
+using ScopedAllowImplicitCollectionCreate_UNSAFE =
+    OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE;
+
+ScopedAllowImplicitCollectionCreate_UNSAFE::ScopedAllowImplicitCollectionCreate_UNSAFE(
+    OperationContext* opCtx)
+    : _opCtx(opCtx) {
+    auto& oss = get(_opCtx);
+    invariant(!oss._allowCollectionCreation);
+    oss._allowCollectionCreation = true;
+}
+
+ScopedAllowImplicitCollectionCreate_UNSAFE::~ScopedAllowImplicitCollectionCreate_UNSAFE() {
+    auto& oss = get(_opCtx);
+    invariant(oss._allowCollectionCreation);
+    oss._allowCollectionCreation = false;
 }
 
 }  // namespace mongo
