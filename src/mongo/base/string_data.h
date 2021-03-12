@@ -350,10 +350,6 @@ inline std::string operator+(StringData lhs, std::string rhs) {
     return rhs;
 }
 
-constexpr fmt::string_view to_string_view(StringData s) noexcept {
-    return fmt::string_view(s.rawData(), s.size());
-}
-
 inline namespace literals {
 
 /**
@@ -366,3 +362,17 @@ constexpr StringData operator"" _sd(const char* c, std::size_t len) {
 }  // namespace literals
 
 }  // namespace mongo
+
+namespace fmt {
+template <>
+class formatter<mongo::StringData> : formatter<std::string_view> {
+    using Base = formatter<std::string_view>;
+
+public:
+    using Base::parse;
+    template <typename FormatContext>
+    auto format(const mongo::StringData& s, FormatContext& fc) {
+        return Base::format(std::string_view{s.rawData(), s.size()}, fc);
+    }
+};
+}  // namespace fmt

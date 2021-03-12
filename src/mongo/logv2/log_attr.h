@@ -60,11 +60,26 @@ struct IsComposedAttr : std::false_type {};
 template <typename... Ts>
 struct IsComposedAttr<ComposedAttr<Ts...>> : std::true_type {};
 
+template <typename T>
+struct NamedArg {
+    const char* name;
+    const T& value;
+};
+
+struct AttrUdl {
+    const char* name;
+
+    template <typename T>
+    NamedArg<T> operator=(T&& v) const {
+        return NamedArg<T>{name, std::forward<T>(v)};
+    }
+};
+
 /**
  * Helper to make regular attributes composable with combine()
  */
 template <typename T>
-auto logAttrs(const fmt::internal::named_arg<T, char>& a) {
+auto logAttrs(const NamedArg<T>& a) {
     return a;
 }
 
@@ -121,8 +136,8 @@ auto multipleAttrs(Ts&&... attrs) {
 }  // namespace logv2
 
 inline namespace literals {
-inline fmt::internal::udl_arg<char> operator"" _attr(const char* s, std::size_t n) {
-    return fmt::operator""_a(s, n);
+constexpr logv2::detail::AttrUdl operator"" _attr(const char* name, std::size_t) {
+    return {name};
 }
 }  // namespace literals
 }  // namespace mongo

@@ -95,7 +95,7 @@ void sendCommandToShards(OperationContext* opCtx,
             auto response = ars.next();
 
             const auto errorContext = "Failed command {} for database '{}' on shard '{}'"_format(
-                command.toString(), dbName, response.shardId);
+                command.toString(), dbName, StringData{response.shardId});
 
             auto shardResponse =
                 uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
