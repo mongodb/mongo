@@ -525,7 +525,9 @@ add_option('runtime-hardening',
     type='choice',
 )
 
-experimental_runtime_hardenings = []
+experimental_runtime_hardenings = [
+    'cfex',
+]
 experimental_runtime_hardening_choices = ['*']
 experimental_runtime_hardening_choices.extend("+" + opt for opt in experimental_runtime_hardenings)
 experimental_runtime_hardening_choices.extend("-" + opt for opt in experimental_runtime_hardenings)
@@ -3023,6 +3025,11 @@ def doConfigure(myenv):
                     LINKFLAGS=[
                         '-fstack-protector-all',
                     ]
+                )
+
+            if 'cfex' in selected_experimental_runtime_hardenings:
+                myenv.Append(
+                    CFLAGS=["-fexceptions"]
                 )
 
         if myenv.ToolchainIs('clang'):
