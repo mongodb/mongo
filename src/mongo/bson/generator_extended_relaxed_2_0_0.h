@@ -54,20 +54,17 @@ public:
     using ExtendedCanonicalV200Generator::writeUndefined;
 
     void writeInt32(fmt::memory_buffer& buffer, int32_t val) const {
-        fmt::format_int str(val);
-        appendTo(buffer, str);
+        appendTo(buffer, fmt::format_int(val));
     }
 
     void writeInt64(fmt::memory_buffer& buffer, int64_t val) const {
-        fmt::format_int str(val);
-        appendTo(buffer, str);
+        appendTo(buffer, fmt::format_int(val));
     }
 
     void writeDouble(fmt::memory_buffer& buffer, double val) const {
-        static const auto& fmtStr = *new auto(fmt::compile<double>(R"({})"));
         if (val >= std::numeric_limits<double>::lowest() &&
             val <= std::numeric_limits<double>::max())
-            compiled_format_to(buffer, fmtStr, val);
+            format_to(std::back_inserter(buffer), FMT_COMPILE(R"({})"), val);
         else {
             ExtendedCanonicalV200Generator::writeDouble(buffer, val);
         }
@@ -81,9 +78,9 @@ public:
         // handles both the case where Date_t::millis is too large, and the case where
         // Date_t::millis is negative (before the epoch).
         if (val.isFormattable()) {
-            appendTo(buffer, R"({"$date":")"_sd);
-            appendTo(buffer, StringData{DateStringBuffer{}.iso8601(val, _localDate)});
-            appendTo(buffer, R"("})");
+            format_to(std::back_inserter(buffer),
+                      FMT_COMPILE(R"({{"$date":"{}"}})"),
+                      StringData{DateStringBuffer{}.iso8601(val, _localDate)});
         } else {
             ExtendedCanonicalV200Generator::writeDate(buffer, val);
         }

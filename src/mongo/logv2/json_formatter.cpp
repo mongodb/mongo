@@ -29,7 +29,6 @@
 
 #include "mongo/logv2/json_formatter.h"
 
-#include <boost/container/small_vector.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/expressions/message.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
@@ -38,7 +37,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
-#include "mongo/logv2/name_extractor.h"
 #include "mongo/util/str_escape.h"
 
 #include <fmt/compile.h>
@@ -46,21 +44,12 @@
 
 namespace mongo::logv2 {
 namespace {
-template <typename CompiledFormatStr, typename... Args>
-static void compiled_format_to(fmt::memory_buffer& buffer,
-                               const CompiledFormatStr& fmt_str,
-                               const Args&... args) {
-    fmt::internal::cf::vformat_to<fmt::buffer_context<char>>(
-        fmt::buffer_range(buffer),
-        fmt_str,
-        {fmt::make_format_args<fmt::buffer_context<char>>(args...)});
-}
 
 struct JSONValueExtractor {
     JSONValueExtractor(fmt::memory_buffer& buffer, size_t attributeMaxSize)
         : _buffer(buffer), _attributeMaxSize(attributeMaxSize) {}
 
-    void operator()(StringData name, CustomAttributeValue const& val) {
+    void operator()(const char* name, CustomAttributeValue const& val) {
         // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
         // want the value and not the whole element.
         if (val.BSONAppend) {
@@ -110,7 +99,7 @@ struct JSONValueExtractor {
         }
     }
 
-    void operator()(StringData name, const BSONObj& val) {
+    void operator()(const char* name, const BSONObj& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
         BSONObj truncated = val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
@@ -121,7 +110,7 @@ struct JSONValueExtractor {
         addTruncationReport(name, truncated, val.objsize());
     }
 
-    void operator()(StringData name, const BSONArray& val) {
+    void operator()(const char* name, const BSONArray& val) {
         // This is a JSON subobject, no quotes needed
         storeUnquoted(name);
         BSONObj truncated = val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0,
@@ -132,23 +121,25 @@ struct JSONValueExtractor {
         addTruncationReport(name, truncated, val.objsize());
     }
 
-    void operator()(StringData name, StringData value) {
+    void operator()(const char* name, StringData value) {
         storeQuoted(name, value);
     }
 
     template <typename Period>
-    void operator()(StringData name, const Duration<Period>& value) {
+    void operator()(const char* name, const Duration<Period>& value) {
         // A suffix is automatically prepended
-        dassert(!name.endsWith(value.mongoUnitSuffix()));
-        static const auto& fmtStr =
-            *new auto(fmt::compile<StringData, StringData, StringData, int64_t>(R"({}"{}{}":{})"));
-        compiled_format_to(
-            _buffer, fmtStr, _separator, name, value.mongoUnitSuffix(), value.count());
+        dassert(!StringData(name).endsWith(value.mongoUnitSuffix()));
+        format_to(std::back_inserter(_buffer),
+                  FMT_COMPILE(R"({}"{}{}":{})"),
+                  _separator,
+                  name,
+                  value.mongoUnitSuffix(),
+                  value.count());
         _separator = ","_sd;
     }
 
     template <typename T>
-    void operator()(StringData name, const T& value) {
+    void operator()(const char* name, const T& value) {
         storeUnquotedValue(name, value);
     }
 
@@ -162,23 +153,20 @@ struct JSONValueExtractor {
 
 private:
     void storeUnquoted(StringData name) {
-        static const auto& fmtStr = *new auto(fmt::compile<StringData, StringData>(R"({}"{}":)"));
-        compiled_format_to(_buffer, fmtStr, _separator, name);
+        format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":)"), _separator, name);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeUnquotedValue(StringData name, const T& value) {
-        static const auto& fmtStr =
-            *new auto(fmt::compile<StringData, StringData, T>(R"({}"{}":{})"));
-        compiled_format_to(_buffer, fmtStr, _separator, name, value);
+        format_to(
+            std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":{})"), _separator, name, value);
         _separator = ","_sd;
     }
 
     template <typename T>
     void storeQuoted(StringData name, const T& value) {
-        static const auto& fmtStr = *new auto(fmt::compile<StringData, StringData>(R"({}"{}":")"));
-        compiled_format_to(_buffer, fmtStr, _separator, name);
+        format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":")"), _separator, name);
         std::size_t before = _buffer.size();
         str::escapeForJSON(_buffer, value);
         if (_attributeMaxSize != 0) {

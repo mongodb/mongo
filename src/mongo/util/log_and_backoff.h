@@ -49,7 +49,7 @@ void logAndBackoff(int32_t logId,
                    logv2::LogSeverity severity,
                    size_t numAttempts,
                    const char (&msg)[N],
-                   const fmt::internal::named_arg<Args, char>&... args) {
+                   const logv2::detail::NamedArg<Args>&... args) {
     logv2::detail::doLog(logId, severity, {component}, msg, args..., "attempts"_attr = numAttempts);
     log_backoff_detail::logAndBackoffImpl(numAttempts);
 }

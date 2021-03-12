@@ -785,7 +785,7 @@ feature that we don't want to exclude entirely, but it makes sense to lean on
 it only when absolutely necessary.
 
 [relaxed_json_2]: https://github.com/mongodb/specifications/blob/master/source/extended-json.rst
-[libfmt]: https://fmt.dev/6.1.1/index.html
-[libfmt_syn]: https://fmt.dev/6.1.1/syntax.html#formatspec
+[libfmt]: https://fmt.dev/7.1.3/index.html
+[libfmt_syn]: https://fmt.dev/7.1.3/syntax.html#formatspec
 [_lastOplogEntryFetcherCallbackForStopTimestamp]: https://github.com/mongodb/mongo/blob/13caf3c499a22c2274bd533043eb7e06e6f8e8a4/src/mongo/db/repl/initial_syncer.cpp#L1500-L1512
 [_summarizeRollback]: https://github.com/mongodb/mongo/blob/13caf3c499a22c2274bd533043eb7e06e6f8e8a4/src/mongo/db/repl/rollback_impl.cpp#L1263-L1305
