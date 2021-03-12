@@ -912,15 +912,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
         context->planNodeId,
         context->frameIdGenerator);
 
-    // There are some cases where 'traverseOutputSlot' gets set to Nothing when TraverseStage
-    // doesn't match anything. One example of when this happens is when innerBranch->getNext()
-    // returns EOF every time it is called by TraverseStage. In these cases $elemMatch should return
-    // false instead of Nothing.
-    auto projectExpr = makeFunction("fillEmpty",
-                                    sbe::makeE<sbe::EVariable>(traverseSlot),
-                                    context->stateHelper.makeState(false));
-
-    return {std::move(projectExpr), std::move(traverseStage)};
+    return {traverseSlot, std::move(traverseStage)};
 }
 
 /**
