@@ -43,7 +43,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -95,16 +94,10 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::ostringstream;
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
+namespace {
 
 // Failpoint for making filemd5 hang.
 MONGO_FAIL_POINT_DEFINE(waitInFilemd5DuringManualYield);
-
-namespace {
 
 Status _setProfileSettings(OperationContext* opCtx,
                            Database* db,
@@ -252,7 +245,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, jsobj));
@@ -298,12 +291,12 @@ public:
                 uasserted(17240, "Can't canonicalize query " + query.toString());
                 return false;
             }
-            unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+            std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
             // We drop and re-acquire these locks every document because md5'ing is expensive
-            unique_ptr<AutoGetCollectionForReadCommand> ctx(
+            std::unique_ptr<AutoGetCollectionForReadCommand> ctx(
                 new AutoGetCollectionForReadCommand(opCtx, nss));
             const CollectionPtr& coll = ctx->getCollection();
 
@@ -414,13 +407,13 @@ public:
     }
 
     void dumpChunks(OperationContext* opCtx,
-                    const string& ns,
+                    const std::string& ns,
                     const BSONObj& query,
                     const BSONObj& sort) {
         DBDirectClient client(opCtx);
         Query q(query);
         q.sort(sort);
-        unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns), q);
+        std::unique_ptr<DBClientCursor> c = client.query(NamespaceString(ns), q);
         while (c->more()) {
             LOGV2(20454, "Chunk: {chunk}", "Dumping chunks", "chunk"_attr = c->nextSafe());
         }
@@ -445,7 +438,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const std::string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         result << "options" << QueryOption_AllSupported;
