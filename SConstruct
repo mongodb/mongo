@@ -527,6 +527,7 @@ add_option('runtime-hardening',
 
 experimental_runtime_hardenings = [
     'cfex',
+    'stackclash',
 ]
 experimental_runtime_hardening_choices = ['*']
 experimental_runtime_hardening_choices.extend("+" + opt for opt in experimental_runtime_hardenings)
@@ -3031,6 +3032,9 @@ def doConfigure(myenv):
                 myenv.Append(
                     CFLAGS=["-fexceptions"]
                 )
+
+            if 'stackclash' in selected_experimental_runtime_hardenings:
+                AddToCCFLAGSIfSupported(myenv, "-fstack-clash-protection")
 
         if myenv.ToolchainIs('clang'):
             # TODO: There are several interesting things to try here, but they each have
