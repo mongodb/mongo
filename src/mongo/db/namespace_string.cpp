@@ -275,20 +275,14 @@ bool NamespaceString::isNamespaceAlwaysUnsharded() const {
     if (db() == NamespaceString::kLocalDb || db() == NamespaceString::kAdminDb)
         return true;
 
-    // Certain config collections can never be sharded
-    if (ns() == kSessionTransactionsTableNamespace.ns() || ns() == kRangeDeletionNamespace.ns() ||
-        ns() == kTransactionCoordinatorsNamespace.ns() || ns() == kVectorClockNamespace.ns() ||
-        ns() == kMigrationCoordinatorsNamespace.ns() || ns() == kIndexBuildEntryNamespace.ns())
-        return true;
+    // Config can only have the system.sessions as sharded
+    if (db() == NamespaceString::kConfigDb)
+        return *this != NamespaceString::kLogicalSessionsNamespace;
 
     if (isSystemDotProfile())
         return true;
 
     if (isSystemDotViews())
-        return true;
-
-    if (ns() == "config.cache.databases" || ns() == "config.cache.collections" ||
-        isConfigDotCacheDotChunks())
         return true;
 
     return false;
