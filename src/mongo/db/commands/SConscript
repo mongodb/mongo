@@ -66,20 +66,6 @@ env.Library(
 )
 
 env.Library(
-    target="write_commands_common",
-    source=[
-        "write_commands/write_commands_common.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/auth/auth',
-        '$BUILD_DIR/mongo/db/auth/authprivilege',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
-    ],
-)
-
-env.Library(
     target="feature_compatibility_parsers",
     source=[
         "feature_compatibility_version_parser.cpp",
@@ -101,20 +87,21 @@ env.Library(
         'end_sessions_command.cpp',
         'fail_point_cmd.cpp',
         'generic.cpp',
+        'generic.idl',
         'hashcmd.cpp',
         'kill_all_sessions_by_pattern_command.cpp',
         'kill_all_sessions_command.cpp',
         'kill_sessions_command.cpp',
         'parameters.cpp',
+        'parameters.idl',
         'parse_log_component_settings.cpp',
         'refresh_logical_session_cache_now.cpp',
         'refresh_sessions_command.cpp',
         'rename_collection_common.cpp',
+        'sessions_commands.idl',
         'start_session_command.cpp',
         'update_metrics.cpp',
-        'parameters.idl',
-        'sessions_commands.idl',
-        'generic.idl',
+        'write_commands_common.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -128,6 +115,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/mongohasher',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -300,6 +288,7 @@ env.Library(
     target="standalone",
     source=[
         "count_cmd.cpp",
+        "create_command.cpp",
         "create_indexes.cpp",
         "current_op.cpp",
         "dbcommands.cpp",
@@ -329,7 +318,7 @@ env.Library(
         "validate.cpp",
         "validate_db_metadata_cmd.cpp",
         "whats_my_sni_command.cpp",
-        "write_commands/write_commands.cpp",
+        "write_commands.cpp",
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -379,7 +368,6 @@ env.Library(
         'rename_collection_idl',
         'test_commands_enabled',
         'validate_db_metadata_command',
-        'write_commands_common',
     ],
 )
 

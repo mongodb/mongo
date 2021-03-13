@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/write_commands/write_commands_common.h"
+#include "mongo/db/commands/write_commands_common.h"
 
 #include <algorithm>
 #include <memory>

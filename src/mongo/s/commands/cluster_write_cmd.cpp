@@ -37,7 +37,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
-#include "mongo/db/commands/write_commands/write_commands_common.h"
+#include "mongo/db/commands/write_commands_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
