@@ -205,6 +205,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
     WAIT_SECS_RANGES = [[0.1, 0.5], [1, 5], [5, 15]]
     MIGRATION_STATE_POLL_INTERVAL_SECS = 0.1
     NO_SUCH_MIGRATION_ERR_CODE = 327
+    INTERNAL_ERR_CODE = 1
+    ILLEGAL_OPERATION_ERR_CODE = 20
+    INVALID_NS_ERR_CODE = 73
 
     def __init__(self, logger, tenant_migration_fixture, tenant_id):
         """Initialize _TenantMigrationThread."""
@@ -262,8 +265,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 if found_idle_request:
                     continue
 
-                wait_secs = random.uniform(*_TenantMigrationThread.WAIT_SECS_RANGES[
-                    migration_num % len(_TenantMigrationThread.WAIT_SECS_RANGES)])
+                wait_secs = random.uniform(
+                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)])
                 self.__lifecycle.wait_for_tenant_migration_interval(wait_secs)
 
                 if is_committed:
@@ -313,6 +316,28 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
             msg = "Tenant migration thread is not running."
             self.logger.error(msg)
             raise errors.ServerFailure(msg)
+
+    def _is_fail_point_abort_reason(self, abort_reason):
+        return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
+            "errmsg"] == "simulate a tenant migration error"
+
+    def _is_empty_id_index_spec_err(self, abort_reason):
+        # TODO (SERVER-55169): Timeseries bucket collections is expected to fail tenant migration
+        # cloner's non-empty id index check.
+        err_msg_regex = "Found empty '_id' index spec but the collection is not specified " + \
+                           "with 'autoIndexId' as false, tenantId: " + self._tenant_id
+        return abort_reason["code"] == self.ILLEGAL_OPERATION_ERR_CODE and re.search(
+            err_msg_regex, abort_reason["errmsg"])
+
+    def _is_write_to_system_views_err(self, abort_reason):
+        # TODO (SERVER-55168): Allow tenant migration cloner to write to system.views collections.
+        err_msg_regex = r"cannot write to {}_.*\.system\.views".format(self._tenant_id)
+        return abort_reason["code"] == self.INVALID_NS_ERR_CODE and re.search(
+            err_msg_regex, abort_reason["errmsg"])
+
+    def _is_blacklisted_abort_reason(self, abort_reason):
+        return self._is_empty_id_index_spec_err(abort_reason) or self._is_write_to_system_views_err(
+            abort_reason)
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
@@ -366,17 +391,31 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     is_committed = True
                     break
                 elif res["state"] == "aborted":
-                    self.logger.info("Tenant migration with donor primary on port " +
-                                     str(donor_primary.port) + " of replica set '" +
-                                     migration_opts.get_donor_name() + "' has aborted: " + str(res))
-                    break
+                    abort_reason = res["abortReason"]
+                    if self._is_fail_point_abort_reason(abort_reason):
+                        self.logger.info("Tenant migration with donor primary on port " +
+                                         str(donor_primary.port) + " of replica set '" +
+                                         migration_opts.get_donor_name() +
+                                         "' has aborted due to failpoint: " + str(res))
+                        break
+                    elif self._is_blacklisted_abort_reason(abort_reason):
+                        self.logger.info("Tenant migration with donor primary on port " +
+                                         str(donor_primary.port) + " of replica set '" +
+                                         migration_opts.get_donor_name() +
+                                         "' has aborted due to a blacklisted error: " + str(res))
+                        break
+                    else:
+                        raise errors.ServerFailure("Tenant migration with donor primary on port " +
+                                                   str(donor_primary.port) + " of replica set '" +
+                                                   migration_opts.get_donor_name() +
+                                                   "' has aborted due to an error: " + str(res))
                 elif not res["ok"]:
-                    self.errors.ServerFailure("Tenant migration with donor primary on port " +
-                                              str(donor_primary.port) + " of replica set '" +
-                                              migration_opts.get_donor_name() + "' has failed: " +
-                                              str(res))
+                    raise errors.ServerFailure("Tenant migration with donor primary on port " +
+                                               str(donor_primary.port) + " of replica set '" +
+                                               migration_opts.get_donor_name() + "' has failed: " +
+                                               str(res))
 
-                time.sleep(_TenantMigrationThread.MIGRATION_STATE_POLL_INTERVAL_SECS)
+                time.sleep(self.MIGRATION_STATE_POLL_INTERVAL_SECS)
 
             # Garbage collect the migration.
             if is_committed:
@@ -407,7 +446,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     migration_opts.migration_id.bytes, 4)
             }, bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
         except pymongo.errors.OperationFailure as err:
-            if err.code != _TenantMigrationThread.NO_SUCH_MIGRATION_ERR_CODE:
+            if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
                 raise
             # The fixture was restarted.
             self.logger.info(
@@ -478,7 +517,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     migration_opts.get_donor_name(), (end_time - start_time) * 1000)
                 raise
 
-            time.sleep(_TenantMigrationThread.MIGRATION_STATE_POLL_INTERVAL_SECS)
+            time.sleep(self.MIGRATION_STATE_POLL_INTERVAL_SECS)
 
     def _drop_tenant_databases(self, rs):
         self.logger.info("Dropping tenant databases from replica set '%s'.", rs.replset_name)
