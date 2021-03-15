@@ -8,7 +8,10 @@
 (function() {
 "use strict";
 
-const rst = new ReplSetTest({nodes: 1});
+const rst = new ReplSetTest({
+    nodes: 1,
+    nodeOptions: {setParameter: {logComponentVerbosity: tojson({command: 2, query: 5})}}
+});
 rst.startSet();
 rst.initiate();
 
@@ -239,7 +242,10 @@ jsTestLog("Running tailable query on the oplog with no results");
     assert.eq(timestampCmp(resumeToken2.ts, resumeToken1.ts), 0);
 
     // Insert dummy data so the next getMore should have a higher resume token.
-    assert.commandWorked(node.getDB(dbName).getCollection(collName + "_other").insert({dummy: 1}));
+    const latestOpTime = assert
+                             .commandWorked(node.getDB(dbName).runCommand(
+                                 {insert: collName + "_other", documents: [{dummy: 1}]}))
+                             .opTime;
 
     jsTest.log("Run another tailable getMore with no results");
     const resGetMore2 = assert.commandWorked(
@@ -249,7 +255,11 @@ jsTestLog("Running tailable query on the oplog with no results");
 
     // Resume token should be greater than the last getMore's.
     const resumeToken3 = assertExpectedResumeTokenFormat(resGetMore2);
-    assert.eq(timestampCmp(resumeToken3.ts, resumeToken2.ts), 1);
+    assert.eq(timestampCmp(resumeToken3.ts, resumeToken2.ts), 1, tojson({
+                  currentResumeToken: resumeToken3,
+                  lastResumeToken: resumeToken2,
+                  latestOpTime: latestOpTime
+              }));
 
     // Kill the tailable cursor.
     assert.commandWorked(localDb.runCommand({killCursors: "oplog.rs", cursors: [cursorId]}));

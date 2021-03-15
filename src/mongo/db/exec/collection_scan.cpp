@@ -223,6 +223,12 @@ void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {
                              "but found a result without a valid 'ts' field: "
                           << record.data.toBson().toString(),
             tsElem.type() == BSONType::bsonTimestamp);
+    LOGV2_DEBUG(550450,
+                5,
+                "Setting _latestOplogEntryTimestamp to the max of the timestamp of the current "
+                "latest oplog entry and the timestamp of the current record",
+                "latestOplogEntryTimestamp"_attr = _latestOplogEntryTimestamp,
+                "currentRecordTimestamp"_attr = tsElem.timestamp());
     _latestOplogEntryTimestamp = std::max(_latestOplogEntryTimestamp, tsElem.timestamp());
 }
 
