@@ -70,8 +70,8 @@ bool killCursorIfAuthorized(OperationContext* opCtx, CursorId id) {
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());
     auto cursorOwner = pin.getValue().getCursor()->getAuthenticatedUsers();
     auto authStatus = auth::checkAuthForKillCursors(as, nss, cursorOwner);
+    audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, authStatus.code());
     if (!authStatus.isOK()) {
-        audit::logKillCursorsAuthzCheck(opCtx->getClient(), nss, id, authStatus.code());
         return false;
     }
 
