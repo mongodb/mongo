@@ -1186,3 +1186,78 @@ commands:
             parameterStruct:
                 type: array<ArrayTypeStruct>
         reply_type: ArrayTypeStruct
+
+    complexActionTypesSubset:
+        description: "new command passes when the action types are a subset"
+        command_name: complexActionTypesSubset
+        namespace: ignored
+        cpp_name: complexActionTypesSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: actionTypeOne
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+
+    complexActionTypesSubsetTwo:
+        description: "new command passes when the action types are a subset"
+        command_name: complexActionTypesSubsetTwo
+        namespace: ignored
+        cpp_name: complexActionTypesSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+
+    complexChecksSubset:
+        description: "new command passes when the complex checks are a subset of the old checks"
+        command_name: complexChecksSubset
+        namespace: ignored
+        cpp_name: complexChecksSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkThree
+                - check: checkTwo
+
+    removedComplexPrivilege:
+        description: "new command passes when a complex privilege is removed"
+        command_name: removedComplexPrivilege
+        namespace: ignored
+        cpp_name: removedComplexPrivilege
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+
+    addedAccessCheckField:
+        description: "new command passes because it adds the access_check field when the api_version is not '1'"
+        command_name: addedAccessCheckField
+        namespace: ignored
+        cpp_name: addedAccessCheckField
+        strict: true
+        api_version: ""
+        reply_type: OkReply
+        access_check:
+            none: true

@@ -711,28 +711,79 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
     return ctxt.errors
 
 
-def check_security_access_check(
-        ctxt: IDLCompatibilityContext, old_access_checks: syntax.AccessChecks,
-        new_access_checks: syntax.AccessChecks, cmd_name: str, new_idl_file_path: str) -> None:
-    """Check the compatibility between security access checks of the old and new command."""
-    if old_access_checks is not None and new_access_checks is not None:
-        old_simple_check = old_access_checks.simple
-        new_simple_check = new_access_checks.simple
-        if old_simple_check is not None and new_simple_check is not None:
-            if old_simple_check.check != new_simple_check.check:
-                ctxt.add_check_not_equal_error(cmd_name, old_simple_check.check,
-                                               new_simple_check.check, new_idl_file_path)
+def split_complex_checks(
+        complex_checks: List[syntax.AccessCheck]) -> Tuple[List[str], List[syntax.Privilege]]:
+    """Split a list of AccessCheck into checks and privileges."""
+    checks = [x.check for x in complex_checks if x.check is not None]
+    privileges = [x.privilege for x in complex_checks if x.privilege is not None]
+    # Sort the list of privileges by the length of the action_type list, in decreasing order
+    # so that two lists of privileges can be compared later.
+    return checks, sorted(privileges, key=lambda x: len(x.action_type), reverse=True)
 
-            else:
-                old_privilege = old_simple_check.privilege
-                new_privilege = new_simple_check.privilege
-                if old_privilege is not None and new_privilege is not None:
-                    if old_privilege.resource_pattern != new_privilege.resource_pattern:
-                        ctxt.add_resource_pattern_not_equal_error(
-                            cmd_name, old_privilege.resource_pattern,
-                            new_privilege.resource_pattern, new_idl_file_path)
-                    if not set(new_privilege.action_type).issubset(old_privilege.action_type):
-                        ctxt.add_new_action_types_not_subset_error(cmd_name, new_idl_file_path)
+
+def check_security_access_checks(ctxt: IDLCompatibilityContext,
+                                 old_access_checks: syntax.AccessChecks,
+                                 new_access_checks: syntax.AccessChecks, cmd: syntax.Command,
+                                 new_idl_file_path: str) -> None:
+    """Check the compatibility between security access checks of the old and new command."""
+    # pylint:disable=too-many-locals,too-many-branches,too-many-nested-blocks
+    cmd_name = cmd.command_name
+    if old_access_checks is not None and new_access_checks is not None:
+        old_access_check_type = old_access_checks.get_access_check_type()
+        new_access_check_type = new_access_checks.get_access_check_type()
+        if old_access_check_type != new_access_check_type:
+            ctxt.add_access_check_type_not_equal_error(cmd_name, old_access_check_type,
+                                                       new_access_check_type, new_idl_file_path)
+        else:
+            old_simple_check = old_access_checks.simple
+            new_simple_check = new_access_checks.simple
+            if old_simple_check is not None and new_simple_check is not None:
+                if old_simple_check.check != new_simple_check.check:
+                    ctxt.add_check_not_equal_error(cmd_name, old_simple_check.check,
+                                                   new_simple_check.check, new_idl_file_path)
+                else:
+                    old_privilege = old_simple_check.privilege
+                    new_privilege = new_simple_check.privilege
+                    if old_privilege is not None and new_privilege is not None:
+                        if old_privilege.resource_pattern != new_privilege.resource_pattern:
+                            ctxt.add_resource_pattern_not_equal_error(
+                                cmd_name, old_privilege.resource_pattern,
+                                new_privilege.resource_pattern, new_idl_file_path)
+                        if not set(new_privilege.action_type).issubset(old_privilege.action_type):
+                            ctxt.add_new_action_types_not_subset_error(cmd_name, new_idl_file_path)
+
+            old_complex_checks = old_access_checks.complex
+            new_complex_checks = new_access_checks.complex
+            if old_complex_checks is not None and new_complex_checks is not None:
+                if len(new_complex_checks) > len(old_complex_checks):
+                    ctxt.add_new_additional_complex_access_check_error(cmd_name, new_idl_file_path)
+                else:
+                    old_checks, old_privileges = split_complex_checks(old_complex_checks)
+                    new_checks, new_privileges = split_complex_checks(new_complex_checks)
+                    if not set(new_checks).issubset(old_checks):
+                        ctxt.add_new_complex_checks_not_subset_error(cmd_name, new_idl_file_path)
+
+                    if len(new_privileges) > len(old_privileges):
+                        ctxt.add_new_complex_privileges_not_subset_error(
+                            cmd_name, new_idl_file_path)
+                    else:
+                        # Check that each new_privilege matches an old_privilege (the resource_pattern is
+                        # equal and the action_types are a subset of the old action_types).
+                        for new_privilege in new_privileges:
+                            for old_privilege in old_privileges:
+                                if (new_privilege.resource_pattern == old_privilege.resource_pattern
+                                        and set(new_privilege.action_type).issubset(
+                                            old_privilege.action_type)):
+                                    old_privileges.remove(old_privilege)
+                                    break
+                            else:
+                                ctxt.add_new_complex_privileges_not_subset_error(
+                                    cmd_name, new_idl_file_path)
+
+    elif new_access_checks is None and old_access_checks is not None:
+        ctxt.add_removed_access_check_field_error(cmd_name, new_idl_file_path)
+    elif old_access_checks is None and new_access_checks is not None and cmd.api_version == '1':
+        ctxt.add_added_access_check_field_error(cmd_name, new_idl_file_path)
 
 
 def check_compatibility(old_idl_dir: str, new_idl_dir: str,
@@ -803,8 +854,8 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                                        old_idl_file, new_idl_file, old_idl_file_path,
                                        new_idl_file_path)
 
-                    check_security_access_check(ctxt, old_cmd.access_check, new_cmd.access_check,
-                                                old_cmd.command_name, new_idl_file_path)
+                    check_security_access_checks(ctxt, old_cmd.access_check, new_cmd.access_check,
+                                                 old_cmd, new_idl_file_path)
 
     # TODO (SERVER-55203): Remove error_skipped logic.
     ctxt.errors.remove_skipped_errors_and_dump_all_errors("Commands", old_idl_dir, new_idl_dir)
