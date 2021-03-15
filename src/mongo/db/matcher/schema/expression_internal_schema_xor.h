@@ -42,7 +42,15 @@ public:
     static constexpr StringData kName = "$_internalSchemaXor"_sd;
 
     InternalSchemaXorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ListOfMatchExpression(INTERNAL_SCHEMA_XOR, std::move(annotation)) {}
+        : ListOfMatchExpression(INTERNAL_SCHEMA_XOR, std::move(annotation), {}) {}
+    InternalSchemaXorMatchExpression(std::vector<std::unique_ptr<MatchExpression>> expressions,
+                                     clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(
+              INTERNAL_SCHEMA_XOR, std::move(annotation), std::move(expressions)) {}
+    InternalSchemaXorMatchExpression(std::unique_ptr<MatchExpression> expression,
+                                     clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(
+              INTERNAL_SCHEMA_XOR, std::move(annotation), makeVector(std::move(expression))) {}
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
@@ -51,7 +59,7 @@ public:
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         auto xorCopy = std::make_unique<InternalSchemaXorMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            xorCopy->add(getChild(i)->shallowClone().release());
+            xorCopy->add(getChild(i)->shallowClone());
         }
         if (getTag()) {
             xorCopy->setTag(getTag()->clone());

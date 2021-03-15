@@ -34,7 +34,6 @@
 #include "mongo/db/query/planner_access.h"
 
 #include <algorithm>
-#include <memory>
 #include <vector>
 
 #include "mongo/base/owned_pointer_vector.h"
@@ -699,7 +698,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
 
         // Indexed by the keyPattern position index assignment.  We want to add
         // prefixes in order but we must order them first.
-        vector<MatchExpression*> prefixExprs(tn->numPrefixFields, nullptr);
+        vector<std::unique_ptr<MatchExpression>> prefixExprs(tn->numPrefixFields);
 
         AndMatchExpression* amExpr = static_cast<AndMatchExpression*>(textFilterMe);
         invariant(amExpr->numChildren() >= tn->numPrefixFields);
@@ -708,8 +707,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
         // stash in prefixExprs.
         size_t curChild = 0;
         while (curChild < amExpr->numChildren()) {
-            MatchExpression* child = amExpr->getChild(curChild);
-            IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+            IndexTag* ixtag = static_cast<IndexTag*>(amExpr->getChild(curChild)->getTag());
             invariant(nullptr != ixtag);
             // Skip this child if it's not part of a prefix, or if we've already assigned a
             // predicate to this prefix position.
@@ -717,33 +715,29 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
                 ++curChild;
                 continue;
             }
-            // prefixExprs takes ownership of 'child'.
-            prefixExprs[ixtag->pos] = child;
+            prefixExprs[ixtag->pos] = std::move((*amExpr->getChildVector())[curChild]);
             amExpr->getChildVector()->erase(amExpr->getChildVector()->begin() + curChild);
             // Don't increment curChild.
         }
 
         // Go through the prefix equalities in order and create an index prefix out of them.
         for (size_t i = 0; i < prefixExprs.size(); ++i) {
-            MatchExpression* prefixMe = prefixExprs[i];
+            auto prefixMe = prefixExprs[i].get();
             invariant(nullptr != prefixMe);
             invariant(MatchExpression::EQ == prefixMe->matchType());
             EqualityMatchExpression* eqExpr = static_cast<EqualityMatchExpression*>(prefixMe);
             prefixBob.append(eqExpr->getData());
-            // We removed this from the AND expression that owned it, so we must clean it
-            // up ourselves.
-            delete prefixMe;
         }
 
         // Clear out an empty $and.
         if (0 == amExpr->numChildren()) {
             tn->filter.reset();
         } else if (1 == amExpr->numChildren()) {
-            // Clear out unsightly only child of $and
-            MatchExpression* child = amExpr->getChild(0);
+            // Clear out unsightly only child of $and.
+            auto child = std::move((*amExpr->getChildVector())[0]);
             amExpr->getChildVector()->clear();
             // Deletes current filter which is amExpr.
-            tn->filter.reset(child);
+            tn->filter = std::move(child);
         }
     }
 
@@ -922,8 +916,8 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
             // OrMatchExpression.
             std::unique_ptr<OrMatchExpression> collapsedFilter =
                 std::make_unique<OrMatchExpression>();
-            collapsedFilter->add(collapseFromFetch->filter.release());
-            collapsedFilter->add(collapseIntoFetch->filter.release());
+            collapsedFilter->add(std::move(collapseFromFetch->filter));
+            collapsedFilter->add(std::move(collapseIntoFetch->filter));
 
             // Normalize the filter and add it to 'into'.
             collapseIntoFetch->filter = MatchExpression::optimize(std::move(collapsedFilter));
@@ -1223,8 +1217,8 @@ bool QueryPlannerAccess::processIndexScansSubnode(
         // The logical sub-tree is responsible for fully evaluating itself. Any required filters or
         // fetches are already hung on it. As such, we remove the filter branch from our tree and
         // assume ownership of it.
+        ownedChild = std::move((*root->getChildVector())[scanState->curChild]);
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
-        ownedChild.reset(child);
     } else {
         ++scanState->curChild;
     }
@@ -1352,10 +1346,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
         verify(ownedRoot);
         if (ownedRoot->numChildren() == 1) {
             // An $and of one thing is that thing.
-            MatchExpression* child = ownedRoot->getChild(0);
+            fetch->filter = std::move((*ownedRoot->getChildVector())[0]);
             ownedRoot->getChildVector()->clear();
-            // Takes ownership.
-            fetch->filter.reset(child);
             // 'autoRoot' will delete the empty $and.
         } else {  // root->numChildren() > 1
             // Takes ownership.
@@ -1581,15 +1573,15 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
 }
 
 void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
-                                                 MatchExpression* match,
+                                                 std::unique_ptr<MatchExpression> match,
                                                  MatchExpression::MatchType type) {
     if (nullptr == node->filter) {
-        node->filter.reset(match);
+        node->filter = std::move(match);
     } else if (type == node->filter->matchType()) {
         // The 'node' already has either an AND or OR filter that matches 'type'. Add 'match' as
         // another branch of the filter.
         ListOfMatchExpression* listFilter = static_cast<ListOfMatchExpression*>(node->filter.get());
-        listFilter->add(match);
+        listFilter->add(std::move(match));
     } else {
         // The 'node' already has a filter that does not match 'type'. If 'type' is AND, then
         // combine 'match' with the existing filter by adding an AND. If 'type' is OR, combine
@@ -1602,8 +1594,8 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
             listFilter = std::make_unique<OrMatchExpression>();
         }
         unique_ptr<MatchExpression> oldFilter = node->filter->shallowClone();
-        listFilter->add(oldFilter.release());
-        listFilter->add(match);
+        listFilter->add(std::move(oldFilter));
+        listFilter->add(std::move(match));
         node->filter = std::move(listFilter);
     }
 }
@@ -1621,7 +1613,6 @@ void QueryPlannerAccess::handleFilter(ScanBuildingState* scanState) {
 
 void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
     MatchExpression* root = scanState->root;
-    MatchExpression* child = root->getChild(scanState->curChild);
 
     if (scanState->inArrayOperator) {
         // We're inside an array operator. The entire array operator expression
@@ -1634,14 +1625,14 @@ void QueryPlannerAccess::handleFilterOr(ScanBuildingState* scanState) {
         }
 
         // Detach 'child' and add it to 'curOr'.
+        auto child = std::move((*root->getChildVector())[scanState->curChild]);
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
-        scanState->curOr->getChildVector()->push_back(child);
+        scanState->curOr->getChildVector()->push_back(std::move(child));
     }
 }
 
 void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
     MatchExpression* root = scanState->root;
-    MatchExpression* child = root->getChild(scanState->curChild);
     const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
 
     if (scanState->inArrayOperator) {
@@ -1654,9 +1645,6 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // Either way, we want to remove this child so that when control returns to handleIndexedAnd
         // we know that we don't need it to create a FETCH stage.
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
-        // Since we are not attaching this child to a filter or tracking it anywhere else, it is
-        // safe to delete it here.
-        delete child;
     } else if (scanState->tightness == IndexBoundsBuilder::INEXACT_COVERED &&
                (INDEX_TEXT == index.type || !index.multikey)) {
         // The bounds are not exact, but the information needed to
@@ -1670,9 +1658,10 @@ void QueryPlannerAccess::handleFilterAnd(ScanBuildingState* scanState) {
         // ever only be applied to the index key "a". We'd incorrectly
         // conclude that the document does not match the query :( so we
         // gotta stick to non-multikey indices.
+        auto child = std::move((*root->getChildVector())[scanState->curChild]);
         root->getChildVector()->erase(root->getChildVector()->begin() + scanState->curChild);
 
-        addFilterToSolutionNode(scanState->currentScan.get(), child, root->matchType());
+        addFilterToSolutionNode(scanState->currentScan.get(), std::move(child), root->matchType());
     } else {
         // We keep curChild in the AND for affixing later.
         ++scanState->curChild;

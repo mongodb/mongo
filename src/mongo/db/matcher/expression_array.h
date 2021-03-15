@@ -54,8 +54,6 @@ public:
                               ElementPath::NonLeafArrayBehavior::kTraverse,
                               std::move(annotation)) {}
 
-    virtual ~ArrayMatchingMatchExpression() {}
-
     /**
      * Returns whether or not the nested array, represented as the object 'anArray', matches.
      *
@@ -75,7 +73,7 @@ public:
 class ElemMatchObjectMatchExpression final : public ArrayMatchingMatchExpression {
 public:
     ElemMatchObjectMatchExpression(StringData path,
-                                   MatchExpression* sub,
+                                   std::unique_ptr<MatchExpression> sub,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
@@ -83,7 +81,7 @@ public:
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ElemMatchObjectMatchExpression> e =
             std::make_unique<ElemMatchObjectMatchExpression>(
-                path(), _sub->shallowClone().release(), _errorAnnotation);
+                path(), _sub->shallowClone(), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -94,8 +92,8 @@ public:
 
     BSONObj getSerializedRightHandSide() const final;
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return boost::none;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return nullptr;
     }
 
     virtual size_t numChildren() const {
@@ -130,17 +128,13 @@ private:
 
 class ElemMatchValueMatchExpression final : public ArrayMatchingMatchExpression {
 public:
-    /**
-     * This constructor takes ownership of 'sub.'
-     */
     ElemMatchValueMatchExpression(StringData path,
-                                  MatchExpression* sub,
+                                  std::unique_ptr<MatchExpression> sub,
                                   clonable_ptr<ErrorAnnotation> annotation = nullptr);
     explicit ElemMatchValueMatchExpression(StringData path,
                                            clonable_ptr<ErrorAnnotation> annotation = nullptr);
-    virtual ~ElemMatchValueMatchExpression();
 
-    void add(MatchExpression* sub);
+    void add(std::unique_ptr<MatchExpression> sub);
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
@@ -148,7 +142,7 @@ public:
         std::unique_ptr<ElemMatchValueMatchExpression> e =
             std::make_unique<ElemMatchValueMatchExpression>(path(), _errorAnnotation);
         for (size_t i = 0; i < _subs.size(); ++i) {
-            e->add(_subs[i]->shallowClone().release());
+            e->add(_subs[i]->shallowClone());
         }
         if (getTag()) {
             e->setTag(getTag()->clone());
@@ -160,8 +154,8 @@ public:
 
     BSONObj getSerializedRightHandSide() const final;
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return _subs;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return &_subs;
     }
 
     virtual size_t numChildren() const {
@@ -169,7 +163,7 @@ public:
     }
 
     virtual MatchExpression* getChild(size_t i) const {
-        return _subs[i];
+        return _subs[i].get();
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -185,7 +179,7 @@ private:
 
     bool _arrayElementMatchesAll(const BSONElement& e) const;
 
-    std::vector<MatchExpression*> _subs;
+    std::vector<std::unique_ptr<MatchExpression>> _subs;
 };
 
 class SizeMatchExpression : public ArrayMatchingMatchExpression {
@@ -211,8 +205,8 @@ public:
         return nullptr;
     }
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return boost::none;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return nullptr;
     }
 
     virtual bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;

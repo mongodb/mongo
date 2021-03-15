@@ -144,8 +144,8 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
 
         if (exprMatchExpr._rewriteResult->matchExpression()) {
             auto andMatch = std::make_unique<AndMatchExpression>();
-            andMatch->add(exprMatchExpr._rewriteResult->releaseMatchExpression().release());
-            andMatch->add(expression.release());
+            andMatch->add(exprMatchExpr._rewriteResult->releaseMatchExpression());
+            andMatch->add(std::move(expression));
             // Re-optimize the new AND in order to make sure that any AND children are absorbed.
             expression = MatchExpression::optimize(std::move(andMatch));
         }

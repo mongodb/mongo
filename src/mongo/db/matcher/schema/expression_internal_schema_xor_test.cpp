@@ -104,11 +104,11 @@ TEST(InternalSchemaXorOp, Equivalent) {
     EqualityMatchExpression sub2("b", baseOperand2["b"]);
 
     InternalSchemaXorMatchExpression e1;
-    e1.add(sub1.shallowClone().release());
-    e1.add(sub2.shallowClone().release());
+    e1.add(sub1.shallowClone());
+    e1.add(sub2.shallowClone());
 
     InternalSchemaXorMatchExpression e2;
-    e2.add(sub1.shallowClone().release());
+    e2.add(sub1.shallowClone());
 
     ASSERT(e1.equivalent(&e1));
     ASSERT_FALSE(e1.equivalent(&e2));

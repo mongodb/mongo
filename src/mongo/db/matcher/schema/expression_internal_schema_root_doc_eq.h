@@ -83,8 +83,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return boost::none;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return nullptr;
     }
 
     MatchCategory getCategory() const final {

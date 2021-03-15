@@ -106,7 +106,9 @@ void MatchExpression::sortTree(MatchExpression* tree) {
         sortTree(tree->getChild(i));
     }
     if (auto&& children = tree->getChildVector()) {
-        std::stable_sort(children->begin(), children->end(), matchExpressionLessThan);
+        std::stable_sort(children->begin(), children->end(), [](auto&& lhs, auto&& rhs) {
+            return matchExpressionLessThan(lhs.get(), rhs.get());
+        });
     }
 }
 

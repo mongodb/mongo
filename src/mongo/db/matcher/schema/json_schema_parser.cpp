@@ -155,13 +155,13 @@ std::unique_ptr<MatchExpression> makeRestriction(
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
 
     auto notExpr = std::make_unique<NotMatchExpression>(
-        typeExpr.release(),
+        std::move(typeExpr),
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
 
     auto orExpr = std::make_unique<OrMatchExpression>(
         doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
-    orExpr->add(notExpr.release());
-    orExpr->add(restrictionExpr.release());
+    orExpr->add(std::move(notExpr));
+    orExpr->add(std::move(restrictionExpr));
 
     return orExpr;
 }
@@ -388,7 +388,7 @@ StatusWithMatchExpression parseLogicalKeyword(const boost::intrusive_ptr<Express
             return nestedSchemaMatch.getStatus();
         }
 
-        listOfExpr->add(nestedSchemaMatch.getValue().release());
+        listOfExpr->add(std::move(nestedSchemaMatch.getValue()));
     }
 
     return {std::move(listOfExpr)};
@@ -431,14 +431,14 @@ StatusWithMatchExpression parseEnum(const boost::intrusive_ptr<ExpressionContext
                 auto rootDocEq = std::make_unique<InternalSchemaRootDocEqMatchExpression>(
                     arrayElem.embeddedObject(),
                     doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
-                orExpr->add(rootDocEq.release());
+                orExpr->add(std::move(rootDocEq));
             }
         } else {
             auto eqExpr = std::make_unique<InternalSchemaEqMatchExpression>(
                 path,
                 arrayElem,
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
-            orExpr->add(eqExpr.release());
+            orExpr->add(std::move(eqExpr));
         }
     }
 
@@ -509,7 +509,7 @@ StatusWithMatchExpression translateRequired(const boost::intrusive_ptr<Expressio
     for (auto&& propertyName : sortedProperties) {
         // This node is tagged as '_propertyExists' to indicate that it will produce a path instead
         // of a detailed BSONObj error during error generation.
-        andExpr->add(new ExistsMatchExpression(
+        andExpr->add(std::make_unique<ExistsMatchExpression>(
             propertyName,
             doc_validation_error::createAnnotation(expCtx, "_propertyExists", BSONObj())));
     }
@@ -568,7 +568,7 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
         if (requiredProperties.find(property.fieldNameStringData()) != requiredProperties.end()) {
             // The field name for which we created the nested schema is a required property. This
             // property must exist and therefore must match 'nestedSchemaMatch'.
-            andExpr->add(nestedSchemaMatch.getValue().release());
+            andExpr->add(std::move(nestedSchemaMatch.getValue()));
         } else {
             // This property either must not exist or must match the nested schema. Therefore, we
             // generate the match expression (OR (NOT (EXISTS)) <nestedSchemaMatch>).
@@ -577,15 +577,15 @@ StatusWithMatchExpression parseProperties(const boost::intrusive_ptr<ExpressionC
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
 
             auto notExpr = std::make_unique<NotMatchExpression>(
-                existsExpr.release(),
+                std::move(existsExpr),
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
 
             auto orExpr = std::make_unique<OrMatchExpression>(
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
-            orExpr->add(notExpr.release());
-            orExpr->add(nestedSchemaMatch.getValue().release());
+            orExpr->add(std::move(notExpr));
+            orExpr->add(std::move(nestedSchemaMatch.getValue()));
 
-            andExpr->add(orExpr.release());
+            andExpr->add(std::move(orExpr));
         }
     }
 
@@ -892,7 +892,7 @@ StatusWithMatchExpression translatePropertyDependency(
             return propertyExistsExpr.getStatus();
         }
 
-        propertyDependencyExpr->add(propertyExistsExpr.getValue().release());
+        propertyDependencyExpr->add(std::move(propertyExistsExpr.getValue()));
     }
 
     auto ifClause = makeDependencyExistsClause(expCtx, path, dependency.fieldNameStringData());
@@ -945,7 +945,7 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
             return dependencyExpr.getStatus();
         }
 
-        andExpr->add(dependencyExpr.getValue().release());
+        andExpr->add(std::move(dependencyExpr.getValue()));
     }
 
     return {std::move(andExpr)};
@@ -1025,22 +1025,18 @@ StatusWith<boost::optional<long long>> parseItems(
                     expCtx,
                     "" /* 'andExprForSubschemas' carries the operator name, not this expression */,
                     BSONObj()));
-            andExprForSubschemas->add(matchArrayIndex.release());
+            andExprForSubschemas->add(std::move(matchArrayIndex));
             ++index;
         }
         startIndexForAdditionalItems = index;
 
         if (path.empty()) {
             andExpr->add(
-                std::make_unique<AlwaysTrueMatchExpression>(
-                    doc_validation_error::createAnnotation(
-                        expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap()))
-                    .release());
+                std::make_unique<AlwaysTrueMatchExpression>(doc_validation_error::createAnnotation(
+                    expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap())));
         } else {
-            andExpr->add(
-                makeRestriction(
-                    expCtx, BSONType::Array, path, std::move(andExprForSubschemas), typeExpr)
-                    .release());
+            andExpr->add(makeRestriction(
+                expCtx, BSONType::Array, path, std::move(andExprForSubschemas), typeExpr));
         }
     } else if (itemsElt.type() == BSONType::Object) {
         // When "items" is an object, generate a single AllElemMatchFromIndex that applies to every
@@ -1060,8 +1056,7 @@ StatusWith<boost::optional<long long>> parseItems(
         auto errorAnnotation = doc_validation_error::createAnnotation(
             expCtx, itemsElt.fieldNameStringData().toString(), itemsElt.wrap());
         if (path.empty()) {
-            andExpr->add(
-                std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)).release());
+            andExpr->add(std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)));
         } else {
             constexpr auto startIndexForItems = 0LL;
             auto allElemMatch =
@@ -1071,8 +1066,7 @@ StatusWith<boost::optional<long long>> parseItems(
                     std::move(exprWithPlaceholder),
                     std::move(errorAnnotation));
             andExpr->add(
-                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr)
-                    .release());
+                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr));
         }
     } else {
         return {ErrorCodes::TypeMismatch,
@@ -1131,8 +1125,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
         auto errorAnnotation = doc_validation_error::createAnnotation(
             expCtx, additionalItemsElt.fieldNameStringData().toString(), additionalItemsElt.wrap());
         if (path.empty()) {
-            andExpr->add(
-                std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)).release());
+            andExpr->add(std::make_unique<AlwaysTrueMatchExpression>(std::move(errorAnnotation)));
         } else {
             auto allElemMatch =
                 std::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
@@ -1141,8 +1134,7 @@ Status parseAdditionalItems(const boost::intrusive_ptr<ExpressionContext>& expCt
                     std::move(otherwiseExpr),
                     std::move(errorAnnotation));
             andExpr->add(
-                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr)
-                    .release());
+                makeRestriction(expCtx, BSONType::Array, path, std::move(allElemMatch), typeExpr));
         }
     }
     return Status::OK();
@@ -1201,7 +1193,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
         if (!allOfExpr.isOK()) {
             return allOfExpr.getStatus();
         }
-        andExpr->add(allOfExpr.getValue().release());
+        andExpr->add(std::move(allOfExpr.getValue()));
     }
 
     if (auto anyOfElt = keywordMap[JSONSchemaParser::kSchemaAnyOfKeyword]) {
@@ -1210,7 +1202,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
         if (!anyOfExpr.isOK()) {
             return anyOfExpr.getStatus();
         }
-        andExpr->add(anyOfExpr.getValue().release());
+        andExpr->add(std::move(anyOfExpr.getValue()));
     }
 
     if (auto oneOfElt = keywordMap[JSONSchemaParser::kSchemaOneOfKeyword]) {
@@ -1219,7 +1211,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
         if (!oneOfExpr.isOK()) {
             return oneOfExpr.getStatus();
         }
-        andExpr->add(oneOfExpr.getValue().release());
+        andExpr->add(std::move(oneOfExpr.getValue()));
     }
 
     if (auto notElt = keywordMap[JSONSchemaParser::kSchemaNotKeyword]) {
@@ -1237,9 +1229,9 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
         }
 
         auto notMatchExpr = std::make_unique<NotMatchExpression>(
-            parsedExpr.getValue().release(),
+            std::move(parsedExpr.getValue()),
             doc_validation_error::createAnnotation(expCtx, "not", BSONObj()));
-        andExpr->add(notMatchExpr.release());
+        andExpr->add(std::move(notMatchExpr));
     }
 
     if (auto enumElt = keywordMap[JSONSchemaParser::kSchemaEnumKeyword]) {
@@ -1247,7 +1239,7 @@ Status translateLogicalKeywords(StringMap<BSONElement>& keywordMap,
         if (!enumExpr.isOK()) {
             return enumExpr.getStatus();
         }
-        andExpr->add(enumExpr.getValue().release());
+        andExpr->add(std::move(enumExpr.getValue()));
     }
 
     return Status::OK();
@@ -1277,7 +1269,7 @@ Status translateArrayKeywords(StringMap<BSONElement>& keywordMap,
         if (!minItemsExpr.isOK()) {
             return minItemsExpr.getStatus();
         }
-        andExpr->add(minItemsExpr.getValue().release());
+        andExpr->add(std::move(minItemsExpr.getValue()));
     }
 
     if (auto maxItemsElt = keywordMap[JSONSchemaParser::kSchemaMaxItemsKeyword]) {
@@ -1286,7 +1278,7 @@ Status translateArrayKeywords(StringMap<BSONElement>& keywordMap,
         if (!maxItemsExpr.isOK()) {
             return maxItemsExpr.getStatus();
         }
-        andExpr->add(maxItemsExpr.getValue().release());
+        andExpr->add(std::move(maxItemsExpr.getValue()));
     }
 
     if (auto uniqueItemsElt = keywordMap[JSONSchemaParser::kSchemaUniqueItemsKeyword]) {
@@ -1294,7 +1286,7 @@ Status translateArrayKeywords(StringMap<BSONElement>& keywordMap,
         if (!uniqueItemsExpr.isOK()) {
             return uniqueItemsExpr.getStatus();
         }
-        andExpr->add(uniqueItemsExpr.getValue().release());
+        andExpr->add(std::move(uniqueItemsExpr.getValue()));
     }
 
     return parseItemsAndAdditionalItems(
@@ -1341,7 +1333,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
         if (!propertiesExpr.isOK()) {
             return propertiesExpr.getStatus();
         }
-        andExpr->add(propertiesExpr.getValue().release());
+        andExpr->add(std::move(propertiesExpr.getValue()));
     }
 
     {
@@ -1362,7 +1354,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
             if (!allowedPropertiesExpr.isOK()) {
                 return allowedPropertiesExpr.getStatus();
             }
-            andExpr->add(allowedPropertiesExpr.getValue().release());
+            andExpr->add(std::move(allowedPropertiesExpr.getValue()));
         }
     }
 
@@ -1375,7 +1367,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
         if (!requiredExpr.isOK()) {
             return requiredExpr.getStatus();
         }
-        andExpr->add(requiredExpr.getValue().release());
+        andExpr->add(std::move(requiredExpr.getValue()));
     }
 
     if (auto minPropertiesElt = keywordMap[JSONSchemaParser::kSchemaMinPropertiesKeyword]) {
@@ -1384,7 +1376,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
         if (!minPropExpr.isOK()) {
             return minPropExpr.getStatus();
         }
-        andExpr->add(minPropExpr.getValue().release());
+        andExpr->add(std::move(minPropExpr.getValue()));
     }
 
     if (auto maxPropertiesElt = keywordMap[JSONSchemaParser::kSchemaMaxPropertiesKeyword]) {
@@ -1393,7 +1385,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
         if (!maxPropExpr.isOK()) {
             return maxPropExpr.getStatus();
         }
-        andExpr->add(maxPropExpr.getValue().release());
+        andExpr->add(std::move(maxPropExpr.getValue()));
     }
 
     if (auto dependenciesElt = keywordMap[JSONSchemaParser::kSchemaDependenciesKeyword]) {
@@ -1402,7 +1394,7 @@ Status translateObjectKeywords(StringMap<BSONElement>& keywordMap,
         if (!dependenciesExpr.isOK()) {
             return dependenciesExpr.getStatus();
         }
-        andExpr->add(dependenciesExpr.getValue().release());
+        andExpr->add(std::move(dependenciesExpr.getValue()));
     }
 
     return Status::OK();
@@ -1433,7 +1425,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!patternExpr.isOK()) {
             return patternExpr.getStatus();
         }
-        andExpr->add(patternExpr.getValue().release());
+        andExpr->add(std::move(patternExpr.getValue()));
     }
 
     if (auto maxLengthElt = keywordMap[JSONSchemaParser::kSchemaMaxLengthKeyword]) {
@@ -1442,7 +1434,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!maxLengthExpr.isOK()) {
             return maxLengthExpr.getStatus();
         }
-        andExpr->add(maxLengthExpr.getValue().release());
+        andExpr->add(std::move(maxLengthExpr.getValue()));
     }
 
     if (auto minLengthElt = keywordMap[JSONSchemaParser::kSchemaMinLengthKeyword]) {
@@ -1451,7 +1443,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!minLengthExpr.isOK()) {
             return minLengthExpr.getStatus();
         }
-        andExpr->add(minLengthExpr.getValue().release());
+        andExpr->add(std::move(minLengthExpr.getValue()));
     }
 
     // Numeric keywords.
@@ -1460,7 +1452,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!multipleOfExpr.isOK()) {
             return multipleOfExpr.getStatus();
         }
-        andExpr->add(multipleOfExpr.getValue().release());
+        andExpr->add(std::move(multipleOfExpr.getValue()));
     }
 
     if (auto maximumElt = keywordMap[JSONSchemaParser::kSchemaMaximumKeyword]) {
@@ -1480,7 +1472,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!maxExpr.isOK()) {
             return maxExpr.getStatus();
         }
-        andExpr->add(maxExpr.getValue().release());
+        andExpr->add(std::move(maxExpr.getValue()));
     } else if (keywordMap[JSONSchemaParser::kSchemaExclusiveMaximumKeyword]) {
         // If "exclusiveMaximum" is present, "maximum" must also be present.
         return {ErrorCodes::FailedToParse,
@@ -1506,7 +1498,7 @@ Status translateScalarKeywords(const boost::intrusive_ptr<ExpressionContext>& ex
         if (!minExpr.isOK()) {
             return minExpr.getStatus();
         }
-        andExpr->add(minExpr.getValue().release());
+        andExpr->add(std::move(minExpr.getValue()));
     } else if (keywordMap[JSONSchemaParser::kSchemaExclusiveMinimumKeyword]) {
         // If "exclusiveMinimum" is present, "minimum" must also be present.
         return {ErrorCodes::FailedToParse,
@@ -1578,14 +1570,14 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
             auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
             auto infoType = encryptInfo.getBsonType();
 
-            andExpr->add(new InternalSchemaBinDataSubTypeExpression(
+            andExpr->add(std::make_unique<InternalSchemaBinDataSubTypeExpression>(
                 path,
                 BinDataType::Encrypt,
                 doc_validation_error::createAnnotation(
                     expCtx, encryptElt.fieldNameStringData().toString(), BSONObj())));
 
             if (auto typeOptional = infoType) {
-                andExpr->add(new InternalSchemaBinDataEncryptedTypeExpression(
+                andExpr->add(std::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(
                     path,
                     typeOptional->typeSet(),
                     doc_validation_error::createAnnotation(
@@ -1806,7 +1798,7 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
     }
 
     if (!path.empty() && typeExpr) {
-        andExpr->add(typeExpr.release());
+        andExpr->add(std::move(typeExpr));
     }
     return {std::move(andExpr)};
 }
