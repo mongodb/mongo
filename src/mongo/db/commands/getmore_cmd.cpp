@@ -605,7 +605,7 @@ public:
                 [exec, dropAndReacquireReadLockIfLocked, &readLock]() {
                     exec->saveState();
                     dropAndReacquireReadLockIfLocked();
-                    exec->restoreState(&readLock->getCollection());
+                    exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
                 };
 
             waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {
