@@ -55,7 +55,11 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "oldParamTypeBsonAnyAllowList-param-bsonTypeAnyParam",
     "newParamTypeBsonAnyAllowList-param-bsonTypeAnyParam",
     "commandAllowedAnyTypesWithVariant-reply-anyTypeField",
-    "replyFieldTypeBsonAnyWithVariant-reply-bsonSerializationTypeAnyReplyField",
+    "replyFieldTypeBsonAnyWithVariant-reply-bsonSerializationTypeAnyStructField",
+    "replyFieldTypeBsonAnyWithVariantWithArray-reply-bsonSerializationTypeAnyStructField",
+    "parameterFieldTypeBsonAnyWithVariant-param-bsonSerializationTypeAnyStructField",
+    "parameterFieldTypeBsonAnyWithVariantWithArray-param-bsonSerializationTypeAnyStructField",
+    "commandTypeBsonAnyWithVariant", "commandTypeBsonAnyWithVariantWithArray",
     "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField", "commandCppTypeNotEqual",
     "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam"
 ]
@@ -185,9 +189,9 @@ def check_reply_field_type_recursive(
             for old_variant_type in old_variant_types:
                 if old_variant_type.name == new_variant_type.name:
                     # Check that the old and new version of each variant type is also compatible.
-                    check_reply_field_type_recursive(
-                        ctxt, old_variant_type, new_variant_type, cmd_name, field_name,
-                        old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
+                    check_reply_field_type(ctxt, old_variant_type, new_variant_type, cmd_name,
+                                           field_name, old_idl_file, new_idl_file,
+                                           old_idl_file_path, new_idl_file_path)
                     break
 
             else:
@@ -226,6 +230,11 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext,
                            new_idl_file_path: str):
     """Check compatibility between old and new reply field type."""
     # pylint: disable=too-many-arguments,too-many-branches
+    if check_array_type(ctxt, "reply_field", old_field_type, new_field_type, cmd_name, 'type',
+                        old_idl_file_path, new_idl_file_path):
+        old_field_type = old_field_type.element_type
+        new_field_type = new_field_type.element_type
+
     if old_field_type is None:
         ctxt.add_reply_field_type_invalid_error(cmd_name, field_name, old_idl_file_path)
         ctxt.errors.dump_errors()
@@ -299,11 +308,6 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
 
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
-
-    if check_array_type(ctxt, "reply_field", old_field_type, new_field_type, cmd_name, 'type',
-                        old_idl_file_path, new_idl_file_path):
-        old_field_type = old_field_type.element_type
-        new_field_type = new_field_type.element_type
 
     check_reply_field_type(ctxt, old_field_type, new_field_type, cmd_name, old_field.name,
                            old_idl_file, new_idl_file, old_idl_file_path, new_idl_file_path)
@@ -390,10 +394,10 @@ def check_param_or_command_type_recursive(
                 for new_variant_type in new_variant_types:
                     if old_variant_type.name == new_variant_type.name:
                         # Check that the old and new version of each variant type is also compatible.
-                        check_param_or_command_type_recursive(
-                            ctxt, old_variant_type, new_variant_type, cmd_name, old_idl_file,
-                            new_idl_file, old_idl_file_path, new_idl_file_path, param_name,
-                            is_command_parameter)
+                        check_param_or_command_type(ctxt, old_variant_type, new_variant_type,
+                                                    cmd_name, old_idl_file, new_idl_file,
+                                                    old_idl_file_path, new_idl_file_path,
+                                                    param_name, is_command_parameter)
                         break
                 else:
                     # old_variant_type was not found in new_variant_types.
