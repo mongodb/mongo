@@ -35,10 +35,12 @@ namespace test_harness {
 static const char *CONNECTION_CREATE = "create";
 static const char *COLLECTION_COUNT = "collection_count";
 static const char *DURATION_SECONDS = "duration_seconds";
+static const char *ENABLE_TRACKING = "enable_tracking";
 static const char *KEY_COUNT = "key_count";
 static const char *READ_THREADS = "read_threads";
+static const char *TABLE_OPERATION_TRACKING = "table:operation_tracking";
+static const char *TABLE_SCHEMA_TRACKING = "table:schema_tracking";
 static const char *VALUE_SIZE = "value_size";
-static const char *TRACKING_COLLECTION = "table:tracking";
 
 } // namespace test_harness
 

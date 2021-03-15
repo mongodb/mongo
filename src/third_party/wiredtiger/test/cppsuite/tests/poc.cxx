@@ -34,7 +34,7 @@
 
 class poc_test : public test_harness::test {
     public:
-    poc_test(const std::string &config, int64_t trace_level, bool enable_tracking) : test(config, enable_tracking)
+    poc_test(const std::string &config, int64_t trace_level) : test(config)
     {
         test_harness::_trace_level = trace_level;
     }
@@ -47,8 +47,9 @@ class poc_test : public test_harness::test {
 };
 
 const std::string poc_test::test::name = "poc_test";
-const std::string poc_test::test::default_config = "collection_count=2,key_count=5,value_size=20,"
-                "read_threads=1,duration_seconds=1";
+const std::string poc_test::test::default_config =
+  "enable_tracking=true,collection_count=2,key_count=5,value_size=20,"
+  "read_threads=1,duration_seconds=1";
 
 int
 main(int argc, char *argv[])
@@ -83,8 +84,8 @@ main(int argc, char *argv[])
         cfg = poc_test::test::default_config;
 
     std::cout << "Configuration\t:" << cfg << std::endl;
-    std::cout << "Tracel level\t:" << trace_level << std::endl;
+    std::cout << "Trace level\t:" << trace_level << std::endl;
 
-    poc_test(cfg, trace_level, true).run();
+    poc_test(cfg, trace_level).run();
     return (0);
 }

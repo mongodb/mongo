@@ -29,6 +29,9 @@
 #ifndef WORKLOAD_GENERATOR_H
 #define WORKLOAD_GENERATOR_H
 
+#include <algorithm>
+#include <map>
+
 #include "random_generator.h"
 #include "workload_tracking.h"
 
@@ -38,14 +41,13 @@ namespace test_harness {
  */
 class workload_generator : public component {
     public:
-    workload_generator(configuration *configuration, bool enable_tracking)
-        : _configuration(configuration), _enable_tracking(enable_tracking)
+    workload_generator(configuration *configuration)
+        : _configuration(configuration), _enable_tracking(false), _workload_tracking(nullptr)
     {
     }
 
     ~workload_generator()
     {
-        delete _workload_tracking;
         for (auto &it : _workers)
             delete it;
     }
@@ -73,15 +75,8 @@ class workload_generator : public component {
         collection_count = key_count = value_size = 0;
         collection_name = "";
 
-        /* Create the activity tracker if required. */
-        if (_enable_tracking) {
-            _workload_tracking = new workload_tracking(TRACKING_COLLECTION);
-            _workload_tracking->load();
-        }
-
         /* Get a session. */
         session = connection_manager::instance().create_session();
-
         /* Create n collections as per the configuration and store each collection name. */
         testutil_check(_configuration->get_int(COLLECTION_COUNT, collection_count));
         for (int i = 0; i < collection_count; ++i) {
@@ -89,7 +84,7 @@ class workload_generator : public component {
             testutil_check(session->create(session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
             if (_enable_tracking)
                 testutil_check(
-                  _workload_tracking->save(tracking_operation::CREATE, collection_name, "", ""));
+                  _workload_tracking->save(tracking_operation::CREATE, collection_name, 0, ""));
             _collection_names.push_back(collection_name);
         }
         debug_info(
@@ -108,8 +103,8 @@ class workload_generator : public component {
                  * configuration. */
                 std::string generated_value =
                   random_generator::random_generator::instance().generate_string(value_size);
-                testutil_check(
-                  insert(cursor, collection_name, j, generated_value.c_str(), _enable_tracking));
+                testutil_check(insert(
+                  cursor, collection_name, j + 1, generated_value.c_str(), _enable_tracking));
             }
         }
         debug_info("Load stage done", _trace_level, DEBUG_INFO);
@@ -145,6 +140,15 @@ class workload_generator : public component {
         _thread_manager.join();
     }
 
+    void
+    set_tracker(workload_tracking *tracking)
+    {
+        /* Tracking cannot be NULL. */
+        testutil_check(tracking == nullptr);
+        _enable_tracking = true;
+        _workload_tracking = tracking;
+    }
+
     /* Workload threaded operations. */
     static void
     execute_operation(thread_context &context)
@@ -166,7 +170,7 @@ class workload_generator : public component {
             break;
         default:
             testutil_die(DEBUG_ABORT, "system: thread_operation is unknown : %d",
-              static_cast<int>(thread_operation::UPDATE));
+              static_cast<int>(context.get_thread_operation()));
             break;
         }
     }
@@ -245,8 +249,8 @@ class workload_generator : public component {
 
     private:
     std::vector<std::string> _collection_names;
-    configuration *_configuration = nullptr;
-    bool _enable_tracking = false;
+    const configuration *_configuration;
+    bool _enable_tracking;
     thread_manager _thread_manager;
     std::vector<thread_context *> _workers;
     workload_tracking *_workload_tracking;

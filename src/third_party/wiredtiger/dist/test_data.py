@@ -62,17 +62,19 @@ scale_config = [
 load_config = key_config + value_config + scale_config
 
 workload_config = [
+    Config('enable_tracking', 'true', r'''
+        Enables tracking to perform validation''', type='boolean'),
     Config('duration_seconds', 0, r'''
-        The duration that the workload run phase will last''',min=0, max=1000000),
+        The duration that the workload run phase will last''', min=0, max=1000000),
     Config('read_threads', 0, r'''
         The number of threads performing read operations''', min=0, max=100),
     Config('insert_threads', 0, r'''
-        The number of threads performing insert operations''',min=0, max=20),
+        The number of threads performing insert operations''', min=0, max=20),
     Config('insert_config',0, r'''
         The definition of the record being inserted''',
         subconfig=load_config),
     Config('update_threads', 0, r'''
-        The number of threads performing update operations''',min=0, max=20),
+        The number of threads performing update operations''', min=0, max=20),
     Config('update_config',0,r''',
         The definition of the record being updated''', subconfig=load_config)
 ]
