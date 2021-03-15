@@ -414,11 +414,15 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
         return;
     }
 
+    // If the exec tree _root was provided, so must be _rootData holding auxiliary data.
+    tassert(5323806, "exec tree data is not provided", _rootData);
+
     auto common = _root->getCommonStats();
     statsOut->nReturned = common->advances;
     statsOut->fromMultiPlanner = isMultiPlan();
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
+    statsOut->replanReason = _rootData->replanReason;
 
     // Collect cumulative execution stats for the plan.
     _root->accumulate(kEmptyPlanNodeId, *statsOut);
@@ -427,8 +431,6 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     queue.push(_solution->root());
 
     // Look through the QuerySolution to collect some static stat details.
-    //
-    // TODO SERVER-51138: handle replan reason for cached plan.
     while (!queue.empty()) {
         auto node = queue.front();
         queue.pop();

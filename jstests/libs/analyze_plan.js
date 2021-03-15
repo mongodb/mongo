@@ -26,6 +26,16 @@ function getRejectedPlan(rejectedPlan) {
 }
 
 /**
+ * Returns a sub-element of the 'cachedPlan' explain output which represents a query plan.
+ */
+function getCachedPlan(cachedPlan) {
+    // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present, it
+    // will hold a serialized cached plan, otherwise it will be stored in the 'cachedPlan' field
+    // itself.
+    return cachedPlan.hasOwnProperty("queryPlan") ? cachedPlan.queryPlan : cachedPlan;
+}
+
+/**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
  * requested stage.

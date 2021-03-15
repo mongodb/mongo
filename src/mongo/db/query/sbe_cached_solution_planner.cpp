@@ -55,7 +55,7 @@ CandidatePlans CachedSolutionPlanner::plan(
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(), &candidate.data, candidate.solution.get());
 
-    if (candidate.failed) {
+    if (!candidate.status.isOK()) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
         LOGV2_DEBUG(2057901,
@@ -63,7 +63,7 @@ CandidatePlans CachedSolutionPlanner::plan(
                     "Execution of cached plan failed, falling back to replan",
                     "query"_attr = redact(_cq.toStringShort()),
                     "planSummary"_attr = explainer->getPlanSummary());
-        return replan(false);
+        return replan(false, str::stream() << "cached plan returned: " << candidate.status);
     }
 
     auto stats{candidate.root->getStats(false /* includeDebugInfo  */)};
@@ -71,9 +71,7 @@ CandidatePlans CachedSolutionPlanner::plan(
     // If the cached plan hit EOF quickly enough, or still as efficient as before, then no need to
     // replan. Finalize the cached plan and return it.
     if (stats->common.isEOF || numReads <= _decisionReads) {
-        return {makeVector<plan_ranker::CandidatePlan>(
-                    finalizeExecutionPlan(std::move(stats), std::move(candidate))),
-                0};
+        return {makeVector(finalizeExecutionPlan(std::move(stats), std::move(candidate))), 0};
     }
 
     // If we're here, the trial period took more than 'maxReadsBeforeReplan' physical reads. This
@@ -81,13 +79,17 @@ CandidatePlans CachedSolutionPlanner::plan(
     LOGV2_DEBUG(
         2058001,
         1,
-        "Evicting cache entry for a query and replanning it since the number of required works "
-        "mismatch the number of cached works",
+        "Evicting cache entry for a query and replanning it since the number of required reads "
+        "mismatch the number of cached reads",
         "maxReadsBeforeReplan"_attr = numReads,
         "decisionReads"_attr = _decisionReads,
         "query"_attr = redact(_cq.toStringShort()),
         "planSummary"_attr = explainer->getPlanSummary());
-    return replan(true);
+    return replan(
+        true,
+        str::stream()
+            << "cached plan was less efficient than expected: expected trial execution to take "
+            << _decisionReads << " reads but it took at least " << numReads << " reads");
 }
 
 plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
@@ -97,7 +99,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
     // a result, we cannot stash the results returned so far in the plan executor.
     if (!stats->common.isEOF && candidate.exitedEarly) {
         candidate.root->close();
-        candidate.root->open(true);
+        candidate.root->open(false);
         // Clear the results queue.
         candidate.results = decltype(candidate.results){};
     }
@@ -105,7 +107,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
     return candidate;
 }
 
-CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
+CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reason) const {
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
@@ -116,13 +118,23 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
         cache->deactivate(_cq);
     }
 
+    auto buildExecutableTree = [&](const QuerySolution& sol) {
+        auto [root, data] = stage_builder::buildSlotBasedExecutableTree(
+            _opCtx, _collection, _cq, sol, _yieldPolicy);
+        data.replanReason.emplace(reason);
+        return std::make_pair(std::move(root), std::move(data));
+    };
+
     // Use the query planning module to plan the whole query.
     auto solutions = uassertStatusOK(QueryPlanner::plan(_cq, _queryParams));
     if (solutions.size() == 1) {
         // Only one possible plan. Build the stages from the solution.
-        auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
-        prepareExecutionPlan(root.get(), &data);
+        auto [root, data] = buildExecutableTree(*solutions[0]);
+        auto status = prepareExecutionPlan(root.get(), &data);
+        uassertStatusOK(status);
+        auto [result, recordId, exitedEarly] = status.getValue();
+        tassert(
+            5323800, "cached planner unexpectedly exited early during prepare phase", !exitedEarly);
 
         auto explainer = plan_explainer_factory::make(root.get(), &data, solutions[0].get());
         LOGV2_DEBUG(
@@ -145,8 +157,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
             solution->cacheData->indexFilterApplied = _queryParams.indexFiltersApplied;
         }
 
-        roots.push_back(stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solution, _yieldPolicy));
+        roots.push_back(buildExecutableTree(*solution));
     }
 
     const auto cachingMode =

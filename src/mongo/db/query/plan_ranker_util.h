@@ -89,7 +89,7 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
             }
         }();
 
-        if (!candidates[i].failed) {
+        if (candidates[i].status.isOK()) {
             log_detail::logScoringPlan([&]() { return candidates[i].solution->toString(); },
                                        [&]() {
                                            auto&& [stats, _] = explainer->getWinningPlanStats(

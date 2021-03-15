@@ -49,8 +49,7 @@ namespace {
  * not contain a stage requiring spilling to disk at all.
  */
 bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
-                       const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots,
-                       size_t* numFailures) {
+                       const std::pair<value::SlotAccessor*, value::SlotAccessor*>& slots) {
     try {
         BSONObj obj;
         RecordId recordId;
@@ -73,16 +72,15 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         candidate->exitedEarly = true;
         return true;
-    } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>&) {
+    } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
         candidate->root->close();
-        candidate->failed = true;
-        ++(*numFailures);
+        candidate->status = ex.toStatus();
     }
     return false;
 }
 }  // namespace
 
-std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool>
+StatusWith<std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool>>
 BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
                                          stage_builder::PlanStageData* data) const {
     invariant(root);
@@ -93,13 +91,13 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     value::SlotAccessor* resultSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
         resultSlot = root->getAccessor(data->ctx, *slot);
-        uassert(4822871, "Query does not have result slot.", resultSlot);
+        tassert(4822871, "Query does not have a result slot.", resultSlot);
     }
 
     value::SlotAccessor* recordIdSlot{nullptr};
     if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
         recordIdSlot = root->getAccessor(data->ctx, *slot);
-        uassert(4822872, "Query does not have record ID slot.", recordIdSlot);
+        tassert(4822872, "Query does not have a recordId slot.", recordIdSlot);
     }
 
     auto exitedEarly{false};
@@ -107,9 +105,12 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
         root->open(false);
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         exitedEarly = true;
+    } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
+        root->close();
+        return ex.toStatus();
     }
 
-    return {resultSlot, recordIdSlot, exitedEarly};
+    return std::make_tuple(resultSlot, recordIdSlot, exitedEarly);
 }
 
 std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStats(
@@ -131,7 +132,6 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
     const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
-
     for (size_t ix = 0; ix < roots.size(); ++ix) {
         auto&& [root, data] = roots[ix];
 
@@ -140,15 +140,26 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
         root->attachToTrialRunTracker(tracker.get());
         trialRunTrackers.emplace_back(root.get(), std::move(tracker));
 
-        auto [resultSlot, recordIdSlot, exitedEarly] = prepareExecutionPlan(root.get(), &data);
-
-        candidates.push_back(
-            {std::move(solutions[ix]), std::move(root), std::move(data), exitedEarly});
+        auto status = prepareExecutionPlan(root.get(), &data);
+        auto [resultSlot, recordIdSlot, exitedEarly] =
+            [&]() -> std::tuple<value::SlotAccessor*, value::SlotAccessor*, bool> {
+            if (status.isOK()) {
+                return status.getValue();
+            }
+            // The candidate plan returned a failure that is not fatal to the execution of the
+            // query, as long as we have other candidates that haven't failed. We will mark the
+            // candidate as failed and keep preparing any remaining candidate plans.
+            return {};
+        }();
+        candidates.push_back({std::move(solutions[ix]),
+                              std::move(root),
+                              std::move(data),
+                              exitedEarly,
+                              status.getStatus()});
         slots.push_back({resultSlot, recordIdSlot});
     }
 
     auto done{false};
-    size_t numFailures{0};
     for (size_t it = 0; it < maxNumResults && !done; ++it) {
         for (size_t ix = 0; ix < candidates.size(); ++ix) {
             // Even if we had a candidate plan that exited early, we still want continue the trial
@@ -157,19 +168,13 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             // early exit exception and return control back to the runtime planner. If that happens,
             // we need to continue and complete the trial period for all candidates, as some of them
             // may have a better cost.
-            if (candidates[ix].failed || candidates[ix].exitedEarly) {
+            if (!candidates[ix].status.isOK() || candidates[ix].exitedEarly) {
                 continue;
             }
 
-            done |= fetchNextDocument(&candidates[ix], slots[ix], &numFailures) ||
-                (numFailures == candidates.size());
+            done |= fetchNextDocument(&candidates[ix], slots[ix]);
         }
     }
-
-    // Make sure we have at least one plan which hasn't failed.
-    uassert(4822873,
-            "Runtime planner encountered a failure while collecting execution stats",
-            numFailures != candidates.size());
 
     return candidates;
 }
