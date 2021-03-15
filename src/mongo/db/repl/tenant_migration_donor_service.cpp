@@ -65,6 +65,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterPersistingInitialDonorStateDoc)
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
@@ -405,6 +406,10 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     setPromiseErrorIfNotReady(lg, _completionPromise, status);
     setPromiseErrorIfNotReady(lg, _decisionPromise, status);
     setPromiseErrorIfNotReady(lg, _migrationCancelablePromise, status);
+
+    if (auto fetcher = _recipientKeysFetcher.lock()) {
+        fetcher->shutdown();
+    }
 }
 
 ExecutorFuture<void>
@@ -413,7 +418,6 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancelationToken& serviceToken,
     const CancelationToken& instanceToken) {
-
     return AsyncTry([this,
                      self = shared_from_this(),
                      executor,
@@ -422,7 +426,10 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                      instanceToken] {
                return recipientTargeterRS->findHost(kPrimaryOnlyReadPreference, instanceToken)
                    .thenRunOn(**executor)
-                   .then([this, self = shared_from_this(), executor](HostAndPort host) {
+                   .then([this, self = shared_from_this(), executor, serviceToken, instanceToken](
+                             HostAndPort host) {
+                       pauseTenantMigrationBeforeFetchingKeys.pauseWhileSet();
+
                        const auto nss = NamespaceString::kKeysCollectionNamespace;
 
                        const auto cmdObj = [&] {
@@ -477,13 +484,17 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                                kMaxRecipientKeyDocsFindAttempts,
                                executor::RemoteCommandRequest::kNoTimeout),
                            _sslMode);
-                       uassertStatusOK(fetcher->schedule());
 
                        {
                            stdx::lock_guard<Latch> lg(_mutex);
+                           checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
+                           uassert(ErrorCodes::Interrupted,
+                                   "Donor service interrupted",
+                                   !serviceToken.isCanceled());
                            _recipientKeysFetcher = fetcher;
                        }
 
+                       uassertStatusOK(fetcher->schedule());
                        fetcher->join();
 
                        {
