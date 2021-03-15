@@ -71,9 +71,11 @@ private:
      * Falls back to a new plan if the performance was worse than anticipated during the trial
      * period.
      *
-     * The plan cache is modified only if 'shouldCache' is true.
+     * The plan cache is modified only if 'shouldCache' is true. The 'reason' string is used to
+     * indicate the reason for replanning, which can be included, for example, into plan stats
+     * summary.
      */
-    CandidatePlans replan(bool shouldCache) const;
+    CandidatePlans replan(bool shouldCache, std::string reason) const;
 
     // Query parameters used to create a query solution when the plan was first created. Used during
     // replanning.

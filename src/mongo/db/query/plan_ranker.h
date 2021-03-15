@@ -186,8 +186,9 @@ struct BaseCandidatePlan {
     // Indicates whether this candidate plan has completed the trial run early by achieving one
     // of the trial run metrics.
     bool exitedEarly{false};
-    // Indicates that this candidate plan has failed in a recoverable fashion during the trial run.
-    bool failed{false};
+    // If the candidate plan has failed in a recoverable fashion during the trial run, contains a
+    // non-OK status.
+    Status status{Status::OK()};
     // Any results produced during the plan's execution prior to scoring are retained here.
     std::queue<ResultType> results;
 };

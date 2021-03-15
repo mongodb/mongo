@@ -50,7 +50,7 @@ protected:
         auto numReads{calculateNumberOfReads(root)};
 
         if (numReads == 0) {
-            return 0;
+            return _kNoReadsBonus;
         }
 
         return static_cast<double>(root->common.advances) / static_cast<double>(numReads);
@@ -61,7 +61,7 @@ protected:
         StringBuilder sb;
 
         if (numReads == 0) {
-            sb << "(0 numReads)";
+            sb << "(" << str::convertDoubleToString(_kNoReadsBonus) << " noReadsBonus)";
         } else {
             sb << "(" << root->common.advances << " advances)/(" << numReads << " numReads)";
         }
@@ -82,6 +82,9 @@ protected:
     }
 
 private:
+    // A plan that performs no reads scores higher than its peers.
+    static constexpr double _kNoReadsBonus = 1.0;
+
     const QuerySolution* _solution;
 };
 }  // namespace

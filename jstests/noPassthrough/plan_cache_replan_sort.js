@@ -3,12 +3,12 @@
  * replanReason: "cached plan returned: ..." in the profiling data.
  * @tags: [
  *   requires_profiling,
- *   sbe_incompatible,
  * ]
  */
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");
 load("jstests/libs/profiler.js");
 
 const conn = MongoRunner.runMongod({
@@ -34,11 +34,11 @@ assert.eq(0, coll.find({x: 5}).sort({y: 1}).itcount());
 const cachedPlans = coll.getPlanCache().list();
 assert.eq(1, cachedPlans.length, cachedPlans);
 assert.eq(true, cachedPlans[0].isActive, cachedPlans);
-assert.eq("SORT", cachedPlans[0].cachedPlan.stage, cachedPlans);
+assert.eq("SORT", getCachedPlan(cachedPlans[0].cachedPlan).stage, cachedPlans);
 
 // Assert we "replan", by running the same query with different parameters.
 // This time the filter is not selective at all.
-db.setProfilingLevel(2);
+assert.commandWorked(db.setProfilingLevel(2));
 assert.eq(20, coll.find({x: 7}).sort({y: 1}).itcount());
 
 const profileObj = getLatestProfilerEntry(db, {op: "query"});

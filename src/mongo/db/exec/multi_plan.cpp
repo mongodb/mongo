@@ -228,7 +228,7 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
 
     for (size_t ix = 0; ix < _candidates.size(); ++ix) {
         auto& candidate = _candidates[ix];
-        if (candidate.failed) {
+        if (!candidate.status.isOK()) {
             continue;
         }
 
@@ -239,12 +239,12 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
         PlanStage::StageState state;
         try {
             state = candidate.root->work(&id);
-        } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>&) {
+        } catch (const ExceptionFor<ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed>& ex) {
             // If a candidate fails due to exceeding allowed resource consumption, then mark the
             // candidate as failed but proceed with the multi-plan trial period. The MultiPlanStage
             // as a whole only fails if _all_ candidates hit their resource consumption limit, or if
             // a different, query-fatal error code is thrown.
-            candidate.failed = true;
+            candidate.status = ex.toStatus();
             ++_failureCount;
 
             // If all children have failed, then rethrow. Otherwise, swallow the error and move onto

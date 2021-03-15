@@ -94,8 +94,11 @@ CandidatePlans SubPlanner::plan(
     auto compositeSolution = std::move(subplanSelectStat.getValue());
     auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
         _opCtx, _collection, _cq, *compositeSolution, _yieldPolicy);
-    prepareExecutionPlan(root.get(), &data);
-    return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
+    auto status = prepareExecutionPlan(root.get(), &data);
+    uassertStatusOK(status);
+    auto [result, recordId, exitedEarly] = status.getValue();
+    tassert(5323804, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
+    return {makeVector(plan_ranker::CandidatePlan{
                 std::move(compositeSolution), std::move(root), std::move(data)}),
             0};
 }
@@ -108,8 +111,12 @@ CandidatePlans SubPlanner::planWholeQuery() const {
     if (solutions.size() == 1) {
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
-        prepareExecutionPlan(root.get(), &data);
-        return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
+        auto status = prepareExecutionPlan(root.get(), &data);
+        uassertStatusOK(status);
+        auto [result, recordId, exitedEarly] = status.getValue();
+        tassert(
+            5323805, "sub-planner unexpectedly exited early during prepare phase", !exitedEarly);
+        return {makeVector(plan_ranker::CandidatePlan{
                     std::move(solutions[0]), std::move(root), std::move(data)}),
                 0};
     }

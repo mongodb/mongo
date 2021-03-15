@@ -86,10 +86,11 @@ protected:
     /**
      * Prepares the given plan stage tree for execution, attaches it to the operation context and
      * returns two slot accessors for the result and recordId slots, and a boolean value indicating
-     * if the plan has exited early from the trial period.
+     * if the plan has exited early from the trial period. If the plan has failed in a recoverable
+     * fashion, it will return a non-OK status.
      */
-    std::tuple<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*, bool> prepareExecutionPlan(
-        PlanStage* root, stage_builder::PlanStageData* data) const;
+    StatusWith<std::tuple<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*, bool>>
+    prepareExecutionPlan(PlanStage* root, stage_builder::PlanStageData* data) const;
 
     /**
      * Executes each plan in a round-robin fashion to collect execution stats. Stops when:

@@ -1,8 +1,6 @@
-// TODO: SERVER-54840 remove sbe_incompatible tag after fix for large generated plan stage tree
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 
 // Confirms that profiled aggregation execution contains all expected metrics with proper values.

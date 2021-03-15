@@ -236,6 +236,10 @@ struct PlanStageData {
     bool shouldTrackLatestOplogTimestamp{false};
     bool shouldTrackResumeToken{false};
     bool shouldUseTailableScan{false};
+
+    // If this execution tree was built as a result of replanning of the cached plan, this string
+    // will include the reason for replanning.
+    std::optional<std::string> replanReason;
 };
 
 /**
