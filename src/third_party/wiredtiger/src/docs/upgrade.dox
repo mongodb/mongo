@@ -85,9 +85,5 @@ To downgrade to a previous release of WiredTiger:
 -# Shut down the new version of the application.
 <br><br>
 -# Start the old version of the application.
-<br><br>
--# The database created with version 10.0 cannot be downgraded to older
-   versions because underlying file formats changed between the 10.0.0
-   release and the 3.2.1 release.
 
 */
