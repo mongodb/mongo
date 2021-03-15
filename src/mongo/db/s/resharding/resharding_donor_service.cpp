@@ -200,27 +200,33 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
             return _updateCoordinator(opCtx.get(), executor);
         })
         .onError([this, executor](Status status) {
+            Status error = status;
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                if (_abortStatus)
+                    error = *_abortStatus;
+            }
+
             LOGV2(4956400,
                   "Resharding operation donor state machine failed",
                   "namespace"_attr = _metadata.getSourceNss(),
                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "error"_attr = status);
+                  "error"_attr = error);
 
-            _transitionToError(status);
+            _transitionToError(error);
             auto opCtx = cc().makeOperationContext();
             return _updateCoordinator(opCtx.get(), executor)
                 .then([this] {
                     // TODO SERVER-52838: Ensure all local collections that may have been created
-                    // for
-                    // resharding are removed, with the exception of the ReshardingDonorDocument,
-                    // before transitioning to kDone.
+                    // for resharding are removed, with the exception of the
+                    // ReshardingDonorDocument, before transitioning to kDone.
                     _transitionState(DonorStateEnum::kDone);
                 })
                 .then([this, executor] {
                     auto opCtx = cc().makeOperationContext();
                     return _updateCoordinator(opCtx.get(), executor);
                 })
-                .then([this, status] { return status; });
+                .then([this, error] { return error; });
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             {
@@ -254,6 +260,7 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
 void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lk(_mutex);
+    _abortStatus.emplace(status);
     _onAbortOrStepdown(lk, status);
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
@@ -276,7 +283,9 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     stdx::lock_guard<Latch> lk(_mutex);
     if (reshardingFields.getAbortReason()) {
         auto status = getStatusFromAbortReason(reshardingFields);
+        _abortStatus.emplace(status);
         _onAbortOrStepdown(lk, status);
+        _critSec.reset();
         return;
     }
 

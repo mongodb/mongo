@@ -247,7 +247,7 @@ private:
         boost::optional<Status> abortReason = boost::none);
 
     /**
-     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' to all recipient shards.
+     * Sends '_flushReshardingStateChange' to all recipient shards.
      *
      * When the coordinator is in a state before 'kDecisionPersisted', refreshes the temporary
      * namespace. When the coordinator is in a state at or after 'kDecisionPersisted', refreshes the
@@ -256,17 +256,15 @@ private:
     void _tellAllRecipientsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the original namespace to all
-     * donor shards.
+     * Sends '_flushReshardingStateChange' for the original namespace to all donor shards.
      */
     void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the original namespace to all
-     * participant shards.
+     * Sends '_flushReshardingStateChange' for the original namespace to all participant shards.
      */
     void _tellAllParticipantsToRefresh(
-        const BSONObj& refreshCmd, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded

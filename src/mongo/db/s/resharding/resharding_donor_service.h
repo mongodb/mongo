@@ -166,8 +166,11 @@ private:
 
     const std::unique_ptr<DonorStateMachineExternalState> _externalState;
 
-    // Protects the promises below
+    // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
+
+    // Contains the status with which the operation was aborted.
+    boost::optional<Status> _abortStatus;
 
     boost::optional<ReshardingCriticalSection> _critSec;
 
