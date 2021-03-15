@@ -40,7 +40,7 @@ class TenantClonerTestFixture : public ClonerTestFixture {
 protected:
     void setUp() override;
 
-    ServiceContext* serviceContext;
+    ServiceContext* serviceContext{nullptr};
     TenantMigrationSharedData* getSharedData();
     Status createCollection(const NamespaceString& nss, const CollectionOptions& options);
     Status createIndexesOnEmptyCollection(const NamespaceString& nss,
