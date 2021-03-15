@@ -725,7 +725,7 @@ format:
 
 /*
  * __wt_metadata_update_base_write_gen --
- *     Update the connection's base write generation.
+ *     Update the connection's base write generation from the config string.
  */
 int
 __wt_metadata_update_base_write_gen(WT_SESSION_IMPL *session, const char *config)
