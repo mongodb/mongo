@@ -59,6 +59,7 @@ syncFrom = function(syncingNode, desiredSyncSource, rst) {
     assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: desiredSyncSource.name}));
     restartServerReplication(syncingNode);
     rst.awaitSyncSource(syncingNode, desiredSyncSource);
+    rst.awaitReplication();
 };
 
 /**
