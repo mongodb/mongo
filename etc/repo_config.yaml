@@ -210,7 +210,6 @@ repos:
     bucket: repo.mongodb.org
     component: multiverse
     architectures:
-      - amd64
       - arm64
       - i386
     repos:
@@ -433,7 +432,6 @@ repos:
     bucket: repo.mongodb.com
     component: multiverse
     architectures:
-      - amd64
       - ppc64el
       - s390x
       - arm64

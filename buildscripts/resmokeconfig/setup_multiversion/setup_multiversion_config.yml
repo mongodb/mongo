@@ -11,16 +11,6 @@ evergreen_projects:
 
 evergreen_buildvariants:
 
-  - name: ubuntu1604
-    edition: targeted
-    platform: ubuntu1604
-    architecture: x86_64
-
-  - name: enterprise-ubuntu1604-64
-    edition: enterprise
-    platform: ubuntu1604
-    architecture: x86_64
-
   - name: enterprise-ubuntu1604-arm64
     edition: enterprise
     platform: ubuntu1604
