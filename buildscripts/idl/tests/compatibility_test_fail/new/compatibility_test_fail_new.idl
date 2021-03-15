@@ -206,13 +206,21 @@ structs:
             bsonSerializationTypeAnyReplyField:
                 type: bsonSerializationTypeAny
 
-    BsonSerializationTypeWithVariantAnyReply:
-        description: "This reply contains a field whose old and new variant types have a bson_serialization_type
+    BsonSerializationTypeWithVariantAnyStruct:
+        description: "This struct contains a field whose old and new variant types have a bson_serialization_type
                         that contains 'any' that is not compatible"
         fields:
-            bsonSerializationTypeAnyReplyField:
+            bsonSerializationTypeAnyStructField:
                 type:
                     variant: [oldBsonSerializationTypeAny, newBsonSerializationTypeAny]
+
+    BsonSerializationTypeWithVariantAnyStructWithArray:
+        description: "This struct contains a field whose old and new variant types have a array of
+                      bson_serialization_type that contains 'any' that is not compatible"
+        fields:
+            bsonSerializationTypeAnyStructField:
+                type:
+                    variant: [array<oldBsonSerializationTypeAny>, array<newBsonSerializationTypeAny>]
 
     CppTypeNotEqualReply:
         description: "This reply contains a field whose old and new type have a bson_serialization_type
@@ -258,6 +266,14 @@ structs:
                 type: 
                     variant: [int, bool, string]
 
+    NewVariantNotSubsetReplyWithArray:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantNotSubsetReplyField:
+                type: 
+                    variant: [array<int>, array<bool>, array<string>]
+
     NewVariantNotSubsetReplyTwo:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
@@ -265,7 +281,15 @@ structs:
             variantNotSubsetReplyFieldTwo:
                 type: 
                     variant: [int, bool, string, double]
-    
+
+    NewVariantNotSubsetReplyTwoWithArray:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantNotSubsetReplyFieldTwo:
+                type: 
+                    variant: [array<int>, array<bool>, array<string>, array<double>]
+   
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is not
                       compatible with the old variant type"
@@ -273,6 +297,14 @@ structs:
             variantRecursiveReplyField:
                 type: 
                     variant: [int, intStringToIntStringBool]
+
+    VariantRecursiveReplyWithArray:
+        description: "This reply contains a field that has a new variant type that is not
+                      compatible with the old variant type"
+        fields:
+            variantRecursiveReplyField:
+                type: 
+                    variant: [array<int>, array<intStringToIntStringBool>]
     
     NewVariantStructNotSubsetReply:
         description: "This reply contains a field whose new variant types are not a subset
@@ -281,6 +313,14 @@ structs:
             variantStructNotSubsetReplyField:
                 type: 
                     variant: [int, string, StructType]
+
+    NewVariantStructNotSubsetReplyWithArray:
+        description: "This reply contains a field whose new variant types are not a subset
+                      of the old variant types"
+        fields:
+            variantStructNotSubsetReplyField:
+                type: 
+                    variant: [array<int>, array<string>, array<StructType>]
     
     VariantStructRecursiveReply:
         description: "This reply contains a field that has a new variant struct type that is not
@@ -289,6 +329,14 @@ structs:
             variantStructRecursiveReplyField:
                 type: 
                     variant: [int, StructFieldTypeRecursiveReplyTwo]
+    
+    VariantStructRecursiveReplyWithArray:
+        description: "This reply contains a field that has a new variant struct type that is not
+                      compatible with the old variant struct type"
+        fields:
+            variantStructRecursiveReplyField:
+                type: 
+                    variant: [array<int>, array<StructFieldTypeRecursiveReplyTwo>]
 
     CommandParamStructRecursiveOne:
         description: "This command parameter struct type contains an unstable field while the
@@ -360,6 +408,14 @@ structs:
                 type: 
                     variant: [int, bool]
 
+    VariantNotSupersetStructWithArray:
+        description: "This struct contains a field where the new variant types are not a superset
+                      of the old variant types"
+        fields:
+            variantNotSupersetField:
+                type: 
+                    variant: [array<int>, array<bool>]
+
     VariantNotSupersetStructTwo:
         description: "This struct contains a field where the new variant types are not a superset
                       of the old variant types"
@@ -367,6 +423,14 @@ structs:
             variantNotSupersetFieldTwo:
                 type: 
                     variant: [int, bool]
+
+    VariantNotSupersetStructTwoWithArray:
+        description: "This struct contains a field where the new variant types are not a superset
+                      of the old variant types"
+        fields:
+            variantNotSupersetFieldTwo:
+                type: 
+                    variant: [array<int>, array<bool>]
 
     NewTypeNotVariantStruct:
         description: "This struct contains a field where the new type is not variant while the
@@ -383,6 +447,14 @@ structs:
                 type: 
                     variant: [int, intStringBoolToIntString]
 
+    VariantRecursiveStructWithArray:
+        description: "This struct contains a field where the new variant types are not
+                      compatible with the old variant types"
+        fields:
+            variantRecursiveField:
+                type: 
+                    variant: [array<int>, array<intStringBoolToIntString>]
+
     VariantStructNotSupersetStruct:
         description: "This struct contains a field where the old variant types contains a struct
                       while the new one does not"
@@ -391,6 +463,14 @@ structs:
                 type: 
                     variant: [int, string]
 
+    VariantStructNotSupersetStructWithArray:
+        description: "This struct contains a field where the old variant types contains a struct
+                      while the new one does not"
+        fields:
+            variantStructNotSupersetField:
+                type: 
+                    variant: [array<int>, array<string>]
+
     VariantStructRecursiveStruct:
         description: "This struct contains a field where the old variant struct and the new
                       variant struct are not compatible"
@@ -398,6 +478,14 @@ structs:
             variantStructRecursiveField:
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive]
+
+    VariantStructRecursiveStructWithArray:
+        description: "This struct contains a field where the old variant struct and the new
+                      variant struct are not compatible"
+        fields:
+            variantStructRecursiveField:
+                type:
+                    variant: [array<int>, array<string>, array<StructCommandParameterTypeRecursive>]
 
 commands:
     invalidAPIVersionNew:
@@ -905,7 +993,65 @@ commands:
         cpp_name: replyFieldTypeBsonAnyWithVariant
         strict: true
         api_version: "1"
-        reply_type: BsonSerializationTypeWithVariantAnyReply
+        reply_type: BsonSerializationTypeWithVariantAnyStruct
+
+    replyFieldTypeBsonAnyWithVariantWithArray:
+        description: "command fails when its reply field variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: replyFieldTypeBsonAnyWithVariantWithArray
+        namespace: ignored
+        cpp_name: replyFieldTypeBsonAnyWithVariantWithArray
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeWithVariantAnyStructWithArray
+
+    parameterFieldTypeBsonAnyWithVariant:
+        description: "command fails when its paramter field variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: parameterFieldTypeBsonAnyWithVariant
+        namespace: ignored
+        cpp_name: parameterFieldTypeBsonAnyWithVariant
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields: 
+            variantAnyField: 
+                type: BsonSerializationTypeWithVariantAnyStruct
+
+    parameterFieldTypeBsonAnyWithVariantWithArray:
+        description: "command fails when its parameter field variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: parameterFieldTypeBsonAnyWithVariantWithArray
+        namespace: ignored
+        cpp_name: parameterFieldTypeBsonAnyWithVariantWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields: 
+            variantAnyField: 
+                type: BsonSerializationTypeWithVariantAnyStructWithArray
+
+    commandTypeBsonAnyWithVariant:
+        description: "command fails when its variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: commandTypeBsonAnyWithVariant
+        namespace: type
+        type: BsonSerializationTypeWithVariantAnyStruct
+        cpp_name: commandTypeBsonAnyWithVariant
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandTypeBsonAnyWithVariantWithArray:
+        description: "command fails when its type variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: commandTypeBsonAnyWithVariantWithArray
+        namespace: type
+        type: BsonSerializationTypeWithVariantAnyStructWithArray
+        cpp_name: commandTypeBsonAnyWithVariantWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
 
     replyFieldCppTypeNotEqual:
         description: "command fails because its reply field type has a bson_serialization_type
@@ -1183,6 +1329,16 @@ commands:
         api_version: "1"
         reply_type: NewVariantNotSubsetReply
 
+    newReplyFieldVariantNotSubsetWithArray:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantNotSubsetWithArray
+        namespace: ignored
+        cpp_name: newReplyFieldVariantNotSubsetWithArray
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantNotSubsetReplyWithArray
+
     newReplyFieldVariantNotSubsetTwo:
         description: "new command fails because its reply field type is a variant type that is not
                       a subset of the old reply field variant types"
@@ -1192,6 +1348,16 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewVariantNotSubsetReplyTwo
+
+    newReplyFieldVariantNotSubsetTwoWithArray:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantNotSubsetTwoWithArray
+        namespace: ignored
+        cpp_name: newReplyFieldVariantNotSubsetTwoWithArray
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantNotSubsetReplyTwoWithArray
 
     replyFieldVariantRecursive:
         description: "new command fails because its reply field type is a variant type that is not
@@ -1203,6 +1369,16 @@ commands:
         api_version: "1"
         reply_type: VariantRecursiveReply
 
+    replyFieldVariantRecursiveWithArray:
+        description: "new command fails because its reply field type is a variant type that is not
+                      compatible with the old reply field variant type"
+        command_name: replyFieldVariantRecursiveWithArray
+        namespace: ignored
+        cpp_name: replyFieldVariantRecursiveWithArray
+        strict: true
+        api_version: "1"
+        reply_type: VariantRecursiveReplyWithArray
+
     newReplyFieldVariantStructNotSubset:
         description: "new command fails because its reply field type is a variant type that is not
                       a subset of the old reply field variant types"
@@ -1212,6 +1388,16 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NewVariantStructNotSubsetReply
+
+    newReplyFieldVariantStructNotSubsetWithArray:
+        description: "new command fails because its reply field type is a variant type that is not
+                      a subset of the old reply field variant types"
+        command_name: newReplyFieldVariantStructNotSubsetWithArray
+        namespace: ignored
+        cpp_name: newReplyFieldVariantStructNotSubsetWithArray
+        strict: true
+        api_version: "1"
+        reply_type: NewVariantStructNotSubsetReplyWithArray
     
     replyFieldVariantStructRecursive:
         description: "new command fails because its reply field type has a variant
@@ -1223,6 +1409,17 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantStructRecursiveReply
+    
+    replyFieldVariantStructRecursiveWithArray:
+        description: "new command fails because its reply field type has a variant
+                      struct type that is not compatible with the old reply field variant
+                      struct type"
+        command_name: replyFieldVariantStructRecursiveWithArray
+        namespace: ignored
+        cpp_name: replyFieldVariantStructRecursiveWithArray
+        strict: true
+        api_version: "1"
+        reply_type: VariantStructRecursiveReplyWithArray
 
     newParamVariantNotSuperset:
         description: "new command fails because its parameter type is a variant type that is not
@@ -1238,6 +1435,20 @@ commands:
                 type: 
                     variant: [int, bool]
 
+    newParamVariantNotSupersetWithArray:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a superset of the old parameter variant types"
+        command_name: newParamVariantNotSupersetWithArray
+        namespace: ignored
+        cpp_name: newParamVariantNotSupersetWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantNotSupersetParam:
+                type: 
+                    variant: [array<int>, array<bool>]
+
     newParamVariantNotSupersetTwo:
         description: "new command fails because its parameter type is a variant type that is not
                       a superset of the old parameter variant types"
@@ -1251,6 +1462,20 @@ commands:
             variantNotSupersetParamTwo:
                 type: 
                     variant: [int, string]
+
+    newParamVariantNotSupersetTwoWithArray:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a superset of the old parameter variant types"
+        command_name: newParamVariantNotSupersetTwoWithArray
+        namespace: ignored
+        cpp_name: newParamVariantNotSupersetTwoWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantNotSupersetParamTwo:
+                type: 
+                    variant: [array<int>, array<string>]
 
     newParamTypeNotVariant:
         description: "new command fails because its parameter type is not variant while the old
@@ -1279,6 +1504,20 @@ commands:
                 type: 
                     variant: [int, intStringBoolToIntString]
 
+    newParamVariantRecursiveWithArray:
+        description: "new command fails because its param type is a variant type that is not
+                      compatible with the old param variant type"
+        command_name: newParamVariantRecursiveWithArray
+        namespace: ignored
+        cpp_name: newParamVariantRecursiveWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantRecursiveParam:
+                type: 
+                    variant: [array<int>, array<intStringBoolToIntString>]
+
     newParamVariantStructNotSuperset:
         description: "new command fails because its parameter type is a variant type that is not
                       a subset of the old parameter variant types"
@@ -1292,6 +1531,20 @@ commands:
             variantStructNotSupersetParam:
                 type: 
                     variant: [int, string]
+
+    newParamVariantStructNotSupersetWithArray:
+        description: "new command fails because its parameter type is a variant type that is not
+                      a subset of the old parameter variant types"
+        command_name: newParamVariantStructNotSupersetWithArray
+        namespace: ignored
+        cpp_name: newParamVariantStructNotSupersetWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantStructNotSupersetParam:
+                type: 
+                    variant: [array<int>, array<string>]
 
     newParamVariantStructRecursive:
         description: "new command fails because its parameter type has a variant
@@ -1308,6 +1561,21 @@ commands:
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive]
 
+    newParamVariantStructRecursiveWithArray:
+        description: "new command fails because its parameter type has a variant
+                      struct type that is not compatible with the old parameter variant
+                      struct type"
+        command_name: newParamVariantStructRecursiveWithArray
+        namespace: ignored
+        cpp_name: newParamVariantStructRecursiveWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantStructRecursiveParam:
+                type:
+                    variant: [array<int>, array<string>, array<StructCommandParameterTypeRecursive>]
+
     newCommandTypeVariantNotSuperset:
         description: "new command fails because its type is a variant type that is not
                       a superset of the old type variant types"
@@ -1319,6 +1587,17 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    newCommandTypeVariantNotSupersetWithArray:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old type variant types"
+        command_name: newCommandTypeVariantNotSupersetWithArray
+        namespace: type
+        type: VariantNotSupersetStructWithArray
+        cpp_name: newCommandTypeVariantNotSupersetWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     newCommandTypeVariantNotSupersetTwo:
         description: "new command fails because its type is a variant type that is not
                       a superset of the old command type variant types"
@@ -1326,6 +1605,17 @@ commands:
         namespace: type
         type: VariantNotSupersetStructTwo
         cpp_name: newCommandTypeVariantNotSupersetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantNotSupersetTwoWithArray:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old command type variant types"
+        command_name: newCommandTypeVariantNotSupersetTwoWithArray
+        namespace: type
+        type: VariantNotSupersetStructTwoWithArray
+        cpp_name: newCommandTypeVariantNotSupersetTwoWithArray
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -1352,6 +1642,17 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    newCommandTypeVariantRecursiveWithArray:
+        description: "new command fails because its type is a variant type that is not
+                      compatible with the old command type variant type"
+        command_name: newCommandTypeVariantRecursiveWithArray
+        namespace: type
+        type: VariantRecursiveStructWithArray
+        cpp_name: newCommandTypeVariantRecursiveWithArray
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     newCommandTypeVariantStructNotSuperset:
         description: "new command fails because its type is a variant type that is not
                       a superset of the old command type variant types"
@@ -1359,6 +1660,17 @@ commands:
         namespace: type
         type: VariantStructNotSupersetStruct
         cpp_name: newCommandTypeVariantStructNotSuperset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantStructNotSupersetWithArray:
+        description: "new command fails because its type is a variant type that is not
+                      a superset of the old command type variant types"
+        command_name: newCommandTypeVariantStructNotSupersetWithArray
+        namespace: type
+        type: VariantStructNotSupersetStructWithArray
+        cpp_name: newCommandTypeVariantStructNotSupersetWithArray
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -1371,6 +1683,18 @@ commands:
         namespace: type
         type: VariantStructRecursiveStruct
         cpp_name: newCommandTypeVariantStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newCommandTypeVariantStructRecursiveWithArray:
+        description: "new command fails because its type has a variant
+                      struct type that is not compatible with the old command type variant
+                      struct type"
+        command_name: newCommandTypeVariantStructRecursiveWithArray
+        namespace: type
+        type: VariantStructRecursiveStructWithArray
+        cpp_name: newCommandTypeVariantStructRecursiveWithArray
         strict: true
         api_version: "1"
         reply_type: OkReply

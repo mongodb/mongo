@@ -175,7 +175,7 @@ structs:
         fields:
             oldVariantTypeReplyField:
                 type: 
-                    variant: [int, string]
+                    variant: [int, string, array<string>]
 
     NewVariantSubsetReply:
         description: "This reply contains a field whose new variant types are a subset
@@ -183,7 +183,7 @@ structs:
         fields:
             variantSubsetReplyField:
                 type: 
-                    variant: [int, bool, string]
+                    variant: [int, bool, string, array<string>]
 
     NewVariantSubsetReplyTwo:
         description: "This reply contains a field whose new variant types are a subset
@@ -191,7 +191,7 @@ structs:
         fields:
             variantSubsetReplyFieldTwo:
                 type: 
-                    variant: [int, string, bool, double]
+                    variant: [int, string, bool, double, array<string>]
     
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is compatible
@@ -199,7 +199,8 @@ structs:
         fields:
             variantRecursiveReplyField:
                 type: 
-                    variant: [int, intStringBoolToIntString]
+                    variant: [int, intStringBoolToIntString,
+                              array<intStringBoolToIntString>, array<string>]
     
     OldVariantStructReply:
         description: "This reply contains a field whose new variant type does not have a variant
@@ -207,7 +208,7 @@ structs:
         fields:
             variantStructReplyField:
                 type: 
-                    variant: [int, string, StructType]
+                    variant: [int, string, StructType, array<StructType>, array<string>]
     
     VariantStructRecursiveReply:
         description: "This reply contains a field that has a new variant struct type that is
@@ -215,7 +216,8 @@ structs:
         fields:
             variantStructRecursiveReplyField:
                 type: 
-                    variant: [int, StructFieldTypeRecursiveReplyTwo]
+                    variant: [int, StructFieldTypeRecursiveReplyTwo,
+                              array<StructFieldTypeRecursiveReplyTwo>, array<string>]
 
     NewCommandParameterStruct:
         description: "The new command parameter's type and the
@@ -299,7 +301,7 @@ structs:
         fields:
             variantSupersetField:
                 type: 
-                    variant: [int, bool]
+                    variant: [int, bool, array<string>]
 
     VariantSupersetStructTwo:
         description: "This struct contains a field where the new variant types are a superset
@@ -307,7 +309,7 @@ structs:
         fields:
             variantSupersetFieldTwo:
                 type: 
-                    variant: [int, bool]
+                    variant: [int, bool, array<string>]
 
     OldTypeNotVariantStruct:
         description: "This struct contains a field where the new type is variant while the
@@ -322,7 +324,8 @@ structs:
         fields:
             variantRecursiveField:
                 type: 
-                    variant: [int, intStringToIntStringBool]
+                    variant: [int, intStringToIntStringBool,
+                              array<intStringToIntStringBool>, array<string>]
 
     VariantStructSupersetStruct:
         description: "This struct contains a field where the new variant types contains a struct
@@ -330,7 +333,8 @@ structs:
         fields:
             variantStructSupersetField:
                 type: 
-                    variant: [int, string, NewCommandParameterStruct]
+                    variant: [int, string, NewCommandParameterStruct,
+                              array<NewCommandParameterStruct>, array<string>]
 
     VariantStructRecursiveStruct:
         description: "This struct contains a field where the old variant struct and the new
@@ -338,7 +342,8 @@ structs:
         fields:
             variantStructRecursiveField:
                 type:
-                    variant: [int, string, StructCommandParameterTypeRecursive]
+                    variant: [int, string, StructCommandParameterTypeRecursive,
+                              array<StructCommandParameterTypeRecursive>, array<string>]
 
     BsonSerializationTypeAnyReply:
         description: "This reply contains a field whose type is 'any' and is explicitly allowed"
@@ -352,7 +357,12 @@ structs:
         fields:
             anyTypeField:
                 type:
-                    variant: [intStringBoolToIntString, bsonSerializationTypeAnyAllowed, StructFieldTypeRecursiveReplyTwo]
+                    variant: [intStringBoolToIntString, 
+                              bsonSerializationTypeAnyAllowed,
+                              StructFieldTypeRecursiveReplyTwo,
+                              array<intStringBoolToIntString>,
+                              array<bsonSerializationTypeAnyAllowed>, 
+                              array<StructFieldTypeRecursiveReplyTwo>]
 
     ArrayTypeStruct:
         description: "Struct with ArrayType field."
@@ -923,7 +933,7 @@ commands:
         fields:
             variantSupersetParam:
                 type: 
-                    variant: [int, bool, string]
+                    variant: [int, bool, string, array<string>]
 
     newParamVariantSupersetTwo:
         description: "new command passes because its parameter type is a variant type that is
@@ -937,7 +947,7 @@ commands:
         fields:
             variantSupersetParam:
                 type: 
-                    variant: [int, string, bool, double]
+                    variant: [int, string, bool, double, array<string>]
 
     oldParamTypeNotVariant:
         description: "new command passes because its parameter type is variant while the old
@@ -951,7 +961,7 @@ commands:
         fields:
             variantParam:
                 type: 
-                    variant: [int, string]
+                    variant: [int, string, array<string>]
 
     newParamVariantRecursive:
         description: "new command passes because its param type is a variant type that is
@@ -965,7 +975,8 @@ commands:
         fields:
             variantRecursiveParam:
                 type: 
-                    variant: [int, intStringToIntStringBool]
+                    variant: [int, intStringToIntStringBool,
+                              array<intStringToIntStringBool>, array<string>]
 
     newParamVariantStructSuperset:
         description: "new command passes because its parameter type is a variant type that is
@@ -979,7 +990,8 @@ commands:
         fields:
             variantStructSupersetParam:
                 type: 
-                    variant: [int, string, NewCommandParameterStruct]
+                    variant: [int, string, NewCommandParameterStruct,
+                              array<NewCommandParameterStruct>, array<string>]
 
     newParamVariantStructRecursive:
         description: "new command passes because its parameter type has a variant
@@ -994,7 +1006,8 @@ commands:
         fields:
             variantStructRecursiveParam:
                 type:
-                    variant: [int, string, StructCommandParameterTypeRecursive]
+                    variant: [int, string, StructCommandParameterTypeRecursive,
+                              array<StructCommandParameterTypeRecursive>, array<string>]
 
     newCommandTypeVariantSuperset:
         description: "new command passes because its type is a variant type that is

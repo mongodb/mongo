@@ -117,7 +117,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                           "compatibility_test_fail/abort/missing_array/command_type_no_array"),
                 ["src"])
 
-    # pylint: disable=too-many-locals,too-many-statements
+    # pylint: disable=too-many-locals,too-many-statements,invalid-name
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
         dir_path = path.dirname(path.realpath(__file__))
@@ -126,7 +126,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 100)
+        self.assertTrue(error_collection.count() == 128)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -410,6 +410,104 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(reply_field_type_bson_any_with_variant_error), "replyFieldTypeBsonAnyWithVariant")
 
+        reply_field_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "replyFieldTypeBsonAnyWithVariantWithArray",
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            reply_field_type_bson_any_with_variant_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(reply_field_type_bson_any_with_variant_with_array_error),
+            "replyFieldTypeBsonAnyWithVariantWithArray")
+
+        reply_field_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "replyFieldTypeBsonAnyWithVariantWithArray",
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            reply_field_type_bson_any_with_variant_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(reply_field_type_bson_any_with_variant_with_array_error),
+            "replyFieldTypeBsonAnyWithVariantWithArray")
+
+        parameter_field_type_bson_any_with_variant_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariant", idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            parameter_field_type_bson_any_with_variant_error.error_id == idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_error),
+            "parameterFieldTypeBsonAnyWithVariant")
+
+        parameter_field_type_bson_any_with_variant_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariant", idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            parameter_field_type_bson_any_with_variant_error.error_id == idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_error),
+            "parameterFieldTypeBsonAnyWithVariant")
+
+        parameter_field_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariantWithArray", idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(parameter_field_type_bson_any_with_variant_with_array_error.error_id ==
+                        idl_compatibility_errors.
+                        ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_with_array_error),
+            "parameterFieldTypeBsonAnyWithVariantWithArray")
+
+        parameter_field_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariantWithArray", idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(parameter_field_type_bson_any_with_variant_with_array_error.error_id ==
+                        idl_compatibility_errors.
+                        ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_with_array_error),
+            "parameterFieldTypeBsonAnyWithVariantWithArray")
+
+        command_type_bson_any_with_variant_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariant",
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_error), "commandTypeBsonAnyWithVariant")
+
+        command_type_bson_any_with_variant_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariant",
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_error), "commandTypeBsonAnyWithVariant")
+
+        command_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariantWithArray",
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_with_array_error),
+            "commandTypeBsonAnyWithVariantWithArray")
+
+        command_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariantWithArray",
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_with_array_error),
+            "commandTypeBsonAnyWithVariantWithArray")
+
         reply_field_cpp_type_not_equal_error = error_collection.get_error_by_command_name(
             "replyFieldCppTypeNotEqual")
         self.assertTrue(reply_field_cpp_type_not_equal_error.error_id ==
@@ -582,6 +680,45 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_reply_field_variant_struct_recursive_error), "replyFieldVariantStructRecursive")
 
+        new_reply_field_variant_not_subset_with_array_error = error_collection.get_error_by_command_name(
+            "newReplyFieldVariantNotSubsetWithArray")
+        self.assertTrue(new_reply_field_variant_not_subset_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_variant_not_subset_with_array_error),
+            "newReplyFieldVariantNotSubsetWithArray")
+
+        new_reply_field_variant_not_subset_with_array_two_errors = error_collection.get_all_errors_by_command_name(
+            "newReplyFieldVariantNotSubsetTwoWithArray")
+        self.assertTrue(len(new_reply_field_variant_not_subset_with_array_two_errors) == 2)
+        for error in new_reply_field_variant_not_subset_with_array_two_errors:
+            self.assertTrue(error.error_id == idl_compatibility_errors.
+                            ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+
+        new_reply_field_variant_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "replyFieldVariantRecursiveWithArray")
+        self.assertTrue(new_reply_field_variant_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_variant_recursive_with_array_error),
+            "replyFieldVariantRecursiveWithArray")
+
+        new_reply_field_variant_struct_not_subset_with_array_error = error_collection.get_error_by_command_name(
+            "newReplyFieldVariantStructNotSubsetWithArray")
+        self.assertTrue(new_reply_field_variant_struct_not_subset_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_variant_struct_not_subset_with_array_error),
+            "newReplyFieldVariantStructNotSubsetWithArray")
+
+        new_reply_field_variant_struct_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "replyFieldVariantStructRecursiveWithArray")
+        self.assertTrue(new_reply_field_variant_struct_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_NOT_SUBSET)
+        self.assertRegex(
+            str(new_reply_field_variant_struct_recursive_with_array_error),
+            "replyFieldVariantStructRecursiveWithArray")
+
         new_command_parameter_contains_validator_error = error_collection.get_error_by_command_name(
             "newCommandParameterValidator")
         self.assertTrue(new_command_parameter_contains_validator_error.error_id ==
@@ -749,6 +886,85 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET)
         self.assertRegex(
             str(new_simple_action_types_not_subset_error), "newSimpleActionTypesNotSubset")
+
+        new_param_variant_not_superset_with_array_error = error_collection.get_error_by_command_name(
+            "newParamVariantNotSupersetWithArray")
+        self.assertTrue(
+            new_param_variant_not_superset_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_not_superset_with_array_error),
+            "newParamVariantNotSupersetWithArray")
+
+        new_param_variant_not_superset_with_array_two_errors = error_collection.get_all_errors_by_command_name(
+            "newParamVariantNotSupersetTwoWithArray")
+        self.assertTrue(len(new_param_variant_not_superset_with_array_two_errors) == 2)
+        for error in new_param_variant_not_superset_with_array_two_errors:
+            self.assertTrue(error.error_id == idl_compatibility_errors.
+                            ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+
+        new_param_variant_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "newParamVariantRecursiveWithArray")
+        self.assertTrue(new_param_variant_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_recursive_with_array_error), "newParamVariantRecursiveWithArray")
+
+        new_param_variant_struct_not_superset_with_array_error = error_collection.get_error_by_command_name(
+            "newParamVariantStructNotSupersetWithArray")
+        self.assertTrue(
+            new_param_variant_struct_not_superset_with_array_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_PARAMETER_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_struct_not_superset_with_array_error),
+            "newParamVariantStructNotSupersetWithArray")
+
+        new_param_variant_struct_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "newParamVariantStructRecursiveWithArray")
+        self.assertTrue(new_param_variant_struct_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_param_variant_struct_recursive_with_array_error),
+            "newParamVariantStructRecursiveWithArray")
+
+        new_command_type_variant_not_superset_with_array_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantNotSupersetWithArray")
+        self.assertTrue(new_command_type_variant_not_superset_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_not_superset_with_array_error),
+            "newCommandTypeVariantNotSupersetWithArray")
+
+        new_command_type_variant_not_superset_with_array_two_errors = error_collection.get_all_errors_by_command_name(
+            "newCommandTypeVariantNotSupersetTwoWithArray")
+        self.assertTrue(len(new_command_type_variant_not_superset_with_array_two_errors) == 2)
+        for error in new_command_type_variant_not_superset_with_array_two_errors:
+            self.assertTrue(error.error_id ==
+                            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+
+        new_command_type_variant_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantRecursiveWithArray")
+        self.assertTrue(new_command_type_variant_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_recursive_with_array_error),
+            "newCommandTypeVariantRecursiveWithArray")
+
+        new_command_type_variant_struct_not_superset_with_array_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantStructNotSupersetWithArray")
+        self.assertTrue(new_command_type_variant_struct_not_superset_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMMAND_VARIANT_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_struct_not_superset_with_array_error),
+            "newCommandTypeVariantStructNotSupersetWithArray")
+
+        new_command_type_variant_struct_recursive_with_array_error = error_collection.get_error_by_command_name(
+            "newCommandTypeVariantStructRecursiveWithArray")
+        self.assertTrue(new_command_type_variant_struct_recursive_with_array_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_NOT_SUPERSET)
+        self.assertRegex(
+            str(new_command_type_variant_struct_recursive_with_array_error),
+            "newCommandTypeVariantStructRecursiveWithArray")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""
