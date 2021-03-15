@@ -1,15 +1,12 @@
 /**
  * Tests that
- * - the recipient rejects all reads between when cloning is done and when the
- *   returnAfterReachingTimestamp (blockTimestamp) is received and reached.
- * - the recipient rejects only reads with atClusterTime < returnAfterReachingTimestamp
- *   (blockTimestamp) after returnAfterReachingTimestamp is reached.
- * - if the migration aborts before the recipient receives the returnAfterReachingTimestamp
- *   (blockTimestamp), the recipient keeps rejecting all reads until the state doc is marked as
- *   garbage collectable.
- * - if the migration aborts after returnAfterReachingTimestamp (blockTimestamp) is reached, the
- *   recipient keeps rejecting reads with atClusterTime < returnAfterReachingTimestamp
- *   (blockTimestamp) until the state doc is garbage collected.
+ * - the recipient rejects all reads between when cloning is done and the rejectReadsBeforeTimestamp
+ * - the recipient rejects only reads with atClusterTime <
+ *   rejectReadsBeforeTimestamp after rejectReadsBeforeTimestamp is reached.
+ * - if the migration aborts before the recipient sets a rejectReadsBeforeTimestamp, the recipient
+ *   keeps rejecting all reads until the state doc is marked as garbage collectable.
+ * - if the migration aborts after rejectReadsBeforeTimestamp is set, the recipient keeps rejecting
+ *   reads with atClusterTime < rejectReadsBeforeTimestamp until the state doc is garbage collected.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
@@ -97,10 +94,12 @@ function testRejectAllReadsAfterCloningDone(testCase, dbName, collName) {
 }
 
 /**
- * Tests that after the recipient has reached the returnAfterReachingTimestamp (blockTimestamp) and
- * after the migration commits, it only rejects reads with atClusterTime < blockTimestamp.
+ * Tests that after the recipient has reached the rejectReadsBeforeTimestamp and
+ * after the migration commits, it only rejects reads with atClusterTime <
+ * rejectReadsBeforeTimestamp.
  */
-function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, dbName, collName) {
+function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
+    testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -113,7 +112,7 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
     const recipientRst = tenantMigrationTest.getRecipientRst();
     const recipientPrimary = recipientRst.getPrimary();
 
-    // Select a read timestamp < blockTimestamp.
+    // Select a read timestamp < rejectReadsBeforeTimestamp.
     const preMigrationTimestamp = getLastOpTime(donorPrimary).ts;
 
     let waitForRejectReadsBeforeTsFp = configureFailPoint(
@@ -127,13 +126,14 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
-    // unspecified atClusterTime have read timestamp >= blockTimestamp.
+    // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
-    });
-    assert.lt(preMigrationTimestamp, donorDoc.blockTimestamp);
+    const recipientDoc =
+        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+            tenantId: tenantId
+        });
+    assert.lt(preMigrationTimestamp, recipientDoc.rejectReadsBeforeTimestamp);
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
     nodes.forEach(node => {
@@ -141,11 +141,12 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
         if (testCase.requiresReadTimestamp) {
             runCommand(
                 db, testCase.command(collName, preMigrationTimestamp), ErrorCodes.SnapshotTooOld);
-            runCommand(db, testCase.command(collName, donorDoc.blockTimestamp), null);
+            runCommand(
+                db, testCase.command(collName, recipientDoc.rejectReadsBeforeTimestamp), null);
         } else {
             // Untimestamped reads are not rejected after the recipient has applied data past the
-            // blockTimestamp. Snapshot reads with unspecified atClusterTime should have read
-            // timestamp >= blockTimestamp so are also not rejected.
+            // rejectReadsBeforeTimestamp. Snapshot reads with unspecified atClusterTime should have
+            // read timestamp >= rejectReadsBeforeTimestamp so are also not rejected.
             runCommand(db, testCase.command(collName), null);
         }
     });
@@ -158,11 +159,12 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
         if (testCase.requiresReadTimestamp) {
             runCommand(
                 db, testCase.command(collName, preMigrationTimestamp), ErrorCodes.SnapshotTooOld);
-            runCommand(db, testCase.command(collName, donorDoc.blockTimestamp), null);
+            runCommand(
+                db, testCase.command(collName, recipientDoc.rejectReadsBeforeTimestamp), null);
         } else {
             // Untimestamped reads are not rejected after the recipient has committed. Snapshot
-            // reads with unspecified atClusterTime should have read timestamp >= blockTimestamp so
-            // are also not rejected.
+            // reads with unspecified atClusterTime should have read timestamp >=
+            // rejectReadsBeforeTimestamp so are also not rejected.
             runCommand(db, testCase.command(collName), null);
         }
     });
@@ -171,11 +173,10 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp(testCase, db
 }
 
 /**
- * Tests that if the migration aborts before the recipient receives the returnAfterReachingTimestamp
- * (blockTimestamp), the recipient keeps rejecting all reads until the state doc is marked as
- * garbage collectable.
+ * Tests that if the migration aborts before the recipient sets the rejectReadsBeforeTimestamp, the
+ * recipient keeps rejecting all reads until the state doc is marked as garbage collectable.
  */
-function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingBlockTimestamp(
+function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingRejectReadsBeforeTimestamp(
     testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
@@ -224,11 +225,11 @@ function testDoNotRejectReadsAfterMigrationAbortedBeforeReachingBlockTimestamp(
 }
 
 /**
- * Tests if the migration aborts after returnAfterReachingTimestamp (blockTimestamp) is reached, the
- * recipient keeps rejecting reads with atClusterTime < returnAfterReachingTimestamp
- * (blockTimestamp) until the state doc is garbage collected.
+ * Tests if the migration aborts after rejectReadsBeforeTimestamp is set, the recipient keeps
+ * rejecting reads with atClusterTime < rejectReadsBeforeTimestamp until the state doc is garbage
+ * collected.
  */
-function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
+function testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBeforeTimestamp(
     testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationId = UUID();
@@ -255,7 +256,7 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
         assert.commandWorked(node.adminCommand(setParametersCmd));
     });
 
-    // Select a read timestamp < blockTimestamp.
+    // Select a read timestamp < rejectReadsBeforeTimestamp.
     const preMigrationTimestamp = getLastOpTime(donorPrimary).ts;
 
     // Force the donor to abort the migration right after the recipient responds to the second
@@ -268,12 +269,13 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that snapshot reads on secondaries with
-    // unspecified atClusterTime have read timestamp >= blockTimestamp.
+    // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
-    });
+    const recipientDoc =
+        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
+            tenantId: tenantId
+        });
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
     nodes.forEach(node => {
@@ -281,11 +283,12 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
         if (testCase.requiresReadTimestamp) {
             runCommand(
                 db, testCase.command(collName, preMigrationTimestamp), ErrorCodes.SnapshotTooOld);
-            runCommand(db, testCase.command(collName, donorDoc.blockTimestamp), null);
+            runCommand(
+                db, testCase.command(collName, recipientDoc.rejectReadsBeforeTimestamp), null);
         } else {
             // Untimestamped reads are not rejected after the recipient has applied data past the
-            // blockTimestamp. Snapshot reads with unspecified atClusterTime should have read
-            // timestamp >= blockTimestamp so are also not rejected.
+            // rejectReadsBeforeTimestamp. Snapshot reads with unspecified atClusterTime should have
+            // read timestamp >= rejectReadsBeforeTimestamp so are also not rejected.
             runCommand(db, testCase.command(collName), null);
         }
     });
@@ -297,7 +300,8 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp(
         const db = node.getDB(dbName);
         if (testCase.requiresReadTimestamp) {
             runCommand(db, testCase.command(collName, preMigrationTimestamp), null);
-            runCommand(db, testCase.command(collName, donorDoc.blockTimestamp), null);
+            runCommand(
+                db, testCase.command(collName, recipientDoc.rejectReadsBeforeTimestamp), null);
         } else {
             runCommand(db, testCase.command(collName), null);
         }
@@ -409,10 +413,11 @@ recipientRst.nodes.forEach(node => {
 
 const testFuncs = {
     afterCloningDone: testRejectAllReadsAfterCloningDone,
-    afterReachingBlockTs: testRejectOnlyReadsWithAtClusterTimeLessThanBlockTimestamp,
+    afterReachingBlockTs: testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp,
     abortBeforeReachingBlockTs:
-        testDoNotRejectReadsAfterMigrationAbortedBeforeReachingBlockTimestamp,
-    abortAfterReachingBlockTs: testDoNotRejectReadsAfterMigrationAbortedAfterReachingBlockTimestamp
+        testDoNotRejectReadsAfterMigrationAbortedBeforeReachingRejectReadsBeforeTimestamp,
+    abortAfterReachingBlockTs:
+        testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBeforeTimestamp
 };
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {

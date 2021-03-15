@@ -1,7 +1,6 @@
 /**
  * Tests that the recipient only rejects with writes between when cloning is done and when it
- * receives and reaches the returnAfterReachingTimestamp (blockTimestamp) since no read is allowed
- * in that time window.
+ * receives and reaches the rejectReadsBeforeTimestamp since no read is allowed in that time window.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
@@ -69,7 +68,7 @@ const kTenantId = "testTenantId";
     clonerDoneFp.off();
     waitForRejectReadsBeforeTsFp.wait();
 
-    // Write after the recipient applied data past the blockTimestamp.
+    // Write after the recipient applied data past the rejectReadsBeforeTimestamp.
     assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
 
     waitForRejectReadsBeforeTsFp.off();
@@ -118,8 +117,8 @@ const kTenantId = "testTenantId";
 })();
 
 (() => {
-    jsTest.log("Test writes after the migration aborted after the recipient applied data past" +
-               " the returnAfterReachingTimestamp");
+    jsTest.log("Test writes after the migration aborted after the recipient finished oplog" +
+               " application");
 
     const tenantId = kTenantId + "AbortAfterReturnAfterReachingTs";
     const ns = tenantId + "_testDb.testColl";
@@ -132,7 +131,7 @@ const kTenantId = "testTenantId";
     };
 
     // Force the donor to abort the migration right after the recipient responds to the second
-    // recipientSyncData (i.e. after it has reached the returnAfterReachingTimestamp).
+    // recipientSyncData.
     let abortFp =
         configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
     TenantMigrationTest.assertAborted(tenantMigrationTest.runMigration(

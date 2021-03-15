@@ -201,15 +201,9 @@ kMigrationFpNames.forEach(fpName => {
         expectedRunMigrationError: ErrorCodes.ConflictingOperationInProgress
     });
 
-    const sentBlockTimestampToRecipient =
-        (!fpName || fpName == "pauseTenantMigrationBeforeLeavingBlockingState" ||
-         fpName == "abortTenantMigrationBeforeLeavingBlockingState");
     testDroppingStateDocCollections(tenantMigrationTest, fpName, {
         dropDonorsCollection: true,
         dropRecipientsCollection: false,
-        // The retry causes the donor to restart the migration and send a different
-        // returnAfterReachingTimestamp/blockTimestamp to the recipient, which is illegal.
-        expectedAbortReason: sentBlockTimestampToRecipient ? ErrorCodes.IllegalOperation : null
     });
 
     const originalMigrationStartedOnRecipient =

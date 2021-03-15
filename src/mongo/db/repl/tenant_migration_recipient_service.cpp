@@ -54,6 +54,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_auth.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
@@ -419,6 +420,29 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilMigrationReachesConsi
     return _dataConsistentPromise.getFuture().get(opCtx);
 }
 
+Timestamp selectRejectReadsBeforeTimestamp(OperationContext* opCtx,
+                                           const Timestamp& returnAfterReachingTimestamp,
+                                           const OpTime& oplogApplierOpTime) {
+    // Don't allow reading before the opTime timestamp of the final write on the recipient
+    // associated with cloning the donor's data so the client can't see an inconsistent state. The
+    // oplog applier timestamp may be null if no oplog entries were copied, but data may still have
+    // been cloned, so use the last applied opTime in that case.
+    //
+    // Note the cloning writes happen on a separate thread, but the last applied opTime in the
+    // replication coordinator is guaranteed to be inclusive of those writes because this function
+    // is called after waiting for the _dataConsistentPromise to resolve, which happens after the
+    // last write for cloning completes (and all of its WUOW onCommit() handlers).
+    auto finalRecipientWriteTimestamp = oplogApplierOpTime.getTimestamp().isNull()
+        ? ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime().getTimestamp()
+        : oplogApplierOpTime.getTimestamp();
+
+    // Also don't allow reading before the returnAfterReachingTimestamp (aka the blockTimestamp) to
+    // prevent readers from possibly seeing data in a point in time snapshot on the recipient that
+    // would not have been seen at the same point in time on the donor if the donor's cluster time
+    // is ahead of the recipient's.
+    return std::max(finalRecipientWriteTimestamp, returnAfterReachingTimestamp);
+}
+
 OpTime
 TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterReachingTimestamp(
     OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp) {
@@ -426,18 +450,6 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
     // started. Additionally, we must have finished processing the recipientSyncData command that
     // waits on _dataConsistentPromise.
     _dataConsistentPromise.getFuture().get(opCtx);
-
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_stateDoc.getRejectReadsBeforeTimestamp()) {
-            uassert(
-                ErrorCodes::IllegalOperation,
-                str::stream() << "Received a conflicting returnAfterReachingTimestamp, received: "
-                              << returnAfterReachingTimestamp.toBSON() << " expected: "
-                              << _stateDoc.getRejectReadsBeforeTimestamp()->toBSON(),
-                returnAfterReachingTimestamp == *_stateDoc.getRejectReadsBeforeTimestamp());
-        }
-    }
 
     auto getWaitOpTimeFuture = [&]() {
         stdx::unique_lock lk(_mutex);
@@ -487,6 +499,7 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
     }
 
     uassertStatusOK(status);
+    auto& donorRecipientOpTimePair = swDonorRecipientOpTimePair.getValue();
 
     // Make sure that the recipient logical clock has advanced to at least the donor timestamp
     // before returning success for recipientSyncData.
@@ -495,7 +508,8 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
 
     {
         stdx::lock_guard lk(_mutex);
-        _stateDoc.setRejectReadsBeforeTimestamp(returnAfterReachingTimestamp);
+        _stateDoc.setRejectReadsBeforeTimestamp(selectRejectReadsBeforeTimestamp(
+            opCtx, returnAfterReachingTimestamp, donorRecipientOpTimePair.recipientOpTime));
     }
     _stopOrHangOnFailPoint(&fpBeforePersistingRejectReadsBeforeTimestamp, opCtx);
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx, _stateDoc));
@@ -509,7 +523,7 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
 
     _stopOrHangOnFailPoint(&fpAfterWaitForRejectReadsBeforeTimestamp, opCtx);
 
-    return swDonorRecipientOpTimePair.getValue().donorOpTime;
+    return donorRecipientOpTimePair.donorOpTime;
 }
 
 std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_connectAndAuth(

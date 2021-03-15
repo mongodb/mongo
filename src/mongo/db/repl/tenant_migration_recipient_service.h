@@ -161,9 +161,6 @@ public:
          * document and waits for the write to be replicated to every node (i.e. wait for
          * 'rejectReadsBeforeTimestamp' to be set on the TenantMigrationRecipientAccessBlocker of
          * every node) to guarantee that no reads will be incorrectly accepted.
-         *
-         * Throws IllegalOperation if the state document already has 'rejectReadsBeforeTimestamp'
-         * that is not equal to 'returnAfterReachingTimestamp', and on other error.
          */
         OpTime waitUntilMigrationReachesReturnAfterReachingTimestamp(
             OperationContext* opCtx, const Timestamp& returnAfterReachingTimestamp);
