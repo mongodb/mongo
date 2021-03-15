@@ -593,9 +593,9 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
         } else if (entry.getStatementId() && !SessionUpdateTracker::isTransactionEntry(entry)) {
             // If it has a statement id but isn't a transaction, it's a retryable write.
-            const auto& sessionId = *entry.getSessionId();
-            const auto& txnNumber = *entry.getTxnNumber();
-            const auto& stmtId = *entry.getStatementId();
+            auto sessionId = *entry.getSessionId();
+            auto txnNumber = *entry.getTxnNumber();
+            auto stmtId = *entry.getStatementId();
             if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
                 // TODO(SERVER-53510): handle pre and post image no-ops
                 LOGV2_DEBUG(5350903,
