@@ -1,4 +1,10 @@
-// Test timeseries-related server parameter settings on server startup
+/*
+ * Tests time-series server parameter settings on server startup.
+
+ * @tags: [
+ *   requires_replication
+ * ]
+ */
 
 (function() {
 'use strict';
