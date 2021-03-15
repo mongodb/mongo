@@ -15,13 +15,6 @@ load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load("jstests/sharding/libs/resharding_test_util.js");
 
-// TODO SERVER-54474: Remove these skips. They're only purpose is to allow for a shutdown without
-// hanging the shell while running consistency checks on donors in the resharding critical section.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-TestData.skipCheckingIndexesConsistentAcrossCluster = true;
-TestData.skipCheckOrphans = true;
-TestData.skipCheckDBHashes = true;
-
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2});
 reshardingTest.setup();
 
@@ -66,15 +59,10 @@ reshardingTest.withReshardingInBackground(
         ]));
     },
     {
-        // TODO SERVER-54474: Remove the interrupting logic/error code and instead expect the
-        // commented out value.
-        //
-        // expectedErrorCode: 5356800,
-        expectedErrorCode: ErrorCodes.Interrupted,
+        expectedErrorCode: 5356800,
         postAbortDecisionPersistedFn: () => {
             ReshardingTestUtil.assertRecipientAbortsLocally(
                 recipient1Conn, recipient1Conn.shardName, "reshardingDb.coll", 5356800);
-            reshardingTest.interruptReshardingThread();
         }
     });
 

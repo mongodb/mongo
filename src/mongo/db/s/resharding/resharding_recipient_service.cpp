@@ -265,19 +265,25 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             return _updateCoordinator(opCtx.get(), executor);
         })
         .onError([this, executor](Status status) {
+            Status error = status;
+            {
+                stdx::lock_guard<Latch> lk(_mutex);
+                if (_abortStatus)
+                    error = *_abortStatus;
+            }
+
             LOGV2(4956500,
                   "Resharding operation recipient state machine failed",
                   "namespace"_attr = _metadata.getSourceNss(),
                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),
-                  "error"_attr = status);
+                  "error"_attr = error);
 
-            _transitionToError(status);
+            _transitionToError(error);
             auto opCtx = cc().makeOperationContext();
             return _updateCoordinator(opCtx.get(), executor)
                 .then([this] {
                     // TODO SERVER-52838: Ensure all local collections that may have been created
-                    // for
-                    // resharding are removed, with the exception of the
+                    // for resharding are removed, with the exception of the
                     // ReshardingRecipientDocument, before transitioning to kDone.
                     _transitionState(RecipientStateEnum::kDone);
                 })
@@ -285,7 +291,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                     auto opCtx = cc().makeOperationContext();
                     return _updateCoordinator(opCtx.get(), executor);
                 })
-                .then([this, status] { return status; });
+                .then([this, error] { return error; });
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             {
@@ -330,6 +336,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lk(_mutex);
+    _abortStatus.emplace(status);
     _onAbortOrStepdown(lk, status);
 
     if (!_completionPromise.getFuture().isReady()) {
@@ -354,12 +361,14 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     if (reshardingFields.getAbortReason()) {
         auto status = getStatusFromAbortReason(reshardingFields);
         invariant(!status.isOK());
+        _abortStatus.emplace(status);
 
         if (_abortSource) {
             _abortSource->cancel();
         }
 
         _onAbortOrStepdown(lk, status);
+        _critSec.reset();
         return;
     }
 

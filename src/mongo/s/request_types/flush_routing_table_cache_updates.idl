@@ -36,7 +36,9 @@ imports:
 
 commands:
     _flushRoutingTableCacheUpdates:
-        description: "An internal command to wait for the last routing table cache refresh for a particular namespace to be persisted to disk"
+        description: >-
+            An internal command to wait for the last routing table cache refresh for a
+            particular namespace to be persisted to disk.
         command_name: _flushRoutingTableCacheUpdates
         strict: true
         namespace: type
@@ -45,10 +47,13 @@ commands:
         fields:
             syncFromConfig:
                 type: bool
-                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
+                description: >-
+                    If true, forces a refresh of the cache entry from the config server
+                    before waiting for updates to be persist.
                 default: true
     _flushRoutingTableCacheUpdatesWithWriteConcern:
-        description: "The same behavior as _flushRoutingTableCacheUpdates but accepts writeConcern." 
+        description: >-
+            The same behavior as _flushRoutingTableCacheUpdates but accepts writeConcern.
         command_name: _flushRoutingTableCacheUpdatesWithWriteConcern
         strict: true
         namespace: type
@@ -57,5 +62,7 @@ commands:
         fields:
             syncFromConfig:
                 type: bool
-                description: "If true, forces a refresh of the cache entry from the config server before waiting for updates to be persist"
+                description: >-
+                    If true, forces a refresh of the cache entry from the config server
+                    before waiting for updates to be persist.
                 default: true

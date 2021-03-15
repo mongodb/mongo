@@ -26,7 +26,7 @@
 # it in the license file.
 #
 
-# _shardsvrFinishReshardCollection IDL File
+# _flushReshardingStateChange IDL File
 
 global:
     cpp_namespace: "mongo"
@@ -35,9 +35,9 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 commands:
-    _shardsvrFinishReshardCollection:
-        description: "An internal command to flush the final resharding state to shards while the critical section is active."
-        command_name: _shardsvrFinishReshardCollection
+    _flushReshardingStateChange:
+        description: "An internal command to flush resharding state changes to shards."
+        command_name: _flushReshardingStateChange
         strict: true
         namespace: type
         api_version: ""

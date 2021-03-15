@@ -5,11 +5,7 @@
  * @tags: [
  *   requires_fcv_49,
  *   uses_atclustertime,
- *   __TEMPORARILY_DISABLED__
  * ]
- *
- * TODO SERVER-54474: Re-enable this test once donors engaged in the critical section are able to
- * abort resharding locally after the coordinator transitions to an error state.
  */
 (function() {
 "use strict";

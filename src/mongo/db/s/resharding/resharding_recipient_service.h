@@ -224,11 +224,14 @@ private:
     std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
     std::vector<ExecutorFuture<void>> _oplogFetcherFutures;
 
-    // Protects the promises below
+    // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("RecipientStateMachine::_mutex");
 
     // Canceled when there is an unrecoverable error or stepdown.
     boost::optional<CancellationSource> _abortSource;
+
+    // Contains the status with which the operation was aborted.
+    boost::optional<Status> _abortStatus;
 
     boost::optional<ReshardingCriticalSection> _critSec;
 

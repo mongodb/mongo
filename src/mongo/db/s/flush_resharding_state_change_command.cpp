@@ -48,7 +48,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/finish_reshard_collection_gen.h"
+#include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 
 namespace mongo {
 namespace {
@@ -61,43 +61,57 @@ void refreshShardVersion(OperationContext* opCtx, const NamespaceString& nss) {
     if (nss.isNamespaceAlwaysUnsharded())
         return;
 
-    auto inRecoverOrRefresh = [&] {
-        Lock::DBLock dbLock{opCtx, nss.db(), MODE_IS};
-        Lock::CollectionLock collLock{opCtx, nss, MODE_IS};
+    {
+        boost::optional<Lock::DBLock> dbLock;
+        dbLock.emplace(opCtx, nss.db(), MODE_IS);
+
+        boost::optional<Lock::CollectionLock> collLock;
+        collLock.emplace(opCtx, nss, MODE_IS);
 
         const auto csr = CollectionShardingRuntime::get(opCtx, nss);
-
         auto critSec =
             csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
 
-        invariant(critSec);
+        if (critSec) {
+            auto inRecoverOrRefresh = [&] {
+                invariant(critSec);
 
-        boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-            CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
+                boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+                    CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        auto metadata = csr->getCurrentMetadataIfKnown();
+                auto metadata = csr->getCurrentMetadataIfKnown();
 
-        csrLock.reset();
-        csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
+                csrLock.reset();
+                csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
 
-        // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-        bool runRecover = metadata ? false : true;
-        csr->setShardVersionRecoverRefreshFuture(
-            recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover), *csrLock);
-        return csr->getShardVersionRecoverRefreshFuture(opCtx);
-    }();
+                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+                bool runRecover = metadata ? false : true;
+                csr->setShardVersionRecoverRefreshFuture(
+                    recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover),
+                    *csrLock);
+                return csr->getShardVersionRecoverRefreshFuture(opCtx);
+            }();
 
-    inRecoverOrRefresh->get(opCtx);
+            collLock.reset();
+            dbLock.reset();
+
+            inRecoverOrRefresh->get(opCtx);
+        } else {
+            collLock.reset();
+            dbLock.reset();
+
+            onShardVersionMismatch(opCtx, nss, boost::none);
+        }
+    }
 }
 
-class ShardsvrFinishReshardCollectionChangeCmd final
-    : public TypedCommand<ShardsvrFinishReshardCollectionChangeCmd> {
+class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
-    using Request = _shardsvrFinishReshardCollection;
+    using Request = _flushReshardingStateChange;
 
     std::string help() const override {
-        return "Internal command used by the resharding coordinator to flush the final state "
-               "change to the participant shards while the critical section is active.";
+        return "Internal command used by the resharding coordinator to flush state changes to the "
+               "participant shards while the critical section is active.";
     }
 
     bool adminOnly() const override {
@@ -133,11 +147,11 @@ public:
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't issue _shardsvrFinishReshardCollection from 'eval'",
+                    "Can't issue _flushReshardingStateChange from 'eval'",
                     !opCtx->getClient()->isInDirectClient());
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Can't call _shardsvrFinishReshardCollection if in read-only mode",
+                    "Can't call _flushReshardingStateChange if in read-only mode",
                     !storageGlobalParams.readOnly);
 
             refreshShardVersion(opCtx, ns());
@@ -147,7 +161,7 @@ public:
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
     };
-} _shardsvrFinishReshardCollection;
+} _flushReshardingStateChange;
 
 }  // namespace
 }  // namespace mongo
