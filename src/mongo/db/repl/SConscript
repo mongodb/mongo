@@ -1014,6 +1014,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/progress_meter',
+        'oplog',
         'repl_server_parameters',
     ]
 )

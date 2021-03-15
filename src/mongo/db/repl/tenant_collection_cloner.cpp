@@ -42,6 +42,7 @@
 #include "mongo/db/repl/database_cloner_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -513,6 +514,11 @@ void TenantCollectionCloner::insertDocumentsCallback(
         wcb.setOrdered(true);
         return wcb;
     }());
+
+    // Set the recipient info on the opCtx to skip checking user permissions in
+    // 'write_ops_exec::performInserts()'.
+    tenantMigrationRecipientInfo(cbd.opCtx) =
+        boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
 
     // write_ops_exec::PerformInserts() will handle limiting the batch size
     // that gets inserted in a single WUOW.
