@@ -11,6 +11,8 @@ load("jstests/core/timeseries/libs/timeseries.js");
  *   requires_fcv_49,
  * ]
  */
+// TODO (SERVER-55192): Re-enable test;
+const disabled = true;
 var $config = (function() {
     var data = {prefix: "create_timeseries_collection", supportsTimeseriesCollections: false};
 
@@ -31,7 +33,7 @@ var $config = (function() {
         }
 
         function create(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
+            if (disabled || !this.supportsTimeseriesCollections) {
                 return;
             }
 
@@ -43,7 +45,7 @@ var $config = (function() {
         }
 
         function insert(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
+            if (disabled || !this.supportsTimeseriesCollections) {
                 return;
             }
 
@@ -58,7 +60,7 @@ var $config = (function() {
         }
 
         function drop(db, collName) {
-            if (!this.supportsTimeseriesCollections) {
+            if (disabled || !this.supportsTimeseriesCollections) {
                 return;
             }
 
