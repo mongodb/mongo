@@ -60,6 +60,13 @@ TEST_F(WindowFunctionStdDevTest, EmptyWindow) {
     ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});
 }
 
+TEST_F(WindowFunctionStdDevTest, SingletonWindow) {
+    pop.add(Value{1});
+    ASSERT_VALUE_EQ(pop.getValue(), Value{0});
+    samp.add(Value{1});
+    ASSERT_VALUE_EQ(samp.getValue(), Value{BSONNULL});
+}
+
 TEST_F(WindowFunctionStdDevTest, ReturnsDouble) {
     pop.add(Value{1});
     pop.add(Value{2});
@@ -194,6 +201,48 @@ TEST_F(WindowFunctionStdDevTest, LargeNumberStability) {
         double calculatedStdDev = pop.getValue().getDouble();
         double relativeError = (calculatedStdDev - trueStdDev) / trueStdDev;
         ASSERT_LTE(relativeError, 1e-15);
+    }
+}
+
+TEST_F(WindowFunctionStdDevTest, HandlesUnderflow) {
+    double nan = std::numeric_limits<double>::quiet_NaN();
+    const int collLength = 10000;
+    const int windowSize = 100;
+    PseudoRandom prng(0);
+    std::vector<double> vec(collLength);
+    for (int j = 0; j < collLength; j++) {
+        vec[j] = prng.nextCanonicalDouble() - 0.5;
+    }
+    for (int i = 0; i < collLength / windowSize; i++) {
+        // Fill up the window. Remove all but one element. The population std dev should now equal
+        // exactly 0 since there is only one element, but due to floating point error, the _m2
+        // quantity might be a small negative value. Taking the sqrt of this in the std dev formula
+        // would then return NaN.
+        for (int j = 0; j < windowSize; j++)
+            pop.add(Value{vec[i * windowSize + j]});
+        for (int k = 0; k < windowSize - 1; k++)
+            pop.remove(Value{vec[i * windowSize + k]});
+        // NaN and -NaN are treated as equal when wrapped in a Value.
+        ASSERT_VALUE_NE(pop.getValue(), Value{nan});
+        ASSERT_VALUE_EQ(pop.getValue(), Value{0});
+        // Empty the window.
+        pop.remove(Value{vec[i * windowSize + (windowSize - 1)]});
+        ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});
+    }
+}
+
+TEST_F(WindowFunctionStdDevTest, ConstantInput) {
+    const int collLength = 1000;
+    const int windowSize = 100;
+    PseudoRandom prng(0);
+    const double constant = prng.nextCanonicalDouble() - 0.5;
+    for (int i = 0; i < windowSize; i++) {
+        pop.add(Value{constant});
+    }
+    for (int i = windowSize; i < collLength; i++) {
+        pop.add(Value{constant});
+        pop.remove(Value{constant});
+        ASSERT_VALUE_EQ(pop.getValue(), Value{0});
     }
 }
 

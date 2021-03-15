@@ -62,7 +62,7 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
         const double val = input.getDouble();
 
         // This is an implementation of the following algorithm:
-        // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
+        // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
         _count += 1;
         const double delta = val - _mean;
         if (delta != 0.0) {
