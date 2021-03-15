@@ -319,7 +319,6 @@ variables:
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-suse12-s390x
-  - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
@@ -351,7 +350,6 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
   - enterprise-amazon2-arm64
-  - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
   - enterprise-windows
   - enterprise-windows-suggested
@@ -389,9 +387,7 @@ variables:
   - enterprise-suse12-s390x
   - suse15
   - enterprise-suse15-64
-  - ubuntu1604
   - ubuntu1804-debug-suggested
-  - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu-dynamic-1804-clang-tidy-required
   - ubuntu1804
@@ -8857,64 +8853,6 @@ buildvariants:
   tasks:
   - name: tla_plus
 
-- name: ubuntu1604
-  display_name: Ubuntu 16.04
-  run_on:
-  - ubuntu1604-test
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: x86_64-ubuntu1604
-    lang_environment: LANG=C
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
-    multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: ubuntu1604
-    repo_edition: org
-    scons_cache_scope: shared
-    large_distro_name: ubuntu1604-build
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - ubuntu1604-build
-  - name: .aggfuzzer .common
-  - name: aggregation
-  - name: .auth !.audit !.multiversion
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .misc_js
-  - name: .concurrency .common
-  - name: concurrency_replication_causal_consistency_gen
-  - name: disk_wiredtiger
-  - name: free_monitoring
-  - name: .jepsen
-    distros:
-    - ubuntu1604-build
-  - name: .jscore .common
-  - name: .jstestfuzz .common
-  - name: libunwind_tests
-  - name: .logical_session_cache .one_sec
-  - name: multiversion_gen
-  - name: .powercycle
-    distros:
-    - ubuntu1604-powercycle
-  - name: replica_sets
-  - name: watchdog_wiredtiger
-  - name: .replica_sets .common
-  - name: .sharding .common !.op_query !.csrs
-  - name: .sharding .txns
-  - name: .stitch
-  - name: .ssl
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
-  - name: .publish
-    distros:
-    - ubuntu1604-small
-
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
   modules:
@@ -10177,10 +10115,10 @@ buildvariants:
   tasks:
   - name: embedded_sdk_build_and_test
 
-- name: embedded-sdk-ubuntu-1604-x86_64
-  display_name: "Embedded SDK - Ubuntu 16.04 x86_64"
+- name: embedded-sdk-ubuntu-1804-x86_64
+  display_name: "Embedded SDK - Ubuntu 18.04 x86_64"
   run_on:
-  - ubuntu1604-build
+  - ubuntu1804-build
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     # We need --allocator=system here to work around SERVER-27675
@@ -11217,26 +11155,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
 
-- name: ubuntu1604-container
-  display_name: "Ubuntu 16.04 Container"
-  run_on:
-  - ubuntu1604-container-server
-  expansions:
-    resmoke_jobs_factor: 1
-    disable_shared_scons_cache: true
-    compile_flags: MONGO_DISTMOD=ubuntu1604 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    tooltags: ""
-    build_mongoreplay: true
-    test_flags: >-
-      --excludeWithAnyTags=requires_os_access
-  tasks:
-  - name: compile_and_archive_dist_test_then_package_TG
-    distros:
-    - ubuntu1604-build
-  - name: jsCore
-  - name: sharding_gen
-  - name: replica_sets
-
 - name: rhel70
   display_name: RHEL 7.0
   run_on:
@@ -11610,56 +11528,6 @@ buildvariants:
 ###########################################
 #          Ubuntu buildvariants           #
 ###########################################
-
-- name: enterprise-ubuntu1604-64
-  display_name: Enterprise Ubuntu 16.04
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1604-test
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    lang_environment: LANG=C
-    push_arch: x86_64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
-    multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: ubuntu1604
-    repo_edition: enterprise
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_test_and_package_serial_TG
-    distros:
-    - ubuntu1604-build
-  - name: .aggfuzzer .common
-  - name: audit
-  - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jepsen
-    distros:
-    - ubuntu1604-build
-  - name: .jscore .common !.compat !.decimal !.sharding
-  - name: .jstestfuzz .common
-  - name: .logical_session_cache .one_sec
-  - name: replica_sets_auth_gen
-  - name: replica_sets_jscore_passthrough
-  - name: sasl
-  - name: sharding_auth_gen
-  - name: snmp
-  - name: .stitch
-  - name: .watchdog
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
-  - name: .publish
-    distros:
-    - ubuntu1604-small
 
 - name: enterprise-ubuntu-dynamic-1804-clang-tidy-required
   display_name: "! Enterprise Clang Tidy"
@@ -12710,17 +12578,17 @@ buildvariants:
     - name: compile_test_and_package_serial_TG
     - name: jsCore
 
-- name: enterprise-ubuntu-no-latch-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
+- name: enterprise-ubuntu-unoptimized-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (without Diagnostic Latches)"
   batchtime: 1440 # 1 day
   modules:
   - enterprise
   expansions:
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-diagnostic-latches=off
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
@@ -12734,27 +12602,26 @@ buildvariants:
     distros:
     - ubuntu1804-build
 
-- name: enterprise-ubuntu-fixed-service-executor-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with FixedServiceExecutor)"
+- name: enterprise-ubuntu-fixed-service-executor-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with FixedServiceExecutor)"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
       --mongodSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
-    large_distro_name: ubuntu1604-build
-
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -12767,27 +12634,27 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sdam-replica-set-monitor-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with SdamReplicaSetMonitor)"
+- name: enterprise-ubuntu-sdam-replica-set-monitor-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with SdamReplicaSetMonitor)"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
       --excludeWithAnyTags=requires_streamable_rsm
-    large_distro_name: ubuntu1604-build
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -12798,25 +12665,25 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-task-executor-pool-size-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with {taskExecutorPoolSize: 4})"
+- name: enterprise-ubuntu-task-executor-pool-size-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with {taskExecutorPoolSize: 4})"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: |- # Set the taskExecutorPoolSize for all tests
         --mongosSetParameters="taskExecutorPoolSize: 4"
-    large_distro_name: ubuntu1604-build
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -12827,26 +12694,26 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
+- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchPrimary-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
         --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1604-build
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -12857,26 +12724,26 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
+- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-matchBusiest-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
         --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1604-build
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
@@ -12887,26 +12754,26 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
+- name: enterprise-ubuntu-sharding-task-executor-pool-rsm-disabled-1804-64-bit
+  display_name: "~ Enterprise Ubuntu 18.04 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
   batchtime: 1440 # 1 day
   run_on:
-    - ubuntu1604-test
+    - ubuntu1804-test
   modules:
   - enterprise
   expansions:
     scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
+    compile_flags: MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     test_flags: >-
         --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
         --excludeWithAnyTags=sets_replica_set_matching_strategy
-    large_distro_name: ubuntu1604-build
+    large_distro_name: ubuntu1804-build
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - ubuntu1604-build
+    - ubuntu1804-build
   - name: .aggregation !.no_async
   - name: .sharding .auth
   - name: .sharding .causally_consistent !.wo_snapshot
