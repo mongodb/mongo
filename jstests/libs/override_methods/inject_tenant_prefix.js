@@ -475,30 +475,41 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
         }
 
         if (migrationCommittedErr || migrationAbortedErr) {
-            // Update the command for reroute/retry.
-            modifyCmdObjForRetry(cmdObjWithTenantId, resObj, true);
-            // It is safe to reformat this resObj since it will not be returned to the caller of
-            // runCommand.
-            reformatResObjForLogging(resObj);
+            // If the command was inside a transaction, skip modifying any objects or fields, since
+            // we will retry the entire transaction outside of this file.
+            if (!TransactionsUtil.isTransientTransactionError(resObj)) {
+                // Update the command for reroute/retry.
+                modifyCmdObjForRetry(cmdObjWithTenantId, resObj, true);
 
-            // Build a new indexMap where the keys are the index that each write that needs to be
-            // retried will have in the next attempt's cmdObj.
-            indexMap = resetIndices(indexMap);
+                // It is safe to reformat this resObj since it will not be returned to the caller of
+                // runCommand.
+                reformatResObjForLogging(resObj);
+
+                // Build a new indexMap where the keys are the index that each write that needs to
+                // be retried will have in the next attempt's cmdObj.
+                indexMap = resetIndices(indexMap);
+            }
 
             if (migrationCommittedErr) {
+                jsTestLog(`Got TenantMigrationCommitted for command against database ${
+                    dbNameWithTenantId} after trying ${numAttempts} times: ${tojson(resObj)}`);
                 // Store the connection to the recipient so the next commands can be rerouted.
                 this.migrationStateDoc = this.getTenantMigrationStateDoc();
                 this.reroutingMongo =
                     connect(this.migrationStateDoc.recipientConnectionString).getMongo();
-
-                jsTest.log(`Got TenantMigrationCommitted for command against database ` +
-                           `"${dbNameWithTenantId}" after trying ${numAttempts} times, rerouting ` +
-                           `the command: ${tojson(resObj)}`);
             } else if (migrationAbortedErr) {
-                jsTest.log(
-                    `Got TenantMigrationAborted for command against database ` +
-                    `"${dbNameWithTenantId}" after trying ${numAttempts} times, retrying the ` +
-                    `command: ${tojson(resObj)}`);
+                jsTestLog(`Got TenantMigrationAborted for command against database ${
+                    dbNameWithTenantId} after trying ${numAttempts} times: ${tojson(resObj)}`);
+            }
+
+            // If the result has a TransientTransactionError label, the entire transaction must be
+            // retried. Return immediately to let the retry be handled by
+            // 'network_error_and_txn_override.js'.
+            if (TransactionsUtil.isTransientTransactionError(resObj)) {
+                jsTestLog(`Got error for transaction against database ` +
+                          `${dbNameWithTenantId} with TransientTransactionError, retrying ` +
+                          `transaction against recipient: ${tojson(resObj)}`);
+                return resObj;
             }
         } else {
             // Modify the resObj before returning the result.
