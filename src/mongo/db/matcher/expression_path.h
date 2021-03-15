@@ -51,8 +51,6 @@ public:
         : MatchExpression(matchType, std::move(annotation)),
           _elementPath(path, leafArrBehavior, nonLeafArrayBehavior) {}
 
-    virtual ~PathMatchExpression() {}
-
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
         MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
         while (cursor->more()) {

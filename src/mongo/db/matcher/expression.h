@@ -328,7 +328,7 @@ public:
      * Do not use to traverse the MatchExpression tree. Use numChildren() and getChild(), which
      * provide access to all nodes.
      */
-    virtual boost::optional<std::vector<MatchExpression*>&> getChildVector() = 0;
+    virtual std::vector<std::unique_ptr<MatchExpression>>* getChildVector() = 0;
 
     /**
      * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).

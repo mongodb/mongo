@@ -28,9 +28,9 @@
  */
 
 #include "mongo/db/matcher/expression_array.h"
-
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo {
 
@@ -67,8 +67,9 @@ bool ArrayMatchingMatchExpression::equivalent(const MatchExpression* other) cons
 // -------
 
 ElemMatchObjectMatchExpression::ElemMatchObjectMatchExpression(
-    StringData path, MatchExpression* sub, clonable_ptr<ErrorAnnotation> annotation)
-    : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)), _sub(sub) {}
+    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_OBJECT, path, std::move(annotation)),
+      _sub(std::move(sub)) {}
 
 bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
                                                   MatchDetails* details) const {
@@ -118,24 +119,16 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchObjectMatchExpression::getOpti
 // -------
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
-    StringData path, MatchExpression* sub, clonable_ptr<ErrorAnnotation> annotation)
-    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {
-    add(sub);
-}
+    StringData path, std::unique_ptr<MatchExpression> sub, clonable_ptr<ErrorAnnotation> annotation)
+    : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)),
+      _subs(makeVector(std::move(sub))) {}
 
 ElemMatchValueMatchExpression::ElemMatchValueMatchExpression(
     StringData path, clonable_ptr<ErrorAnnotation> annotation)
     : ArrayMatchingMatchExpression(ELEM_MATCH_VALUE, path, std::move(annotation)) {}
 
-ElemMatchValueMatchExpression::~ElemMatchValueMatchExpression() {
-    for (unsigned i = 0; i < _subs.size(); i++)
-        delete _subs[i];
-    _subs.clear();
-}
-
-void ElemMatchValueMatchExpression::add(MatchExpression* sub) {
-    verify(sub);
-    _subs.push_back(sub);
+void ElemMatchValueMatchExpression::add(std::unique_ptr<MatchExpression> sub) {
+    _subs.push_back(std::move(sub));
 }
 
 bool ElemMatchValueMatchExpression::matchesArray(const BSONObj& anArray,
@@ -191,11 +184,8 @@ MatchExpression::ExpressionOptimizerFunc ElemMatchValueMatchExpression::getOptim
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& subs = static_cast<ElemMatchValueMatchExpression&>(*expression)._subs;
 
-        for (MatchExpression*& subExpression : subs) {
-            auto optimizedSubExpression =
-                MatchExpression::optimize(std::unique_ptr<MatchExpression>(subExpression));
-            subExpression = optimizedSubExpression.release();
-        }
+        for (auto& subExpression : subs)
+            subExpression = MatchExpression::optimize(std::move(subExpression));
 
         return expression;
     };

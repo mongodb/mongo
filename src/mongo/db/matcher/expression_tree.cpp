@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <iterator>
+
 #include "mongo/db/matcher/expression_tree.h"
 
 #include "mongo/bson/bsonmisc.h"
@@ -37,19 +40,6 @@
 #include "mongo/db/matcher/expression_text_base.h"
 
 namespace mongo {
-
-ListOfMatchExpression::~ListOfMatchExpression() {
-    for (unsigned i = 0; i < _expressions.size(); i++) {
-        delete _expressions[i];
-    }
-    _expressions.clear();
-}
-
-void ListOfMatchExpression::add(MatchExpression* e) {
-    verify(e);
-    _expressions.push_back(e);
-}
-
 
 void ListOfMatchExpression::_debugList(StringBuilder& debug, int indentationLevel) const {
     for (unsigned i = 0; i < _expressions.size(); i++)
@@ -69,37 +59,28 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
         auto& children = static_cast<ListOfMatchExpression&>(*expression)._expressions;
 
         // Recursively apply optimizations to child expressions.
-        for (auto& childExpression : children) {
-            // Since 'childExpression' is a reference to a member of the ListOfMatchExpression's
-            // child array, this assignment replaces the original child with the optimized child.
-            // We must set this child's entry in '_expressions' to null after assigning ownership to
-            // 'childExpressionPtr'. Otherwise, if the call to optimize() throws we will attempt to
-            // free twice.
-            std::unique_ptr<MatchExpression> childExpressionPtr(childExpression);
-            childExpression = nullptr;
-
-            auto optimizedExpression = MatchExpression::optimize(std::move(childExpressionPtr));
-            childExpression = optimizedExpression.release();
-        }
+        for (auto& childExpression : children)
+            childExpression = MatchExpression::optimize(std::move(childExpression));
 
         // Associativity of AND and OR: an AND absorbs the children of any ANDs among its children
         // (and likewise for any OR with OR children).
         MatchType matchType = expression->matchType();
         if (matchType == AND || matchType == OR) {
-            std::vector<MatchExpression*> absorbedExpressions;
-            for (MatchExpression*& childExpression : children) {
+            auto absorbedExpressions = std::vector<std::unique_ptr<MatchExpression>>{};
+            for (auto& childExpression : children) {
                 if (childExpression->matchType() == matchType) {
                     // Move this child out of the children array.
-                    std::unique_ptr<ListOfMatchExpression> childExpressionPtr(
-                        static_cast<ListOfMatchExpression*>(childExpression));
+                    auto childExpressionPtr = std::move(childExpression);
                     childExpression = nullptr;  // Null out this child's entry in _expressions, so
                                                 // that it will be deleted by the erase call below.
 
                     // Move all of the grandchildren from the child expression to
                     // absorbedExpressions.
-                    auto& grandChildren = childExpressionPtr->_expressions;
-                    absorbedExpressions.insert(
-                        absorbedExpressions.end(), grandChildren.begin(), grandChildren.end());
+                    auto& grandChildren =
+                        static_cast<ListOfMatchExpression&>(*childExpressionPtr)._expressions;
+                    std::move(grandChildren.begin(),
+                              grandChildren.end(),
+                              std::back_inserter(absorbedExpressions));
                     grandChildren.clear();
 
                     // Note that 'childExpressionPtr' will now be destroyed.
@@ -111,19 +92,18 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             children.erase(std::remove(children.begin(), children.end(), nullptr), children.end());
 
             // Append the absorbed children to the end of the array.
-            children.insert(children.end(), absorbedExpressions.begin(), absorbedExpressions.end());
+            std::move(absorbedExpressions.begin(),
+                      absorbedExpressions.end(),
+                      std::back_inserter(children));
         }
 
         // Remove all children of AND that are $alwaysTrue and all children of OR that are
         // $alwaysFalse.
         if (matchType == AND || matchType == OR) {
-            for (MatchExpression*& childExpression : children) {
+            for (auto& childExpression : children)
                 if ((childExpression->isTriviallyTrue() && matchType == MatchExpression::AND) ||
-                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::OR)) {
-                    std::unique_ptr<MatchExpression> childPtr(childExpression);
+                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::OR))
                     childExpression = nullptr;
-                }
-            }
 
             // We replaced each destroyed child expression with nullptr. Now we remove those
             // nullptrs from the vector.
@@ -144,12 +124,13 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             if ((matchType == AND || matchType == OR || matchType == INTERNAL_SCHEMA_XOR)) {
                 // Simplify AND/OR/XOR with exactly one operand to an expression consisting of just
                 // that operand.
-                MatchExpression* simplifiedExpression = children.front();
+                auto simplifiedExpression = std::move(children.front());
                 children.clear();
-                return std::unique_ptr<MatchExpression>(simplifiedExpression);
+                return simplifiedExpression;
             } else if (matchType == NOR) {
                 // Simplify NOR of exactly one operand to NOT of that operand.
-                auto simplifiedExpression = std::make_unique<NotMatchExpression>(children.front());
+                auto simplifiedExpression =
+                    std::make_unique<NotMatchExpression>(std::move(children.front()));
                 children.clear();
                 return simplifiedExpression;
             }
@@ -186,7 +167,7 @@ bool ListOfMatchExpression::equivalent(const MatchExpression* other) const {
 
     // TOOD: order doesn't matter
     for (unsigned i = 0; i < _expressions.size(); i++)
-        if (!_expressions[i]->equivalent(realOther->_expressions[i]))
+        if (!_expressions[i]->equivalent(realOther->_expressions[i].get()))
             return false;
 
     return true;

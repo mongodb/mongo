@@ -292,9 +292,8 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             // be added to 'root', because it is handled outside of the MatchExpressionParser
             // library. The following operators currently follow this convention:
             //    - $comment  has no action associated with the operator.
-            if (parsedExpression.getValue().get()) {
-                root->add(parsedExpression.getValue().release());
-            }
+            if (auto&& expr = parsedExpression.getValue())
+                root->add(std::move(expr));
 
             continue;
         }
@@ -336,11 +335,8 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         addExpressionToRoot(expCtx, root.get(), std::move(eq.getValue()));
     }
 
-    if (root->numChildren() == 1) {
-        std::unique_ptr<MatchExpression> real(root->getChild(0));
-        root->clearAndRelease();
-        return {std::move(real)};
-    }
+    if (root->numChildren() == 1)
+        return {std::move((*root->getChildVector())[0])};
 
     return {std::move(root)};
 }
@@ -1199,7 +1195,7 @@ StatusWithMatchExpression parseTreeTopLevel(
         if (!sub.isOK())
             return sub.getStatus();
 
-        temp->add(sub.getValue().release());
+        temp->add(std::move(sub.getValue()));
     }
 
     if constexpr (std::is_same_v<T, InternalSchemaXorMatchExpression>) {
@@ -1254,10 +1250,9 @@ StatusWithMatchExpression parseElemMatch(StringData name,
                 expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())));
 
         doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx, &theAnd);
-        for (size_t i = 0; i < theAnd.numChildren(); i++) {
-            emValueExpr->add(theAnd.getChild(i));
-        }
-        theAnd.clearAndRelease();
+        for (size_t i = 0; i < theAnd.numChildren(); i++)
+            emValueExpr->add(theAnd.releaseChild(i));
+        theAnd.clear();
 
         return {std::move(emValueExpr)};
     }
@@ -1284,7 +1279,7 @@ StatusWithMatchExpression parseElemMatch(StringData name,
 
     return {std::make_unique<ElemMatchObjectMatchExpression>(
         name,
-        sub.release(),
+        std::move(sub),
         doc_validation_error::createAnnotation(
             expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap())))};
 }
@@ -1329,7 +1324,7 @@ StatusWithMatchExpression parseAll(StringData name,
                 return inner;
             doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx,
                                                                       inner.getValue().get());
-            myAnd->add(inner.getValue().release());
+            myAnd->add(std::move(inner.getValue()));
         }
 
         return {std::move(myAnd)};
@@ -1341,7 +1336,7 @@ StatusWithMatchExpression parseAll(StringData name,
         if (e.type() == BSONType::RegEx) {
             auto expr = std::make_unique<RegexMatchExpression>(
                 name, e, doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
-            myAnd->add(expr.release());
+            myAnd->add(std::move(expr));
         } else if (e.type() == BSONType::Object &&
                    MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement())) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
@@ -1349,7 +1344,7 @@ StatusWithMatchExpression parseAll(StringData name,
             auto expr = std::make_unique<EqualityMatchExpression>(
                 name, e, doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
             expr->setCollator(expCtx->getCollator());
-            myAnd->add(expr.release());
+            myAnd->add(std::move(expr));
         }
     }
 

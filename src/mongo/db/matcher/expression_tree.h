@@ -30,8 +30,10 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 /**
  * this contains all Expessions that define the structure of the tree
@@ -41,25 +43,16 @@ namespace mongo {
 
 class ListOfMatchExpression : public MatchExpression {
 public:
-    explicit ListOfMatchExpression(MatchType type,
-                                   clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : MatchExpression(type, std::move(annotation)) {}
-    virtual ~ListOfMatchExpression();
-
-    /**
-     * @param e - I take ownership
-     */
-    void add(MatchExpression* e);
+    ListOfMatchExpression(MatchType type,
+                          clonable_ptr<ErrorAnnotation> annotation,
+                          std::vector<std::unique_ptr<MatchExpression>> expressions)
+        : MatchExpression(type, std::move(annotation)), _expressions(std::move(expressions)) {}
 
     void add(std::unique_ptr<MatchExpression> e) {
-        add(e.release());
+        _expressions.push_back(std::move(e));
     }
 
-    /**
-     * clears all the thingsd we own, and does NOT delete
-     * someone else has taken ownership
-     */
-    void clearAndRelease() {
+    void clear() {
         _expressions.clear();
     }
 
@@ -67,33 +60,31 @@ public:
         return _expressions.size();
     }
 
-    virtual MatchExpression* getChild(size_t i) const {
-        return _expressions[i];
+    MatchExpression* getChild(size_t i) const final {
+        return _expressions[i].get();
     }
 
     /*
      * Replaces the ith child with nullptr, and releases ownership of the child.
      */
-    virtual std::unique_ptr<MatchExpression> releaseChild(size_t i) {
-        auto child = std::unique_ptr<MatchExpression>(_expressions[i]);
-        _expressions[i] = nullptr;
-        return child;
+    std::unique_ptr<MatchExpression> releaseChild(size_t i) {
+        return std::move(_expressions[i]);
     }
 
     /*
      * Removes the ith child, and releases ownership of the child.
      */
     virtual std::unique_ptr<MatchExpression> removeChild(size_t i) {
-        auto child = std::unique_ptr<MatchExpression>(_expressions[i]);
+        auto child = std::move(_expressions[i]);
         _expressions.erase(_expressions.begin() + i);
         return child;
     }
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return _expressions;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return &_expressions;
     }
 
-    bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const final;
 
     MatchCategory getCategory() const final {
         return MatchCategory::kLogical;
@@ -107,7 +98,7 @@ protected:
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 
-    std::vector<MatchExpression*> _expressions;
+    std::vector<std::unique_ptr<MatchExpression>> _expressions;
 };
 
 class AndMatchExpression : public ListOfMatchExpression {
@@ -115,10 +106,15 @@ public:
     static constexpr StringData kName = "$and"_sd;
 
     AndMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ListOfMatchExpression(AND, std::move(annotation)) {}
-    virtual ~AndMatchExpression() {}
+        : ListOfMatchExpression(AND, std::move(annotation), {}) {}
+    AndMatchExpression(std::vector<std::unique_ptr<MatchExpression>> expressions,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(AND, std::move(annotation), std::move(expressions)) {}
+    AndMatchExpression(std::unique_ptr<MatchExpression> expression,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(AND, std::move(annotation), makeVector(std::move(expression))) {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -126,7 +122,7 @@ public:
         std::unique_ptr<AndMatchExpression> self =
             std::make_unique<AndMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone().release());
+            self->add(getChild(i)->shallowClone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -154,10 +150,15 @@ public:
     static constexpr StringData kName = "$or"_sd;
 
     OrMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ListOfMatchExpression(OR, std::move(annotation)) {}
-    virtual ~OrMatchExpression() {}
+        : ListOfMatchExpression(OR, std::move(annotation), {}) {}
+    OrMatchExpression(std::vector<std::unique_ptr<MatchExpression>> expressions,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(OR, std::move(annotation), std::move(expressions)) {}
+    OrMatchExpression(std::unique_ptr<MatchExpression> expression,
+                      clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(OR, std::move(annotation), makeVector(std::move(expression))) {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -165,7 +166,7 @@ public:
         std::unique_ptr<OrMatchExpression> self =
             std::make_unique<OrMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone().release());
+            self->add(getChild(i)->shallowClone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -193,10 +194,15 @@ public:
     static constexpr StringData kName = "$nor"_sd;
 
     NorMatchExpression(clonable_ptr<ErrorAnnotation> annotation = nullptr)
-        : ListOfMatchExpression(NOR, std::move(annotation)) {}
-    virtual ~NorMatchExpression() {}
+        : ListOfMatchExpression(NOR, std::move(annotation), {}) {}
+    NorMatchExpression(std::vector<std::unique_ptr<MatchExpression>> expressions,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(NOR, std::move(annotation), std::move(expressions)) {}
+    NorMatchExpression(std::unique_ptr<MatchExpression> expression,
+                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : ListOfMatchExpression(NOR, std::move(annotation), makeVector(std::move(expression))) {}
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const;
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -204,7 +210,7 @@ public:
         std::unique_ptr<NorMatchExpression> self =
             std::make_unique<NorMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone().release());
+            self->add(getChild(i)->shallowClone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -237,14 +243,14 @@ public:
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<NotMatchExpression> self =
-            std::make_unique<NotMatchExpression>(_exp->shallowClone().release(), _errorAnnotation);
+            std::make_unique<NotMatchExpression>(_exp->shallowClone(), _errorAnnotation);
         if (getTag()) {
             self->setTag(getTag()->clone());
         }
         return self;
     }
 
-    virtual bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const {
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
         return !_exp->matches(doc, nullptr);
     }
 
@@ -256,7 +262,7 @@ public:
 
     virtual void serialize(BSONObjBuilder* out, bool includePath) const;
 
-    bool equivalent(const MatchExpression* other) const;
+    bool equivalent(const MatchExpression* other) const final;
 
     size_t numChildren() const final {
         return 1;
@@ -266,11 +272,11 @@ public:
         return _exp.get();
     }
 
-    boost::optional<std::vector<MatchExpression*>&> getChildVector() final {
-        return boost::none;
+    std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
+        return nullptr;
     }
 
-    MatchExpression* releaseChild(void) {
+    MatchExpression* releaseChild() {
         return _exp.release();
     }
 

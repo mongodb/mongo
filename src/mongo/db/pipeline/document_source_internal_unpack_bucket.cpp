@@ -662,7 +662,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
                 andMatchExpr->add(std::make_unique<LTMatchExpression>(
                     timeseries::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
-                andMatchExpr->add(controlPred.release());
+                andMatchExpr->add(std::move(controlPred));
 
                 return andMatchExpr;
             }
@@ -676,7 +676,7 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
                 andMatchExpr->add(std::make_unique<LTEMatchExpression>(
                     timeseries::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
-                andMatchExpr->add(controlPred.release());
+                andMatchExpr->add(std::move(controlPred));
 
                 return andMatchExpr;
             }

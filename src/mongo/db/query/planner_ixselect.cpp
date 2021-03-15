@@ -484,10 +484,15 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
             newContext.innermostParentElemMatch = static_cast<ElemMatchValueMatchExpression*>(node);
 
             auto&& children = node->getChildVector();
-            if (!std::all_of(children->begin(), children->end(), [&](MatchExpression* child) {
+            if (!std::all_of(children->begin(), children->end(), [&](auto&& child) {
                     const auto newPath = fullPathToNode.toString() + child->path();
-                    return _compatible(
-                        keyPatternElt, index, keyPatternIdx, child, newPath, collator, newContext);
+                    return _compatible(keyPatternElt,
+                                       index,
+                                       keyPatternIdx,
+                                       child.get(),
+                                       newPath,
+                                       collator,
+                                       newContext);
                 })) {
                 return false;
             }

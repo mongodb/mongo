@@ -115,11 +115,9 @@ void sortUsingTags(MatchExpression* tree) {
     }
 
     if (auto&& children = tree->getChildVector())
-        std::stable_sort(children->begin(),
-                         children->end(),
-                         [](const MatchExpression* lhs, const MatchExpression* rhs) {
-                             return tagComparison(lhs, rhs) < 0;
-                         });
+        std::stable_sort(children->begin(), children->end(), [](auto&& lhs, auto&& rhs) {
+            return tagComparison(lhs.get(), rhs.get()) < 0;
+        });
 }
 
 // Attaches 'node' to 'target'. If 'target' is an AND, adds 'node' as a child of 'target'.
@@ -140,15 +138,15 @@ void attachNode(MatchExpression* node,
     }
 
     if (MatchExpression::AND == target->matchType()) {
-        AndMatchExpression* andNode = static_cast<AndMatchExpression*>(target);
-        andNode->add(clone.release());
+        auto andNode = static_cast<AndMatchExpression*>(target);
+        andNode->add(std::move(clone));
     } else {
-        std::unique_ptr<AndMatchExpression> andNode = std::make_unique<AndMatchExpression>();
-        IndexTag* indexTag = static_cast<IndexTag*>(clone->getTag());
+        auto andNode = std::make_unique<AndMatchExpression>();
+        auto indexTag = static_cast<IndexTag*>(clone->getTag());
         andNode->setTag(new IndexTag(indexTag->index));
-        andNode->add(target);
-        andNode->add(clone.release());
-        targetParent->getChildVector()->operator[](targetPosition) = andNode.release();
+        andNode->add(std::move((*targetParent->getChildVector())[targetPosition]));
+        andNode->add(std::move(clone));
+        targetParent->getChildVector()->operator[](targetPosition) = std::move(andNode);
     }
 }
 
