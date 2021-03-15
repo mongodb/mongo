@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load('jstests/replsets/rslib.js');           // For getLatestOp.
+load('jstests/replsets/rslib.js');           // For getLatestOp, getFirstOplogEntry.
 load('jstests/libs/change_stream_util.js');  // For ChangeStreamTest.
 
 const oplogSize = 1;  // size in MB
@@ -66,8 +66,7 @@ for (let nextExpectedId of [4, 5]) {
 
 // Confirm that we can begin a stream at a timestamp that precedes the start of the oplog, if
 // the first entry in the oplog is the replica set initialization message.
-const firstOplogEntry =
-    testDB.getSiblingDB("local").oplog.rs.find().sort({$natural: 1}).limit(1).toArray()[0];
+const firstOplogEntry = getFirstOplogEntry(rst.getPrimary());
 assert.eq(firstOplogEntry.o.msg, "initiating set");
 assert.eq(firstOplogEntry.op, "n");
 

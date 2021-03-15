@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load('jstests/replsets/rslib.js');  // For getLatestOp.
+load('jstests/replsets/rslib.js');  // For getLatestOp, getFirstOplogEntry.
 
 const oplogSize = 1;  // size in MB
 const rst = new ReplSetTest({nodes: 1, oplogSize: oplogSize});
@@ -58,8 +58,7 @@ assert.eq(next.o2._id, 1);
 
 // Confirm that we can begin an aggregation at a timestamp that precedes the start of the oplog, if
 // the first entry in the oplog is the replica set initialization message.
-const firstOplogEntry =
-    testDB.getSiblingDB("local").oplog.rs.find().sort({$natural: 1}).limit(1).toArray()[0];
+const firstOplogEntry = getFirstOplogEntry(rst.getPrimary());
 assert.eq(firstOplogEntry.o.msg, "initiating set");
 assert.eq(firstOplogEntry.op, "n");
 
