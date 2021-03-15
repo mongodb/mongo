@@ -203,6 +203,59 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 })();
 
 (() => {
+    jsTestLog("Test sending donorAbortMigration before fetching keys from admin.system.keys.");
+
+    const tmt = new TenantMigrationTest({name: jsTestName()});
+    if (!tmt.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
+
+    const barrierBeforeFetchingKeys =
+        configureFailPoint(tmt.getDonorPrimary(), "pauseTenantMigrationBeforeFetchingKeys");
+
+    configureFailPoint(tmt.getRecipientPrimary(), "failCommand", {
+        failInternalCommands: true,
+        blockConnection: true,
+        blockTimeMS: kDelayMS,
+        failCommands: ["find"],
+        namespace: "admin.system.keys"
+    });
+
+    const tenantId = kTenantId;
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: tenantId,
+        recipientConnString: tmt.getRecipientConnString(),
+    };
+    assert.commandWorked(tmt.startMigration(migrationOpts));
+
+    barrierBeforeFetchingKeys.wait();
+
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(tmt.getDonorRst());
+    const tryAbortThread =
+        new Thread(TenantMigrationUtil.tryAbortMigrationAsync, migrationOpts, donorRstArgs);
+    tryAbortThread.start();
+
+    // Wait for donorAbortMigration command to start.
+    assert.soon(() => {
+        const res = assert.commandWorked(tmt.getDonorPrimary().adminCommand(
+            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
+        return res.inprog[0].receivedCancelation;
+    });
+    barrierBeforeFetchingKeys.off();
+
+    tryAbortThread.join();
+    assert.commandWorked(tryAbortThread.returnData());
+
+    const stateRes = assert.commandWorked(tmt.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+
+    tmt.stop();
+})();
+
+(() => {
     jsTestLog("Test sending donorAbortMigration to interrupt waiting for keys to replicate.");
 
     const donorRst = new ReplSetTest({
