@@ -64,6 +64,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -568,7 +569,11 @@ WriteResult performInserts(OperationContext* opCtx,
         curOp.debug().additiveMetrics.ninserted = 0;
     }
 
-    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
+    // If we are performing inserts from tenant migrations, skip checking if the user is allowed to
+    // write to the namespace.
+    if (!repl::tenantMigrationRecipientInfo(opCtx)) {
+        uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
+    }
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());

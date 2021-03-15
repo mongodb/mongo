@@ -329,15 +329,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.ILLEGAL_OPERATION_ERR_CODE and re.search(
             err_msg_regex, abort_reason["errmsg"])
 
-    def _is_write_to_system_views_err(self, abort_reason):
-        # TODO (SERVER-55168): Allow tenant migration cloner to write to system.views collections.
-        err_msg_regex = r"cannot write to {}_.*\.system\.views".format(self._tenant_id)
-        return abort_reason["code"] == self.INVALID_NS_ERR_CODE and re.search(
-            err_msg_regex, abort_reason["errmsg"])
-
     def _is_blacklisted_abort_reason(self, abort_reason):
-        return self._is_empty_id_index_spec_err(abort_reason) or self._is_write_to_system_views_err(
-            abort_reason)
+        return self._is_empty_id_index_spec_err(abort_reason)
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
