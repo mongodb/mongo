@@ -17,10 +17,17 @@ var $config = extendWorkload($config, function($config, $super) {
     const kResolveRolesDelayMS = 100;
 
     const originalSetup = $config.setup;
+    const originalTeardown = $config.teardown;
+
     $config.setup = function(db, collName, cluster) {
         originalSetup(db, collName, cluster);
 
         const cacheBypass = {configureFailPoint: 'authUserCacheBypass', mode: 'alwaysOn'};
+        const getUser = {
+            configureFailPoint: 'authLocalGetUser',
+            mode: 'alwaysOn',
+            data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
+        };
 
         cluster.executeOnMongosNodes(function(nodeAdminDB) {
             assert.commandWorked(nodeAdminDB.runCommand(cacheBypass));
@@ -28,12 +35,24 @@ var $config = extendWorkload($config, function($config, $super) {
 
         cluster.executeOnMongodNodes(function(nodeAdminDB) {
             assert.commandWorked(nodeAdminDB.runCommand(cacheBypass));
-            assert.commandWorked(nodeAdminDB.runCommand({
-                configureFailPoint: 'authLocalGetUser',
-                mode: 'alwaysOn',
-                data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
-            }));
+            assert.commandWorked(nodeAdminDB.runCommand(getUser));
         });
+    };
+
+    $config.teardown = function(db, collName, cluster) {
+        const cacheBypass = {configureFailPoint: 'authUserCacheBypass', mode: 'off'};
+        const getUser = {configureFailPoint: 'authLocalGetUser', mode: 'off'};
+
+        cluster.executeOnMongosNodes(function(nodeAdminDB) {
+            assert.commandWorked(nodeAdminDB.runCommand(cacheBypass));
+        });
+
+        cluster.executeOnMongodNodes(function(nodeAdminDB) {
+            assert.commandWorked(nodeAdminDB.runCommand(cacheBypass));
+            assert.commandWorked(nodeAdminDB.runCommand(getUser));
+        });
+
+        originalTeardown(db, collName, cluster);
     };
 
     return $config;
