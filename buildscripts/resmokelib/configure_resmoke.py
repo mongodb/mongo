@@ -246,6 +246,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.EVERGREEN_REVISION_ORDER_ID = config.pop("revision_order_id")
     _config.EVERGREEN_TASK_ID = config.pop("task_id")
     _config.EVERGREEN_TASK_NAME = config.pop("task_name")
+    _config.EVERGREEN_TASK_DOC = config.pop("task_doc")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variant_name")
     _config.EVERGREEN_VERSION_ID = config.pop("version_id")
 
@@ -276,6 +277,16 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
 
     # Config Dir options.
     _config.CONFIG_DIR = config.pop("config_dir")
+
+    # Configure evergreen task documentation
+    if _config.EVERGREEN_TASK_NAME:
+        task_name = utils.get_task_name_without_suffix(_config.EVERGREEN_TASK_NAME,
+                                                       _config.EVERGREEN_VARIANT_NAME)
+        evg_task_doc_file = os.path.join(_config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml")
+        if os.path.exists(evg_task_doc_file):
+            evg_task_doc = utils.load_yaml_file(evg_task_doc_file)
+            if task_name in evg_task_doc:
+                _config.EVERGREEN_TASK_DOC = evg_task_doc[task_name]
 
     _config.UNDO_RECORDER_PATH = config.pop("undo_recorder_path")
 

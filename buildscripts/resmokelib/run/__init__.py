@@ -7,14 +7,11 @@ import os
 import os.path
 import random
 import shlex
-import subprocess
 import sys
-import tarfile
 import time
 
 import curatorbin
 import pkg_resources
-import requests
 
 try:
     import grpc_tools.protoc
@@ -34,7 +31,6 @@ from buildscripts.resmokelib import testing
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import jasper_process
-from buildscripts.resmokelib.core import redirect as redirect_lib
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
@@ -170,6 +166,18 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         """Run the suite and tests specified."""
         self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
                                   " ".join([shlex.quote(arg) for arg in sys.argv]))
+
+        if config.EVERGREEN_TASK_DOC:
+            self._resmoke_logger.info("Evergreen task documentation:\n%s",
+                                      config.EVERGREEN_TASK_DOC)
+        elif config.EVERGREEN_TASK_NAME:
+            self._resmoke_logger.info("Evergreen task documentation is absent for this task.")
+            task_name = utils.get_task_name_without_suffix(config.EVERGREEN_TASK_NAME,
+                                                           config.EVERGREEN_VARIANT_NAME)
+            self._resmoke_logger.info(
+                "If you are familiar with the functionality of %s task, "
+                "please consider adding documentation for it in %s", task_name,
+                os.path.join(config.CONFIG_DIR, "evg_task_doc", "evg_task_doc.yml"))
 
         if config.FUZZ_MONGOD_CONFIGS:
             local_args = to_local_args()

@@ -120,6 +120,7 @@ DEFAULTS = {
     "revision_order_id": None,
     "task_id": None,
     "task_name": None,
+    "task_doc": None,
     "variant_name": None,
     "version_id": None,
 
@@ -304,6 +305,9 @@ EVERGREEN_TASK_ID = None
 
 # The name of the Evergreen task that resmoke.py is being run for.
 EVERGREEN_TASK_NAME = None
+
+# The documentation that describes what Evergreen task does.
+EVERGREEN_TASK_DOC = None
 
 # The name of the Evergreen build variant that resmoke.py is being run on.
 EVERGREEN_VARIANT_NAME = None

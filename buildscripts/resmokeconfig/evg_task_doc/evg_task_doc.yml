@@ -1,0 +1,22 @@
+# Evergreen task documentation
+#
+# If you are adding/updating task documentation, please follow this syntax:
+# evergreen_task_name: |-
+#   documentation line
+#   the next documentation line
+#
+# This will allow to print out the documentation nicely as a multiline string
+# to stdout, which would show up in Evergreen task logs next to the verbatim
+# resmoke invocation.
+#
+# Please limit each line to 80 characters.
+
+jsCore: |-
+  Core set of lightweight tasks run against a standalone mongod.
+
+noPassthrough: |-
+  "Passthrough" means running a test against different runtime Cluster
+  configurations, including topology, runtime flags, fault injections, and other
+  parameters. Most tests by default are able to run in "passthrough" suites.
+  NoPassthrough is an exception, where tests here only run in the exact
+  configuration predefined in the tests themselves.
