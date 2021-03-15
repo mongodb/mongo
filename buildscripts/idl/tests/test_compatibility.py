@@ -34,7 +34,7 @@ import sys
 from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
-#pylint: disable=wrong-import-position
+#pylint: disable=wrong-import-position,too-many-lines
 import idl_check_compatibility
 import idl_compatibility_errors
 
@@ -126,7 +126,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 128)
+        self.assertTrue(error_collection.count() == 138)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -969,6 +969,67 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_variant_struct_recursive_with_array_error),
             "newCommandTypeVariantStructRecursiveWithArray")
+
+        access_check_type_change_error = error_collection.get_error_by_command_name(
+            "accessCheckTypeChange")
+        self.assertTrue(access_check_type_change_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL)
+        self.assertRegex(str(access_check_type_change_error), "accessCheckTypeChange")
+
+        access_check_type_change_two_error = error_collection.get_error_by_command_name(
+            "accessCheckTypeChangeTwo")
+        self.assertTrue(access_check_type_change_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL)
+        self.assertRegex(str(access_check_type_change_two_error), "accessCheckTypeChangeTwo")
+
+        complex_checks_not_subset_error = error_collection.get_error_by_command_name(
+            "complexChecksNotSubset")
+        self.assertTrue(complex_checks_not_subset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMPLEX_CHECKS_NOT_SUBSET)
+        self.assertRegex(str(complex_checks_not_subset_error), "complexChecksNotSubset")
+
+        complex_checks_not_subset_two_error = error_collection.get_error_by_command_name(
+            "complexChecksNotSubsetTwo")
+        self.assertTrue(complex_checks_not_subset_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(str(complex_checks_not_subset_two_error), "complexChecksNotSubsetTwo")
+
+        complex_resource_pattern_change_error = error_collection.get_error_by_command_name(
+            "complexResourcePatternChange")
+        self.assertTrue(complex_resource_pattern_change_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET)
+        self.assertRegex(str(complex_resource_pattern_change_error), "complexResourcePatternChange")
+
+        complex_action_types_not_subset_error = error_collection.get_error_by_command_name(
+            "complexActionTypesNotSubset")
+        self.assertTrue(complex_action_types_not_subset_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET)
+        self.assertRegex(str(complex_action_types_not_subset_error), "complexActionTypesNotSubset")
+
+        complex_action_types_not_subset_two_error = error_collection.get_error_by_command_name(
+            "complexActionTypesNotSubsetTwo")
+        self.assertTrue(complex_action_types_not_subset_two_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET)
+        self.assertRegex(
+            str(complex_action_types_not_subset_two_error), "complexActionTypesNotSubsetTwo")
+
+        additional_complex_access_check_error = error_collection.get_error_by_command_name(
+            "additionalComplexAccessCheck")
+        self.assertTrue(additional_complex_access_check_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(str(additional_complex_access_check_error), "additionalComplexAccessCheck")
+
+        removed_access_check_field_error = error_collection.get_error_by_command_name(
+            "removedAccessCheckField")
+        self.assertTrue(removed_access_check_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REMOVED_ACCESS_CHECK_FIELD)
+        self.assertRegex(str(removed_access_check_field_error), "removedAccessCheckField")
+
+        added_access_check_field_error = error_collection.get_error_by_command_name(
+            "addedAccessCheckField")
+        self.assertTrue(added_access_check_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_ADDED_ACCESS_CHECK_FIELD)
+        self.assertRegex(str(added_access_check_field_error), "addedAccessCheckField")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""

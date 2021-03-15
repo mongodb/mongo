@@ -102,6 +102,12 @@ ERROR_ID_CHECK_NOT_EQUAL = "ID0058"
 ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL = "ID0059"
 ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET = "ID0060"
 ERROR_ID_TYPE_NOT_ARRAY = "ID0061"
+ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL = "ID0062"
+ERROR_ID_NEW_COMPLEX_CHECKS_NOT_SUBSET = "ID0063"
+ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET = "ID0064"
+ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK = "ID0065"
+ERROR_ID_REMOVED_ACCESS_CHECK_FIELD = "ID0066"
+ERROR_ID_ADDED_ACCESS_CHECK_FIELD = "ID0067"
 
 # TODO (SERVER-55203): Remove SKIPPED_COMMANDS logic.
 # Any breaking changes added to API V1 before releasing 5.0 should be added to SKIPPED_COMMANDS to
@@ -870,7 +876,7 @@ class IDLCompatibilityContext(object):
         ) % (command_name, new_resource_pattern, old_resource_pattern), file)
 
     def add_new_action_types_not_subset_error(self, command_name: str, file: str) -> None:
-        """Add an error about the command access_check check not being equal."""
+        """Add an error about the new access_check action types not being a subset of the old ones."""
         self._add_error(ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET, command_name,
                         ("'%s' has new action types that are not a subset of the old action types")
                         % (command_name), file)
@@ -888,6 +894,46 @@ class IDLCompatibilityContext(object):
             ERROR_ID_TYPE_NOT_ARRAY, command_name,
             "The command '%s' has %s: '%s' with new type '%s' while the older type was '%s'." %
             (command_name, symbol, symbol_name, new_type, old_type), file)
+
+    def add_access_check_type_not_equal_error(self, command_name: str, old_type: str, new_type: str,
+                                              file: str) -> None:
+        """Add an error about the command access_check types not being equal."""
+        self._add_error(
+            ERROR_ID_ACCESS_CHECK_TYPE_NOT_EQUAL, command_name,
+            ("'%s' has access_check of type %s in the old version and access_check of type '%s'"
+             "in the new version.") % (command_name, old_type, new_type), file)
+
+    def add_new_complex_checks_not_subset_error(self, command_name: str, file: str) -> None:
+        """Add an error about the complex access_check checks not being a subset of the old ones."""
+        self._add_error(
+            ERROR_ID_NEW_COMPLEX_CHECKS_NOT_SUBSET, command_name,
+            ("'%s' has new complex access_checks checks that are not a subset of the old complex"
+             " access_check checks.") % (command_name), file)
+
+    def add_new_complex_privileges_not_subset_error(self, command_name: str, file: str) -> None:
+        """Add an error about the complex access_check privileges not being a subset of the old ones."""
+        self._add_error(
+            ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET, command_name,
+            ("'%s' has complex access_checks privileges that have changed the resource_pattern"
+             " or changed/added an action_type in the new command.") % (command_name), file)
+
+    def add_new_additional_complex_access_check_error(self, command_name: str, file: str) -> None:
+        """Add an error about an additional complex access_check being added."""
+        self._add_error(ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK, command_name, (
+            "'%s' has additional complex access_checks in the new command that are not in the old command"
+        ) % (command_name), file)
+
+    def add_removed_access_check_field_error(self, command_name: str, file: str) -> None:
+        """Add an error the new command removing the access_check field."""
+        self._add_error(ERROR_ID_REMOVED_ACCESS_CHECK_FIELD, command_name, (
+            "'%s' has removed the access_check field in the new command when it exists in the old command"
+        ) % (command_name), file)
+
+    def add_added_access_check_field_error(self, command_name: str, file: str) -> None:
+        """Add an error the new command adding the access_check field when the api_version is '1'."""
+        self._add_error(ERROR_ID_ADDED_ACCESS_CHECK_FIELD, command_name, (
+            "'%s' has added the access_check field in the new command when it did not exist in the "
+            "old command and the api_version is '1'") % (command_name), file)
 
 
 def _assert_unique_error_messages() -> None:

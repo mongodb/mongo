@@ -1817,3 +1817,155 @@ commands:
         strict: true
         api_version: "1"
         reply_type: NotStructFieldReply
+
+    accessCheckTypeChange:
+        description: "new command fails because the access check type has changed"
+        command_name: accessCheckTypeChange
+        namespace: ignored
+        cpp_name: accessCheckTypeChange
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            simple:
+                check: oldCheck
+
+    accessCheckTypeChangeTwo:
+        description: "new command fails because the access check type has changed"
+        command_name: accessCheckTypeChangeTwo
+        namespace: ignored
+        cpp_name: accessCheckTypeChangeTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkThree
+                - check: checkOne
+
+    complexChecksNotSubset:
+        description: "new command fails because the complex checks are not a subset of the 
+                      old complex checks"
+        command_name: complexChecksNotSubset
+        namespace: ignored
+        cpp_name: complexChecksNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
+                - check: checkTwo
+
+    complexChecksNotSubsetTwo:
+        description: "new command fails because the complex checks are not a subset of the 
+                      old complex checks"
+        command_name: complexChecksNotSubsetTwo
+        namespace: ignored
+        cpp_name: complexChecksNotSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - check: checkTwo
+
+    complexResourcePatternChange:
+        description: "new command fails because there is a change in the complex resource patterns"
+        command_name: complexResourcePatternChange
+        namespace: ignored
+        cpp_name: complexResourcePatternChange
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: actionTypeOne
+
+    complexActionTypesNotSubset:
+        description: "new command fails because there is a change in the complex action types"
+        command_name: complexActionTypesNotSubset
+        namespace: ignored
+        cpp_name: complexActionTypesNotSubset
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: actionTypeOne
+                - check: checkOne
+
+    complexActionTypesNotSubsetTwo:
+        description: "new command fails because there is a change in the complex action types"
+        command_name: complexActionTypesNotSubsetTwo
+        namespace: ignored
+        cpp_name: complexActionTypesNotSubsetTwo
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+                - privilege:
+                    resource_pattern: resourcePatternTwo
+                    action_type: [actionTypeOne, actionTypeFour]
+                - privilege:
+                    resource_pattern: resourcePatternThree
+                    action_type: [actionTypeOne, actionTypeTwo, actionTypeThree]
+
+    additionalComplexAccessCheck:
+        description: "new command fails because there is an additional complex access check"
+        command_name: additionalComplexAccessCheck
+        namespace: ignored
+        cpp_name: additionalComplexAccessCheck
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: [actionTypeOne, actionTypeTwo]
+                - check: checkOne
+                - privilege:
+                    resource_pattern: resourcePattern
+                    action_type: actionTypeOne
+
+    removedAccessCheckField:
+        description: "new command fails because it removes the access_check field"
+        command_name: removedAccessCheckField
+        namespace: ignored
+        cpp_name: removedAccessCheckField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            none: true
+
+    addedAccessCheckField:
+        description: "new command fails because it adds the access_check field when the api_version is '1'"
+        command_name: addedAccessCheckField
+        namespace: ignored
+        cpp_name: addedAccessCheckField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply

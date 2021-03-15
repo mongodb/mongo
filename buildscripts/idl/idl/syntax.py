@@ -566,6 +566,16 @@ class AccessChecks(common.SourceLocation):
 
         super(AccessChecks, self).__init__(file_name, line, column)
 
+    def get_access_check_type(self) -> str:
+        """Get type of AccessChecks."""
+        if self.none:
+            return "none"
+        if self.simple:
+            return "simple"
+        if self.complex:
+            return "complex"
+        return "undefined"
+
 
 class Command(Struct):
     """
