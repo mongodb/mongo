@@ -229,7 +229,7 @@ Status userAllowedCreateNS(const NamespaceString& ns) {
         // 'config.system.sessions', there will be a corresponding persisted chunk metadata
         // collection 'config.cache.chunks.config.system.sessions'. We wish to allow writes to this
         // collection.
-        if (ns.coll().find(".system.sessions") != std::string::npos) {
+        if (ns.isConfigDotCacheDotChunks()) {
             return Status::OK();
         }
 
