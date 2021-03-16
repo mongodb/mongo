@@ -728,17 +728,16 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
         // Assert that keys are retrieved from the sorter in non-decreasing order, but only in debug
         // builds since this check can be expensive.
         int cmpData;
-        if (_descriptor->unique()) {
+        if (kDebugBuild || _descriptor->unique()) {
             cmpData = data.first.compareWithoutRecordId(previousKey);
-        }
-
-        if (kDebugBuild && data.first.compare(previousKey) < 0) {
-            LOGV2_FATAL_NOTRACE(
-                31171,
-                "Expected the next key to be greater than or equal to the previous key",
-                "nextKey"_attr = data.first.toString(),
-                "previousKey"_attr = previousKey.toString(),
-                "index"_attr = _descriptor->indexName());
+            if (cmpData < 0) {
+                LOGV2_FATAL_NOTRACE(
+                    31171,
+                    "Expected the next key to be greater than or equal to the previous key",
+                    "nextKey"_attr = data.first.toString(),
+                    "previousKey"_attr = previousKey.toString(),
+                    "index"_attr = _descriptor->indexName());
+            }
         }
 
         // Before attempting to insert, perform a duplicate key check.
