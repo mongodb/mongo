@@ -772,7 +772,7 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
         if (!chunkElem) {
             // Only the first (and in that case, only) aggregation result may not have chunks. That
             // case is already caught by the uassert above.
-            static constexpr auto msg = "No chunks found in aggregation result";
+            static constexpr auto& msg = "No chunks found in aggregation result";
             LOGV2_ERROR(5487400, msg, "elem"_attr = elem);
             uasserted(5487401, msg);
         }

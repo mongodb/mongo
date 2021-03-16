@@ -103,7 +103,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             }
         })
         .onError([this, anchor = shared_from_this()](const Status& status) {
-            static constexpr auto errorMsg =
+            static constexpr auto& errorMsg =
                 "Failed to complete construction of sharding DDL coordinator";
             LOGV2_ERROR(5390530,
                         errorMsg,
