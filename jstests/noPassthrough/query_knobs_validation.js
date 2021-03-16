@@ -37,6 +37,7 @@ const expectedParamDefaults = {
     internalDocumentSourceLookupCacheSizeBytes: 100 * 1024 * 1024,
     internalLookupStageIntermediateDocumentMaxSizeBytes: 100 * 1024 * 1024,
     internalDocumentSourceGroupMaxMemoryBytes: 100 * 1024 * 1024,
+    internalDocumentSourceSetWindowFieldsMaxMemoryBytes: 100 * 1024 * 1024,
     internalPipelineLengthLimit: 1000,
     internalQueryMaxJsEmitBytes: 100 * 1024 * 1024,
     internalQueryMaxPushBytes: 100 * 1024 * 1024,
@@ -149,6 +150,10 @@ assertSetParameterFails("internalQueryFacetBufferSizeBytes", -1);
 assertSetParameterSucceeds("internalDocumentSourceGroupMaxMemoryBytes", 11);
 assertSetParameterFails("internalDocumentSourceGroupMaxMemoryBytes", 0);
 assertSetParameterFails("internalDocumentSourceGroupMaxMemoryBytes", -1);
+
+assertSetParameterSucceeds("internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 11);
+assertSetParameterFails("internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 0);
+assertSetParameterFails("internalDocumentSourceSetWindowFieldsMaxMemoryBytes", -1);
 
 assertSetParameterSucceeds("internalQueryMaxJsEmitBytes", 10);
 assertSetParameterFails("internalQueryMaxJsEmitBytes", 0);

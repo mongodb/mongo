@@ -71,6 +71,7 @@ private:
         if (_values.size() == 0) {
             return;
         }
+        _memUsageBytes -= _values.front().getApproximateSize();
         _function->remove(_values.front());
         _values.pop();
     }

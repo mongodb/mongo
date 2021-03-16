@@ -301,6 +301,16 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
       gt: 0
+  
+  internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
+    description: "Maximum size of the data that the $setWindowFields aggregation stage will cache in-memory before throwing an error."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalDocumentSourceSetWindowFieldsMaxMemoryBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+      gt: 0
 
   internalInsertMaxBatchSize:
     description: "Maximum number of documents that we will insert in a single batch."

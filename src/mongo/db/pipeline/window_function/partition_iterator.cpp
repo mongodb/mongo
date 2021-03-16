@@ -85,6 +85,8 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
             getNextDocument();
             if (_state == IteratorState::kAwaitingAdvanceToEOF) {
                 _cache.clear();
+                // Everything should be empty at this point.
+                _memUsageBytes = 0;
                 _currentIndex = 0;
                 _state = IteratorState::kAdvancedToEOF;
                 return AdvanceResult::kEOF;
@@ -105,6 +107,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advance() {
             // In either of these states, there's no point in reading from the prior document source
             // because we've already hit EOF.
             _cache.clear();
+            _memUsageBytes = 0;
             _currentIndex = 0;
             return AdvanceResult::kEOF;
         default:
@@ -200,10 +203,14 @@ void PartitionIterator::getNextDocument() {
             advanceToNextPartition();
         } else if (_expCtx->getValueComparator().compare(curKey, _partitionKey) != 0) {
             _nextPartition = NextPartitionState{std::move(doc), std::move(curKey)};
+            _memUsageBytes += getNextPartitionStateSize();
             _state = IteratorState::kAwaitingAdvanceToNext;
-        } else
+        } else {
+            _memUsageBytes += doc.getApproximateSize();
             _cache.emplace_back(std::move(doc));
+        }
     } else {
+        _memUsageBytes += doc.getApproximateSize();
         _cache.emplace_back(std::move(doc));
         _state = IteratorState::kIntraPartition;
     }

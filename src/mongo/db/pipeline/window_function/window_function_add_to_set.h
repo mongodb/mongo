@@ -43,9 +43,12 @@ public:
 
     explicit WindowFunctionAddToSet(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx),
-          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
+          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {
+        _memUsageBytes = sizeof(*this);
+    }
 
     void add(Value value) override {
+        _memUsageBytes += value.getApproximateSize();
         _values.insert(std::move(value));
     }
 
@@ -56,11 +59,13 @@ public:
         auto iter = _values.find(std::move(value));
         tassert(
             5423800, "Can't remove from an empty WindowFunctionAddToSet", iter != _values.end());
+        _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
 
     void reset() override {
         _values.clear();
+        _memUsageBytes = sizeof(*this);
     }
 
     Value getValue() const override {
