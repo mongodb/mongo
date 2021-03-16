@@ -23,7 +23,7 @@ assert.commandFailedWithCode(coll.runCommand({
         $setWindowFields: {
             partitionBy: "$arr",
             sortBy: {_id: 1},
-            output: {a: {$sum: {input: "$int_field", documents: ["unbounded", "current"]}}}
+            output: {a: {$sum: "$int_field", window: {documents: ["unbounded", "current"]}}}
         }
     }],
     cursor: {}
