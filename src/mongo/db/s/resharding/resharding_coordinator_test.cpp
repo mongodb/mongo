@@ -703,38 +703,52 @@ TEST_F(ReshardingCoordinatorPersistenceTest, WriteInitialInfoSucceeds) {
     writeInitialStateAndCatalogUpdatesExpectSuccess(
         operationContext(), expectedCoordinatorDoc, initialChunks, newZones);
 
-    // Confirm the shard version was increased for the donor shard.
+    // Confirm the shard version was increased for the donor shard. The collection version was
+    // bumped twice in 'writeInitialStateAndCatalogUpdatesExpectSuccess': once when reshardingFields
+    // is inserted to the collection doc, and once again when the state transitions to
+    // kPreparingToDonate.
     auto donorChunkPostTransition = getChunkDoc(operationContext(), donorChunk.getMin());
     ASSERT_EQ(donorChunkPostTransition.getStatus(), Status::OK());
     ASSERT_EQ(donorChunkPostTransition.getValue().getVersion().majorVersion(),
-              collectionVersion.majorVersion() + 1);
+              collectionVersion.majorVersion() + 2);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, BasicStateTransitionSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
 
-    // Ensure the chunks for the original namespace exist since they will be bumped as a product of
-    // the state transition to kPreparingToDonate.
+    // Ensure the chunks for the original and temporary namespaces exist since they will be bumped
+    // as a product of the state transition to kBlockingWrites.
     auto donorChunk = makeAndInsertChunksForDonorShard(
         _originalNss, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
-    auto collectionVersion = donorChunk.getVersion();
+    auto donorCollectionVersion = donorChunk.getVersion();
+
+    auto recipientChunk = makeAndInsertChunksForRecipientShard(
+        _tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto recipientCollectionVersion = donorChunk.getVersion();
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kBlockingWrites);
 
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
-    assertChunkVersionIncreasedAfterStateTransition(donorChunk, collectionVersion);
+    assertChunkVersionIncreasedAfterStateTransition(donorChunk, donorCollectionVersion);
+    assertChunkVersionIncreasedAfterStateTransition(recipientChunk, recipientCollectionVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
 
+    // Ensure the chunks for the original and temporary namespaces exist since they will be bumped
+    // as a product of the state transition to kCloning.
+    auto donorChunk = makeAndInsertChunksForDonorShard(
+        _originalNss, _originalEpoch, _oldShardKey, std::vector{OID::gen(), OID::gen()});
+    auto donorCollectionVersion = donorChunk.getVersion();
+
     auto recipientChunk = makeAndInsertChunksForRecipientShard(
         _tempNss, _tempEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
-    auto collectionVersion = recipientChunk.getVersion();
+    auto recipientCollectionVersion = recipientChunk.getVersion();
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
@@ -742,7 +756,8 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWithFetchTimestampSu
     emplaceFetchTimestampIfExists(expectedCoordinatorDoc, Timestamp(1, 1));
 
     writeStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
-    assertChunkVersionIncreasedAfterStateTransition(recipientChunk, collectionVersion);
+    assertChunkVersionIncreasedAfterStateTransition(donorChunk, donorCollectionVersion);
+    assertChunkVersionIncreasedAfterStateTransition(recipientChunk, recipientCollectionVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSucceeds) {
@@ -779,6 +794,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSu
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToErrorSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kPreparingToDonate, _originalEpoch);
+    auto initialChunksIds = std::vector{OID::gen(), OID::gen()};
+
+    auto tempNssChunks = makeChunks(_tempNss, _tempEpoch, _newShardKey, initialChunksIds);
+    auto recipientChunk = tempNssChunks[1];
+    insertChunkAndZoneEntries(tempNssChunks, makeZones(_tempNss, _newShardKey));
 
     insertChunkAndZoneEntries(
         makeChunks(_originalNss, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
@@ -797,7 +817,14 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
     auto coordinatorDoc =
         insertStateAndCatalogEntries(CoordinatorStateEnum::kDecisionPersisted, _finalEpoch);
 
+    // Ensure the chunks for the original namespace exist since they will be bumped as a product of
+    // the state transition to kDone.
+    auto finalChunk = makeAndInsertChunksForRecipientShard(
+        _originalNss, _finalEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
+    auto collectionVersion = finalChunk.getVersion();
+
     removeCoordinatorDocAndReshardingFieldsExpectSuccess(operationContext(), coordinatorDoc);
+    assertChunkVersionIncreasedAfterStateTransition(finalChunk, collectionVersion);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDoesNotExistFails) {
@@ -807,7 +834,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
     ASSERT_THROWS_CODE(resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
                            operationContext(), coordinatorDoc),
                        AssertionException,
-                       5057701);
+                       5514600);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest,

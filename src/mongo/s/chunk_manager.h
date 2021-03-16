@@ -291,7 +291,7 @@ public:
 
     bool sameReshardingFields(const RoutingTableHistory& other) const {
         if (_reshardingFields && other._reshardingFields) {
-            return _reshardingFields->toBSON().woCompare(other._reshardingFields->toBSON());
+            return _reshardingFields->toBSON().woCompare(other._reshardingFields->toBSON()) == 0;
         } else {
             return !_reshardingFields && !other._reshardingFields;
         }

@@ -43,6 +43,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/distinct_command_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
@@ -475,6 +476,50 @@ NamespaceStringOrUUID getNsOrUUIDForChunkTargeting(const CollectionType& coll) {
     } else {
         return {coll.getNss()};
     }
+}
+
+std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
+                                                        const NamespaceString& nss) {
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto findCollResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            CollectionType::ConfigNS,
+                                            BSON(CollectionType::kNssFieldName << nss.ns()),
+                                            {},
+                                            1));
+    uassert(
+        ErrorCodes::Error(5514600), "Collection does not exist", !findCollResponse.docs.empty());
+    const CollectionType coll(findCollResponse.docs[0]);
+    const auto nsOrUUID = getNsOrUUIDForChunkTargeting(coll);
+
+    DistinctCommand distinctCmd(ChunkType::ConfigNS, ChunkType::shard.name());
+    if (nsOrUUID.uuid()) {
+        distinctCmd.setQuery(BSON(ChunkType::collectionUUID << *(nsOrUUID.uuid())));
+    } else {
+        distinctCmd.setQuery(BSON(ChunkType::ns(nsOrUUID.nss()->ns())));
+    }
+
+    const auto distinctResult = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kConfigDb.toString(),
+        distinctCmd.toBSON({}),
+        Shard::RetryPolicy::kIdempotent));
+    uassertStatusOK(distinctResult.commandStatus);
+
+    const auto valuesElem = distinctResult.response.getField("values");
+    std::vector<ShardId> shardIds;
+    for (const auto shard : valuesElem.Array()) {
+        shardIds.emplace_back(shard.String());
+    }
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find shardIds owning chunks for collection '" << nss.ns()
+                          << ", but found none",
+            !shardIds.empty());
+
+    return shardIds;
 }
 
 }  // namespace
@@ -1353,19 +1398,38 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
     }
 }
 
-void ShardingCatalogManager::bumpCollShardVersionsAndChangeMetadataInTxn(
+void ShardingCatalogManager::bumpCollectionVersionAndChangeMetadataInTxn(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const std::vector<ShardId>& shardIds,
+    unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
+
+    bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+        opCtx, {nss}, std::move(changeMetadataFunc));
+}
+
+void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+    OperationContext* opCtx,
+    const std::vector<NamespaceString>& collNames,
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc) {
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+    using NssAndShardIds = std::pair<NamespaceString, std::vector<ShardId>>;
+    std::vector<NssAndShardIds> nssAndShardIds;
+    for (const auto& nss : collNames) {
+        auto shardIds = getShardsOwningChunksForCollection(opCtx, nss);
+        nssAndShardIds.emplace_back(nss, std::move(shardIds));
+    }
+
     withTransaction(opCtx,
                     NamespaceString::kConfigReshardingOperationsNamespace,
                     [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                        bumpMajorVersionOneChunkPerShard(opCtx, nss, txnNumber, shardIds);
+                        for (const auto& nssAndShardId : nssAndShardIds) {
+                            bumpMajorVersionOneChunkPerShard(
+                                opCtx, nssAndShardId.first, txnNumber, nssAndShardId.second);
+                        }
                         changeMetadataFunc(opCtx, txnNumber);
                     });
 }
