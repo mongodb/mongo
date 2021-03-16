@@ -53,6 +53,10 @@ jsTestLog("rsConfig2: " + tojson(rsConfig2));
 assert.commandWorked(rsConfig2);
 assert.eq(tojson(rsConfig2.config.members), tojson(rsConfig1.config.members));
 
+// Verify that the node can accept writes before running the reconfig.
+
+assert.soon(() => mongod.adminCommand({isMaster: 1}).ismaster, "Node failed to become a master");
+
 // Make sure that configuration can not be applied manually as it is invalid and no override is
 // specified
 
