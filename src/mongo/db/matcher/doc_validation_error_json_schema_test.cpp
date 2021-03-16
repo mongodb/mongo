@@ -1842,7 +1842,8 @@ TEST(JSONSchemaValidation, ArrayMinItemsTypeArray) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 2},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1]}]}]}]}");
+        "            'consideredValue': [1],"
+        "            'numberOfItems': 1}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1876,7 +1877,8 @@ TEST(JSONSchemaValidation, ArrayMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 2},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1]}]}]}]}");
+        "            'consideredValue': [1],"
+        "            'numberOfItems': 1}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1939,7 +1941,8 @@ TEST(JSONSchemaValidation, ArrayMaxItems) {
         "           {'operatorName': 'maxItems',"
         "            'specifiedAs': {'maxItems': 2},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1, 2, 3]}]}]}]}");
+        "            'consideredValue': [1, 2, 3],"
+        "            'numberOfItems': 3}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2147,7 +2150,8 @@ TEST(JSONSchemaValidation, ArrayItemsSingleSchemaCombinedWithMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': ['A', 'B']}]}]}]}");
+        "            'consideredValue': ['A', 'B'],"
+        "            'numberOfItems': 2}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2174,8 +2178,11 @@ TEST(JSONSchemaValidation, ArrayItemsSingleSchemaNested) {
         "sub-schema', 'itemIndex': 0, 'details': ["
         "        {'operatorName': 'properties', 'propertiesNotSatisfied': ["
         "          {'propertyName': 'b', 'details': [ "
-        "            {'operatorName': 'minItems', 'specifiedAs': { 'minItems': 2 }, 'reason': "
-        "'array did not match specified length', 'consideredValue': [1]}]}]}]}]}]}]}");
+        "            {'operatorName': 'minItems',"
+        "             'specifiedAs': { 'minItems': 2 },"
+        "             'reason': 'array did not match specified length', "
+        "             'consideredValue': [1],"
+        "             'numberOfItems': 1}]}]}]}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2281,7 +2288,8 @@ TEST(JSONSchemaValidation, ArrayItemsSchemaArrayCombinedWithMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1, 'A']}]}]}]}");
+        "            'consideredValue': [1, 'A'],"
+        "            'numberOfItems': 2}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2302,7 +2310,8 @@ TEST(JSONSchemaValidation, ArrayItemsSchemaArrayCombinedWithMinItemsOnShortArray
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1]}]}]}]}");
+        "            'consideredValue': [1],"
+        "            'numberOfItems': 1}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2356,7 +2365,8 @@ TEST(JSONSchemaValidation, ArrayItemsEmptySchemaArrayCombinedWithMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1, 'A']}]}]}]}");
+        "            'consideredValue': [1, 'A'],"
+        "            'numberOfItems': 2}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2499,7 +2509,8 @@ TEST(JSONSchemaValidation, ArrayAdditionalItemsSchemaCombinedWithMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1, 'First', {}]}]}]}]}");
+        "            'consideredValue': [1, 'First', {}],"
+        "            'numberOfItems': 3}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -2580,7 +2591,8 @@ TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseCombinedWithMinItems) {
         "           {'operatorName': 'minItems',"
         "            'specifiedAs': {'minItems': 5},"
         "            'reason': 'array did not match specified length',"
-        "            'consideredValue': [1]}]}]}]}");
+        "            'consideredValue': [1],"
+        "            'numberOfItems': 1}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
