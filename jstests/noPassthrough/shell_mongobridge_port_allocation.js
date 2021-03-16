@@ -44,39 +44,32 @@ for (let node of rst.nodes) {
 
 rst.stopSet();
 
-// We run ShardingTest under mongobridge with both 1-node replica set shards and stand-alone
-// mongod shards.
-for (let options of [{rs: {nodes: 1}}, {rs: false, shardAsReplicaSet: false}]) {
-    resetAllocatedPorts();
+// We run ShardingTest under mongobridge with 1-node replica set shards
+resetAllocatedPorts();
 
-    const numMongos = 5;
-    const numShards = 5;
-    const st = new ShardingTest(Object.assign({
-        mongos: numMongos,
-        shards: numShards,
-        config: {nodes: 1},
-        useBridge: true,
-    },
-                                              options));
+const numMongos = 5;
+const numShards = 5;
+const st = new ShardingTest({
+    mongos: numMongos,
+    shards: numShards,
+    config: {nodes: 1},
+    rs: {nodes: 1},
+    useBridge: true,
+});
 
-    for (let i = 0; i < numMongos; ++i) {
-        checkBridgeOffset(st["s" + i], "mongos");
-    }
-
-    for (let configServer of st.configRS.nodes) {
-        checkBridgeOffset(configServer, "config server");
-    }
-
-    for (let i = 0; i < numShards; ++i) {
-        if (options.rs) {
-            for (let node of st["rs" + i].nodes) {
-                checkBridgeOffset(node, "shard");
-            }
-        } else {
-            checkBridgeOffset(st["d" + i], "shard");
-        }
-    }
-
-    st.stop();
+for (let i = 0; i < numMongos; ++i) {
+    checkBridgeOffset(st["s" + i], "mongos");
 }
+
+for (let configServer of st.configRS.nodes) {
+    checkBridgeOffset(configServer, "config server");
+}
+
+for (let i = 0; i < numShards; ++i) {
+    for (let node of st["rs" + i].nodes) {
+        checkBridgeOffset(node, "shard");
+    }
+}
+
+st.stop();
 })();

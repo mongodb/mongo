@@ -9,12 +9,7 @@
 
 load('jstests/concurrency/fsm_libs/shard_fixture.js');
 
-const rsTestOriginal = new ShardingTest({
-    shards: 2,
-    mongos: 2,
-    config: 2,
-    shardAsReplicaSet: true,
-});
+const rsTestOriginal = new ShardingTest({shards: 2, mongos: 2, config: 2});
 
 const rsTestWrapper =
     new FSMShardingTest(`mongodb://${rsTestOriginal.s0.host},${rsTestOriginal.s1.host}`);
@@ -38,22 +33,4 @@ assert.eq(rsTestWrapper.c(1).host, rsTestOriginal.c1.host);
 assert.eq(rsTestWrapper.c(2), rsTestOriginal.c2);  // Both should be undefined.
 
 rsTestOriginal.stop();
-
-const dTestOriginal = new ShardingTest({
-    shards: 1,
-    mongos: 1,
-    config: 1,
-    shardAsReplicaSet: false,
-});
-
-const dTestWrapper = new FSMShardingTest(dTestOriginal.s.host);
-
-assert.eq(dTestWrapper.shard(0).host, dTestOriginal.shard0.host);
-assert.eq(dTestWrapper.s(0).host, dTestOriginal.s0.host);
-assert.eq(dTestWrapper.d(0).host, dTestOriginal.d0.host);
-assert.eq(dTestWrapper.c(0).host, dTestOriginal.c0.host);
-
-assert.eq(dTestWrapper.rs(0), dTestOriginal.rs0);  // Both should be undefined.
-
-dTestOriginal.stop();
 })();
