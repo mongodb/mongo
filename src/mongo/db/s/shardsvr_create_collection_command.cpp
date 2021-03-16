@@ -119,7 +119,7 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss.isSystem() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                nss.isTemporaryReshardingCollection());
+                nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection());
 
     auto optNumInitialChunks = request.getNumInitialChunks();
     if (optNumInitialChunks) {
