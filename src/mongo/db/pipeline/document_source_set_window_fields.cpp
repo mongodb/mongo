@@ -119,23 +119,23 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     std::vector<WindowFunctionStatement> outputFields) {
 
     // Starting with an input like this:
-    //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, fields: {...}}}
+    //     {$setWindowFields: {partitionBy: {$foo: "$x"}, sortBy: {y: 1}, output: {...}}}
 
     // We move the partitionBy expression out into its own $set stage:
     //     {$set: {__tmp: {$foo: "$x"}}}
-    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
+    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, output: {...}}}
     //     {$unset: '__tmp'}
 
     // This lets us insert a $sort in between:
     //     {$set: {__tmp: {$foo: "$x"}}}
     //     {$sort: {__tmp: 1, y: 1}}
-    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
+    //     {$setWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, output: {...}}}
     //     {$unset: '__tmp'}
 
     // Which lets us replace $setWindowFields with $_internalSetWindowFields:
     //     {$set: {__tmp: {$foo: "$x"}}}
     //     {$sort: {__tmp: 1, y: 1}}
-    //     {$_internalSetWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, fields: {...}}}
+    //     {$_internalSetWindowFields: {partitionBy: "$__tmp", sortBy: {y: 1}, output: {...}}}
     //     {$unset: '__tmp'}
 
     // If partitionBy is a field path, we can $sort by that field directly and avoid creating a

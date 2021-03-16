@@ -51,7 +51,7 @@ assert.commandWorked(run({
     $setWindowFields: {
         partitionBy: "$state",
         sortBy: {city: 1},
-        output: {a: {$sum: {input: 1, documents: ["unbounded", "current"]}}}
+        output: {a: {$sum: 1, window: {documents: ["unbounded", "current"]}}}
     }
 }));
 
