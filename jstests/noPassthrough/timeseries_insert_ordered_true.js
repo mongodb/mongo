@@ -33,10 +33,13 @@ resetColl();
 
 configureFailPoint(conn, 'failTimeseriesInsert', {metadata: 'fail'});
 
+// Temporarily use null meta instead of missing meta to accomodate the new $_internalUnpackBucket
+// behavior which is null meta in a bucket is materialized as "null" meta.
+// TODO SERVER-55213: Remove 'meta: null'.
 const docs = [
-    {_id: 0, [timeFieldName]: ISODate()},
-    {_id: 1, [timeFieldName]: ISODate()},
-    {_id: 2, [timeFieldName]: ISODate()},
+    {_id: 0, meta: null, [timeFieldName]: ISODate()},
+    {_id: 1, meta: null, [timeFieldName]: ISODate()},
+    {_id: 2, meta: null, [timeFieldName]: ISODate()},
 ];
 
 let res = assert.commandWorked(coll.insert(docs, {ordered: true}));
