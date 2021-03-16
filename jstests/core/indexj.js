@@ -3,11 +3,18 @@
 // change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
-t = db.jstests_indexj;
+(function() {
+"use strict";
+
+const t = db[jsTestName()];
 t.drop();
+
+const isSBEEnabled = (() => {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 
 function keysExamined(query, hint, sort) {
     if (!hint) {
@@ -16,46 +23,63 @@ function keysExamined(query, hint, sort) {
     if (!sort) {
         sort = {};
     }
-    var explain = t.find(query).sort(sort).hint(hint).explain("executionStats");
+    const explain = t.find(query).sort(sort).hint(hint).explain("executionStats");
     return explain.executionStats.totalKeysExamined;
 }
 
-t.createIndex({a: 1});
-t.save({a: 5});
+assert.commandWorked(t.createIndex({a: 1}));
+assert.commandWorked(t.insert({a: 5}));
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "A");
 
-t.drop();
-t.createIndex({a: 1});
-t.save({a: 4});
+assert(t.drop());
+assert.commandWorked(t.createIndex({a: 1}));
+assert.commandWorked(t.insert({a: 4}));
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "B");
 
-t.save({a: 5});
+assert.commandWorked(t.insert({a: 5}));
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "D");
 
-t.save({a: 4});
+assert.commandWorked(t.insert({a: 4}));
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "C");
 
-t.save({a: 5});
+assert.commandWorked(t.insert({a: 5}));
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "D");
 
-t.drop();
-t.createIndex({a: 1, b: 1});
-t.save({a: 1, b: 1});
-t.save({a: 1, b: 2});
-t.save({a: 2, b: 1});
-t.save({a: 2, b: 2});
+assert(t.drop());
+assert.commandWorked(t.createIndex({a: 1, b: 1}));
+assert.commandWorked(t.insert({a: 1, b: 1}));
+assert.commandWorked(t.insert({a: 1, b: 2}));
+assert.commandWorked(t.insert({a: 2, b: 1}));
+assert.commandWorked(t.insert({a: 2, b: 2}));
 
-assert.eq(3, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(3, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+// We make different assertions about the number of keys examined depending on whether we are using
+// SBE or the classic engine. This is because the classic engine will use a multi-interval index
+// scan whereas SBE will decompose the intervals into a set of single-interval bounds and will end
+// up examining 0 keys.
+let expectedKeys = isSBEEnabled ? 0 : 3;
+assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
+assert.eq(expectedKeys,
+          keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
 
-t.save({a: 1, b: 1});
-t.save({a: 1, b: 1});
-assert.eq(3, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(3, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(3, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+assert.commandWorked(t.insert({a: 1, b: 1}));
+assert.commandWorked(t.insert({a: 1, b: 1}));
+assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
+assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
+assert.eq(expectedKeys,
+          keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
 
-assert.eq(2, keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
-assert.eq(2, keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
+// We examine one less key in the classic engine because the bounds are slightly tighter.
+if (!isSBEEnabled) {
+    expectedKeys = 2;
+}
+assert.eq(expectedKeys, keysExamined({a: {$in: [1, 1.9]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}));
+assert.eq(expectedKeys,
+          keysExamined({a: {$in: [1.1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}, {a: -1, b: -1}));
 
-t.save({a: 1, b: 1.5});
-assert.eq(4, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}), "F");
+assert.commandWorked(t.insert({a: 1, b: 1.5}));
+
+// We examine one extra key in both engines because we've inserted a document that falls within
+// both sets of bounds being scanned.
+expectedKeys = isSBEEnabled ? 1 : 4;
+assert.eq(expectedKeys, keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1}), "F");
+})();
