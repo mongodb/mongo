@@ -40,6 +40,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/vector_clock.h"
@@ -831,8 +832,20 @@ ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
-    const ReshardingCoordinatorDocument& doc) {
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) {
     invariant(doc.getReshardingUUID() == _coordinatorDoc.getReshardingUUID());
+
+    BSONObjBuilder bob;
+    bob.append("newState", CoordinatorState_serializer(doc.getState()));
+    bob.append("oldState", CoordinatorState_serializer(_coordinatorDoc.getState()));
+    bob.append("namespace", doc.getSourceNss().toString());
+    bob.append("collectionUUID", doc.getSourceUUID().toString());
+    bob.append("reshardingUUID", doc.getReshardingUUID().toString());
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "resharding.coordinator.transition",
+                                           doc.getSourceNss().toString(),
+                                           bob.obj(),
+                                           ShardingCatalogClient::kMajorityWriteConcern);
 
     LOGV2_INFO(5343001,
                "Transitioned resharding coordinator state",
@@ -1023,7 +1036,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
 
     resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
-    installCoordinatorDoc(updatedCoordinatorDoc);
+    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
     ReshardingMetrics::get(cc().getServiceContext())->onStart();
@@ -1058,7 +1071,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
                                                       updatedCoordinatorDoc,
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones));
-    installCoordinatorDoc(updatedCoordinatorDoc);
+    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 };
 
 
@@ -1209,7 +1222,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
         opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     // Update the in memory state
-    installCoordinatorDoc(updatedCoordinatorDoc);
+    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
     return Status::OK();
 };
@@ -1257,7 +1270,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
                                                                            updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc
-    installCoordinatorDoc(updatedCoordinatorDoc);
+    installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(
