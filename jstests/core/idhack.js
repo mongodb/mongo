@@ -62,7 +62,7 @@ assertNonIdHackPlan(db, getWinningPlan(explain.queryPlanner), isSBEEnabled);
 
 // Covered query returning _id field only can be handled by ID hack.
 explain = t.find(query, {_id: 1}).explain();
-assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "PROJECTION_COVERED", isSBEEnabled);
+assertIdHackPlan(db, getWinningPlan(explain.queryPlanner), "FETCH", isSBEEnabled);
 // Check doc from covered ID hack query.
 assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}), explain);
 
