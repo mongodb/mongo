@@ -34,6 +34,7 @@
 #include <memory>
 #include <vector>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/namespace_string.h"
@@ -59,6 +60,8 @@ public:
     enum class AllowedWithApiStrict {
         // The stage is always allowed in the pipeline regardless of API versions.
         kAlways,
+        // This stage can be allowed in a stable API version, depending on the parameters.
+        kSometimes,
         // The stage is allowed only for internal client when 'apiStrict' is set to true.
         kInternal,
         // The stage is never allowed in API version '1' when 'apiStrict' is set to true.
@@ -138,6 +141,16 @@ public:
      */
     virtual PrivilegeVector requiredPrivileges(bool isMongos,
                                                bool bypassDocumentValidation) const = 0;
+
+    /**
+     * Does any custom assertions necessary to validate this stage is permitted in the given API
+     * Version. For example, if certain stage parameters are permitted but others excluded, that
+     * should happen here.
+     */
+    virtual void assertPermittedInAPIVersion(const APIParameters&) const {
+        // By default there are no custom checks needed. The 'AllowedWithApiStrict' flag should take
+        // care of most cases.
+    }
 
     /**
      * Returns true if this is a $collStats stage.

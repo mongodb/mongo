@@ -70,6 +70,8 @@ public:
             return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::collStats)};
         }
 
+        void assertPermittedInAPIVersion(const APIParameters&) const;
+
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
         }
