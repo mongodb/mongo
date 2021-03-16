@@ -161,9 +161,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     auto opCtx = operationContext();
 
-    std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
-    ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
-        opCtx, kNss, shardIds, [&](OperationContext*, TxnNumber) {});
+    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+        opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
     ASSERT_TRUE(chunkMajorVersionWasBumpedAndOtherFieldsAreUnchanged(
         shard0Chunk0, getChunkDoc(operationContext(), shard0Chunk0.getMin()), targetChunkVersion));
@@ -203,9 +202,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0});
 
     auto opCtx = operationContext();
-    std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
-    ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
-        opCtx, kNss, shardIds, [&](OperationContext*, TxnNumber) {});
+    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+        opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
     assertOnlyOneChunkVersionBumped(
         operationContext(), {shard0Chunk0, shard0Chunk1}, targetChunkVersion);
@@ -251,9 +249,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0, shard1Chunk1});
 
     auto opCtx = operationContext();
-    std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
-    ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
-        opCtx, kNss, shardIds, [&](OperationContext*, TxnNumber) {});
+    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+        opCtx, kNss, [&](OperationContext*, TxnNumber) {});
 
     assertOnlyOneChunkVersionBumped(
         operationContext(), {shard0Chunk0, shard0Chunk1}, targetChunkVersion);
@@ -282,10 +279,9 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
 
     size_t numCalls = 0;
-    const std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
     ShardingCatalogManager::get(operationContext())
-        ->bumpCollShardVersionsAndChangeMetadataInTxn(
-            operationContext(), kNss, shardIds, [&](OperationContext*, TxnNumber) {
+        ->bumpCollectionVersionAndChangeMetadataInTxn(
+            operationContext(), kNss, [&](OperationContext*, TxnNumber) {
                 ++numCalls;
                 if (numCalls < 5) {
                     throw WriteConflictException();
@@ -313,8 +309,8 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     numCalls = 0;
     ShardingCatalogManager::get(operationContext())
-        ->bumpCollShardVersionsAndChangeMetadataInTxn(
-            operationContext(), kNss, shardIds, [&](OperationContext*, TxnNumber) {
+        ->bumpCollectionVersionAndChangeMetadataInTxn(
+            operationContext(), kNss, [&](OperationContext*, TxnNumber) {
                 ++numCalls;
                 if (numCalls >= 5) {
                     fp.reset();
@@ -354,12 +350,10 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
 
     size_t numCalls = 0;
-    const std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                           ->bumpCollectionVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
-                               shardIds,
                                [&](OperationContext*, TxnNumber) {
                                    ++numCalls;
                                    uasserted(ErrorCodes::ShutdownInProgress,
@@ -382,10 +376,9 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     numCalls = 0;
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                           ->bumpCollectionVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
-                               shardIds,
                                [&](OperationContext*, TxnNumber) {
                                    ++numCalls;
                                    uasserted(ErrorCodes::NotWritablePrimary,
@@ -408,16 +401,15 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
 
     numCalls = 0;
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
-                           ->bumpCollShardVersionsAndChangeMetadataInTxn(
+                           ->bumpCollectionVersionAndChangeMetadataInTxn(
                                operationContext(),
                                kNss,
-                               shardIds,
                                [&](OperationContext*, TxnNumber) {
                                    ++numCalls;
                                    cc().getOperationContext()->markKilled(ErrorCodes::Interrupted);
 
                                    // Throw a LockTimeout exception so
-                                   // bumpCollShardVersionsAndChangeMetadataInTxn() makes another
+                                   // bumpCollectionVersionAndChangeMetadataInTxn() makes another
                                    // retry attempt and discovers operation context has been killed.
                                    uasserted(ErrorCodes::LockTimeout,
                                              "simulating lock timeout error from test");

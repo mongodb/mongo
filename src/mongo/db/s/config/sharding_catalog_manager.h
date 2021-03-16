@@ -283,14 +283,19 @@ public:
      * In a single transaction, effectively bumps the shard version for each shard in the collection
      * to be the current collection version's major version + 1 inside an already-running
      * transaction.
-     *
-     * Note: it's the responsibility of the caller to ensure that the list of shards is stable,
-     * as any shards added after the shard ids have been passed in will be missed.
      */
-    void bumpCollShardVersionsAndChangeMetadataInTxn(
+    void bumpCollectionVersionAndChangeMetadataInTxn(
         OperationContext* opCtx,
         const NamespaceString& nss,
-        const std::vector<ShardId>& shardIds,
+        unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
+
+    /**
+     * Same as bumpCollectionVersionAndChangeMetadataInTxn, but bumps the version for several
+     * collections in a single transaction.
+     */
+    void bumpMultipleCollectionVersionsAndChangeMetadataInTxn(
+        OperationContext* opCtx,
+        const std::vector<NamespaceString>& collNames,
         unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
 
     /**
