@@ -1225,8 +1225,12 @@ Status RollbackImpl::_triggerOpObserver(OperationContext* opCtx) {
 
 void RollbackImpl::_transitionFromRollbackToSecondary(OperationContext* opCtx) {
     invariant(opCtx);
-    invariant(_replicationCoordinator->getMemberState() == MemberState(MemberState::RS_ROLLBACK));
 
+    // It is possible that this node has actually been removed due to a reconfig via
+    // heartbeat during rollback. But it should be fine to transition to SECONDARY
+    // and this won't change how the node reports its member state since topology
+    // coordinator will always check if the node exists in its local config when
+    // returning member state.
     LOGV2(21611, "Transition to SECONDARY");
 
     ReplicationStateTransitionLockGuard transitionGuard(opCtx, MODE_X);

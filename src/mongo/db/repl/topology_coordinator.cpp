@@ -1003,8 +1003,11 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
             nextAction = HeartbeatResponseAction::makeReconfigAction();
             nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
 
-            // TODO(SERVER-48178) Only continue processing heartbeat in primary state to avoid
-            // concurrent reconfig and rollback.
+            // Only continue processing heartbeat in primary state. In other states it is not
+            // safe to continue processing heartbeat and should start reconfig right away.
+            // e.g. if this node was removed from replSet, _selfIndex is -1, and a following
+            // check on _selfIndex will keep retrying heartbeat to fetch new config, preventing
+            // the new config to be installed.
             if (_role != Role::kLeader) {
                 return nextAction;
             }
