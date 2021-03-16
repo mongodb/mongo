@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string_view>
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/sort.h"

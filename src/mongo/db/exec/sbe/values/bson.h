@@ -42,7 +42,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
 const char* advance(const char* be, size_t fieldNameSize);
 
 inline auto fieldNameView(const char* be) noexcept {
-    return std::string_view{be + 1};
+    return StringData{be + 1};
 }
 
 template <class ArrayBuilder>
@@ -53,7 +53,7 @@ void convertToBsonObj(ObjBuilder& builder, value::Object* obj);
 
 template <class ObjBuilder>
 void appendValueToBsonObj(ObjBuilder& builder,
-                          std::string_view name,
+                          StringData name,
                           value::TypeTags tag,
                           value::Value val);
 }  // namespace bson

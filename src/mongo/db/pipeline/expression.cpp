@@ -1972,12 +1972,8 @@ TimeUnit ExpressionDateDiff::convertToTimeUnit(const Value& value) {
             str::stream() << "$dateDiff requires 'unit' to be a string, but got "
                           << typeName(value.getType()),
             BSONType::String == value.getType());
-    auto valueAsString = value.getStringData();
-    return addContextToAssertionException(
-        [&]() {
-            return parseTimeUnit(std::string_view{valueAsString.rawData(), valueAsString.size()});
-        },
-        "$dateDiff parameter 'unit' value parsing failed"_sd);
+    return addContextToAssertionException([&] { return parseTimeUnit(value.getStringData()); },
+                                          "$dateDiff parameter 'unit' value parsing failed"_sd);
 }
 
 DayOfWeek ExpressionDateDiff::parseStartOfWeek(const Value& value) {
@@ -1985,11 +1981,8 @@ DayOfWeek ExpressionDateDiff::parseStartOfWeek(const Value& value) {
             str::stream() << "$dateDiff requires 'startOfWeek' to be a string, but got "
                           << typeName(value.getType()),
             BSONType::String == value.getType());
-    auto valueAsString = value.getStringData();
     return addContextToAssertionException(
-        [&]() {
-            return parseDayOfWeek(std::string_view{valueAsString.rawData(), valueAsString.size()});
-        },
+        [&] { return parseDayOfWeek(value.getStringData()); },
         "$dateDiff parameter 'startOfWeek' value parsing failed"_sd);
 }
 

@@ -92,20 +92,20 @@ std::string DebugPrinter::print(const std::vector<Block>& blocks) {
                 break;
         }
 
-        std::string_view sv(b.str);
+        StringData sv(b.str);
         if (!sv.empty()) {
-            if (sv.front() == '`') {
-                sv.remove_prefix(1);
+            if (*sv.begin() == '`') {
+                sv = sv.substr(1);
                 if (!ret.empty() && ret.back() == ' ') {
                     ret.resize(ret.size() - 1, 0);
                 }
             }
-            if (!sv.empty() && sv.back() == '`') {
-                sv.remove_suffix(1);
+            if (!sv.empty() && *(sv.end() - 1) == '`') {
+                sv = sv.substr(0, sv.size() - 1);
                 addSpace = false;
             }
             if (!sv.empty()) {
-                ret.append(sv);
+                ret.append(sv.begin(), sv.end());
                 if (addSpace) {
                     ret.append(" ");
                 }

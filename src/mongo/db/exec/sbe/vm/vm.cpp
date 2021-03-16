@@ -750,12 +750,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggLast(value::TypeTag
 }
 
 
-bool hasSeparatorAt(size_t idx, std::string_view input, std::string_view separator) {
-    if (separator.size() + idx > input.size()) {
-        return false;
-    }
-
-    return input.compare(idx, separator.size(), separator) == 0;
+bool hasSeparatorAt(size_t idx, StringData input, StringData separator) {
+    return (idx + separator.size() <= input.size()) &&
+        input.substr(idx, separator.size()) == separator;
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSplit(ArityType arity) {
@@ -775,7 +772,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSplit(ArityType
 
     size_t splitStart = 0;
     size_t splitPos;
-    while ((splitPos = input.find(separator, splitStart)) != std::string_view::npos) {
+    while ((splitPos = input.find(separator, splitStart)) != std::string::npos) {
         auto [tag, val] = value::makeNewString(input.substr(splitStart, splitPos - splitStart));
         arr->push_back(tag, val);
 
@@ -835,7 +832,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arit
     } else if (tagInObj == value::TypeTags::Object) {
         auto objRoot = value::getObjectView(valInObj);
         for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-            std::string_view sv(objRoot->field(idx));
+            StringData sv(objRoot->field(idx));
 
             if (restrictFieldsSet.count(sv) == 0) {
 
@@ -947,7 +944,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(Ar
             kb.appendNumberLong(num);
         } else if (value::isString(tag)) {
             auto str = value::getStringView(tag, val);
-            kb.appendString(StringData{str.data(), str.length()});
+            kb.appendString(str);
         } else {
             uasserted(4822802, "unsuppored key string type");
         }
@@ -1154,19 +1151,15 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(Arit
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto inputStrView = value::getStringView(typeTagInputStr, valueInputStr);
-    auto findStrView = value::getStringView(typeTagFindStr, valueFindStr);
-    auto replacementStrView = value::getStringView(typeTagReplacementStr, valueReplacementStr);
+    auto input = value::getStringView(typeTagInputStr, valueInputStr);
+    auto find = value::getStringView(typeTagFindStr, valueFindStr);
+    auto replacement = value::getStringView(typeTagReplacementStr, valueReplacementStr);
 
     // If find string is empty, return nothing, since an empty find will match every position in a
     // string.
-    if (findStrView.empty()) {
+    if (find.empty()) {
         return {false, value::TypeTags::Nothing, 0};
     }
-
-    auto input = StringData(inputStrView.data(), inputStrView.length());
-    auto find = StringData(findStrView.data(), findStrView.length());
-    auto replacement = StringData(replacementStrView.data(), replacementStrView.length());
 
     // If find string is not found, return the original string.
     size_t startIndex = input.find(find);
@@ -1182,8 +1175,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(Arit
     output << input.substr(endIndex);
 
     auto strData = output.stringData();
-    auto [outputStrTypeTag, outputStrValue] =
-        sbe::value::makeNewString({strData.rawData(), strData.size()});
+    auto [outputStrTypeTag, outputStrValue] = sbe::value::makeNewString(strData);
     return {true, outputStrTypeTag, outputStrValue};
 }
 
@@ -1321,9 +1313,7 @@ std::tuple<bool, value::TypeTags, value::Value> builtinDateHelper(
     invariant(timeZoneDB);
 
     auto tzString = value::getStringView(typeTagTz, valueTz);
-    const auto tz = tzString == ""
-        ? timeZoneDB->utcZone()
-        : timeZoneDB->getTimeZone(StringData{tzString.data(), tzString.size()});
+    const auto tz = tzString == "" ? timeZoneDB->utcZone() : timeZoneDB->getTimeZone(tzString);
 
     auto date =
         computeDateFn(tz,
@@ -1858,8 +1848,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityTyp
         if (!value::isString(tag)) {
             return {false, value::TypeTags::Nothing, 0};
         }
-        auto sv = sbe::value::getStringView(tag, value);
-        result << StringData{sv.data(), sv.size()};
+        result << sbe::value::getStringView(tag, value);
     }
 
     auto [strTag, strValue] = sbe::value::makeNewString(result.str());
@@ -1956,7 +1945,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(Ar
             return {false, value::TypeTags::Nothing, 0};
         }
         // Check for valid bounds.
-        if (static_cast<size_t>(startIndex) > str.length()) {
+        if (static_cast<size_t>(startIndex) > str.size()) {
             return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
         }
     }
@@ -2003,7 +1992,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(Arity
             return {false, value::TypeTags::Nothing, 0};
         }
         // Check for valid bounds.
-        if (static_cast<size_t>(startCodePointIndex) > str.length()) {
+        if (static_cast<size_t>(startCodePointIndex) > str.size()) {
             return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
         }
     }
@@ -2044,7 +2033,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(Arity
     byteIndex = startByteIndex;
     for (codePointIndex = startCodePointIndex; codePointIndex < endCodePointIndex;
          ++codePointIndex) {
-        if (str.compare(byteIndex, substr.size(), substr) == 0) {
+        if (str.substr(byteIndex, substr.size()).compare(substr) == 0) {
             return {
                 false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointIndex)};
         }
@@ -2088,7 +2077,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(Arit
         return {false, value::TypeTags::Boolean, false};
     }
     auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
-    if (timezoneDB->isTimeZoneIdentifier((StringData{timezoneStr.data(), timezoneStr.size()}))) {
+    if (timezoneDB->isTimeZoneIdentifier(timezoneStr)) {
         return {false, value::TypeTags::Boolean, true};
     }
     return {false, value::TypeTags::Boolean, false};
@@ -2322,7 +2311,7 @@ namespace {
  * ...} from the result of pcre_exec().
  */
 std::tuple<bool, value::TypeTags, value::Value> buildRegexMatchResultObject(
-    std::string_view inputString,
+    StringData inputString,
     const std::vector<int>& capturesBuffer,
     size_t numCaptures,
     uint32_t& startBytePos,
@@ -2419,7 +2408,7 @@ std::tuple<bool, value::TypeTags, value::Value> buildRegexMatchResultObject(
  * returned is true/false.
  */
 std::tuple<bool, value::TypeTags, value::Value> pcreNextMatch(value::PcreRegex* pcre,
-                                                              std::string_view inputString,
+                                                              StringData inputString,
                                                               std::vector<int>& capturesBuffer,
                                                               uint32_t& startBytePos,
                                                               uint32_t& codePointPos,
@@ -2454,7 +2443,7 @@ std::tuple<bool, value::TypeTags, value::Value> pcreNextMatch(value::PcreRegex* 
  */
 std::tuple<bool, value::TypeTags, value::Value> pcreFirstMatch(
     value::PcreRegex* pcre,
-    std::string_view inputString,
+    StringData inputString,
     bool isMatch = false,
     std::vector<int>* capturesBuffer = nullptr,
     uint32_t* startBytePos = nullptr,
@@ -2507,16 +2496,15 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
 
     // For strings, call CollatorInterface::getComparisonKey() to obtain the comparison key.
     if (value::isString(tag)) {
-        auto sv = value::getStringView(tag, val);
-        auto compKey = collator->getComparisonKey(StringData{sv.data(), sv.size()});
+        auto compKey = collator->getComparisonKey(value::getStringView(tag, val));
         auto keyData = compKey.getKeyData();
-        return value::makeNewString(std::string_view{keyData.rawData(), keyData.size()});
+        return value::makeNewString(keyData);
     }
 
     // For collatable types other than strings (such as arrays and objects), we take the slow
     // path and round-trip the value through BSON.
     BSONObjBuilder input;
-    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""sv, tag, val);
+    bson::appendValueToBsonObj<BSONObjBuilder>(input, ""_sd, tag, val);
 
     BSONObjBuilder output;
     CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
@@ -2625,8 +2613,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
             startBytePos += str::getCodePointLength(inputString[startBytePos]);
             ++codePointPos;
         } else {
-            startBytePos += matchString.length();
-            for (size_t byteIdx = 0; byteIdx < matchString.length(); ++codePointPos) {
+            startBytePos += matchString.size();
+            for (size_t byteIdx = 0; byteIdx < matchString.size(); ++codePointPos) {
                 byteIdx += str::getCodePointLength(matchString[byteIdx]);
             }
         }
@@ -2801,7 +2789,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinHasNullBytes(Ar
     }
 
     auto stringView = value::getStringView(strType, strValue);
-    auto hasNullBytes = stringView.find('\0') != std::string_view::npos;
+    auto hasNullBytes = stringView.find('\0') != std::string::npos;
 
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(hasNullBytes)};
 }
