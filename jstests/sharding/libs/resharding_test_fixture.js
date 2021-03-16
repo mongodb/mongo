@@ -76,9 +76,12 @@ var ReshardingTest = class {
     setup() {
         this._st = new ShardingTest({
             mongos: 1,
+            mongosOptions: {setParameter: {featureFlagResharding: true}},
             config: 1,
+            configOptions: {setParameter: {featureFlagResharding: true}},
             shards: this._numShards,
             rs: {nodes: 2},
+            rsOptions: {setParameter: {featureFlagResharding: true}},
             manualAddShard: true,
         });
 

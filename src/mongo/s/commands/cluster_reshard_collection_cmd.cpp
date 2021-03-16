@@ -40,6 +40,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -110,7 +111,7 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(ReshardCollectionCmd);
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ReshardCollectionCmd, resharding::gFeatureFlagResharding);
 
 }  // namespace
 }  // namespace mongo

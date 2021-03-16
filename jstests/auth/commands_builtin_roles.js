@@ -75,7 +75,10 @@ function testProperAuthorization(conn, t, testcase, r) {
                 " with role " + r.key;
         }
     } else {
-        if (res.ok == 1 || (res.ok == 0 && res.code != authErrCode)) {
+        // Don't error if the test failed with CommandNotFound rather than an authorization failure
+        // because some commands may be guarded by feature flags.
+        if (res.ok == 1 ||
+            (res.ok == 0 && res.code != authErrCode && res.code !== ErrorCodes.CommandNotFound)) {
             out = "expected authorization failure" +
                 " but received result " + tojson(res) + " on db " + testcase.runOnDb +
                 " with role " + r.key;

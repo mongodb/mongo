@@ -1304,4 +1304,20 @@ CommandRegistry* globalCommandRegistry();
         }                                                                   \
     }
 
+/**
+ * Creates a command object of type CmdType if the featureFlag is enabled for
+ * this process, regardless of the current FCV. Prefer this syntax to using
+ * MONGO_INITIALIZER directly. The created Command object is "leaked"
+ * intentionally, since it will register itself.
+ *
+ * The command objects will be created after the "default" initializer, and all
+ * startup option processing happens prior to "default" (see base/init.h).
+ */
+#define MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CmdType, featureFlag)        \
+    MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
+        if (featureFlag.isEnabledAndIgnoreFCV()) {                          \
+            new CmdType();                                                  \
+        }                                                                   \
+    }
+
 }  // namespace mongo

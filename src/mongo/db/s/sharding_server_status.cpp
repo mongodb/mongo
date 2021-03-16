@@ -41,6 +41,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -113,7 +114,9 @@ public:
             CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
         }
 
-        {
+        // The serverStatus command is run before the FCV is initialized so we ignore it when
+        // checking whether the resharding feature is enabled here.
+        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
             BSONObjBuilder subObjBuilder(result.subobjStart("resharding"));
             ReshardingMetrics::get(opCtx->getServiceContext())->serialize(&subObjBuilder);
         }
