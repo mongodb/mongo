@@ -2115,6 +2115,15 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                           "completionStatus"_attr = status,
                           "interruptStatus"_attr = _taskState.getInterruptStatus());
                     status = _taskState.getInterruptStatus();
+                } else if (status == ErrorCodes::CallbackCanceled) {
+                    // All of our async components don't exit with CallbackCanceled normally unless
+                    // they are shut down by the instance itself via interrupt. If we get a
+                    // CallbackCanceled error without an interrupt, it is coming from the service's
+                    // cancellation token on failovers. It is possible for the token to get canceled
+                    // before the instance is interrupted, so we replace the CallbackCanceled error
+                    // with InterruptedDueToReplStateChange and treat it as a retryable error.
+                    status = Status{ErrorCodes::InterruptedDueToReplStateChange,
+                                    "operation was interrupted"};
                 }
             }
 
