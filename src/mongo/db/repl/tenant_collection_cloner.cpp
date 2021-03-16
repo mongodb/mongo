@@ -271,14 +271,15 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
     };
 
     // Tenant collections are replicated collections and it's impossible to have an empty _id index
-    // and collection options 'autoIndexId' as false. These are extra sanity checks made on the
-    // response received from the remote node.
+    // and collection options 'autoIndexId' as false except for collections that use clustered
+    // index. These are extra sanity checks made on the response received from the remote node.
     uassert(
         ErrorCodes::IllegalOperation,
         str::stream() << "Found empty '_id' index spec but the collection is not specified with "
                          "'autoIndexId' as false, tenantId: "
                       << _tenantId << ", namespace: " << this->_sourceNss,
-        !_idIndexSpec.isEmpty() || _collectionOptions.autoIndexId == CollectionOptions::NO);
+        _collectionOptions.clusteredIndex || !_idIndexSpec.isEmpty() ||
+            _collectionOptions.autoIndexId == CollectionOptions::NO);
 
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(4884504,
@@ -423,7 +424,12 @@ void TenantCollectionCloner::runQuery() {
         ? QUERY("query" << BSONObj())
         // Use $expr and the aggregation version of $gt to avoid type bracketing.
         : QUERY("$expr" << BSON("$gt" << BSON_ARRAY("$_id" << _lastDocId["_id"])));
-    query.hint(BSON("_id" << 1));
+    if (_collectionOptions.clusteredIndex) {
+        // RecordIds are _id values and has no separate _id index
+        query.hint(BSON("$natural" << 1));
+    } else {
+        query.hint(BSON("_id" << 1));
+    }
 
     // Any errors that are thrown here (including NamespaceNotFound) will be handled on the stage
     // level.
