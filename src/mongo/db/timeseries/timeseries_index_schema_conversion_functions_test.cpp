@@ -132,10 +132,19 @@ TEST(TimeseriesIndexSchemaConversionTest, TimeSubFieldIndexSpecConversionFails) 
 }
 
 // {mm: 1} <=> {meta: 1}
-TEST(TimeseriesIndexSchemaConversionTest, MetadataIndexSpecConversion) {
+TEST(TimeseriesIndexSchemaConversionTest, AscendingMetadataIndexSpecConversion) {
     TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
     BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << 1);
     BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << 1);
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {mm: -1} <=> {meta: -1}
+TEST(TimeseriesIndexSchemaConversionTest, DescendingMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << -1);
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << -1);
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }
@@ -251,6 +260,61 @@ TEST(TimeseriesIndexSchemaConversionTest, ManyFieldCompoundIndexSpecConversion) 
              << 1 << kMetaFieldName + kSubField2Name << 1 << kMetaFieldName + ".foo" << 1
              << kMetaFieldName + ".bar" << 1 << kMetaFieldName + ".baz" << 1
              << kControlMinTimeFieldName << 1 << kControlMaxTimeFieldName << 1);
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {mm: "hashed"} <=> {meta: "hashed"}
+TEST(TimeseriesIndexSchemaConversionTest, HashedMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << "hashed");
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << "hashed");
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {"mm.$**": 1} <=> {"meta.$**": 1}
+TEST(TimeseriesIndexSchemaConversionTest, WildcardMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName + ".$**" << 1);
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName + ".$**" << 1);
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {"mm.subfield1.$**": 1} <=> {"meta.subfield1.$**": 1}
+TEST(TimeseriesIndexSchemaConversionTest, WildcardMetadataSubfieldIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName + kSubField1Name + ".$**" << 1);
+    BSONObj bucketsIndexSpec =
+        BSON(BucketUnpacker::kBucketMetaFieldName + kSubField1Name + ".$**" << 1);
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {mm: "text"} <=> {meta: "text"}
+TEST(TimeseriesIndexSchemaConversionTest, TextMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << "text");
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << "text");
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {mm: "2d"} <=> {meta: "2d"}
+TEST(TimeseriesIndexSchemaConversionTest, 2dTextMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << "2d");
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << "2d");
+
+    testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
+}
+
+// {mm: "2dsphere"} <=> {meta: "2dsphere"}
+TEST(TimeseriesIndexSchemaConversionTest, 2dsphereMetadataIndexSpecConversion) {
+    TimeseriesOptions timeseriesOptions = makeTimeseriesOptions();
+    BSONObj timeseriesIndexSpec = BSON(kTimeseriesMetaFieldName << "2dsphere");
+    BSONObj bucketsIndexSpec = BSON(BucketUnpacker::kBucketMetaFieldName << "2dsphere");
 
     testBothWaysIndexSpecConversion(timeseriesOptions, timeseriesIndexSpec, bucketsIndexSpec);
 }

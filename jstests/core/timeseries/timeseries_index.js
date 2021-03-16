@@ -1,5 +1,5 @@
 /**
- * Tests basic index creation and drops on a time-series collection.
+ * Tests index creation, index drops, list indexes, hide/unhide index on a time-series collection.
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
@@ -25,6 +25,8 @@ let collCountPostfix = 0;
 
 const timeFieldName = 'tm';
 const metaFieldName = 'mm';
+const controlMinTimeFieldName = "control.min." + timeFieldName;
+const controlMaxTimeFieldName = "control.max." + timeFieldName;
 
 const doc = {
     _id: 0,
@@ -33,6 +35,14 @@ const doc = {
 };
 
 /**
+ * Tests time-series
+ *   - createIndex
+ *   - queryable index (on time-series and underlying buckets collection using buckets format hint)
+ *   - dropIndex (by index name and key)
+ *   - listIndexes
+ *   - hide/unhide (index by index name and key)
+ *   - createIndex w/ hidden:true
+ *
  * Accepts two index key patterns.
  * The first key pattern is for the createIndexes command on the time-series collection.
  * The second key pattern is what we can expect to use as a hint when querying the bucket
@@ -44,20 +54,21 @@ const runTest = function(keyForCreate, hint) {
     coll.drop();  // implicitly drops bucketsColl.
 
     jsTestLog('Running test: collection: ' + coll.getFullName() +
-              '; index spec key for createIndexes: ' + tojson(keyForCreate) +
-              '; index spec key for hint: ' + tojson(hint));
+              ';\nindex spec key for createIndexes: ' + tojson(keyForCreate) +
+              ';\nindex spec key for query hint: ' + tojson(hint));
 
     assert.commandWorked(db.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
+    // Insert data on the time-series collection and index it.
     assert.commandWorked(coll.insert(doc, {ordered: false}),
                          'failed to insert doc: ' + tojson(doc));
-
     assert.commandWorked(coll.createIndex(keyForCreate),
                          'failed to create index: ' + tojson(keyForCreate));
 
-    // Check bucket collection.
+    // Check that the buckets collection was created, the index on it is usable and the document is
+    // present in the expected format.
     const bucketDocs = bucketsColl.find().hint(hint).toArray();
     assert.eq(1, bucketDocs.length, bucketDocs);
 
@@ -66,17 +77,22 @@ const runTest = function(keyForCreate, hint) {
     assert.eq(doc[timeFieldName], bucketDoc.control.min[timeFieldName], bucketDoc);
     assert.docEq(doc[metaFieldName], bucketDoc.meta, bucketDoc);
 
-    // Check listIndexes command result directly so that we can inspect the namespace in addition
-    // to the index key pattern.
+    // Check that listIndexes against the time-series collection returns the index just created.
+    //
+    // Note: call the listIndexes command directly, rather than use a helper, so that we can inspect
+    // the result's namespace in addition to the result's index key pattern.
     const cursorDoc = assert.commandWorked(db.runCommand({listIndexes: coll.getName()})).cursor;
     assert.eq(coll.getFullName(), cursorDoc.ns, tojson(cursorDoc));
     assert.eq(1, cursorDoc.firstBatch.length, tojson(cursorDoc));
     assert.docEq(keyForCreate, cursorDoc.firstBatch[0].key, tojson(cursorDoc));
 
-    // Check that the underlying buckets collection index was dropped properly.
+    // Drop the index on the time-series collection and then check that the underlying buckets
+    // collection index was dropped properly.
     assert.commandWorked(coll.dropIndex(keyForCreate),
                          'failed to drop index: ' + tojson(keyForCreate));
     assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
+    assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
                                               ErrorCodes.BadValue);
 
     // Check that we are able to drop the index by name (single name and array of names).
@@ -91,22 +107,30 @@ const runTest = function(keyForCreate, hint) {
     assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide1'}),
                          'failed to create index: ' + tojson(keyForCreate));
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.eq(1, coll.find().hint(hint).toArray().length);
     assert.commandWorked(coll.hideIndex('hide1'), 'failed to hide index: hide1');
     assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
                                               ErrorCodes.BadValue);
+    assert.commandFailedWithCode(assert.throws(() => coll.find().hint(keyForCreate).toArray()),
+                                              ErrorCodes.BadValue);
     assert.commandWorked(coll.unhideIndex('hide1'), 'failed to unhide index: hide1');
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.eq(1, coll.find().hint(hint).toArray().length);
     assert.commandWorked(coll.dropIndex('hide1'), 'failed to drop index: hide1');
 
     // Check that we are able to hide and unhide the index by key.
     assert.commandWorked(coll.createIndex(keyForCreate, {name: 'hide2'}),
                          'failed to create index: ' + tojson(keyForCreate));
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.eq(1, coll.find().hint(hint).toArray().length);
     assert.commandWorked(coll.hideIndex(keyForCreate), 'failed to hide index: hide2');
     assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
                                               ErrorCodes.BadValue);
+    assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
     assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide2');
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.eq(1, coll.find().hint(hint).toArray().length);
     assert.commandWorked(coll.dropIndex('hide2'), 'failed to drop index: hide2');
 
     // Check that we are able to create the index as hidden.
@@ -114,34 +138,48 @@ const runTest = function(keyForCreate, hint) {
                          'failed to create index: ' + tojson(keyForCreate));
     assert.commandFailedWithCode(assert.throws(() => bucketsColl.find().hint(hint).toArray()),
                                               ErrorCodes.BadValue);
+    assert.commandFailedWithCode(assert.throws(() => coll.find().hint(hint).toArray()),
+                                              ErrorCodes.BadValue);
     assert.commandWorked(coll.unhideIndex(keyForCreate), 'failed to unhide index: hide3');
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
-    assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide2');
+    assert.eq(1, coll.find().hint(hint).toArray().length);
+    assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide3');
 };
 
+/**
+ * Time-series index creation and usage testing.
+ */
+
+// metaField ascending and descending indexes.
 runTest({[metaFieldName]: 1}, {meta: 1});
 runTest({[metaFieldName]: -1}, {meta: -1});
+
+// metaField subfield indexes.
 runTest({[metaFieldName + '.tag1']: 1}, {'meta.tag1': 1});
 runTest({[metaFieldName + '.tag1']: 1, [metaFieldName + '.tag2']: -1},
         {'meta.tag1': 1, 'meta.tag2': -1});
 
-runTest({[timeFieldName]: 1},
-        {['control.min.' + timeFieldName]: 1, ['control.max.' + timeFieldName]: 1});
-runTest({[metaFieldName + '.tag1']: 1, [timeFieldName]: 1},
-        {'meta.tag1': 1, ['control.min.' + timeFieldName]: 1, ['control.max.' + timeFieldName]: 1});
-runTest({[timeFieldName]: -1},
-        {['control.max.' + timeFieldName]: -1, ['control.min.' + timeFieldName]: -1});
-runTest(
-    {[metaFieldName + '.tag1']: 1, [timeFieldName]: -1},
-    {'meta.tag1': 1, ['control.max.' + timeFieldName]: -1, ['control.min.' + timeFieldName]: -1});
-runTest({[metaFieldName + '.tag1']: -1, [metaFieldName + '.tag2']: 1, [timeFieldName]: 1}, {
-    'meta.tag1': -1,
-    'meta.tag2': 1,
-    ['control.min.' + timeFieldName]: 1,
-    ['control.max.' + timeFieldName]: 1
-});
+// timeField ascending and descending indexes.
+runTest({[timeFieldName]: 1}, {[controlMinTimeFieldName]: 1, [controlMaxTimeFieldName]: 1});
+runTest({[timeFieldName]: -1}, {[controlMaxTimeFieldName]: -1, [controlMinTimeFieldName]: -1});
 
-// Check index creation error handling.
+// Compound metaField and timeField.
+runTest({[metaFieldName + '.tag1']: 1, [timeFieldName]: 1},
+        {'meta.tag1': 1, [controlMinTimeFieldName]: 1, [controlMaxTimeFieldName]: 1});
+runTest({[metaFieldName + '.tag1']: 1, [timeFieldName]: -1},
+        {'meta.tag1': 1, [controlMaxTimeFieldName]: -1, [controlMinTimeFieldName]: -1});
+
+// Multi-metaField sub-fields and timeField compound index.
+runTest(
+    {[metaFieldName + '.tag1']: -1, [metaFieldName + '.tag2']: 1, [timeFieldName]: 1},
+    {'meta.tag1': -1, 'meta.tag2': 1, [controlMinTimeFieldName]: 1, [controlMaxTimeFieldName]: 1});
+
+// metaField hashed index.
+runTest({[metaFieldName]: "hashed"}, {'meta': "hashed"});
+
+/*
+ * Test time-series index creation error handling.
+ */
 
 const coll = db.getCollection(collNamePrefix + collCountPostfix++);
 coll.drop();
