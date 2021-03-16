@@ -44,7 +44,17 @@ namespace mongo {
 REGISTER_DOCUMENT_SOURCE(collStats,
                          DocumentSourceCollStats::LiteParsed::parse,
                          DocumentSourceCollStats::createFromBson,
-                         LiteParsedDocumentSource::AllowedWithApiStrict::kNeverInVersion1);
+                         LiteParsedDocumentSource::AllowedWithApiStrict::kSometimes);
+
+void DocumentSourceCollStats::LiteParsed::assertPermittedInAPIVersion(
+    const APIParameters& apiParameters) const {
+    if (apiParameters.getAPIVersion() && *apiParameters.getAPIVersion() == "1" &&
+        apiParameters.getAPIStrict().value_or(false)) {
+        uassert(ErrorCodes::APIStrictError,
+                "only the 'count' option to $collStats is supported in API Version 1",
+                !_spec.getLatencyStats() && !_spec.getQueryExecStats() && !_spec.getStorageStats());
+    }
+}
 
 const char* DocumentSourceCollStats::getSourceName() const {
     return kStageName.rawData();

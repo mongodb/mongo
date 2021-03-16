@@ -171,6 +171,10 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                             isInternalClient);
                     break;
                 }
+                case AllowanceFlags::kSometimes: {
+                    stage->assertPermittedInAPIVersion(apiParameters);
+                    break;
+                }
                 case AllowanceFlags::kAlways: {
                     break;
                 }
