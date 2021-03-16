@@ -1658,7 +1658,10 @@ private:
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
             auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
+            auto arrayLength = attributeValueAsArray.nFields();
             appendConsideredValue(attributeValueAsArray);
+            auto& objBuilder = _context->getCurrentObjBuilder();
+            objBuilder.append("numberOfItems", arrayLength);
         } else {
             _context->setCurrentRuntimeState(RuntimeState::kNoError);
         }
