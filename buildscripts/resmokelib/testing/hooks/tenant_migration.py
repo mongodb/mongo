@@ -321,17 +321,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
             "errmsg"] == "simulate a tenant migration error"
 
-    def _is_empty_id_index_spec_err(self, abort_reason):
-        # TODO (SERVER-55169): Timeseries bucket collections is expected to fail tenant migration
-        # cloner's non-empty id index check.
-        err_msg_regex = "Found empty '_id' index spec but the collection is not specified " + \
-                           "with 'autoIndexId' as false, tenantId: " + self._tenant_id
-        return abort_reason["code"] == self.ILLEGAL_OPERATION_ERR_CODE and re.search(
-            err_msg_regex, abort_reason["errmsg"])
-
-    def _is_blacklisted_abort_reason(self, abort_reason):
-        return self._is_empty_id_index_spec_err(abort_reason)
-
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
         recipient_rs = self._tenant_migration_fixture.get_replset(recipient_rs_index)
@@ -390,12 +379,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                                          str(donor_primary.port) + " of replica set '" +
                                          migration_opts.get_donor_name() +
                                          "' has aborted due to failpoint: " + str(res))
-                        break
-                    elif self._is_blacklisted_abort_reason(abort_reason):
-                        self.logger.info("Tenant migration with donor primary on port " +
-                                         str(donor_primary.port) + " of replica set '" +
-                                         migration_opts.get_donor_name() +
-                                         "' has aborted due to a blacklisted error: " + str(res))
                         break
                     else:
                         raise errors.ServerFailure("Tenant migration with donor primary on port " +
