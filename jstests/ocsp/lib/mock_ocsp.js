@@ -28,8 +28,9 @@ class ResponderCertSet {
 const OCSP_DELEGATE_RESPONDER =
     new ResponderCertSet(OCSP_CA_PEM, OCSP_RESPONDER_CERT, OCSP_RESPONDER_KEY);
 const OCSP_CA_RESPONDER = new ResponderCertSet(OCSP_CA_PEM, OCSP_CA_CERT, OCSP_CA_KEY);
-const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(
-    OCSP_INTERMEDIATE_CA_PEM, OCSP_INTERMEDIATE_CA_CERT, OCSP_INTERMEDIATE_CA_KEY);
+const OCSP_INTERMEDIATE_RESPONDER = new ResponderCertSet(OCSP_INTERMEDIATE_CA_WITH_ROOT_PEM,
+                                                         OCSP_INTERMEDIATE_CA_ONLY_CERT,
+                                                         OCSP_INTERMEDIATE_CA_ONLY_KEY);
 
 class MockOCSPServer {
     /**

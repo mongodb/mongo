@@ -2006,6 +2006,11 @@ Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     fetchAndStaple(promisePtr)
         .getAsync([this, sm = _manager->shared_from_this()](
                       StatusWith<Milliseconds> swDurationInitial) mutable {
+            if (!swDurationInitial.isOK()) {
+                LOGV2_WARNING(5512202,
+                              "Server was unable to staple OCSP Response",
+                              "reason"_attr = swDurationInitial.getStatus());
+            }
             startPeriodicJob(swDurationInitial);
         });
 
@@ -2056,6 +2061,12 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
 void OCSPFetcher::doPeriodicJob() {
     fetchAndStaple(nullptr).getAsync(
         [this, sm = _manager->shared_from_this()](StatusWith<Milliseconds> swDuration) {
+            if (!swDuration.isOK()) {
+                LOGV2_WARNING(5512201,
+                              "Server was unable to staple OCSP Response",
+                              "reason"_attr = swDuration.getStatus());
+            }
+
             stdx::lock_guard<Latch> lock(this->_staplingMutex);
 
             if (_shutdown) {
@@ -2065,6 +2076,15 @@ void OCSPFetcher::doPeriodicJob() {
             this->_ocspStaplingAnchor.setPeriod(getPeriodForStapleJob(swDuration));
         });
 }
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
+    SSL_CTX_get_extra_chain_certs(ctx, sk);
+}
+#else
+void sslContextGetOtherCerts(SSL_CTX* ctx, STACK_OF(X509) * *sk) {
+    SSL_CTX_get0_chain_certs(ctx, sk);
+}
+#endif
 
 Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
     // Generate a new verified X509StoreContext to get our own certificate chain
@@ -2078,6 +2098,10 @@ Future<Milliseconds> OCSPFetcher::fetchAndStaple(Promise<void>* promise) {
     }
 
     X509_STORE_CTX_set_cert(storeCtx.get(), _cert);
+    STACK_OF(X509) * sk;
+
+    sslContextGetOtherCerts(_context, &sk);
+    X509_STORE_CTX_set_chain(storeCtx.get(), sk);
 
     if (X509_verify_cert(storeCtx.get()) <= 0) {
         return getSSLFailure("Could not verify X509 certificate store for OCSP Stapling.");
