@@ -100,7 +100,7 @@ structs:
                     or 'aborted'.
                 optional: true
             abortReason:
-                type: object
+                type: object_owned
                 description: "The error that caused the migration to abort."
                 optional: true
             expireAt:

@@ -232,8 +232,11 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
 
         _durableState.state = _stateDoc.getState();
         if (_stateDoc.getAbortReason()) {
-            _durableState.abortReason =
-                getStatusFromCommandResult(_stateDoc.getAbortReason().get());
+            auto abortReasonBson = _stateDoc.getAbortReason().get();
+            auto code = abortReasonBson["code"].Int();
+            auto errmsg = abortReasonBson["errmsg"].String();
+            _durableState.abortReason = Status(ErrorCodes::Error(code), errmsg);
+            _abortReason = _durableState.abortReason;
         }
 
         _initialDonorStateDurablePromise.emplaceValue();
