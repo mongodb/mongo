@@ -610,8 +610,10 @@ def check_command_param_or_type_struct_field(
     if not old_field.unstable and new_field.unstable:
         ctxt.add_new_param_or_command_type_field_unstable_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
-    if old_field.unstable and not new_field.optional and not new_field.unstable:
-        ctxt.add_new_param_or_command_type_field_stable_required_error(
+    # If old field is unstable and new field is stable, the new field should either be optional or
+    # have a default value.
+    if old_field.unstable and not new_field.unstable and not new_field.optional and new_field.default is None:
+        ctxt.add_new_param_or_command_type_field_stable_required_no_default_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
 
     if old_field.optional and not new_field.optional:

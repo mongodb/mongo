@@ -380,11 +380,11 @@ structs:
             addedRequiredTypeField:
                 type: string
 
-    StableRequiredTypeFieldStruct:
-        description: "This struct contains a field that is stable and required in the new version
-                      that was unstable in the old version"
+    StableRequiredNoDefaultTypeFieldStruct:
+        description: "This struct contains a field that is stable and required with no default value
+                      in the new version that was unstable in the old version"
         fields:
-            stableRequiredTypeField:
+            stableRequiredNoDefaultTypeField:
                 type: string
 
     ArrayTypeStruct:
@@ -564,12 +564,12 @@ commands:
                 type: string
                 unstable: true
 
-    commandParameterStableRequired:
-        description: "new required stable command parameter fails because it is unstable
-                      in the corresponding old command"
-        command_name: commandParameterStableRequired
+    commandParameterStableRequiredNoDefault:
+        description: "new required stable command parameter with no default value fails
+                      because it is unstable in the corresponding old command"
+        command_name: commandParameterStableRequiredNoDefault
         namespace: ignored
-        cpp_name: commandParameterStableRequired
+        cpp_name: commandParameterStableRequiredNoDefault
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -1298,13 +1298,13 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
-    newTypeFieldStableRequired:
-        description: "new required stable type field fails because it is unstable
+    newTypeFieldStableRequiredNoDefault:
+        description: "new required stable type field with no default value fails because it is unstable
                       in the corresponding old command"
-        command_name: newTypeFieldStableRequired
+        command_name: newTypeFieldStableRequiredNoDefault
         namespace: type
-        type: StableRequiredTypeFieldStruct
-        cpp_name: newTypeFieldStableRequired
+        type: StableRequiredNoDefaultTypeFieldStruct
+        cpp_name: newTypeFieldStableRequiredNoDefault
         strict: true
         api_version: "1"
         reply_type: OkReply

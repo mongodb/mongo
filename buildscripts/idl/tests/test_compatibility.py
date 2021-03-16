@@ -175,12 +175,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_UNSTABLE)
         self.assertRegex(str(command_parameter_unstable_error), "commandParameterUnstable")
 
-        command_parameter_stable_required_error = error_collection.get_error_by_command_name(
-            "commandParameterStableRequired")
-        self.assertTrue(command_parameter_stable_required_error.error_id ==
-                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED)
+        command_parameter_stable_required_no_default_error = error_collection.get_error_by_command_name(
+            "commandParameterStableRequiredNoDefault")
+        self.assertTrue(
+            command_parameter_stable_required_no_default_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED_NO_DEFAULT)
         self.assertRegex(
-            str(command_parameter_stable_required_error), "commandParameterStableRequired")
+            str(command_parameter_stable_required_no_default_error),
+            "commandParameterStableRequiredNoDefault")
 
         command_parameter_required_error = error_collection.get_error_by_command_name(
             "commandParameterRequired")
@@ -637,9 +639,11 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED)
         self.assertRegex(str(new_type_field_added_required_error), "newTypeFieldAddedRequired")
 
-        new_type_field_stable_required_error = error_collection.get_error_by_error_id(
-            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED)
-        self.assertRegex(str(new_type_field_stable_required_error), "newTypeFieldStableRequired")
+        new_type_field_stable_required_no_default_error = error_collection.get_error_by_error_id(
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED_NO_DEFAULT)
+        self.assertRegex(
+            str(new_type_field_stable_required_no_default_error),
+            "newTypeFieldStableRequiredNoDefault")
 
         new_reply_field_variant_type_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE)
