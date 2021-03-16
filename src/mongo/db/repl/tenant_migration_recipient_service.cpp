@@ -338,10 +338,19 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
                    _stateDoc.getCloneFinishedRecipientOpTime()->toBSON());
 
     if (_stateDoc.getExpireAt())
-        bob.append("expireAt", _stateDoc.getExpireAt()->toString());
+        bob.append("expireAt", *_stateDoc.getExpireAt());
 
     if (_client) {
         bob.append("donorSyncSource", _client->getServerAddress());
+    }
+
+    if (_stateDoc.getStartAt()) {
+        bob.append("receiveStart", *_stateDoc.getStartAt());
+    }
+
+    if (_tenantOplogApplier) {
+        bob.appendNumber("numOpsApplied",
+                         static_cast<long long>(_tenantOplogApplier->getNumOpsApplied()));
     }
 
     return bob.obj();
@@ -733,7 +742,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
 
     // Persist the state doc before starting the data sync.
     _stateDoc.setState(TenantMigrationRecipientStateEnum::kStarted);
-
+    _stateDoc.setStartAt(getGlobalServiceContext()->getFastClockSource()->now());
 
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {

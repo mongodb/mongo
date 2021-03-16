@@ -90,6 +90,12 @@ public:
      */
     SemiFuture<OpTimePair> getNotificationForOpTime(OpTime donorOpTime);
 
+    size_t getNumOpsApplied() {
+        stdx::lock_guard lk(_mutex);
+        return _numOpsApplied;
+    }
+
+
     /**
      * Returns the optime the applier will start applying from. Used for testing.
      */
@@ -167,6 +173,7 @@ private:
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
     bool _applyLoopApplyingBatch = false;                                 // (M)
+    size_t _numOpsApplied{0};                                             // (M)
 };
 
 /**
