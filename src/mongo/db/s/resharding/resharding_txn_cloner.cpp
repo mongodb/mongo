@@ -178,7 +178,7 @@ void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
     oplogEntry.setNss({});
     oplogEntry.setSessionId(opCtx->getLogicalSessionId());
     oplogEntry.setTxnNumber(opCtx->getTxnNumber());
-    oplogEntry.setStatementId(kIncompleteHistoryStmtId);
+    oplogEntry.setStatementIds({kIncompleteHistoryStmtId});
     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
     oplogEntry.setWallClockTime(Date_t::now());
     oplogEntry.setFromMigrate(true);

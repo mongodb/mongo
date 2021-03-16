@@ -84,7 +84,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 const boost::optional<BSONObj>& o2Field,
                                 const OperationSessionInfo& sessionInfo,
                                 Date_t wallClockTime,
-                                const boost::optional<StmtId>& statementId) {
+                                const std::vector<StmtId>& statementIds) {
     return {
         repl::DurableOplogEntry(opTime,                           // optime
                                 hash,                             // hash
@@ -98,7 +98,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 sessionInfo,                      // session info
                                 boost::none,                      // upsert
                                 wallClockTime,                    // wall clock time
-                                statementId,                      // statement id
+                                statementIds,                     // statement ids
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
                                 boost::none,    // post-image optime
@@ -123,7 +123,7 @@ repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& lsid,
                           TransactionParticipant::kDeadEndSentinel,  // o2
                           sessionInfo,                               // session info
                           wallClockTime,                             // wall clock time
-                          kIncompleteHistoryStmtId);                 // statement id
+                          {kIncompleteHistoryStmtId});               // statement id
 }
 
 }  // namespace
@@ -263,14 +263,13 @@ std::shared_ptr<Notification<bool>> SessionCatalogMigrationSource::getNotificati
 bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock, OperationContext* opCtx) {
     while (_currentOplogIterator) {
         if (auto nextOplog = _currentOplogIterator->getNext(opCtx)) {
-            auto nextStmtId = nextOplog->getStatementId();
+            auto nextStmtIds = nextOplog->getStatementIds();
 
             // Skip the rest of the chain for this session since the ns is unrelated with the
             // current one being migrated. It is ok to not check the rest of the chain because
             // retryable writes doesn't allow touching different namespaces.
-            if (!nextStmtId ||
-                (nextStmtId && *nextStmtId != kIncompleteHistoryStmtId &&
-                 nextOplog->getNss() != _ns)) {
+            if (nextStmtIds.empty() ||
+                (nextStmtIds.front() != kIncompleteHistoryStmtId && nextOplog->getNss() != _ns)) {
                 _currentOplogIterator.reset();
                 return false;
             }

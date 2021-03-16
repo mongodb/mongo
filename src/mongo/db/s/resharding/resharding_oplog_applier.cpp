@@ -126,12 +126,13 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
 
     // If it's not a CRUD type, it's an oplog related to transaction, so convert it to
     // incompleteHistory stmtId.
-    const auto stmtId = oplog.isCrudOpType() ? *oplog.getStatementId() : kIncompleteHistoryStmtId;
+    const auto stmtIds = oplog.isCrudOpType() ? oplog.getStatementIds()
+                                              : std::vector<StmtId>{kIncompleteHistoryStmtId};
 
     try {
         txnParticipant.beginOrContinue(opCtx, txnNumber, boost::none, boost::none);
 
-        if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+        if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
             // Skip the incoming statement because it has already been logged locally.
             return Status::OK();
         }
@@ -221,7 +222,7 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
             // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog entry
             // wallTime when replicating.
             sessionTxnRecord.setLastWriteDate(noOpOplog.getWallClockTime());
-            txnParticipant.onRetryableWriteCloningCompleted(opCtx, {stmtId}, sessionTxnRecord);
+            txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
 
             wunit.commit();
         });

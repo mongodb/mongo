@@ -182,7 +182,7 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
-                              boost::none,                 // statement id
+                              {},                          // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -204,7 +204,7 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
-                              boost::none,                 // statement id
+                              {},                          // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -238,7 +238,7 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
-                              boost::none,                 // statement id
+                              {},                          // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -272,7 +272,7 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
-                              boost::none,                 // statement id
+                              {},                          // statement ids
                               boost::none,    // optime of previous write within same transaction
                               boost::none,    // pre-image optime
                               boost::none,    // post-image optime
@@ -333,7 +333,7 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                               {},                          // sessionInfo
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
-                              boost::none,                 // statement id
+                              {},                          // statement ids
                               prevWriteOpTime,  // optime of previous write within same transaction
                               boost::none,      // pre-image optime
                               boost::none,      // post-image optime

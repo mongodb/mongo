@@ -74,7 +74,7 @@ class RecordCursor;
 struct CollectionUpdateArgs {
     enum class StoreDocOption { None, PreImage, PostImage };
 
-    StmtId stmtId = kUninitializedStmtId;
+    std::vector<StmtId> stmtIds = {kUninitializedStmtId};
 
     // The document before modifiers were applied.
     boost::optional<BSONObj> preImageDoc;

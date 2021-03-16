@@ -246,7 +246,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         CollectionUpdateArgs args;
 
         if (!request->explain()) {
-            args.stmtId = request->getStmtId();
+            args.stmtIds = request->getStmtIds();
             args.update = logObj;
             if (_isUserInitiatedWrite) {
                 args.criteria = CollectionShardingState::get(opCtx(), collection()->ns())

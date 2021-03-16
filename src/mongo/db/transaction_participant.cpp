@@ -171,9 +171,11 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 
             // Each entry should correspond to a retryable write or a FCV4.0 format transaction.
             // These oplog entries must have statementIds.
-            invariant(entry.getStatementId());
-            if (*entry.getStatementId() == kIncompleteHistoryStmtId) {
+            auto stmtIds = entry.getStatementIds();
+            invariant(!stmtIds.empty());
+            if (stmtIds.front() == kIncompleteHistoryStmtId) {
                 // Only the dead end sentinel can have this id for oplog write history
+                invariant(stmtIds.size() == 1);
                 invariant(entry.getObject2());
                 invariant(entry.getObject2()->woCompare(TransactionParticipant::kDeadEndSentinel) ==
                           0);
@@ -187,15 +189,17 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 return result;
             }
 
-            const auto insertRes =
-                result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
-            if (!insertRes.second) {
-                const auto& existingOpTime = insertRes.first->second;
-                fassertOnRepeatedExecution(lsid,
-                                           result.lastTxnRecord->getTxnNum(),
-                                           *entry.getStatementId(),
-                                           existingOpTime,
-                                           entry.getOpTime());
+            for (auto stmtId : entry.getStatementIds()) {
+                const auto insertRes =
+                    result.committedStatements.emplace(stmtId, entry.getOpTime());
+                if (!insertRes.second) {
+                    const auto& existingOpTime = insertRes.first->second;
+                    fassertOnRepeatedExecution(lsid,
+                                               result.lastTxnRecord->getTxnNum(),
+                                               stmtId,
+                                               existingOpTime,
+                                               entry.getOpTime());
+                }
             }
         } catch (const DBException& ex) {
             if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
@@ -2348,8 +2352,9 @@ boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStat
     TransactionHistoryIterator txnIter(*stmtTimestamp);
     while (txnIter.hasNext()) {
         const auto entry = txnIter.next(opCtx);
-        invariant(entry.getStatementId());
-        if (*entry.getStatementId() == stmtId)
+        auto stmtIds = entry.getStatementIds();
+        invariant(!stmtIds.empty());
+        if (std::find(stmtIds.begin(), stmtIds.end(), stmtId) != stmtIds.end())
             return entry;
     }
 

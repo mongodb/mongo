@@ -65,7 +65,7 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                                     {},    // sessionInfo
                                     true,  // upsert
                                     wallClockTime,
-                                    boost::none,    // statementId
+                                    {},             // statementIds
                                     boost::none,    // prevWriteOpTime
                                     boost::none,    // preImageOpTime
                                     boost::none,    // postImageOpTime

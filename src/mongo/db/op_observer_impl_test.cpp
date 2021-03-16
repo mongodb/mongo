@@ -777,7 +777,7 @@ TEST_F(OpObserverTransactionTest, TransactionalPrepareTest) {
     opObserver().onInserts(opCtx(), nss1, uuid1, inserts1.begin(), inserts1.end(), false);
 
     CollectionUpdateArgs updateArgs2;
-    updateArgs2.stmtId = 1;
+    updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 0 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
@@ -1236,7 +1236,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
     CollectionUpdateArgs updateArgs1;
-    updateArgs1.stmtId = 0;
+    updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
@@ -1245,7 +1245,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
     OplogUpdateEntryArgs update1(std::move(updateArgs1), nss1, uuid1);
 
     CollectionUpdateArgs updateArgs2;
-    updateArgs2.stmtId = 1;
+    updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
@@ -1438,7 +1438,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
     CollectionUpdateArgs updateArgs1;
-    updateArgs1.stmtId = 0;
+    updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
@@ -1447,7 +1447,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
     OplogUpdateEntryArgs update1(std::move(updateArgs1), nss1, uuid1);
 
     CollectionUpdateArgs updateArgs2;
-    updateArgs2.stmtId = 1;
+    updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"
@@ -1514,7 +1514,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
                                             << "x");
     const auto updateFilter = BSON("_id" << 0);
 
-    updateArgs1.stmtId = 0;
+    updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = updatePostImage;
     updateArgs1.update = updateSpec;
     updateArgs1.preImageDoc = updatePreImage;
@@ -1588,7 +1588,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
                                             << "x");
     const auto updateFilter = BSON("_id" << 0);
 
-    updateArgs1.stmtId = 0;
+    updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = updatePostImage;
     updateArgs1.update = updateSpec;
     updateArgs1.preImageDoc = updatePreImage;
@@ -1798,7 +1798,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     txnParticipant.unstashTransactionResources(opCtx(), "update");
 
     CollectionUpdateArgs updateArgs1;
-    updateArgs1.stmtId = 0;
+    updateArgs1.stmtIds = {0};
     updateArgs1.updatedDoc = BSON("_id" << 0 << "data"
                                         << "x");
     updateArgs1.update = BSON("$set" << BSON("data"
@@ -1807,7 +1807,7 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdatePrepareTest) {
     OplogUpdateEntryArgs update1(std::move(updateArgs1), nss1, uuid1);
 
     CollectionUpdateArgs updateArgs2;
-    updateArgs2.stmtId = 1;
+    updateArgs2.stmtIds = {1};
     updateArgs2.updatedDoc = BSON("_id" << 1 << "data"
                                         << "y");
     updateArgs2.update = BSON("$set" << BSON("data"

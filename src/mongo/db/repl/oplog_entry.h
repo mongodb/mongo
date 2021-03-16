@@ -36,6 +36,7 @@
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace repl {
@@ -118,6 +119,26 @@ public:
 
     void setSessionId(boost::optional<LogicalSessionId> value) & {
         getOperationSessionInfo().setSessionId(std::move(value));
+    }
+
+    void setStatementIds(const std::vector<StmtId>& stmtIds) & {
+        if (stmtIds.empty()) {
+            OplogEntryBase::setStatementIds(boost::none);
+        } else if (stmtIds.size() == 1) {
+            OplogEntryBase::setStatementIds({{stmtIds.front()}});
+        } else {
+            OplogEntryBase::setStatementIds({{stmtIds}});
+        }
+    }
+
+    std::vector<StmtId> getStatementIds() const {
+        if (!OplogEntryBase::getStatementIds()) {
+            return {};
+        }
+        return stdx::visit(
+            visit_helper::Overloaded{[](StmtId stmtId) { return std::vector<StmtId>{stmtId}; },
+                                     [](const std::vector<StmtId>& stmtIds) { return stmtIds; }},
+            *OplogEntryBase::getStatementIds());
     }
 
     void setTxnNumber(boost::optional<std::int64_t> value) & {
@@ -218,7 +239,7 @@ public:
     using MutableOplogEntry::kPreImageOpTimeFieldName;
     using MutableOplogEntry::kPrevWriteOpTimeInTransactionFieldName;
     using MutableOplogEntry::kSessionIdFieldName;
-    using MutableOplogEntry::kStatementIdFieldName;
+    using MutableOplogEntry::kStatementIdsFieldName;
     using MutableOplogEntry::kTermFieldName;
     using MutableOplogEntry::kTimestampFieldName;
     using MutableOplogEntry::kTxnNumberFieldName;
@@ -243,7 +264,7 @@ public:
     using MutableOplogEntry::getPreImageOpTime;
     using MutableOplogEntry::getPrevWriteOpTimeInTransaction;
     using MutableOplogEntry::getSessionId;
-    using MutableOplogEntry::getStatementId;
+    using MutableOplogEntry::getStatementIds;
     using MutableOplogEntry::getTerm;
     using MutableOplogEntry::getTimestamp;
     using MutableOplogEntry::getTxnNumber;
@@ -298,7 +319,7 @@ public:
                       const OperationSessionInfo& sessionInfo,
                       const boost::optional<bool>& isUpsert,
                       const mongo::Date_t& wallClockTime,
-                      const boost::optional<StmtId>& statementId,
+                      const std::vector<StmtId>& statementIds,
                       const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                       const boost::optional<OpTime>& preImageOpTime,
                       const boost::optional<OpTime>& postImageOpTime,
@@ -457,7 +478,7 @@ public:
     static constexpr auto kPrevWriteOpTimeInTransactionFieldName =
         DurableOplogEntry::kPrevWriteOpTimeInTransactionFieldName;
     static constexpr auto kSessionIdFieldName = DurableOplogEntry::kSessionIdFieldName;
-    static constexpr auto kStatementIdFieldName = DurableOplogEntry::kStatementIdFieldName;
+    static constexpr auto kStatementIdFieldName = DurableOplogEntry::kStatementIdsFieldName;
     static constexpr auto kTermFieldName = DurableOplogEntry::kTermFieldName;
     static constexpr auto kTimestampFieldName = DurableOplogEntry::kTimestampFieldName;
     static constexpr auto kTxnNumberFieldName = DurableOplogEntry::kTxnNumberFieldName;
@@ -504,7 +525,7 @@ public:
 
     // Wrapper methods for DurableOplogEntry
     const boost::optional<mongo::Value>& get_id() const&;
-    const boost::optional<std::int32_t> getStatementId() const&;
+    std::vector<StmtId> getStatementIds() const&;
     const OperationSessionInfo& getOperationSessionInfo() const;
     const boost::optional<mongo::LogicalSessionId>& getSessionId() const;
     const boost::optional<std::int64_t> getTxnNumber() const;

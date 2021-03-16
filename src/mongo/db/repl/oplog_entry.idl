@@ -132,10 +132,11 @@ structs:
                 description: "Used by tests in replication and also by production resharding code to
                               store timestamps."
             stmtId:
-                cpp_name: statementId
-                type: StmtId
+                cpp_name: statementIds
+                type:
+                    variant: [StmtId, array<StmtId>]
                 optional: true
-                description: "Identifier of the transaction statement which generated this oplog
+                description: "Identifier of the transaction statement(s) which generated this oplog
                               entry"
             prevOpTime:
                 cpp_name: prevWriteOpTimeInTransaction

@@ -364,7 +364,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
                               << oplogEntry->getNss().ns(),
-                !oplogEntry->getStatementId());
+                oplogEntry->getStatementIds().empty());
         return {};
     }
     // If this oplog entry is from a tenant migration, include the tenant migration
@@ -433,10 +433,11 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
     auto nss = oplogEntryTemplate->getNss();
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
+        invariant(!begin->stmtIds.empty());
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
                               << nss.ns(),
-                begin->stmtId == kUninitializedStmtId);
+                begin->stmtIds.front() == kUninitializedStmtId);
         return {};
     }
 
@@ -472,7 +473,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         OplogLink oplogLink;
         if (i > 0)
             oplogLink.prevOpTime = opTimes[i - 1];
-        appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtId);
+        appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtIds);
 
         opTimes[i] = insertStatementOplogSlot;
         timestamps[i] = insertStatementOplogSlot.getTimestamp();
@@ -510,7 +511,9 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
 void appendOplogEntryChainInfo(OperationContext* opCtx,
                                MutableOplogEntry* oplogEntry,
                                OplogLink* oplogLink,
-                               StmtId stmtId) {
+                               const std::vector<StmtId>& stmtIds) {
+    invariant(!stmtIds.empty());
+
     // We sometimes have a pre-image no-op entry even for normal non-retryable writes
     // if recordPreImages is enabled on the collection.
     if (!oplogLink->preImageOpTime.isNull()) {
@@ -518,7 +521,10 @@ void appendOplogEntryChainInfo(OperationContext* opCtx,
     }
 
     // Not a retryable write.
-    if (stmtId == kUninitializedStmtId) {
+    if (stmtIds.front() == kUninitializedStmtId) {
+        // If the statement id is uninitialized, it must be the only one. There cannot also be
+        // initialized statement ids.
+        invariant(stmtIds.size() == 1);
         return;
     }
 
@@ -526,7 +532,7 @@ void appendOplogEntryChainInfo(OperationContext* opCtx,
     invariant(txnParticipant);
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
-    oplogEntry->setStatementId(stmtId);
+    oplogEntry->setStatementIds(stmtIds);
     if (oplogLink->prevOpTime.isNull()) {
         oplogLink->prevOpTime = txnParticipant.getLastWriteOpTime();
     }

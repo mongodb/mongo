@@ -43,6 +43,20 @@ namespace mongo {
 namespace {
 const std::vector<BSONObj> emptyArrayFilters{};
 const BSONObj emptyCollation{};
+
+template <typename T>
+void appendArrayToString(const T& arr, StringBuilder* builder) {
+    bool first = true;
+    *builder << "[";
+    for (const auto& elem : arr) {
+        if (!first) {
+            *builder << ", ";
+        }
+        first = false;
+        *builder << elem;
+    }
+    *builder << "]";
+}
 }  // namespace
 
 class FieldRef;
@@ -235,12 +249,12 @@ public:
         return _yieldPolicy;
     }
 
-    void setStmtId(StmtId stmtId) {
-        _stmtId = std::move(stmtId);
+    void setStmtIds(std::vector<StmtId> stmtIds) {
+        _stmtIds = std::move(stmtIds);
     }
 
-    StmtId getStmtId() const {
-        return _stmtId;
+    const std::vector<StmtId>& getStmtIds() const {
+        return _stmtIds;
     }
 
     const std::string toString() const {
@@ -250,18 +264,12 @@ public:
         builder << " sort: " << _sort;
         builder << " collation: " << getCollation();
         builder << " updateModification: " << getUpdateModification().toString();
-        builder << " stmtId: " << _stmtId;
 
-        builder << " arrayFilters: [";
-        bool first = true;
-        for (auto arrayFilter : getArrayFilters()) {
-            if (!first) {
-                builder << ", ";
-            }
-            first = false;
-            builder << arrayFilter;
-        }
-        builder << "]";
+        builder << " stmtIds: ";
+        appendArrayToString(getStmtIds(), &builder);
+
+        builder << " arrayFilters: ";
+        appendArrayToString(getArrayFilters(), &builder);
 
         if (getUpdateConstants()) {
             builder << " updateConstants: " << *getUpdateConstants();
@@ -302,8 +310,8 @@ private:
     // by the user for each individual element of the 'updates' array in the 'update' command.
     boost::optional<BSONObj> _letParameters;
 
-    // The statement id of this request.
-    StmtId _stmtId = kUninitializedStmtId;
+    // The statement ids of this request.
+    std::vector<StmtId> _stmtIds = {kUninitializedStmtId};
 
     // Flags controlling the update.
 
