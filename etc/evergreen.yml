@@ -4067,6 +4067,22 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       name: aggregation_wildcard_fuzzer
 
+## Standalone fuzzer for checking timeseries optimizations correctness ##
+- <<: *jstestfuzz_template
+  name: aggregation_timeseries_fuzzer_gen
+  tags: ["aggfuzzer", "common", "timeseries"]
+  commands:
+  - func: "generate fuzzer tasks"
+    vars:
+      <<: *jstestfuzz_config_vars
+      num_files: 5
+      num_tasks: 5
+      jstestfuzz_vars: --diffTestingMode timeseries
+      npm_command: agg-fuzzer
+      suite: generational_fuzzer
+      resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      name: aggregation_timeseries_fuzzer
+
 ## jstestfuzz standalone fuzzer for checking find and aggregate equivalence ##
 - <<: *jstestfuzz_template
   name: query_fuzzer_standalone_gen
