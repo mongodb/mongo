@@ -113,14 +113,14 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
 
                 WT_RET(__pack_size(session, &pv, &len));
                 offset = WT_PTRDIFF(p, buf->mem);
-                WT_RET(__wt_buf_grow(session, buf, buf->size + len));
+                WT_RET(__wt_buf_grow(session, buf, (buf->size + len) - old_len));
                 p = (uint8_t *)buf->mem + offset;
-                end = (uint8_t *)buf->mem + buf->size + len;
+                end = (uint8_t *)buf->mem + (buf->size + len) - old_len;
                 /* Make room if we're inserting out-of-order. */
                 if (offset + old_len < buf->size)
                     memmove(p + len, p + old_len, buf->size - (offset + old_len));
                 WT_RET(__pack_write(session, &pv, &p, len));
-                buf->size += len;
+                buf->size += len - old_len;
                 break;
 
             default:
