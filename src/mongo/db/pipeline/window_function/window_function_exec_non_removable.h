@@ -89,6 +89,10 @@ public:
         return _function->getValue(false);
     }
 
+    size_t getApproximateSize() const final {
+        return _function->getMemUsage();
+    }
+
     void reset() final {
         _initialized = false;
         _function->reset();

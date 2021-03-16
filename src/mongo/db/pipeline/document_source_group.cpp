@@ -155,10 +155,10 @@ int DocumentSourceGroup::freeMemory() {
     int totalMemorySaved = 0;
     for (auto&& group : *_groups) {
         for (size_t i = 0; i < group.second.size(); i++) {
-            auto prevMemUsage = group.second[i]->memUsageForSorter();
+            auto prevMemUsage = group.second[i]->getMemUsage();
             group.second[i]->reduceMemoryConsumptionIfAble();
 
-            auto memorySaved = prevMemUsage - group.second[i]->memUsageForSorter();
+            auto memorySaved = prevMemUsage - group.second[i]->getMemUsage();
             // Update the memory usage for this AccumulationStatement.
             _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes -= memorySaved;
             // Update the memory usage for this group.
@@ -581,8 +581,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         } else {
             for (size_t i = 0; i < group.size(); i++) {
                 // subtract old mem usage. New usage added back after processing.
-                _memoryTracker.memoryUsageBytes -= group[i]->memUsageForSorter();
-                oldAccumMemUsage[i] = group[i]->memUsageForSorter();
+                _memoryTracker.memoryUsageBytes -= group[i]->getMemUsage();
+                oldAccumMemUsage[i] = group[i]->getMemUsage();
             }
         }
 
@@ -594,9 +594,9 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _accumulatedFields[i].expr.argument->evaluate(rootDocument, &pExpCtx->variables),
                 _doingMerge);
 
-            _memoryTracker.memoryUsageBytes += group[i]->memUsageForSorter();
+            _memoryTracker.memoryUsageBytes += group[i]->getMemUsage();
             _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes +=
-                group[i]->memUsageForSorter() - oldAccumMemUsage[i];
+                group[i]->getMemUsage() - oldAccumMemUsage[i];
         }
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {

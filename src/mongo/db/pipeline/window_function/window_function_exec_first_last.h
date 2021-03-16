@@ -37,6 +37,12 @@
 namespace mongo {
 
 class WindowFunctionExecForEndpoint : public WindowFunctionExec {
+public:
+    // Endpoint executors are constant size and don't hold any of the values passing through.
+    size_t getApproximateSize() const final {
+        return 0;
+    }
+
 protected:
     WindowFunctionExecForEndpoint(PartitionIterator* iter,
                                   boost::intrusive_ptr<Expression> input,

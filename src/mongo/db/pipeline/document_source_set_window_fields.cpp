@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/visit_helper.h"
 
 using boost::intrusive_ptr;
@@ -267,6 +268,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 }
 
 void DocumentSourceInternalSetWindowFields::initialize() {
+    _maxMemory = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
     for (auto& wfs : _outputFields) {
         _executableOutputs[wfs.fieldName] = WindowFunctionExec::create(&_iterator, wfs);
     }
@@ -290,8 +292,13 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
 
     // Populate the output document with the result from each window function.
     MutableDocument addFieldsSpec;
+    size_t functionMemUsage = 0;
     for (auto&& [fieldName, function] : _executableOutputs) {
         addFieldsSpec.addField(fieldName, function->getNext());
+        functionMemUsage += function->getApproximateSize();
+        uassert(5414201,
+                "Exceeded memory limit in DocumentSourceSetWindowFields",
+                functionMemUsage + _iterator.getApproximateSize() < _maxMemory);
     }
 
     // Advance the iterator and handle partition/EOF edge cases.

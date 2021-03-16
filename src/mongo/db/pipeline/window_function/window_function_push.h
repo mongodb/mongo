@@ -43,35 +43,32 @@ public:
         return std::make_unique<WindowFunctionPush>(expCtx);
     }
 
-    explicit WindowFunctionPush(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx),
-          _values(
-              _expCtx->getValueComparator().makeOrderedValueMultimap<ValueListConstIterator>()) {}
+    explicit WindowFunctionPush(ExpressionContext* const expCtx) : WindowFunctionState(expCtx) {
+        _memUsageBytes = sizeof(*this);
+    }
 
     void add(Value value) override {
-        _list.emplace_back(std::move(value));
-        auto iter = std::prev(_list.end());
-        _values.insert({*iter, iter});
+        _memUsageBytes += value.getApproximateSize();
+        _values.push_back(std::move(value));
     }
 
     /**
      * This should only remove the first/lowest element in the window.
      */
     void remove(Value value) override {
-        // The order of the key-value pairs whose keys compare equivalent is the order of insertion
-        // and does not change in std::multimap. So find() / erase() will remove the oldest equal
-        // element, which is what we want, to satisfy "remove() undoes add() when called in FIFO
-        // order".
-        auto iter = _values.find(std::move(value));
-        tassert(5423801, "Can't remove from an empty WindowFunctionPush", iter != _values.end());
-        // Erase the element from both '_values' and '_list'.
-        _list.erase(iter->second);
-        _values.erase(iter);
+        tassert(5423801, "Can't remove from an empty WindowFunctionPush", _values.size() != 0);
+        auto valToRemove = _values.front();
+        tassert(
+            5414202,
+            "Attempted to remove an element other than the first element from WindowFunctionPush",
+            _expCtx->getValueComparator().evaluate(valToRemove == value));
+        _values.pop_front();
+        _memUsageBytes -= value.getApproximateSize();
     }
 
     void reset() override {
         _values.clear();
-        _list.clear();
+        _memUsageBytes = sizeof(*this);
     }
 
     Value getValue() const override {
@@ -79,14 +76,11 @@ public:
         if (_values.empty())
             return kDefault;
 
-        return Value{std::vector<Value>(_list.begin(), _list.end())};
+        return Value{std::vector<Value>(_values.begin(), _values.end())};
     }
 
 private:
-    ValueMultimap<ValueListConstIterator> _values;
-    // std::list makes sure that the order of the elements in the returned array is the order of
-    // insertion.
-    std::list<Value> _list;
+    std::deque<Value> _values;
 };
 
 }  // namespace mongo

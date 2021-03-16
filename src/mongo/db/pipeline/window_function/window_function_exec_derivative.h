@@ -73,6 +73,11 @@ public:
     Value getNext() final;
     void reset() final {}
 
+    // This executor does not store any documents as it processes.
+    size_t getApproximateSize() const final {
+        return 0;
+    }
+
 private:
     boost::intrusive_ptr<Expression> _position;
     boost::intrusive_ptr<Expression> _time;

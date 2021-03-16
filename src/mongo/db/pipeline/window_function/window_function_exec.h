@@ -71,6 +71,11 @@ public:
      */
     virtual void reset() = 0;
 
+    /**
+     * Returns how much memory the accumulators or window functions being held are using.
+     */
+    virtual size_t getApproximateSize() const = 0;
+
 protected:
     WindowFunctionExec(PartitionIterator* iter) : _iter(iter){};
 
@@ -101,6 +106,15 @@ public:
         return _function->getValue();
     }
 
+    /**
+     * Return the byte size of the values being stored by this class. Does not include the constant
+     * size objects being held or the overhead of the data structures.
+     */
+    size_t getApproximateSize() const final {
+        return _function->getApproximateSize() + _memUsageBytes;
+    }
+
+
 protected:
     boost::intrusive_ptr<Expression> _input;
     std::unique_ptr<WindowFunctionState> _function;
@@ -113,7 +127,12 @@ protected:
     void addValue(Value v) {
         _function->add(v);
         _values.push(v);
+        _memUsageBytes += v.getApproximateSize();
     }
+
+    // Track the byte size of the values being stored by this class. Does not include the constant
+    // size objects being held or the overhead of the data structures.
+    size_t _memUsageBytes = 0;
 
 private:
     virtual void processDocumentsToUpperBound() = 0;

@@ -102,6 +102,15 @@ public:
      */
     boost::optional<std::pair<int, int>> getEndpoints(const WindowBounds& bounds);
 
+    /**
+     * Returns the value in bytes of the data being stored by this partition iterator. Does not
+     * include the size of the constant size objects being held or the overhead of the data
+     * structures.
+     */
+    auto getApproximateSize() const {
+        return _memUsageBytes;
+    }
+
 private:
     /**
      * Retrieves the next document from the prior stage and updates the state accordingly.
@@ -116,6 +125,8 @@ private:
                 "Invalid call to PartitionIterator::advanceToNextPartition",
                 _nextPartition != boost::none);
         _cache.clear();
+        // Cache is cleared, and we are moving the _nextPartition value to different positions.
+        _memUsageBytes = getNextPartitionStateSize();
         _cache.emplace_back(std::move(_nextPartition->_doc));
         _partitionKey = std::move(_nextPartition->_partitionKey);
         _nextPartition.reset();
@@ -138,6 +149,17 @@ private:
         Value _partitionKey;
     };
     boost::optional<NextPartitionState> _nextPartition;
+    size_t getNextPartitionStateSize() {
+        if (_nextPartition) {
+            return _nextPartition->_doc.getApproximateSize() +
+                _nextPartition->_partitionKey.getApproximateSize();
+        }
+        return 0;
+    }
+
+    // The value in bytes of the data being held. Does not include the size of the constant size
+    // data members or overhead of data structures.
+    size_t _memUsageBytes = 0;
 
     enum class IteratorState {
         // Default state, no documents have been pulled into the cache.

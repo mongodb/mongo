@@ -63,6 +63,8 @@ void generateServerParameters(BSONObjBuilder* out) {
     out->appendNumber("internalQueryProhibitBlockingMergeOnMongoS",
                       internalQueryProhibitBlockingMergeOnMongoS.load());
     out->appendNumber("internalQueryMaxAddToSetBytes", internalQueryMaxAddToSetBytes.load());
+    out->appendNumber("internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+                      internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
 }
 
 bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {

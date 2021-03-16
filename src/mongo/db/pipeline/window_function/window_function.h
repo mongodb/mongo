@@ -51,9 +51,14 @@ public:
     virtual void remove(Value) = 0;
     virtual Value getValue() const = 0;
     virtual void reset() = 0;
+    size_t getApproximateSize() {
+        tassert(5414200, "_memUsageBytes not set for function", _memUsageBytes != 0);
+        return _memUsageBytes;
+    }
 
 protected:
     ExpressionContext* _expCtx;
+    size_t _memUsageBytes = 0;
 };
 
 }  // namespace mongo

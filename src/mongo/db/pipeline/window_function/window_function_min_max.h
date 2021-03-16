@@ -44,10 +44,13 @@ public:
 
     explicit WindowFunctionMinMax(ExpressionContext* const expCtx)
         : WindowFunctionState(expCtx),
-          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {}
+          _values(_expCtx->getValueComparator().makeOrderedValueMultiset()) {
+        _memUsageBytes = sizeof(*this);
+    }
 
     void add(Value value) final {
         _values.insert(std::move(value));
+        _memUsageBytes += value.getApproximateSize();
     }
 
     void remove(Value value) final {
@@ -56,11 +59,13 @@ public:
         // which is what we want, to satisfy "remove() undoes add() when called in FIFO order".
         auto iter = _values.find(std::move(value));
         tassert(5371400, "Can't remove from an empty WindowFunctionMinMax", iter != _values.end());
+        _memUsageBytes -= iter->getApproximateSize();
         _values.erase(iter);
     }
 
     void reset() final {
         _values.clear();
+        _memUsageBytes = sizeof(*this);
     }
 
     Value getValue() const final {
