@@ -42,7 +42,7 @@ namespace test_harness {
 class workload_generator : public component {
     public:
     workload_generator(configuration *configuration)
-        : _configuration(configuration), _enable_tracking(false), _workload_tracking(nullptr)
+        : component(configuration), _enable_tracking(false), _workload_tracking(nullptr)
     {
     }
 
@@ -78,7 +78,7 @@ class workload_generator : public component {
         /* Get a session. */
         session = connection_manager::instance().create_session();
         /* Create n collections as per the configuration and store each collection name. */
-        testutil_check(_configuration->get_int(COLLECTION_COUNT, collection_count));
+        testutil_check(_config->get_int(COLLECTION_COUNT, collection_count));
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
             testutil_check(session->create(session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
@@ -91,8 +91,8 @@ class workload_generator : public component {
           std::to_string(collection_count) + " collections created", _trace_level, DEBUG_INFO);
 
         /* Open a cursor on each collection and use the configuration to insert key/value pairs. */
-        testutil_check(_configuration->get_int(KEY_COUNT, key_count));
-        testutil_check(_configuration->get_int(VALUE_SIZE, value_size));
+        testutil_check(_config->get_int(KEY_COUNT, key_count));
+        testutil_check(_config->get_int(VALUE_SIZE, value_size));
         for (const auto &collection_name : _collection_names) {
             /* WiredTiger lets you open a cursor on a collection using the same pointer. When a
              * session is closed, WiredTiger APIs close the cursors too. */
@@ -120,8 +120,8 @@ class workload_generator : public component {
         session = nullptr;
         duration_seconds = read_threads = 0;
 
-        testutil_check(_configuration->get_int(DURATION_SECONDS, duration_seconds));
-        testutil_check(_configuration->get_int(READ_THREADS, read_threads));
+        testutil_check(_config->get_int(DURATION_SECONDS, duration_seconds));
+        testutil_check(_config->get_int(READ_THREADS, read_threads));
         /* Generate threads to execute read operations on the collections. */
         for (int i = 0; i < read_threads; ++i) {
             thread_context *tc = new thread_context(_collection_names, thread_operation::READ);
@@ -249,7 +249,6 @@ class workload_generator : public component {
 
     private:
     std::vector<std::string> _collection_names;
-    const configuration *_configuration;
     bool _enable_tracking;
     thread_manager _thread_manager;
     std::vector<thread_context *> _workers;

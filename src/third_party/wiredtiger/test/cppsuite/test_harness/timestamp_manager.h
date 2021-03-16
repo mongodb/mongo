@@ -29,6 +29,8 @@
 #ifndef TIMESTAMP_MANAGER_H
 #define TIMESTAMP_MANAGER_H
 
+#include "component.h"
+
 namespace test_harness {
 /*
  * The timestamp monitor class manages global timestamp state for all components in the test
@@ -36,6 +38,8 @@ namespace test_harness {
  */
 class timestamp_manager : public component {
     public:
+    timestamp_manager(configuration *config) : component(config) {}
+
     void
     run()
     {

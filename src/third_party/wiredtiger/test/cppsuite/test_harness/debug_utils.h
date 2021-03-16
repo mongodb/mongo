@@ -35,6 +35,7 @@ namespace test_harness {
 #define DEBUG_ABORT -1
 #define DEBUG_ERROR 0
 #define DEBUG_INFO 1
+#define DEBUG_TRACE 2
 
 static int64_t _trace_level = 0;
 
