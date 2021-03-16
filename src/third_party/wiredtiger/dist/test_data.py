@@ -49,7 +49,7 @@ key_config=[
 
 value_config = [
     Config('value_size', 0, r'''
-        The size of the values to be created''', min=0, max=10000),
+        The size of the values to be created''', min=0, max=1000000000),
 ]
 
 scale_config = [
@@ -57,6 +57,22 @@ scale_config = [
         The number of colections the workload generator operates over''', min=0, max=200000),
     Config('key_count', 0, r'''
         The number of keys to be operated on per colection''', min=0, max=1000000),
+]
+
+throttle_config = [
+    Config('rate_per_second',1,r'''
+        The number of times an operation should be performed per second''', min=1,max=1000),
+]
+
+stat_config = [
+    Config('enabled', 'false', r'''
+        Whether or not this statistic is relevant to the workload''',
+        type='boolean'),
+]
+
+limit_stat = stat_config + [
+    Config('limit', 0, r'''
+    The limit value a statistic is allowed to reach''')
 ]
 
 load_config = key_config + value_config + scale_config
@@ -79,6 +95,17 @@ workload_config = [
         The definition of the record being updated''', subconfig=load_config)
 ]
 
+test_config = [
+    Config('cache_size_mb', 0, r'''
+        The cache size that wiredtiger will be configured to run with''', min=0, max=100000000000)
+]
+
+runtime_monitor_config = throttle_config +[
+    Config('stat_cache_size', '', '''
+        The maximum cache percentage that can be hit while running.''',
+        type='category', subconfig=limit_stat)
+]
+
 methods = {
-'poc_test' : Method(load_config + workload_config),
+'poc_test' : Method(load_config + workload_config + runtime_monitor_config + test_config),
 }

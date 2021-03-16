@@ -701,6 +701,7 @@ desc
 designator
 dest
 destSize
+destructor
 dev
 dh
 dhandle
@@ -1024,6 +1025,7 @@ maxCLevel
 maxcpu
 maxdbs
 maxdiff
+mb
 mbll
 mbss
 mem

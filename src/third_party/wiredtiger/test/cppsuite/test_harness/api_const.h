@@ -32,15 +32,26 @@
 /* Define all constants related to WiredTiger APIs and testing. */
 namespace test_harness {
 
-static const char *CONNECTION_CREATE = "create";
+/* Configuration API consts. */
+static const char *CACHE_SIZE_MB = "cache_size_mb";
 static const char *COLLECTION_COUNT = "collection_count";
 static const char *DURATION_SECONDS = "duration_seconds";
 static const char *ENABLE_TRACKING = "enable_tracking";
+static const char *ENABLED = "enabled";
 static const char *KEY_COUNT = "key_count";
+static const char *LIMIT = "limit";
+static const char *RATE_PER_SECOND = "rate_per_second";
 static const char *READ_THREADS = "read_threads";
+static const char *STAT_CACHE_SIZE = "stat_cache_size";
+static const char *VALUE_SIZE = "value_size";
+
+/* WiredTiger API consts. */
+static const char *CONNECTION_CREATE = "create";
+
+/* Test harness consts. */
 static const char *TABLE_OPERATION_TRACKING = "table:operation_tracking";
 static const char *TABLE_SCHEMA_TRACKING = "table:schema_tracking";
-static const char *VALUE_SIZE = "value_size";
+static const char *STATISTICS_URI = "statistics:";
 
 } // namespace test_harness
 
