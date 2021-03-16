@@ -620,7 +620,8 @@ struct MergeSortNode : public QuerySolutionNodeWithSortSet {
 };
 
 struct FetchNode : public QuerySolutionNode {
-    FetchNode();
+    FetchNode() {}
+    FetchNode(std::unique_ptr<QuerySolutionNode> child) : QuerySolutionNode(std::move(child)) {}
     virtual ~FetchNode() {}
 
     virtual StageType getType() const {

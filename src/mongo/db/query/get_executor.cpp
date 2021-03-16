@@ -65,6 +65,7 @@
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
@@ -919,8 +920,64 @@ protected:
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
         const IndexDescriptor* descriptor, QueryPlannerParams* plannerParams) final {
-        // Fall back to normal planning.
-        return nullptr;
+        invariant(descriptor);
+        invariant(plannerParams);
+
+        tassert(5536100,
+                "SBE cannot handle query with metadata",
+                !_cq->metadataDeps()[DocumentMetadataFields::kSortKey]);
+
+        // For the return key case, we use the common path.
+        if (_cq->getFindCommand().getReturnKey()) {
+            return nullptr;
+        }
+
+        invariant(descriptor->getEntry());
+        std::unique_ptr<QuerySolutionNode> root = [&]() {
+            auto ixScan = std::make_unique<IndexScanNode>(
+                indexEntryFromIndexCatalogEntry(_opCtx, *descriptor->getEntry(), _cq));
+
+            const auto bsonKey =
+                IndexBoundsBuilder::objFromElement(_cq->getQueryObj()["_id"], _cq->getCollator());
+            OrderedIntervalList oil("_id");
+            oil.intervals.push_back(IndexBoundsBuilder::makePointInterval(bsonKey));
+
+            ixScan->bounds.fields.push_back(std::move(oil));
+            ixScan->queryCollator = _cq->getCollator();
+            return ixScan;
+        }();
+
+        // IDHack plans always include a FETCH by convention. A covered IDHack probably isn't a
+        // common case (a point query on _id where the only field returned is _id). It could be
+        // useful for an existence check, but we don't go out of our way to support it.
+        root = std::make_unique<FetchNode>(std::move(root));
+
+        if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            auto shardFilter = std::make_unique<ShardingFilterNode>();
+            shardFilter->children.push_back(root.release());
+            root = std::move(shardFilter);
+        }
+
+        if (const auto* projection = _cq->getProj(); projection) {
+            invariant(_cq->root());
+
+            if (projection->isSimple()) {
+                root = std::make_unique<ProjectionNodeSimple>(
+                    std::move(root), *_cq->root(), *projection);
+            } else {
+                root = std::make_unique<ProjectionNodeDefault>(
+                    std::move(root), *_cq->root(), *projection);
+            }
+        }
+
+        auto soln = std::make_unique<QuerySolution>(plannerParams->options);
+        soln->setRoot(std::move(root));
+
+        auto execTree = buildExecutableTree(*soln);
+        auto result = makeResult();
+        result->emplace(std::move(execTree), std::move(soln));
+
+        return result;
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
