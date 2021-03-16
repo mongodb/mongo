@@ -2648,9 +2648,9 @@ buildvariants:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
-  # - name: generate-datafile-little-endian
-  # - name: verify-datafile-little-endian
-  # - name: verify-datafile-from-big-endian
+  - name: generate-datafile-little-endian
+  - name: verify-datafile-little-endian
+  - name: verify-datafile-from-big-endian
 
 - name: big-endian
   display_name: "~ Big-endian (s390x/zSeries)"
@@ -2665,9 +2665,9 @@ buildvariants:
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
   - name: compile
-  # - name: generate-datafile-big-endian
-  # - name: verify-datafile-big-endian
-  # - name: verify-datafile-from-little-endian
+  - name: generate-datafile-big-endian
+  - name: verify-datafile-big-endian
+  - name: verify-datafile-from-little-endian
 
 - name: ubuntu1804-ppc
   display_name: "~ Ubuntu 18.04 PPC"
