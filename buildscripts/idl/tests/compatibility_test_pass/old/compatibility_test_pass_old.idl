@@ -266,7 +266,15 @@ structs:
         description: "This struct contains a field that is stable and optional in the new version
                       but unstable in the corresponding old version"
         fields:
-            addedOptionalTypeField:
+            stableOptionalTypeField:
+                type: string
+                unstable: true
+
+    StableWithDefaultTypeFieldStruct:
+        description: "This struct contains a field that is stable and required with a default value
+                      in the new version but unstable in the corresponding old version"
+        fields:
+            stableWithDefaultTypeField:
                 type: string
                 unstable: true
 
@@ -409,6 +417,20 @@ commands:
         reply_type: OkReply
         fields:
             newOptionalStableParam:
+                type: string
+                unstable: true
+
+    addedCommandParameterStableWithDefault:
+        description: "new command has a required stable parameter with a default value
+                      that is unstable in the corresponding old command and still passes"
+        command_name: addedCommandParameterStableWithDefault
+        namespace: ignored
+        cpp_name: addedCommandParameterStableWithDefault
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newStableParamWithDefault:
                 type: string
                 unstable: true
 
@@ -800,6 +822,17 @@ commands:
         namespace: type
         type: StableOptionalTypeFieldStruct
         cpp_name: newTypeFieldStableOptional
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeFieldStableWithDefault:
+        description: "new command has a required type field with a default value
+                      that is unstable in the corresponding old command and still passes"
+        command_name: newTypeFieldStableWithDefault
+        namespace: type
+        type: StableWithDefaultTypeFieldStruct
+        cpp_name: newTypeFieldStableWithDefault
         strict: true
         api_version: "1"
         reply_type: OkReply

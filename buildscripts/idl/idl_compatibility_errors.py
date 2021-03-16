@@ -71,7 +71,7 @@ ERROR_ID_NEW_REPLY_FIELD_VARIANT_TYPE_NOT_SUBSET = "ID0027"
 ERROR_ID_REMOVED_COMMAND_PARAMETER = "ID0028"
 ERROR_ID_ADDED_REQUIRED_COMMAND_PARAMETER = "ID0029"
 ERROR_ID_COMMAND_PARAMETER_UNSTABLE = "ID0030"
-ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED = "ID0031"
+ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED_NO_DEFAULT = "ID0031"
 ERROR_ID_COMMAND_PARAMETER_REQUIRED = "ID0032"
 ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0033"
 ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY = "ID0034"
@@ -85,7 +85,7 @@ ERROR_ID_COMMAND_PARAMETER_CONTAINS_VALIDATOR = "ID0041"
 ERROR_ID_COMMAND_PARAMETER_VALIDATORS_NOT_EQUAL = "ID0042"
 ERROR_ID_COMMAND_TYPE_CONTAINS_VALIDATOR = "ID0043"
 ERROR_ID_COMMAND_TYPE_VALIDATORS_NOT_EQUAL = "ID0044"
-ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED = "ID0045"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED_NO_DEFAULT = "ID0045"
 ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_REQUIRED = "ID0046"
 ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0047"
 ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED = "ID0048"
@@ -490,29 +490,31 @@ class IDLCompatibilityContext(object):
                 "that was optional in the old struct type." % (command_name, type_name, field_name),
                 file)
 
-    def add_new_param_or_command_type_field_stable_required_error(
-            self, command_name: str, field_name: str, file: str, type_name: Optional[str],
+    def add_new_param_or_command_type_field_stable_required_no_default_error(
+            self, struct_name: str, field_name: str, file: str, type_name: Optional[str],
             is_command_parameter: bool) -> None:
         # pylint: disable=too-many-arguments,invalid-name
         """
         Add a stable required parameter or command type field error.
 
         Add an error about the new command parameter or command type field being stable and
-        required when the corresponding old command parameter or command type field is
-        unstable.
+        required with no default value when the corresponding old command parameter or command
+        type field is unstable.
         """
         if is_command_parameter:
             self._add_error(
-                ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED, command_name,
-                "'%s' has a stable required field or sub-field '%s' that "
-                "was unstable in the old struct. "
-                "The new field should be optional." % (command_name, field_name), file)
+                ERROR_ID_COMMAND_PARAMETER_STABLE_REQUIRED_NO_DEFAULT, struct_name,
+                "'%s' has a stable required field '%s' with no default that was unstable in the"
+                " old struct."
+                "The new field should be optional or have a default value" % (struct_name,
+                                                                              field_name), file)
         else:
             self._add_error(
-                ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED, command_name,
-                "'%s' or its sub-struct has type '%s' with a stable and required "
-                "type field '%s' that was unstable "
-                "in the old struct type." % (command_name, type_name, field_name), file)
+                ERROR_ID_NEW_COMMAND_TYPE_FIELD_STABLE_REQUIRED_NO_DEFAULT, struct_name,
+                ("'%s' has type '%s' with a stable and required type field '%s' with no default "
+                 "that was unstable in the old struct type."
+                 "The new field should be optional or have a default value") %
+                (struct_name, type_name, field_name), file)
 
     def add_new_param_or_command_type_field_unstable_error(self, command_name: str, field_name: str,
                                                            file: str, type_name: Optional[str],
