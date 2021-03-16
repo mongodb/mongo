@@ -110,6 +110,7 @@ assert.eq(currOp.dataSyncCompleted, false, tojson(res));
 assert(!currOp.dataConsistentStopDonorOpTime, tojson(res));
 assert(!currOp.cloneFinishedRecipientOpTime, tojson(res));
 assert(!currOp.expireAt, tojson(res));
+assert.gt(new Date(), currOp.receiveStart, tojson(res));
 // Must exist now.
 assert(currOp.startFetchingDonorOpTime, tojson(res));
 assert(currOp.startApplyingDonorOpTime, tojson(res));
@@ -152,6 +153,8 @@ assert(currOp.startApplyingDonorOpTime, tojson(res));
 assert(currOp.dataConsistentStopDonorOpTime, tojson(res));
 assert(currOp.cloneFinishedRecipientOpTime, tojson(res));
 assert(!currOp.expireAt, tojson(res));
+// The oplog applier should have applied at least the noop resume token.
+assert.gte(currOp.numOpsApplied, 1, tojson(res));
 fpAfterDataConsistent.off();
 
 jsTestLog("Waiting for migration to complete.");

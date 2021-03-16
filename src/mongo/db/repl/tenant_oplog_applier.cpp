@@ -299,6 +299,8 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
             lastBatchCompletedOpTimes.recipientOpTime;
     }
 
+    _numOpsApplied += batch->ops.size();
+
     LOGV2_DEBUG(4886002,
                 1,
                 "Tenant Oplog Applier finished applying batch",

@@ -212,6 +212,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForSingleBatch) {
     ASSERT_EQ(2, entries.size());
     assertNoOpMatches(srcOps[0], entries[0]);
     assertNoOpMatches(srcOps[1], entries[1]);
+    ASSERT_EQ(srcOps.size(), applier->getNumOpsApplied());
     applier->shutdown();
     applier->join();
 }
@@ -237,6 +238,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeBatch) {
     for (size_t i = 0; i < srcOps.size(); i++) {
         assertNoOpMatches(srcOps[i], entries[i]);
     }
+    ASSERT_EQ(srcOps.size(), applier->getNumOpsApplied());
     applier->shutdown();
     applier->join();
 }
