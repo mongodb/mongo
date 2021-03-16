@@ -225,13 +225,13 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
 
     _metaValue = _bucket[kBucketMetaFieldName];
     if (_spec.metaField) {
-        // The spec indicates that there should be a metadata region. Missing metadata in this case
-        // is expressed with null, so the field is expected to be present. We also disallow
-        // undefined since the undefined BSON type is deprecated.
+        // The spec indicates that there might be a metadata region. Missing metadata in
+        // measurements is expressed with missing metadata in a bucket. But we disallow undefined
+        // since the undefined BSON type is deprecated.
         uassert(5369600,
-                "The $_internalUnpackBucket stage requires metadata to be present in a bucket if "
-                "metaField parameter is provided",
-                (_metaValue.type() != BSONType::Undefined) && _metaValue);
+                "The $_internalUnpackBucket stage allows metadata to be absent or otherwise, it "
+                "must not be the deprecated undefined bson type",
+                !_metaValue || _metaValue.type() != BSONType::Undefined);
     } else {
         // If the spec indicates that the time series collection has no metadata field, then we
         // should not find a metadata region in the underlying bucket documents.
@@ -276,7 +276,8 @@ Document BucketUnpacker::getNext() {
         measurement.addField(_spec.timeField, Value{timeElem});
     }
 
-    if (_includeMetaField && !_metaValue.isNull()) {
+    // Includes metaField when we're instructed to do so and metaField value exists.
+    if (_includeMetaField && _metaValue) {
         measurement.addField(*_spec.metaField, Value{_metaValue});
     }
 
