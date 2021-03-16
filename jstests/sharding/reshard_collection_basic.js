@@ -12,7 +12,13 @@ load("jstests/sharding/libs/find_chunks_util.js");
 (function() {
 'use strict';
 
-const st = new ShardingTest({mongos: 1, shards: 2});
+const st = new ShardingTest({
+    mongos: 1,
+    mongosOptions: {setParameter: {featureFlagResharding: true}},
+    configOptions: {setParameter: {featureFlagResharding: true}},
+    shards: 2,
+    shardOptions: {setParameter: {featureFlagResharding: true}},
+});
 const kDbName = 'db';
 const collName = 'foo';
 const ns = kDbName + '.' + collName;

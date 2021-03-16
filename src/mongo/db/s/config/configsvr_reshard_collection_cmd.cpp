@@ -44,6 +44,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
@@ -59,6 +60,11 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "reshardCollection command not enabled",
+                    resharding::gFeatureFlagResharding.isEnabled(
+                        serverGlobalParams.featureCompatibility));
+
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrReshardCollection can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
