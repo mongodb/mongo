@@ -141,7 +141,7 @@ repl::MutableOplogEntry parseOplog(const BSONObj& oplogBSON) {
     uassert(ErrorCodes::UnsupportedFormat,
             str::stream() << "oplog with opTime " << oplogEntry.getTimestamp().toString()
                           << " does not have stmtId: " << redact(oplogBSON),
-            oplogEntry.getStatementId());
+            !oplogEntry.getStatementIds().empty());
 
     return oplogEntry;
 }
@@ -220,7 +220,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
         oplogEntry.setObject2(oplogBSON);  // TODO: strip redundant info?
     }
 
-    const auto stmtId = *oplogEntry.getStatementId();
+    const auto stmtIds = oplogEntry.getStatementIds();
 
     auto uniqueOpCtx = cc().makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
@@ -231,7 +231,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
 
     try {
         txnParticipant.beginOrContinue(opCtx, result.txnNum, boost::none, boost::none);
-        if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
+        if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
             // Skip the incoming statement because it has already been logged locally
             return lastResult;
         }
@@ -242,8 +242,9 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
             return lastResult;
         }
 
-        if (stmtId == kIncompleteHistoryStmtId) {
+        if (stmtIds.front() == kIncompleteHistoryStmtId) {
             // No need to log entries for transactions whose history has been truncated
+            invariant(stmtIds.size() == 1);
             return lastResult;
         }
 
@@ -295,7 +296,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
 
                 // We do not migrate transaction oplog entries so don't set the txn state.
-                txnParticipant.onRetryableWriteCloningCompleted(opCtx, {stmtId}, sessionTxnRecord);
+                txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
             }
 
             wunit.commit();

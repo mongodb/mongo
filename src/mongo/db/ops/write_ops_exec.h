@@ -56,6 +56,19 @@ struct WriteResult {
     std::vector<StatusWith<SingleWriteResult>> results;
 };
 
+/**
+ * Enums used to differentiate between types of insert/update operations based on how they were
+ * issued.
+ */
+enum class InsertType {
+    kStandard,
+    kFromMigrate,  // From a chunk migration.
+    kTimeseries,
+};
+enum class UpdateType {
+    kStandard,
+    kTimeseries,
+};
 
 /**
  * Performs a batch of inserts, updates, or deletes.
@@ -68,15 +81,18 @@ struct WriteResult {
  * exception being thrown from these functions. Callers are responsible for managing LastError in
  * that case. This should generally be combined with LastError handling from parse failures.
  *
- * 'fromMigrate' indicates whether the operation was induced by a chunk migration
+ * 'type' indicates whether the operation was induced by a standard write, a chunk migration, or a
+ * time-series insert.
  *
  * Note: performInserts() gets called for both user and internal (like tenant collection cloner,
  * and initial sync/tenant migration oplog buffer) inserts.
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::Insert& op,
-                           bool fromMigrate = false);
-WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& op);
+                           const InsertType& type = InsertType::kStandard);
+WriteResult performUpdates(OperationContext* opCtx,
+                           const write_ops::Update& op,
+                           const UpdateType& type = UpdateType::kStandard);
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& op);
 
 /**

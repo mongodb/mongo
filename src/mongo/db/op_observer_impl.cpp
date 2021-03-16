@@ -165,7 +165,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry.setUuid(args.uuid);
 
     repl::OplogLink oplogLink;
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtId);
+    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtIds);
 
     OpTimeBundle opTimes;
     // We never want to store pre- or post- images when we're migrating oplog entries from another
@@ -202,7 +202,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry.setObject2(args.updateArgs.criteria);
     oplogEntry.setFromMigrateIfTrue(args.updateArgs.fromMigrate);
     // oplogLink could have been changed to include pre/postImageOpTime by the previous no-op write.
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtId);
+    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtIds);
     if (args.updateArgs.oplogSlot) {
         oplogEntry.setOpTime(*args.updateArgs.oplogSlot);
     }
@@ -226,7 +226,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     oplogEntry.setDestinedRecipient(destinedRecipientDecoration(opCtx));
 
     repl::OplogLink oplogLink;
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
+    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
 
     OpTimeBundle opTimes;
     // We never want to store pre-images when we're migrating oplog entries from another
@@ -245,7 +245,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     oplogEntry.setObject(documentKeyDecoration(opCtx).get().getShardKeyAndId());
     oplogEntry.setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
+    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
     opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
     opTimes.wallClockTime = oplogEntry.getWallClockTime();
     return opTimes;
@@ -484,10 +484,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         times.insert(end(times), begin(opTimeList), end(opTimeList));
 
         std::vector<StmtId> stmtIdsWritten;
-        std::transform(first,
-                       last,
-                       std::back_inserter(stmtIdsWritten),
-                       [](const InsertStatement& stmt) { return stmt.stmtId; });
+        std::for_each(first, last, [&](const InsertStatement& stmt) {
+            stmtIdsWritten.insert(stmtIdsWritten.end(), stmt.stmtIds.begin(), stmt.stmtIds.end());
+        });
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(lastOpTime);
@@ -575,7 +574,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-        onWriteOpCompleted(opCtx, std::vector<StmtId>{args.updateArgs.stmtId}, sessionTxnRecord);
+        onWriteOpCompleted(opCtx, args.updateArgs.stmtIds, sessionTxnRecord);
     }
 
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {

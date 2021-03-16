@@ -79,7 +79,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 {},                               // sessionInfo
                                 boost::none,                      // upsert
                                 Date_t(),                         // wall clock time
-                                boost::none,                      // statement id
+                                {},                               // statement ids
                                 boost::none,     // optime of previous write within same transaction
                                 preImageOpTime,  // pre-image optime
                                 postImageOpTime,  // post-image optime

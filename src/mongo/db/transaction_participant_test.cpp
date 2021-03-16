@@ -74,7 +74,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 BSONObj object,
                                 OperationSessionInfo sessionInfo,
                                 Date_t wallClockTime,
-                                boost::optional<StmtId> stmtId,
+                                const std::vector<StmtId>& stmtIds,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
     return repl::DurableOplogEntry(
         opTime,                        // optime
@@ -89,7 +89,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         sessionInfo,                   // sessionInfo
         boost::none,                   // upsert
         wallClockTime,                 // wall clock time
-        stmtId,                        // statement id
+        stmtIds,                       // statement ids
         prevWriteOpTimeInTransaction,  // optime of previous write within same transaction
         boost::none,                   // pre-image optime
         boost::none,                   // post-image optime

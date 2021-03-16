@@ -148,11 +148,11 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 
     writeConflictRetry(opCtx(), "upsert", collection()->ns().ns(), [&] {
         WriteUnitOfWork wunit(opCtx());
-        uassertStatusOK(
-            collection()->insertDocument(opCtx(),
-                                         InsertStatement(_params.request->getStmtId(), newDocument),
-                                         _params.opDebug,
-                                         _params.request->isFromMigration()));
+        uassertStatusOK(collection()->insertDocument(
+            opCtx(),
+            InsertStatement(_params.request->getStmtIds(), newDocument),
+            _params.opDebug,
+            _params.request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.

@@ -213,7 +213,7 @@ public:
                                repl::OpTypeEnum opType,
                                const BSONObj& obj1,
                                const boost::optional<BSONObj> obj2) {
-        return makeOplog(opTime, opType, obj1, obj2, {}, boost::none);
+        return makeOplog(opTime, opType, obj1, obj2, {}, {});
     }
 
     repl::OplogEntry makeOplog(const repl::OpTime& opTime,
@@ -221,7 +221,7 @@ public:
                                const BSONObj& obj1,
                                const boost::optional<BSONObj> obj2,
                                const OperationSessionInfo& sessionInfo,
-                               const boost::optional<StmtId>& statementId) {
+                               const std::vector<StmtId>& statementIds) {
         ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
         return {repl::DurableOplogEntry(opTime,
                                         boost::none /* hash */,
@@ -235,7 +235,7 @@ public:
                                         sessionInfo,
                                         boost::none /* upsert */,
                                         {} /* date */,
-                                        statementId,
+                                        statementIds,
                                         boost::none /* prevWrite */,
                                         boost::none /* preImage */,
                                         boost::none /* postImage */,
@@ -1937,7 +1937,7 @@ public:
                                              UUID uuid,
                                              const LogicalSessionId& lsid,
                                              TxnNumber txnNumber,
-                                             StmtId stmtId,
+                                             const std::vector<StmtId>& stmtIds,
                                              repl::OpTime prevOpTime) {
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
@@ -1945,10 +1945,10 @@ public:
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(BSON("TestValue" << 0));
         oplogEntry.setWallClockTime(Date_t::now());
-        if (stmtId != kUninitializedStmtId) {
+        if (stmtIds.front() != kUninitializedStmtId) {
             oplogEntry.setSessionId(lsid);
             oplogEntry.setTxnNumber(txnNumber);
-            oplogEntry.setStatementId(stmtId);
+            oplogEntry.setStatementIds(stmtIds);
             oplogEntry.setPrevWriteOpTimeInTransaction(prevOpTime);
         }
         return repl::logOp(opCtx, &oplogEntry);
@@ -1956,7 +1956,7 @@ public:
 
     void writeTxnRecord(const LogicalSessionId& lsid,
                         const TxnNumber& txnNum,
-                        StmtId stmtId,
+                        const std::vector<StmtId>& stmtIds,
                         repl::OpTime prevOpTime,
                         boost::optional<DurableTxnStateEnum> txnState) {
         auto newClient = operationContext()->getServiceContext()->makeClient("testWriteTxnRecord");
@@ -1976,7 +1976,7 @@ public:
         AutoGetCollection autoColl(opCtx, kCrudNs, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
         const auto opTime = insertRetryableOplog(
-            opCtx, kCrudNs, kCrudUUID, session->getSessionId(), txnNum, stmtId, prevOpTime);
+            opCtx, kCrudNs, kCrudUUID, session->getSessionId(), txnNum, stmtIds, prevOpTime);
 
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setSessionId(session->getSessionId());
@@ -1984,7 +1984,7 @@ public:
         sessionTxnRecord.setLastWriteOpTime(opTime);
         sessionTxnRecord.setLastWriteDate(Date_t::now());
         sessionTxnRecord.setState(txnState);
-        txnParticipant.onWriteOpCompletedOnPrimary(opCtx, {stmtId}, sessionTxnRecord);
+        txnParticipant.onWriteOpCompletedOnPrimary(opCtx, stmtIds, sessionTxnRecord);
         wuow.commit();
     }
 
@@ -2186,12 +2186,8 @@ public:
                                                               << kCrudUUID << "o" << doc))
                                            << "prepare" << true);
 
-        crudOps->push_back(makeOplog(prepareOptime,
-                                     repl::OpTypeEnum::kCommand,
-                                     applyOpsCmd,
-                                     boost::none,
-                                     session,
-                                     boost::none));
+        crudOps->push_back(makeOplog(
+            prepareOptime, repl::OpTypeEnum::kCommand, applyOpsCmd, boost::none, session, {}));
 
         repl::OpTime commitOptime(prepareOptime.getTimestamp() + 1, prepareOptime.getTerm());
         crudOps->push_back(makeOplog(commitOptime,
@@ -2199,7 +2195,7 @@ public:
                                      BSON("commitTransaction" << 1),
                                      boost::none,
                                      session,
-                                     boost::none));
+                                     {}));
     }
 
     /**
@@ -2326,19 +2322,19 @@ TEST_F(ReshardingOplogApplierRetryableTest, GroupInserts) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                1));
+                                {1}));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
                                 repl::OpTypeEnum::kInsert,
                                 BSON("_id" << 2),
                                 boost::none,
                                 session,
-                                2));
+                                {2}));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
                                 repl::OpTypeEnum::kInsert,
                                 BSON("_id" << 3),
                                 boost::none,
                                 session,
-                                3));
+                                {3}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 5 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2402,13 +2398,13 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session1,
-                                1));
+                                {1}));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
                                 repl::OpTypeEnum::kInsert,
                                 BSON("_id" << 2),
                                 boost::none,
                                 session1,
-                                2));
+                                {2}));
 
     OperationSessionInfo session2;
     session2.setSessionId(makeLogicalSessionIdForTest());
@@ -2419,7 +2415,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                                 BSON("$set" << BSON("x" << 1)),
                                 BSON("_id" << 2),
                                 session2,
-                                1));
+                                {1}));
 
     OperationSessionInfo session3;
     session3.setSessionId(makeLogicalSessionIdForTest());
@@ -2430,7 +2426,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session3,
-                                1));
+                                {1}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2491,13 +2487,13 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session1,
-                                1));
+                                {1}));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
                                 repl::OpTypeEnum::kInsert,
                                 BSON("_id" << 2),
                                 boost::none,
                                 session1,
-                                2));
+                                {2}));
 
     OperationSessionInfo session2;
     session2.setSessionId(makeLogicalSessionIdForTest());
@@ -2508,7 +2504,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                                 BSON("_id" << 3),
                                 boost::none,
                                 session2,
-                                1));
+                                {1}));
 
     session1.setTxnNumber(2);
 
@@ -2517,7 +2513,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                                 BSON("_id" << 4),
                                 boost::none,
                                 session1,
-                                21));
+                                {21}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2565,7 +2561,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
 TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
     auto lsid = makeLogicalSessionIdForTest();
 
-    writeTxnRecord(lsid, 2, 1, {}, boost::none);
+    writeTxnRecord(lsid, 2, {1}, {}, boost::none);
 
     std::deque<repl::OplogEntry> crudOps;
 
@@ -2578,7 +2574,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                21));
+                                {21}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2617,7 +2613,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
     auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber existingTxnNum = 20;
     const StmtId existingStmtId = 1;
-    writeTxnRecord(lsid, existingTxnNum, existingStmtId, {}, boost::none);
+    writeTxnRecord(lsid, existingTxnNum, {existingStmtId}, {}, boost::none);
 
     OperationSessionInfo session;
     const TxnNumber incomingTxnNum = 15;
@@ -2632,7 +2628,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                incomingStmtId));
+                                {incomingStmtId}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2682,7 +2678,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
     auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber existingTxnNum = 20;
     const StmtId existingStmtId = 1;
-    writeTxnRecord(lsid, existingTxnNum, existingStmtId, {}, boost::none);
+    writeTxnRecord(lsid, existingTxnNum, {existingStmtId}, {}, boost::none);
 
     OperationSessionInfo session;
     const TxnNumber incomingTxnNum = existingTxnNum;
@@ -2697,7 +2693,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                incomingStmtId));
+                                {incomingStmtId}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2737,7 +2733,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
     auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber existingTxnNum = 20;
     const StmtId existingStmtId = 1;
-    writeTxnRecord(lsid, existingTxnNum, existingStmtId, {}, boost::none);
+    writeTxnRecord(lsid, existingTxnNum, {existingStmtId}, {}, boost::none);
 
     OperationSessionInfo session;
     const TxnNumber incomingTxnNum = existingTxnNum;
@@ -2752,7 +2748,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                incomingStmtId));
+                                {incomingStmtId}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2809,7 +2805,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                1));
+                                {1}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2867,7 +2863,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                1));
+                                {1}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2924,7 +2920,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                1));
+                                {1}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -2989,7 +2985,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                                 BSON("_id" << 1),
                                 boost::none,
                                 session,
-                                1));
+                                {1}));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
     boost::optional<ReshardingOplogApplier> applier;
@@ -3045,21 +3041,21 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 {},
-                                boost::none));
+                                {}));
 
     auto preImageOplog = makeOplog(repl::OpTime(Timestamp(6, 3), 1),
                                    repl::OpTypeEnum::kNoop,
                                    BSON("_id" << 1),
                                    boost::none,
                                    session1,
-                                   boost::none);
+                                   {});
 
     auto updateOplog = makeOplog(repl::OpTime(Timestamp(8, 3), 1),
                                  repl::OpTypeEnum::kUpdate,
                                  BSON("$set" << BSON("x" << 1)),
                                  BSON("_id" << 1),
                                  session1,
-                                 1);
+                                 {1});
     updateOplog.setPreImageOp(std::make_shared<repl::DurableOplogEntry>(preImageOplog.getEntry()));
     crudOps.push_back(updateOplog);
 
@@ -3111,21 +3107,21 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
                                 BSON("_id" << 1),
                                 boost::none,
                                 {},
-                                boost::none));
+                                {}));
 
     auto postImageOplog = makeOplog(repl::OpTime(Timestamp(6, 3), 1),
                                     repl::OpTypeEnum::kNoop,
                                     BSON("_id" << 1 << "x" << 1),
                                     boost::none,
                                     session1,
-                                    boost::none);
+                                    {});
 
     auto updateOplog = makeOplog(repl::OpTime(Timestamp(8, 3), 1),
                                  repl::OpTypeEnum::kUpdate,
                                  BSON("$set" << BSON("x" << 1)),
                                  BSON("_id" << 1),
                                  session1,
-                                 1);
+                                 {1});
     updateOplog.setPostImageOp(
         std::make_shared<repl::DurableOplogEntry>(postImageOplog.getEntry()));
     crudOps.push_back(updateOplog);
@@ -3169,7 +3165,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
 TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
     auto lsid = makeLogicalSessionIdForTest();
 
-    writeTxnRecord(lsid, 2, 1, {}, boost::none);
+    writeTxnRecord(lsid, 2, {1}, {}, boost::none);
 
     std::deque<repl::OplogEntry> crudOps;
 
@@ -3218,7 +3214,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
     auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber existingTxnNum = 20;
     const StmtId existingStmtId = 1;
-    writeTxnRecord(lsid, existingTxnNum, existingStmtId, {}, boost::none);
+    writeTxnRecord(lsid, existingTxnNum, {existingStmtId}, {}, boost::none);
 
     OperationSessionInfo session;
     const TxnNumber incomingTxnNum = 15;
@@ -3279,7 +3275,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
     auto lsid = makeLogicalSessionIdForTest();
     const TxnNumber existingTxnNum = 20;
     const StmtId existingStmtId = 1;
-    writeTxnRecord(lsid, existingTxnNum, existingStmtId, {}, boost::none);
+    writeTxnRecord(lsid, existingTxnNum, {existingStmtId}, {}, boost::none);
 
     OperationSessionInfo session;
     const TxnNumber incomingTxnNum = existingTxnNum;

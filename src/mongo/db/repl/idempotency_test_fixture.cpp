@@ -265,7 +265,7 @@ OplogEntry IdempotencyTest::prepare(LogicalSessionId lsid,
                           boost::none /* o2 */,
                           info /* sessionInfo */,
                           Date_t::min() /* wallClockTime -- required but not checked */,
-                          stmtId,
+                          {stmtId},
                           boost::none /* uuid */,
                           prevOpTime);
 }
@@ -278,21 +278,21 @@ OplogEntry IdempotencyTest::commitUnprepared(LogicalSessionId lsid,
     OperationSessionInfo info;
     info.setSessionId(lsid);
     info.setTxnNumber(txnNum);
-    return makeCommandOplogEntryWithSessionInfoAndStmtId(
-        nextOpTime(), nss, BSON("applyOps" << ops), lsid, txnNum, stmtId, prevOpTime);
+    return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(), nss, BSON("applyOps" << ops), lsid, txnNum, {stmtId}, prevOpTime);
 }
 
 OplogEntry IdempotencyTest::commitPrepared(LogicalSessionId lsid,
                                            TxnNumber txnNum,
                                            StmtId stmtId,
                                            OpTime prepareOpTime) {
-    return makeCommandOplogEntryWithSessionInfoAndStmtId(
+    return makeCommandOplogEntryWithSessionInfoAndStmtIds(
         nextOpTime(),
         nss,
         BSON("commitTransaction" << 1 << "commitTimestamp" << prepareOpTime.getTimestamp()),
         lsid,
         txnNum,
-        stmtId,
+        {stmtId},
         prepareOpTime);
 }
 
@@ -300,8 +300,8 @@ OplogEntry IdempotencyTest::abortPrepared(LogicalSessionId lsid,
                                           TxnNumber txnNum,
                                           StmtId stmtId,
                                           OpTime prepareOpTime) {
-    return makeCommandOplogEntryWithSessionInfoAndStmtId(
-        nextOpTime(), nss, BSON("abortTransaction" << 1), lsid, txnNum, stmtId, prepareOpTime);
+    return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        nextOpTime(), nss, BSON("abortTransaction" << 1), lsid, txnNum, {stmtId}, prepareOpTime);
 }
 
 OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
@@ -319,7 +319,7 @@ OplogEntry IdempotencyTest::partialTxn(LogicalSessionId lsid,
                           boost::none /* o2 */,
                           info /* sessionInfo */,
                           Date_t::min() /* wallClockTime -- required but not checked */,
-                          stmtId,
+                          {stmtId},
                           boost::none /* uuid */,
                           prevOpTime);
 }

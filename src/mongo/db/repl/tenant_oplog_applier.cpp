@@ -593,11 +593,12 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Use the same wallclock time as the noop entry.
             sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
             sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
-        } else if (entry.getStatementId() && !SessionUpdateTracker::isTransactionEntry(entry)) {
+        } else if (!entry.getStatementIds().empty() &&
+                   !SessionUpdateTracker::isTransactionEntry(entry)) {
             // If it has a statement id but isn't a transaction, it's a retryable write.
             auto sessionId = *entry.getSessionId();
             auto txnNumber = *entry.getTxnNumber();
-            auto stmtId = *entry.getStatementId();
+            auto entryStmtIds = entry.getStatementIds();
             if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
                 // TODO(SERVER-53510): handle pre and post image no-ops
                 LOGV2_DEBUG(5350903,
@@ -606,19 +607,19 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                             "entry"_attr = entry.getEntry(),
                             "sessionId"_attr = sessionId,
                             "txnNumber"_attr = txnNumber,
-                            "statementId"_attr = stmtId,
+                            "statementIds"_attr = entryStmtIds,
                             "tenant"_attr = _tenantId,
                             "migrationUuid"_attr = _migrationUuid);
                 continue;
             }
-            stmtIds.push_back(stmtId);
+            stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
 
             LOGV2_DEBUG(5350901,
                         2,
                         "Tenant Oplog Applier processing retryable write",
                         "sessionId"_attr = sessionId,
                         "txnNumber"_attr = txnNumber,
-                        "statementId"_attr = stmtId,
+                        "statementIds"_attr = entryStmtIds,
                         "tenant"_attr = _tenantId,
                         "migrationUuid"_attr = _migrationUuid);
             opCtx->setLogicalSessionId(sessionId);
@@ -643,15 +644,15 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             uassert(5350902,
                     str::stream() << "Tenant oplog application processed same retryable write "
                                      "twice for transaction "
-                                  << txnNumber << " statement " << stmtId << " on session "
-                                  << sessionId,
-                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId));
+                                  << txnNumber << " statement " << entryStmtIds.front()
+                                  << " on session " << sessionId,
+                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(entryStmtIds.front()));
             prevWriteOpTime = txnParticipant.getLastWriteOpTime();
 
             // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
             noopEntry.setSessionId(sessionId);
             noopEntry.setTxnNumber(txnNumber);
-            noopEntry.setStatementId(stmtId);
+            noopEntry.setStatementIds(entryStmtIds);
 
             // set fromMigrate on the no-op so the session update tracker recognizes it.
             noopEntry.setFromMigrate(true);

@@ -669,7 +669,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::typedRun(OperationCo
                 makeUpdateRequest(opCtx, req, verbosity, &updateRequest);
 
                 if (opCtx->getTxnNumber()) {
-                    updateRequest.setStmtId(stmtId);
+                    updateRequest.setStmtIds({stmtId});
                 }
 
                 const ExtensionsCallbackReal extensionsCallback(

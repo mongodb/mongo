@@ -1444,7 +1444,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
                                                 sessionInfo,                // sessionInfo
                                                 boost::none,                // isUpsert
                                                 Date_t(),                   // wallClockTime
-                                                boost::none,                // statementId
+                                                {},                         // statementIds
                                                 OpTime(),      // prevWriteOpTimeInTransaction
                                                 boost::none,   // preImageOpTime
                                                 boost::none,   // postImageOpTime
@@ -1478,7 +1478,7 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
         sessionInfo,                // sessionInfo
         boost::none,                // isUpsert
         Date_t(),                   // wallClockTime
-        boost::none,                // statementId
+        {},                         // statementIds
         partialApplyOpsOpTime,      // prevWriteOpTimeInTransaction
         boost::none,                // preImageOpTime
         boost::none,                // postImageOpTime

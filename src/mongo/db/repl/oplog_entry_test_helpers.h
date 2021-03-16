@@ -48,7 +48,7 @@ OplogEntry makeOplogEntry(repl::OpTime opTime,
                           boost::optional<BSONObj> object2 = boost::none,
                           OperationSessionInfo sessionInfo = {},
                           Date_t wallClockTime = Date_t(),
-                          boost::optional<StmtId> stmtId = boost::none,
+                          const std::vector<StmtId>& stmtIds = {},
                           boost::optional<UUID> uuid = boost::none,
                           boost::optional<OpTime> prevOpTime = boost::none);
 
@@ -118,13 +118,13 @@ OplogEntry makeCommandOplogEntry(OpTime opTime,
 /**
  * Creates an oplog entry for 'command' with the given 'optime', 'namespace' and session information
  */
-OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtId(
+OplogEntry makeCommandOplogEntryWithSessionInfoAndStmtIds(
     OpTime opTime,
     const NamespaceString& nss,
     const BSONObj& command,
     LogicalSessionId lsid,
     TxnNumber txnNum,
-    StmtId stmtId,
+    std::vector<StmtId> stmtIds,
     boost::optional<OpTime> prevOpTime = boost::none);
 
 /**
@@ -135,14 +135,14 @@ OplogEntry makeInsertDocumentOplogEntryWithSessionInfo(OpTime opTime,
                                                        const BSONObj& documentToInsert,
                                                        OperationSessionInfo info);
 
-OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+OplogEntry makeInsertDocumentOplogEntryWithSessionInfoAndStmtIds(
     OpTime opTime,
     const NamespaceString& nss,
     boost::optional<UUID> uuid,
     const BSONObj& documentToInsert,
     LogicalSessionId lsid,
     TxnNumber txnNum,
-    StmtId stmtId,
+    const std::vector<StmtId>& stmtIds,
     boost::optional<OpTime> prevOpTime = boost::none);
 
 BSONObj makeInsertApplyOpsEntry(const NamespaceString& nss, const UUID& uuid, const BSONObj& doc);

@@ -102,7 +102,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const OperationSessionInfo& sessionInfo,
                           const boost::optional<bool>& isUpsert,
                           const mongo::Date_t& wallClockTime,
-                          const boost::optional<StmtId>& statementId,
+                          const std::vector<StmtId>& statementIds,
                           const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                           const boost::optional<OpTime>& preImageOpTime,
                           const boost::optional<OpTime>& postImageOpTime,
@@ -136,8 +136,10 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
         invariant(o2Field);
         builder.append(OplogEntryBase::kUpsertFieldName, isUpsert.get());
     }
-    if (statementId) {
-        builder.append(OplogEntryBase::kStatementIdFieldName, statementId.get());
+    if (statementIds.size() == 1) {
+        builder.append(OplogEntryBase::kStatementIdsFieldName, statementIds.front());
+    } else if (!statementIds.empty()) {
+        builder.append(OplogEntryBase::kStatementIdsFieldName, statementIds);
     }
     if (prevWriteOpTimeInTransaction) {
         const BSONObj localObject = prevWriteOpTimeInTransaction.get().toBSON();
@@ -312,7 +314,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const OperationSessionInfo& sessionInfo,
                                      const boost::optional<bool>& isUpsert,
                                      const mongo::Date_t& wallClockTime,
-                                     const boost::optional<StmtId>& statementId,
+                                     const std::vector<StmtId>& statementIds,
                                      const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
                                      const boost::optional<OpTime>& preImageOpTime,
                                      const boost::optional<OpTime>& postImageOpTime,
@@ -330,7 +332,7 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                           sessionInfo,
                                           isUpsert,
                                           wallClockTime,
-                                          statementId,
+                                          statementIds,
                                           prevWriteOpTimeInTransaction,
                                           preImageOpTime,
                                           postImageOpTime,
@@ -587,8 +589,8 @@ const boost::optional<mongo::Value>& OplogEntry::get_id() const& {
     return _entry.get_id();
 }
 
-const boost::optional<std::int32_t> OplogEntry::getStatementId() const& {
-    return _entry.getStatementId();
+std::vector<StmtId> OplogEntry::getStatementIds() const& {
+    return _entry.getStatementIds();
 }
 
 const OperationSessionInfo& OplogEntry::getOperationSessionInfo() const {

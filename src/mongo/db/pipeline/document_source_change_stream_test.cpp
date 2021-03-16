@@ -384,7 +384,7 @@ public:
                                     sessionInfo,                        // sessionInfo
                                     boost::none,                        // upsert
                                     Date_t(),                           // wall clock time
-                                    boost::none,                        // statement id
+                                    {},                                 // statement ids
                                     prevOpTime,  // optime of previous write within same transaction
                                     preImageOpTime,  // pre-image optime
                                     boost::none,     // post-image optime
@@ -1226,7 +1226,7 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
                                 sessionInfo,                      // sessionInfo
                                 boost::none,                      // upsert
                                 Date_t(),                         // wall clock time
-                                boost::none,                      // statement id
+                                {},                               // statement ids
                                 applyOpsOpTime,  // optime of previous write within same transaction
                                 boost::none,     // pre-image optime
                                 boost::none,     // post-image optime
@@ -1635,7 +1635,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
         sessionInfo,                      // sessionInfo
         boost::none,                      // upsert
         Date_t(),                         // wall clock time
-        boost::none,                      // statement id
+        {},                               // statement ids
         applyOpsOpTime2,                  // optime of previous write within same transaction
         boost::none,                      // pre-image optime
         boost::none,                      // post-image optime
@@ -1770,7 +1770,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
         sessionInfo,                      // sessionInfo
         boost::none,                      // upsert
         Date_t(),                         // wall clock time
-        boost::none,                      // statement id
+        {},                               // statement ids
         applyOpsOpTime2,                  // optime of previous write within same transaction
         boost::none,                      // pre-image optime
         boost::none,                      // post-image optime
