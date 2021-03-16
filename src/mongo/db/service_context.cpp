@@ -248,7 +248,16 @@ void ServiceContext::ClientDeleter::operator()(Client* client) const {
 }
 
 ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Client* client) {
-    auto opCtx = std::make_unique<OperationContext>(client, _nextOpId.fetchAndAdd(1));
+    OperationId curOp;
+    {
+        stdx::lock_guard lk(_mutex);
+        curOp = _nextOpId++;
+        while(curOp == 0 || _clientByOperationId.find(curOp) != _clientByOperationId.end()) {
+             curOp = _nextOpId++;
+        }
+    }
+
+    auto opCtx = std::make_unique<OperationContext>(client, curOp);
     if (client->session()) {
         _numCurrentOps.addAndFetch(1);
     }

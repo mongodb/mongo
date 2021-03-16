@@ -690,7 +690,7 @@ private:
     std::vector<KillOpListenerInterface*> _killOpListeners;
 
     // Counter for assigning operation ids.
-    AtomicWord<OperationId> _nextOpId{1};
+    OperationId _nextOpId{1};
 
     // When the catalog is restarted, the generation goes up by one each time.
     AtomicWord<uint64_t> _catalogGeneration{0};
