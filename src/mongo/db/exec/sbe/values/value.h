@@ -422,7 +422,7 @@ public:
         }
     }
 
-    void push_back(std::string_view name, TypeTags tag, Value val) {
+    void push_back(StringData name, TypeTags tag, Value val) {
         if (tag != TypeTags::Nothing) {
             ValueGuard guard{tag, val};
             // Reserve space in all vectors, they are the same size. We arbitrarily picked _typeTags
@@ -437,7 +437,7 @@ public:
         }
     }
 
-    std::pair<TypeTags, Value> getField(std::string_view field) {
+    std::pair<TypeTags, Value> getField(StringData field) {
         for (size_t idx = 0; idx < _typeTags.size(); ++idx) {
             if (_names[idx] == field) {
                 return {_typeTags[idx], _values[idx]};
@@ -597,12 +597,11 @@ private:
  */
 class PcreRegex {
 public:
-    PcreRegex(std::string_view pattern, std::string_view options)
-        : _pattern(pattern), _options(options) {
+    PcreRegex(StringData pattern, StringData options) : _pattern(pattern), _options(options) {
         _compile();
     }
 
-    PcreRegex(std::string_view pattern) : PcreRegex(pattern, "") {}
+    PcreRegex(StringData pattern) : PcreRegex(pattern, "") {}
 
     PcreRegex(const PcreRegex& other) : PcreRegex(other._pattern, other._options) {}
 
@@ -639,7 +638,7 @@ public:
      *         = 0  there was a match, but not enough space in the buffer
      *         > 0  the number of matches
      */
-    int execute(std::string_view input, int startPos, std::vector<int>& buf);
+    int execute(StringData input, int startPos, std::vector<int>& buf);
 
     size_t getNumberCaptures() const;
 
@@ -715,7 +714,7 @@ inline size_t getStringLength(TypeTags tag, const Value& val) noexcept {
 /**
  * getStringView() should be preferred over getRawStringView() where possible.
  */
-inline std::string_view getStringView(TypeTags tag, const Value& val) noexcept {
+inline StringData getStringView(TypeTags tag, const Value& val) noexcept {
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
 
@@ -776,9 +775,9 @@ inline uint8_t* getBSONBinDataCompat(TypeTags tag, Value val) {
     }
 }
 
-inline bool canUseSmallString(std::string_view input) {
+inline bool canUseSmallString(StringData input) {
     auto length = input.size();
-    auto ptr = input.data();
+    auto ptr = input.rawData();
     auto end = ptr + length;
     return length <= kSmallStringMaxLength && std::find(ptr, end, '\0') == end;
 }
@@ -787,18 +786,18 @@ inline bool canUseSmallString(std::string_view input) {
  * Callers must check that canUseSmallString() returns true before calling this function.
  * makeNewString() should be preferred over makeSmallString() where possible.
  */
-inline std::pair<TypeTags, Value> makeSmallString(std::string_view input) {
+inline std::pair<TypeTags, Value> makeSmallString(StringData input) {
     dassert(canUseSmallString(input));
 
     Value smallString{0};
     auto buf = getRawStringView(TypeTags::StringSmall, smallString);
-    memcpy(buf, input.data(), input.size());
+    memcpy(buf, input.rawData(), input.size());
     return {TypeTags::StringSmall, smallString};
 }
 
-inline std::pair<TypeTags, Value> makeBigString(std::string_view input) {
+inline std::pair<TypeTags, Value> makeBigString(StringData input) {
     auto len = input.size();
-    auto ptr = input.data();
+    auto ptr = input.rawData();
 
     invariant(len < static_cast<uint32_t>(std::numeric_limits<int32_t>::max()));
 
@@ -810,7 +809,7 @@ inline std::pair<TypeTags, Value> makeBigString(std::string_view input) {
     return {TypeTags::StringBig, reinterpret_cast<Value>(buf)};
 }
 
-inline std::pair<TypeTags, Value> makeNewString(std::string_view input) {
+inline std::pair<TypeTags, Value> makeNewString(StringData input) {
     if (canUseSmallString(input)) {
         return makeSmallString(input);
     } else {
@@ -886,7 +885,7 @@ inline KeyString::Value* getKeyStringView(Value val) noexcept {
     return reinterpret_cast<KeyString::Value*>(val);
 }
 
-std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options);
+std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options);
 
 std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex);
 
@@ -923,13 +922,13 @@ struct BsonRegex {
     BsonRegex(const char* rawValue) {
         pattern = rawValue;
         // We add 1 to account NULL byte after pattern.
-        flags = pattern.data() + pattern.size() + 1;
+        flags = pattern.rawData() + pattern.size() + 1;
     }
 
-    BsonRegex(std::string_view pattern, std::string_view flags) : pattern(pattern), flags(flags) {
+    BsonRegex(StringData pattern, StringData flags) : pattern(pattern), flags(flags) {
         // Ensure that flags follow right after pattern in memory. Otherwise 'dataView()' may return
-        // invalid 'std::string_view' object.
-        invariant(pattern.data() + pattern.size() + 1 == flags.data());
+        // invalid 'StringData' object.
+        invariant(pattern.rawData() + pattern.size() + 1 == flags.rawData());
     }
 
     size_t byteSize() const {
@@ -938,15 +937,15 @@ struct BsonRegex {
     }
 
     const char* data() const {
-        return pattern.data();
+        return pattern.rawData();
     }
 
-    std::string_view dataView() const {
+    StringData dataView() const {
         return {data(), byteSize()};
     }
 
-    std::string_view pattern;
-    std::string_view flags;
+    StringData pattern;
+    StringData flags;
 };
 
 inline BsonRegex getBsonRegexView(Value val) noexcept {
@@ -955,13 +954,13 @@ inline BsonRegex getBsonRegexView(Value val) noexcept {
 
 std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex);
 
-std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags);
+std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags);
 
-inline std::string_view getBsonJavascriptView(Value val) noexcept {
+inline StringData getBsonJavascriptView(Value val) noexcept {
     return getStringView(TypeTags::StringBig, val);
 }
 
-std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code);
+std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code);
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 
@@ -1146,7 +1145,7 @@ public:
         }
     }
     std::pair<TypeTags, Value> getViewOfValue() const;
-    std::string_view getFieldName() const;
+    StringData getFieldName() const;
 
     bool atEnd() const {
         if (_object) {

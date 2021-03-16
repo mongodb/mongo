@@ -58,16 +58,16 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back(value::TypeTags::MaxKey, 0);
     testData->push_back(value::TypeTags::bsonUndefined, 0);
 
-    std::string_view smallString = "perfect";
+    StringData smallString = "perfect";
     invariant(sbe::value::canUseSmallString(smallString));
-    std::string_view bigString = "too big string to fit into value";
+    StringData bigString = "too big string to fit into value";
     invariant(!sbe::value::canUseSmallString(bigString));
-    std::string_view smallStringWithNull = "a\0b";
+    StringData smallStringWithNull = "a\0b";
     invariant(smallStringWithNull.size() <= sbe::value::kSmallStringMaxLength);
-    std::string_view bigStringWithNull = "too big string \0 to fit into value";
+    StringData bigStringWithNull = "too big string \0 to fit into value";
     invariant(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
 
-    std::vector<std::string_view> stringCases = {
+    std::vector<StringData> stringCases = {
         smallString,
         smallStringWithNull,
         bigString,

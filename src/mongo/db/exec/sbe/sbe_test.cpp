@@ -35,16 +35,15 @@
 namespace mongo::sbe {
 
 TEST(SBEValues, Basic) {
-    using namespace std::literals;
     {
-        const auto [tag, val] = value::makeNewString("small"sv);
+        const auto [tag, val] = value::makeNewString("small"_sd);
         ASSERT_EQUALS(tag, value::TypeTags::StringSmall);
 
         value::releaseValue(tag, val);
     }
 
     {
-        const auto [tag, val] = value::makeNewString("not so small string"sv);
+        const auto [tag, val] = value::makeNewString("not so small string"_sd);
         ASSERT_EQUALS(tag, value::TypeTags::StringBig);
 
         value::releaseValue(tag, val);
@@ -53,11 +52,11 @@ TEST(SBEValues, Basic) {
         const auto [tag, val] = value::makeNewObject();
         auto obj = value::getObjectView(val);
 
-        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"sv);
-        obj->push_back("field"sv, fieldTag, fieldVal);
+        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
+        obj->push_back("field"_sd, fieldTag, fieldVal);
 
         ASSERT_EQUALS(obj->size(), 1);
-        const auto [checkTag, checkVal] = obj->getField("field"sv);
+        const auto [checkTag, checkVal] = obj->getField("field"_sd);
 
         ASSERT_EQUALS(fieldTag, checkTag);
         ASSERT_EQUALS(fieldVal, checkVal);
@@ -68,7 +67,7 @@ TEST(SBEValues, Basic) {
         const auto [tag, val] = value::makeNewArray();
         auto obj = value::getArrayView(val);
 
-        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"sv);
+        const auto [fieldTag, fieldVal] = value::makeNewString("not so small string"_sd);
         obj->push_back(fieldTag, fieldVal);
 
         ASSERT_EQUALS(obj->size(), 1);
@@ -198,15 +197,15 @@ TEST(SBEValues, HashCompound) {
     {
         auto [tag1, val1] = value::makeNewObject();
         auto obj1 = value::getObjectView(val1);
-        obj1->push_back("a"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
-        obj1->push_back("b"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
-        obj1->push_back("c"sv, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
+        obj1->push_back("a"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-5));
+        obj1->push_back("b"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
+        obj1->push_back("c"_sd, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-7));
 
         auto [tag2, val2] = value::makeNewObject();
         auto obj2 = value::getObjectView(val2);
-        obj2->push_back("a"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
-        obj2->push_back("b"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
-        obj2->push_back("c"sv, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
+        obj2->push_back("a"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-5.0));
+        obj2->push_back("b"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6.0));
+        obj2->push_back("c"_sd, value::TypeTags::NumberDouble, value::bitcastFrom<double>(-7.0));
 
         ASSERT_EQUALS(value::hashValue(tag1, val1), value::hashValue(tag2, val2));
 
