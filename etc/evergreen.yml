@@ -3310,17 +3310,17 @@ tasks:
           --separate-debug
           PREFIX=dist-test
 
-- name: archive_dist_test_debug
-  depends_on:
-    - name: archive_dist_test
-  commands:
-    - func: "scons compile"
-      vars:
-        targets: >-
-          archive-dist-test-debug
-        task_compile_flags: >-
-          --separate-debug
-          PREFIX=dist-test
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-binaries.${ext|tgz}
+        remote_file: ${mongo_binaries}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/gzip
+        display_name: Binaries
 
     - command: archive.targz_pack
       params:
@@ -3352,19 +3352,6 @@ tasks:
         exclude_files:
           - "*_test.pdb"
 
-    - func: "upload debugsymbols"
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-binaries.${ext|tgz}
-        remote_file: ${mongo_binaries}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: application/gzip
-        display_name: Binaries
-
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3385,6 +3372,21 @@ tasks:
         ignore_artifacts_for_spawn: false
         files:
           - src/artifacts.json
+
+
+- name: archive_dist_test_debug
+  depends_on:
+    - name: archive_dist_test
+  commands:
+    - func: "scons compile"
+      vars:
+        targets: >-
+          archive-dist-test-debug
+        task_compile_flags: >-
+          --separate-debug
+          PREFIX=dist-test
+
+    - func: "upload debugsymbols"
 
 - name: compile_ninja
   commands:
