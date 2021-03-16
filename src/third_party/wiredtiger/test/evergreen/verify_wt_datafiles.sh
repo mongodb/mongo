@@ -57,7 +57,7 @@ do
 	echo "${d}"
 
 	${wt_binary} -h ${d} printlog > /dev/null
-	if [ "$?" -ne "0" ]; then 
+	if [ "$?" -ne "0" ]; then
 		echo "Failed to dump '${d}' log files, exiting ..."
 		exit 1
 	fi
