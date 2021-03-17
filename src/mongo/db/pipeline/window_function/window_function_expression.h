@@ -120,7 +120,7 @@ public:
 
     virtual std::unique_ptr<WindowFunctionState> buildRemovable() const = 0;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
         MutableDocument args;
 
         args[_accumulatorName] = _input->serialize(static_cast<bool>(explain));
@@ -241,6 +241,73 @@ public:
 
     std::unique_ptr<WindowFunctionState> buildRemovable() const final {
         return RemovableType::create(_expCtx);
+    }
+};
+
+template <typename RankType>
+class ExpressionFromRankAccumulator : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx) {
+        // 'obj' is something like '{$func: <args>}'
+        uassert(5371601, "Rank style window functions take no other arguments", obj.nFields() == 1);
+        boost::optional<StringData> accumulatorName;
+        // Rank based accumulators are always unbounded to current.
+        WindowBounds bounds = WindowBounds{
+            WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Current{}}};
+        boost::intrusive_ptr<::mongo::Expression> input;
+        auto arg = obj.firstElement();
+        auto argName = arg.fieldNameStringData();
+        if (parserMap.find(argName) != parserMap.end()) {
+            uassert(5371603,
+                    str::stream() << accumulatorName << " must be specified with '{}' as the value",
+                    arg.type() == BSONType::Object && arg.embeddedObject().nFields() == 0);
+            accumulatorName = argName;
+        } else {
+            tasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "Window function found an unknown argument: " << argName);
+        }
+
+        // Rank based accumulators use the sort by expression as the input.
+        uassert(
+            5371602,
+            str::stream()
+                << accumulatorName
+                << " must be specified with a top level sortBy expression with exactly one element",
+            sortBy && sortBy->isSingleElementKey());
+        auto sortPatternPart = sortBy.get()[0];
+        if (sortPatternPart.fieldPath) {
+            auto sortExpression = ExpressionFieldPath::createPathFromString(
+                expCtx, sortPatternPart.fieldPath->fullPath(), expCtx->variablesParseState);
+            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+                expCtx, accumulatorName->toString(), std::move(sortExpression), std::move(bounds));
+        } else {
+            return make_intrusive<ExpressionFromRankAccumulator<RankType>>(
+                expCtx, accumulatorName->toString(), sortPatternPart.expression, std::move(bounds));
+        }
+    }
+
+    ExpressionFromRankAccumulator(ExpressionContext* expCtx,
+                                  std::string accumulatorName,
+                                  boost::intrusive_ptr<::mongo::Expression> input,
+                                  WindowBounds bounds)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)) {}
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        return RankType::create(_expCtx);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        tasserted(5371600,
+                  str::stream() << "Window function " << _accumulatorName
+                                << " is not supported with a removable window");
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        MutableDocument args;
+        args.addField(_accumulatorName, Value(Document()));
+        return args.freezeToValue();
     }
 };
 
