@@ -124,21 +124,20 @@ const int kTimeseriesControlVersion = 1;
 /**
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
-write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const BucketCatalog::BucketId& bucketId,
-                                                     const BucketCatalog::CommitData& data,
-                                                     const BSONObj& metadata) {
+write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
+    std::shared_ptr<BucketCatalog::WriteBatch> batch, const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
     {
-        if (!data.bucketMin.isEmpty() || !data.bucketMax.isEmpty()) {
+        if (!batch->min().isEmpty() || !batch->max().isEmpty()) {
             BSONObjBuilder controlBuilder(updateBuilder.subobjStart(
                 str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "control"));
-            if (!data.bucketMin.isEmpty()) {
+            if (!batch->min().isEmpty()) {
                 controlBuilder.append(
-                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "min", data.bucketMin);
+                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "min", batch->min());
             }
-            if (!data.bucketMax.isEmpty()) {
+            if (!batch->max().isEmpty()) {
                 controlBuilder.append(
-                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "max", data.bucketMax);
+                    str::stream() << doc_diff::kSubDiffSectionFieldPrefix << "max", batch->max());
             }
         }
     }
@@ -146,8 +145,8 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const BucketCatalog::Bucket
         // doc_diff::kSubDiffSectionFieldPrefix + <field name> => {<index_0>: ..., <index_1>: ...}
         StringDataMap<BSONObjBuilder> dataFieldBuilders;
         auto metadataElem = metadata.firstElement();
-        DecimalCounter<uint32_t> count(data.numCommittedMeasurements);
-        for (const auto& doc : data.docs) {
+        DecimalCounter<uint32_t> count(batch->numPreviouslyCommittedMeasurements());
+        for (const auto& doc : batch->measurements()) {
             for (const auto& elem : doc) {
                 auto key = elem.fieldNameStringData();
                 if (metadataElem && key == metadataElem.fieldNameStringData()) {
@@ -165,7 +164,7 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const BucketCatalog::Bucket
         for (auto& pair : dataFieldBuilders) {
             // Existing 'data' fields with measurements require different treatment from fields
             // not observed before (missing from control.min and control.max).
-            if (data.newFieldNamesToBeInserted.count(pair.first)) {
+            if (batch->newFieldNamesToBeInserted().count(pair.first)) {
                 newDataFieldsBuilder.append(pair.first, pair.second.obj());
             }
         }
@@ -176,30 +175,29 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(const BucketCatalog::Bucket
         for (auto& pair : dataFieldBuilders) {
             // Existing 'data' fields with measurements require different treatment from fields
             // not observed before (missing from control.min and control.max).
-            if (!data.newFieldNamesToBeInserted.count(pair.first)) {
+            if (!batch->newFieldNamesToBeInserted().count(pair.first)) {
                 dataBuilder.append(doc_diff::kSubDiffSectionFieldPrefix + pair.first.toString(),
                                    BSON(doc_diff::kInsertSectionFieldName << pair.second.obj()));
             }
         }
     }
     write_ops::UpdateModification u(updateBuilder.obj(), write_ops::UpdateModification::DiffTag{});
-    write_ops::UpdateOpEntry update(BSON("_id" << *bucketId), std::move(u));
-    invariant(!update.getMulti(), bucketId->toString());
-    invariant(!update.getUpsert(), bucketId->toString());
+    write_ops::UpdateOpEntry update(BSON("_id" << *batch->bucketId()), std::move(u));
+    invariant(!update.getMulti(), batch->bucketId()->toString());
+    invariant(!update.getUpsert(), batch->bucketId()->toString());
     return update;
 }
 
 /**
  * Returns the single-element array to use as the vector of documents for inserting a new bucket.
  */
-BSONArray makeTimeseriesInsertDocument(const BucketCatalog::BucketId& bucketId,
-                                       const BucketCatalog::CommitData& data,
+BSONArray makeTimeseriesInsertDocument(std::shared_ptr<BucketCatalog::WriteBatch> batch,
                                        const BSONObj& metadata) {
     auto metadataElem = metadata.firstElement();
 
     StringDataMap<BSONObjBuilder> dataBuilders;
     DecimalCounter<uint32_t> count;
-    for (const auto& doc : data.docs) {
+    for (const auto& doc : batch->measurements()) {
         for (const auto& elem : doc) {
             auto key = elem.fieldNameStringData();
             if (metadataElem && key == metadataElem.fieldNameStringData()) {
@@ -213,12 +211,12 @@ BSONArray makeTimeseriesInsertDocument(const BucketCatalog::BucketId& bucketId,
     BSONArrayBuilder builder;
     {
         BSONObjBuilder bucketBuilder(builder.subobjStart());
-        bucketBuilder.append("_id", *bucketId);
+        bucketBuilder.append("_id", *batch->bucketId());
         {
             BSONObjBuilder bucketControlBuilder(bucketBuilder.subobjStart("control"));
             bucketControlBuilder.append("version", kTimeseriesControlVersion);
-            bucketControlBuilder.append("min", data.bucketMin);
-            bucketControlBuilder.append("max", data.bucketMax);
+            bucketControlBuilder.append("min", batch->min());
+            bucketControlBuilder.append("max", batch->max());
         }
         if (metadataElem) {
             bucketBuilder.appendAs(metadataElem, "meta");
@@ -576,8 +574,7 @@ public:
 
         StatusWith<SingleWriteResult> _performTimeseriesInsert(
             OperationContext* opCtx,
-            const BucketCatalog::BucketId& bucketId,
-            const BucketCatalog::CommitData& data,
+            std::shared_ptr<BucketCatalog::WriteBatch> batch,
             const BSONObj& metadata) const {
             if (checkFailTimeseriesInsertFailPoint(metadata)) {
                 return {ErrorCodes::FailPointEnabled,
@@ -604,7 +601,7 @@ public:
             }
 
             builder.append(write_ops::Insert::kDocumentsFieldName,
-                           makeTimeseriesInsertDocument(bucketId, data, metadata));
+                           makeTimeseriesInsertDocument(batch, metadata));
 
             auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
             auto timeseriesInsertBatch = InsertOp::parse(request);
@@ -615,15 +612,14 @@ public:
 
         StatusWith<SingleWriteResult> _performTimeseriesUpdate(
             OperationContext* opCtx,
-            const BucketCatalog::BucketId& bucketId,
-            const BucketCatalog::CommitData& data,
+            std::shared_ptr<BucketCatalog::WriteBatch> batch,
             const BSONObj& metadata) const {
             if (checkFailTimeseriesInsertFailPoint(metadata)) {
                 return {ErrorCodes::FailPointEnabled,
                         "Failed time-series insert due to failTimeseriesInsert fail point"};
             }
 
-            auto update = makeTimeseriesUpdateOpEntry(bucketId, data, metadata);
+            auto update = makeTimeseriesUpdateOpEntry(batch, metadata);
             write_ops::Update timeseriesUpdateBatch(ns().makeTimeseriesBucketsNamespace(),
                                                     {update});
 
@@ -650,7 +646,7 @@ public:
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
-                                     const BucketCatalog::BucketId& bucketId,
+                                     std::shared_ptr<BucketCatalog::WriteBatch> batch,
                                      size_t start,
                                      size_t index,
                                      std::vector<BSONObj>* errors,
@@ -659,39 +655,38 @@ public:
                                      std::vector<size_t>* updatesToRetryAsInserts) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
-            auto metadata = bucketCatalog.getMetadata(bucketId);
-            auto data = bucketCatalog.commit(bucketId);
-            while (!data.docs.empty()) {
-                auto result = data.numCommittedMeasurements == 0
-                    ? _performTimeseriesInsert(opCtx, bucketId, data, metadata)
-                    : _performTimeseriesUpdate(opCtx, bucketId, data, metadata);
+            auto metadata = bucketCatalog.getMetadata(batch->bucketId());
+            bucketCatalog.prepareCommit(batch);
 
-                if (data.numCommittedMeasurements != 0 && result.isOK() &&
-                    result.getValue().getNModified() == 0) {
-                    // No bucket was found to update, meaning that it was manually removed.
-                    bucketCatalog.clear(bucketId);
-                    updatesToRetryAsInserts->push_back(index);
-                    return;
-                }
+            auto result = batch->numPreviouslyCommittedMeasurements() == 0
+                ? _performTimeseriesInsert(opCtx, batch, metadata)
+                : _performTimeseriesUpdate(opCtx, batch, metadata);
 
-                if (auto error = generateError(opCtx, result, start + index, errors->size())) {
-                    errors->push_back(*error);
-                }
-
-                auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-                const auto replMode = replCoord->getReplicationMode();
-
-                *opTime = replMode != repl::ReplicationCoordinator::modeNone
-                    ? boost::make_optional(
-                          repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
-                    : boost::none;
-                *electionId = replMode == repl::ReplicationCoordinator::modeReplSet
-                    ? boost::make_optional(replCoord->getElectionId())
-                    : boost::none;
-
-                data = bucketCatalog.commit(
-                    bucketId, BucketCatalog::CommitInfo{std::move(result), *opTime, *electionId});
+            if (batch->numPreviouslyCommittedMeasurements() != 0 && result.isOK() &&
+                result.getValue().getNModified() == 0) {
+                // No bucket was found to update, meaning that it was manually removed.
+                bucketCatalog.clear(batch->bucket(), batch);
+                updatesToRetryAsInserts->push_back(index);
+                return;
             }
+
+            if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                errors->push_back(*error);
+            }
+
+            auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+            const auto replMode = replCoord->getReplicationMode();
+
+            *opTime = replMode != repl::ReplicationCoordinator::modeNone
+                ? boost::make_optional(
+                      repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
+                : boost::none;
+            *electionId = replMode == repl::ReplicationCoordinator::modeReplSet
+                ? boost::make_optional(replCoord->getElectionId())
+                : boost::none;
+
+            bucketCatalog.finish(
+                batch, BucketCatalog::CommitInfo{std::move(result), *opTime, *electionId});
         }
 
         /**
@@ -710,8 +705,7 @@ public:
             const boost::optional<std::vector<size_t>>& indices = boost::none) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
-            std::vector<std::pair<BucketCatalog::BucketId, size_t>> bucketsToCommit;
-            std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
+            std::vector<std::pair<std::shared_ptr<BucketCatalog::WriteBatch>, size_t>> batches;
             auto insert = [&](size_t index) {
                 invariant(start + index < request().getDocuments().size());
 
@@ -720,12 +714,7 @@ public:
                 if (auto error = generateError(opCtx, result, index, errors->size())) {
                     errors->push_back(*error);
                 } else {
-                    auto& [bucketId, commitInfo] = result.getValue();
-                    if (commitInfo) {
-                        bucketsToWaitOn.push_back({std::move(*commitInfo), index});
-                    } else {
-                        bucketsToCommit.push_back({std::move(bucketId), index});
-                    }
+                    batches.emplace_back(result.getValue(), index);
                 }
             };
 
@@ -741,19 +730,27 @@ public:
 
             std::vector<size_t> updatesToRetryAsInserts;
 
-            for (const auto& [bucketId, index] : bucketsToCommit) {
-                _commitTimeseriesBucket(opCtx,
-                                        bucketId,
-                                        start,
-                                        index,
-                                        errors,
-                                        opTime,
-                                        electionId,
-                                        &updatesToRetryAsInserts);
+            for (auto& [batch, index] : batches) {
+                bool shouldCommit = batch->claimCommitRights();
+                if (shouldCommit) {
+                    _commitTimeseriesBucket(opCtx,
+                                            batch,
+                                            start,
+                                            index,
+                                            errors,
+                                            opTime,
+                                            electionId,
+                                            &updatesToRetryAsInserts);
+                    batch.reset();
+                }
             }
 
-            for (const auto& [future, index] : bucketsToWaitOn) {
-                auto swCommitInfo = future.getNoThrow(opCtx);
+            for (const auto& [batch, index] : batches) {
+                if (!batch) {
+                    continue;
+                }
+
+                auto swCommitInfo = batch->getResult();
                 if (!swCommitInfo.isOK()) {
                     invariant(swCommitInfo.getStatus() == ErrorCodes::TimeseriesBucketCleared,
                               str::stream()
