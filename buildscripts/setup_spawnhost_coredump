@@ -41,7 +41,7 @@ git clone git@github.com:ruediger/Boost-Pretty-Printer.git &
 # debug symbols will be dumped into a `debug/lib` directory for tidiness. The mongo
 # `<reporoot>/src/` directory is soft linked as `debug/src`. The .gdbinit file assumes gdb is being
 # run from the `debug` directory.
-BIN_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test_debug/mongo-*.tgz`
+BIN_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test*/mongo-*.tgz`
 tar --wildcards --strip-components=2 -xzf $BIN_ARCHIVE '*/bin/mongod' '*/bin/mongos' '*/bin/mongo' '*/bin/mongobridge' &
 tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/lib/*' &
 DBG_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test_debug/debugsymbols-*.tgz`
