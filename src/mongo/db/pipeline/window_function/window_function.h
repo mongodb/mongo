@@ -60,5 +60,4 @@ protected:
     ExpressionContext* _expCtx;
     size_t _memUsageBytes = 0;
 };
-
 }  // namespace mongo

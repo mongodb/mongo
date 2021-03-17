@@ -22,8 +22,7 @@ const nDocsPerTicker = 10;
 seedWithTickerData(coll, nDocsPerTicker);
 
 // Run the suite of partition and bounds tests against the $avg function.
-// TODO SERVER-53713 Enable removable testing.
-testAccumAgainstGroup(coll, "$avg", null, true);
+testAccumAgainstGroup(coll, "$avg");
 
 // Test a combination of two different runnning averages.
 let results =

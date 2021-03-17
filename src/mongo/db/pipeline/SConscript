@@ -129,6 +129,7 @@ env.Library(
         'accumulator_sum.cpp',
         'window_function/window_bounds.cpp',
         'window_function/window_function_expression.cpp',
+        'window_function/window_function_sum.cpp'
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
@@ -437,6 +438,8 @@ env.CppUnitTest(
         'window_function/window_function_push_test.cpp',
         'window_function/window_function_std_dev_test.cpp',
         'window_function/window_function_exec_first_last_test.cpp',
+        'window_function/window_function_avg_test.cpp',
+        'window_function/window_function_sum_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

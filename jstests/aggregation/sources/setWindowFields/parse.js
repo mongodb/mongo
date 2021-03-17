@@ -73,10 +73,8 @@ assert.commandFailedWithCode(runWindowFunction({abcde: 1}),
                              'Window function $sum found an unknown argument: abcde');
 
 // Bounds can be bounded, or bounded on one side.
-assert.commandFailedWithCode(runWindowFunction({"$sum": "$a", window: {documents: [-2, +4]}}),
-                             5461500);
-assert.commandFailedWithCode(
-    runWindowFunction({"$sum": "$a", window: {documents: [-3, 'unbounded']}}), 5461500);
+assert.commandWorked(runWindowFunction({"$sum": "$a", window: {documents: [-2, +4]}}));
+assert.commandWorked(runWindowFunction({"$sum": "$a", window: {documents: [-3, 'unbounded']}}));
 assert.commandWorked(runWindowFunction({"$sum": "$a", window: {documents: ['unbounded', +5]}}));
 assert.commandWorked(runWindowFunction({"$max": "$a", window: {documents: [-3, 'unbounded']}}));
 
@@ -98,8 +96,7 @@ assert.commandFailedWithCode(
 
 // Numeric bounds can be a constant expression:
 let expr = {$add: [2, 2]};
-assert.commandFailedWithCode(runWindowFunction({"$sum": "$a", window: {documents: [expr, expr]}}),
-                             5461500);
+assert.commandWorked(runWindowFunction({"$sum": "$a", window: {documents: [expr, expr]}}));
 assert.commandFailedWithCode(runWindowFunction({"$sum": "$a", window: {range: [expr, expr]}}),
                              5397901);
 assert.commandFailedWithCode(

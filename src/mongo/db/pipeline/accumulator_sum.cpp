@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
+#include "mongo/db/pipeline/window_function/window_function_sum.h"
 #include "mongo/util/summation.h"
 
 namespace mongo {
@@ -46,8 +47,7 @@ using boost::intrusive_ptr;
 
 REGISTER_ACCUMULATOR(sum, genericParseSingleExpressionAccumulator<AccumulatorSum>);
 REGISTER_EXPRESSION(sum, ExpressionFromAccumulator<AccumulatorSum>::parse);
-REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
-    sum, window_function::ExpressionFromAccumulator<AccumulatorSum>::parse);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(sum, AccumulatorSum, WindowFunctionSum);
 REGISTER_ACCUMULATOR(count, parseCountAccumulator);
 
 const char* AccumulatorSum::getOpName() const {
@@ -74,9 +74,11 @@ void AccumulatorSum::processInternal(const Value& input, bool merging) {
     // Upgrade to the widest type required to hold the result.
     totalType = Value::getWidestNumeric(totalType, input.getType());
     switch (input.getType()) {
-        case NumberInt:
         case NumberLong:
-            nonDecimalTotal.addLong(input.coerceToLong());
+            nonDecimalTotal.addLong(input.getLong());
+            break;
+        case NumberInt:
+            nonDecimalTotal.addInt(input.getInt());
             break;
         case NumberDouble:
             nonDecimalTotal.addDouble(input.getDouble());
