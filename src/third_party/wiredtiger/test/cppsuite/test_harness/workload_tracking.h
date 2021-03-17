@@ -60,7 +60,7 @@ class workload_tracking : public component {
         : component(_config), _cursor_operations(nullptr), _cursor_schema(nullptr),
           _operation_table_config(operation_table_config),
           _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
-          _schema_table_name(schema_table_name), _timestamp(0U)
+          _schema_table_name(schema_table_name), _timestamp(0U), _enabled(false)
     {
     }
 
@@ -80,6 +80,10 @@ class workload_tracking : public component {
     load()
     {
         WT_SESSION *session;
+        /* Is tracking enabled? */
+        testutil_check(_config->get_bool(ENABLE_TRACKING, _enabled));
+        if (!_enabled)
+            return;
 
         /* Initiate schema tracking. */
         session = connection_manager::instance().create_session();
@@ -109,7 +113,10 @@ class workload_tracking : public component {
       const V &value)
     {
         WT_CURSOR *cursor;
-        int error_code;
+        int error_code = 0;
+
+        if (!_enabled)
+            return (error_code);
 
         /* Select the correct cursor to save in the collection associated to specific operations. */
         switch (operation) {
@@ -145,6 +152,7 @@ class workload_tracking : public component {
     WT_CURSOR *_cursor_operations;
     WT_CURSOR *_cursor_schema;
     uint64_t _timestamp;
+    bool _enabled;
 };
 } // namespace test_harness
 
