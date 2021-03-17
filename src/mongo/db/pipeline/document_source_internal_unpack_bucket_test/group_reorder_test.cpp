@@ -39,7 +39,8 @@ using InternalUnpackBucketGroupReorder = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't'}}");
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto countSpecObj = fromjson("{$count: 'foo'}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
@@ -49,14 +50,16 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCount) {
     // $count gets rewritten to $group + $project.
     ASSERT_EQ(3, serialized.size());
 
-    auto optimized =
-        fromjson("{$_internalUnpackBucket: { include: [], timeField: 't', metaField: 'meta'}}");
+    auto optimized = fromjson(
+        "{$_internalUnpackBucket: { include: [], timeField: 't', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
 TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't'}}");
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta', timeField: 't', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpecObj = fromjson("{$group: {_id: '$a', s: {$sum: '$b'}}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
@@ -67,7 +70,8 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
 
     // We do not get the reorder since we are grouping on a field.
     auto optimized = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta'}}");
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 

@@ -51,7 +51,8 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeAllMeasurementFields) {
                                                      << "time" << kUserDefinedMetaName << "a"
                                                      << "b")
                                        << timeseries::kTimeFieldName << kUserDefinedTimeName
-                                       << timeseries::kMetaFieldName << kUserDefinedMetaName));
+                                       << timeseries::kMetaFieldName << kUserDefinedMetaName
+                                       << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
     // This source will produce two buckets.
     auto source = DocumentSourceMock::createForTest(
@@ -95,7 +96,7 @@ TEST_F(InternalUnpackBucketExecTest, UnpackExcludeASingleField) {
     auto spec = BSON("$_internalUnpackBucket"
                      << BSON("exclude" << BSON_ARRAY("b") << timeseries::kTimeFieldName
                                        << kUserDefinedTimeName << timeseries::kMetaFieldName
-                                       << kUserDefinedMetaName));
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
 
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
@@ -136,10 +137,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackExcludeASingleField) {
 
 TEST_F(InternalUnpackBucketExecTest, UnpackEmptyInclude) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("include" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("include" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -169,10 +170,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyInclude) {
 
 TEST_F(InternalUnpackBucketExecTest, UnpackEmptyExclude) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -213,10 +214,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackEmptyExclude) {
 
 TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmptyExclude) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket" << BSON(timeseries::kTimeFieldName
-                                              << kUserDefinedTimeName << timeseries::kMetaFieldName
-                                              << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON(timeseries::kTimeFieldName
+                             << kUserDefinedTimeName << timeseries::kMetaFieldName
+                             << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -272,10 +273,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackNeitherIncludeNorExcludeDefaultsToEmp
 
 TEST_F(InternalUnpackBucketExecTest, SparseColumnsWhereOneColumnIsExhaustedBeforeTheOther) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -306,7 +307,8 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeWithDollarPrefix) {
                                                      << "time" << kUserDefinedMetaName << "$a"
                                                      << "b")
                                        << timeseries::kTimeFieldName << kUserDefinedTimeName
-                                       << timeseries::kMetaFieldName << kUserDefinedMetaName));
+                                       << timeseries::kMetaFieldName << kUserDefinedMetaName
+                                       << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
     // This source will produce two buckets.
     auto source = DocumentSourceMock::createForTest(
@@ -347,10 +349,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackBasicIncludeWithDollarPrefix) {
 
 TEST_F(InternalUnpackBucketExecTest, UnpackMetadataOnly) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -386,10 +388,10 @@ TEST_F(InternalUnpackBucketExecTest, UnpackMetadataOnly) {
 
 TEST_F(InternalUnpackBucketExecTest, UnpackWithStrangeTimestampOrdering) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -437,9 +439,9 @@ TEST_F(InternalUnpackBucketExecTest, UnpackWithStrangeTimestampOrdering) {
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadataWhenMetaFieldUnspecified) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket" << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
-                                                        << kUserDefinedTimeName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
     auto source =
         DocumentSourceMock::createForTest({"{data: {_id: {'1':1, "
@@ -481,10 +483,10 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadataWhenMet
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesExcludedMetadataWhenBucketHasMetadata) {
     auto expCtx = getExpCtx();
-    auto spec = BSON("$_internalUnpackBucket"
-                     << BSON("exclude" << BSON_ARRAY(kUserDefinedMetaName)
-                                       << timeseries::kTimeFieldName << kUserDefinedTimeName
-                                       << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket" << BSON(
+                         "exclude" << BSON_ARRAY(kUserDefinedMetaName) << timeseries::kTimeFieldName
+                                   << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                   << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
     auto source = DocumentSourceMock::createForTest(
         {"{meta: {'m1': 999, 'm2': 9999}, data: {_id: {'1':1, "
@@ -526,10 +528,10 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesExcludedMetadataWhenBu
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsOnUndefinedMetadata) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source =
@@ -542,9 +544,9 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsOnUndefinedMetadata) {
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsWhenMetadataIsPresentUnexpectedly) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket" << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
-                                                        << kUserDefinedTimeName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source =
@@ -560,10 +562,10 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerThrowsWhenMetadataIsPresentUn
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesNullMetadata) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source =
@@ -608,10 +610,10 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesNullMetadata) {
 
 TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -670,10 +672,10 @@ TEST_F(InternalUnpackBucketExecTest, BucketUnpackerHandlesMissingMetadata) {
 
 TEST_F(InternalUnpackBucketExecTest, ThrowsOnEmptyDataValue) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(
@@ -685,10 +687,10 @@ TEST_F(InternalUnpackBucketExecTest, ThrowsOnEmptyDataValue) {
 
 TEST_F(InternalUnpackBucketExecTest, HandlesEmptyBucket) {
     auto expCtx = getExpCtx();
-    auto spec =
-        BSON("$_internalUnpackBucket"
-             << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName << kUserDefinedTimeName
-                               << timeseries::kMetaFieldName << kUserDefinedMetaName));
+    auto spec = BSON("$_internalUnpackBucket"
+                     << BSON("exclude" << BSONArray() << timeseries::kTimeFieldName
+                                       << kUserDefinedTimeName << timeseries::kMetaFieldName
+                                       << kUserDefinedMetaName << "bucketMaxSpanSeconds" << 3600));
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(spec.firstElement(), expCtx);
 
     auto source = DocumentSourceMock::createForTest(Document{}, expCtx);
@@ -706,7 +708,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonObjArgment) {
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonArrayInclude) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {include: 'not array', timeField: "
-                                    "'foo', metaField: 'bar'}}")
+                                    "'foo', metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -716,7 +718,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonArrayInclude) {
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonArrayExclude) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {exclude: 'not array', timeField: "
-                                    "'foo', metaField: 'bar'}}")
+                                    "'foo', metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -726,7 +728,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonArrayExclude) {
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonStringInclude) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {include: [999, 1212], timeField: "
-                                    "'foo', metaField: 'bar'}}")
+                                    "'foo', metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -734,51 +736,50 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonStringInclude) {
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsDottedPaths) {
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalUnpackBucket::createFromBson(
-            fromjson(
-                "{$_internalUnpackBucket: {exclude: ['a.b'], timeField: 'foo', metaField: 'bar'}}")
-                .firstElement(),
-            getExpCtx()),
-        AssertionException,
-        5346503);
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {exclude: ['a.b'], timeField: 'foo', "
+                                    "metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5346503);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsBadIncludeExcludeFieldName) {
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalUnpackBucket::createFromBson(
-            fromjson("{$_internalUnpackBucket: {TYPO: [], timeField: 'foo', metaField: 'bar'}}")
-                .firstElement(),
-            getExpCtx()),
-        AssertionException,
-        5346506);
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {TYPO: [], timeField: 'foo', "
+                                    "metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5346506);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonStringTimeField) {
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalUnpackBucket::createFromBson(
-            fromjson("{$_internalUnpackBucket: {include: [], timeField: 999, metaField: 'bar'}}")
-                .firstElement(),
-            getExpCtx()),
-        AssertionException,
-        5346504);
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {include: [], timeField: 999, "
+                                    "metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5346504);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonStringMetaField) {
-    ASSERT_THROWS_CODE(
-        DocumentSourceInternalUnpackBucket::createFromBson(
-            fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', metaField: 999}}")
-                .firstElement(),
-            getExpCtx()),
-        AssertionException,
-        5346505);
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', "
+                                    "metaField: 999, bucketMaxSpanSeconds: 3600}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5346505);
 }
 
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsDottedMetaField) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', "
-                                    "metaField: 'address.city'}}")
+                                    "metaField: 'address.city', bucketMaxSpanSeconds: 3600}}")
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -788,7 +789,7 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsDottedMetaField) {
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsAdditionalFields) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', "
-                                    "metaField: 'bar', extra: 1}}")
+                                    "metaField: 'bar', bucketMaxSpanSeconds: 3600, extra: 1}}")
                                .firstElement(),
                            getExpCtx()),
                        AssertionException,
@@ -796,21 +797,32 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsAdditionalFields) {
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsMissingTimeField) {
+    ASSERT_THROWS(DocumentSourceInternalUnpackBucket::createFromBson(
+                      fromjson("{$_internalUnpackBucket: {include: [], metaField: 'bar', "
+                               "bucketMaxSpanSeconds: 3600}}")
+                          .firstElement(),
+                      getExpCtx()),
+                  AssertionException);
+}
+
+TEST_F(InternalUnpackBucketExecTest, ParserRejectsMissingBucketMaxSpanSeconds) {
     ASSERT_THROWS(
         DocumentSourceInternalUnpackBucket::createFromBson(
-            fromjson("{$_internalUnpackBucket: {include: [], metaField: 'bar'}}").firstElement(),
+            fromjson("{$_internalUnpackBucket: {include: [], metaField: 'bar', timeField: 'foo'}}")
+                .firstElement(),
             getExpCtx()),
         AssertionException);
 }
 
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsBothIncludeAndExcludeParameters) {
-    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
-                           fromjson("{$_internalUnpackBucket: {include: ['_id', 'a'], exclude: "
-                                    "['a'], timeField: 'time', metaField: 'bar'}}")
-                               .firstElement(),
-                           getExpCtx()),
-                       AssertionException,
-                       5408000);
+    ASSERT_THROWS_CODE(
+        DocumentSourceInternalUnpackBucket::createFromBson(
+            fromjson("{$_internalUnpackBucket: {include: ['_id', 'a'], exclude: "
+                     "['a'], timeField: 'time', metaField: 'bar', bucketMaxSpanSeconds: 3600}}")
+                .firstElement(),
+            getExpCtx()),
+        AssertionException,
+        5408000);
 }
 }  // namespace
 }  // namespace mongo

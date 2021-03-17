@@ -359,15 +359,18 @@ Status _createTimeseries(OperationContext* opCtx,
         viewOptions.collation = options.collation;
 
         if (options.timeseries->getMetaField()) {
-            viewOptions.pipeline =
-                BSON_ARRAY(BSON("$_internalUnpackBucket" << BSON(
-                                    "timeField" << options.timeseries->getTimeField() << "metaField"
-                                                << *options.timeseries->getMetaField() << "exclude"
-                                                << BSONArray())));
+            viewOptions.pipeline = BSON_ARRAY(BSON(
+                "$_internalUnpackBucket"
+                << BSON("timeField" << options.timeseries->getTimeField() << "metaField"
+                                    << *options.timeseries->getMetaField() << "bucketMaxSpanSeconds"
+                                    << options.timeseries->getBucketMaxSpanSeconds() << "exclude"
+                                    << BSONArray())));
         } else {
             viewOptions.pipeline = BSON_ARRAY(BSON(
-                "$_internalUnpackBucket" << BSON("timeField" << options.timeseries->getTimeField()
-                                                             << "exclude" << BSONArray())));
+                "$_internalUnpackBucket"
+                << BSON("timeField" << options.timeseries->getTimeField() << "bucketMaxSpanSeconds"
+                                    << options.timeseries->getBucketMaxSpanSeconds() << "exclude"
+                                    << BSONArray())));
         }
 
         // Create the time-series view.

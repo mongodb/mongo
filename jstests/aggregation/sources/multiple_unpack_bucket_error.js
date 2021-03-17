@@ -13,8 +13,8 @@ coll.drop();
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [
-        {$_internalUnpackBucket: {exclude: [], timeField: 'time'}},
-        {$_internalUnpackBucket: {exclude: [], timeField: 'time'}}
+        {$_internalUnpackBucket: {exclude: [], timeField: 'time', bucketMaxSpanSeconds: 3600}},
+        {$_internalUnpackBucket: {exclude: [], timeField: 'time', bucketMaxSpanSeconds: 3600}}
     ],
     cursor: {}
 }),

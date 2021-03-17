@@ -39,8 +39,9 @@ namespace {
 using InternalUnpackBucketSampleReorderTest = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenSimpleProject) {
-    auto unpackSpec =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false, y: false}}");
 
@@ -57,8 +58,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenSimpleProject) {
 }
 
 TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
-    auto unpackSpec =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
     auto projectSpec =
         fromjson("{$project: {_id: true, city: '$myMeta.address.city', temp: '$temp.celsius'}}");
@@ -70,7 +72,7 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
 
     ASSERT_EQ(3, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp'], timeField: "
-                               "'foo', metaField: 'myMeta'}}"),
+                               "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
     const UnorderedFieldsBSONObjComparator kComparator;
@@ -78,8 +80,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
 }
 
 TEST_F(InternalUnpackBucketSampleReorderTest, SimpleProjectThenSample) {
-    auto unpackSpec =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: true, x: true}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
 
@@ -90,7 +93,7 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SimpleProjectThenSample) {
 
     ASSERT_EQ(3, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'x'], timeField: "
-                               "'foo', metaField: 'myMeta'}}"),
+                               "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
     const UnorderedFieldsBSONObjComparator kComparator;
@@ -98,8 +101,9 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SimpleProjectThenSample) {
 }
 
 TEST_F(InternalUnpackBucketSampleReorderTest, ComputedProjectThenSample) {
-    auto unpackSpec =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpec =
         fromjson("{$project: {_id: true, city: '$myMeta.address.city', temp: '$temp.celsius'}}");
     auto sampleSpec = fromjson("{$sample: {size: 500}}");
@@ -111,7 +115,7 @@ TEST_F(InternalUnpackBucketSampleReorderTest, ComputedProjectThenSample) {
 
     ASSERT_EQ(3, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp'], timeField: "
-                               "'foo', metaField: 'myMeta'}}"),
+                               "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
     const UnorderedFieldsBSONObjComparator kComparator;

@@ -43,7 +43,9 @@ using InternalUnpackBucketSplitMatchOnMetaAndRename = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMetaFieldSpecified) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}").firstElement(),
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: "
+                 "3600}}")
+            .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(fromjson("{meta: {$gt: 1}}"), getExpCtx());
 
@@ -59,7 +61,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMetaFiel
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMatchOnMetaField) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(fromjson("{a: {$gt: 1}}"), getExpCtx());
@@ -76,7 +79,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, DoesNotSplitWhenNoMatchOnM
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenEntireMatchIsOnMetaField) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -96,7 +100,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenEntireMatchIsOnM
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
        SplitsWhenIndependentPartOfMatchIsOnMetaField) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -116,7 +121,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
        DoesNotSplitsWhenDependentPartOfMatchIsOnMetaField) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -136,7 +142,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenSharedPrefixOfMetaIsNotSubfield) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -156,7 +163,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsWhenSharedPrefixOfMe
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithExpr) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit =
@@ -175,7 +183,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithExpr) 
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithType) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit =
@@ -193,7 +202,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWithType) 
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenMultiplePredicates) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -213,7 +223,8 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenMultip
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenSeveralFieldReferences) {
     auto unpack = DocumentSourceInternalUnpackBucket::createFromBson(
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}")
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600}}")
             .firstElement(),
         getExpCtx());
     auto matchToSplit = DocumentSourceMatch::create(
@@ -235,8 +246,9 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, SplitsAndRenamesWhenSevera
 }
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMapsControlPredicates) {
-    auto unpack =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpack = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto pipeline = Pipeline::parse(
         makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0, $lte: 5}, a: {$lte: 4}}}")),
         getExpCtx());
@@ -257,8 +269,9 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeSplitsMatchAndMaps
 }
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeMovesMetaMatchBeforeUnpack) {
-    auto unpack =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpack = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto pipeline =
         Pipeline::parse(makeVector(unpack, fromjson("{$match: {myMeta: {$gte: 0}}}")), getExpCtx());
     ASSERT_EQ(2u, pipeline->getSources().size());
@@ -274,8 +287,9 @@ TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename, OptimizeMovesMetaMatchBefo
 
 TEST_F(InternalUnpackBucketSplitMatchOnMetaAndRename,
        OptimizeDoesNotErrorOnFailedSplitOfMetaMatch) {
-    auto unpack =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpack = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto match = fromjson(
         "{$match: {$and: [{x: {$lte: 1}}, {$or: [{'myMeta.a': "
         "{$gt: 1}}, {y: {$lt: 1}}]}]}}");

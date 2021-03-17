@@ -43,7 +43,8 @@ using InternalUnpackBucketBuildProjectToInternalizeTest = AggregationContextFixt
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectForGroupDependencies) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -66,7 +67,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectForProjectDependencies) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: true, x: {f: '$y'}}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -90,8 +92,9 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectWhenInMiddleOfPipeline) {
     auto matchSpec = fromjson("{$match: {'meta.source': 'primary'}}");
-    auto unpackSpec =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x', f: {$first: '$y'}}}");
     auto pipeline = Pipeline::parse(makeVector(matchSpec, unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -115,7 +118,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectWhenGroupDependenciesAreDotted) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: '$x.y', f: {$first: '$a.b'}}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -138,7 +142,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsIncludeProjectWhenProjectDependenciesAreDotted) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: {a : true}}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -161,7 +166,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        DoesNotBuildProjectWhenThereAreNoDependencies) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto groupSpec = fromjson("{$group: {_id: {$const: null}, count: { $sum: {$const: 1 }}}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, groupSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -182,7 +188,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        DoesNotBuildProjectWhenSortDependenciesAreNotFinite) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto sortSpec = fromjson("{$sort: {x: 1}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -203,7 +210,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        DoesNotBuildProjectWhenProjectDependenciesAreNotFinite) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto sortSpec = fromjson("{$sort: {x: 1}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, sortSpec, projectSpec), getExpCtx());
@@ -225,7 +233,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
 }
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableInclusionProject) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: true, x: true}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -245,7 +254,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableInclusionPro
 }
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableNonBoolInclusionProject) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: 1, x: 1.0, y: 1.5}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -266,7 +276,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableNonBoolInclu
 }
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableExclusionProject) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
     auto pipeline = Pipeline::parse(makeVector(unpackSpec, projectSpec), getExpCtx());
     auto& container = pipeline->getSources();
@@ -287,7 +298,8 @@ TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest, UsesViableExclusionPro
 
 TEST_F(InternalUnpackBucketBuildProjectToInternalizeTest,
        BuildsInclusionProjectInsteadOfViableExclusionProject) {
-    auto unpackSpec = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpec = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto projectSpec = fromjson("{$project: {_id: false, x: false}}");
     auto sortSpec = fromjson("{$sort: {y: 1}}");
     auto groupSpec = fromjson("{$group: {_id: '$y', f: {$first: '$z'}}}");

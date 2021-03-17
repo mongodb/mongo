@@ -38,8 +38,9 @@ namespace {
 using InternalUnpackBucketSortReorderTest = AggregationContextFixture;
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto countSpecObj = fromjson("{$sort: {'meta1.a': 1, 'meta1.b': -1}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
@@ -54,8 +55,9 @@ TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSort) {
 }
 
 TEST_F(InternalUnpackBucketSortReorderTest, OptimizeForMetaSortNegative) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'meta1', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto countSpecObj = fromjson("{$sort: {'meta1.a': 1, 'unrelated': -1}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, countSpecObj), getExpCtx());
