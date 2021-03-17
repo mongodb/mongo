@@ -42,6 +42,11 @@
 
 namespace mongo {
 class BucketCatalog {
+    struct Bucket;
+    struct ExecutionStats;
+    class MinMax;
+    using IdleList = std::list<Bucket*>;
+
 public:
     // This constant, together with parameters defined in timeseries.idl, defines limits on the
     // measurements held in a bucket.
@@ -78,20 +83,104 @@ public:
         boost::optional<OID> electionId;
     };
 
-    struct InsertResult {
-        BucketId bucketId;
-        boost::optional<Future<CommitInfo>> commitInfo;
-    };
+    /**
+     * The basic unit of work for a bucket. Each insert will return a shared_ptr to a WriteBatch.
+     * When a writer is finished with all their insertions, they should then take steps to ensure
+     * each batch they wrote into is committed. To ensure a batch is committed, a writer should
+     * first attempt to claimCommitRights(). If successful, the writer can proceed to commit (or
+     * abort) the batch via BucketCatalog::prepareCommit and BucketCatalog::finish. If unsuccessful,
+     * it means another writer is in the process of committing. The writer can proceed to do other
+     * work (like commit another batch), and when they have no other work to do, they can wait for
+     * this batch to be committed by executing the blocking operation getResult().
+     */
+    class WriteBatch {
+        friend class BucketCatalog;
 
-    struct CommitData {
-        std::vector<BSONObj> docs;
-        BSONObj bucketMin;  // The full min/max if this is the bucket's first commit, or the updates
-        BSONObj bucketMax;  // since the previous commit if not.
-        uint32_t numCommittedMeasurements;
-        StringSet newFieldNamesToBeInserted;
+    public:
+        WriteBatch() = delete;
+        explicit WriteBatch(const std::shared_ptr<Bucket>& bucket,
+                            const std::shared_ptr<ExecutionStats>& stats);
+
+        /**
+         * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
+         * granted. If it returns false, rights are revoked, and the caller should get the result
+         * of the batch with getResult(). Non-blocking.
+         */
+        bool claimCommitRights();
+
+        /**
+         * Retrieve the result of the write batch commit. Should be called by any interested party
+         * that does not have commit rights. Blocking.
+         */
+        StatusWith<CommitInfo> getResult() const;
+
+        std::shared_ptr<Bucket> bucket() const;
+        BucketId bucketId() const;
+
+        const std::vector<BSONObj>& measurements() const;
+        const BSONObj& min() const;
+        const BSONObj& max() const;
+        const StringSet& newFieldNamesToBeInserted() const;
+        uint32_t numPreviouslyCommittedMeasurements() const;
+
+        /**
+         * Whether the batch is active and can be written to.
+         */
+        bool active() const;
+
+        /**
+         * Whether the batch has been committed or aborted.
+         */
+        bool finished() const;
 
         BSONObj toBSON() const;
+
+    private:
+        /**
+         * Add a measurement. Active batches only.
+         */
+        void _addMeasurement(const BSONObj& doc);
+
+        /**
+         * Record a set of new-to-the-bucket fields. Active batches only.
+         */
+        void _recordNewFields(StringSet&& fields);
+
+        /**
+         * Prepare the batch for commit. Sets min/max appropriately, records the number of documents
+         * that have previously been committed to the bucket, and marks the batch inactive. Must
+         * have commit rights.
+         */
+        void _prepareCommit(MinMax* min, MinMax* max, uint32_t numMeasurementsCommitted);
+
+        /**
+         * Report the result and status of a commit, and notify anyone waiting on getResult(). Must
+         * have commit rights. Inactive batches only.
+         */
+        void _finish(const CommitInfo& info);
+
+        /**
+         * Abandon the write batch and notify any waiters that the bucket has been cleared. Must
+         * have commit rights.
+         */
+        void _abort();
+
+        std::shared_ptr<Bucket> _bucket;
+        const BucketId _bucketId;
+        std::shared_ptr<ExecutionStats> _stats;
+
+        std::vector<BSONObj> _measurements;
+        BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
+        BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
+        uint32_t _numPreviouslyCommittedMeasurements;
+        StringSet _newFieldNamesToBeInserted;
+
+        bool _active = true;
+
+        AtomicWord<bool> _commitRights{false};
+        SharedPromise<CommitInfo> _promise;
     };
+
 
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
@@ -112,26 +201,28 @@ public:
     BSONObj getMetadata(const BucketId& bucketId) const;
 
     /**
-     * Returns the id of the bucket that the document belongs in, and a Future to wait on if the
-     * caller is a waiter for the bucket. If no Future is provided, the caller is the committer for
-     * this bucket.
+     * Returns the WriteBatch into which the document was inserted. Any caller who receives the same
+     * batch may commit or abort the batch. See WriteBatch for more details.
      */
-    StatusWith<InsertResult> insert(OperationContext* opCtx,
-                                    const NamespaceString& ns,
-                                    const BSONObj& doc);
+    StatusWith<std::shared_ptr<WriteBatch>> insert(OperationContext* opCtx,
+                                                   const NamespaceString& ns,
+                                                   const BSONObj& doc);
 
     /**
-     * Returns the uncommitted measurements and the number of measurements that have already been
-     * committed for the given bucket. This should be called continuously by the committer until
-     * there are no more uncommitted measurements.
+     * Prepares a batch for commit, transitioning it to an inactive state.
      */
-    CommitData commit(const BucketId& bucketId,
-                      boost::optional<CommitInfo> previousCommitInfo = boost::none);
+    void prepareCommit(std::shared_ptr<WriteBatch> batch);
 
     /**
-     * Clears the given bucket.
+     * Records the result of a batch commit.
      */
-    void clear(const BucketId& bucketId);
+    void finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
+
+    /**
+     * Clears the given bucket. Aborts any unfinished WriteBatches. If non-null, the operation
+     * assumes the caller already has commit rights on batchWithRights.
+     */
+    void clear(std::shared_ptr<Bucket> bucket, std::shared_ptr<WriteBatch> batchWithRights);
 
     /**
      * Clears the buckets for the given namespace.
@@ -274,10 +365,7 @@ private:
         uint64_t _memoryUsage = 0;
     };
 
-    struct Bucket;
-    using IdleList = std::list<Bucket*>;
-
-    struct Bucket {
+    struct Bucket : public std::enable_shared_from_this<Bucket> {
         explicit Bucket(const BucketId&);
 
         // Access to the bucket is controlled by this lock
@@ -291,12 +379,6 @@ private:
 
         // The metadata of the data that this bucket contains.
         BucketMetadata metadata;
-
-        // Measurements to be inserted into the bucket.
-        std::vector<BSONObj> measurementsToBeInserted;
-
-        // New top-level field names of the measurements to be inserted.
-        StringSet newFieldNamesToBeInserted;
 
         // Top-level field names of the measurements that have been inserted into the bucket.
         StringSet fieldNames;
@@ -318,18 +400,8 @@ private:
         // measurements to be inserted.
         uint32_t numMeasurements = 0;
 
-        // The number of measurements that were most recently returned from a call to commit().
-        uint32_t numPendingCommitMeasurements = 0;
-
         // The number of committed measurements in the bucket.
         uint32_t numCommittedMeasurements = 0;
-
-        // The number of current writers for the bucket.
-        uint32_t numWriters = 0;
-
-        // Promises for committers to fulfill in order to signal to waiters that their measurements
-        // have been committed.
-        std::queue<boost::optional<Promise<CommitInfo>>> promises;
 
         // Whether the bucket is full. This can be due to number of measurements, size, or time
         // range.
@@ -356,6 +428,30 @@ private:
          * Returns whether BucketCatalog::commit has been called at least once on this bucket.
          */
         bool hasBeenCommitted() const;
+
+        /**
+         * Returns whether all measurements have been committed
+         */
+        bool allCommitted() const;
+
+        /**
+         * Return a pointer to the current, open batch.
+         */
+        std::shared_ptr<WriteBatch> activeBatch(const std::shared_ptr<ExecutionStats>& stats);
+
+        /**
+         * Return a pointer to the earliest uncommitted batch.
+         */
+        std::shared_ptr<WriteBatch> oldestUncommittedBatch() const;
+
+        /**
+         * Remove the oldest batch. Takes a batch parameter as confirmation that the caller knows
+         * what batch is being removed.
+         */
+        void removeOldestBatch(const std::shared_ptr<WriteBatch>& batch);
+
+    private:
+        std::queue<std::shared_ptr<WriteBatch>> _batches;
     };
 
     struct ExecutionStats {
@@ -386,6 +482,7 @@ private:
                      ExecutionStats* stats,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog, const BucketId& bucketId);
+        BucketAccess(BucketCatalog* catalog, const std::shared_ptr<Bucket>& bucket);
         ~BucketAccess();
 
         bool isLocked() const;
@@ -440,6 +537,8 @@ private:
 
     StripedMutex::SharedLock _lockShared() const;
     StripedMutex::ExclusiveLock _lockExclusive() const;
+
+    void _waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch);
 
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
