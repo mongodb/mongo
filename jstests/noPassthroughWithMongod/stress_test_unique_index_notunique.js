@@ -1,20 +1,14 @@
-// Tests that unique indexes can be built with a large number of non-unique values
-
-// @tags: [
-//   assumes_unsharded_collection,
-//   requires_non_retryable_writes,
-// ]
+/*
+ * Tests that unique indexes can be built with a large number of non-unique values.
+ *
+ * @tags: [
+ *  // This workload is too impactful on ephemeralForTest
+ *  requires_wiredtiger,
+ * ]
+ */
 
 (function() {
 "use strict";
-
-load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-// This workload would timeout on ephemeralForTest. isEphemeralForTest throws an exception if called
-// from a mongos, so we need to check that first. Unique indexes are not supported on sharded
-// collections anyway so it's safe to quit early if the db is a mongos.
-if (isMongos(db) || isEphemeralForTest(db)) {
-    return;
-}
 
 let coll = db.stress_test_unique_index_notunique;
 coll.drop();
