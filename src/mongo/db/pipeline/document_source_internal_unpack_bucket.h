@@ -46,7 +46,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceInternalUnpackBucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                       BucketUnpacker bucketUnpacker);
+                                       BucketUnpacker bucketUnpacker,
+                                       int bucketMaxSpanSeconds);
 
     const char* getSourceName() const override {
         return kStageName.rawData();
@@ -181,6 +182,7 @@ private:
     GetNextResult doGetNext() final;
 
     BucketUnpacker _bucketUnpacker;
+    int _bucketMaxSpanSeconds;
 
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;

@@ -46,7 +46,8 @@ using InternalUnpackBucketPushdownProjectionsTest = AggregationContextFixture;
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        OptimizeAddFieldsWithMetaProjectionSingleField) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'userMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'userMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {newMeta: {$toUpper : '$userMeta'}}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
@@ -62,8 +63,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaProjectionDocument) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj =
         fromjson("{$addFields: {newMeta: {$concat: ['$myMeta.a', '$myMeta.b']}}}");
 
@@ -81,8 +83,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaPro
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaProjections) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj =
         fromjson("{$addFields: {device: '$myMeta.a', deviceType: '$myMeta.b'}}");
 
@@ -100,8 +103,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaPr
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProjectionFields) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj =
         fromjson("{$addFields: {device: '$myMeta.a', temp: {$add: ['$temperature', '$offset']}}}");
 
@@ -120,8 +124,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProje
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotSplitAddFieldsWithMetaProjectionInSuffix) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {temp: '$temperature', device: '$myMeta.a'}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
@@ -137,8 +142,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotSplitAddFieldsWithMetaP
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMixedProjection) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj =
         fromjson("{$addFields: {newMeta: {$add: ['$myMeta.a', '$temperature']}}}");
 
@@ -155,7 +161,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMissingMetaField) {
-    auto unpackSpecObj = fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {newMeta: '$myMeta'}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
@@ -172,8 +179,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        DoNotPushdownAddFieldsWithReservedBucketFieldName) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {data: '$myMeta'}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
@@ -190,8 +198,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        DoNotPushdownNestedFieldWithReservedBucketFieldName) {
-    auto unpackSpecObj =
-        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto addFieldsSpecObj = fromjson("{$addFields: {data : {x: '$myMeta'}}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
@@ -211,7 +220,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        PushDownComputedMetaProjectionReplaceWithProjField) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj = fromjson("{$project: {_id : true, device: '$myMeta.a'}}");
 
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
@@ -230,7 +240,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        PushDownComputedMetaProjectionReplaceWithIdentityProj) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, 'y.z' : true, device: '$myMeta.a'}}");
 
@@ -251,7 +262,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownMixedProjection) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj = fromjson(
         "{$project: {_id: true, x: true, newMeta: {$add: ['$myMeta.a', '$temperature']}}}");
 
@@ -270,7 +282,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownMixedProjection
 TEST_F(InternalUnpackBucketPushdownProjectionsTest,
        DoNotPushDownProjectionWithReservedBucketField) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, meta: {$add: ['$myMeta.a', '$myMeta.b']}}}");
 
@@ -287,7 +300,8 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownNestedProjectionWithReservedName) {
     auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta'}}");
+        "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+        "bucketMaxSpanSeconds: 3600}}");
     auto projectSpecObj =
         fromjson("{$project: {_id: true, x: true, data: {z: {$add: ['$myMeta.a', '$myMeta.b']}}}}");
 
