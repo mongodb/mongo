@@ -95,7 +95,8 @@ class AutoGetCollectionForReadBase {
 
 public:
     AutoGetCollectionForReadBase(OperationContext* opCtx,
-                                 const EmplaceAutoGetCollectionFunc& emplaceAutoColl);
+                                 const EmplaceAutoGetCollectionFunc& emplaceAutoColl,
+                                 bool isLockFreeReadSubOperation = false);
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
