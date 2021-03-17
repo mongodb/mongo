@@ -96,7 +96,8 @@ assert.commandWorked(migrationThread.returnData());
 recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collName);
 assert.eq(4, recipientColl.find().itcount());
 assert.eq(recipientColl.find().sort({_id: 1}).toArray(), docs);
-tenantMigrationTest.checkTenantDBHashes(tenantId);
+TenantMigrationUtil.checkTenantDBHashes(
+    tenantMigrationTest.getDonorRst(), tenantMigrationTest.getRecipientRst(), tenantId);
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();

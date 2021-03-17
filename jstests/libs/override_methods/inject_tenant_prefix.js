@@ -397,8 +397,26 @@ Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
         numAttempts++;
         let resObj;
         if (this.reroutingMongo) {
-            resObj = reroutingRunCommandFunc();
             this.recordRerouteDueToTenantMigration();
+
+            // After getting a TenantMigrationCommitted error, wait for the python test fixture to
+            // do a dbhash check on the donor and recipient primaries before we retry the command on
+            // the recipient.
+            assert.soon(() => {
+                let findRes = assert.commandWorked(originalRunCommand.apply(this, [
+                    "testTenantMigration",
+                    {
+                        find: "dbhashCheck",
+                        filter: {_id: this.migrationStateDoc._id},
+                    },
+                    0
+                ]));
+
+                const docs = findRes.cursor.firstBatch;
+                return docs[0] != null;
+            });
+
+            resObj = reroutingRunCommandFunc();
         } else {
             resObj = originalRunCommandFunc();
         }
