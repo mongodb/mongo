@@ -1036,7 +1036,6 @@ void TenantMigrationRecipientService::Instance::_createOplogBuffer() {
         _donorOplogBuffer = std::move(bufferCollection);
     }
 
-    stdx::unique_lock lk(_mutex);
     invariant(_stateDoc.getStartFetchingDonorOpTime());
     {
         // Ensure we are primary when trying to startup and create the oplog buffer collection.
