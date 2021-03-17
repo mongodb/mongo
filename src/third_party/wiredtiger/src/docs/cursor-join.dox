@@ -41,4 +41,9 @@ joins', a join cursor will return duplicates. A join cursor never returns
 duplicates unless \c "operation=or" is used in a join configuration, or unless
 the first joined cursor is itself a join cursor that would return duplicates.
 
+Another example of using a join cursor is provided in @ex_ref{ex_col_store.c}.
+Here the columns hour and temp are joined together to find the maximum and minimum
+temperature for a given time period.
+
+@snippet ex_col_store.c col-store join
 */

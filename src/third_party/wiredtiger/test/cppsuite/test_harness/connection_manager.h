@@ -67,7 +67,7 @@ class connection_manager {
     }
 
     void
-    create(std::string home = DEFAULT_DIR)
+    create(const std::string &config, const std::string &home = DEFAULT_DIR)
     {
         if (_conn != nullptr) {
             debug_info("connection is not NULL, cannot be re-opened.", _trace_level, DEBUG_ERROR);
@@ -78,7 +78,7 @@ class connection_manager {
         testutil_make_work_dir(home.c_str());
 
         /* Open conn. */
-        testutil_check(wiredtiger_open(home.c_str(), NULL, CONNECTION_CREATE, &_conn));
+        testutil_check(wiredtiger_open(home.c_str(), NULL, config.c_str(), &_conn));
     }
 
     WT_SESSION *

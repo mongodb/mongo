@@ -228,10 +228,12 @@ __hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_MODIFY_VECTOR *modifies,
 
 /*
  * __wt_hs_insert_updates --
- *     Copy one set of saved updates into the database's history store table.
+ *     Copy one set of saved updates into the database's history store table. Whether the function
+ *     fails or succeeds, if there is a successful write to history, cache_write_hs is set to true.
  */
 int
-__wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
+__wt_hs_insert_updates(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, bool *cache_write_hs)
 {
     WT_BTREE *btree, *hs_btree;
     WT_CURSOR *hs_cursor;
@@ -258,6 +260,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
     char ts_string[3][WT_TS_INT_STRING_SIZE];
     bool enable_reverse_modify, hs_inserted, squashed, ts_updates_in_hs;
 
+    *cache_write_hs = false;
     btree = S2BT(session);
     prev_upd = NULL;
     insert_cnt = 0;
@@ -632,6 +635,10 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
 err:
     if (ret == 0 && insert_cnt > 0)
         __hs_verbose_cache_stats(session, btree);
+
+    /* cache_write_hs is set to true as there was at least one successful write to history. */
+    if (insert_cnt > 0)
+        *cache_write_hs = true;
 
     __wt_scr_free(session, &key);
     /* modify_value is allocated in __wt_modify_pack. Free it if it is allocated. */

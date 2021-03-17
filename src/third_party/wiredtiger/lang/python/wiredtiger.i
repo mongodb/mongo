@@ -55,6 +55,15 @@ from packing import pack, unpack
 ## @endcond
 %}
 
+/*
+ * For some reason, SWIG doesn't import some types from stdint.h.  We need to tell SWIG something
+ * about those type we use.  We don't need to be exact in our typing here, SWIG just needs hints
+ * so it knows what Python types to map to.
+ */
+%inline %{
+    typedef unsigned int uint32_t;
+%}
+
 /* Set the input argument to point to a temporary variable */ 
 %typemap(in, numinputs=0) WT_CONNECTION ** (WT_CONNECTION *temp = NULL) {
 	$1 = &temp;
@@ -63,6 +72,21 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 %typemap(in, numinputs=0) WT_CURSOR ** (WT_CURSOR *temp = NULL) {
+	$1 = &temp;
+}
+%typemap(in, numinputs=0) WT_FILE_HANDLE ** (WT_FILE_HANDLE *temp = NULL) {
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) WT_LOCATION_HANDLE ** (WT_LOCATION_HANDLE *temp = NULL) {
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) bool * (bool temp = false) {
+	$1 = &temp;
+ }
+%typemap(in, numinputs=0) wt_off_t * (wt_off_t temp = false) {
 	$1 = &temp;
 }
 
@@ -164,6 +188,51 @@ from packing import pack, unpack
 		SWIG_exception_fail(SWIG_AttributeError,
 		    "bad string value for WT_ITEM");
 	$1 = &val;
+}
+
+%typemap(in,numinputs=0) (char ***object_list, int *countp) (char **list, uint32_t nentries) {
+	$1 = &list;
+	$2 = &nentries;
+}
+
+%typemap(argout) (char ***object_list, int *countp) {
+	int i;
+	char **list;
+
+	$result = PyList_New(*$2);
+	list = (*$1);
+	/*
+	 * When we're done with the individual C strings, free them.
+	 * In theory, we should call the ss_location_list_free() method,
+	 * but that's awkward, since we don't have the storage_source and session.
+	 */
+	for (i = 0; i < *$2; i++) {
+		PyObject *o = PyString_InternFromString(list[i]);
+		PyList_SetItem($result, i, o);
+		free(list[i]);
+	}
+	free(list);
+}
+
+
+%typemap(argout) WT_FILE_HANDLE ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_file_handle, 0);
+}
+
+%typemap(argout) WT_LOCATION_HANDLE ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_location_handle, 0);
+}
+
+%typemap(argout) WT_STORAGE_SOURCE ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_storage_source, 0);
+}
+
+%typemap(argout) bool * {
+	$result = PyBool_FromLong(*$1);
+}
+
+%typemap(argout) wt_off_t * {
+	$result = PyInt_FromLong(*$1);
 }
 
 %typemap(freearg) (WT_MODIFY *, int *nentriesp) {
@@ -269,7 +338,10 @@ from packing import pack, unpack
 %enddef
 DESTRUCTOR(__wt_connection, close)
 DESTRUCTOR(__wt_cursor, close)
+DESTRUCTOR(__wt_file_handle, close)
 DESTRUCTOR(__wt_session, close)
+DESTRUCTOR(__wt_storage_source, close)
+DESTRUCTOR(__wt_location_handle, close)
 
 /*
  * OVERRIDE_METHOD must be used when overriding or extending an existing
@@ -445,6 +517,9 @@ def wiredtiger_calc_modify_string(session, oldv, newv, maxdiff, nmod):
 SELFHELPER(struct __wt_connection, connection)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
+SELFHELPER(struct __wt_file_handle, file_handle)
+SELFHELPER(struct __wt_location_handle, location_handle)
+SELFHELPER(struct __wt_storage_source, storage_source)
 
  /*
   * Create an error exception if it has not already
@@ -563,6 +638,24 @@ OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
 	if (*$1)
 		$result = PyBytes_FromStringAndSize(*$1, *$2);
  }
+
+/* Handle binary data input from FILE_HANDLE->fh_write. */
+%typemap(in,numinputs=1) (size_t length, const void *buf) (Py_ssize_t length, const void *buf = NULL) {
+    if (PyBytes_AsStringAndSize($input, &buf, &length) < 0)
+        SWIG_exception_fail(SWIG_AttributeError,
+          "bad bytes input argument");
+    $1 = length;
+    $2 = buf;
+}
+
+/* Handle binary data input from FILE_HANDLE->fh_read. */
+%typemap(in,numinputs=1) (size_t length, void *buf) (Py_ssize_t length, const void *buf = NULL) {
+      if (PyBytes_AsStringAndSize($input, &buf, &length) < 0)
+          SWIG_exception_fail(SWIG_AttributeError,
+            "bad bytes input argument");
+    $1 = length;
+    $2 = buf;
+}
 
 /* Handle record number returns from get_recno */
 %typemap(in,numinputs=0) (uint64_t *recnop) (uint64_t recno) { $1 = &recno; }
@@ -874,6 +967,146 @@ typedef int int_void;
 	}
 };
 
+%define CONCAT(a,b)   a##b
+%enddef
+
+ /*
+  * SIDESTEP_METHOD is a workaround.  We don't yet have some methods exposed in
+  * a way that makes them callable.  For some reason, this workaround works,
+  * even though it's awkward.
+  */
+%define SIDESTEP_METHOD(cclass, method, cargs, cargs_call)
+%ignore cclass::method;
+%rename (method) cclass::CONCAT(_,method);
+%extend cclass {
+    int CONCAT(_, method) cargs {
+        return (self->method cargs_call );
+     }
+};
+%enddef
+
+SIDESTEP_METHOD(__wt_storage_source, ss_location_handle,
+  (WT_SESSION *session, const char *config, WT_LOCATION_HANDLE **handle),
+  (self, session, config, handle))
+
+SIDESTEP_METHOD(__wt_location_handle, close,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_storage_source, ss_exist,
+  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
+    const char *name, bool *existp),
+  (self, session, location_handle, name, existp))
+
+SIDESTEP_METHOD(__wt_storage_source, ss_flush,
+  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
+    const char *name, const char *config),
+  (self, session, location_handle, name, config))
+
+SIDESTEP_METHOD(__wt_storage_source, ss_open_object,
+  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
+    const char *name, uint32_t flags, WT_FILE_HANDLE **file_handlep),
+  (self, session, location_handle, name, flags, file_handlep))
+
+SIDESTEP_METHOD(__wt_storage_source, ss_remove,
+  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
+    const char *name, uint32_t flags),
+  (self, session, location_handle, name, flags))
+
+SIDESTEP_METHOD(__wt_storage_source, ss_size,
+  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
+    const char *name, wt_off_t *sizep),
+  (self, session, location_handle, name, sizep))
+
+SIDESTEP_METHOD(__wt_storage_source, terminate,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_file_handle, close,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_advise,
+  (WT_SESSION *session, wt_off_t offset, wt_off_t len, int advice),
+  (self, session, offset, len, advice))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_extend,
+  (WT_SESSION *session, wt_off_t offset),
+  (self, session, offset))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_extend_nolock,
+  (WT_SESSION *session, wt_off_t offset),
+  (self, session, offset))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_lock,
+  (WT_SESSION *session, bool lock),
+  (self, session, lock))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_map,
+  (WT_SESSION *session, bool lock, void *mapped_regionp, size_t *lengthp, void *mapped_cookiep),
+  (self, session, mapped_regionp, lengthp, mapped_cookiep))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_map_discard,
+  (WT_SESSION *session, void *map, size_t length, void *mapped_cookie),
+  (self, session, map, length, mapped_cookie))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_map_preload,
+  (WT_SESSION *session, const void *map, size_t length, void *mapped_cookie),
+  (self, session, map, length, mapped_cookie))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_unmap,
+  (WT_SESSION *session, void *mapped_region, size_t length, void *mapped_cookie),
+  (self, session, mapped_region, length, mapped_cookie))
+
+   /*
+SIDESTEP_METHOD(__wt_file_handle, fh_read,
+  (WT_SESSION *session, wt_off_t offset, size_t len, void *buf),
+  (self, session, offset, len, buf))
+   */
+
+SIDESTEP_METHOD(__wt_file_handle, fh_size,
+  (WT_SESSION *session, wt_off_t *sizep),
+  (self, session, sizep))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_sync,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_sync_nowait,
+  (WT_SESSION *session),
+  (self, session))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_truncate,
+  (WT_SESSION *session, wt_off_t offset),
+  (self, session, offset))
+
+SIDESTEP_METHOD(__wt_file_handle, fh_write,
+  (WT_SESSION *session, unsigned long offset, size_t length, const void *buf),
+  (self, session, offset, length, buf))
+
+%ignore __wt_file_handle::fh_read;
+%rename (fh_read) __wt_file_handle::_fh_read;
+%extend __wt_file_handle {
+    int _fh_read(WT_SESSION *session, unsigned long offset, size_t length, void *buf) {
+        return (self->fh_read(self, session, offset, length, buf));
+    }
+};
+
+%ignore __wt_storage_source::ss_location_list;
+%rename (ss_location_list) __wt_storage_source::_ss_location_list;
+%extend __wt_storage_source {
+    int _ss_location_list(WT_SESSION *session, WT_LOCATION_HANDLE *handle, const char *prefix,
+      uint32_t limit, char ***object_list, int *countp) {
+        return (self->ss_location_list(self, session, handle, prefix, limit, object_list, countp));
+    }
+};
+
+/*
+ * No need for a location_list_free method, as the list and its components
+ * are freed immediately after the location_list call.
+ */
+%ignore __wt_storage_source::ss_location_list_free;
+
 %{
 int diagnostic_build() {
 #ifdef HAVE_DIAGNOSTIC
@@ -929,6 +1162,9 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(Modify) __wt_modify;
 %rename(Session) __wt_session;
 %rename(Connection) __wt_connection;
+%rename(FileHandle) __wt_file_handle;
+%rename(StorageSource) __wt_storage_source;
+%rename(LocationHandle) __wt_location_handle;
 
 %include "wiredtiger.h"
 
@@ -1205,5 +1441,7 @@ def _rename_with_prefix(prefix, toclass):
 _rename_with_prefix('WT_STAT_CONN_', stat.conn)
 _rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
 _rename_with_prefix('WT_STAT_SESSION_', stat.session)
+_rename_with_prefix('WT_SS_', StorageSource)
+_rename_with_prefix('WT_FILE_HANDLE_', FileHandle)
 del _rename_with_prefix
 %}

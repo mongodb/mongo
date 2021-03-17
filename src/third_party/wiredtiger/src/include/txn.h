@@ -104,19 +104,9 @@ struct __wt_txn_shared {
      */
     wt_timestamp_t read_timestamp;
 
-    TAILQ_ENTRY(__wt_txn_shared) read_timestampq;
-    TAILQ_ENTRY(__wt_txn_shared) durable_timestampq;
-    /* Set if need to clear from the durable queue */
-
     volatile uint8_t is_allocating;
-    uint8_t clear_durable_q;
-    uint8_t clear_read_q; /* Set if need to clear from the read queue */
-
     WT_CACHE_LINE_PAD_END
 };
-
-TAILQ_HEAD(__wt_txn_dts_qh, __wt_txn_shared);
-TAILQ_HEAD(__wt_txn_rts_qh, __wt_txn_shared);
 
 struct __wt_txn_global {
     volatile uint64_t current; /* Current transaction ID. */
@@ -150,16 +140,6 @@ struct __wt_txn_global {
 
     /* Protects logging, checkpoints and transaction visibility. */
     WT_RWLOCK visibility_rwlock;
-
-    /* List of transactions sorted by durable timestamp. */
-    WT_RWLOCK durable_timestamp_rwlock;
-    struct __wt_txn_dts_qh durable_timestamph;
-    uint32_t durable_timestampq_len;
-
-    /* List of transactions sorted by read timestamp. */
-    WT_RWLOCK read_timestamp_rwlock;
-    struct __wt_txn_rts_qh read_timestamph;
-    uint32_t read_timestampq_len;
 
     /*
      * Track information about the running checkpoint. The transaction snapshot used when

@@ -16,6 +16,7 @@ ext/compressors/zstd ZSTD
 ext/encryptors/nop
 ext/encryptors/rotn
 ext/extractors/csv
+ext/storage_sources/local_store POSIX_HOST
 ext/test/fail_fs
 ext/test/local_store
 .

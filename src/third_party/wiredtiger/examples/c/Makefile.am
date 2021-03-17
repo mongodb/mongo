@@ -9,6 +9,7 @@ noinst_PROGRAMS = \
 	ex_backup \
 	ex_backup_block \
 	ex_call_center \
+	ex_col_store \
 	ex_config_parse \
 	ex_cursor \
 	ex_data_source \
