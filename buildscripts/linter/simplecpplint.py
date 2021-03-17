@@ -128,6 +128,7 @@ class Linter:
 
         start_line = self._check_for_server_side_public_license()
 
+        self._check_newlines()
         self._check_and_strip_comments()
 
         for linenum in range(start_line, len(self.clean_lines)):
@@ -149,6 +150,13 @@ class Linter:
                 self._check_for_generic_fcv(linenum)
 
         return self._error_count
+
+    def _check_newlines(self):
+        """Check that each source file ends with a newline character."""
+        if self.raw_lines and self.raw_lines[-1][-1:] != '\n':
+            self._error(
+                len(self.raw_lines), 'mongo/final_newline',
+                'Files must end with a newline character.')
 
     def _check_and_strip_comments(self):
         in_multi_line_comment = False
