@@ -60,7 +60,7 @@ void doLogUnpacked(int32_t id,
                    LogSeverity const& severity,
                    LogOptions const& options,
                    const S& message,
-                   const NamedArg<Args>&... args) {
+                   const fmt::internal::named_arg<Args, char>&... args) {
     auto attributes = makeAttributeStorage(args...);
 
     fmt::string_view msg{message};
@@ -73,7 +73,7 @@ void doLogUnpacked(int32_t id,
                    LogOptions const& options,
                    const S&,  // formatMsg not used
                    const char (&msg)[N],
-                   const NamedArg<Args>&... args) {
+                   const fmt::internal::named_arg<Args, char>&... args) {
     doLogUnpacked(id, severity, options, msg, args...);
 }
 

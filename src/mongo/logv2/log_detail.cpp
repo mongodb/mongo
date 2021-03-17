@@ -44,64 +44,61 @@
 namespace mongo::logv2::detail {
 
 struct UnstructuredValueExtractor {
-    void operator()(const char* name, CustomAttributeValue const& val) {
+    void operator()(StringData name, CustomAttributeValue const& val) {
         // Prefer string serialization over BSON if available.
         if (val.stringSerialize) {
             fmt::memory_buffer buffer;
             val.stringSerialize(buffer);
-            _addString(name, fmt::to_string(buffer));
+            _storage.push_back(fmt::to_string(buffer));
+            operator()(name, _storage.back());
         } else if (val.toString) {
-            _addString(name, val.toString());
+            _storage.push_back(val.toString());
+            operator()(name, _storage.back());
         } else if (val.BSONAppend) {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
             BSONElement element = builder.done().getField(name);
-            _addString(name, element.toString(false));
+            _storage.push_back(element.toString(false));
+            operator()(name, _storage.back());
         } else if (val.BSONSerialize) {
             BSONObjBuilder builder;
             val.BSONSerialize(builder);
-            (*this)(name, builder.done());
+            operator()(name, builder.done());
         } else if (val.toBSONArray) {
-            (*this)(name, val.toBSONArray());
+            operator()(name, val.toBSONArray());
         }
     }
 
-    void operator()(const char* name, const BSONObj& val) {
+    void operator()(StringData name, const BSONObj& val) {
         StringBuilder ss;
         val.toString(ss, false);
-        _addString(name, ss.str());
+        _storage.push_back(ss.str());
+        operator()(name, _storage.back());
     }
 
-    void operator()(const char* name, const BSONArray& val) {
+    void operator()(StringData name, const BSONArray& val) {
         StringBuilder ss;
         val.toString(ss, true);
-        _addString(name, ss.str());
+        _storage.push_back(ss.str());
+        operator()(name, _storage.back());
     }
 
     template <typename Period>
-    void operator()(const char* name, const Duration<Period>& val) {
-        _addString(name, val.toString());
+    void operator()(StringData name, const Duration<Period>& val) {
+        _storage.push_back(val.toString());
+        operator()(name, _storage.back());
     }
 
     template <typename T>
-    void operator()(const char* name, const T& val) {
-        _args.push_back(fmt::arg(name, std::cref(val)));
+    void operator()(StringData name, const T& val) {
+        args.push_back(fmt::internal::make_arg<fmt::format_context>(val));
     }
 
-    void reserve(size_t n) {
-        _args.reserve(n, n);
-    }
-
-    const auto& args() const {
-        return _args;
-    }
+    boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
+                                   constants::kNumStaticAttrs>
+        args;
 
 private:
-    void _addString(const char* name, std::string&& val) {
-        (*this)(name, _storage.emplace_back(std::move(val)));
-    }
-
-    fmt::dynamic_format_arg_store<fmt::format_context> _args;
     std::deque<std::string> _storage;
 };
 
@@ -119,7 +116,10 @@ static void checkUniqueAttrs(int32_t id, const TypeErasedAttributeStorage& attrs
         StringData sep;
         std::string msg;
         for (auto&& a : attrs) {
-            msg.append(format(FMT_STRING(R"({}"{}")"), sep, a.name));
+            msg.append(sep.rawData(), sep.size())
+                .append("\"")
+                .append(a.name.rawData(), a.name.size())
+                .append("\"");
             sep = ","_sd;
         }
         uasserted(4793301, format(FMT_STRING("LOGV2 (id={}) attribute collision: [{}]"), id, msg));
@@ -169,10 +169,11 @@ void doUnstructuredLogImpl(LogSeverity const& severity,  // NOLINT
                            TypeErasedAttributeStorage const& attrs) {
 
     UnstructuredValueExtractor extractor;
-    extractor.reserve(attrs.size());
+    extractor.args.reserve(attrs.size());
     attrs.apply(extractor);
-    auto formatted =
-        fmt::vformat(std::string_view{message.rawData(), message.size()}, extractor.args());
+    auto formatted = fmt::vformat(
+        to_string_view(message),
+        fmt::basic_format_args<fmt::format_context>(extractor.args.data(), extractor.args.size()));
 
     doLogImpl(0, severity, options, formatted, TypeErasedAttributeStorage());
 }

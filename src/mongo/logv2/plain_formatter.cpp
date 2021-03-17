@@ -33,7 +33,6 @@
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/util/str_escape.h"
 
 #include <boost/container/small_vector.hpp>
@@ -41,26 +40,29 @@
 #include <boost/log/expressions/message.hpp>
 #include <boost/log/utility/formatting_ostream.hpp>
 
-#include <any>
 #include <deque>
 #include <fmt/format.h>
+#include <forward_list>
 
 namespace mongo::logv2 {
 namespace {
 
 struct TextValueExtractor {
-    void operator()(const char* name, CustomAttributeValue const& val) {
+    void operator()(StringData name, CustomAttributeValue const& val) {
         if (val.stringSerialize) {
             fmt::memory_buffer buffer;
             val.stringSerialize(buffer);
-            _addString(name, fmt::to_string(buffer));
+            _storage.push_back(fmt::to_string(buffer));
+            operator()(name, StringData(_storage.back()));
         } else if (val.toString) {
-            _addString(name, val.toString());
+            _storage.push_back(val.toString());
+            operator()(name, StringData(_storage.back()));
         } else if (val.BSONAppend) {
             BSONObjBuilder builder;
             val.BSONAppend(builder, name);
             BSONElement element = builder.done().getField(name);
-            _addString(name, element.toString(false));
+            _storage.push_back(element.toString(false));
+            operator()(name, _storage.back());
         } else if (val.BSONSerialize) {
             BSONObjBuilder builder;
             val.BSONSerialize(builder);
@@ -70,72 +72,82 @@ struct TextValueExtractor {
         }
     }
 
-    void operator()(const char* name, const BSONObj& val) {
-        _addString(name, val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
+    void operator()(StringData name, const BSONObj& val) {
+        _storage.push_back(val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0));
+        operator()(name, StringData(_storage.back()));
     }
 
-    void operator()(const char* name, const BSONArray& val) {
-        _addString(name, val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+    void operator()(StringData name, const BSONArray& val) {
+        _storage.push_back(val.jsonString(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, true));
+        operator()(name, StringData(_storage.back()));
     }
 
     template <typename Period>
-    void operator()(const char* name, const Duration<Period>& val) {
-        _addString(name, val.toString());
+    void operator()(StringData name, const Duration<Period>& val) {
+        _storage.push_back(val.toString());
+        operator()(name, StringData(_storage.back()));
     }
 
-    template <typename T>
-    void operator()(const char* name, const T& val) {
-        _add(name, val);
+    void operator()(StringData name, bool val) {
+        _namedBool.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedBool.front());
     }
 
-    const auto& args() const {
-        return _args;
+    void operator()(StringData name, int val) {
+        _namedInt.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedInt.front());
     }
 
-    void reserve(std::size_t sz) {
-        _args.reserve(sz, sz);
+    void operator()(StringData name, unsigned int val) {
+        _namedUInt.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedUInt.front());
     }
+
+    void operator()(StringData name, long long val) {
+        _namedLL.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedLL.front());
+    }
+
+    void operator()(StringData name, unsigned long long val) {
+        _namedULL.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedULL.front());
+    }
+
+    void operator()(StringData name, double val) {
+        _namedDouble.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedDouble.front());
+    }
+
+    void operator()(StringData name, StringData val) {
+        _namedStringData.push_front(fmt::arg(fmt::string_view(name.rawData(), name.size()), val));
+        add(_namedStringData.front());
+    }
+
+    boost::container::small_vector<fmt::basic_format_arg<fmt::format_context>,
+                                   constants::kNumStaticAttrs>
+        args;
 
 private:
-    /**
-     * Workaround for `dynamic_format_arg_store`'s desire to copy string
-     * values and user-defined values.
-     */
-    static auto _wrapValue(StringData val) {
-        return std::string_view{val.rawData(), val.size()};
-    }
-
     template <typename T>
-    static auto _wrapValue(const T& val) {
-        return std::cref(val);
+    void add(const T& named) {
+        args.push_back(fmt::internal::make_arg<fmt::format_context>(named));
     }
 
-    template <typename T>
-    void _add(const char* name, const T& val) {
-        // Store our own fmt::arg results in a container of std::any,
-        // and give reference_wrappers to _args. This avoids a string
-        // copy of the 'name' inside _args.
-        _args.push_back(std::cref(_store(fmt::arg(name, _wrapValue(val)))));
-    }
-
-    void _addString(const char* name, std::string&& val) {
-        _add(name, StringData{_store(std::move(val))});
-    }
-
-    template <typename T>
-    const T& _store(T&& val) {
-        return std::any_cast<const T&>(_storage.emplace_back(std::forward<T>(val)));
-    }
-
-    std::deque<std::any> _storage;
-    fmt::dynamic_format_arg_store<fmt::format_context> _args;
+    std::deque<std::string> _storage;
+    std::forward_list<fmt::internal::named_arg<bool, char>> _namedBool;
+    std::forward_list<fmt::internal::named_arg<int, char>> _namedInt;
+    std::forward_list<fmt::internal::named_arg<unsigned int, char>> _namedUInt;
+    std::forward_list<fmt::internal::named_arg<long long, char>> _namedLL;
+    std::forward_list<fmt::internal::named_arg<unsigned long long, char>> _namedULL;
+    std::forward_list<fmt::internal::named_arg<double, char>> _namedDouble;
+    std::forward_list<fmt::internal::named_arg<StringData, char>> _namedStringData;
 };
 
 }  // namespace
 
 void PlainFormatter::operator()(boost::log::record_view const& rec,
                                 fmt::memory_buffer& buffer) const {
-    using boost::log::extract;
+    using namespace boost::log;
 
     StringData message = extract<StringData>(attributes::message(), rec).get();
     const auto& attrs = extract<TypeErasedAttributeStorage>(attributes::attributes(), rec).get();
@@ -143,15 +155,19 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
     // Log messages logged via logd are already formatted and have the id == 0
     if (attrs.empty()) {
         if (extract<int32_t>(attributes::id(), rec).get() == 0) {
-            buffer.append(message.begin(), message.end());
+            buffer.append(message.rawData(), message.rawData() + message.size());
+
             return;
         }
     }
 
     TextValueExtractor extractor;
-    extractor.reserve(attrs.size());
+    extractor.args.reserve(attrs.size());
     attrs.apply(extractor);
-    fmt::vformat_to(buffer, std::string_view{message.rawData(), message.size()}, extractor.args());
+    fmt::vformat_to(
+        buffer,
+        to_string_view(message),
+        fmt::basic_format_args<fmt::format_context>(extractor.args.data(), extractor.args.size()));
 
     size_t attributeMaxSize = buffer.size();
     if (extract<LogTruncation>(attributes::truncation(), rec).get() == LogTruncation::Enabled) {
@@ -168,6 +184,7 @@ void PlainFormatter::operator()(boost::log::record_view const& rec,
 
 void PlainFormatter::operator()(boost::log::record_view const& rec,
                                 boost::log::formatting_ostream& strm) const {
+    using namespace boost::log;
     fmt::memory_buffer buffer;
     operator()(rec, buffer);
     strm.write(buffer.data(), buffer.size());
