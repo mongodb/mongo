@@ -37,18 +37,19 @@ directories containing the old IDL files from previous releases.
 """
 
 import argparse
-import logging
 import os
 import sys
 from typing import Dict, List, Optional, Tuple, Union
 
 from idl import parser, syntax, errors, common
 from idl.compiler import CompilerImportResolver
-from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection
+from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection, dump_errors
 
 ALLOW_ANY_TYPE_LIST: List[str] = [
-    "commandAllowedAnyTypes", "commandAllowedAnyTypes-param-anyTypeParam",
-    "commandAllowedAnyTypes-reply-anyTypeField", "oldTypeBsonAnyAllowList",
+    "commandAllowedAnyTypes",
+    "commandAllowedAnyTypes-param-anyTypeParam",
+    "commandAllowedAnyTypes-reply-anyTypeField",
+    "oldTypeBsonAnyAllowList",
     "newTypeBsonAnyAllowList",
     "oldReplyFieldTypeBsonAnyAllowList-reply-oldBsonSerializationTypeAnyReplyField",
     "newReplyFieldTypeBsonAnyAllowList-reply-newBsonSerializationTypeAnyReplyField",
@@ -59,10 +60,77 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "replyFieldTypeBsonAnyWithVariantWithArray-reply-bsonSerializationTypeAnyStructField",
     "parameterFieldTypeBsonAnyWithVariant-param-bsonSerializationTypeAnyStructField",
     "parameterFieldTypeBsonAnyWithVariantWithArray-param-bsonSerializationTypeAnyStructField",
-    "commandTypeBsonAnyWithVariant", "commandTypeBsonAnyWithVariantWithArray",
-    "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField", "commandCppTypeNotEqual",
-    "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam"
+    "commandTypeBsonAnyWithVariant",
+    "commandTypeBsonAnyWithVariantWithArray",
+    "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField",
+    "commandCppTypeNotEqual",
+    "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam",
+
+    # TODO (SERVER-54956): Decide what to do with commands: (create, createIndexes).
+    'create-param-backwards',
+    'createIndexes-param-commitQuorum',
+    'createIndexes-reply-commitQuorum',
+
+    # TODO (SERVER-54923): Decide what to do with commands: (saslStart, saslContinue).
+    'saslStart-param-payload',
+    'explain-param-use44SortKeys',
+    'explain-param-useNewUpsert',
+    'saslStart-param-payload',
+    'saslStart-reply-payload',
+    'saslContinue-param-payload',
+    'saslContinue-reply-payload',
+
+    # TODO (SERVER-54925): Decide what to do with commands:
+    # (aggregate, find, update, delete, findAndModify, explain).
+    'aggregate-param-pipeline',
+    'aggregate-param-explain',
+    'aggregate-param-allowDiskUse',
+    'aggregate-param-cursor',
+    'aggregate-param-hint',
+    'aggregate-param-needsMerge',
+    'aggregate-param-fromMongos',
+    'aggregate-param-$_requestReshardingResumeToken',
+    'aggregate-param-isMapReduceCommand',
+    'find-param-filter',
+    'find-param-projection',
+    'find-param-sort',
+    'find-param-hint',
+    'find-param-collation',
+    'find-param-singleBatch',
+    'find-param-allowDiskUse',
+    'find-param-min',
+    'find-param-max',
+    'find-param-returnKey',
+    'find-param-showRecordId',
+    'find-param-$queryOptions',
+    'find-param-tailable',
+    'find-param-oplogReplay',
+    'find-param-noCursorTimeout',
+    'find-param-awaitData',
+    'find-param-allowPartialResults',
+    'find-param-readOnce',
+    'find-param-allowSpeculativeMajorityRead',
+    'find-param-$_requestResumeToken',
+    'find-param-$_resumeAfter',
+    'find-param-maxTimeMS',
+    'update-param-u',
+    'update-param-hint',
+    'update-param-upsertSupplied',
+    'update-reply-_id',
+    'delete-param-limit',
+    'delete-param-hint',
+    'findAndModify-param-hint',
+    'findAndModify-param-update',
+    'findAndModify-reply-upserted',
+    'explain-param-collation',
+    'explain-param-use44SortKeys',
+    'explain-param-useNewUpsert',
+
+    # TODO (SERVER-54927): Decide what to do with commands: (hello).
+    'hello-param-saslSupportedMechs'
 ]
+
+SKIPPED_FILES = ["unittest.idl"]
 
 
 def get_new_commands(
@@ -75,7 +143,7 @@ def get_new_commands(
 
     for dirpath, _, filenames in os.walk(new_idl_dir):
         for new_filename in filenames:
-            if not new_filename.endswith('.idl'):
+            if not new_filename.endswith('.idl') or new_filename in SKIPPED_FILES:
                 continue
 
             new_idl_file_path = os.path.join(dirpath, new_filename)
@@ -634,7 +702,10 @@ def check_error_reply(old_basic_types_path: str, new_basic_types_path: str,
                     check_reply_fields(ctxt, old_error_reply_struct, new_error_reply_struct, "n/a",
                                        old_idl_file, new_idl_file, old_basic_types_path,
                                        new_basic_types_path)
-    ctxt.errors.dump_errors()
+
+    # TODO (SERVER-55203): Remove error_skipped logic.
+    ctxt.errors.remove_skipped_errors_and_dump_all_errors("ErrorReply", old_basic_types_path,
+                                                          new_basic_types_path)
     return ctxt.errors
 
 
@@ -677,7 +748,7 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
     old_commands: Dict[str, syntax.Command] = dict()
     for dirpath, _, filenames in os.walk(old_idl_dir):
         for old_filename in filenames:
-            if not old_filename.endswith('.idl'):
+            if not old_filename.endswith('.idl') or old_filename in SKIPPED_FILES:
                 continue
 
             old_idl_file_path = os.path.join(dirpath, old_filename)
@@ -733,7 +804,9 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     check_security_access_check(ctxt, old_cmd.access_check, new_cmd.access_check,
                                                 old_cmd.command_name, new_idl_file_path)
 
-    ctxt.errors.dump_errors()
+    # TODO (SERVER-55203): Remove error_skipped logic.
+    ctxt.errors.remove_skipped_errors_and_dump_all_errors("Commands", old_idl_dir, new_idl_dir)
+
     return ctxt.errors
 
 
@@ -741,19 +814,21 @@ def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
     arg_parser.add_argument("-v", "--verbose", action="count", help="Enable verbose logging")
+    arg_parser.add_argument("--include", type=str, action="append",
+                            help="Directory to search for IDL import files")
     arg_parser.add_argument("old_idl_dir", metavar="OLD_IDL_DIR",
                             help="Directory where old IDL files are located")
     arg_parser.add_argument("new_idl_dir", metavar="NEW_IDL_DIR",
                             help="Directory where new IDL files are located")
     args = arg_parser.parse_args()
 
-    error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, [])
+    error_coll = check_compatibility(args.old_idl_dir, args.new_idl_dir, args.include)
     if error_coll.has_errors():
         sys.exit(1)
 
     old_basic_types_path = os.path.join(args.old_idl_dir, "mongo/idl/basic_types.idl")
     new_basic_types_path = os.path.join(args.new_idl_dir, "mongo/idl/basic_types.idl")
-    error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path, [])
+    error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path, args.include)
     if error_reply_coll.has_errors():
         sys.exit(1)
 
