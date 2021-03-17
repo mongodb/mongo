@@ -52,7 +52,6 @@ struct BucketSpec {
     std::set<std::string> fieldSet;
 };
 
-
 /**
  * BucketUnpacker will unpack bucket fields for metadata and the provided fields.
  */
@@ -62,29 +61,6 @@ public:
     static constexpr StringData kBucketIdFieldName = "_id"_sd;
     static constexpr StringData kBucketDataFieldName = "data"_sd;
     static constexpr StringData kBucketMetaFieldName = "meta"_sd;
-
-    // A table that is useful for interpolations between the number of measurements in a bucket and
-    // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
-    // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
-    // timestamp BSONObj. The table is bounded by 16 MB (2 << 23 bytes) where the table entries are
-    // pairs of b_i and S_i for the lower bounds of the row key digit intervals [0, 9], [10, 99],
-    // [100, 999], [1000, 9999] and so on. The last entry in the table, S7, is the first entry to
-    // exceed the server BSON object limit of 16 MB.
-    static constexpr std::array<std::pair<int32_t, int32_t>, 8> kTimestampObjSizeTable{
-        {{0, BSONObj::kMinBSONLength},
-         {10, 115},
-         {100, 1195},
-         {1000, 12895},
-         {10000, 138895},
-         {100000, 1488895},
-         {1000000, 15888895},
-         {10000000, 168888895}}};
-
-    /**
-     * Given the size of a BSONObj timestamp column, formatted as it would be in a time-series
-     * system.buckets.X collection, returns the number of measurements in the bucket in O(1) time.
-     */
-    static int computeMeasurementCount(int targetTimestampObjSize);
 
     // When BucketUnpacker is created with kInclude it must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
@@ -100,18 +76,7 @@ public:
           _includeTimeField(includeTimeField),
           _includeMetaField(includeMetaField) {}
 
-    /**
-     * This method will continue to materialize Documents until the bucket is exhausted. A
-     * precondition of this method is that 'hasNext()' must be true.
-     */
     Document getNext();
-
-    /**
-     * This method will extract the j-th measurement from the bucket. A precondition of this method
-     * is that j >= 0 && j <= the number of measurements within the underlying bucket.
-     */
-    Document extractSingleMeasurement(int j);
-
     bool hasNext() const {
         return _timeFieldIter && _timeFieldIter->more();
     }
@@ -141,10 +106,6 @@ public:
         return _includeTimeField;
     }
 
-    int32_t numberOfMeasurements() const {
-        return _numberOfMeasurements;
-    }
-
     void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);
 
 private:
@@ -171,9 +132,6 @@ private:
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
     // phase according to the provided 'Behavior' and 'BucketSpec'.
     std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
-
-    // The number of measurements in the bucket.
-    int32_t _numberOfMeasurements = 0;
 };
 
 class DocumentSourceInternalUnpackBucket : public DocumentSource {
@@ -196,17 +154,6 @@ public:
         return kStageName.rawData();
     }
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    /**
-     * Use 'serializeToArray' above.
-     */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;
-    }
-
     bool includeMetaField() const {
         return _bucketUnpacker.includeMetaField();
     }
@@ -227,13 +174,7 @@ public:
                 ChangeStreamRequirement::kBlacklist};
     }
 
-    DepsTracker::State getDependencies(DepsTracker* deps) const final {
-        if (_sampleSize) {
-            deps->needRandomGenerator = true;
-        }
-        deps->needWholeDocument = true;
-        return DepsTracker::State::EXHAUSTIVE_ALL;
-    }
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
@@ -294,69 +235,9 @@ public:
     std::unique_ptr<MatchExpression> createPredicatesOnBucketLevelField(
         const MatchExpression* matchExpr) const;
 
-    /**
-     * Sets the sample size to 'n' and the maximum number of measurements in a bucket to be
-     * 'bucketMaxCount'. Calling this method implicitly changes the behavior from having the stage
-     * unpack every bucket in a collection to sampling buckets to generate a uniform random sample
-     * of size 'n'.
-     */
-    void setSampleParameters(long long n, int bucketMaxCount) {
-        _sampleSize = n;
-        _bucketMaxCount = bucketMaxCount;
-    }
-
-    boost::optional<long long> sampleSize() const {
-        return _sampleSize;
-    }
-
 private:
-    /**
-     * Carries the bucket _id and index for the measurement that was sampled by
-     * 'sampleRandomBucketOptimized'.
-     */
-    struct SampledMeasurementKey {
-        SampledMeasurementKey(OID bucketId, int64_t measurementIndex)
-            : bucketId(bucketId), measurementIndex(measurementIndex) {}
-
-        bool operator==(const SampledMeasurementKey& key) const {
-            return this->bucketId == key.bucketId && this->measurementIndex == key.measurementIndex;
-        }
-
-        OID bucketId;
-        int32_t measurementIndex;
-    };
-
-    /**
-     * Computes a hash of 'SampledMeasurementKey' so measurements that have already been seen can
-     * be kept track of for de-duplication after sampling.
-     */
-    struct SampledMeasurementKeyHasher {
-        size_t operator()(const SampledMeasurementKey& s) const {
-            return absl::Hash<uint64_t>{}(s.bucketId.view().read<uint64_t>()) ^
-                absl::Hash<uint32_t>{}(s.bucketId.view().read<uint32_t>(8)) ^
-                absl::Hash<int32_t>{}(s.measurementIndex);
-        }
-    };
-
-    // Tracks which measurements have been seen so far. This is only used when sampling is enabled
-    // for the purpose of de-duplicating measurements.
-    using SeenSet = stdx::unordered_set<SampledMeasurementKey, SampledMeasurementKeyHasher>;
-
     GetNextResult doGetNext() final;
 
-    /**
-     * Keeps trying to sample a unique measurement by using the optimized ARHASH algorithm up to a
-     * hardcoded maximum number of attempts. If a unique measurement isn't found before the maximum
-     * number of tries is exhausted this method will throw.
-     */
-    GetNextResult sampleUniqueMeasurementFromBuckets();
-
     BucketUnpacker _bucketUnpacker;
-
-    long long _nSampledSoFar = 0;
-    int _bucketMaxCount = 0;
-    boost::optional<long long> _sampleSize;
-
-    SeenSet _seenSet;
 };
 }  // namespace mongo
