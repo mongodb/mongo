@@ -239,6 +239,77 @@ var TenantMigrationUtil = (function() {
         return mtab.numBlockedWrites;
     }
 
+    /**
+     * Determines if a database name belongs to the given tenant.
+     */
+    function isNamespaceForTenant(tenantId, dbName) {
+        return dbName.startsWith(`${tenantId}_`);
+    }
+
+    /**
+     * Compares the hashes for DBs that belong to the specified tenant between the donor and
+     * recipient primaries.
+     */
+    function checkTenantDBHashes(donorRst,
+                                 recipientRst,
+                                 tenantId,
+                                 excludedDBs = [],
+                                 msgPrefix = 'checkTenantDBHashes',
+                                 ignoreUUIDs = false) {
+        // Always skip db hash checks for the config, admin, and local database.
+        excludedDBs = [...excludedDBs, "config", "admin", "local"];
+
+        const donorPrimary = donorRst.getPrimary();
+        const recipientPrimary = recipientRst.getPrimary();
+
+        // Filter out all dbs that don't belong to the tenant.
+        let combinedDBNames = [...donorPrimary.getDBNames(), ...recipientPrimary.getDBNames()];
+        combinedDBNames = combinedDBNames.filter(
+            dbName => (isNamespaceForTenant(tenantId, dbName) && !excludedDBs.includes(dbName)));
+        combinedDBNames = new Set(combinedDBNames);
+
+        for (const dbName of combinedDBNames) {
+            // Pass in an empty array for the secondaries, since we only wish to compare the DB
+            // hashes between the donor and recipient primary in this test.
+            const donorDBHash = assert.commandWorked(donorRst.getHashes(dbName, []).primary);
+            const recipientDBHash =
+                assert.commandWorked(recipientRst.getHashes(dbName, []).primary);
+
+            const donorCollections = Object.keys(donorDBHash.collections);
+            const donorCollInfos = new CollInfos(donorPrimary, 'donorPrimary', dbName);
+            donorCollInfos.filter(donorCollections);
+
+            const recipientCollections = Object.keys(recipientDBHash.collections);
+            const recipientCollInfos = new CollInfos(recipientPrimary, 'recipientPrimary', dbName);
+            recipientCollInfos.filter(recipientCollections);
+
+            // TODO (SERVER-55343): Investigate temp collection behavior during tenant migrations.
+            donorCollInfos.collInfosRes =
+                donorCollInfos.collInfosRes.filter(info => !info.options.temp);
+            recipientCollInfos.collInfosRes =
+                recipientCollInfos.collInfosRes.filter(info => !info.options.temp);
+
+            print(`checking db hash between donor: ${donorPrimary} and recipient: ${
+                recipientPrimary}`);
+
+            const collectionPrinted = new Set();
+            const success = DataConsistencyChecker.checkDBHash(donorDBHash,
+                                                               donorCollInfos,
+                                                               recipientDBHash,
+                                                               recipientCollInfos,
+                                                               msgPrefix,
+                                                               ignoreUUIDs,
+                                                               true, /* syncingHasIndexes */
+                                                               collectionPrinted);
+            if (!success) {
+                print(`checkTenantDBHashes dumping donor and recipient primary oplogs`);
+                donorRst.dumpOplog(donorPrimary, {}, 100);
+                recipientRst.dumpOplog(recipientPrimary, {}, 100);
+            }
+            assert(success, 'dbhash mismatch between donor and recipient primaries');
+        }
+    }
+
     return {
         kExternalKeysNs,
         getExternalKeys,
@@ -255,6 +326,8 @@ var TenantMigrationUtil = (function() {
         isMigrationCompleted,
         getTenantMigrationAccessBlocker,
         getNumBlockedReads,
-        getNumBlockedWrites
+        getNumBlockedWrites,
+        isNamespaceForTenant,
+        checkTenantDBHashes
     };
 })();

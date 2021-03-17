@@ -13,6 +13,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import tenant_migration
+from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -36,7 +37,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         if not isinstance(fixture, tenant_migration.TenantMigrationFixture):
             raise ValueError("The ContinuousTenantMigration hook requires a TenantMigrationFixture")
         self._tenant_migration_fixture = fixture
-        self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
+        self._shell_options = shell_options
 
         self._tenant_migration_thread = None
 
@@ -46,7 +47,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
             raise ValueError("No TenantMigrationFixture to run migrations on")
         self.logger.info("Starting the tenant migration thread.")
         self._tenant_migration_thread = _TenantMigrationThread(
-            self.logger, self._tenant_migration_fixture, self._tenant_id)
+            self.logger, self._tenant_migration_fixture, self._shell_options, test_report)
         self._tenant_migration_thread.start()
 
     def after_suite(self, test_report):
@@ -206,14 +207,17 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
     MIGRATION_STATE_POLL_INTERVAL_SECS = 0.1
     NO_SUCH_MIGRATION_ERR_CODE = 327
     INTERNAL_ERR_CODE = 1
+    THREAD_NAME = "TenantMigrationThread"
 
-    def __init__(self, logger, tenant_migration_fixture, tenant_id):
+    def __init__(self, logger, tenant_migration_fixture, shell_options, test_report):
         """Initialize _TenantMigrationThread."""
-        threading.Thread.__init__(self, name="TenantMigrationThread")
+        threading.Thread.__init__(self, name=self.THREAD_NAME)
         self.daemon = True
         self.logger = logger
         self._tenant_migration_fixture = tenant_migration_fixture
-        self._tenant_id = tenant_id
+        self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
+        self._test_report = test_report
+        self._shell_options = shell_options
 
         self.__lifecycle = TenantMigrationLifeCycle()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -308,6 +312,10 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         """Wait until stop or timeout."""
         self._is_stopped_evt.wait(timeout)
 
+    def short_name(self):
+        """Return the name of the thread."""
+        return self.THREAD_NAME
+
     def _check_thread(self):
         """Throw an error if the thread is not running."""
         if not self.is_alive():
@@ -325,6 +333,24 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         read_preference = {"mode": "primary"} if random.randint(0, 1) else {"mode": "secondary"}
         return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference)
 
+    def _check_tenant_migration_dbhash(self, migration_opts):
+        # Set the donor connection string, recipient connection string, and migration uuid string for the tenant migration dbhash check script.
+        self._shell_options[
+            "global_vars"]["TestData"]["donorConnectionString"] = migration_opts.get_donor_primary(
+            ).get_internal_connection_string()
+        self._shell_options["global_vars"]["TestData"][
+            "recipientConnectionString"] = migration_opts.get_recipient_primary(
+            ).get_internal_connection_string()
+        self._shell_options["global_vars"]["TestData"][
+            "migrationIdString"] = migration_opts.migration_id.__str__()
+
+        dbhash_test_case = dbhash_tenant_migration.CheckTenantMigrationDBHash(
+            self.logger, self._tenant_migration_fixture, self._shell_options)
+        dbhash_test_case.before_suite(self._test_report)
+        dbhash_test_case.before_test(self, self._test_report)
+        dbhash_test_case.after_test(self, self._test_report)
+        dbhash_test_case.after_suite(self._test_report)
+
     def _run_migration(self, migration_opts):  # noqa: D205,D400
         """Run a tenant migration based on 'migration_opts', wait for the migration decision and
         garbage collection. Return true if the migration commits and false otherwise.
@@ -338,6 +364,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
             # Garbage collect the migration prior to throwing error to avoid migration conflict
             # in the next test.
             if is_committed:
+                # Once we have committed a migration, run a dbhash check before rerouting commands.
+                self._check_tenant_migration_dbhash(migration_opts)
+
                 # If the migration committed, to avoid routing commands incorrectly, wait for the
                 # donor/proxy to reroute at least one command before doing garbage collection. Stop
                 # waiting when the test finishes.
