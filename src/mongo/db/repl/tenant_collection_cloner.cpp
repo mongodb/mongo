@@ -323,6 +323,13 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         // We are resuming and the collection already exists.
         DBDirectClient client(opCtx.get());
 
+        // Set the recipient info on the opCtx to bypass the access blocker for local reads.
+        tenantMigrationRecipientInfo(opCtx.get()) =
+            boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
+        // Reset the recipient info after local reads so oplog entries for future writes
+        // (createCollection/createIndex) don't get stamped with the fromTenantMigration field.
+        ON_BLOCK_EXIT([&opCtx] { tenantMigrationRecipientInfo(opCtx.get()) = boost::none; });
+
         auto fieldsToReturn = BSON("_id" << 1);
         _lastDocId =
             client.findOne(_existingNss->ns(), Query().sort(BSON("_id" << -1)), &fieldsToReturn);

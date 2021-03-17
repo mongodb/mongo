@@ -58,7 +58,7 @@ const kTenantId = "testTenantId";
     startOplogFetcherFp.wait();
 
     // Write before cloning is done.
-    assert.commandWorked(tenantCollOnRecipient.remove({_id: 1}));
+    assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}), ErrorCodes.SnapshotTooOld);
 
     startOplogFetcherFp.off();
     clonerDoneFp.wait();

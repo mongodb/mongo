@@ -36,6 +36,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_executor.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/cancelation.h"
@@ -79,6 +80,16 @@ Status TenantMigrationRecipientAccessBlocker::waitUntilCommittedOrAborted(
 SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
     OperationContext* opCtx) {
     if (MONGO_unlikely(tenantMigrationRecipientNotRejectReads.shouldFail())) {
+        return SharedSemiFuture<void>();
+    }
+
+    // Exclude internal reads decorated with 'tenantMigrationRecipientInfo' from any logic.
+    if (repl::tenantMigrationRecipientInfo(opCtx).has_value()) {
+        LOGV2_DEBUG(5492000,
+                    1,
+                    "Internal tenant read got excluded from the MTAB filtering",
+                    "tenantId"_attr = _tenantId,
+                    "opId"_attr = opCtx->getOpID());
         return SharedSemiFuture<void>();
     }
 

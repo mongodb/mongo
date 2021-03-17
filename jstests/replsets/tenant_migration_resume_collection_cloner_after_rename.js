@@ -16,10 +16,15 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const recipientRst = new ReplSetTest({
     nodes: 2,
     name: jsTestName() + "_recipient",
-    // Use a batch size of 2 so that collection cloner requires more than a single batch to
-    // complete.
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient,
-                               {setParameter: {collectionClonerBatchSize: 2}})
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient, {
+        setParameter: {
+            // Use a batch size of 2 so that collection cloner requires more than a single batch to
+            // complete.
+            collectionClonerBatchSize: 2,
+            // Allow reads on recipient before migration completes for testing.
+            'failpoint.tenantMigrationRecipientNotRejectReads': tojson({mode: 'alwaysOn'}),
+        }
+    })
 });
 
 recipientRst.startSet();
