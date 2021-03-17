@@ -91,6 +91,31 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
             std::reverse(curExpansion.begin(), curExpansion.end());
         }
         batch->ops.emplace_back(TenantOplogEntry(std::move(op), expansionsIndex));
+    } else if (op.getPreImageOpTime() || op.getPostImageOpTime()) {
+        uassert(5351001,
+                str::stream() << "expected donor oplog entry with opTime: "
+                              << op.getOpTime().toString() << ": " << redact(op.toBSONForLogging())
+                              << " to have only one of " << OplogEntryBase::kPreImageOpTimeFieldName
+                              << " or " << OplogEntryBase::kPostImageOpTimeFieldName,
+                !op.getPreImageOpTime() || !op.getPostImageOpTime());
+        OpTime imageOpTime =
+            op.getPreImageOpTime() ? *op.getPreImageOpTime() : *op.getPostImageOpTime();
+        // Almost all the time, this oplog entry will be the previous one in the batch.  However,
+        // it may fall on a batch boundary or in unusual cases there may be oplog entries in
+        // between.  In these cases we add the image directly before the oplog entry it refers to.
+        // This is consistent with what shard migration does.  The oplog applier will ignore
+        // image entries which are not directly followed by the entry referring to them.
+        if (batch->ops.empty() || batch->ops.back().entry.getOpTime() != imageOpTime) {
+            LOGV2_DEBUG(5351004,
+                        1,
+                        "Tenant Oplog Batcher reordering pre- or post- image for oplog entry",
+                        "opTime"_attr = op.getOpTime(),
+                        "imageOpTime"_attr = imageOpTime);
+            auto imageOp = OplogEntry(
+                uassertStatusOK(_oplogBuffer->findByTimestamp(opCtx, imageOpTime.getTimestamp())));
+            batch->ops.emplace_back(TenantOplogEntry(std::move(imageOp)));
+        }
+        batch->ops.emplace_back(TenantOplogEntry(std::move(op)));
     } else {
         batch->ops.emplace_back(TenantOplogEntry(std::move(op)));
     }

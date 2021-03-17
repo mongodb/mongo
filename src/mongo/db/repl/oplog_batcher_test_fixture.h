@@ -83,6 +83,12 @@ OplogEntry makeInsertOplogEntry(int t,
                                 const NamespaceString& nss,
                                 boost::optional<UUID> uuid = boost::none);
 
+OplogEntry makeUpdateOplogEntry(int t,
+                                const NamespaceString& nss,
+                                boost::optional<UUID> uuid = boost::none,
+                                boost::optional<OpTime> preImageOpTime = boost::none,
+                                boost::optional<OpTime> postImageOpTime = boost::none);
+
 OplogEntry makeNoopOplogEntry(int t, const StringData& msg);
 
 OplogEntry makeApplyOpsOplogEntry(int t,

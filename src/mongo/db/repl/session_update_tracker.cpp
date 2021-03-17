@@ -118,20 +118,13 @@ bool isTransactionEntryFromTenantMigrations(const OplogEntry& entry) {
         return false;
     }
 
-    if (entry.getOpType() != repl::OpTypeEnum::kNoop) {
+    if (entry.getFromMigrate()) {
+        // Retryable writes have fromMigrate set.
         return false;
     }
 
-    // Transaction no-op entries will have an o2 with a command, or an o2 with no optype
-    // field (for entries generated from config.transactions).  Retryable writes will have
-    // entries with optypes other than command.
-    if (entry.getObject2()) {
-        auto innerOpTypeStr =
-            (*entry.getObject2())[OplogEntry::kOpTypeFieldName].valueStringDataSafe();
-        if (!innerOpTypeStr.empty() &&
-            OpType_parse(IDLParserErrorContext("isTransactionEntryFromTenantMigration"_sd),
-                         innerOpTypeStr) != OpTypeEnum::kCommand)
-            return false;
+    if (entry.getOpType() != repl::OpTypeEnum::kNoop) {
+        return false;
     }
 
     if (!entry.getSessionId() || !entry.getTxnNumber()) {
