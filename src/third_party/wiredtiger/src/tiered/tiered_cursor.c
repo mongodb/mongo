@@ -37,7 +37,7 @@ __curtiered_open_cursors(WT_CURSOR_TIERED *curtiered)
     WT_ASSERT(session, tiered->ntiers > 0);
 
     /*
-     * If the key is pointing to memory that is pinned by a chunk cursor, take a copy before closing
+     * If the key is pointing to memory that is pinned by a tier cursor, take a copy before closing
      * cursors.
      */
     if (F_ISSET(cursor, WT_CURSTD_KEY_INT))
@@ -48,7 +48,7 @@ __curtiered_open_cursors(WT_CURSOR_TIERED *curtiered)
     WT_ASSERT(session, curtiered->cursors == NULL);
     WT_ERR(__wt_calloc_def(session, tiered->ntiers, &curtiered->cursors));
 
-    /* Open the cursors for chunks that have changed. */
+    /* Open the cursors for tiers that have changed. */
     __wt_verbose(session, WT_VERB_TIERED,
       "tiered opening cursor session(%p):tiered cursor(%p), tiers: %u", (void *)session,
       (void *)curtiered, tiered->ntiers);
@@ -100,8 +100,8 @@ __curtiered_close_cursors(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered)
 
 /*
  * __curtiered_reset_cursors --
- *     Reset any positioned chunk cursors. If the skip parameter is non-NULL, that cursor is about
- *     to be used, so there is no need to reset it.
+ *     Reset any positioned tier cursors. If the skip parameter is non-NULL, that cursor is about to
+ *     be used, so there is no need to reset it.
  */
 static int
 __curtiered_reset_cursors(WT_CURSOR_TIERED *curtiered, WT_CURSOR *skip)
@@ -112,7 +112,7 @@ __curtiered_reset_cursors(WT_CURSOR_TIERED *curtiered, WT_CURSOR *skip)
 
     /* Fast path if the cursor is not positioned. */
     if ((curtiered->current == NULL || curtiered->current == skip) &&
-      !F_ISSET(curtiered, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV))
+      !F_ISSET(curtiered, WT_CURTIERED_ITERATE_NEXT | WT_CURTIERED_ITERATE_PREV))
         return (0);
 
     WT_FORALL_CURSORS(curtiered, c, i)
@@ -124,7 +124,7 @@ __curtiered_reset_cursors(WT_CURSOR_TIERED *curtiered, WT_CURSOR *skip)
     }
 
     curtiered->current = NULL;
-    F_CLR(curtiered, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+    F_CLR(curtiered, WT_CURTIERED_ITERATE_NEXT | WT_CURTIERED_ITERATE_PREV);
 
     return (ret);
 }
@@ -316,9 +316,9 @@ __curtiered_get_current(
     }
 
     if (multiple)
-        F_SET(curtiered, WT_CLSM_MULTIPLE);
+        F_SET(curtiered, WT_CURTIERED_MULTIPLE);
     else
-        F_CLR(curtiered, WT_CLSM_MULTIPLE);
+        F_CLR(curtiered, WT_CURTIERED_MULTIPLE);
 
     WT_RET(current->get_key(current, &c->key));
     WT_RET(current->get_value(current, &c->value));
@@ -332,17 +332,16 @@ __curtiered_get_current(
 
 /*
  * __curtiered_compare --
- *     WT_CURSOR->compare implementation for the LSM cursor type.
+ *     WT_CURSOR->compare implementation for the tiered cursor type.
  */
 static int
 __curtiered_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 {
-    WT_CURSOR_TIERED *alsm;
+    WT_CURSOR_TIERED *atiered;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
-    /* There's no need to sync with the LSM tree, avoid WT_LSM_ENTER. */
-    alsm = (WT_CURSOR_TIERED *)a;
+    atiered = (WT_CURSOR_TIERED *)a;
     CURSOR_API_CALL(a, session, compare, NULL);
 
     /*
@@ -354,18 +353,18 @@ __curtiered_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
     WT_ERR(__cursor_needkey(a));
     WT_ERR(__cursor_needkey(b));
 
-    WT_ERR(__wt_compare(session, alsm->tiered->collator, &a->key, &b->key, cmpp));
+    WT_ERR(__wt_compare(session, atiered->tiered->collator, &a->key, &b->key, cmpp));
 
 err:
     API_END_RET(session, ret);
 }
 
 /*
- * __curtiered_position_chunk --
- *     Position a chunk cursor.
+ * __curtiered_position_tier --
+ *     Position a tier cursor.
  */
 static int
-__curtiered_position_chunk(WT_CURSOR_TIERED *curtiered, WT_CURSOR *c, bool forward, int *cmpp)
+__curtiered_position_tier(WT_CURSOR_TIERED *curtiered, WT_CURSOR *c, bool forward, int *cmpp)
 {
     WT_CURSOR *cursor;
     WT_SESSION_IMPL *session;
@@ -398,7 +397,7 @@ __curtiered_position_chunk(WT_CURSOR_TIERED *curtiered, WT_CURSOR *c, bool forwa
 
 /*
  * __curtiered_next --
- *     WT_CURSOR->next method for the LSM cursor type.
+ *     WT_CURSOR->next method for the tiered cursor type.
  */
 static int
 __curtiered_next(WT_CURSOR *cursor)
@@ -418,20 +417,20 @@ __curtiered_next(WT_CURSOR *cursor)
     WT_ERR(__curtiered_enter(curtiered, false));
 
     /* If we aren't positioned for a forward scan, get started. */
-    if (curtiered->current == NULL || !F_ISSET(curtiered, WT_CLSM_ITERATE_NEXT)) {
+    if (curtiered->current == NULL || !F_ISSET(curtiered, WT_CURTIERED_ITERATE_NEXT)) {
         WT_FORALL_CURSORS(curtiered, c, i)
         {
             if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
                 WT_ERR(c->reset(c));
                 ret = c->next(c);
             } else if (c != curtiered->current &&
-              (ret = __curtiered_position_chunk(curtiered, c, true, &cmp)) == 0 && cmp == 0 &&
+              (ret = __curtiered_position_tier(curtiered, c, true, &cmp)) == 0 && cmp == 0 &&
               curtiered->current == NULL)
                 curtiered->current = c;
             WT_ERR_NOTFOUND_OK(ret, false);
         }
-        F_SET(curtiered, WT_CLSM_ITERATE_NEXT | WT_CLSM_MULTIPLE);
-        F_CLR(curtiered, WT_CLSM_ITERATE_PREV);
+        F_SET(curtiered, WT_CURTIERED_ITERATE_NEXT | WT_CURTIERED_MULTIPLE);
+        F_CLR(curtiered, WT_CURTIERED_ITERATE_PREV);
 
         /* We just positioned *at* the key, now move. */
         if (curtiered->current != NULL)
@@ -441,7 +440,7 @@ retry:
         /*
          * If there are multiple cursors on that key, move them forward.
          */
-        if (F_ISSET(curtiered, WT_CLSM_MULTIPLE)) {
+        if (F_ISSET(curtiered, WT_CURTIERED_MULTIPLE)) {
             WT_FORALL_CURSORS(curtiered, c, i)
             {
                 if (!F_ISSET(c, WT_CURSTD_KEY_INT))
@@ -473,7 +472,7 @@ err:
 
 /*
  * __curtiered_prev --
- *     WT_CURSOR->prev method for the LSM cursor type.
+ *     WT_CURSOR->prev method for the tiered cursor type.
  */
 static int
 __curtiered_prev(WT_CURSOR *cursor)
@@ -493,20 +492,20 @@ __curtiered_prev(WT_CURSOR *cursor)
     WT_ERR(__curtiered_enter(curtiered, false));
 
     /* If we aren't positioned for a reverse scan, get started. */
-    if (curtiered->current == NULL || !F_ISSET(curtiered, WT_CLSM_ITERATE_PREV)) {
+    if (curtiered->current == NULL || !F_ISSET(curtiered, WT_CURTIERED_ITERATE_PREV)) {
         WT_FORALL_CURSORS(curtiered, c, i)
         {
             if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
                 WT_ERR(c->reset(c));
                 ret = c->prev(c);
             } else if (c != curtiered->current &&
-              (ret = __curtiered_position_chunk(curtiered, c, false, &cmp)) == 0 && cmp == 0 &&
+              (ret = __curtiered_position_tier(curtiered, c, false, &cmp)) == 0 && cmp == 0 &&
               curtiered->current == NULL)
                 curtiered->current = c;
             WT_ERR_NOTFOUND_OK(ret, false);
         }
-        F_SET(curtiered, WT_CLSM_ITERATE_PREV | WT_CLSM_MULTIPLE);
-        F_CLR(curtiered, WT_CLSM_ITERATE_NEXT);
+        F_SET(curtiered, WT_CURTIERED_ITERATE_PREV | WT_CURTIERED_MULTIPLE);
+        F_CLR(curtiered, WT_CURTIERED_ITERATE_NEXT);
 
         /* We just positioned *at* the key, now move. */
         if (curtiered->current != NULL)
@@ -516,7 +515,7 @@ retry:
         /*
          * If there are multiple cursors on that key, move them backwards.
          */
-        if (F_ISSET(curtiered, WT_CLSM_MULTIPLE)) {
+        if (F_ISSET(curtiered, WT_CURTIERED_MULTIPLE)) {
             WT_FORALL_CURSORS(curtiered, c, i)
             {
                 if (!F_ISSET(c, WT_CURSTD_KEY_INT))
@@ -548,7 +547,7 @@ err:
 
 /*
  * __curtiered_reset --
- *     WT_CURSOR->reset method for the LSM cursor type.
+ *     WT_CURSOR->reset method for the tiered cursor type.
  */
 static int
 __curtiered_reset(WT_CURSOR *cursor)
@@ -576,7 +575,7 @@ err:
 
 /*
  * __curtiered_lookup --
- *     Position an LSM cursor.
+ *     Position a tiered cursor.
  */
 static int
 __curtiered_lookup(WT_CURSOR_TIERED *curtiered, WT_ITEM *value)
@@ -619,7 +618,7 @@ err:
 
 /*
  * __curtiered_search --
- *     WT_CURSOR->search method for the LSM cursor type.
+ *     WT_CURSOR->search method for the tiered cursor type.
  */
 static int
 __curtiered_search(WT_CURSOR *cursor)
@@ -634,7 +633,7 @@ __curtiered_search(WT_CURSOR *cursor)
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__curtiered_enter(curtiered, true));
-    F_CLR(curtiered, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+    F_CLR(curtiered, WT_CURTIERED_ITERATE_NEXT | WT_CURTIERED_ITERATE_PREV);
 
     ret = __curtiered_lookup(curtiered, &cursor->value);
 
@@ -647,7 +646,7 @@ err:
 
 /*
  * __curtiered_search_near --
- *     WT_CURSOR->search_near method for the LSM cursor type.
+ *     WT_CURSOR->search_near method for the tiered cursor type.
  */
 static int
 __curtiered_search_near(WT_CURSOR *cursor, int *exactp)
@@ -668,13 +667,13 @@ __curtiered_search_near(WT_CURSOR *cursor, int *exactp)
     WT_ERR(__cursor_needkey(cursor));
     __cursor_novalue(cursor);
     WT_ERR(__curtiered_enter(curtiered, true));
-    F_CLR(curtiered, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
+    F_CLR(curtiered, WT_CURTIERED_ITERATE_NEXT | WT_CURTIERED_ITERATE_PREV);
 
     /*
-     * search_near is somewhat fiddly: we can't just use a nearby key from the in-memory chunk
-     * because there could be a closer key on disk.
+     * search_near is somewhat fiddly: we can't just use a nearby key from the first tier because
+     * there could be a closer key in a lower tier.
      *
-     * As we search down the chunks, we stop as soon as we find an exact match. Otherwise, we
+     * As we search down the tiers, we stop as soon as we find an exact match. Otherwise, we
      * maintain the smallest cursor larger than the search key and the largest cursor smaller than
      * the search key. At the end, we prefer the larger cursor, but if no record is larger, position
      * on the last record in the tree.
@@ -745,16 +744,16 @@ __curtiered_search_near(WT_CURSOR *cursor, int *exactp)
             __curtiered_deleted_decode(curtiered, &cursor->value);
         else {
             /*
-             * We have a key pointing at memory that is pinned by the current chunk cursor. In the
+             * We have a key pointing at memory that is pinned by the current tier cursor. In the
              * unlikely event that we have to reopen cursors to move to the next record, make sure
-             * the cursor flags are set so a copy is made before the current chunk cursor releases
+             * the cursor flags are set so a copy is made before the current tier cursor releases
              * its position.
              */
             F_CLR(cursor, WT_CURSTD_KEY_SET);
             F_SET(cursor, WT_CURSTD_KEY_INT);
             /*
-             * We call __curtiered_next here as we want to advance forward. If we are a random LSM
-             * cursor calling next on the cursor will not advance as we intend.
+             * We call __curtiered_next here as we want to advance forward. If we are a random
+             * tiered cursor calling next on the cursor will not advance as we intend.
              */
             if ((ret = __curtiered_next(cursor)) == 0) {
                 cmp = 1;
@@ -824,7 +823,7 @@ __curtiered_put(WT_CURSOR_TIERED *curtiered, const WT_ITEM *key, const WT_ITEM *
 
 /*
  * __curtiered_insert --
- *     WT_CURSOR->insert method for the LSM cursor type.
+ *     WT_CURSOR->insert method for the tiered cursor type.
  */
 static int
 __curtiered_insert(WT_CURSOR *cursor)
@@ -872,7 +871,7 @@ err:
 
 /*
  * __curtiered_update --
- *     WT_CURSOR->update method for the LSM cursor type.
+ *     WT_CURSOR->update method for the tiered cursor type.
  */
 static int
 __curtiered_update(WT_CURSOR *cursor)
@@ -893,7 +892,7 @@ __curtiered_update(WT_CURSOR *cursor)
     if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
         WT_ERR(__curtiered_lookup(curtiered, &value));
         /*
-         * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may
+         * Copy the key out, since the insert resets non-primary tier cursors which our lookup may
          * have landed on.
          */
         WT_ERR(__cursor_needkey(cursor));
@@ -920,7 +919,7 @@ err:
 
 /*
  * __curtiered_remove --
- *     WT_CURSOR->remove method for the LSM cursor type.
+ *     WT_CURSOR->remove method for the tiered cursor type.
  */
 static int
 __curtiered_remove(WT_CURSOR *cursor)
@@ -944,7 +943,7 @@ __curtiered_remove(WT_CURSOR *cursor)
     if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
         WT_ERR(__curtiered_lookup(curtiered, &value));
         /*
-         * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may
+         * Copy the key out, since the insert resets non-primary tier cursors which our lookup may
          * have landed on.
          */
         WT_ERR(__cursor_needkey(cursor));
@@ -952,9 +951,9 @@ __curtiered_remove(WT_CURSOR *cursor)
     WT_ERR(__curtiered_put(curtiered, &cursor->key, &__tombstone, positioned, false));
 
     /*
-     * If the cursor was positioned, it stays positioned with a key but no no value, otherwise,
-     * there's no position, key or value. This isn't just cosmetic, without a reset, iteration on
-     * this cursor won't start at the beginning/end of the table.
+     * If the cursor was positioned, it stays positioned with a key but no value, otherwise, there's
+     * no position, key or value. This isn't just cosmetic, without a reset, iteration on this
+     * cursor won't start at the beginning/end of the table.
      */
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     if (positioned)
@@ -970,7 +969,7 @@ err:
 
 /*
  * __curtiered_reserve --
- *     WT_CURSOR->reserve method for the LSM cursor type.
+ *     WT_CURSOR->reserve method for the tiered cursor type.
  */
 static int
 __curtiered_reserve(WT_CURSOR *cursor)
@@ -990,7 +989,7 @@ __curtiered_reserve(WT_CURSOR *cursor)
 
     WT_ERR(__curtiered_lookup(curtiered, &value));
     /*
-     * Copy the key out, since the insert resets non-primary chunk cursors which our lookup may have
+     * Copy the key out, since the insert resets non-primary tier cursors which our lookup may have
      * landed on.
      */
     WT_ERR(__cursor_needkey(cursor));
@@ -1004,20 +1003,19 @@ err:
      * The application might do a WT_CURSOR.get_value call when we return, so we need a value and
      * the underlying functions didn't set one up. For various reasons, those functions may not have
      * done a search and any previous value in the cursor might race with WT_CURSOR.reserve (and in
-     * cases like LSM, the reserve never encountered the original key). For simplicity, repeat the
-     * search here.
+     * cases like tiered, the reserve never encountered the original key). For simplicity, repeat
+     * the search here.
      */
     return (ret == 0 ? cursor->search(cursor) : ret);
 }
 
 /*
- * __curtiered_random_chunk --
- *     Pick a chunk at random, weighted by the size of all chunks. Weighting proportional to
- *     documents avoids biasing towards small chunks. Then return the cursor on the chunk we have
- *     picked.
+ * __curtiered_random_tier --
+ *     Pick a tier at random, weighted by the size of all tiers. Weighting proportional to documents
+ *     avoids biasing towards small tiers. Then return the cursor on the tier we have picked.
  */
 static void
-__curtiered_random_chunk(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered, WT_CURSOR **cursor)
+__curtiered_random_tier(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered, WT_CURSOR **cursor)
 {
     u_int i;
 
@@ -1028,7 +1026,7 @@ __curtiered_random_chunk(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered, 
 
 /*
  * __curtiered_next_random --
- *     WT_CURSOR->next method for the LSM cursor type when configured with next_random.
+ *     WT_CURSOR->next method for the tiered cursor type when configured with next_random.
  */
 static int
 __curtiered_next_random(WT_CURSOR *cursor)
@@ -1047,9 +1045,9 @@ __curtiered_next_random(WT_CURSOR *cursor)
     WT_ERR(__curtiered_enter(curtiered, false));
 
     for (;;) {
-        __curtiered_random_chunk(session, curtiered, &c);
+        __curtiered_random_tier(session, curtiered, &c);
         /*
-         * This call to next_random on the chunk can potentially end in WT_NOTFOUND if the chunk we
+         * This call to next_random on the tier can potentially end in WT_NOTFOUND if the tier we
          * picked is empty. We want to retry in that case.
          */
         WT_ERR_NOTFOUND_OK(__wt_curfile_next_random(c), true);
@@ -1077,7 +1075,7 @@ err:
 
 /*
  * __wt_curtiered_open --
- *     WT_SESSION->open_cursor method for LSM cursors.
+ *     WT_SESSION->open_cursor method for tiered cursors.
  */
 int
 __wt_curtiered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, const char *cfg[],
@@ -1121,7 +1119,7 @@ __wt_curtiered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
 
     WT_RET(__wt_config_gets_def(session, cfg, "checkpoint", 0, &cval));
     if (cval.len != 0)
-        WT_RET_MSG(session, EINVAL, "LSM does not support opening by checkpoint");
+        WT_RET_MSG(session, EINVAL, "tiered tables do not support opening by checkpoint");
 
     WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
     bulk = cval.val != 0;

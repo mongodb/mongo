@@ -37,17 +37,13 @@ class test_tiered01(wttest.WiredTigerTestCase):
     G = 1024 * M
     uri = "table:test_tiered01"
 
-    chunk_size_scenarios = wtscenario.quick_scenarios('s_chunk_size',
-        [1*M,20*M,None], [0.6,0.6,0.6])
-    # Occasionally add a lot of records, so that merges (and bloom) happen.
+    # Occasionally add a lot of records.
     record_count_scenarios = wtscenario.quick_scenarios(
         'nrecs', [10, 10000], [0.9, 0.1])
 
-    config_vars = [ 'chunk_size', ]
+    config_vars = []
 
-    scenarios = wtscenario.make_scenarios(
-        chunk_size_scenarios, record_count_scenarios,
-        prune=100, prunelong=500)
+    scenarios = wtscenario.make_scenarios(record_count_scenarios, prune=100, prunelong=500)
 
     # Test create of an object.
     def test_tiered(self):

@@ -43,6 +43,7 @@ struct __wt_cursor_tiered {
 #define WT_CURTIERED_ACTIVE 0x1u       /* Incremented the session count */
 #define WT_CURTIERED_ITERATE_NEXT 0x2u /* Forward iteration */
 #define WT_CURTIERED_ITERATE_PREV 0x4u /* Backward iteration */
+#define WT_CURTIERED_MULTIPLE 0x8u     /* Multiple cursors have values */
                                        /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
