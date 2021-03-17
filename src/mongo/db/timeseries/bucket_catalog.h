@@ -35,7 +35,6 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/key_string.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/string_map.h"
@@ -287,15 +286,17 @@ private:
 
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-            return H::combine(std::move(h), metadata._keyString.hash());
+            return H::combine(std::move(h),
+                              std::hash<std::string_view>()(std::string_view(
+                                  metadata._sorted.objdata(), metadata._sorted.objsize())));
         }
 
     private:
         BSONObj _metadata;
         std::shared_ptr<const ViewDefinition> _view;
 
-        // This encodes the _metadata object with all fields sorted in collation order
-        KeyString::Value _keyString;
+        // This stores the _metadata object with all fields sorted to allow for binary comparisons.
+        BSONObj _sorted;
     };
 
     class MinMax {
