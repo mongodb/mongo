@@ -40,10 +40,10 @@
 
 namespace mongo {
 
-REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+REGISTER_WINDOW_FUNCTION(
     covarianceSamp, window_function::ExpressionFromAccumulator<AccumulatorCovarianceSamp>::parse);
 
-REGISTER_NON_REMOVABLE_WINDOW_FUNCTION(
+REGISTER_WINDOW_FUNCTION(
     covariancePop, window_function::ExpressionFromAccumulator<AccumulatorCovariancePop>::parse);
 
 void AccumulatorCovariance::processInternal(const Value& input, bool merging) {

@@ -44,6 +44,8 @@ using boost::optional;
 
 namespace mongo::window_function {
 
+REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
+
 StringMap<Expression::Parser> Expression::parserMap;
 
 intrusive_ptr<Expression> Expression::parse(BSONObj obj,
@@ -124,8 +126,7 @@ boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
 
 MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
-    // defined by REGISTER_NON_REMOVABLE_WINDOW_FUNCTION and REGISTER_REMOVABLE_WINDOW_FUNCTION
-    // macros.
+    // defined by REGISTER_WINDOW_FUNCTION and REGISTER_REMOVABLE_WINDOW_FUNCTION
 }
 
 }  // namespace mongo::window_function

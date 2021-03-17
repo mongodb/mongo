@@ -222,6 +222,25 @@ assert.commandWorked(run({
          output: {v: {$min: "$a", window: {documents: ['unbounded', 'current']}}}}
 }));
 
+// Some odd non-accumulator functions
+assert.commandWorked(run({
+    $setWindowFields: {
+        sortBy: {ts: 1},
+        output: {v: {$derivative: {input: "$a"}, window: {documents: ['unbounded', 'current']}}}
+    }
+}));
+assert.commandWorked(run({
+    $setWindowFields: {
+        sortBy: {ts: 1},
+        output: {
+            v: {
+                $derivative: {input: "$a", outputUnit: 'second'},
+                window: {documents: ['unbounded', 'current']}
+            }
+        }
+    }
+}));
+
 // Not every accumulator is automatically a window function.
 assert.commandFailedWithCode(run({$setWindowFields: {output: {v: {$mergeObjects: "$a"}}}}),
                              ErrorCodes.FailedToParse,
