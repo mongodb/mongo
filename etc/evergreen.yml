@@ -319,7 +319,6 @@ variables:
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-suse12-s390x
-  - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu2004-arm64
@@ -388,7 +387,6 @@ variables:
   - suse15
   - enterprise-suse15-64
   - ubuntu1804-debug-suggested
-  - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu-dynamic-1804-clang-tidy-required
   - ubuntu1804
   - ubuntu1804-arm64
@@ -8857,48 +8855,6 @@ buildvariants:
     timeout_secs: 345600 # 4 days
   tasks:
   - name: tla_plus
-
-- name: enterprise-ubuntu1604-arm64
-  display_name: Enterprise Ubuntu 16.04 arm64
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1604-arm64-large
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    push_path: linux
-    push_bucket: downloads.10gen.com
-    push_name: linux
-    push_arch: aarch64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: arm64
-    packager_distro: ubuntu1604
-    repo_edition: enterprise
-    multiversion_platform: ubuntu1604
-    multiversion_architecture: arm64
-    multiversion_architecture_42_or_later: aarch64
-    multiversion_edition: enterprise
-    scons_cache_scope: shared
-  tasks:
-  - name: compile_test_and_package_serial_TG
-  - name: aggregation
-  - name: .auth !.audit !.multiversion !.jscore
-  - name: .misc_js
-  - name: fle
-  - name: .jscore .common !.auth
-  - name: .jstestfuzz .common
-  - name: replica_sets
-  - name: .replica_sets .common
-  - name: .sharding .txns
-  - name: sharding_gen
-  - name: .ssl
-  - name: .stitch
-  - name: .publish
-    distros:
-    - ubuntu1604-test
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64

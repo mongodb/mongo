@@ -203,18 +203,6 @@ repos:
     repos:
       - apt/ubuntu/dists/trusty/mongodb-org
 
-  - name: ubuntu1604
-    type: deb
-    code_name: "xenial"
-    edition: org
-    bucket: repo.mongodb.org
-    component: multiverse
-    architectures:
-      - arm64
-      - i386
-    repos:
-      - apt/ubuntu/dists/xenial/mongodb-org
-
   - name: ubuntu1804
     type: deb
     code_name: "bionic"
@@ -424,20 +412,6 @@ repos:
       - i386
     repos:
       - apt/ubuntu/dists/trusty/mongodb-enterprise
-
-  - name: ubuntu1604
-    type: deb
-    code_name: "xenial"
-    edition: enterprise
-    bucket: repo.mongodb.com
-    component: multiverse
-    architectures:
-      - ppc64el
-      - s390x
-      - arm64
-      - i386
-    repos:
-      - apt/ubuntu/dists/xenial/mongodb-enterprise
 
   - name: ubuntu1804
     type: deb

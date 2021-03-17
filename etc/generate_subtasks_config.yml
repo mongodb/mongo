@@ -23,7 +23,6 @@ build_variant_large_distro_exceptions:
   - enterprise-suse12-64
   - enterprise-suse12-s390x
   - enterprise-suse15-64
-  - enterprise-ubuntu1604-arm64
   - enterprise-ubuntu1804-arm64
   - enterprise-ubuntu1804-ppc64le
   - enterprise-ubuntu1804-s390x
