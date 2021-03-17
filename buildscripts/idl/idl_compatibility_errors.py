@@ -103,6 +103,14 @@ ERROR_ID_RESOURCE_PATTERN_NOT_EQUAL = "ID0059"
 ERROR_ID_NEW_ACTION_TYPES_NOT_SUBSET = "ID0060"
 ERROR_ID_TYPE_NOT_ARRAY = "ID0061"
 
+# TODO (SERVER-55203): Remove SKIPPED_COMMANDS logic.
+# Any breaking changes added to API V1 before releasing 5.0 should be added to SKIPPED_COMMANDS to
+# be skipped from compatibility checking.
+SKIPPED_COMMANDS = {
+    "invalidReplySkippedCommand": [ERROR_ID_NEW_REPLY_FIELD_MISSING],
+    "dropDatabase": [ERROR_ID_NEW_REPLY_FIELD_MISSING]
+}
+
 
 class IDLCompatibilityCheckerError(Exception):
     """Base class for all IDL Compatibility Checker exceptions."""
@@ -146,6 +154,15 @@ class IDLCompatibilityError(object):
                                                             os.path.basename(self.new_idl_dir),
                                                             self.file, self.error_id, self.msg)
         return msg
+
+
+def dump_errors(header_msg: str, errors: List[IDLCompatibilityError]) -> None:
+    """Print the list of errors."""
+    error_list = [str(error) for error in errors]
+    print(header_msg + "\n: %s errors:" % (len(error_list)))
+    for error_msg in error_list:
+        print("%s\n\n" % error_msg)
+    print("------------------------------------------------")
 
 
 class IDLCompatibilityErrorCollection(object):
@@ -197,16 +214,40 @@ class IDLCompatibilityErrorCollection(object):
         """Get all the errors in the error collection with the command command_name."""
         return [a for a in self._errors if a.command_name == command_name]
 
+    def extract_skipped_errors(self) -> List[IDLCompatibilityError]:
+        """Remove all the errors in the error collection that are skipped and return them."""
+        skipped_errors = [
+            c for c in self._errors
+            if c.command_name in SKIPPED_COMMANDS and c.error_id in SKIPPED_COMMANDS[c.command_name]
+        ]
+        self._errors = [
+            c for c in self._errors if not (c.command_name in SKIPPED_COMMANDS
+                                            and c.error_id in SKIPPED_COMMANDS[c.command_name])
+        ]
+        return skipped_errors
+
     def to_list(self) -> List[str]:
         """Return a list of formatted error messages."""
         return [str(error) for error in self._errors]
 
     def dump_errors(self) -> None:
         """Print the list of errors."""
-        print("Errors found while checking IDL compatibility")
-        for error_msg in self.to_list():
-            print("%s\n\n" % error_msg)
-        print("Found %s errors" % (len(self.to_list())))
+        dump_errors("Errors found while checking IDL compatibility", self._errors)
+
+    def remove_skipped_errors_and_dump_all_errors(self, checking_target: str, old_path: str,
+                                                  new_path: str) -> None:
+        """Remove skipped errors from errors list and dump skipped and found errors."""
+        skipped_errors = self.extract_skipped_errors()
+        suffix_msg = "for (%s) between old directory (%s) and the new directory (%s)" % (
+            checking_target, old_path, new_path)
+        dump_errors(
+            "(Note: Skipped errors should be fixed before 5.0 release as it won't be skipped" +
+            " after.)\n" + "Errors skipped while checking IDL compatibility " + suffix_msg,
+            skipped_errors)
+        dump_errors("Errors found while checking IDL compatibility " + suffix_msg, self._errors)
+        print("(Note: Any breaking changes added to API V1 before releasing 5.0 should be added to "
+              + "SKIPPED_COMMANDS list at (/buildscripts/idl/idl_compatibility_errors.py) to be " +
+              "skipped from compatibility checking.)")
 
     def count(self) -> int:
         """Return the count of errors."""
