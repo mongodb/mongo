@@ -41,8 +41,8 @@ namespace test_harness {
  */
 class workload_generator : public component {
     public:
-    workload_generator(configuration *configuration)
-        : component(configuration), _enable_tracking(false), _workload_tracking(nullptr)
+    workload_generator(configuration *configuration, workload_tracking *tracking)
+        : component(configuration), _tracking(tracking)
     {
     }
 
@@ -51,6 +51,9 @@ class workload_generator : public component {
         for (auto &it : _workers)
             delete it;
     }
+
+    /* Delete the copy constructor. */
+    workload_generator(const workload_generator &) = delete;
 
     /*
      * Function that performs the following steps using the configuration that is defined by the
@@ -64,7 +67,7 @@ class workload_generator : public component {
      * defined by the configuration.
      */
     void
-    load()
+    populate()
     {
         WT_CURSOR *cursor;
         WT_SESSION *session;
@@ -82,9 +85,7 @@ class workload_generator : public component {
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
             testutil_check(session->create(session, collection_name.c_str(), DEFAULT_TABLE_SCHEMA));
-            if (_enable_tracking)
-                testutil_check(
-                  _workload_tracking->save(tracking_operation::CREATE, collection_name, 0, ""));
+            testutil_check(_tracking->save(tracking_operation::CREATE, collection_name, 0, ""));
             _collection_names.push_back(collection_name);
         }
         debug_info(
@@ -103,22 +104,22 @@ class workload_generator : public component {
                  * configuration. */
                 std::string generated_value =
                   random_generator::random_generator::instance().generate_string(value_size);
-                testutil_check(insert(
-                  cursor, collection_name, j + 1, generated_value.c_str(), _enable_tracking));
+                testutil_check(insert(cursor, collection_name, j + 1, generated_value.c_str()));
             }
         }
-        debug_info("Load stage done", _trace_level, DEBUG_INFO);
+        debug_info("Populate stage done", _trace_level, DEBUG_INFO);
     }
 
     /* Do the work of the main part of the workload. */
     void
     run()
     {
-        WT_SESSION *session;
         int64_t duration_seconds, read_threads;
 
-        session = nullptr;
         duration_seconds = read_threads = 0;
+
+        /* Populate the database. */
+        populate();
 
         testutil_check(_config->get_int(DURATION_SECONDS, duration_seconds));
         testutil_check(_config->get_int(READ_THREADS, read_threads));
@@ -138,15 +139,6 @@ class workload_generator : public component {
             it->finish();
         }
         _thread_manager.join();
-    }
-
-    void
-    set_tracker(workload_tracking *tracking)
-    {
-        /* Tracking cannot be NULL. */
-        testutil_check(tracking == nullptr);
-        _enable_tracking = true;
-        _workload_tracking = tracking;
     }
 
     /* Workload threaded operations. */
@@ -201,7 +193,7 @@ class workload_generator : public component {
     /* WiredTiger APIs wrappers for single operations. */
     template <typename K, typename V>
     int
-    insert(WT_CURSOR *cursor, const std::string &collection_name, K key, V value, bool save)
+    insert(WT_CURSOR *cursor, const std::string &collection_name, K key, V value)
     {
         int error_code;
 
@@ -214,9 +206,7 @@ class workload_generator : public component {
 
         if (error_code == 0) {
             debug_info("key/value inserted", _trace_level, DEBUG_INFO);
-            if (save)
-                error_code =
-                  _workload_tracking->save(tracking_operation::INSERT, collection_name, key, value);
+            error_code = _tracking->save(tracking_operation::INSERT, collection_name, key, value);
         } else
             debug_info("key/value insertion failed", _trace_level, DEBUG_ERROR);
 
@@ -249,10 +239,9 @@ class workload_generator : public component {
 
     private:
     std::vector<std::string> _collection_names;
-    bool _enable_tracking;
     thread_manager _thread_manager;
     std::vector<thread_context *> _workers;
-    workload_tracking *_workload_tracking;
+    workload_tracking *_tracking;
 };
 } // namespace test_harness
 
