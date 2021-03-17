@@ -154,13 +154,16 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     optional<intrusive_ptr<Expression>> complexPartitionBy;
     optional<FieldPath> simplePartitionBy;
     optional<intrusive_ptr<Expression>> simplePartitionByExpr;
-    // If there is no partitionBy, both are empty.
+    // If partitionBy is a constant or there is no partitionBy, both are empty.
     // If partitionBy is already a field path, we only fill in simplePartitionBy.
     // If partitionBy is a more complex expression, we will need to generate a $set stage,
     // which will bind the value of the expression to the name in simplePartitionBy.
     if (partitionBy) {
-        auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(partitionBy->get());
-        if (exprFieldPath && exprFieldPath->isRootFieldPath()) {
+        partitionBy = (*partitionBy)->optimize();
+        if (dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
+            // partitionBy optimizes to a constant expression, equivalent to a single partition.
+        } else if (auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(partitionBy->get());
+                   exprFieldPath && exprFieldPath->isRootFieldPath()) {
             // ExpressionFieldPath has "CURRENT" as an explicit first component,
             // but for $sort we don't want that.
             simplePartitionBy = exprFieldPath->getFieldPath().tail();
