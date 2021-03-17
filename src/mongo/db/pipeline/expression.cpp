@@ -287,6 +287,38 @@ const char* ExpressionAbs::getOpName() const {
 
 /* ------------------------- ExpressionAdd ----------------------------- */
 
+StatusWith<Value> ExpressionAdd::apply(Value lhs, Value rhs) {
+    BSONType diffType = Value::getWidestNumeric(rhs.getType(), lhs.getType());
+
+    if (diffType == NumberDecimal) {
+        Decimal128 left = lhs.coerceToDecimal();
+        Decimal128 right = rhs.coerceToDecimal();
+        return Value(left.add(right));
+    } else if (diffType == NumberDouble) {
+        double right = rhs.coerceToDouble();
+        double left = lhs.coerceToDouble();
+        return Value(left + right);
+    } else if (diffType == NumberLong) {
+        long long result;
+
+        // If there is an overflow, convert the values to doubles.
+        if (overflow::add(lhs.coerceToLong(), rhs.coerceToLong(), &result)) {
+            return Value(lhs.coerceToDouble() + rhs.coerceToDouble());
+        }
+        return Value(result);
+    } else if (diffType == NumberInt) {
+        long long right = rhs.coerceToLong();
+        long long left = lhs.coerceToLong();
+        return Value::createIntOrLong(left + right);
+    } else if (lhs.nullish() || rhs.nullish()) {
+        return Value(BSONNULL);
+    } else {
+        return Status(ErrorCodes::TypeMismatch,
+                      str::stream() << "cannot $add a" << typeName(rhs.getType()) << " from a "
+                                    << typeName(lhs.getType()));
+    }
+}
+
 Value ExpressionAdd::evaluate(const Document& root, Variables* variables) const {
     // We'll try to return the narrowest possible result value while avoiding overflow, loss
     // of precision due to intermediate rounding or implicit use of decimal types. To do that,

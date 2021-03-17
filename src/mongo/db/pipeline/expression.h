@@ -809,6 +809,15 @@ public:
 
 class ExpressionAdd final : public ExpressionVariadic<ExpressionAdd> {
 public:
+    /**
+     * Adds two values as if by {$add: [{$const: lhs}, {$const: rhs}]}.
+     *
+     * If either argument is nullish, returns BSONNULL.
+     *
+     * Otherwise, returns ErrorCodes::TypeMismatch.
+     */
+    static StatusWith<Value> apply(Value lhs, Value rhs);
+
     explicit ExpressionAdd(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionAdd>(expCtx) {}
 

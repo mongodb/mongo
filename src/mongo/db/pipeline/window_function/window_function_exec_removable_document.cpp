@@ -56,7 +56,8 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
     stdx::visit(
         visit_helper::Overloaded{
             [](const WindowBounds::Unbounded&) {
-                // Pass. _upperBound defaults to boost::none which represents no upper bound.
+                // Pass. _upperBound defaults to boost::none which represents no upper
+                // bound.
             },
             [&](const WindowBounds::Current&) { _upperBound = 0; },
             [&](const int& upperIndex) { _upperBound = upperIndex; },
@@ -71,7 +72,12 @@ void WindowFunctionExecRemovableDocument::initialize() {
     for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[i]) {
-            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
+            Value valToAdd = _sortBy
+                ? Value(std::vector<Value>{
+                      _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables),
+                      _input->evaluate(*doc, &_input->getExpressionContext()->variables)})
+                : _input->evaluate(*doc, &_input->getExpressionContext()->variables);
+            addValue(valToAdd);
         } else {
             break;
         }
@@ -89,7 +95,12 @@ void WindowFunctionExecRemovableDocument::update() {
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[_upperBound.get()]) {
-            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
+            Value valToAdd = _sortBy
+                ? Value(std::vector<Value>{
+                      _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables),
+                      _input->evaluate(*doc, &_input->getExpressionContext()->variables)})
+                : _input->evaluate(*doc, &_input->getExpressionContext()->variables);
+            addValue(valToAdd);
         }
     }
 

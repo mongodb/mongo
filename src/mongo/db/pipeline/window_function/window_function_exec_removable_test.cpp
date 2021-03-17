@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
+#include "mongo/db/pipeline/window_function/window_function_integral.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -62,6 +63,24 @@ public:
             std::make_unique<WindowFunctionMax>(getExpCtx().get());
         return WindowFunctionExecRemovableDocument(
             _iter.get(), std::move(input), std::move(maxFunc), bounds);
+    }
+
+    WindowFunctionExecRemovableDocument createForFieldPath(
+        std::deque<DocumentSource::GetNextResult> docs,
+        const std::string& inputPath,
+        const std::string& sortByPath,
+        WindowBounds::DocumentBased bounds) {
+        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+        _iter = std::make_unique<PartitionIterator>(
+            getExpCtx().get(), _docSource.get(), boost::none, boost::none);
+        auto input = ExpressionFieldPath::parse(
+            getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
+        auto sortBy = ExpressionFieldPath::parse(
+            getExpCtx().get(), sortByPath, getExpCtx()->variablesParseState);
+        std::unique_ptr<WindowFunctionState> integralFunc =
+            std::make_unique<WindowFunctionIntegral>(getExpCtx().get());
+        return WindowFunctionExecRemovableDocument(
+            _iter.get(), std::move(input), std::move(sortBy), std::move(integralFunc), bounds);
     }
 
     auto advanceIterator() {
@@ -328,6 +347,31 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, InputExpressionAllowedToCreateVa
     ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), mgr.getNext());
     iter->advance();
     ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), mgr.getNext());
+}
+
+TEST_F(WindowFunctionExecRemovableDocumentTest, CanReceiveSortByExpression) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{Document{{"x", 1}, {"y", 0}},
+                                                                Document{{"x", 3}, {"y", 2}},
+                                                                Document{{"x", 5}, {"y", 4}},
+                                                                Document{{"x", 5}, {"y", 5}},
+                                                                Document{{"x", 6}, {"y", 3}}};
+    // Test 'sortBy'.
+    auto mgr = createForFieldPath(
+        docs, "$y" /* input */, "$x" /* sortBy */, WindowBounds::DocumentBased{-1, 1});
+    double expectedIntegral = 2.0;  // (2 + 0) * (3 - 1) / 2.0 = 2.0
+    ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
+    advanceIterator();
+    expectedIntegral += 6.0;  // (4 + 2) * (5 - 3) / 2.0 = 6.0
+    ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
+    advanceIterator();
+    expectedIntegral += 0.0 - 2.0;
+    ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
+    advanceIterator();
+    expectedIntegral += 4.0 - 6.0;
+    ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
+    advanceIterator();
+    expectedIntegral -= 0.0;
+    ASSERT_VALUE_EQ(Value(expectedIntegral), mgr.getNext());
 }
 
 }  // namespace
