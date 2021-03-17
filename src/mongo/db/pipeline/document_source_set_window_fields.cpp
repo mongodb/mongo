@@ -273,7 +273,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 void DocumentSourceInternalSetWindowFields::initialize() {
     _maxMemory = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
     for (auto& wfs : _outputFields) {
-        _executableOutputs[wfs.fieldName] = WindowFunctionExec::create(&_iterator, wfs);
+        _executableOutputs[wfs.fieldName] = WindowFunctionExec::create(&_iterator, wfs, _sortBy);
     }
     _init = true;
 }

@@ -57,7 +57,8 @@ public:
      * over the given bounds, both found within the WindowFunctionStatement.
      */
     static std::unique_ptr<WindowFunctionExec> create(PartitionIterator* iter,
-                                                      const WindowFunctionStatement& functionStmt);
+                                                      const WindowFunctionStatement& functionStmt,
+                                                      const boost::optional<SortPattern>& sortBy);
 
     virtual ~WindowFunctionExec() = default;
 
