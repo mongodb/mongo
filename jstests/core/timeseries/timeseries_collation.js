@@ -46,29 +46,55 @@ const docs = [
         _id: 1,
         [timeFieldName]: ISODate(),
         [metaFieldName]: {a: ['B'], c: 'd'},
+        r: "s",
         x: '5',
         y: {z: ['5']}
     },
-    {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {a: ['B'], c: 'D'}}
+    {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: {a: ['B'], c: 'D'}},
+    {
+        _id: 3,
+        [timeFieldName]: ISODate(),
+        [metaFieldName]: {a: ['B'], c: 'd'},
+        r: "S",
+        X: '10',
+        Y: {z: ['2']}
+    },
 ];
 
 assert.commandWorked(coll.insert([docs[0], docs[1]], {ordered: false}));
 assert.commandWorked(coll.insert(docs[2], {ordered: false}));
+assert.commandWorked(coll.insert(docs[3], {ordered: false}));
 
-// The metadata of all of the inserted documents matches based on the collation, so when returned
-// they will all have the metadata from the document that was inserted first.
+// The metadata of all of the inserted documents matches based on the collation. If we were to
+// take collation into account when bucketing, we would end up getting back documents which all
+// share the same metadata, which wouldn't match their original data. So let's make sure all
+// the documents match their original data that we inserted.
 const results = coll.find().sort({_id: 1}).toArray();
+assert.eq(docs.length, results.length);
 for (let i = 0; i < results.length; i++) {
-    const doc = docs[i];
-    doc[metaFieldName] = docs[0][metaFieldName];
-    assert.docEq(results[i], doc);
+    assert.docEq(results[i], docs[i]);
 }
 
+// Now let's check that min and max appropriately ignore collation for field names, but not values.
 const buckets = bucketsColl.find().toArray();
 jsTestLog('Checking buckets: ' + tojson(buckets));
-assert.eq(buckets.length, 1);
-assert.eq(buckets[0].control.min.x, '5');
+assert.eq(buckets.length, 3);
+assert.eq(buckets[0].control.min.x, '10');
 assert.eq(buckets[0].control.min.y, {z: ['2']});
 assert.eq(buckets[0].control.max.x, '10');
-assert.eq(buckets[0].control.max.y, {z: ['5']});
+assert.eq(buckets[0].control.max.y, {z: ['2']});
+assert.eq(buckets[1].control.min.r, 's');
+assert.eq(buckets[1].control.min.x, '5');
+assert.eq(buckets[1].control.min.X, '10');
+assert.eq(buckets[1].control.min.y, {z: ['5']});
+assert.eq(buckets[1].control.min.Y, {z: ['2']});
+assert.eq(buckets[1].control.max.r, 's');
+assert.eq(buckets[1].control.max.x, '5');
+assert.eq(buckets[1].control.max.X, '10');
+assert.eq(buckets[1].control.max.y, {z: ['5']});
+assert.eq(buckets[1].control.max.Y, {z: ['2']});
+assert.eq(buckets[2].control.min.x, null);
+assert.eq(buckets[2].control.min.y, null);
+assert.eq(buckets[2].control.max.x, null);
+assert.eq(buckets[2].control.max.y, null);
 })();

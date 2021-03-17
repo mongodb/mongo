@@ -64,26 +64,6 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
         }
     }
 }
-
-KeyString::Value toKeyString(const BSONObj& obj, const CollatorInterface* collator) {
-    // TODO SERVER-54736: Change KeyString API to allow building subobjects in place and avoid
-    // temporary BSONObjBuilder
-    BSONObjBuilder objBuilder;
-    normalizeObject(&objBuilder, obj);
-
-    KeyString::StringTransformFn getComparisonString = [&](StringData stringData) {
-        return collator->getComparisonString(stringData);
-    };
-    const KeyString::StringTransformFn& transform = collator ? getComparisonString : nullptr;
-
-    KeyString::HeapBuilder ksBuilder{KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING};
-    for (auto&& elem : objBuilder.obj()) {
-        ksBuilder.appendBSONElement(elem, transform);
-    }
-    ksBuilder.appendDiscriminator(KeyString::Discriminator::kInclusive);
-    return ksBuilder.release();
-}
-
 }  // namespace
 
 const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::kEmptyStats{
@@ -519,11 +499,14 @@ void BucketCatalog::_setIdTimestamp(BucketId* id, const Date_t& time) {
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
                                               std::shared_ptr<const ViewDefinition>& v)
-    : _metadata(obj), _view(v), _keyString(toKeyString(_metadata, _view->defaultCollator())) {}
+    : _metadata(obj), _view(v) {
+    BSONObjBuilder objBuilder;
+    normalizeObject(&objBuilder, _metadata);
+    _sorted = objBuilder.obj();
+}
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return _view->defaultCollator() == other._view->defaultCollator() &&
-        _keyString == other._keyString;
+    return _sorted.binaryEqual(other._sorted);
 }
 
 const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
