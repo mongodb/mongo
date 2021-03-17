@@ -1431,6 +1431,12 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
 
+  - name: unit-test-with-compile
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - func: "unit test"
+
   - name: unit-test-long
     depends_on:
     - name: compile
@@ -2634,7 +2640,7 @@ buildvariants:
       # macos-1012 is a more stable distro that we want to use for our PR testing task
       distros: macos-1012
     - name: make-check-test
-    - name: unit-test
+    - name: unit-test-with-compile
     - name: fops
 
 - name: little-endian
