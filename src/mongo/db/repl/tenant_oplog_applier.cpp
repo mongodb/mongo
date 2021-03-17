@@ -532,6 +532,8 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
         }
     });
 
+    boost::optional<MutableOplogEntry> prePostImageEntry = boost::none;
+    OpTime originalPrePostImageOpTime;
     for (auto iter = begin; iter != end; iter++) {
         const auto& entry = *iter->first;
         invariant(!isResumeTokenNoop(entry));
@@ -593,6 +595,10 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Use the same wallclock time as the noop entry.
             sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
             sessionTxnRecord->setState(DurableTxnStateEnum::kCommitted);
+
+            // If we have a prePostImage no-op here, it is orphaned; this can happen in some
+            // very unlikely rollback situations.
+            prePostImageEntry = boost::none;
         } else if (!entry.getStatementIds().empty() &&
                    !SessionUpdateTracker::isTransactionEntry(entry)) {
             // If it has a statement id but isn't a transaction, it's a retryable write.
@@ -600,17 +606,48 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             auto txnNumber = *entry.getTxnNumber();
             auto entryStmtIds = entry.getStatementIds();
             if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
-                // TODO(SERVER-53510): handle pre and post image no-ops
-                LOGV2_DEBUG(5350903,
+                // There are two types of no-ops we expect here.  One is pre/post image, which
+                // will have an empty o2 field.  The other is previously transformed oplog
+                // entries from earlier migrations.
+                LOGV2_DEBUG(5351000,
                             2,
-                            "Skipping retryable write no-op",
-                            "entry"_attr = entry.getEntry(),
+                            "Tenant Oplog Applier processing retryable write no-op",
+                            "entry"_attr = redact(entry.toBSONForLogging()),
                             "sessionId"_attr = sessionId,
                             "txnNumber"_attr = txnNumber,
                             "statementIds"_attr = entryStmtIds,
                             "tenant"_attr = _tenantId,
                             "migrationUuid"_attr = _migrationUuid);
-                continue;
+                // We don't wrap the no-ops in another no-op.
+                // If object2 is missing, this is a preImage/postImage.
+                if (!entry.getObject2()) {
+                    // *noopEntry.getObject2() is the original migrated no-op in BSON format.
+                    prePostImageEntry =
+                        uassertStatusOK(MutableOplogEntry::parse(*noopEntry.getObject2()));
+                    originalPrePostImageOpTime = entry.getOpTime();
+                    prePostImageEntry->setOpTime(noopEntry.getOpTime());
+                    prePostImageEntry->setWallClockTime(noopEntry.getWallClockTime());
+                    prePostImageEntry->setFromMigrate(true);
+                    // Clear the old tenant migration UUID.
+                    prePostImageEntry->setFromTenantMigration(boost::none);
+                    // Don't write the no-op entry.
+                    continue;
+                } else {
+                    // Otherwise this is a previously migrated retryable write.  Avoid
+                    // re-wrapping it.
+                    uassert(5351003,
+                            str::stream() << "Tenant Oplog Applier received unexpected Empty o2 "
+                                             "field (original oplog entry) in migrated noop: "
+                                          << redact(entry.toBSONForLogging()),
+                            !entry.getObject2()->isEmpty());
+                    // *noopEntry.getObject2() is the original migrated no-op in BSON format.
+                    noopEntry = uassertStatusOK(MutableOplogEntry::parse(*noopEntry.getObject2()));
+                    noopEntry.setOpTime(*iter->second);
+                    noopEntry.setWallClockTime(
+                        opCtx->getServiceContext()->getFastClockSource()->now());
+                    // Clear the old tenant migration UUID.
+                    noopEntry.setFromTenantMigration(boost::none);
+                }
             }
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
 
@@ -621,7 +658,55 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         "txnNumber"_attr = txnNumber,
                         "statementIds"_attr = entryStmtIds,
                         "tenant"_attr = _tenantId,
+                        "noop_entry"_attr = redact(noopEntry.toBSON()),
                         "migrationUuid"_attr = _migrationUuid);
+
+            if (entry.getPreImageOpTime()) {
+                uassert(
+                    5351005,
+                    str::stream()
+                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
+                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
+                        << sessionId << " because the preImage is missing",
+                    prePostImageEntry);
+
+                uassert(
+                    5351002,
+                    str::stream()
+                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
+                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
+                        << sessionId << " because the preImage op time "
+                        << originalPrePostImageOpTime.toString()
+                        << " does not match the expected optime "
+                        << entry.getPreImageOpTime()->toString(),
+                    originalPrePostImageOpTime == entry.getPreImageOpTime());
+                noopEntry.setPreImageOpTime(prePostImageEntry->getOpTime());
+            } else if (entry.getPostImageOpTime()) {
+                uassert(
+                    5351006,
+                    str::stream()
+                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
+                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
+                        << sessionId << " because the postImage is missing",
+                    prePostImageEntry);
+
+                uassert(
+                    5351007,
+                    str::stream()
+                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
+                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
+                        << sessionId << " because the postImage op time "
+                        << originalPrePostImageOpTime.toString()
+                        << " does not match the expected optime "
+                        << entry.getPostImageOpTime()->toString(),
+                    originalPrePostImageOpTime == entry.getPostImageOpTime());
+                noopEntry.setPostImageOpTime(prePostImageEntry->getOpTime());
+            } else {
+                // Got a prePostImage no-op without the original entry; this can happen in some
+                // very unlikely rollback situations.
+                prePostImageEntry = boost::none;
+            }
+
             opCtx->setLogicalSessionId(sessionId);
             opCtx->setTxnNumber(txnNumber);
             if (!scopedSession)
@@ -660,13 +745,14 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Use the same wallclock time as the noop entry.  The lastWriteOpTime will be filled
             // in after the no-op is written.
             sessionTxnRecord.emplace(sessionId, txnNumber, OpTime(), noopEntry.getWallClockTime());
+        } else {
+            // This is a partial transaction oplog entry.
+
+            // If we have a prePostImage no-op here, it is orphaned; this can happen in some
+            // very unlikely rollback situations.
+            prePostImageEntry = boost::none;
         }
 
-        // TODO(SERVER-53510) Correctly fill in pre-image and post-image op times.
-        const boost::optional<OpTime> preImageOpTime = boost::none;
-        const boost::optional<OpTime> postImageOpTime = boost::none;
-        noopEntry.setPreImageOpTime(preImageOpTime);
-        noopEntry.setPostImageOpTime(postImageOpTime);
         noopEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
 
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
@@ -674,6 +760,9 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 WriteUnitOfWork wuow(opCtx.get());
 
+                // Write the pre/post image entry, if it exists.
+                if (prePostImageEntry)
+                    repl::logOp(opCtx.get(), &*prePostImageEntry);
                 // Write the noop entry and update config.transactions.
                 auto oplogOpTime = repl::logOp(opCtx.get(), &noopEntry);
                 if (sessionTxnRecord) {
@@ -688,6 +777,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
 
                 wuow.commit();
             });
+        prePostImageEntry = boost::none;
 
         // Invalidate in-memory state so that the next time the session is checked out, it
         // would reload the transaction state from config.transactions.

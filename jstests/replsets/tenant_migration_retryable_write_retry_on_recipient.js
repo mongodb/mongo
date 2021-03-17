@@ -52,9 +52,12 @@ function setupRetryableWritesForCollection(collName) {
     assert.commandWorked(donorPrimary.getCollection(kNs).insert(
         [{x: 9, tag: "delete"}, {x: 10, tag: "delete"}, {x: 11, tag: "delete"}],
         {writeConcern: {w: "majority"}}));
+
+    let result = {collName: collName};
     // For the find-and-modify.  Note there is no "x: 12"; "x: 12" will be upserted.
     const kTagFindAndModifyBefore = "find and modify before";
     const kFindAndModifyExtra = "extra";
+    result.findAndModifyExtra = kFindAndModifyExtra;
     assert.commandWorked(donorPrimary.getCollection(kNs).insert(
         [
             {x: 13, tag: kTagFindAndModifyBefore, extra: kFindAndModifyExtra},
@@ -62,7 +65,6 @@ function setupRetryableWritesForCollection(collName) {
         ],
         {writeConcern: {w: "majority"}}));
 
-    let result = {collName: collName};
     // Setup command for batched inserts.
     const lsid1 = {id: UUID()};
     const sessionTag1 = "retryable insert " + collName;
@@ -229,24 +231,21 @@ function testRecipientRetryableWrites(db, writes) {
     // If the retryable find and modify is erroneously re-run, we will see sessionTag4 here
     assert.eq(kNoTag, findAndModifyUpsertDoc.tag);
 
-    // TODO(SERVER-53510): Enable this part of the test which requires pre- and post- images.
-    if (false) {
-        jsTestLog("Testing retryable findAndModify with update and postImage");
-        let res = assert.commandWorked(
-            db.runCommand(writes.retryableFindAndModifyUpdateWithPostImageCommand));
-        // If postimages don't work right, we'll see "none" for extra or a null here.
-        assert(res.value);
-        assert.eq(res.value.extra, kFindAndModifyExtra);
-        const findAndModifyUpdatePostImageDoc = db[kCollName].findOne({x: 13});
-        // If the retryable find and modify is erroneously re-run, we will see sessionTag5 here
-        assert.eq(kNoTag, findAndModifyUpdatePostImageDoc.tag);
+    jsTestLog("Testing retryable findAndModify with update and postImage");
+    let res = assert.commandWorked(
+        db.runCommand(writes.retryableFindAndModifyUpdateWithPostImageCommand));
+    // If postimages don't work right, we'll see "none" for extra or a null here.
+    assert(res.value);
+    assert.eq(res.value.extra, writes.findAndModifyExtra);
+    const findAndModifyUpdatePostImageDoc = db[kCollName].findOne({x: 13});
+    // If the retryable find and modify is erroneously re-run, we will see sessionTag5 here
+    assert.eq(kNoTag, findAndModifyUpdatePostImageDoc.tag);
 
-        jsTestLog("Testing retryable findAndModify with delete and preImage");
-        res = assert.commandWorked(
-            db.runCommand(writes.retryableFindAndModifyUpdateWithPreImageCommand));
-        // If preimages don't work right, we'll see a null here.
-        assert(res.value);
-    }
+    jsTestLog("Testing retryable findAndModify with delete and preImage");
+    res =
+        assert.commandWorked(db.runCommand(writes.retryableFindAndModifyUpdateWithPreImageCommand));
+    // If preimages don't work right, we'll see a null here.
+    assert(res.value);
 }
 jsTestLog("Run retryable write on primary after the migration");
 testRecipientRetryableWrites(recipientDb, beforeWrites);
@@ -258,5 +257,36 @@ assert.commandWorked(recipientRst.getSecondary().adminCommand({replSetStepUp: 1}
 jsTestLog("Run retryable write on secondary after the migration");
 testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), beforeWrites);
 testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), duringWrites);
+
+tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
+
+jsTestLog("Trying a back-to-back migration");
+const tenantMigrationTest2 = new TenantMigrationTest(
+    {name: jsTestName() + "2", donorRst: tenantMigrationTest.getRecipientRst()});
+const recipient2Primary = tenantMigrationTest2.getRecipientPrimary();
+const recipient2Db = recipient2Primary.getDB(kDbName);
+const migrationOpts2 = {
+    migrationIdString: extractUUIDFromObject(UUID()),
+    tenantId: kTenantId,
+};
+
+// TODO(SERVER-55193): Make back-to-back migration work and remove this 'remove'
+assert.commandWorked(
+    recipientRst.getPrimary().getDB("config").tenantMigrationRecipients.remove({}));
+
+assert.commandWorked(tenantMigrationTest2.runMigration(migrationOpts2));
+
+// Print the no-op oplog entries for debugging purposes.
+jsTestLog("Second recipient oplog migration entries.");
+printjson(recipient2Primary.getDB("local")
+              .oplog.rs.find({op: 'n', fromTenantMigration: {$exists: true}})
+              .sort({'$natural': -1})
+              .toArray());
+
+jsTestLog("Test retryable write on primary after the second migration");
+testRecipientRetryableWrites(recipient2Db, beforeWrites);
+testRecipientRetryableWrites(recipient2Db, duringWrites);
+
+tenantMigrationTest2.stop();
 tenantMigrationTest.stop();
 })();

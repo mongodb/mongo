@@ -190,6 +190,37 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
                               boost::none)};  // _id
 }
 
+/**
+ * Generates an update oplog entry with the given number used for the timestamp, and the given
+ * pre- and post- image optimes.
+ */
+OplogEntry makeUpdateOplogEntry(int t,
+                                const NamespaceString& nss,
+                                boost::optional<UUID> uuid,
+                                boost::optional<OpTime> preImageOpTime,
+                                boost::optional<OpTime> postImageOpTime) {
+    BSONObj oField = BSON("_id" << t << "a" << t);
+    BSONObj o2Field = BSON("_id" << t);
+    return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                              boost::none,                 // hash
+                              OpTypeEnum::kUpdate,         // op type
+                              nss,                         // namespace
+                              uuid,                        // uuid
+                              boost::none,                 // fromMigrate
+                              OplogEntry::kOplogVersion,   // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              {},                          // statement ids
+                              boost::none,  // optime of previous write within same transaction
+                              preImageOpTime,
+                              postImageOpTime,
+                              boost::none,    // ShardId of resharding recipient
+                              boost::none)};  // _id
+}
+
 OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
     BSONObj oField = BSON("msg" << msg << "count" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime

@@ -395,6 +395,79 @@ TEST_F(TenantOplogBatcherTest, LargeTransactionProcessedIndividuallyAndExpanded)
     batcher->join();
 }
 
+TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageOutOfOrder) {
+    auto batcher = std::make_shared<TenantOplogBatcher>(
+        "tenant", &_oplogBuffer, _executor, Timestamp(0, 0) /* resumeBatchingTs */);
+    ASSERT_OK(batcher->startup());
+    auto batchFuture = batcher->getNextBatch(bigBatchLimits);
+    // We just started, no batch should be available.
+    ASSERT(!batchFuture.isReady());
+    std::vector<BSONObj> srcOps;
+    srcOps.push_back(makeNoopOplogEntry(1, "preImage").getEntry().toBSON());
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "foo")).getEntry().toBSON());
+    srcOps.push_back(
+        makeUpdateOplogEntry(3, NamespaceString(dbName, "bar"), UUID::gen(), OpTime({1, 1}, 1))
+            .getEntry()
+            .toBSON());
+
+    _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
+
+    auto batch = batchFuture.get();
+    batcher->shutdown();
+
+    // Expect the pre-image to have been inserted twice.
+    ASSERT_EQUALS(srcOps.size() + 1, batch.ops.size()) << toString(batch);
+    ASSERT(batch.expansions.empty());
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[0].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[0].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[1], batch.ops[1].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[1].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[2].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[2].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[2], batch.ops[3].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[3].expansionsEntry);
+
+    batcher->join();
+}
+
+TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageOutOfOrder) {
+    auto batcher = std::make_shared<TenantOplogBatcher>(
+        "tenant", &_oplogBuffer, _executor, Timestamp(0, 0) /* resumeBatchingTs */);
+    ASSERT_OK(batcher->startup());
+    auto batchFuture = batcher->getNextBatch(bigBatchLimits);
+    // We just started, no batch should be available.
+    ASSERT(!batchFuture.isReady());
+    std::vector<BSONObj> srcOps;
+    srcOps.push_back(makeNoopOplogEntry(1, "postImage").getEntry().toBSON());
+    srcOps.push_back(makeInsertOplogEntry(2, NamespaceString(dbName, "foo")).getEntry().toBSON());
+    srcOps.push_back(makeUpdateOplogEntry(3,
+                                          NamespaceString(dbName, "bar"),
+                                          UUID::gen(),
+                                          boost::none /* preImageOpTime */,
+                                          OpTime({1, 1}, 1))
+                         .getEntry()
+                         .toBSON());
+
+    _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
+
+    auto batch = batchFuture.get();
+    batcher->shutdown();
+
+    // Expect the post-image to have been inserted twice.
+    ASSERT_EQUALS(srcOps.size() + 1, batch.ops.size()) << toString(batch);
+    ASSERT(batch.expansions.empty());
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[0].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[0].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[1], batch.ops[1].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[1].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[2].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[2].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[2], batch.ops[3].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[3].expansionsEntry);
+
+    batcher->join();
+}
+
 TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchOpsLimits) {
     auto batcher = std::make_shared<TenantOplogBatcher>(
         "tenant", &_oplogBuffer, _executor, Timestamp(0, 0) /* resumeBatchingTs */);
@@ -405,6 +478,71 @@ TEST_F(TenantOplogBatcherTest, GetNextApplierBatchRejectsZeroBatchOpsLimits) {
     ASSERT_THROWS_CODE(batcher->getNextBatch(limits), DBException, 4885607);
 
     batcher->shutdown();
+    batcher->join();
+}
+
+TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPreImageBeforeBatchStart) {
+    auto batcher = std::make_shared<TenantOplogBatcher>(
+        "tenant", &_oplogBuffer, _executor, Timestamp(0, 0) /* resumeBatchingTs */);
+    ASSERT_OK(batcher->startup());
+    std::vector<BSONObj> srcOps;
+    srcOps.push_back(makeNoopOplogEntry(1, "preImage").getEntry().toBSON());
+    srcOps.push_back(
+        makeUpdateOplogEntry(2, NamespaceString(dbName, "bar"), UUID::gen(), OpTime({1, 1}, 1))
+            .getEntry()
+            .toBSON());
+
+    _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
+    // Pull the preImage off the buffer.
+    BSONObj preImagePopped;
+    ASSERT(_oplogBuffer.tryPop(nullptr /* mock does not need opCtx */, &preImagePopped));
+    // Start the batcher reading after the preImage has been removed.
+    auto batchFuture = batcher->getNextBatch(bigBatchLimits);
+    ASSERT_BSONOBJ_EQ(preImagePopped, srcOps[0]);
+    auto batch = batchFuture.get();
+    batcher->shutdown();
+
+    // Expect the pre-image to have been inserted.
+    ASSERT_EQUALS(srcOps.size(), batch.ops.size()) << toString(batch);
+    ASSERT(batch.expansions.empty());
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[0].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[0].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[1], batch.ops[1].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[1].expansionsEntry);
+    batcher->join();
+}
+
+TEST_F(TenantOplogBatcherTest, OplogBatcherRetreivesPostImageBeforeBatchStart) {
+    auto batcher = std::make_shared<TenantOplogBatcher>(
+        "tenant", &_oplogBuffer, _executor, Timestamp(0, 0) /* resumeBatchingTs */);
+    ASSERT_OK(batcher->startup());
+    std::vector<BSONObj> srcOps;
+    srcOps.push_back(makeNoopOplogEntry(1, "postImage").getEntry().toBSON());
+    srcOps.push_back(makeUpdateOplogEntry(2,
+                                          NamespaceString(dbName, "bar"),
+                                          UUID::gen(),
+                                          boost::none /* preImageOpTime */,
+                                          OpTime({1, 1}, 1))
+                         .getEntry()
+                         .toBSON());
+
+    _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
+    // Pull the postImage off the buffer.
+    BSONObj postImagePopped;
+    ASSERT(_oplogBuffer.tryPop(nullptr /* mock does not need opCtx */, &postImagePopped));
+    // Start the batcher reading after the preImage has been removed.
+    auto batchFuture = batcher->getNextBatch(bigBatchLimits);
+    ASSERT_BSONOBJ_EQ(postImagePopped, srcOps[0]);
+    auto batch = batchFuture.get();
+    batcher->shutdown();
+
+    // Expect the post-image to have been inserted.
+    ASSERT_EQUALS(srcOps.size(), batch.ops.size()) << toString(batch);
+    ASSERT(batch.expansions.empty());
+    ASSERT_BSONOBJ_EQ(srcOps[0], batch.ops[0].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[0].expansionsEntry);
+    ASSERT_BSONOBJ_EQ(srcOps[1], batch.ops[1].entry.getEntry().toBSON());
+    ASSERT_EQUALS(-1, batch.ops[1].expansionsEntry);
     batcher->join();
 }
 
