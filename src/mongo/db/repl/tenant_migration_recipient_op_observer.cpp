@@ -49,11 +49,8 @@ const auto tenantIdToDeleteDecoration =
  * Initializes the TenantMigrationRecipientAccessBlocker for the tenant migration denoted by the
  * given state doc.
  */
-void onFinishCloning(OperationContext* opCtx,
-                     const TenantMigrationRecipientDocument& recipientStateDoc) {
-    invariant(recipientStateDoc.getState() == TenantMigrationRecipientStateEnum::kStarted);
-    invariant(recipientStateDoc.getDataConsistentStopDonorOpTime());
-
+void createAccessBlockerIfNeeded(OperationContext* opCtx,
+                                 const TenantMigrationRecipientDocument& recipientStateDoc) {
     if (tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
             opCtx->getServiceContext(), recipientStateDoc.getTenantId())) {
         // The migration failed part-way on the recipient with a retryable error, and got retried
@@ -117,9 +114,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                 case TenantMigrationRecipientStateEnum::kDone:
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
-                    if (recipientStateDoc.getDataConsistentStopDonorOpTime()) {
-                        onFinishCloning(opCtx, recipientStateDoc);
-                    }
+                    createAccessBlockerIfNeeded(opCtx, recipientStateDoc);
                     break;
                 case TenantMigrationRecipientStateEnum::kConsistent:
                     if (recipientStateDoc.getRejectReadsBeforeTimestamp()) {

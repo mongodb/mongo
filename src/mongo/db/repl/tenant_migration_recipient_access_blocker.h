@@ -64,6 +64,9 @@ namespace mongo {
  * To ensure atClusterTime and afterClusterTime reads are consistent, when the recipient receives a
  * recipientSyncData command with a returnAfterReachingTimestamp after the consistent point, the
  * `rejectBeforeTimestamp` will be advanced to the given returnAfterReachingTimestamp.
+ *
+ * Blocker excludes all operations with 'tenantMigrationRecipientInfo' decoration set, as they are
+ * internal.
  */
 class TenantMigrationRecipientAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationRecipientAccessBlocker>,

@@ -38,6 +38,7 @@
 #include "mongo/db/repl/database_cloner_gen.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
 #include "mongo/db/repl/tenant_database_cloner.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -174,6 +175,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
 BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStage() {
     auto opCtx = cc().makeOperationContext();
     DBDirectClient client(opCtx.get());
+    tenantMigrationRecipientInfo(opCtx.get()) =
+        boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
 
     std::vector<UUID> clonedCollectionUUIDs;
     auto collectionInfos =
