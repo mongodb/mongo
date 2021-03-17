@@ -300,7 +300,8 @@ function TenantMigrationTest({
         // If the migration has been successfully committed, check the db hashes for the tenantId
         // between the donor and recipient.
         if (stateRes.state === TenantMigrationTest.State.kCommitted) {
-            this.checkTenantDBHashes(tenantId);
+            TenantMigrationUtil.checkTenantDBHashes(
+                this.getDonorRst(), this.getRecipientRst(), tenantId);
         }
 
         return stateRes;
@@ -515,7 +516,8 @@ function TenantMigrationTest({
      */
     this.verifyRecipientDB = function(
         tenantId, dbName, collName, migrationCommitted = true, data = loadDummyData()) {
-        const shouldMigrate = migrationCommitted && this.isNamespaceForTenant(tenantId, dbName);
+        const shouldMigrate =
+            migrationCommitted && TenantMigrationUtil.isNamespaceForTenant(tenantId, dbName);
 
         jsTestLog(`Verifying that data in collection ${collName} of DB ${dbName} was ${
             (shouldMigrate ? "" : "not")} migrated to the recipient`);
@@ -557,13 +559,6 @@ function TenantMigrationTest({
      */
     this.nonTenantDB = function(tenantId, dbName) {
         return `non_${tenantId}_${dbName}`;
-    };
-
-    /**
-     * Determines if a database name belongs to the given tenant.
-     */
-    this.isNamespaceForTenant = function(tenantId, dbName) {
-        return dbName.startsWith(`${tenantId}_`);
     };
 
     /**
@@ -653,62 +648,6 @@ function TenantMigrationTest({
      */
     this.getRecipientConnString = function() {
         return this.getRecipientRst().getURL();
-    };
-
-    /**
-     * Compares the hashes for DBs that belong to the specified tenant between the donor and
-     * recipient primaries.
-     */
-    this.checkTenantDBHashes = function(
-        tenantId, excludedDBs = [], msgPrefix = 'checkTenantDBHashes', ignoreUUIDs = false) {
-        // Always skip db hash checks for the local database.
-        excludedDBs = [...excludedDBs, "local"];
-
-        const donorPrimary = this.getDonorRst().getPrimary();
-        const recipientPrimary = this.getRecipientRst().getPrimary();
-
-        // Filter out all dbs that don't belong to the tenant.
-        let combinedDBNames = [...donorPrimary.getDBNames(), ...recipientPrimary.getDBNames()];
-        combinedDBNames =
-            combinedDBNames.filter(dbName => (this.isNamespaceForTenant(tenantId, dbName) &&
-                                              !excludedDBs.includes(dbName)));
-        combinedDBNames = new Set(combinedDBNames);
-
-        for (const dbName of combinedDBNames) {
-            // Pass in an empty array for the secondaries, since we only wish to compare the DB
-            // hashes between the donor and recipient primary in this test.
-            const donorDBHash =
-                assert.commandWorked(this.getDonorRst().getHashes(dbName, []).primary);
-            const recipientDBHash =
-                assert.commandWorked(this.getRecipientRst().getHashes(dbName, []).primary);
-
-            const donorCollections = Object.keys(donorDBHash.collections);
-            const donorCollInfos = new CollInfos(donorPrimary, 'donorPrimary', dbName);
-            donorCollInfos.filter(donorCollections);
-
-            const recipientCollections = Object.keys(recipientDBHash.collections);
-            const recipientCollInfos = new CollInfos(recipientPrimary, 'recipientPrimary', dbName);
-            recipientCollInfos.filter(recipientCollections);
-
-            print(`checking db hash between donor: ${donorPrimary} and recipient: ${
-                recipientPrimary}`);
-
-            const collectionPrinted = new Set();
-            const success = DataConsistencyChecker.checkDBHash(donorDBHash,
-                                                               donorCollInfos,
-                                                               recipientDBHash,
-                                                               recipientCollInfos,
-                                                               msgPrefix,
-                                                               ignoreUUIDs,
-                                                               true, /* syncingHasIndexes */
-                                                               collectionPrinted);
-            if (!success) {
-                print(`checkTenantDBHashes dumping donor and recipient primary oplogs`);
-                this.getDonorRst().dumpOplog(donorPrimary, {}, 100);
-                this.getRecipientRst().dumpOplog(recipientPrimary, {}, 100);
-            }
-            assert(success, 'dbhash mismatch between donor and recipient primaries');
-        }
     };
 
     /**

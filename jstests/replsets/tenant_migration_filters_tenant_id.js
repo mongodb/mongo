@@ -9,6 +9,7 @@
 
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
@@ -28,7 +29,7 @@ const makeBaseTenantId = () => {
 const runTest = (baseTenantId, dbName, shouldMatch) => {
     jsTestLog(`Running tenant migration with dbName ${dbName} and tenantId ${baseTenantId}`);
 
-    assert.eq(shouldMatch, tenantMigrationTest.isNamespaceForTenant(baseTenantId, dbName));
+    assert.eq(shouldMatch, TenantMigrationUtil.isNamespaceForTenant(baseTenantId, dbName));
     tenantMigrationTest.insertDonorDB(dbName, collName);
 
     // Run a migration with the base tenant ID.
