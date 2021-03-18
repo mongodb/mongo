@@ -36,11 +36,11 @@ var ShardedIndexUtil = (function() {
     };
 
     /*
-     * Returns true if the array contains the given BSON object.
+     * Returns true if the array contains the given BSON object, ignoring the field order
      */
-    let containsBSON = function(arr, targetObj) {
+    let containsBSONIgnoreFieldsOrder = function(arr, targetObj) {
         for (const obj of arr) {
-            if (bsonWoCompare(obj, targetObj) === 0) {
+            if (bsonUnorderedFieldsCompare(obj, targetObj) === 0) {
                 return true;
             }
         }
@@ -76,16 +76,16 @@ var ShardedIndexUtil = (function() {
         // [{"spec" : {"v" : 2, "key" : {"_id" : 1}, "name" : "_id_"}}];
         let consistentIndexes = indexDocs[0].indexes;
         for (let i = 1; i < indexDocs.length; i++) {
-            consistentIndexes =
-                consistentIndexes.filter(index => this.containsBSON(indexDocs[i].indexes, index));
+            consistentIndexes = consistentIndexes.filter(
+                index => this.containsBSONIgnoreFieldsOrder(indexDocs[i].indexes, index));
         }
 
         // Find inconsistent indexes. For the example above:
         // {"rs0": [{"spec" : {"v" : 2, "key" : {"x" : 1}, "name" : "x_1"}}], "rs1" : []};
         const inconsistentIndexesOnShard = {};
         for (const indexDoc of indexDocs) {
-            const inconsistentIndexes =
-                indexDoc.indexes.filter(index => !this.containsBSON(consistentIndexes, index));
+            const inconsistentIndexes = indexDoc.indexes.filter(
+                index => !this.containsBSONIgnoreFieldsOrder(consistentIndexes, index));
             inconsistentIndexesOnShard[indexDoc.shard] = inconsistentIndexes;
         }
 
@@ -95,7 +95,7 @@ var ShardedIndexUtil = (function() {
     return {
         assertIndexExistsOnShard,
         assertIndexDoesNotExistOnShard,
-        containsBSON,
+        containsBSONIgnoreFieldsOrder,
         getPerShardIndexes,
         findInconsistentIndexesAcrossShards
     };
