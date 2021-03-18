@@ -1,3 +1,6 @@
+# This Chef task installs MongoDB in a new EC2 instance spun up by Kitchen in
+# preparation for running some basic server functionality tests.
+
 artifacts_tarball = 'artifacts.tgz'
 homedir = "/tmp"
 
@@ -30,7 +33,7 @@ end
 if platform_family? 'debian'
 
   # SERVER-40491 Debian 8 sources.list need to point to archive url
-  if node['platform_version'] == '8.1'
+  if node['platform'] == 'debian' and node['platform_version'] == '8.1'
     cookbook_file '/etc/apt/sources.list' do
       source 'sources.list.debian8'
       owner 'root'
@@ -40,13 +43,20 @@ if platform_family? 'debian'
     end
   end
 
-  execute 'apt-get update' do
-    command 'apt-get update'
+  execute 'apt update' do
+    command 'apt update'
     live_stream true
   end
 
   ENV['DEBIAN_FRONTEND'] = 'noninteractive'
   package 'openssl'
+
+  # the ubuntu 16.04 image does not have some dependencies installed by default
+  # and it is required for the install_compass script
+  execute 'install dependencies' do
+    command 'apt-get install -y python libsasl2-modules-gssapi-mit'
+    live_stream true
+  end
 
   # dpkg returns 1 if dependencies are not satisfied, which they will not be
   # for enterprise builds. We install dependencies in the next block.
@@ -68,15 +78,8 @@ if platform_family? 'debian'
   # yum and zypper fetch dependencies automatically, but dpkg does not.
   # Installing the dependencies explicitly is fragile, so we reply on apt-get
   # to install dependencies after the fact.
-  execute 'install dependencies' do
-    command 'apt-get update && apt-get -y -f install'
-    live_stream true
-  end
-
-  # the ubuntu 16.04 image does not have python installed by default
-  # and it is required for the install_compass script
-  execute 'install python' do
-    command 'apt-get install -y python'
+  execute 'update and fix broken dependencies' do
+    command 'apt update && apt -y -f install'
     live_stream true
   end
 
