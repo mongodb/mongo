@@ -571,7 +571,10 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     _state = COMMIT_START;
     _stateChangedCV.notify_all();
 
-    auto const deadline = Date_t::now() + Seconds(30);
+    // Assigning a timeout slightly higher than the one used for network requests to the config
+    // server. Enough time to retry at least once in case of network failures (SERVER-51397).
+    auto const deadline = Date_t::now() + Shard::kDefaultConfigCommandTimeout +
+        Shard::kDefaultConfigCommandTimeout / 4;
     while (_sessionId) {
         if (stdx::cv_status::timeout ==
             _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
