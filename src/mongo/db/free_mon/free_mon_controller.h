@@ -95,9 +95,9 @@ public:
     static FreeMonController* get(ServiceContext* serviceContext);
 
     /**
-     * Set the FreeMonController in the ServiceContext.
+     * Initialize the FreeMonController decoration in the ServiceContext.
      */
-    static void set(ServiceContext* serviceContext, std::unique_ptr<FreeMonController> controller);
+    static void init(ServiceContext* serviceContext, std::unique_ptr<FreeMonController> controller);
 
     /**
      * Start registration of mongod with remote service.
