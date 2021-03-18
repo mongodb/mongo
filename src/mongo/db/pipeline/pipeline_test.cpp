@@ -2564,6 +2564,39 @@ class LookupWithLetWithDBAndColl : public Base {
     }
 };
 
+class CollectionCloningPipeline : public Base {
+    string inputPipeJson() {
+        return "[{$match: {$expr: {$gte: ['$_id', {$literal: 1}]}}}"
+               ",{$sort: {_id: 1}}"
+               ",{$replaceWith: {original: '$$ROOT'}}"
+               ",{$lookup: {from: {db: 'config', coll: 'cache.chunks.test'},"
+               "pipeline: [], as: 'intersectingChunk'}}"
+               ",{$match: {intersectingChunk: {$ne: []}}}"
+               ",{$replaceWith: '$original'}"
+               "]";
+    }
+
+    string shardPipeJson() {
+        return "[{$match: {$and: [{_id: {$_internalExprGte: 1}}, {$expr: {$gte: ['$_id', "
+               "{$const: 1}]}}]}}"
+               ", {$sort: {sortKey: {_id: 1}}}"
+               ", {$replaceRoot: {newRoot: {original: '$$ROOT'}}}"
+               ", {$lookup: {from: {db: 'config', coll: 'cache.chunks.test'}, as: "
+               "'intersectingChunk', let: {}, pipeline: []}}"
+               ", {$match: {intersectingChunk: {$not: {$eq: []}}}}"
+               ", {$replaceRoot: {newRoot: '$original'}}"
+               "]";
+    }
+
+    string mergePipeJson() {
+        return "[]";
+    }
+
+    NamespaceString getLookupCollNs() override {
+        return {"config", "cache.chunks.test"};
+    }
+};
+
 }  // namespace lookupFromShardsInParallel
 
 namespace moveFinalUnwindFromShardsToMerger {
@@ -2691,7 +2724,7 @@ class MatchWithSkipAddFieldsAndLimit : public Base {
 /**
  * The addition of a $group stage between the $skip and $limit stages _does_ prevent us from
  * propagating the limit to the shards. The merger will need to see all the documents from each
- * shard before it can aply the $limit.
+ * shard before it can apply the $limit.
  */
 class MatchWithSkipGroupAndLimit : public Base {
     string inputPipeJson() {
@@ -3172,7 +3205,7 @@ DEATH_TEST_F(PipelineMustRunOnMongoSTest,
 }
 
 /**
- * For the purpsoses of this test, assume every collection is unsharded. Stages may ask this during
+ * For the purposes of this test, assume every collection is unsharded. Stages may ask this during
  * setup. For example, to compute its constraints, the $merge stage needs to know if the output
  * collection is sharded.
  */
@@ -4208,6 +4241,7 @@ public:
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithDBAndColl>();
         add<Optimizations::Sharded::lookupFromShardsInParallel::LookupWithLetWithDBAndColl>();
+        add<Optimizations::Sharded::lookupFromShardsInParallel::CollectionCloningPipeline>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithUnshardedCollection>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::MergeWithShardedCollection>();

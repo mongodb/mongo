@@ -840,7 +840,7 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     }
 
     auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(_idExpressions.front().get());
-    if (!fieldPathExpr || !fieldPathExpr->isRootFieldPath()) {
+    if (!fieldPathExpr || fieldPathExpr->isVariableReference()) {
         return nullptr;
     }
 

@@ -163,7 +163,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
         if (dynamic_cast<ExpressionConstant*>(partitionBy->get())) {
             // partitionBy optimizes to a constant expression, equivalent to a single partition.
         } else if (auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(partitionBy->get());
-                   exprFieldPath && exprFieldPath->isRootFieldPath()) {
+                   exprFieldPath && !exprFieldPath->isVariableReference()) {
             // ExpressionFieldPath has "CURRENT" as an explicit first component,
             // but for $sort we don't want that.
             simplePartitionBy = exprFieldPath->getFieldPath().tail();

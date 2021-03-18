@@ -1485,7 +1485,11 @@ public:
 class ExpressionFieldPath final : public Expression {
 public:
     bool isRootFieldPath() const {
-        return _variable == Variables::kRootId;
+        return _variable == Variables::kRootId && _fieldPath.getPathLength() == 1;
+    }
+
+    bool isVariableReference() const {
+        return Variables::isUserDefinedVariable(_variable);
     }
 
     boost::intrusive_ptr<Expression> optimize() final;
@@ -1988,7 +1992,7 @@ public:
      * Multiplies two values together as if by evaluate() on
      *     {$multiply: [{$const: lhs}, {$const: rhs}]}.
      *
-     * Note that evaluate() does not use apply() directly, because when $muliply takes more than
+     * Note that evaluate() does not use apply() directly, because when $multiply takes more than
      * two arguments, it uses a wider intermediate state than Value.
      *
      * Returns BSONNULL if either argument is nullish.
