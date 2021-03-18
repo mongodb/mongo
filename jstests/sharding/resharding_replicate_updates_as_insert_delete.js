@@ -43,23 +43,10 @@ reshardingTest.withReshardingInBackground(  //
         ],
     },
     (tempNs) => {
-        // Wait for cloning to have finished on both recipient shards to know that the donor shards
-        // have begun including the "destinedRecipient" field in their oplog entries. It would
-        // technically be sufficient to only wait for cloning to have *started*, but querying the
-        // temporary resharding collection through mongos may cause the RecipientStateMachine to
-        // never be constructed on recipientShardNames[0].
-        //
-        // TODO SERVER-53539: Replace the assert.soon() with the following code.
-        //
-        // const tempColl = mongos.getCollection(tempNs);
-        // assert.soon(() => tempColl.findOne(docToUpdate) !== null);
-        assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: testColl.getFullName()
-            });
-
-            return coordinatorDoc !== null && coordinatorDoc.state === "applying";
-        });
+        // Wait for cloning to have at least started on the recipient shards to know that the donor
+        // shards have begun including the "destinedRecipient" field in their oplog entries.
+        const tempColl = mongos.getCollection(tempNs);
+        assert.soon(() => tempColl.findOne(docToUpdate) !== null);
 
         assert.commandFailedWithCode(
             testColl.update({_id: 0, x: 2, s: 2}, {$set: {y: 10}}),
