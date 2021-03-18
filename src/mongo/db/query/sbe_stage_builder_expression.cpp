@@ -1173,7 +1173,7 @@ public:
             collatorSlot,
             _context->planNodeId);
 
-        // Create a branch stage to select between the branch that produces one null if any eleemnts
+        // Create a branch stage to select between the branch that produces one null if any elements
         // in the original input were null or missing, or otherwise select the branch that unwinds
         // and concatenates elements into the output array.
         auto [nullExpr, nullStage] = makeNullLimitCoscanTree();
@@ -1790,7 +1790,7 @@ public:
         }
 
         sbe::value::SlotId slotId;
-        if (expr->isRootFieldPath()) {
+        if (!expr->isVariableReference()) {
             slotId = _context->rootSlot;
         } else {
             auto it = _context->environment.find(expr->getVariableId());

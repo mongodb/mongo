@@ -299,6 +299,38 @@ void moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
 }
 
 /**
+ * When the last stage of shard pipeline is $sort, move stages that can run on shards and don't
+ * rename or modify the fields in $sort from merge pipeline. The function starts from the beginning
+ * of the merge pipeline and finds the first consecutive eligible stages.
+ */
+void moveEligibleStreamingStagesBeforeSortOnShards(Pipeline* shardPipe,
+                                                   Pipeline* mergePipe,
+                                                   const BSONObj& sortPattern) {
+    tassert(5363800,
+            "Expected non-empty shardPipe consisting of at least a $sort stage",
+            !shardPipe->getSources().empty());
+    if (!dynamic_cast<DocumentSourceSort*>(shardPipe->getSources().back().get())) {
+        // Expected last stage on the shards to be a $sort.
+        return;
+    }
+    auto sortPaths = sortPattern.getFieldNames<std::set<std::string>>();
+    auto firstMergeStage = mergePipe->getSources().cbegin();
+    std::function<bool(DocumentSource*)> distributedPlanLogicCallback = [](DocumentSource* stage) {
+        return !static_cast<bool>(stage->distributedPlanLogic());
+    };
+    auto [lastUnmodified, renameMap] = semantic_analysis::findLongestViablePrefixPreservingPaths(
+        firstMergeStage, mergePipe->getSources().cend(), sortPaths, distributedPlanLogicCallback);
+    for (const auto& sortPath : sortPaths) {
+        auto pair = renameMap.find(sortPath);
+        if (pair == renameMap.end() || pair->first != pair->second) {
+            return;
+        }
+    }
+    shardPipe->getSources().insert(shardPipe->getSources().end(), firstMergeStage, lastUnmodified);
+    mergePipe->getSources().erase(firstMergeStage, lastUnmodified);
+}
+
+/**
  * Returns true if the final stage of the pipeline limits the number of documents it could output
  * (such as a $limit stage).
  *
@@ -775,6 +807,10 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
 
     // The order in which optimizations are applied can have significant impact on the efficiency of
     // the final pipeline. Be Careful!
+    if (inputsSort) {
+        moveEligibleStreamingStagesBeforeSortOnShards(
+            shardsPipeline.get(), mergePipeline.get(), *inputsSort);
+    }
     moveFinalUnwindFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
     propagateDocLimitToShards(shardsPipeline.get(), mergePipeline.get());
     limitFieldsSentFromShardsToMerger(shardsPipeline.get(), mergePipeline.get());
@@ -857,7 +893,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // pipeline; if not, we retain the existing pipeline.
     // - Call establishShardCursors to dispatch the aggregation to the targeted shards.
     // - Stale shard version errors are thrown up to the top-level handler, causing a retry on the
-    // entire aggregation commmand.
+    // entire aggregation command.
     auto cursors = std::vector<RemoteCursor>();
     auto shardResults = std::vector<AsyncRequestsSender::Response>();
     auto opCtx = expCtx->opCtx;

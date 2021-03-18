@@ -72,7 +72,9 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
 boost::optional<StringMap<std::string>> renamedPaths(
     const Pipeline::SourceContainer::const_iterator start,
     const Pipeline::SourceContainer::const_iterator end,
-    const std::set<std::string>& pathsOfInterest);
+    const std::set<std::string>& pathsOfInterest,
+    boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
+        boost::none);
 
 /**
  * Tracks renames by walking a pipeline backwards. Takes two reverse iterators that represent two
@@ -87,7 +89,24 @@ boost::optional<StringMap<std::string>> renamedPaths(
 boost::optional<StringMap<std::string>> renamedPaths(
     const Pipeline::SourceContainer::const_reverse_iterator start,
     const Pipeline::SourceContainer::const_reverse_iterator end,
-    const std::set<std::string>& pathsOfInterest);
+    const std::set<std::string>& pathsOfInterest,
+    boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
+        boost::none);
+
+/**
+ * Attempts to find a maximal prefix of the pipeline given by 'start' and 'end' which will preserve
+ * all paths in 'pathsOfInterest' and also have each DocumentSource satisfy
+ * 'additionalStageValidatorCallback'.
+ *
+ * Returns an iterator to the first stage which modifies one of the paths in 'pathsOfInterest' or
+ * fails 'additionalStageValidatorCallback', or returns 'end' if no such stage exists.
+ */
+std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
+findLongestViablePrefixPreservingPaths(const Pipeline::SourceContainer::const_iterator start,
+                                       const Pipeline::SourceContainer::const_iterator end,
+                                       const std::set<std::string>& pathsOfInterest,
+                                       boost::optional<std::function<bool(DocumentSource*)>>
+                                           additionalStageValidatorCallback = boost::none);
 
 /**
  * Given a set of paths 'dependencies', determines which of those paths will be modified if all
@@ -98,5 +117,8 @@ boost::optional<StringMap<std::string>> renamedPaths(
  */
 std::set<std::string> extractModifiedDependencies(const std::set<std::string>& dependencies,
                                                   const std::set<std::string>& preservedPaths);
+
+bool pathSetContainsOverlappingPath(const std::set<std::string>& paths,
+                                    const std::string& targetPath);
 
 }  // namespace mongo::semantic_analysis
