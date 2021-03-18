@@ -29,6 +29,10 @@ var TimeseriesTest = class {
         return arr[Random.randInt(arr.length)];
     }
 
+    static getRandomUsage() {
+        return Random.randInt(101);
+    }
+
     /**
      * Generates time-series data based on the TSBS document-per-event format.
      *
@@ -37,10 +41,6 @@ var TimeseriesTest = class {
      */
     static generateHosts(numHosts) {
         const hosts = new Array(numHosts);
-
-        const getRandomUsage = function() {
-            return Random.randInt(101);
-        };
 
         const regions = [
             "ap-northeast-1",
@@ -102,21 +102,22 @@ var TimeseriesTest = class {
             const regionIndex = Random.randInt(regions.length);
             hosts[i] = {
                 fields: {
-                    usage_guest: getRandomUsage(),
-                    usage_guest_nice: getRandomUsage(),
-                    usage_idle: getRandomUsage(),
-                    usage_iowait: getRandomUsage(),
-                    usage_irq: getRandomUsage(),
-                    usage_nice: getRandomUsage(),
-                    usage_softirq: getRandomUsage(),
-                    usage_steal: getRandomUsage(),
-                    usage_system: getRandomUsage(),
-                    usage_user: getRandomUsage(),
+                    usage_guest: TimeseriesTest.getRandomUsage(),
+                    usage_guest_nice: TimeseriesTest.getRandomUsage(),
+                    usage_idle: TimeseriesTest.getRandomUsage(),
+                    usage_iowait: TimeseriesTest.getRandomUsage(),
+                    usage_irq: TimeseriesTest.getRandomUsage(),
+                    usage_nice: TimeseriesTest.getRandomUsage(),
+                    usage_softirq: TimeseriesTest.getRandomUsage(),
+                    usage_steal: TimeseriesTest.getRandomUsage(),
+                    usage_system: TimeseriesTest.getRandomUsage(),
+                    usage_user: TimeseriesTest.getRandomUsage(),
                 },
                 tags: {
                     arch: TimeseriesTest.getRandomElem(["x64", "x86"]),
                     datacenter: TimeseriesTest.getRandomElem(dataCenters[regionIndex]),
                     hostname: "host_" + i,
+                    hostid: i,
                     os: TimeseriesTest.getRandomElem(
                         ["Ubuntu15.10", "Ubuntu16.10", "Ubuntu16.04LTS"]),
                     rack: Random.randInt(100).toString(),
