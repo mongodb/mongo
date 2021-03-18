@@ -42,7 +42,7 @@ class AggregateResourceConsumptionMetricsInBackground(jsfile.JSHook):
             return
 
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            self.logger, test, self, self._js_filename, self._shell_options)
+            test.logger, test, self, self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming the background aggregate metrics thread.")

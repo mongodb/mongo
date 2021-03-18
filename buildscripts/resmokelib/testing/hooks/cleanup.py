@@ -34,7 +34,7 @@ class CleanEveryN(interface.Hook):
         if self.tests_run < self.n:
             return
 
-        hook_test_case = CleanEveryNTestCase.create_after_test(self.logger, test, self)
+        hook_test_case = CleanEveryNTestCase.create_after_test(test.logger, test, self)
         hook_test_case.configure(self.fixture)
         hook_test_case.run_dynamic_test(test_report)
 
