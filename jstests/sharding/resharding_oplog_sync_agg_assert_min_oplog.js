@@ -9,7 +9,7 @@
 const rst = new ReplSetTest({
     // Set the syncdelay to 1s to speed up checkpointing.
     nodeOptions: {syncdelay: 1},
-    nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
+    nodes: 1
 });
 // Set max oplog size to 1MB.
 rst.startSet({oplogSize: 1});
