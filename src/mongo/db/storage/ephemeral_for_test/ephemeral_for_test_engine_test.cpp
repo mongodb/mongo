@@ -39,7 +39,7 @@ namespace {
 
 class EphemeralForTestKVHarnessHelper : public KVHarnessHelper {
 public:
-    EphemeralForTestKVHarnessHelper() : _engine(new EphemeralForTestEngine()) {}
+    EphemeralForTestKVHarnessHelper(ServiceContext*) : _engine(new EphemeralForTestEngine()) {}
 
     virtual KVEngine* restartEngine() {
         // Intentionally not restarting since the in-memory storage engine
@@ -55,8 +55,8 @@ private:
     std::unique_ptr<EphemeralForTestEngine> _engine;
 };
 
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return std::make_unique<EphemeralForTestKVHarnessHelper>();
+std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
+    return std::make_unique<EphemeralForTestKVHarnessHelper>(svcCtx);
 }
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {

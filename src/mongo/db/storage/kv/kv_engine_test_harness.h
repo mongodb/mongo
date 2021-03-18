@@ -55,8 +55,9 @@ public:
 
     virtual KVEngine* restartEngine() = 0;
 
-    static std::unique_ptr<KVHarnessHelper> create();
-    static void registerFactory(std::function<std::unique_ptr<KVHarnessHelper>()> factory);
+    static std::unique_ptr<KVHarnessHelper> create(ServiceContext* svcCtx);
+    static void registerFactory(
+        std::function<std::unique_ptr<KVHarnessHelper>(ServiceContext*)> factory);
 };
 
 }  // namespace mongo

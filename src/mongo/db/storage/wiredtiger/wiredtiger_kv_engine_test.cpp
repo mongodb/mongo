@@ -56,16 +56,13 @@
 namespace mongo {
 namespace {
 
-class WiredTigerKVHarnessHelper : public KVHarnessHelper, public ScopedGlobalServiceContextForTest {
+class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
-    WiredTigerKVHarnessHelper(bool forRepair = false)
-        : _dbpath("wt-kv-harness"), _forRepair(forRepair) {
-        invariant(hasGlobalServiceContext());
-        _engine.reset(makeEngine());
+    WiredTigerKVHarnessHelper(ServiceContext* svcCtx, bool forRepair = false)
+        : _dbpath("wt-kv-harness"), _forRepair(forRepair), _engine(makeEngine()) {
         repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                getGlobalServiceContext(), repl::ReplSettings())));
+            svcCtx,
+            std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx, repl::ReplSettings()));
         _engine->notifyStartupComplete();
     }
 
@@ -102,20 +99,25 @@ private:
 
     const std::unique_ptr<ClockSource> _cs = std::make_unique<ClockSourceMock>();
     unittest::TempDir _dbpath;
-    std::unique_ptr<WiredTigerKVEngine> _engine;
     bool _forRepair;
+    std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
-class WiredTigerKVEngineTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class WiredTigerKVEngineTest : public ServiceContextTest {
 public:
     WiredTigerKVEngineTest(bool repair = false)
-        : _helper(repair), _engine(_helper.getWiredTigerKVEngine()) {}
-
-    std::unique_ptr<OperationContext> makeOperationContext() {
-        return std::make_unique<OperationContextNoop>(_engine->newRecoveryUnit());
-    }
+        : _helper(getServiceContext(), repair), _engine(_helper.getWiredTigerKVEngine()) {}
 
 protected:
+    ServiceContext::UniqueOperationContext _makeOperationContext() {
+        auto opCtx = makeOperationContext();
+        opCtx->setRecoveryUnit(
+            std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        return opCtx;
+    }
+
     WiredTigerKVHarnessHelper _helper;
     WiredTigerKVEngine* _engine;
 };
@@ -126,7 +128,7 @@ public:
 };
 
 TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
 
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
@@ -184,7 +186,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 }
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
-    auto opCtxPtr = makeOperationContext();
+    auto opCtxPtr = _makeOperationContext();
 
     NamespaceString nss("a.b");
     std::string ident = "collection-1234";
@@ -332,8 +334,8 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     assertPinnedMovesSoon(Timestamp(40, 1));
 }
 
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return std::make_unique<WiredTigerKVHarnessHelper>();
+std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
+    return std::make_unique<WiredTigerKVHarnessHelper>(svcCtx);
 }
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {

@@ -42,12 +42,9 @@
 namespace mongo {
 namespace biggie {
 
-class BiggieKVHarnessHelper : public KVHarnessHelper, public ScopedGlobalServiceContextForTest {
+class BiggieKVHarnessHelper : public KVHarnessHelper {
 public:
-    BiggieKVHarnessHelper() {
-        invariant(hasGlobalServiceContext());
-        _engine = std::make_unique<KVEngine>();
-    }
+    BiggieKVHarnessHelper(ServiceContext* svcCtx) : _engine(std::make_unique<KVEngine>()) {}
 
     virtual KVEngine* getEngine() override {
         return _engine.get();
@@ -61,8 +58,8 @@ private:
     std::unique_ptr<KVEngine> _engine;
 };
 
-std::unique_ptr<KVHarnessHelper> makeHelper() {
-    return std::make_unique<BiggieKVHarnessHelper>();
+std::unique_ptr<KVHarnessHelper> makeHelper(ServiceContext* svcCtx) {
+    return std::make_unique<BiggieKVHarnessHelper>(svcCtx);
 }
 
 MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {

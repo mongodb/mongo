@@ -189,7 +189,7 @@ public:
     }
 
     void setUp() override {
-        helper = KVHarnessHelper::create();
+        helper = KVHarnessHelper::create(getGlobalServiceContext());
         engine = helper->getEngine();
         snapshotManager = helper->getEngine()->getSnapshotManager();
 

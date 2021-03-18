@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -47,7 +48,7 @@ using NonRepairableFeatureMask = DurableCatalogImpl::FeatureTracker::NonRepairab
 using RepairableFeature = DurableCatalogImpl::FeatureTracker::RepairableFeature;
 using RepairableFeatureMask = DurableCatalogImpl::FeatureTracker::RepairableFeatureMask;
 
-class DurableCatalogFeatureTrackerTest : public unittest::Test {
+class DurableCatalogFeatureTrackerTest : public ServiceContextTest {
 public:
     static const NonRepairableFeature kNonRepairableFeature1 =
         static_cast<NonRepairableFeature>(1 << 0);
@@ -64,10 +65,15 @@ public:
 
     static const RepairableFeature kRepairableFeature3 = static_cast<RepairableFeature>(1 << 2);
 
-    DurableCatalogFeatureTrackerTest() : _helper(KVHarnessHelper::create()) {}
+    DurableCatalogFeatureTrackerTest() : _helper(KVHarnessHelper::create(getServiceContext())) {}
 
-    std::unique_ptr<OperationContext> newOperationContext() {
-        return std::make_unique<OperationContextNoop>(_helper->getEngine()->newRecoveryUnit());
+    ServiceContext::UniqueOperationContext newOperationContext() {
+        auto opCtx = makeOperationContext();
+        opCtx->setRecoveryUnit(
+            std::unique_ptr<RecoveryUnit>(_helper->getEngine()->newRecoveryUnit()),
+            WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->swapLockState(std::make_unique<LockerNoop>(), WithLock::withoutLock());
+        return opCtx;
     }
 
     void setUp() final {

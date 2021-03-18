@@ -34,6 +34,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 /**
@@ -82,7 +83,7 @@ public:
 
 private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SizeRecoveryState::_mutex");
-    std::set<std::string> _collectionsAlwaysNeedingSizeAdjustment;
+    StringSet _collectionsAlwaysNeedingSizeAdjustment;
 };
 
 /**
