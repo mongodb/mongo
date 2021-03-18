@@ -3582,6 +3582,11 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         _topCoord->prepareForUnconditionalStepDown();
         lk.unlock();
 
+        // To prevent a deadlock between session checkout and RSTL lock taking, disallow new
+        // sessions from being checked out. Existing sessions currently checked out will be killed
+        // by the killOpThread.
+        ScopedBlockSessionCheckouts blockSessions(opCtx);
+
         // Primary node won't be electable or removed after the configuration change.
         // So, finish the reconfig under RSTL, so that the step down occurs safely.
         arsd.emplace(this, opCtx, ReplicationCoordinator::OpsKillingStateTransitionEnum::kStepDown);
