@@ -1,3 +1,6 @@
+# This Chef task installs MongoDB in a new EC2 instance spun up by Kitchen in
+# preparation for running some basic server functionality tests.
+
 artifacts_tarball = 'artifacts.tgz'
 user = node['current_user']
 homedir = node['etc']['passwd'][user]['dir']
@@ -24,6 +27,7 @@ end
 
 execute 'extract artifacts' do
   command "tar xzvf #{artifacts_tarball}"
+  live_stream true
   cwd homedir
 end
 
@@ -31,15 +35,24 @@ if platform_family? 'debian'
 
   execute 'apt-get update' do
     command 'apt-get update'
+    live_stream true
   end
 
   ENV['DEBIAN_FRONTEND'] = 'noninteractive'
   package 'openssl'
 
+  # the ubuntu 16.04 image does not have some dependencies installed by default
+  # and it is required for the install_compass script
+  execute 'install dependencies' do
+    command 'apt-get install -y python libsasl2-modules-gssapi-mit'
+    live_stream true
+  end
+
   # dpkg returns 1 if dependencies are not satisfied, which they will not be
   # for enterprise builds. We install dependencies in the next block.
   execute 'install mongod' do
     command 'dpkg -i `find . -name "*server*.deb"`'
+    live_stream true
     cwd homedir
     returns [0, 1]
   end
@@ -47,6 +60,7 @@ if platform_family? 'debian'
   # install the tools so we can test install_compass
   execute 'install mongo tools' do
     command 'dpkg -i `find . -name "*tools*.deb"`'
+    live_stream true
     cwd homedir
     returns [0, 1]
   end
@@ -54,36 +68,38 @@ if platform_family? 'debian'
   # yum and zypper fetch dependencies automatically, but dpkg does not.
   # Installing the dependencies explicitly is fragile, so we reply on apt-get
   # to install dependencies after the fact.
-  execute 'install dependencies' do
-    command 'apt-get update && apt-get -y -f install'
-  end
-
-  # the ubuntu 16.04 image does not have python installed by default
-  # and it is required for the install_compass script
-  execute 'install python' do
-    command 'apt-get install -y python'
+  execute 'update and fix broken dependencies' do
+    command 'apt-get update && apt -y -f install'
+    live_stream true
   end
 
   execute 'install mongo shell' do
     command 'dpkg -i `find . -name "*shell*.deb"`'
+    live_stream true
     cwd homedir
   end
 end
 
 if platform_family? 'rhel'
+  bash 'wait for yum updates if they are running' do
+    sleep 120
+  end
   execute 'install mongod' do
     command 'yum install -y `find . -name "*server*.rpm"`'
+    live_stream true
     cwd homedir
   end
 
   # install the tools so we can test install_compass
   execute 'install mongo tools' do
     command 'yum install -y `find . -name "*tools*.rpm"`'
+    live_stream true
     cwd homedir
   end
 
   execute 'install mongo shell' do
     command 'yum install -y `find . -name "*shell*.rpm"`'
+    live_stream true
     cwd homedir
   end
 end
@@ -103,10 +119,12 @@ if platform_family? 'suse'
     done
     exit 1
   EOD
+  flags "-x"
   end
 
   execute 'install mongod' do
     command 'zypper --no-gpg-checks -n install `find . -name "*server*.rpm"`'
+    live_stream true
     cwd homedir
   end
 
@@ -118,12 +136,13 @@ if platform_family? 'suse'
 
   execute 'install mongo' do
     command 'zypper --no-gpg-checks -n install `find . -name "*shell*.rpm"`'
+    live_stream true
     cwd homedir
   end
 end
 
 inspec_wait = <<HEREDOC
-#!/bin/bash
+#!/bin/bash -x
 ulimit -v unlimited
 for i in {1..60}
 do
