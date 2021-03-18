@@ -21,7 +21,7 @@ load("jstests/replsets/rslib.js");
 
 // Run a command, return the result if it worked, or assert with a message otherwise.
 let checkedRunCommand = (db, cmd) =>
-    ((res, msg) => (assert.commandWorked(res, msg), res))(db.runCommand(cmd), tojson(cmd));
+    ((res, msg) => ((assert.commandWorked(res, msg), res)))(db.runCommand(cmd), tojson(cmd));
 
 // Like db.getCollectionNames, but allows a filter.
 let getCollectionNames = (db, filter) => checkedRunCommand(db, {listCollections: 1, filter})
