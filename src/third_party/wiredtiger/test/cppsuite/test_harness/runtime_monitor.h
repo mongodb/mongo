@@ -141,7 +141,7 @@ class runtime_monitor : public component {
         testutil_check(_config->get(STAT_CACHE_SIZE, &nested));
         configuration sub_config = configuration(nested);
         _stats.push_back(new cache_limit_statistic(&sub_config));
-        _running = true;
+        component::load();
     }
 
     void

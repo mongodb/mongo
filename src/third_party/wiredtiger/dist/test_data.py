@@ -106,6 +106,23 @@ runtime_monitor_config = throttle_config +[
         type='category', subconfig=limit_stat)
 ]
 
+transaction_config = [
+    Config('min_operation_per_transaction', 1, r'''
+        The minimum number of operations per transaction''', min=1, max=200000),
+    Config('max_operation_per_transaction', 1, r'''
+        The maximum number of operations per transaction''', min=1, max=200000),
+]
+
+timestamp_config = [
+    Config('enable_timestamp', 'true', r'''
+        Enables timestamp management''', type='boolean'),
+    Config('oldest_lag', 0, r'''
+        The duration between the stable and oldest timestamps''', min=0, max=1000000),
+    Config('stable_lag', 0, r'''
+        The duration between the latest and stable timestamps''', min=0, max=1000000),
+]
+
 methods = {
-'poc_test' : Method(load_config + workload_config + runtime_monitor_config + test_config),
+    'poc_test' : Method(load_config + workload_config + runtime_monitor_config + transaction_config
+        + timestamp_config + test_config),
 }

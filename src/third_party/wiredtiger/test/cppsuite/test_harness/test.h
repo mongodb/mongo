@@ -61,7 +61,8 @@ class test {
         _timestamp_manager = new timestamp_manager(_configuration);
         _workload_tracking = new workload_tracking(_configuration, OPERATION_TRACKING_TABLE_CONFIG,
           TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG, TABLE_SCHEMA_TRACKING);
-        _workload_generator = new workload_generator(_configuration, _workload_tracking);
+        _workload_generator =
+          new workload_generator(_configuration, _timestamp_manager, _workload_tracking);
         _thread_manager = new thread_manager();
         /*
          * Ordering is not important here, any dependencies between components should be resolved
@@ -95,8 +96,7 @@ class test {
     void
     run()
     {
-        int64_t cache_size_mb = 100;
-        int64_t duration_seconds = 0;
+        int64_t cache_size_mb = 100, duration_seconds = 0;
         bool enable_tracking = false, is_success = true;
 
         /* Build the database creation config string. */
@@ -118,6 +118,7 @@ class test {
 
         /* Sleep duration seconds. */
         testutil_check(_configuration->get_int(DURATION_SECONDS, duration_seconds));
+        testutil_assert(duration_seconds >= 0);
         std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
 
         /* End the test. */
@@ -175,8 +176,8 @@ class test {
     std::vector<component *> _components;
     configuration *_configuration;
     runtime_monitor *_runtime_monitor;
-    timestamp_manager *_timestamp_manager;
     thread_manager *_thread_manager;
+    timestamp_manager *_timestamp_manager;
     workload_generator *_workload_generator;
     workload_tracking *_workload_tracking;
 };

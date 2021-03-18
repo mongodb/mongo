@@ -49,7 +49,7 @@
 
 namespace test_harness {
 /* Tracking operations. */
-enum class tracking_operation { CREATE, DELETE_COLLECTION, DELETE_KEY, INSERT };
+enum class tracking_operation { CREATE, DELETE_COLLECTION, DELETE_KEY, INSERT, UPDATE };
 /* Class used to track operations performed on collections */
 class workload_tracking : public component {
 
@@ -57,12 +57,15 @@ class workload_tracking : public component {
     workload_tracking(configuration *_config, const std::string &operation_table_config,
       const std::string &operation_table_name, const std::string &schema_table_config,
       const std::string &schema_table_name)
-        : component(_config), _cursor_operations(nullptr), _cursor_schema(nullptr),
+        : component(_config), _cursor_operations(nullptr), _cursor_schema(nullptr), _enabled(false),
           _operation_table_config(operation_table_config),
           _operation_table_name(operation_table_name), _schema_table_config(schema_table_config),
-          _schema_table_name(schema_table_name), _timestamp(0U), _enabled(false)
+          _schema_table_name(schema_table_name)
     {
     }
+
+    /* Delete the copy constructor. */
+    workload_tracking(const workload_tracking &) = delete;
 
     const std::string &
     get_schema_table_name() const
@@ -110,7 +113,7 @@ class workload_tracking : public component {
     template <typename K, typename V>
     int
     save(const tracking_operation &operation, const std::string &collection_name, const K &key,
-      const V &value)
+      const V &value, wt_timestamp_t ts)
     {
         WT_CURSOR *cursor;
         int error_code = 0;
@@ -123,13 +126,13 @@ class workload_tracking : public component {
         case tracking_operation::CREATE:
         case tracking_operation::DELETE_COLLECTION:
             cursor = _cursor_schema;
-            cursor->set_key(cursor, collection_name.c_str(), _timestamp++);
+            cursor->set_key(cursor, collection_name.c_str(), ts);
             cursor->set_value(cursor, static_cast<int>(operation));
             break;
 
         default:
             cursor = _cursor_operations;
-            cursor->set_key(cursor, collection_name.c_str(), key, _timestamp++);
+            cursor->set_key(cursor, collection_name.c_str(), key, ts);
             cursor->set_value(cursor, static_cast<int>(operation), value);
             break;
         }
@@ -145,14 +148,13 @@ class workload_tracking : public component {
     }
 
     private:
+    WT_CURSOR *_cursor_operations;
+    WT_CURSOR *_cursor_schema;
+    bool _enabled;
     const std::string _operation_table_config;
     const std::string _operation_table_name;
     const std::string _schema_table_config;
     const std::string _schema_table_name;
-    WT_CURSOR *_cursor_operations;
-    WT_CURSOR *_cursor_schema;
-    uint64_t _timestamp;
-    bool _enabled;
 };
 } // namespace test_harness
 
