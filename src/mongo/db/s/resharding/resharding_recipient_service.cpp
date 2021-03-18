@@ -226,6 +226,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _donorShardIds{recipientDoc.getDonorShards()},
+      _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _recipientCtx{recipientDoc.getMutableState()},
       _fetchTimestamp{recipientDoc.getFetchTimestamp()} {}
 
@@ -433,9 +434,7 @@ void ReshardingRecipientService::RecipientStateMachine::_initTxnCloner(
         catalogCache->getShardedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
     std::set<ShardId> shardList;
 
-    const auto myShardId = ShardingState::get(opCtx)->shardId();
     routingInfo.getAllShardIds(&shardList);
-    shardList.erase(myShardId);
 
     for (const auto& shard : shardList) {
         _txnCloners.push_back(std::make_unique<ReshardingTxnCloner>(
@@ -509,21 +508,25 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return _collectionCloner->run(**executor, abortToken)
-        .then([this, executor, abortToken] {
-            if (_txnCloners.empty()) {
-                return SemiFuture<void>::makeReady();
-            }
+    return whenAllSucceed(_collectionCloner->run(**executor, abortToken),
+                          (*executor)
+                              ->sleepFor(_minimumOperationDuration, abortToken)
+                              .then([this, executor, abortToken] {
+                                  if (_txnCloners.empty()) {
+                                      return SemiFuture<void>::makeReady();
+                                  }
 
-            auto serviceContext = Client::getCurrent()->getServiceContext();
+                                  auto serviceContext = Client::getCurrent()->getServiceContext();
 
-            std::vector<ExecutorFuture<void>> txnClonerFutures;
-            for (auto&& txnCloner : _txnCloners) {
-                txnClonerFutures.push_back(txnCloner->run(serviceContext, **executor, abortToken));
-            }
+                                  std::vector<ExecutorFuture<void>> txnClonerFutures;
+                                  for (auto&& txnCloner : _txnCloners) {
+                                      txnClonerFutures.push_back(
+                                          txnCloner->run(serviceContext, **executor, abortToken));
+                                  }
 
-            return whenAllSucceed(std::move(txnClonerFutures));
-        })
+                                  return whenAllSucceed(std::move(txnClonerFutures));
+                              }))
+        .thenRunOn(**executor)
         .then([this] {
             // ReshardingTxnCloners must complete before the recipient transitions to kApplying to
             // avoid errors caused by donor shards unpinning the fetchTimestamp.

@@ -197,10 +197,14 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
  */
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
-    auto donorShardIds = resharding::extractShardIds(coordinatorDoc.getDonorShards());
     TypeCollectionRecipientFields recipientFields(
-        std::move(donorShardIds), coordinatorDoc.getSourceUUID(), coordinatorDoc.getSourceNss());
+        resharding::extractShardIds(coordinatorDoc.getDonorShards()),
+        coordinatorDoc.getSourceUUID(),
+        coordinatorDoc.getSourceNss(),
+        resharding::gReshardingMinimumOperationDurationMillis.load());
+
     emplaceFetchTimestampIfExists(recipientFields, coordinatorDoc.getFetchTimestamp());
+
     return recipientFields;
 }
 

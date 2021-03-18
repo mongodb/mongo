@@ -333,7 +333,9 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
     auto recipientDoc = ReshardingRecipientDocument{
-        std::move(recipientCtx), reshardingFields.getRecipientFields()->getDonorShardIds()};
+        std::move(recipientCtx),
+        reshardingFields.getRecipientFields()->getDonorShardIds(),
+        reshardingFields.getRecipientFields()->getMinimumOperationDurationMillis()};
 
     auto sourceNss = reshardingFields.getRecipientFields()->getSourceNss();
     auto sourceUUID = reshardingFields.getRecipientFields()->getSourceUUID();

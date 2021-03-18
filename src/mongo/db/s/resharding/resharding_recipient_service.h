@@ -205,6 +205,7 @@ private:
     // config.localReshardingOperations.recipient.
     const CommonReshardingMetadata _metadata;
     const std::vector<ShardId> _donorShardIds;
+    const Milliseconds _minimumOperationDuration;
 
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.recipient.
