@@ -1,0 +1,21 @@
+# This workload uses 10000 tables and the workload is evenly distributed among them.
+# The workload creates, opens and drop tables, and it fails if the time taken is more
+# than the configured idle_table_cycle.
+conn_config="cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000"
+table_config="type=file"
+table_count=10000
+idle_table_cycle=15
+random_range=1000000000
+pareto=10
+range_partition=true
+report_interval=5
+checkpoint_threads=1
+checkpoint_interval=30
+populate_threads=1
+pre_load_data=true
+icount=10000000
+run_time=900
+threads=((count=10,inserts=1,throttle=1000),(count=10,reads=1))
+max_latency=1000
+sample_interval=5
+sample_rate=1
