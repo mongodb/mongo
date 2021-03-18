@@ -196,7 +196,6 @@ void SessionsCollection::_doRefresh(const NamespaceString& ns,
     auto init = [ns](BSONObjBuilder* batch) {
         batch->append("update", ns.coll());
         batch->append("ordered", false);
-        batch->append("allowImplicitCollectionCreation", false);
         batch->append(WriteConcernOptions::kWriteConcernField, kMajorityWriteConcern.toBSON());
     };
 

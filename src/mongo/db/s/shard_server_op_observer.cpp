@@ -488,7 +488,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     // TODO (SERVER-52778): Delete the lines below once all usages of
     // ScopedAllowImplicitCollectionCreate_UNSAFE have been removed
     auto* const csr = CollectionShardingRuntime::get(opCtx, collectionName);
-    if (opCtx->writesAreReplicated() && !csr->getCurrentMetadataIfKnown()) {
+    if (!csr->getCurrentMetadataIfKnown()) {
         csr->setFilteringMetadata(opCtx, CollectionMetadata());
     }
 }
