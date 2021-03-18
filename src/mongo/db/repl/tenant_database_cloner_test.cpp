@@ -77,6 +77,7 @@ protected:
             return Status::OK();
         };
         _mockClient->setOperationTime(_operationTime);
+        _mockServer->setCommandReply("collStats", BSON("size" << 1));
     }
 
     std::unique_ptr<TenantDatabaseCloner> makeDatabaseCloner(

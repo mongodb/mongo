@@ -327,6 +327,23 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
                _stateDoc.getNumRestartsDueToDonorConnectionFailure());
     bob.append("numRestartsDueToRecipientFailure", _stateDoc.getNumRestartsDueToRecipientFailure());
 
+    if (_tenantAllDatabaseCloner) {
+        auto stats = _tenantAllDatabaseCloner->getStats();
+        bob.append("approxTotalDataSize", stats.approxTotalDataSize);
+        bob.append("approxTotalBytesCopied", stats.approxTotalBytesCopied);
+
+        long long elapsedMillis = duration_cast<Milliseconds>(Date_t::now() - stats.start).count();
+        bob.append("totalReceiveElapsedMillis", elapsedMillis);
+
+        // Perform the multiplication first to avoid rounding errors, and add one to avoid division
+        // by 0.
+        long long timeRemainingMillis =
+            ((stats.approxTotalDataSize - stats.approxTotalBytesCopied) * elapsedMillis) /
+            (stats.approxTotalBytesCopied + 1);
+
+        bob.append("remainingReceiveEstimatedMillis", timeRemainingMillis);
+    }
+
     if (_stateDoc.getStartFetchingDonorOpTime())
         bob.append("startFetchingDonorOpTime", _stateDoc.getStartFetchingDonorOpTime()->toBSON());
     if (_stateDoc.getStartApplyingDonorOpTime())

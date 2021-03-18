@@ -46,6 +46,10 @@ public:
         size_t databasesCloned{0};
         size_t databasesClonedBeforeFailover{0};
         std::vector<TenantDatabaseCloner::Stats> databaseStats;
+        Date_t start;
+
+        long long approxTotalDataSize{0};
+        long long approxTotalBytesCopied{0};
 
         std::string toString() const;
         BSONObj toBSON() const;
@@ -96,6 +100,11 @@ private:
      * already cloned.
      */
     AfterStageBehavior listExistingDatabasesStage();
+
+    /**
+     * The preStage sets the start time in _stats.
+     */
+    void preStage() final;
 
     /**
      *

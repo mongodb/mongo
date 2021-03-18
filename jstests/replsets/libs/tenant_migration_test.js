@@ -125,7 +125,10 @@ function TenantMigrationTest({
             privileges: [
                 {resource: {cluster: true}, actions: ["listDatabases", "useUUID"]},
                 {resource: {db: "", collection: ""}, actions: ["listCollections"]},
-                {resource: {anyResource: true}, actions: ["collStats", "find", "listIndexes"]}
+                {
+                    resource: {anyResource: true},
+                    actions: ["dbStats", "collStats", "find", "listIndexes"]
+                }
             ],
             roles: []
         }));

@@ -302,6 +302,8 @@ void TenantDatabaseCloner::postStage() {
         {
             stdx::lock_guard<Latch> lk(_mutex);
             _stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
+            _stats.approxTotalBytesCopied +=
+                _stats.collectionStats[_stats.clonedCollections].approxTotalBytesCopied;
             _currentCollectionCloner = nullptr;
             // Abort the tenant database cloner if the collection clone failed.
             if (!collStatus.isOK())
@@ -318,6 +320,8 @@ TenantDatabaseCloner::Stats TenantDatabaseCloner::getStats() const {
     TenantDatabaseCloner::Stats stats = _stats;
     if (_currentCollectionCloner) {
         stats.collectionStats[_stats.clonedCollections] = _currentCollectionCloner->getStats();
+        stats.approxTotalBytesCopied +=
+            stats.collectionStats[stats.clonedCollections].approxTotalBytesCopied;
     }
     return stats;
 }
