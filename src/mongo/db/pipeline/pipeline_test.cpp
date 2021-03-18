@@ -580,6 +580,103 @@ TEST(PipelineOptimizationTest, MoveMatchBeforeSort) {
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
+TEST(PipelineOptimizationTest, LookupMoveSortNotOnAsBefore) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'new', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {left: 1}}"
+        "]";
+    string outputPipe =
+        "[{$sort: {sortKey: {left: 1}}}"
+        ",{$lookup: {from : 'lookupColl', as : 'new', localField: 'left', foreignField: "
+        "'right'}}"
+        "]";
+    string serializedPipe =
+        "[{$sort: {left: 1}}"
+        ",{$lookup: {from : 'lookupColl', as : 'new', localField: 'left', foreignField: "
+        "'right'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupMoveSortOnPrefixStringOfAsBefore) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'leftNew', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {left: 1}}"
+        "]";
+    string outputPipe =
+        "[{$sort: {sortKey: {left: 1}}}"
+        ",{$lookup: {from : 'lookupColl', as : 'leftNew', localField: 'left', foreignField: "
+        "'right'}}"
+        "]";
+    string serializedPipe =
+        "[{$sort: {left: 1}}"
+        ",{$lookup: {from : 'lookupColl', as : 'leftNew', localField: 'left', foreignField: "
+        "'right'}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupShouldNotMoveSortOnAsBefore) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {same: 1, left: 1}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {sortKey: {same: 1, left: 1}}}"
+        "]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {same: 1, left: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupShouldNotMoveSortOnPathPrefixOfAsBefore) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same.new', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {same: 1}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same.new', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {sortKey: {same: 1}}}"
+        "]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same.new', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$sort: {same: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LookupUnwindShouldNotMoveSortBefore) {
+    string inputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        ",{$sort: {left: 1}}"
+        "]";
+    string outputPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right', unwinding: {preserveNullAndEmptyArrays: false}}}"
+        ",{$sort: {sortKey: {left: 1}}}"
+        "]";
+    string serializedPipe =
+        "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
+        "'right'}}"
+        ",{$unwind: {path: '$same'}}"
+        ",{$sort: {left: 1}}"
+        "]";
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 TEST(PipelineOptimizationTest, LookupShouldCoalesceWithUnwindOnAs) {
     string inputPipe =
         "[{$lookup: {from : 'lookupColl', as : 'same', localField: 'left', foreignField: "
@@ -2219,8 +2316,8 @@ TEST(PipelineOptimizationTest, MatchGetsPushedIntoBothChildrenOfUnion) {
         "   coll: 'unionColl',"
         "   pipeline: [{$match: {x: {$eq: 2}}}]"
         " }},"
-        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}},"
-        " {$sort: {sortKey: {score: 1}}}"
+        " {$sort: {sortKey: {score: 1}}},"
+        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}}"
         "]",
         "["
         " {$match: {x: {$eq: 2}}},"
@@ -2228,8 +2325,8 @@ TEST(PipelineOptimizationTest, MatchGetsPushedIntoBothChildrenOfUnion) {
         "   coll: 'unionColl',"
         "   pipeline: [{$match: {x: {$eq: 2}}}]"
         " }},"
-        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}},"
-        " {$sort: {score: 1}}"
+        " {$sort: {score: 1}},"
+        " {$lookup: {from: 'lookupColl', as: 'y', localField: 'z', foreignField: 'z'}}"
         "]");
 
     // Test that the $match can get pulled forward from after the $unionWith to inside, then to the
