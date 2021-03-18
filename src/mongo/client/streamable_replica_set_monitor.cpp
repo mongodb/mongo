@@ -252,6 +252,8 @@ void StreamableReplicaSetMonitor::init() {
         _uri, _sdamConfig, _eventsPublisher, _topologyManager->getTopologyDescription(), _executor);
     _eventsPublisher->registerListener(_serverDiscoveryMonitor);
 
+    _eventsPublisher->registerListener(_queryProcessor);
+
     _isDropped.store(false);
 
     ReplicaSetMonitorManager::get()->getNotifier().onFoundSet(getName());
@@ -402,10 +404,6 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
 
     // Add the query to the list of outstanding queries.
     auto queryIter = _outstandingQueries.insert(_outstandingQueries.end(), query);
-
-    // Send topology changes to the query processor to satisfy the future.
-    // It will be removed as a listener when all waiting queries have been satisfied.
-    _eventsPublisher->registerListener(_queryProcessor);
 
     // After a deadline or when the input cancellation token is canceled, cancel this query. If the
     // query completes first, the deadlineCancelSource will be used to cancel this task.
@@ -775,14 +773,7 @@ void StreamableReplicaSetMonitor::_failOutstandingWithStatus(WithLock, Status st
 std::list<StreamableReplicaSetMonitor::HostQueryPtr>::iterator
 StreamableReplicaSetMonitor::_eraseQueryFromOutstandingQueries(
     WithLock, std::list<HostQueryPtr>::iterator iter) {
-
-    auto retVal = _outstandingQueries.erase(iter);
-    if (_outstandingQueries.size() == 0) {
-        // If there are no more outstanding queries, no need to listen for topology
-        // changes in this monitor.
-        _eventsPublisher->removeListener(_queryProcessor);
-    }
-    return retVal;
+    return _outstandingQueries.erase(iter);
 }
 
 void StreamableReplicaSetMonitor::_processOutstanding(
