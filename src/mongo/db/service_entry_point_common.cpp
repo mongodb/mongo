@@ -1355,7 +1355,6 @@ void ExecCommandDatabase::_initiateCommand() {
 
     BSONElement cmdOptionMaxTimeMSField;
     BSONElement maxTimeMSOpOnlyField;
-    BSONElement allowImplicitCollectionCreationField;
     BSONElement helpField;
 
     StringMap<int> topLevelFields;
@@ -1368,8 +1367,6 @@ void ExecCommandDatabase::_initiateCommand() {
                     "Can not specify maxTimeMSOpOnly for non internal clients",
                     _isInternalClient());
             maxTimeMSOpOnlyField = element;
-        } else if (fieldName == "allowImplicitCollectionCreation") {
-            allowImplicitCollectionCreationField = element;
         } else if (fieldName == CommandHelpers::kHelpFieldName) {
             helpField = element;
         } else if (fieldName == "comment") {
