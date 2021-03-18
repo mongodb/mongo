@@ -452,6 +452,7 @@ env.Library(
     target='service_context',
     source=[
         'baton.cpp',
+        'cancelable_operation_context.cpp',
         'client.cpp',
         'client_strand.cpp',
         'default_baton.cpp',
@@ -2304,6 +2305,7 @@ if wiredtiger:
     envWithAsio.CppUnitTest(
         target='db_unittest_test',
         source=[
+            'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
             'client_strand_test.cpp',
             'client_context_test.cpp',
