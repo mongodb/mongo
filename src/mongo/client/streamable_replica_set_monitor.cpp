@@ -202,6 +202,8 @@ void StreamableReplicaSetMonitor::init() {
         _uri, _sdamConfig, _eventsPublisher, _topologyManager->getTopologyDescription(), _executor);
     _eventsPublisher->registerListener(_isMasterMonitor);
 
+    _eventsPublisher->registerListener(_queryProcessor);
+
     _isDropped.store(false);
 
     ReplicaSetMonitorManager::get()->getNotifier().onFoundSet(getName());
@@ -353,12 +355,8 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
     query->deadlineHandle = swDeadlineHandle.getValue();
     _outstandingQueries.push_back(query);
 
-    // Send topology changes to the query processor to satisfy the future.
-    // It will be removed as a listener when all waiting queries have been satisfied.
-    _eventsPublisher->registerListener(_queryProcessor);
-
     return std::move(pf.future).semi();
-}  // namespace mongo
+}
 
 boost::optional<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_getHosts(
     const TopologyDescriptionPtr& topology, const ReadPreferenceSetting& criteria) {
@@ -760,10 +758,6 @@ void StreamableReplicaSetMonitor::_processOutstanding(
     if (_outstandingQueries.size()) {
         // enable expedited mode
         _isMasterMonitor->requestImmediateCheck();
-    } else {
-        // if no more outstanding queries, no need to listen for topology changes in
-        // this monitor.
-        _eventsPublisher->removeListener(_queryProcessor);
     }
 }
 

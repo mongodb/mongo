@@ -32,12 +32,10 @@ namespace mongo::sdam {
 
 void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
     stdx::lock_guard lock(_mutex);
+    // Make sure we're not re-registering a listener. This is a linear scan of a vector, but there
+    // are only a few calls to registerListener in the codebase so this shouldn't be a problem.
+    invariant(std::find(_listeners.begin(), _listeners.end(), listener) == _listeners.end());
     _listeners.push_back(listener);
-}
-
-void TopologyEventsPublisher::removeListener(TopologyListenerPtr listener) {
-    stdx::lock_guard lock(_mutex);
-    _listeners.erase(std::remove(_listeners.begin(), _listeners.end(), listener), _listeners.end());
 }
 
 void TopologyEventsPublisher::close() {
