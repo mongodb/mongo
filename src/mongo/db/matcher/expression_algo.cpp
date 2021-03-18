@@ -224,22 +224,6 @@ bool _isSubsetOf(const MatchExpression* lhs, const ExistsMatchExpression* rhs) {
 }
 
 /**
- * Returns whether the leaf at 'path' is independent of 'fields'.
- */
-bool isLeafIndependentOf(const StringData& path, const std::set<std::string>& fields) {
-    // For each field in 'fields', we need to check if that field is a prefix of 'path' or if 'path'
-    // is a prefix of that field. For example, the expression {a.b: {c: 1}} is not independent of
-    // 'a.b.c', and and the expression {a.b.c.d: 1} is not independent of 'a.b.c'.
-    for (StringData field : fields) {
-        if (path == field || expression::isPathPrefixOf(path, field) ||
-            expression::isPathPrefixOf(field, path)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-/**
  * Creates a MatchExpression that is equivalent to {$and: [children[0], children[1]...]}.
  */
 unique_ptr<MatchExpression> createAndOfNodes(std::vector<unique_ptr<MatchExpression>>* children) {
@@ -410,32 +394,49 @@ bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     return false;
 }
 
-bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet) {
-    switch (expr.getCategory()) {
-        case MatchExpression::MatchCategory::kLogical: {
-            // Any logical expression is independent of 'pathSet' if all its children are
-            // independent of 'pathSet'.
-            for (size_t i = 0; i < expr.numChildren(); i++) {
-                if (!isIndependentOf(*expr.getChild(i), pathSet)) {
-                    return false;
-                }
+// Checks if 'expr' has any children which do not have renaming implemented.
+bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr) {
+    if (expr.matchType() == MatchExpression::MatchType::EXPRESSION) {
+        return true;
+    } else if (expr.getCategory() == MatchExpression::MatchCategory::kArrayMatching ||
+               expr.getCategory() == MatchExpression::MatchCategory::kOther) {
+        return false;
+    } else if (expr.getCategory() == MatchExpression::MatchCategory::kLogical) {
+        for (size_t i = 0; i < expr.numChildren(); i++) {
+            if (!hasOnlyRenameableMatchExpressionChildren(*expr.getChild(i))) {
+                return false;
             }
-            return true;
-        }
-        case MatchExpression::MatchCategory::kLeaf: {
-            return isLeafIndependentOf(expr.path(), pathSet);
-        }
-        // All other match expressions are never considered independent.
-        case MatchExpression::MatchCategory::kArrayMatching:
-        case MatchExpression::MatchCategory::kOther: {
-            return false;
         }
     }
+    return true;
+}
 
-    MONGO_UNREACHABLE;
+bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet) {
+    // Any expression types that do not have renaming implemented cannot have their independence
+    // evaluated here. See applyRenamesToExpression().
+    if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
+        return false;
+    }
+
+    auto depsTracker = DepsTracker{};
+    expr.addDependencies(&depsTracker);
+    return std::none_of(
+        depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
+            return pathSet.find(field) != pathSet.end() ||
+                std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
+                       return expression::isPathPrefixOf(field, path) ||
+                           expression::isPathPrefixOf(path, field);
+                   });
+        });
 }
 
 bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots) {
+    // Any expression types that do not have renaming implemented cannot have their independence
+    // evaluated here. See applyRenamesToExpression().
+    if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
+        return false;
+    }
+
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
     return std::all_of(

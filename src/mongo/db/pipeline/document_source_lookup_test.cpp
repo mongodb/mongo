@@ -1009,12 +1009,18 @@ TEST_F(DocumentSourceLookUpTest,
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
 
-    auto expectedPipe = fromjson(
-        str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
-                      << sequentialCacheStageObj()
-                      << ", {$facet: {facetPipe: [{$teeConsumer: {}},{$group: {_id: '$_id'}}, "
-                         "{$match: {$and: [{_id: {$_internalExprEq: 5}}, {$expr: {$eq: "
-                         "['$_id', {$const: 5}]}}]}}]}}]");
+    // Note that the second $match stage should be moved up to before the $group stage, since $group
+    // should swap with $match when filtering on $_id.
+    auto expectedPipe =
+        fromjson(str::stream() << "[{mock: {}},"
+                                  " {$match: {x:{$eq: 1}}},"
+                                  " {$sort: {sortKey: {x: 1}}},"
+                               << sequentialCacheStageObj()
+                               << ",{$facet: {facetPipe: ["
+                                  "   {$teeConsumer: {}},"
+                                  "   {$match: {$and: [{_id: {$_internalExprEq: 5}},"
+                                  "                    {$expr: {$eq: ['$_id', {$const: 5}]}}]}},"
+                                  "   {$group: {_id: '$_id'}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
