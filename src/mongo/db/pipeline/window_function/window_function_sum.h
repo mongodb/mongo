@@ -45,7 +45,9 @@ protected:
           _negInfiniteValueCount(0),
           _nanCount(0),
           _doubleCount(0),
-          _decimalCount(0) {}
+          _decimalCount(0) {
+        _memUsageBytes = sizeof(*this) + _sumAcc->getMemUsage();
+    }
 
 public:
     static Value getDefault() {
@@ -69,6 +71,7 @@ public:
         _nanCount = 0;
         _doubleCount = 0;
         _decimalCount = 0;
+        _memUsageBytes = sizeof(*this) + _sumAcc->getMemUsage();
     }
 
 private:
