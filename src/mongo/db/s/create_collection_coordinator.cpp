@@ -397,7 +397,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !_nss.isSystem() || _nss == NamespaceString::kLogicalSessionsNamespace ||
-                _nss.isTemporaryReshardingCollection());
+                _nss.isTemporaryReshardingCollection() || _nss.isTimeseriesBucketsCollection());
 
     if (_request.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
