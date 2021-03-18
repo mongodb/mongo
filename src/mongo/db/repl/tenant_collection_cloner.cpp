@@ -176,10 +176,27 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
         count = 0;
     }
 
+    BSONObj res;
+    getClient()->runCommand(
+        _sourceNss.db().toString(), BSON("collStats" << _sourceNss.coll()), res);
+    auto status = getStatusFromCommandResult(res);
+    if (!status.isOK()) {
+        LOGV2_WARNING(5426601,
+                      "Skipping recording of data size metrics for collection due to failure in the"
+                      " 'collStats' command, tenant migration stats may be inaccurate.",
+                      "nss"_attr = _sourceNss,
+                      "migrationId"_attr = getSharedData()->getMigrationId(),
+                      "tenantId"_attr = _tenantId,
+                      "status"_attr = status);
+    }
+
     _progressMeter.setTotalWhileRunning(static_cast<unsigned long long>(count));
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.documentToCopy = count;
+        _stats.approxTotalDataSize = status.isOK() ? res.getField("size").safeNumberLong() : 0;
+        _stats.avgObjSize =
+            _stats.approxTotalDataSize ? res.getField("avgObjSize").safeNumberLong() : 0;
     }
     return kContinueNormally;
 }
@@ -342,6 +359,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
             {
                 stdx::lock_guard<Latch> lk(_mutex);
                 _stats.documentsCopied += count;
+                _stats.approxTotalBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
                 _progressMeter.hit(count);
             }
         } else {
@@ -508,6 +526,7 @@ void TenantCollectionCloner::insertDocumentsCallback(
         }
         _documentsToInsert.swap(docs);
         _stats.documentsCopied += docs.size();
+        _stats.approxTotalBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
         ++_stats.insertedBatches;
         _progressMeter.hit(int(docs.size()));
     }

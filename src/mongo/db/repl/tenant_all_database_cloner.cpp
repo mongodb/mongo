@@ -65,6 +65,11 @@ BaseCloner::ClonerStages TenantAllDatabaseCloner::getStages() {
     return {&_listDatabasesStage, &_listExistingDatabasesStage};
 }
 
+void TenantAllDatabaseCloner::preStage() {
+    stdx::lock_guard lk(_mutex);
+    _stats.start = getSharedData()->getClock()->now();
+}
+
 BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
     // This will be set after a successful listDatabases command.
     _operationTime = Timestamp();
@@ -126,7 +131,6 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
     auto opCtx = cc().makeOperationContext();
     DBDirectClient client(opCtx.get());
 
-    BSONObj res;
     const BSONObj filter = ClonerUtils::makeTenantDatabaseFilter(_tenantId);
     auto databasesArray = client.getDatabaseInfos(filter, true /* nameOnly */);
 
@@ -189,6 +193,26 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
 
 void TenantAllDatabaseCloner::postStage() {
     {
+        // Finish calculating the size of the databases that were either partially cloned or
+        // completely un-cloned from a previous migration. Perform this before grabbing the _mutex,
+        // as commands are being sent over the network.
+        long long approxTotalDataSize = 0;
+        for (const auto& dbName : _databases) {
+            BSONObj res;
+            getClient()->runCommand(dbName, BSON("dbStats" << 1), res);
+            if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
+                LOGV2_WARNING(5426600,
+                              "Skipping recording of data size metrics for database due to failure "
+                              "in the 'dbStats' command, tenant migration stats may be inaccurate.",
+                              "db"_attr = dbName,
+                              "migrationId"_attr = getSharedData()->getMigrationId(),
+                              "tenantId"_attr = _tenantId,
+                              "status"_attr = status);
+            } else {
+                approxTotalDataSize += res.getField("dataSize").safeNumberLong();
+            }
+        }
+
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.databasesCloned = 0;
         _stats.databasesToClone = _databases.size();
@@ -197,7 +221,9 @@ void TenantAllDatabaseCloner::postStage() {
             _stats.databaseStats.emplace_back();
             _stats.databaseStats.back().dbname = dbName;
         }
+        _stats.approxTotalDataSize = approxTotalDataSize;
     }
+
     for (const auto& dbName : _databases) {
         {
             stdx::lock_guard<Latch> lk(_mutex);
@@ -231,6 +257,8 @@ void TenantAllDatabaseCloner::postStage() {
         {
             stdx::lock_guard<Latch> lk(_mutex);
             _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
+            _stats.approxTotalBytesCopied +=
+                _stats.databaseStats[_stats.databasesCloned].approxTotalBytesCopied;
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
         }
@@ -242,6 +270,8 @@ TenantAllDatabaseCloner::Stats TenantAllDatabaseCloner::getStats() const {
     TenantAllDatabaseCloner::Stats stats = _stats;
     if (_currentDatabaseCloner) {
         stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
+        stats.approxTotalBytesCopied +=
+            stats.databaseStats[stats.databasesCloned].approxTotalBytesCopied;
     }
     return stats;
 }
@@ -269,6 +299,8 @@ void TenantAllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
                           static_cast<long long>(databasesClonedBeforeFailover));
     builder->appendNumber("databasesToClone", static_cast<long long>(databasesToClone));
     builder->appendNumber("databasesCloned", static_cast<long long>(databasesCloned));
+    builder->appendNumber("approxTotalDataSize", approxTotalDataSize);
+    builder->appendNumber("approxTotalBytesCopied", approxTotalBytesCopied);
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));
         db.append(&dbBuilder);

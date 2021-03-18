@@ -117,6 +117,9 @@ protected:
         TenantClonerTestFixture::setUp();
 
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
+        _mockServer->setCommandReply("dbStats", StatusWith<BSONObj>(BSON("dataSize" << 1)));
+        _mockServer->setCommandReply("collStats", BSON("size" << 1));
+
         _mockClient->setOperationTime(_operationTime);
 
         {

@@ -55,6 +55,10 @@ public:
         size_t indexes{0};
         size_t insertedBatches{0};
         size_t receivedBatches{0};
+        long long avgObjSize{0};
+        long long approxTotalDataSize{0};
+        long long approxTotalBytesCopied{0};
+
 
         std::string toString() const;
         BSONObj toBSON() const;
