@@ -38,7 +38,11 @@ namespace mongo {
 
 class WindowFunctionAvg final : public RemovableSum {
 public:
-    explicit WindowFunctionAvg(ExpressionContext* const expCtx) : RemovableSum(expCtx), _count(0) {}
+    explicit WindowFunctionAvg(ExpressionContext* const expCtx) : RemovableSum(expCtx), _count(0) {
+        // Note that RemovableSum manages the memory usage tracker directly for calls to add/remove.
+        // Here we only add the members that this class holds.
+        _memUsageBytes += sizeof(long long);
+    }
 
     static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
         return std::make_unique<WindowFunctionAvg>(expCtx);
@@ -92,6 +96,7 @@ public:
     void reset() {
         RemovableSum::reset();
         _count = 0;
+        _memUsageBytes += sizeof(long long);
     }
 
 private:
