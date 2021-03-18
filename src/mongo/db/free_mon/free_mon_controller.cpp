@@ -33,7 +33,6 @@
 
 #include "mongo/db/free_mon/free_mon_controller.h"
 
-#include "mongo/db/ftdc/collector.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -41,17 +40,21 @@ namespace mongo {
 namespace {
 
 const auto getFreeMonController =
-    ServiceContext::declareDecoration<std::unique_ptr<FreeMonController>>();
+    ServiceContext::declareDecoration<synchronized_value<std::unique_ptr<FreeMonController>>>();
 
 }  // namespace
 
 FreeMonController* FreeMonController::get(ServiceContext* serviceContext) {
-    return getFreeMonController(serviceContext).get();
+    return getFreeMonController(serviceContext)->get();
 }
 
-void FreeMonController::set(ServiceContext* serviceContext,
-                            std::unique_ptr<FreeMonController> controller) {
-    getFreeMonController(serviceContext) = std::move(controller);
+void FreeMonController::init(ServiceContext* serviceContext,
+                             std::unique_ptr<FreeMonController> controller) {
+    auto fmcContainer = getFreeMonController(serviceContext).synchronize();
+    // Since FreeMonController::get() provides raw pointers, the FreeMonController can only be
+    // set once without producing memory leaks.
+    invariant(!fmcContainer->get());
+    fmcContainer = std::move(controller);
 }
 
 

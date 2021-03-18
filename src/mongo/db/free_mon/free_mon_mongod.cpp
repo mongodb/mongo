@@ -326,7 +326,7 @@ void startFreeMonitoring(ServiceContext* serviceContext) {
     registerCollectors(controller.get());
 
     // Install the new controller
-    FreeMonController::set(getGlobalServiceContext(), std::move(controller));
+    FreeMonController::init(getGlobalServiceContext(), std::move(controller));
 
     RegistrationType registrationType = RegistrationType::DoNotRegister;
     if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOn) {
