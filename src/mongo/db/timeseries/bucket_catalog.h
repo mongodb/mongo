@@ -47,10 +47,6 @@ class BucketCatalog {
     using IdleList = std::list<Bucket*>;
 
 public:
-    // This constant, together with parameters defined in timeseries.idl, defines limits on the
-    // measurements held in a bucket.
-    static constexpr auto kTimeseriesBucketMaxTimeRange = Hours(1);
-
     class BucketId {
         friend class BucketCatalog;
 

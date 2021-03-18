@@ -357,6 +357,11 @@ public:
     NamespaceString makeTimeseriesBucketsNamespace() const;
 
     /**
+     * Returns the time-series view namespace for this buckets namespace.
+     */
+    NamespaceString bucketsNamespaceToTimeseries() const;
+
+    /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
      * omission is that map reduce `tmp.mr` collections may or may not be replicated. Callers must
      * decide how to handle that case separately.
