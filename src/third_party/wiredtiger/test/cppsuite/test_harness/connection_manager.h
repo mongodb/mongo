@@ -54,7 +54,7 @@ class connection_manager {
     instance()
     {
         static connection_manager _instance;
-        return _instance;
+        return (_instance);
     }
 
     void
@@ -96,7 +96,18 @@ class connection_manager {
         testutil_check(_conn->open_session(_conn, NULL, NULL, &session));
         _conn_mutex.unlock();
 
-        return session;
+        return (session);
+    }
+
+    /*
+     * set_timestamp calls into the connection API in a thread safe manner to set global timestamps.
+     */
+    void
+    set_timestamp(const std::string &config)
+    {
+        _conn_mutex.lock();
+        testutil_check(_conn->set_timestamp(_conn, config.c_str()));
+        _conn_mutex.unlock();
     }
 
     private:

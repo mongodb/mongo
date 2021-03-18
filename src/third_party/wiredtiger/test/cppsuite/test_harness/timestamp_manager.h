@@ -30,23 +30,133 @@
 #define TIMESTAMP_MANAGER_H
 
 #include "component.h"
+#include <atomic>
+#include <chrono>
+#include <sstream>
+#include <thread>
 
 namespace test_harness {
 /*
  * The timestamp monitor class manages global timestamp state for all components in the test
- * harness. It also manages the global timestamps within WiredTiger.
+ * harness. It also manages the global timestamps within WiredTiger. All timestamps are in seconds
+ * unless specified otherwise.
  */
 class timestamp_manager : public component {
     public:
-    timestamp_manager(configuration *config) : component(config) {}
+    timestamp_manager(configuration *config)
+        : /* _periodic_update_s is hardcoded to 1 second for now. */
+          component(config), _increment_ts(0U), _is_enabled(false), _latest_ts(0U), _oldest_lag(0),
+          _oldest_ts(0U), _periodic_update_s(1), _stable_lag(0), _stable_ts(0U)
+    {
+    }
+
+    /* Delete the copy constructor. */
+    timestamp_manager(const timestamp_manager &) = delete;
+
+    void
+    load()
+    {
+        testutil_assert(_config != nullptr);
+        testutil_check(_config->get_int(OLDEST_LAG, _oldest_lag));
+        testutil_assert(_oldest_lag >= 0);
+        testutil_check(_config->get_int(STABLE_LAG, _stable_lag));
+        testutil_assert(_stable_lag >= 0);
+        testutil_check(_config->get_bool(ENABLE_TIMESTAMP, _is_enabled));
+        component::load();
+    }
 
     void
     run()
     {
-        while (_running) {
-            /* Do something. */
+        std::string config;
+        /* latest_ts_s represents the time component of the latest timestamp provided. */
+        wt_timestamp_t latest_ts_s;
+
+        while (_is_enabled && _running) {
+            /* Timestamps are checked periodically. */
+            std::this_thread::sleep_for(std::chrono::seconds(_periodic_update_s));
+            latest_ts_s = (_latest_ts >> 32);
+            /*
+             * Keep a time window between the latest and stable ts less than the max defined in the
+             * configuration.
+             */
+            testutil_assert(latest_ts_s >= _stable_ts);
+            if ((latest_ts_s - _stable_ts) > _stable_lag) {
+                _stable_ts = latest_ts_s - _stable_lag;
+                config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
+            }
+
+            /*
+             * Keep a time window between the stable and oldest ts less than the max defined in the
+             * configuration.
+             */
+            testutil_assert(_stable_ts > _oldest_ts);
+            if ((_stable_ts - _oldest_ts) > _oldest_lag) {
+                _oldest_ts = _stable_ts - _oldest_lag;
+                if (!config.empty())
+                    config += ",";
+                config += std::string(OLDEST_TS) + "=" + decimal_to_hex(_oldest_ts);
+            }
+
+            /* Save the new timestamps. */
+            if (!config.empty()) {
+                connection_manager::instance().set_timestamp(config);
+                config = "";
+            }
         }
     }
+
+    bool
+    is_enabled() const
+    {
+        return _is_enabled;
+    }
+
+    /*
+     * Get a unique commit timestamp. The first 32 bits represent the epoch time in seconds. The
+     * last 32 bits represent an increment for uniqueness.
+     */
+    wt_timestamp_t
+    get_next_ts()
+    {
+        uint64_t current_time = get_time_now_s();
+        _increment_ts.fetch_add(1);
+
+        current_time = (current_time << 32) | (_increment_ts & 0x00000000FFFFFFFF);
+        _latest_ts = current_time;
+
+        return (_latest_ts);
+    }
+
+    static const std::string
+    decimal_to_hex(int64_t value)
+    {
+        std::stringstream ss;
+        ss << std::hex << value;
+        std::string res(ss.str());
+        return (res);
+    }
+
+    private:
+    uint64_t
+    get_time_now_s() const
+    {
+        auto now = std::chrono::system_clock::now().time_since_epoch();
+        uint64_t current_time_s =
+          static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(now).count());
+        return (current_time_s);
+    }
+
+    private:
+    bool _is_enabled;
+    const wt_timestamp_t _periodic_update_s;
+    std::atomic<wt_timestamp_t> _increment_ts;
+    wt_timestamp_t _latest_ts, _oldest_ts, _stable_ts;
+    /*
+     * _oldest_lag is the time window between the stable and oldest timestamps.
+     * _stable_lag is the time window between the latest and stable timestamps.
+     */
+    int64_t _oldest_lag, _stable_lag;
 };
 } // namespace test_harness
 

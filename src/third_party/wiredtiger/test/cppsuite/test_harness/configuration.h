@@ -26,8 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef CONFIGURATION_SETTINGS_H
-#define CONFIGURATION_SETTINGS_H
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
 
 extern "C" {
 #include "test_util.h"
