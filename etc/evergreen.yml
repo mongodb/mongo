@@ -221,7 +221,7 @@ variables:
 - &enterprise-windows-nopush-template
   name: enterprise-windows-nopush-template
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   modules:
   - enterprise
   expansions: &enterprise-windows-nopush-expansions-template
@@ -236,11 +236,11 @@ variables:
     multiversion_platform: windows
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -9428,7 +9428,7 @@ buildvariants:
   display_name: "* Windows DEBUG"
   batchtime: 240 # 4 hours
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   expansions:
     exe: ".exe"
     content_type: application/zip
@@ -9438,15 +9438,15 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-xlarge
+    - windows-vsCurrent-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - windows-64-vs2019-xlarge
+    - windows-vsCurrent-xlarge
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -9457,13 +9457,13 @@ buildvariants:
   - name: .misc_js !.non_win_dbg
   - name: .concurrency .debug_only
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -9472,18 +9472,18 @@ buildvariants:
   - name: .read_write_concern !.large
   - name: .read_write_concern .large
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: .replica_sets !.large !.encrypt !.auth
   - name: .replica_sets .large
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .resharding_fuzzer
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: session_jscore_passthrough
   - name: sharding_gen
   - name: .stitch
@@ -9497,7 +9497,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   expansions:
     burn_in_tests_build_variant: enterprise-windows-suggested
     exe: ".exe"
@@ -9513,7 +9513,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 5
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
@@ -9522,10 +9522,10 @@ buildvariants:
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
-    - windows-64-vs2019-xlarge
+    - windows-vsCurrent-xlarge
   - name: compile_build_tools_next_TG
     distros:
-    - windows-64-vs2019-xlarge
+    - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
@@ -9534,7 +9534,7 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: compile_run_and_archive_dbtest_TG
     distros:
-      - windows-64-vs2019-xlarge
+      - windows-vsCurrent-xlarge
   - name: unittest_shell_hang_analyzer_gen
 
 - <<: *enterprise-windows-required-template
@@ -9556,7 +9556,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 5
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     test_flags: >-
         --mongodSetParameters="{
             featureFlagToaster: true,
@@ -9586,7 +9586,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - windows-64-vs2019-small
+    - windows-vsCurrent-small
   expansions:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
@@ -9601,7 +9601,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 3
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
@@ -9610,13 +9610,13 @@ buildvariants:
   tasks:
     - name: compile_test_and_package_serial_TG
       distros:
-        - windows-64-vs2019-xlarge
+        - windows-vsCurrent-xlarge
     - name: audit
     - name: auth_audit_gen
     - name: buildscripts_test
     - name: causally_consistent_jscore_txns_passthrough
       distros:
-        - windows-64-vs2019-large
+        - windows-vsCurrent-large
     - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
     - name: external_auth
     - name: external_auth_aws
@@ -9662,7 +9662,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 3
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     test_flags: >-
         --mongodSetParameters="{
             featureFlagToaster: true,
@@ -9691,7 +9691,7 @@ buildvariants:
   tasks:
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .benchmarks
 
 - <<: *enterprise-windows-nopush-template
@@ -9710,7 +9710,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi
     exe: ".exe"
@@ -9723,18 +9723,18 @@ buildvariants:
     scons_cache_scope: shared
     multiversion_platform: windows
     multiversion_edition: enterprise
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .concurrency .common
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: concurrency_replication_causal_consistency_gen
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common !.decimal !.compat !.sharding
@@ -9754,7 +9754,7 @@ buildvariants:
 - name: windows
   display_name: Windows
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   expansions:
     additional_package_targets: msi
     exe: ".exe"
@@ -9772,12 +9772,12 @@ buildvariants:
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     test_flags: *windows_common_test_excludes
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -9788,7 +9788,7 @@ buildvariants:
     # with more RAM for these suites.
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
     distros:
-      - windows-64-vs2019-large
+      - windows-vsCurrent-large
   - name: .concurrency .common
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -9817,7 +9817,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - windows-64-vs2019-small
+    - windows-vsCurrent-small
   expansions:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
@@ -9832,7 +9832,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
     max_sub_suites: 3
-    large_distro_name: windows-64-vs2019-large
+    large_distro_name: windows-vsCurrent-large
     push_path: windows
     push_bucket: downloads.10gen.com
     push_name: windows
@@ -9842,7 +9842,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: .aggfuzzer
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -9853,7 +9853,7 @@ buildvariants:
     # with more RAM for these suites.
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.common !.debug_only
     distros:
-      - windows-64-vs2019-large
+      - windows-vsCurrent-large
   - name: .concurrency .common
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
@@ -9881,7 +9881,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     exe: ".exe"
@@ -9898,10 +9898,10 @@ buildvariants:
   # timing-sensitive tests to fail.
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: compile_ninja_next_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
   - name: audit
   # Do not add more tasks to this list.
 
@@ -12704,7 +12704,7 @@ buildvariants:
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
   run_on:
-  - windows-64-vs2019-small
+  - windows-vsCurrent-small
   stepback: false
   tasks:
   - name: win_shared_scons_cache_pruning
@@ -12816,4 +12816,4 @@ buildvariants:
   tasks:
   - name: visibility_test_TG
     distros:
-    - windows-64-vs2019-large
+    - windows-vsCurrent-large
