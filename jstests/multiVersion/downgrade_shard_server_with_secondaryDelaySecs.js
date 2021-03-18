@@ -17,6 +17,9 @@
 (function() {
 "use strict";
 
+// This test triggers an unclean shutdown, which may cause inaccurate fast counts.
+TestData.skipEnforceFastCountOnValidate = true;
+
 function checkForSecondaryDelaySecs(primaryDB) {
     let config = primaryDB.runCommand({replSetGetConfig: 1}).config;
     assert.eq(config.members[0].secondaryDelaySecs, 0, config);
