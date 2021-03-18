@@ -47,11 +47,11 @@ let doAggregationLookup = function(localColl, fromColl) {
             }
         },
         {
-            $sort: {_id: 1}
+            $sort: {localField: 1}
         }]).toArray();
 };
 
-let getCurentQueryExecutorStats = function() {
+let getCurrentQueryExecutorStats = function() {
     let queryExecutor = testDB.serverStatus().metrics.queryExecutor;
 
     let curScannedObjects = queryExecutor.scannedObjects - lastScannedObjects;
@@ -73,7 +73,7 @@ let testQueryExecutorStatsWithCollectionScan = function() {
 
     assert.eq(output, expectedOutput);
 
-    let [curScannedObjects, curScannedKeys] = getCurentQueryExecutorStats();
+    let [curScannedObjects, curScannedKeys] = getCurrentQueryExecutorStats();
 
     // For collection scan, total scannedObjects should be sum of
     // (total documents in local collection +
@@ -102,7 +102,7 @@ let testQueryExecutorStatsWithIndexScan = function() {
 
     assert.eq(output, expectedOutput);
 
-    let [curScannedObjects, curScannedKeys] = getCurentQueryExecutorStats();
+    let [curScannedObjects, curScannedKeys] = getCurrentQueryExecutorStats();
 
     // For index scan, total scannedObjects should be sum of
     // (total documents in local collection + total matched documents in foreign collection)
@@ -118,7 +118,7 @@ insertDocumentToCollection(localColl, localDocCount, "localField");
 
 // This test might be called over an existing MongoD instance. We should populate
 // lastScannedObjects and lastScannedKeys with existing stats values in that case.
-getCurentQueryExecutorStats();
+getCurrentQueryExecutorStats();
 
 testQueryExecutorStatsWithCollectionScan();
 testQueryExecutorStatsWithIndexScan();
