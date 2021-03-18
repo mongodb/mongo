@@ -40,6 +40,8 @@ void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
         return;
     }
     stdx::lock_guard lock(_mutex);
+    // Make sure we're not re-registering a listener. This is a linear scan of a vector, but there
+    // are only a few calls to registerListener in the codebase so this shouldn't be a problem.
     if (std::find_if(_listeners.begin(),
                      _listeners.end(),
                      [&locked_listener](const TopologyListenerPtr& ptr) {
@@ -47,22 +49,6 @@ void TopologyEventsPublisher::registerListener(TopologyListenerPtr listener) {
                      }) == std::end(_listeners)) {
         _listeners.push_back(listener);
     }
-}
-
-void TopologyEventsPublisher::removeListener(TopologyListenerPtr listener) {
-    auto locked_listener = listener.lock();
-    if (!locked_listener) {
-        LOGV2_WARNING(5148002,
-                      "Trying to unregister an empty listener from TopologyEventsPublisher");
-        return;
-    }
-    stdx::lock_guard lock(_mutex);
-    _listeners.erase(std::remove_if(_listeners.begin(),
-                                    _listeners.end(),
-                                    [&locked_listener](const TopologyListenerPtr& ptr) {
-                                        return ptr.lock() == locked_listener;
-                                    }),
-                     _listeners.end());
 }
 
 void TopologyEventsPublisher::close() {
