@@ -188,7 +188,8 @@ var $config = (function() {
                         assertAlways.hasFields(indexList, ["indexes"]);
                         const indexes = indexList["indexes"];
                         const indexKeyPatterns = indexes.map(index => getKeyPattern(index));
-                        return ShardedIndexUtil.containsBSON(indexKeyPatterns, expectedIndex);
+                        return ShardedIndexUtil.containsBSONIgnoreFieldsOrder(indexKeyPatterns,
+                                                                              expectedIndex);
                     });
                     if (!match) {
                         print(`Could not find index ${
