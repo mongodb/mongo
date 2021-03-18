@@ -44,7 +44,8 @@ from buildscripts.linter import git, parallel
 #
 
 # Expected version of ESLint.
-ESLINT_VERSION = "2.3.0"
+# If you want to update the version, please refer to `buildscripts/eslint/README.md`
+ESLINT_VERSION = "7.22.0"
 
 # Name of ESLint as a binary.
 ESLINT_PROGNAME = "eslint"
@@ -93,6 +94,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
     urllib.request.urlretrieve(url, temp_tar_file)
 
     # pylint: disable=too-many-function-args
+    print("Extracting ESLint %s to %s" % (ESLINT_VERSION, dest_file))
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)
     shutil.move(eslint_distfile, dest_file)
@@ -120,7 +122,7 @@ class ESLint(object):
             if os.path.isfile(path):
                 self.path = path
             else:
-                print("WARNING: Could not find ESLint at %s" % (path))
+                print("WARNING: Could not find ESLint at %s" % path)
 
         # Check the environment variable
         if "MONGO_ESLINT" in os.environ:
@@ -143,13 +145,18 @@ class ESLint(object):
 
             self.path = os.path.join(cache_dir, eslint_progname)
 
+            if os.path.isfile(self.path) and not self._validate_version(warn=True):
+                print(
+                    "WARNING: removing ESLint from %s to download the correct version" % self.path)
+                os.remove(self.path)
+
             if not os.path.isfile(self.path):
                 if sys.platform.startswith("linux"):
                     get_eslint_from_cache(self.path, "Linux", self.arch)
                 elif sys.platform == "darwin":
                     get_eslint_from_cache(self.path, "Darwin", self.arch)
                 else:
-                    print("ERROR: eslint.py does not support downloading ESLint " +
+                    print("ERROR: eslint.py does not support downloading ESLint "
                           "on this platform, please install ESLint " + ESLINT_VERSION)
         # Validate we have the correct version
         if not self._validate_version():
@@ -165,8 +172,8 @@ class ESLint(object):
             return True
 
         if warn:
-            print("WARNING: eslint found in path, but incorrect version found at " + self.path +
-                  " with version: " + esl_version)
+            print("WARNING: ESLint found in path %s, but the version is incorrect: %s" %
+                  (self.path, esl_version))
         return False
 
     def _lint(self, file_name, print_diff):
@@ -209,10 +216,11 @@ def _lint_files(eslint, files):
     """Lint a list of files with ESLint."""
     eslint = ESLint(eslint, _get_build_dir())
 
+    print("Running ESLint %s at %s" % (ESLINT_VERSION, eslint.path))
     lint_clean = parallel.parallel_process([os.path.abspath(f) for f in files], eslint.lint)
 
     if not lint_clean:
-        print("ERROR: ESLint found errors. Run ESLint manually to see errors in "\
+        print("ERROR: ESLint found errors. Run ESLint manually to see errors in "
               "files that were skipped")
         sys.exit(1)
 
@@ -260,6 +268,7 @@ def _autofix_files(eslint, files):
     """Auto-fix the specified files with ESLint."""
     eslint = ESLint(eslint, _get_build_dir())
 
+    print("Running ESLint %s at %s" % (ESLINT_VERSION, eslint.path))
     autofix_clean = parallel.parallel_process([os.path.abspath(f) for f in files], eslint.autofix)
 
     if not autofix_clean:
@@ -282,11 +291,14 @@ def main():
     """Execute Main entry point."""
     success = False
     usage = "%prog [-e <eslint>] [-d] lint|lint-patch|fix [glob patterns] "
-    description = "lint runs ESLint on provided patterns or all .js files under jstests/ "\
-                  "and src/mongo. lint-patch runs ESLint against .js files modified in the "\
-                  "provided patch file (for upload.py). "\
-                  "fix runs ESLint with --fix on provided patterns "\
-                  "or files under jstests/ and src/mongo."
+    description = ("The script will try to find ESLint version %s on your system and run it. "
+                   "If it won't find the version it will try to download it and then run it. "
+                   "Commands description: lint runs ESLint on provided patterns or all .js "
+                   "files under `jstests/` and `src/mongo`; "
+                   "lint-patch runs ESLint against .js files modified in the "
+                   "provided patch file (for upload.py); "
+                   "fix runs ESLint with --fix on provided patterns "
+                   "or files under jstests/ and src/mongo." % ESLINT_VERSION)
     epilog = "*Unless you specify -d a separate ESLint process will be launched for every file"
     parser = OptionParser(usage=usage, description=description, epilog=epilog)
     parser.add_option(
@@ -296,9 +308,15 @@ def main():
         dest="eslint",
         help="Fully qualified path to eslint executable",
     )
-    parser.add_option("-d", "--dirmode", action="store_true", default=True, dest="dirmode",
-                      help="Considers the glob patterns as directories and runs ESLint process " \
-                           "against each pattern",)
+    parser.add_option(
+        "-d",
+        "--dirmode",
+        action="store_true",
+        default=True,
+        dest="dirmode",
+        help="Considers the glob patterns as directories and runs ESLint process "
+        "against each pattern",
+    )
 
     (options, args) = parser.parse_args(args=sys.argv)
 
