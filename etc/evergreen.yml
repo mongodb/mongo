@@ -150,9 +150,6 @@ variables:
   setup_task:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
-    # NOTE: To disable the compile bypass feature, comment out the next line.
-  - func: "bypass compile and fetch binaries"
-  - func: "update bypass expansions"
   teardown_task:
   - func: "attach scons logs"
   - func: "attach report"
@@ -523,13 +520,6 @@ functions:
       script: |
         set -o errexit
         mongo_binary=dist-test/bin/mongo${exe}
-        # For compile bypass we need to skip the binary version check since we can tag a commit
-        # after the base commit binaries were created. This would lead to a mismatch of the binaries
-        # and the version from git describe --abbrev=7 in the compile_expansions.yml.
-        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
-          echo "Skipping binary version check since we are bypassing compile in this patch build."
-          exit 0
-        fi
         ${activate_virtualenv}
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
@@ -1025,33 +1015,6 @@ functions:
     params:
       exec_timeout_secs: ${timeout_secs}
 
-  "update bypass expansions": &update_bypass_expansions
-    command: expansions.update
-    params:
-      ignore_missing_file: true
-      file: src/bypass_compile_expansions.yml
-
-  "bypass compile and fetch binaries":
-    command: shell.exec
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        if [ -n "${burn_in_bypass}" ]; then
-          ${activate_virtualenv}
-          # Evergreen executable is in $HOME, so add that to the path.
-          DESTDIR=${destdir} PATH=$PATH:$HOME $python buildscripts/burn_in_tags_bypass_compile_and_fetch_binaries.py            \
-            --project ${project}                                               \
-            --build-variant ${burn_in_bypass}                                  \
-            --revision ${revision}                                             \
-            --out-file bypass_compile_expansions.yml                           \
-            --version-id ${version_id}                                         \
-            --json-artifact artifacts.json
-        fi
-
   ### Set expansion macros used in each task.
   ### Note that this function will override task expansions set in update_bypass_expansions
   "set task expansion macros": &set_task_expansion_macros
@@ -1215,7 +1178,6 @@ functions:
   "do setup":
   - *set_task_expansion_macros
   - *fetch_artifacts
-  - *update_bypass_expansions
   - *fetch_binaries
   - *fetch_debugsymbols_archive
   - *extract_binaries
@@ -1243,7 +1205,6 @@ functions:
   - *set_task_expansion_macros
   - *set_up_venv
   - *upload_pip_requirements
-  - *update_bypass_expansions
   - *get_buildnumber
   - *set_up_credentials
   - *fetch_benchmarks
@@ -1832,9 +1793,6 @@ functions:
         set -o errexit
         set -o verbose
 
-        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
-          exit 0
-        fi
         rm -rf ${install_directory|/data/mongo-install-directory}
 
         # Use hardlinks to reduce the disk space impact of installing
@@ -1917,7 +1875,7 @@ functions:
         MONGO_VERSION=$(git describe --abbrev=7)
         # If this is a patch build, we add the patch version id to the version string so we know
         # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
+        if [ "${is_patch}" = "true" ]; then
           MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
         fi
 
@@ -2439,10 +2397,6 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-
-        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
-            exit 0
-        fi
 
         ${activate_virtualenv}
         if [ "${has_packages|}" = "true" ] ; then
@@ -3328,7 +3282,6 @@ tasks:
           - "./etc/scons/**"
           - "artifacts.json"
           - "buildscripts/**"
-          - "bypass_compile_expansions.yml"
           - "compile_expansions.yml"
           - "jstests/**"
           - "library_dependency_graph.json"
@@ -5543,7 +5496,6 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
-      bypass_compile: false
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5563,7 +5515,6 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
-      bypass_compile: false
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5583,7 +5534,6 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
-      bypass_compile: false
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5603,7 +5553,6 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
-      bypass_compile: false
   - func: "attach scons logs"
   - func: "run tests"
     vars:
@@ -5623,7 +5572,6 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
-      bypass_compile: false
   - func: "attach scons logs"
   - func: "run tests"
     vars:
