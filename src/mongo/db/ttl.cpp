@@ -57,6 +57,7 @@
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -294,15 +295,27 @@ private:
      * Generate the safe expiration date for a given collection and user-configured
      * expireAfterSeconds value.
      */
-    Date_t safeExpirationDate(const CollectionPtr& coll, std::int64_t expireAfterSeconds) const {
+    Date_t safeExpirationDate(OperationContext* opCtx,
+                              const CollectionPtr& coll,
+                              std::int64_t expireAfterSeconds) const {
         if (coll->ns().isTimeseriesBucketsCollection()) {
-            // Don't delete data unless it is safely out of range of the bucket maximum time range.
-            // On time-series collections, the _id (and thus RecordId) is the minimum time value of
-            // a bucket. A bucket may have newer data, so we cannot safely delete the entire bucket
-            // yet until the maximum bucket range has passed, even if the minimum value can be
-            // expired.
-            return Date_t::now() - Seconds(expireAfterSeconds) -
-                Seconds(BucketCatalog::kTimeseriesBucketMaxTimeRange);
+            auto timeseriesNs = coll->ns().bucketsNamespaceToTimeseries();
+            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, timeseriesNs.db());
+            invariant(viewCatalog);
+            auto viewDef = viewCatalog->lookup(opCtx, timeseriesNs.ns());
+            uassert(ErrorCodes::NamespaceNotFound,
+                    fmt::format("Could not find view definition for namespace: {}",
+                                timeseriesNs.toString()),
+                    viewDef);
+
+            const auto bucketMaxSpan = Seconds(viewDef->timeseries()->getBucketMaxSpanSeconds());
+
+            // Don't delete data unless it is safely out of range of the bucket maximum time
+            // range. On time-series collections, the _id (and thus RecordId) is the minimum
+            // time value of a bucket. A bucket may have newer data, so we cannot safely delete
+            // the entire bucket yet until the maximum bucket range has passed, even if the
+            // minimum value can be expired.
+            return Date_t::now() - Seconds(expireAfterSeconds) - bucketMaxSpan;
         }
 
         return Date_t::now() - Seconds(expireAfterSeconds);
@@ -375,7 +388,8 @@ private:
 
         const Date_t kDawnOfTime =
             Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
-        const auto expirationDate = safeExpirationDate(collection, secondsExpireElt.numberLong());
+        const auto expirationDate =
+            safeExpirationDate(opCtx, collection, secondsExpireElt.numberLong());
         const BSONObj startKey = BSON("" << kDawnOfTime);
         const BSONObj endKey = BSON("" << expirationDate);
         // The canonical check as to whether a key pattern element is "ascending" or
@@ -459,7 +473,7 @@ private:
                     "running TTL job for collection clustered by _id",
                     logAttrs(collection->ns()));
 
-        const auto expirationDate = safeExpirationDate(collection, *expireAfterSeconds);
+        const auto expirationDate = safeExpirationDate(opCtx, collection, *expireAfterSeconds);
 
         // Generate upper bound ObjectId that compares greater than every ObjectId with a the same
         // timestamp or lower.

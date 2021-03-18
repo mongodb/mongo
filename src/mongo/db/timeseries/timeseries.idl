@@ -61,6 +61,16 @@ server_parameters:
         cpp_varname: gTimeseriesBucketsCollectionClusterById
         default: true
 
+enums:
+    BucketGranularity:
+        description: "Describes a time-series collection's expected interval between subsequent
+                      measurements"
+        type: string
+        values:
+            Seconds: "seconds"
+            Minutes: "minutes"
+            Hours: "hours"
+
 structs:
     TimeseriesOptions:
         description: "The options that define a time-series collection."
@@ -82,3 +92,12 @@ structs:
                               deleted."
                 type: safeInt64
                 optional: true
+            granularity:
+                description: "Describes the expected interval between subsequent measurements"
+                type: BucketGranularity
+                default: Seconds
+            bucketMaxSpanSeconds:
+                description: "The maximum range of time values for a bucket, in seconds"
+                type: safeInt
+                default: 3600
+                validator: { gte: 1 }

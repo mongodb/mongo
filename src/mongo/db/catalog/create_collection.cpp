@@ -123,6 +123,16 @@ Status _createTimeseries(OperationContext* opCtx,
 
     options.viewOn = bucketsNs.coll().toString();
 
+    auto granularity = options.timeseries->getGranularity();
+    uassert(ErrorCodes::InvalidOptions,
+            "Time-series 'granularity' is required to be 'seconds'",
+            granularity == BucketGranularityEnum::Seconds);
+
+    auto bucketMaxSpan = options.timeseries->getBucketMaxSpanSeconds();
+    uassert(ErrorCodes::InvalidOptions,
+            "Time-series 'bucketMaxSpanSeconds' is required to be 3600",
+            bucketMaxSpan == 3600);
+
     if (options.timeseries->getMetaField()) {
         options.pipeline =
             BSON_ARRAY(BSON("$_internalUnpackBucket"

@@ -100,6 +100,9 @@ testValidTimeseriesOptions({timeField: "time", metaField: "meta"});
 testValidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(100)});
 testValidTimeseriesOptions(
     {timeField: "time", metaField: "meta", expireAfterSeconds: NumberLong(100)});
+testValidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "seconds"});
+testValidTimeseriesOptions(
+    {timeField: "time", metaField: "meta", granularity: "seconds", bucketMaxSpanSeconds: 3600});
 
 testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
@@ -114,6 +117,10 @@ testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "time"}, ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: "time", metaField: "meta", granularity: "minutes"},
+                             ErrorCodes.InvalidOptions);
+testInvalidTimeseriesOptions({timeField: "time", metaField: "meta", bucketMaxSpanSeconds: 10},
+                             ErrorCodes.InvalidOptions);
 
 testCompatibleCreateOptions({storageEngine: {}});
 testCompatibleCreateOptions({indexOptionDefaults: {}});
