@@ -2916,10 +2916,6 @@ def doConfigure(myenv):
         # Warn about moves of prvalues, which can inhibit copy elision.
         AddToCXXFLAGSIfSupported(myenv, "-Wpessimizing-move")
 
-        # Warn about redundant moves, such as moving a local variable in a return that is different
-        # than the return type.
-        AddToCXXFLAGSIfSupported(myenv, "-Wredundant-move")
-
         # Disable warning about variables that may not be initialized
         # Failures are triggered in the case of boost::optional in GCC 4.8.x
         # TODO: re-evaluate when we move to GCC 5.3
