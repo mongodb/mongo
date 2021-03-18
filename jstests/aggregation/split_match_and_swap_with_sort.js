@@ -37,8 +37,6 @@ assert.commandWorked(
 }
 
 {
-    // Note that a $expr cannot be moved. However, the optimizer can split the non-$expr part of the
-    // $match and move that to be in front of the $sort.
     const pipeline =
         [{$sort: {b: 1}}, {$match: {$and: [{a: {$ne: 2}}, {$expr: {$ne: ["$a", "$b"]}}]}}];
 
@@ -47,7 +45,9 @@ assert.commandWorked(
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({a: {"$not": {"$eq": 2}}}, collScanStage.filter, collScanStage);
+    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
+              collScanStage.filter,
+              collScanStage);
 }
 
 {
@@ -62,6 +62,8 @@ assert.commandWorked(
     const pipelineExplained = coll.explain().aggregate(pipeline);
     const collScanStage = getAggPlanStage(pipelineExplained, "COLLSCAN");
     assert.neq(null, collScanStage, pipelineExplained);
-    assert.eq({a: {"$not": {"$eq": 2}}}, collScanStage.filter, collScanStage);
+    assert.eq({$and: [{a: {"$not": {"$eq": 2}}}, {$expr: {$ne: ["$a", "$b"]}}]},
+              collScanStage.filter,
+              collScanStage);
 }
 }());

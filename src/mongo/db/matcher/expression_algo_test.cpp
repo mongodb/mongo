@@ -811,6 +811,32 @@ TEST(IsIndependent, BallIsIndependentOfBalloon) {
     ASSERT_FALSE(expression::isIndependentOf(*expr.get(), {"a.ball.c"}));
 }
 
+// This is a descriptive test to ensure that until renames are implemented for these expressions,
+// matches on these expressions cannot be swapped with other stages.
+TEST(IsIndependent, NonRenameableExpressionIsNotIndependent) {
+    std::vector<std::string> stringExpressions = {
+        // Category: kOther.
+        "{$or: [{a: {$size: 3}}, {b: {$size: 4}}]}",
+        // Category: kArrayMatching.
+        "{$or: [{a: {$_internalSchemaMaxItems: 3}}, {b: {$_internalSchemaMaxItems: 4}}]}",
+        "{$or: [{a: {$_internalSchemaMinItems: 3}}, {b: {$_internalSchemaMinItems: 4}}]}",
+        "{$or: [{a: {$_internalSchemaObjectMatch: {b: 1}}},"
+        "       {a: {$_internalSchemaObjectMatch: {b: 2}}}]}",
+        "{$or: [{a: {$elemMatch: {b: 3}}}, {a: {$elemMatch: {b: 4}}}]}"};
+
+    for (auto str : stringExpressions) {
+        BSONObj matchPredicate = fromjson(str);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(swMatchExpression.getStatus());
+        auto matchExpression = std::move(swMatchExpression.getValue());
+
+        // Both of these should be true once renames are implemented.
+        ASSERT_FALSE(expression::isIndependentOf(*matchExpression.get(), {"c"}));
+        ASSERT_FALSE(expression::isOnlyDependentOn(*matchExpression.get(), {"a", "b"}));
+    }
+}
+
 TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -1147,6 +1173,50 @@ TEST(SplitMatchExpression, ShouldNotMoveMaxItemsAcrossRename) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob, true);
     ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{a: {$_internalSchemaMaxItems: 3}}"));
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveMaxItemsInLogicalExpressionAcrossRename) {
+    BSONObj matchPredicate = fromjson(
+        "{$or: [{a: {$_internalSchemaMaxItems: 3}},"
+        "       {a: {$_internalSchemaMaxItems: 4}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_FALSE(splitExpr.first.get());
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob, true);
+    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+                      fromjson("{$or: [{a: {$_internalSchemaMaxItems: 3}},"
+                               "       {a: {$_internalSchemaMaxItems: 4}}]}"));
+}
+
+TEST(SplitMatchExpression, ShouldNotMoveInternalSchemaObjectMatchInLogicalExpressionAcrossRename) {
+    BSONObj matchPredicate = fromjson(
+        "{$or: [{a: {$_internalSchemaObjectMatch: {b: 1}}},"
+        "       {a: {$_internalSchemaObjectMatch: {b: 1}}}]}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"a", "c"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_FALSE(splitExpr.first.get());
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob, true);
+    ASSERT_BSONOBJ_EQ(secondBob.obj(),
+                      fromjson("{$or: [{a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}},"
+                               "       {a: {$_internalSchemaObjectMatch: {b: {$eq: 1}}}}]}"));
 }
 
 TEST(SplitMatchExpression, ShouldMoveMinLengthAcrossRename) {
