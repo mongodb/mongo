@@ -23,6 +23,9 @@ AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=Fals
 AddOption("--enable-attach", dest="attach", action="store_true", default=False,
           help="Configure for debugger attach on failure.")
 
+AddOption("--disable-standalone-build", dest="standalone-build", action="store_true", default=False,
+          help="Disable WT Standalone build.")
+
 AddOption("--enable-diagnostic", dest="diagnostic", action="store_true", default=False,
           help="Configure WiredTiger to perform various run-time diagnostic tests. DO NOT configure this option in production environments.")
 
@@ -172,6 +175,11 @@ if GetOption("lang-python"):
     env.Append(LIBPATH=[distutils.sysconfig.PREFIX + r"\libs"])
     env.Append(CPPPATH=[distutils.sysconfig.get_python_inc()])
 
+disableStandaloneBuild = GetOption("standalone-build")
+if disableStandaloneBuild:
+    print('Disable Standalone Build')
+else:
+    env.Append(CPPDEFINES = ["WT_STANDALONE_BUILD"])
 
 # Build WiredTiger.h file
 #
