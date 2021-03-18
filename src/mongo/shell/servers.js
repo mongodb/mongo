@@ -1386,6 +1386,11 @@ function appendSetParameterArgs(argArray) {
                             continue;
                         }
 
+                        if (paramName === "reshardingMinimumOperationDurationMillis" &&
+                            argArrayContains("reshardingMinimumOperationDurationMillis")) {
+                            continue;
+                        }
+
                         const paramVal = ((param) => {
                             if (typeof param === "object") {
                                 return JSON.stringify(param);

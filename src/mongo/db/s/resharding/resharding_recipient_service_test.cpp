@@ -154,6 +154,7 @@ public:
             // Populating the set of donor shard ids isn't necessary to test the functionality of
             // creating the temporary resharding collection.
             recipientFields.setDonorShardIds({});
+            recipientFields.setMinimumOperationDurationMillis(5000);
 
             reshardingFields.setRecipientFields(recipientFields);
             coll.setReshardingFields(reshardingFields);

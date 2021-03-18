@@ -27,6 +27,7 @@ var ReshardingTest = class {
         numDonors: numDonors = 1,
         numRecipients: numRecipients = 1,
         reshardInPlace: reshardInPlace = false,
+        minimumOperationDurationMS: minimumOperationDurationMS = undefined,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -41,6 +42,8 @@ var ReshardingTest = class {
         /** @private */
         this._numShards = this._reshardInPlace ? Math.max(this._numDonors, this._numRecipients)
                                                : this._numDonors + this._numRecipients;
+        /** @private */
+        this._minimumOperationDurationMS = minimumOperationDurationMS;
 
         // Properties set by setup().
         /** @private */
@@ -74,11 +77,18 @@ var ReshardingTest = class {
     }
 
     setup() {
+        let config = {setParameter: {featureFlagResharding: true}};
+
+        if (this._minimumOperationDurationMS !== undefined) {
+            config.setParameter.reshardingMinimumOperationDurationMillis =
+                this._minimumOperationDurationMS;
+        }
+
         this._st = new ShardingTest({
             mongos: 1,
             mongosOptions: {setParameter: {featureFlagResharding: true}},
             config: 1,
-            configOptions: {setParameter: {featureFlagResharding: true}},
+            configOptions: config,
             shards: this._numShards,
             rs: {nodes: 2},
             rsOptions: {setParameter: {featureFlagResharding: true}},

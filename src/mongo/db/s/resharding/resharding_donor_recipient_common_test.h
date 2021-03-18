@@ -146,7 +146,7 @@ protected:
         const NamespaceString& originalNss,
         const boost::optional<Timestamp>& fetchTimestamp = boost::none) {
         auto recipientFields =
-            TypeCollectionRecipientFields(donorShardIds, existingUUID, originalNss);
+            TypeCollectionRecipientFields(donorShardIds, existingUUID, originalNss, 5000);
         emplaceFetchTimestampIfExists(recipientFields, fetchTimestamp);
         fields.setRecipientFields(std::move(recipientFields));
     }

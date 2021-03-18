@@ -73,6 +73,8 @@ structs:
                 cpp_name: sourceNss
                 type: namespacestring
                 description: "The namespace of the collection being resharded."
+            minimumOperationDurationMillis:
+                type: long
 
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections

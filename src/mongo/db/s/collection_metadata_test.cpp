@@ -118,7 +118,7 @@ protected:
 
         if (state == CoordinatorStateEnum::kDecisionPersisted) {
             TypeCollectionRecipientFields recipientFields{
-                {kThisShard, kOtherShard}, existingUuid, kNss};
+                {kThisShard, kOtherShard}, existingUuid, kNss, 5000};
             reshardingFields.setRecipientFields(std::move(recipientFields));
         } else if (state == CoordinatorStateEnum::kBlockingWrites) {
             TypeCollectionDonorFields donorFields{

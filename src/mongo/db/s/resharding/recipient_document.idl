@@ -54,3 +54,5 @@ structs:
             donorShards:
                 type: array<shard_id>
                 description: "The list of donor shards that report to this recipient."
+            minimumOperationDurationMillis:
+                type: long
