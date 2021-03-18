@@ -101,4 +101,8 @@ compression; see @ref compression for more information.
 Configure WiredTiger for <a href="http://www.zlib.net/">zlib</a>
 compression; see @ref compression for more information.
 
+@par \c --disable-standalone-build
+Configure WiredTiger to disable standalone build. Standalone build is enabled
+by default.
+
  */

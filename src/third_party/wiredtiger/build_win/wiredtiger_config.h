@@ -73,6 +73,9 @@
 /* Define to 1 to disable any crc32 hardware support. */
 /* #undef HAVE_NO_CRC32_HARDWARE */
 
+/* Define to 1 to disable standalone wiredtiger build. */
+/* #undef WT_STANDALONE_BUILD */
+
 /* Define to 1 if pthread condition variables support monotonic clocks. */
 /* #undef HAVE_PTHREAD_COND_MONOTONIC */
 
