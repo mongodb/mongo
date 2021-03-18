@@ -57,8 +57,6 @@ const testOptions = function(allowed,
                       bucketsColl);
         }
 
-        assert.commandFailedWithCode(testDB.runCommand({drop: bucketsCollName}),
-                                     ErrorCodes.IllegalOperation);
         assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
     } else {
         assert.commandFailedWithCode(res, errorCode);

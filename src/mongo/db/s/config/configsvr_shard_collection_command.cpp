@@ -84,7 +84,7 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss.isSystem() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                nss.isTemporaryReshardingCollection());
+                nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection());
 
     // Ensure numInitialChunks is within valid bounds.
     // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
