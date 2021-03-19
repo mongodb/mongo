@@ -378,6 +378,27 @@ var ShardingTest = function(params) {
         }
     };
 
+    this.stopAllConfigServers = function(opts) {
+        if (this.configRS) {
+            this.configRS.stopSet(undefined, undefined, opts);
+        } else {
+            // Old style config triplet
+            for (var i = 0; i < this._configServers.length; i++) {
+                this.stopConfigServer(i, opts);
+            }
+        }
+    };
+
+    this.stopAllShards = function(opts) {
+        for (var i = 0; i < this._connections.length; i++) {
+            if (this._rs[i]) {
+                this._rs[i].test.stopSet(15, undefined, opts);
+            } else {
+                this.stopMongod(i, opts);
+            }
+        }
+    };
+
     this.stopAllMongos = function(opts) {
         for (var i = 0; i < this._mongos.length; i++) {
             this.stopMongos(i, opts);
@@ -389,23 +410,12 @@ var ShardingTest = function(params) {
 
         this.stopAllMongos(opts);
 
-        for (var i = 0; i < this._connections.length; i++) {
-            if (this._rs[i]) {
-                this._rs[i].test.stopSet(15, undefined, opts);
-            } else {
-                this.stopMongod(i, opts);
-            }
-        }
+        let startTime = new Date();  // Measure the execution time of shutting down shards.
+        this.stopAllShards(opts);
+        print("ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +
+              this._connections.length + " shards.");
 
-        if (this.configRS) {
-            this.configRS.stopSet(undefined, undefined, opts);
-        } else {
-            // Old style config triplet
-            for (var i = 0; i < this._configServers.length; i++) {
-                this.stopConfigServer(i, opts);
-            }
-        }
-
+        this.stopAllConfigServers(opts);
         if (!opts || !opts.noCleanData) {
             print("ShardingTest stop deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {

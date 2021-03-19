@@ -39,6 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
+#include "mongo/db/auth/auth_options.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -604,6 +605,12 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         clusterAuthMode == ServerGlobalParams::ClusterAuthMode_x509) {
         if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_disabled) {
             return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
+        }
+
+        if (!shouldEnforceUserClusterSeparation()) {
+            return Status(ErrorCodes::BadValue,
+                          "cannot have have x.509 cluster authentication while not enforcing user "
+                          "cluster separation");
         }
     }
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {

@@ -49,6 +49,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_options.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -91,8 +92,6 @@ using std::stringstream;
 using std::vector;
 
 namespace {
-
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enforceUserClusterSeparation, bool, true);
 
 // Used to obtain mutex that guards modifications to persistent authorization data
 const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::mutex>();
@@ -803,7 +802,7 @@ public:
 #ifdef MONGO_CONFIG_SSL
         if (getSSLManager() && dbname == "$external" &&
             getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
-            if (enforceUserClusterSeparation) {
+            if (shouldEnforceUserClusterSeparation()) {
                 uasserted(ErrorCodes::BadValue,
                           "Cannot create an x.509 user with a subjectname that would be "
                           "recognized as an internal cluster member");

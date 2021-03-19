@@ -43,6 +43,7 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/auth_options.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
@@ -67,56 +68,81 @@ namespace {
 static bool _isX509AuthDisabled;
 static constexpr auto kX509AuthenticationDisabledMessage = "x.509 authentication is disabled."_sd;
 
+constexpr auto kExternalDB = "$external"_sd;
+
 #ifdef MONGO_CONFIG_SSL
 Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj) {
     if (!getSSLManager()) {
         return Status(ErrorCodes::ProtocolError,
                       "SSL support is required for the MONGODB-X509 mechanism.");
     }
-    if (user.getDB() != "$external") {
-        return Status(ErrorCodes::ProtocolError,
-                      "X.509 authentication must always use the $external database.");
-    }
-
-    Client* client = Client::getCurrent();
-    AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
-    uassert(ErrorCodes::AuthenticationFailed,
-            "No verified subject name available from client",
-            !clientName.empty());
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "Unable to verify x.509 certificate, as no CA has been provided.");
-    } else if (user.getUser() != clientName.toString()) {
+    }
+
+    Client* client = opCtx->getClient();
+    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
+    if (clientName.empty()) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "No verified subject name available from client");
+    }
+
+    if (user.getDB() != kExternalDB) {
+        return Status(ErrorCodes::ProtocolError,
+                      "X.509 authentication must always use the $external database.");
+    }
+
+    if (user.getUser() != clientName.toString()) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "There is no x.509 client certificate matching the user.");
-    } else {
-        // Handle internal cluster member auth, only applies to server-server connections
-        if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
-            int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
-            if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_undefined ||
-                clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile) {
-                return Status(ErrorCodes::AuthenticationFailed,
-                              "The provided certificate "
-                              "can only be used for cluster authentication, not client "
-                              "authentication. The current configuration does not allow "
-                              "x.509 cluster authentication, check the --clusterAuthMode flag");
-            }
-            authorizationSession->grantInternalAuthorization(client);
-        }
-        // Handle normal client authentication, only applies to client-server connections
-        else {
-            if (_isX509AuthDisabled) {
-                return Status(ErrorCodes::BadValue, kX509AuthenticationDisabledMessage);
-            }
-            Status status = authorizationSession->addAndAuthorizeUser(opCtx, user);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-        return Status::OK();
     }
+
+    AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
+
+    auto isInternalClient = [&]() -> bool {
+        return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
+    };
+
+    auto authorizeExternalUser = [&]() -> Status {
+        if (_isX509AuthDisabled) {
+            return Status(ErrorCodes::BadValue, kX509AuthenticationDisabledMessage);
+        }
+        return authorizationSession->addAndAuthorizeUser(opCtx, user);
+    };
+
+    if (getSSLManager()->getSSLConfiguration().isClusterMember(clientName)) {
+        // Handle internal cluster member auth, only applies to server-server connections
+        switch (serverGlobalParams.clusterAuthMode.load()) {
+            case ServerGlobalParams::ClusterAuthMode_undefined:
+            case ServerGlobalParams::ClusterAuthMode_keyFile: {
+                uassert(ErrorCodes::AuthenticationFailed,
+                        "The provided certificate can only be used for cluster authentication, not "
+                        "client authentication. The current configuration does not allow x.509 "
+                        "cluster authentication, check the --clusterAuthMode flag",
+                        !shouldEnforceUserClusterSeparation());
+
+                return authorizeExternalUser();
+            } break;
+            case ServerGlobalParams::ClusterAuthMode_sendKeyFile:
+            case ServerGlobalParams::ClusterAuthMode_sendX509:
+            case ServerGlobalParams::ClusterAuthMode_x509: {
+                if (!isInternalClient()) {
+                    warning() << "Client isn't a mongod or mongos, but is connecting with a "
+                                 "certificate with cluster membership";
+                }
+
+                authorizationSession->grantInternalAuthorization(client);
+                return Status::OK();
+            } break;
+        }
+    } else {
+        // Handle normal client authentication, only applies to client-server connections
+        return authorizeExternalUser();
+    }
+
+    MONGO_UNREACHABLE;
 }
 #endif  // MONGO_CONFIG_SSL
 
