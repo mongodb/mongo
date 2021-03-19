@@ -37,6 +37,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -298,6 +299,8 @@ public:
 
         auto client = opCtx->getClient();
         if (ClientMetadata::tryFinalize(client)) {
+            audit::logClientMetadata(client);
+
             // If we are the first hello, then set split horizon parameters.
             auto sniName = client->getSniNameForSession();
             SplitHorizon::setParameters(client, std::move(sniName));

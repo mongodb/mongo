@@ -36,6 +36,10 @@ namespace audit {
 
 ImpersonatedClientAttrs::ImpersonatedClientAttrs(Client* client) {}
 
+void logClientMetadata(Client* client) {
+    invariant(client);
+}
+
 void logAuthentication(Client* client, const AuthenticateEvent&) {
     invariant(client);
 }

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/audit.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -72,6 +73,7 @@ public:
         auto metaElem = cmdObj[kMetadataDocumentName];
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
         ClientMetadata::tryFinalize(opCtx->getClient());
+        audit::logClientMetadata(opCtx->getClient());
 
         result.appendBool("ismaster", true);
 

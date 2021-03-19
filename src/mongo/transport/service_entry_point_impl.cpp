@@ -163,6 +163,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
 
     auto clientName = "conn{}"_format(session->id());
     auto client = _svcCtx->makeClient(clientName, session);
+    auto uuid = client->getUUID();
 
     const bool quiet = serverGlobalParams.quiet.load();
 
@@ -193,12 +194,13 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         LOGV2(22943,
               "Connection accepted",
               "remote"_attr = session->remote(),
+              "uuid"_attr = uuid.toString(),
               "connectionId"_attr = session->id(),
               "connectionCount"_attr = connectionCount);
     }
 
     auto ssmIt = *maybeSsmIt;
-    ssmIt->setCleanupHook([this, ssmIt, quiet, session = std::move(session)] {
+    ssmIt->setCleanupHook([this, ssmIt, quiet, session = std::move(session), uuid] {
         size_t connectionCount;
         auto remote = session->remote();
         {
@@ -212,6 +214,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             LOGV2(22944,
                   "Connection ended",
                   "remote"_attr = remote,
+                  "uuid"_attr = uuid.toString(),
                   "connectionId"_attr = session->id(),
                   "connectionCount"_attr = connectionCount);
         }
