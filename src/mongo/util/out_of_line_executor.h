@@ -111,7 +111,7 @@ public:
      *
      * The Task will be passed a Status schedStatus that is either:
      * * schedStatus.isOK() if the function is run in an out-of-line context
-     * * isCancelationError(schedStatus.code()) if the function is run in an inline context
+     * * isCancellationError(schedStatus.code()) if the function is run in an inline context
      *
      * All of this is to say: CHECK YOUR STATUS.
      */

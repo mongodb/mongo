@@ -46,7 +46,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -235,11 +235,11 @@ public:
     }
 
     /**
-     * Returns a CancelationToken that will be canceled when the OperationContext is killed via
+     * Returns a CancellationToken that will be canceled when the OperationContext is killed via
      * markKilled (including for internal reasons, like the OperationContext deadline being
      * reached).
      */
-    CancelationToken getCancelationToken() {
+    CancellationToken getCancellationToken() {
         return _cancelSource.token();
     }
 
@@ -640,9 +640,9 @@ private:
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
 
-    // Used to cancel all tokens obtained via getCancelationToken() when this OperationContext is
+    // Used to cancel all tokens obtained via getCancellationToken() when this OperationContext is
     // killed.
-    CancelationSource _cancelSource;
+    CancellationSource _cancelSource;
 
     BatonHandle _baton;
 

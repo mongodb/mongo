@@ -152,7 +152,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> parentExecutor,
     UUID migrationId,
-    const CancelationToken& token);
+    const CancellationToken& token);
 
 /**
  * Creates a view on the oplog that allows a tenant migration recipient to fetch retryable writes

@@ -239,7 +239,7 @@ ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
 
 SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& stepdownToken) noexcept {
+    const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
 
     return ExecutorFuture<void>(**executor)
@@ -315,7 +315,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                     _completionPromise.emplaceValue();
                 }
             } else {
-                _metrics()->onCompletion(ErrorCodes::isCancelationError(status)
+                _metrics()->onCompletion(ErrorCodes::isCancellationError(status)
                                              ? ReshardingOperationStatusEnum::kCanceled
                                              : ReshardingOperationStatusEnum::kFailure);
                 stdx::lock_guard<Latch> lg(_mutex);
@@ -445,7 +445,7 @@ void ReshardingRecipientService::RecipientStateMachine::_initTxnCloner(
 ExecutorFuture<void>
 ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-    const CancelationToken& abortToken) {
+    const CancellationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kCloning) {
         return ExecutorFuture(**executor);
     }
@@ -560,7 +560,7 @@ ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyS
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelationToken& abortToken) {
+        const CancellationToken& abortToken) {
     if (_recipientCtx.getState() > RecipientStateEnum::kSteadyState) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -824,7 +824,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(clientOpTime, CancelationToken::uncancelable())
+        .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this] {
             auto opCtx = cc().makeOperationContext();
@@ -957,10 +957,10 @@ void ReshardingRecipientService::RecipientStateMachine::_onAbortOrStepdown(WithL
     }
 }
 
-CancelationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
-    const CancelationToken& stepdownToken) {
+CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortSource(
+    const CancellationToken& stepdownToken) {
     stdx::lock_guard<Latch> lk(_mutex);
-    _abortSource = CancelationSource(stepdownToken);
+    _abortSource = CancellationSource(stepdownToken);
     return _abortSource->token();
 }
 

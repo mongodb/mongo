@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -93,7 +93,7 @@ public:
      *   (b) the cancellation token was canceled due to a stepdown or abort.
      */
     SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
-                         CancelationToken cancelToken);
+                         CancellationToken cancelToken);
 
     /**
      * Fetches and inserts a single batch of documents.

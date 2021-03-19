@@ -73,7 +73,7 @@ public:
             // Increment the count of commands that experienced a local timeout
             // Note that these commands do not count as "failed".
             ++_data.timedOut;
-        } else if (ErrorCodes::isCancelationError(status)) {
+        } else if (ErrorCodes::isCancellationError(status)) {
             // Increment the count of commands that were canceled locally
             ++_data.canceled;
         } else if (ErrorCodes::isShutdownError(status)) {
@@ -938,7 +938,7 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
     }
 
     if (requestState->interface()->inShutdown() ||
-        ErrorCodes::isCancelationError(response.status)) {
+        ErrorCodes::isCancellationError(response.status)) {
         finalResponsePromise.emplaceValue(response);
         return;
     }
@@ -1204,7 +1204,7 @@ void NetworkInterfaceTL::_answerAlarm(Status status, std::shared_ptr<AlarmState>
     // Since the lock is released before canceling the timer, this thread can win the race with
     // cancelAlarm(). Thus if status is CallbackCanceled, then this alarm is already removed from
     // _inProgressAlarms.
-    if (ErrorCodes::isCancelationError(status)) {
+    if (ErrorCodes::isCancellationError(status)) {
         return;
     }
 

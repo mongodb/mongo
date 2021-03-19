@@ -179,8 +179,10 @@ TEST_F(TaskExecutorFixture, RunExhaustFutureShouldReceiveMultipleResponses) {
                              opCtx.get());
 
     RequestHandlerUtil exhaustRequestHandler;
-    auto swFuture = executor()->scheduleExhaustRemoteCommand(
-        std::move(rcr), exhaustRequestHandler.getRequestCallbackFn(), opCtx->getCancelationToken());
+    auto swFuture =
+        executor()->scheduleExhaustRemoteCommand(std::move(rcr),
+                                                 exhaustRequestHandler.getRequestCallbackFn(),
+                                                 opCtx->getCancellationToken());
 
     for (size_t i = 0; i < 5; ++i) {
         auto counters = exhaustRequestHandler.getCountersWhenReady();

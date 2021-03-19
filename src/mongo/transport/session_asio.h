@@ -488,7 +488,7 @@ private:
 
     template <typename MutableBufferSequence>
     Future<void> read(const MutableBufferSequence& buffers, const BatonHandle& baton = nullptr) {
-        // TODO SERVER-47229 Guard active ops for cancelation here.
+        // TODO SERVER-47229 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
         if (_sslSocket) {
             return opportunisticRead(*_sslSocket, buffers, baton);
@@ -514,7 +514,7 @@ private:
 
     template <typename ConstBufferSequence>
     Future<void> write(const ConstBufferSequence& buffers, const BatonHandle& baton = nullptr) {
-        // TODO SERVER-47229 Guard active ops for cancelation here.
+        // TODO SERVER-47229 Guard active ops for cancellation here.
 #ifdef MONGO_CONFIG_SSL
         _ranHandshake = true;
         if (_sslSocket) {
@@ -680,7 +680,7 @@ private:
                 networkingBaton && networkingBaton->canWait()) {
                 return networkingBaton->addSession(*this, NetworkingBaton::Type::Out)
                     .onError([](Status error) {
-                        if (ErrorCodes::isCancelationError(error)) {
+                        if (ErrorCodes::isCancellationError(error)) {
                             // If the baton has detached, it will cancel its polling. We catch that
                             // error here and return Status::OK so that we invoke
                             // opportunisticWrite() again and switch to asio::async_write() below.

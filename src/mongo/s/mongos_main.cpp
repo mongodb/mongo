@@ -567,7 +567,7 @@ private:
                     self->_updateConfigServer(args.status, setName, update);
                 })
                 .getStatus();
-        if (ErrorCodes::isCancelationError(schedStatus.code())) {
+        if (ErrorCodes::isCancellationError(schedStatus.code())) {
             LOGV2_DEBUG(22848,
                         2,
                         "Unable to schedule updating sharding state with confirmed replica set due"
@@ -580,7 +580,7 @@ private:
     }
 
     void _updateConfigServer(Status status, std::string setName, ConnectionString update) {
-        if (ErrorCodes::isCancelationError(status.code())) {
+        if (ErrorCodes::isCancellationError(status.code())) {
             stdx::lock_guard lock(_mutex);
             _updateStates.erase(setName);
             return;

@@ -111,7 +111,7 @@ Status RollbackChecker::reset_sync() {
 
     if (!cbh.isOK()) {
         return Status(ErrorCodes::CallbackCanceled,
-                      "RollbackChecker reset failed due to callback cancelation");
+                      "RollbackChecker reset failed due to callback cancellation");
     }
 
     _executor->wait(cbh.getValue());

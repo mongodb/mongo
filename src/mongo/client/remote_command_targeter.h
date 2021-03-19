@@ -75,10 +75,10 @@ public:
      * an OperationContext is available.
      */
     virtual SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                             const CancelationToken& cancelToken) = 0;
+                                             const CancellationToken& cancelToken) = 0;
 
-    virtual SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
-                                                           const CancelationToken& cancelToken) = 0;
+    virtual SemiFuture<std::vector<HostAndPort>> findHosts(
+        const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) = 0;
 
     /**
      * Reports to the targeter that a 'status' indicating a not primary error was received when

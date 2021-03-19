@@ -40,7 +40,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/string_map.h"
@@ -221,7 +221,7 @@ private:
 
         /** See `FailPoint::pauseWhileSetAndNotCanceled`. */
         void pauseWhileSetAndNotCanceled(Interruptible* interruptible,
-                                         const CancelationToken& token) {
+                                         const CancellationToken& token) {
             auto alreadyCounted = AlreadyCounted{false};
             while (MONGO_unlikely(_shouldFail(alreadyCounted, nullptr))) {
                 uassert(
@@ -535,7 +535,7 @@ public:
      * This method will throw if the token is canceled, to match the behavior when the
      * Interruptible* is interrupted.
      */
-    void pauseWhileSetAndNotCanceled(Interruptible* interruptible, const CancelationToken& token) {
+    void pauseWhileSetAndNotCanceled(Interruptible* interruptible, const CancellationToken& token) {
         _impl()->pauseWhileSetAndNotCanceled(interruptible, token);
     }
 

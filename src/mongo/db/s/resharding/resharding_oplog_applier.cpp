@@ -273,7 +273,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _oplogIter(std::move(oplogIterator)) {}
 
 ExecutorFuture<void> ReshardingOplogApplier::applyUntilCloneFinishedTs(
-    CancelationToken cancelToken) {
+    CancellationToken cancelToken) {
     invariant(_stage == ReshardingOplogApplier::Stage::kStarted);
 
     // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
@@ -284,7 +284,7 @@ ExecutorFuture<void> ReshardingOplogApplier::applyUntilCloneFinishedTs(
         .onError([this](Status status) { return _onError(status); });
 }
 
-ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone(CancelationToken cancelToken) {
+ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone(CancellationToken cancelToken) {
     invariant(_stage == ReshardingOplogApplier::Stage::kReachedCloningTS);
 
     // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
@@ -295,7 +295,7 @@ ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone(CancelationToken can
         .onError([this](Status status) { return _onError(status); });
 }
 
-ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancelationToken cancelToken) {
+ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToken cancelToken) {
     return ExecutorFuture(_executor)
         .then([this, cancelToken] {
             auto batchClient = makeKillableClient(_service(), kClientName);

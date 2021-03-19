@@ -180,7 +180,7 @@ ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
 
 SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(
             [this] { _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(); })
@@ -599,7 +599,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(clientOpTime, CancelationToken::uncancelable())
+        .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this] {
             auto opCtx = cc().makeOperationContext();

@@ -62,7 +62,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -356,7 +356,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                 ErrorCodes::isNotPrimaryError(swNumDeleted.getStatus());
         })
         .withDelayBetweenIterations(delayBetweenBatches)
-        .on(executor, CancelationToken::uncancelable())
+        .on(executor, CancellationToken::uncancelable())
         .ignoreValue();
 }
 
@@ -406,7 +406,7 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
 
         // Asynchronously wait for majority write concern.
         return WaitForMajorityService::get(opCtx->getServiceContext())
-            .waitUntilMajority(clientOpTime, CancelationToken::uncancelable())
+            .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
             .thenRunOn(executor);
     });
 }

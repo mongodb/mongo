@@ -168,7 +168,7 @@ void DropDatabaseCoordinator::_removeStateDocument() {
 
 ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(
             Phase::kDrop,

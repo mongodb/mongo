@@ -60,7 +60,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* op
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting&,
-                                                            const CancelationToken&) {
+                                                            const CancellationToken&) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }
@@ -69,7 +69,7 @@ SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreference
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHosts(
-    const ReadPreferenceSetting&, const CancelationToken&) {
+    const ReadPreferenceSetting&, const CancellationToken&) {
 
     return _findHostReturnValue;
 }

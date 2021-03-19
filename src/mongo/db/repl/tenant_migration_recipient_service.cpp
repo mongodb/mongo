@@ -69,7 +69,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -240,7 +240,7 @@ ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const 
 }
 
 ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
 
@@ -261,7 +261,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
            })
         .until([token](Status status) { return status.isOK() || token.isCanceled(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
@@ -462,9 +462,9 @@ TenantMigrationRecipientService::Instance::waitUntilMigrationReachesReturnAfterR
 
     auto status = swDonorRecipientOpTimePair.getStatus();
 
-    // A cancelation error may occur due to an interrupt. If that is the case, replace the error
+    // A cancellation error may occur due to an interrupt. If that is the case, replace the error
     // code with the interrupt code, the true reason for interruption.
-    if (ErrorCodes::isCancelationError(status)) {
+    if (ErrorCodes::isCancellationError(status)) {
         stdx::lock_guard lk(_mutex);
         if (!_taskState.getInterruptStatus().isOK()) {
             status = _taskState.getInterruptStatus();
@@ -568,13 +568,13 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
 
     // Only ever used to cancel when the setTenantMigrationRecipientInstanceHostTimeout failpoint is
     // set.
-    CancelationSource getHostCancelSource;
+    CancellationSource getHostCancelSource;
     setTenantMigrationRecipientInstanceHostTimeout.execute([&](const BSONObj& data) {
         auto exec = **_scopedExecutor;
         const auto deadline =
             exec->now() + Milliseconds(data["findHostTimeoutMillis"].safeNumberLong());
         // Cancel the find host request after a timeout. Ignore callback handle.
-        exec->sleepUntil(deadline, CancelationToken::uncancelable())
+        exec->sleepUntil(deadline, CancellationToken::uncancelable())
             .getAsync([getHostCancelSource](auto) mutable { getHostCancelSource.cancel(); });
     });
 
@@ -714,7 +714,7 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
 
             return true;
         })
-        .on(**_scopedExecutor, CancelationToken::uncancelable())
+        .on(**_scopedExecutor, CancellationToken::uncancelable())
         .semi();
 }
 
@@ -796,7 +796,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
             // doesn't rollback.
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
+                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -1446,7 +1446,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
+                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -1476,7 +1476,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFu
                 tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), stateDoc));
             return WaitForMajorityService::get(opCtx->getServiceContext())
                 .waitUntilMajority(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                                   CancelationToken::uncancelable());
+                                   CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -1568,7 +1568,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
+                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
@@ -1730,13 +1730,13 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_updateStateDocForMa
 
             auto writeOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             return WaitForMajorityService::get(opCtx->getServiceContext())
-                .waitUntilMajority(writeOpTime, CancelationToken::uncancelable());
+                .waitUntilMajority(writeOpTime, CancellationToken::uncancelable());
         })
         .semi();
 }
 
 void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs(
-    const CancelationToken& token) {
+    const CancellationToken& token) {
     std::vector<ExternalKeysCollectionDocument> keyDocs;
     auto cursor =
         _client->query(NamespaceString::kKeysCollectionNamespace,
@@ -1785,7 +1785,7 @@ void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() c
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancellationToken& token) noexcept {
     _scopedExecutor = executor;
     auto scopedOutstandingMigrationCounter =
         TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingReceivingCount();
@@ -2147,7 +2147,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // Network and cancellation errors can be caused due to interrupt() (which shuts
             // down the cloner/fetcher dbClientConnection & oplog applier), so replace those
             // error status with interrupt status, if set.
-            if (ErrorCodes::isCancelationError(status) || ErrorCodes::isNetworkError(status)) {
+            if (ErrorCodes::isCancellationError(status) || ErrorCodes::isNetworkError(status)) {
                 stdx::lock_guard lk(_mutex);
                 if (_taskState.isInterrupted()) {
                     LOGV2(4881207,

@@ -48,12 +48,12 @@ public:
     }
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancelationToken& cancelToken) override {
+                                     const CancellationToken& cancelToken) override {
         return _mock->findHost(readPref, cancelToken);
     }
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
-                                                   const CancelationToken& cancelToken) override {
+                                                   const CancellationToken& cancelToken) override {
         return _mock->findHosts(readPref, cancelToken);
     }
 

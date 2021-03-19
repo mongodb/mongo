@@ -39,7 +39,7 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 
@@ -82,7 +82,7 @@ Status TenantMigrationDonorAccessBlocker::checkIfCanWrite() {
 Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx,
                                                                       OperationType operationType) {
     // Source to cancel the timeout if the operation completed in time.
-    CancelationSource cancelTimeoutSource;
+    CancellationSource cancelTimeoutSource;
     auto executor = getAsyncBlockingOperationsExecutor();
     std::vector<ExecutorFuture<void>> futures;
 

@@ -94,10 +94,10 @@ protected:
 
 private:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancelationToken& token) noexcept override final;
+                         const CancellationToken& token) noexcept override final;
 
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                          const CancelationToken& token) noexcept = 0;
+                                          const CancellationToken& token) noexcept = 0;
 
     void interrupt(Status status) override final;
 

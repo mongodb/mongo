@@ -34,12 +34,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 
 namespace mongo {
 
 CancelableOperationContext::CancelableOperationContext(ServiceContext::UniqueOperationContext opCtx,
-                                                       const CancelationToken& cancelToken,
+                                                       const CancellationToken& cancelToken,
                                                        ExecutorPtr executor)
     : _sharedBlock{std::make_shared<SharedBlock>()},
       _opCtx{std::move(opCtx)},

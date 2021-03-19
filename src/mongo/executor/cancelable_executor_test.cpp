@@ -34,7 +34,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/executor_test_util.h"
 #include "mongo/util/future.h"
 
@@ -76,7 +76,7 @@ private:
 TEST(CancelableExecutor, SchedulesWorkCorrectly) {
     auto exec = InlineQueuedCountingExecutor::make();
     auto [promise, future] = makePromiseFuture<void>();
-    CancelationSource source;
+    CancellationSource source;
     auto fut2 =
         std::move(future).thenRunOn(CancelableExecutor::make(exec, source.token())).then([] {
             return 42;
@@ -91,7 +91,7 @@ TEST(CancelableExecutor, SchedulesWorkCorrectly) {
 TEST(CancelableExecutor, WorkCanceledBeforeScheduleDoesNotRun) {
     auto exec = InlineQueuedCountingExecutor::make();
     auto [promise, future] = makePromiseFuture<void>();
-    CancelationSource source;
+    CancellationSource source;
     auto fut2 =
         std::move(future).thenRunOn(CancelableExecutor::make(exec, source.token())).then([] {
             return 42;
@@ -109,7 +109,7 @@ TEST_F(CancelableExecutorTest, WorkCanceledAfterPreviousWorkOnExecutorHasRunDoes
     mongo::unittest::threadAssertionMonitoredTest([this](auto& assertionMonitor) {
         auto [promise, future] = makePromiseFuture<void>();
         auto [innerPromise, innerFuture] = makePromiseFuture<void>();
-        CancelationSource source;
+        CancellationSource source;
         unittest::Barrier barrier(2);
         auto fut2 = std::move(future)
                         .thenRunOn(CancelableExecutor::make(executor(), source.token()))
@@ -135,10 +135,10 @@ TEST_F(CancelableExecutorTest, WorkCanceledAfterPreviousWorkOnExecutorHasRunDoes
 // the CancelableExecutor being canceled before the callback is ready, and
 // because the backing executor refuses work for some other reason, the backing
 // executor's error status takes precedence.
-TEST(CancelableExecutor, ExecutorRejectionsTakePrecedenceOverCancelation) {
+TEST(CancelableExecutor, ExecutorRejectionsTakePrecedenceOverCancellation) {
     auto exec = RejectingExecutor::make();
     auto [promise, future] = makePromiseFuture<void>();
-    CancelationSource source;
+    CancellationSource source;
     auto fut2 =
         std::move(future).thenRunOn(CancelableExecutor::make(exec, source.token())).then([] {
             return 42;
@@ -149,13 +149,13 @@ TEST(CancelableExecutor, ExecutorRejectionsTakePrecedenceOverCancelation) {
 }
 
 // Check that no continuations (even error-handling ones) scheduled on a CancelableExecutor
-// run after it is canceled, and that the cancelation error status is passed to the next
+// run after it is canceled, and that the cancellation error status is passed to the next
 // error-handling callback on the future chain that runs in a non-canceled execution context/
 // on an executor that accepts the work.
 TEST(CancelableExecutor, ErrorsArePropagatedToAcceptingExecutor) {
     auto exec = InlineQueuedCountingExecutor::make();
     auto [promise, future] = makePromiseFuture<void>();
-    CancelationSource source;
+    CancellationSource source;
     auto cancelExec = CancelableExecutor::make(exec, source.token());
     source.cancel();
     // It's safe to FAIL in the continuations here, because this executor runs
@@ -178,7 +178,7 @@ TEST(CancelableExecutor, ErrorsArePropagatedToAcceptingExecutor) {
 TEST(CancelableExecutor, UncanceledExecutorCanBeChainedCorrectly) {
     auto exec = InlineQueuedCountingExecutor::make();
     auto [promise, future] = makePromiseFuture<void>();
-    CancelationSource source;
+    CancellationSource source;
     auto cancelExec = CancelableExecutor::make(exec, source.token());
     auto fut2 = std::move(future)
                     .thenRunOn(exec)

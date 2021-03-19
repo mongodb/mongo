@@ -46,7 +46,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -334,7 +334,7 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
     return Pipeline::create(std::move(stages), expCtx);
 }
 
-bool shouldStopUpdatingExternalKeys(Status status, const CancelationToken& token) {
+bool shouldStopUpdatingExternalKeys(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
 }
 
@@ -343,7 +343,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> parentExecutor,
     UUID migrationId,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
     auto ttlExpiresAt = serviceContext->getFastClockSource()->now() +
         Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()} +
         Seconds{repl::tenantMigrationExternalKeysRemovalBufferSecs.load()};
@@ -388,7 +388,7 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
         // AsyncTry itself on an executor that won't shut down.
         //
         // TODO SERVER-54735: Stop using the parent executor here.
-        .on(parentExecutor, CancelationToken::uncancelable());
+        .on(parentExecutor, CancellationToken::uncancelable());
 }
 
 }  // namespace tenant_migration_util

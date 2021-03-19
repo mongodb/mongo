@@ -613,14 +613,14 @@ void ThreadPoolTaskExecutor::scheduleIntoPool_inlock(WorkQueue* fromQueue,
                 }
 
                 _pool->schedule([this, cbState](auto status) {
-                    invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
+                    invariant(status.isOK() || ErrorCodes::isCancellationError(status.code()));
 
                     runCallback(std::move(cbState));
                 });
             });
         } else {
             _pool->schedule([this, cbState](auto status) {
-                if (ErrorCodes::isCancelationError(status.code())) {
+                if (ErrorCodes::isCancellationError(status.code())) {
                     stdx::lock_guard<Latch> lk(_mutex);
 
                     cbState->canceled.store(1);
@@ -786,14 +786,14 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
             }
 
             _pool->schedule([this, cbState, expectedExhaustIter](auto status) {
-                invariant(status.isOK() || ErrorCodes::isCancelationError(status.code()));
+                invariant(status.isOK() || ErrorCodes::isCancellationError(status.code()));
 
                 runCallbackExhaust(cbState, expectedExhaustIter);
             });
         });
     } else {
         _pool->schedule([this, cbState, expectedExhaustIter](auto status) {
-            if (ErrorCodes::isCancelationError(status.code())) {
+            if (ErrorCodes::isCancellationError(status.code())) {
                 stdx::lock_guard<Latch> lk(_mutex);
 
                 cbState->canceled.store(1);

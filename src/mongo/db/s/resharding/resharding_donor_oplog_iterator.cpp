@@ -208,7 +208,7 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
 }
 
 ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getNextBatch(
-    std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) {
     if (_hasSeenFinalOplogEntry) {
         invariant(!_pipeline);
         return ExecutorFuture(std::move(executor), std::vector<repl::OplogEntry>{});
@@ -248,8 +248,8 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
     if (batch.empty() && !_hasSeenFinalOplogEntry) {
         return ExecutorFuture(executor)
             .then([this, cancelToken] {
-                return future_util::withCancelation(_insertNotifier->awaitInsert(_resumeToken),
-                                                    cancelToken);
+                return future_util::withCancellation(_insertNotifier->awaitInsert(_resumeToken),
+                                                     cancelToken);
             })
             .then([this, cancelToken, executor] {
                 return getNextBatch(std::move(executor), cancelToken);

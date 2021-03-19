@@ -110,7 +110,7 @@ public:
     ~RecipientStateMachine();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancelationToken& token) noexcept override;
+                         const CancellationToken& token) noexcept override;
 
     void interrupt(Status status) override;
 
@@ -143,14 +143,14 @@ private:
 
     ExecutorFuture<void> _cloneThenTransitionToApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelationToken& abortToken);
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _applyThenTransitionToSteadyState(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancelationToken& abortToken);
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -199,7 +199,7 @@ private:
     // Initializes the _abortSource and generates a token from it to return back the caller.
     //
     // Should only be called once per lifetime.
-    CancelationToken _initAbortSource(const CancelationToken& stepdownToken);
+    CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.recipient.
@@ -228,7 +228,7 @@ private:
     Mutex _mutex = MONGO_MAKE_LATCH("RecipientStateMachine::_mutex");
 
     // Canceled when there is an unrecoverable error or stepdown.
-    boost::optional<CancelationSource> _abortSource;
+    boost::optional<CancellationSource> _abortSource;
 
     boost::optional<ReshardingCriticalSection> _critSec;
 

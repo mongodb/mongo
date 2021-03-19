@@ -74,7 +74,7 @@ public:
     ExecutorFuture<void> run(
         ServiceContext* serviceContext,
         std::shared_ptr<executor::TaskExecutor> executor,
-        CancelationToken cancelToken,
+        CancellationToken cancelToken,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest = nullptr);
 
     void updateProgressDocument_forTest(OperationContext* opCtx, const LogicalSessionId& progress) {

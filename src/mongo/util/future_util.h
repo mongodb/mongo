@@ -96,7 +96,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken)&& {
+    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken)&& {
         auto loop = std::make_shared<TryUntilLoopWithDelay>(std::move(executor),
                                                             std::move(_body),
                                                             std::move(_condition),
@@ -116,7 +116,7 @@ private:
                               BodyCallable executeLoopBody,
                               ConditionCallable shouldStopIteration,
                               Delay delay,
-                              CancelationToken cancelToken)
+                              CancellationToken cancelToken)
             : executor(std::move(executor)),
               executeLoopBody(std::move(executeLoopBody)),
               shouldStopIteration(std::move(shouldStopIteration)),
@@ -187,7 +187,7 @@ private:
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
         Delay delay;
-        CancelationToken cancelToken;
+        CancellationToken cancelToken;
     };
 
     BodyCallable _body;
@@ -237,7 +237,7 @@ public:
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(ExecutorPtr executor, CancelationToken cancelToken)&& {
+    auto on(ExecutorPtr executor, CancellationToken cancelToken)&& {
         auto loop = std::make_shared<TryUntilLoop>(
             std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
@@ -279,7 +279,7 @@ private:
         TryUntilLoop(ExecutorPtr executor,
                      BodyCallable executeLoopBody,
                      ConditionCallable shouldStopIteration,
-                     CancelationToken cancelToken)
+                     CancellationToken cancelToken)
             : executor(std::move(executor)),
               executeLoopBody(std::move(executeLoopBody)),
               shouldStopIteration(std::move(shouldStopIteration)),
@@ -338,7 +338,7 @@ private:
         ExecutorPtr executor;
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
-        CancelationToken cancelToken;
+        CancellationToken cancelToken;
     };
 
     BodyCallable _body;
@@ -648,14 +648,14 @@ SemiFuture<Result> whenAny(FuturePack&&... futures) {
 namespace future_util {
 
 /**
- * Takes an input Future, ExecutorFuture, SemiFuture, or SharedSemiFuture and a CancelationToken,
+ * Takes an input Future, ExecutorFuture, SemiFuture, or SharedSemiFuture and a CancellationToken,
  * and returns a new SemiFuture that will be resolved when either the input future is resolved or
- * when the input CancelationToken is canceled. If the token is canceled before the input future is
+ * when the input CancellationToken is canceled. If the token is canceled before the input future is
  * resolved, the resulting SemiFuture will be resolved with a CallbackCanceled error. Otherwise, the
  * resulting SemiFuture will be resolved with the same result as the input future.
  */
 template <typename FutureT, typename Value = typename FutureT::value_type>
-SemiFuture<Value> withCancelation(FutureT&& inputFuture, const CancelationToken& token) {
+SemiFuture<Value> withCancellation(FutureT&& inputFuture, const CancellationToken& token) {
     /**
      * A structure used to share state between the continuation we attach to the input future and
      * the continuation we attach to the token's onCancel() future.
@@ -683,12 +683,12 @@ SemiFuture<Value> withCancelation(FutureT&& inputFuture, const CancelationToken&
 
     token.onCancel().unsafeToInlineFuture().getAsync([sharedBlock](Status s) {
         if (s.isOK()) {
-            // If the cancelation token is canceled first, change done to true and set the value on
+            // If the cancellation token is canceled first, change done to true and set the value on
             // the promise.
             if (!sharedBlock->done.swap(true)) {
                 sharedBlock->resultPromise.setError(
                     {ErrorCodes::CallbackCanceled,
-                     "CancelationToken canceled while waiting for input future"});
+                     "CancellationToken canceled while waiting for input future"});
             }
         }
     });

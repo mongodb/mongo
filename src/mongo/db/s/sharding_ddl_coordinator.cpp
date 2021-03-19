@@ -72,7 +72,7 @@ void ShardingDDLCoordinator::interrupt(Status status) {
 }
 
 SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                             const CancelationToken& token) noexcept {
+                                             const CancellationToken& token) noexcept {
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor, token, anchor = shared_from_this()] {

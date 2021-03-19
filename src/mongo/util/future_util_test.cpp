@@ -90,7 +90,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesOnceWithAlwaysTrueCondition) {
     auto i = 0;
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, 1);
@@ -102,7 +102,7 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotExecuteIfExecutorAlreadyShutdown) {
     auto i = 0;
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -116,7 +116,7 @@ TEST_F(AsyncTryUntilTest, LoopWithDelayDoesNotExecuteIfExecutorAlreadyShutdown) 
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
                          .withDelayBetweenIterations(Milliseconds(0))
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_THROWS_CODE(resultFut.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -131,7 +131,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrue) {
                          return i;
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
@@ -145,7 +145,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrueWithFutureReturnType) 
                          return Future<int>::makeReady(i);
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
@@ -159,7 +159,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrueWithSemiFutureReturnTy
                          return SemiFuture<int>::makeReady(i);
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
@@ -173,7 +173,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrueWithExecutorFutureRetu
                          return ExecutorFuture<int>(executor(), i);
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
@@ -184,7 +184,7 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotRespectConstDelayIfConditionIsAlreadyTrue) 
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
                          .withDelayBetweenIterations(Seconds(10000000))
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     // This would hang for a very long time if the behavior were incorrect.
     resultFut.wait();
 
@@ -196,7 +196,7 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotRespectBackoffDelayIfConditionIsAlreadyTrue
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
                          .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     // This would hang for a very long time if the behavior were incorrect.
     resultFut.wait();
 
@@ -212,7 +212,7 @@ TEST_F(AsyncTryUntilTest, LoopRespectsConstDelayAfterEvaluatingCondition) {
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
                          .withDelayBetweenIterations(Seconds(1000))
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     ASSERT_FALSE(resultFut.isReady());
 
     // Advance the time some, but not enough to be past the delay yet.
@@ -243,7 +243,7 @@ TEST_F(AsyncTryUntilTest, LoopRespectsBackoffDelayAfterEvaluatingCondition) {
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
                          .withBackoffBetweenIterations(TestBackoff{Seconds(1000)})
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
     ASSERT_FALSE(resultFut.isReady());
 
     // Due to the backoff, the delays are going to be 1000 seconds and 2000 seconds.
@@ -292,7 +292,7 @@ TEST_F(AsyncTryUntilTest, LoopBodyPropagatesValueOfLastIterationToCaller) {
                          return i;
                      })
                          .until([&](StatusWith<int> swInt) { return i == expectedResult; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_EQ(resultFut.get(), expectedResult);
 }
@@ -305,7 +305,7 @@ TEST_F(AsyncTryUntilTest, FutureReturningLoopBodyPropagatesValueOfLastIterationT
                          return Future<int>::makeReady(i);
                      })
                          .until([&](StatusWith<int> swInt) { return i == expectedResult; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_EQ(resultFut.get(), expectedResult);
 }
@@ -318,7 +318,7 @@ TEST_F(AsyncTryUntilTest, SemiFutureReturningLoopBodyPropagatesValueOfLastIterat
                          return SemiFuture<int>::makeReady(i);
                      })
                          .until([&](StatusWith<int> swInt) { return i == expectedResult; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_EQ(resultFut.get(), expectedResult);
 }
@@ -331,7 +331,7 @@ TEST_F(AsyncTryUntilTest, ExecutorFutureReturningLoopBodyPropagatesValueOfLastIt
                          return ExecutorFuture<int>(executor(), i);
                      })
                          .until([&](StatusWith<int> swInt) { return i == expectedResult; })
-                         .on(executor(), CancelationToken::uncancelable());
+                         .on(executor(), CancellationToken::uncancelable());
 
     ASSERT_EQ(resultFut.get(), expectedResult);
 }
@@ -349,7 +349,7 @@ TEST_F(AsyncTryUntilTest, LoopBodyPropagatesErrorToConditionAndCaller) {
                                  });
                                  return true;
                              })
-                             .on(executor(), CancelationToken::uncancelable());
+                             .on(executor(), CancellationToken::uncancelable());
 
         ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
     });
@@ -368,7 +368,7 @@ TEST_F(AsyncTryUntilTest, FutureReturningLoopBodyPropagatesErrorToConditionAndCa
                                  });
                                  return true;
                              })
-                             .on(executor(), CancelationToken::uncancelable());
+                             .on(executor(), CancellationToken::uncancelable());
 
         ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
     });
@@ -387,7 +387,7 @@ TEST_F(AsyncTryUntilTest, SemiFutureReturningLoopBodyPropagatesErrorToConditionA
                                  });
                                  return true;
                              })
-                             .on(executor(), CancelationToken::uncancelable());
+                             .on(executor(), CancellationToken::uncancelable());
 
         ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
     });
@@ -406,7 +406,7 @@ TEST_F(AsyncTryUntilTest, ExecutorFutureReturningLoopBodyPropagatesErrorToCondit
                                  });
                                  return true;
                              })
-                             .on(executor(), CancelationToken::uncancelable());
+                             .on(executor(), CancellationToken::uncancelable());
 
         ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
     });
@@ -415,7 +415,7 @@ TEST_F(AsyncTryUntilTest, ExecutorFutureReturningLoopBodyPropagatesErrorToCondit
 static const Status kCanceledStatus = {ErrorCodes::CallbackCanceled, "AsyncTry::until canceled"};
 
 TEST_F(AsyncTryUntilTest, AsyncTryUntilCanBeCanceled) {
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto resultFut =
         AsyncTry([] {}).until([](Status) { return false; }).on(executor(), cancelSource.token());
     // This should hang forever if it is not canceled.
@@ -424,7 +424,7 @@ TEST_F(AsyncTryUntilTest, AsyncTryUntilCanBeCanceled) {
 }
 
 TEST_F(AsyncTryUntilTest, AsyncTryUntilWithDelayCanBeCanceled) {
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto resultFut = AsyncTry([] {})
                          .until([](Status) { return false; })
                          .withDelayBetweenIterations(Hours(1000))
@@ -437,7 +437,7 @@ TEST_F(AsyncTryUntilTest, AsyncTryUntilWithDelayCanBeCanceled) {
 }
 
 TEST_F(AsyncTryUntilTest, AsyncTryUntilWithBackoffCanBeCanceled) {
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto resultFut = AsyncTry([] {})
                          .until([](Status) { return false; })
                          .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
@@ -448,7 +448,7 @@ TEST_F(AsyncTryUntilTest, AsyncTryUntilWithBackoffCanBeCanceled) {
 
 TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopDoesNotExecuteIfAlreadyCanceled) {
     int counter{0};
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto canceledToken = cancelSource.token();
     cancelSource.cancel();
     auto resultFut = AsyncTry([&] { ++counter; })
@@ -459,7 +459,7 @@ TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopDoesNotExecuteIfAlreadyCanceled) {
 }
 
 TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithDelayDoesNotExecuteIfAlreadyCanceled) {
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     int counter{0};
     auto canceledToken = cancelSource.token();
     cancelSource.cancel();
@@ -472,7 +472,7 @@ TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithDelayDoesNotExecuteIfAlreadyCa
 }
 
 TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithBackoffDoesNotExecuteIfAlreadyCanceled) {
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     int counter{0};
     auto canceledToken = cancelSource.token();
     cancelSource.cancel();
@@ -1229,16 +1229,16 @@ TEST_F(WhenAnyTest, WorksWithVariadicTemplateAndExecutorFutures) {
     ASSERT_EQ(idx, kWhichIdxWillBeFirst);
 }
 
-class WithCancelationTest : public FutureUtilTest {};
+class WithCancellationTest : public FutureUtilTest {};
 
 TEST_F(FutureUtilTest,
-       WithCancelationReturnsSuccessIfInputFutureResolvedWithSuccessBeforeCancelation) {
+       WithCancellationReturnsSuccessIfInputFutureResolvedWithSuccessBeforeCancellation) {
     const int kResult{5};
     auto [promise, future] = makePromiseFuture<int>();
 
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
-    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+    auto cancelableFuture = future_util::withCancellation(std::move(future), cancelSource.token());
 
     promise.emplaceValue(kResult);
     ASSERT_EQ(cancelableFuture.get(), kResult);
@@ -1247,12 +1247,13 @@ TEST_F(FutureUtilTest,
     cancelSource.cancel();
 }
 
-TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfInputFutureResolvedWithErrorBeforeCancelation) {
+TEST_F(FutureUtilTest,
+       WithCancellationReturnsErrorIfInputFutureResolvedWithErrorBeforeCancellation) {
     auto [promise, future] = makePromiseFuture<int>();
 
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
-    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+    auto cancelableFuture = future_util::withCancellation(std::move(future), cancelSource.token());
 
     const Status kErrorStatus{ErrorCodes::InternalError, ""};
     promise.setError(kErrorStatus);
@@ -1262,11 +1263,11 @@ TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfInputFutureResolvedWithError
     cancelSource.cancel();
 }
 
-TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfTokenCanceledFirst) {
+TEST_F(FutureUtilTest, WithCancellationReturnsErrorIfTokenCanceledFirst) {
     auto [promise, future] = makePromiseFuture<int>();
 
-    CancelationSource cancelSource;
-    auto cancelableFuture = future_util::withCancelation(std::move(future), cancelSource.token());
+    CancellationSource cancelSource;
+    auto cancelableFuture = future_util::withCancellation(std::move(future), cancelSource.token());
     cancelSource.cancel();
     ASSERT_THROWS_CODE(cancelableFuture.get(), DBException, ErrorCodes::CallbackCanceled);
 
@@ -1274,44 +1275,44 @@ TEST_F(FutureUtilTest, WithCancelationReturnsErrorIfTokenCanceledFirst) {
     promise.setError(kCanceledStatus);
 }
 
-TEST_F(FutureUtilTest, WithCancelationWorksWithVoidInput) {
+TEST_F(FutureUtilTest, WithCancellationWorksWithVoidInput) {
     auto [promise, future] = makePromiseFuture<void>();
 
     auto cancelableFuture =
-        future_util::withCancelation(std::move(future), CancelationToken::uncancelable());
+        future_util::withCancellation(std::move(future), CancellationToken::uncancelable());
 
     promise.emplaceValue();
     ASSERT(cancelableFuture.isReady());
 }
 
-TEST_F(FutureUtilTest, WithCancelationWorksWithSemiFutureInput) {
+TEST_F(FutureUtilTest, WithCancellationWorksWithSemiFutureInput) {
     const int kResult{5};
     auto [promise, future] = makePromiseFuture<int>();
 
     auto cancelableFuture =
-        future_util::withCancelation(std::move(future).semi(), CancelationToken::uncancelable());
+        future_util::withCancellation(std::move(future).semi(), CancellationToken::uncancelable());
 
     promise.emplaceValue(kResult);
     ASSERT_EQ(cancelableFuture.get(), kResult);
 }
 
-TEST_F(FutureUtilTest, WithCancelationWorksWithSharedSemiFutureInput) {
+TEST_F(FutureUtilTest, WithCancellationWorksWithSharedSemiFutureInput) {
     const int kResult{5};
     auto [promise, future] = makePromiseFuture<int>();
 
-    auto cancelableFuture = future_util::withCancelation(std::move(future).semi().share(),
-                                                         CancelationToken::uncancelable());
+    auto cancelableFuture = future_util::withCancellation(std::move(future).semi().share(),
+                                                          CancellationToken::uncancelable());
 
     promise.emplaceValue(kResult);
     ASSERT_EQ(cancelableFuture.get(), kResult);
 }
 
-TEST_F(FutureUtilTest, WithCancelationWorksWithExecutorFutureInput) {
+TEST_F(FutureUtilTest, WithCancellationWorksWithExecutorFutureInput) {
     const int kResult{5};
     auto [promise, future] = makePromiseFuture<int>();
 
-    auto cancelableFuture = future_util::withCancelation(std::move(future).thenRunOn(executor()),
-                                                         CancelationToken::uncancelable());
+    auto cancelableFuture = future_util::withCancellation(std::move(future).thenRunOn(executor()),
+                                                          CancellationToken::uncancelable());
 
     promise.emplaceValue(kResult);
     ASSERT_EQ(cancelableFuture.get(), kResult);

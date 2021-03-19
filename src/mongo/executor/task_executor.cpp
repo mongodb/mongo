@@ -41,7 +41,7 @@ MONGO_FAIL_POINT_DEFINE(pauseScheduleCallWithCancelTokenUntilCanceled);
 Status wrapCallbackHandleWithCancelToken(
     const std::shared_ptr<TaskExecutor>& executor,
     const StatusWith<TaskExecutor::CallbackHandle>& swCallbackHandle,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
     if (!swCallbackHandle.isOK()) {
         return swCallbackHandle.getStatus();
     }
@@ -57,14 +57,14 @@ Status wrapCallbackHandleWithCancelToken(
 
 /**
  * Takes a schedule(Exhaust)RemoteCommand(OnAny)-style function and wraps it to return a future and
- * be cancelable with CancelationTokens.
+ * be cancelable with CancellationTokens.
  */
 template <typename Request, typename Response, typename ScheduleFn, typename CallbackFn>
 ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
     const std::shared_ptr<TaskExecutor>& executor,
     ScheduleFn&& schedule,
     const Request& request,
-    const CancelationToken& token,
+    const CancellationToken& token,
     const BatonHandle& baton,
     const CallbackFn& cb) {
     if (token.isCanceled()) {
@@ -149,7 +149,7 @@ void TaskExecutor::schedule(OutOfLineExecutor::Task func) {
     }
 }
 
-ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancelationToken& token) {
+ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancellationToken& token) {
     if (token.isCanceled()) {
         return ExecutorFuture<void>(shared_from_this(), TaskExecutor::kCallbackCanceledErrorStatus);
     }
@@ -183,7 +183,7 @@ ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancelationToke
     auto cbHandle = scheduleWorkAt(
         when, [alarmState](const auto& args) mutable { alarmState->signal(args.status); });
 
-    // Handle cancelation via the input CancelationToken.
+    // Handle cancellation via the input CancellationToken.
     auto scheduleStatus =
         wrapCallbackHandleWithCancelToken(shared_from_this(), std::move(cbHandle), token);
 
@@ -274,7 +274,7 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
 }
 
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand(
-    const RemoteCommandRequest& request, const CancelationToken& token, const BatonHandle& baton) {
+    const RemoteCommandRequest& request, const CancellationToken& token, const BatonHandle& baton) {
     return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
                                                     TaskExecutor::ResponseStatus>(
         shared_from_this(),
@@ -287,7 +287,7 @@ ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand
 
 ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCommandOnAny(
     const RemoteCommandRequestOnAny& request,
-    const CancelationToken& token,
+    const CancellationToken& token,
     const BatonHandle& baton) {
     return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
                                                     TaskExecutor::ResponseOnAnyStatus>(
@@ -313,7 +313,7 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteComm
 ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleExhaustRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
-    const CancelationToken& token,
+    const CancellationToken& token,
     const BatonHandle& baton) {
     return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
                                                     TaskExecutor::ResponseStatus>(
@@ -328,7 +328,7 @@ ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleExhaustRemote
 ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleExhaustRemoteCommandOnAny(
     const RemoteCommandRequestOnAny& request,
     const RemoteCommandOnAnyCallbackFn& cb,
-    const CancelationToken& token,
+    const CancellationToken& token,
     const BatonHandle& baton) {
     return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
                                                     TaskExecutor::ResponseOnAnyStatus>(

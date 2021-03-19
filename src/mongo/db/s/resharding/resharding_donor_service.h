@@ -79,7 +79,7 @@ public:
     ~DonorStateMachine();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                         const CancelationToken& token) noexcept override;
+                         const CancellationToken& token) noexcept override;
 
     void interrupt(Status status) override;
 

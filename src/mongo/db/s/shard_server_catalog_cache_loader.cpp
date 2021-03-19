@@ -982,7 +982,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
 
     _executor->schedule([this, nss](auto status) {
         if (!status.isOK()) {
-            if (ErrorCodes::isCancelationError(status)) {
+            if (ErrorCodes::isCancellationError(status)) {
                 return;
             }
 
@@ -1010,7 +1010,7 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(Oper
 
     _executor->schedule([this, name = dbName.toString()](auto status) {
         if (!status.isOK()) {
-            if (ErrorCodes::isCancelationError(status)) {
+            if (ErrorCodes::isCancellationError(status)) {
                 return;
             }
 
@@ -1075,7 +1075,7 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
             return;
         }
 
-        if (ErrorCodes::isCancelationError(status.code())) {
+        if (ErrorCodes::isCancellationError(status.code())) {
             LOGV2(22096,
                   "Cache loader failed to schedule a persisted metadata update task for namespace "
                   "{namespace} due to {error}. Clearing task list so that scheduling will be "
@@ -1149,7 +1149,7 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
             return;
         }
 
-        if (ErrorCodes::isCancelationError(status.code())) {
+        if (ErrorCodes::isCancellationError(status.code())) {
             LOGV2(22099,
                   "Cache loader failed to schedule a persisted metadata update task for database "
                   "{database} due to {error}. Clearing task list so that scheduling will be "

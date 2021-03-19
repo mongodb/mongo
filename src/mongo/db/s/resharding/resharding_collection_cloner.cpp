@@ -343,7 +343,7 @@ auto ReshardingCollectionCloner::_withTemporaryOperationContext(Callable&& calla
 }
 
 SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskExecutor> executor,
-                                                 CancelationToken cancelToken) {
+                                                 CancellationToken cancelToken) {
     struct ChainContext {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
         bool moreToCome = true;
@@ -372,7 +372,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskE
                 });
             }
 
-            if (status.isA<ErrorCategory::CancelationError>() ||
+            if (status.isA<ErrorCategory::CancellationError>() ||
                 status.isA<ErrorCategory::NotPrimaryError>()) {
                 // Cancellation and NotPrimary errors indicate the primary-only service Instance
                 // will be shut down or is shutting down now - provided the cancelToken is also
@@ -411,7 +411,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskE
         .on(executor, cancelToken)
         .onCompletion([this, chainCtx](Status status) {
             if (chainCtx->pipeline) {
-                // Guarantee the pipeline is always cleaned up - even upon cancelation.
+                // Guarantee the pipeline is always cleaned up - even upon cancellation.
                 _withTemporaryOperationContext([&](auto* opCtx) {
                     chainCtx->pipeline->dispose(opCtx);
                     chainCtx->pipeline.reset();

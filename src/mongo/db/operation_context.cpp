@@ -292,8 +292,9 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 // - _baton is notified (someone's queuing work for the baton)
 // - _baton::run returns (timeout fired / networking is ready / socket disconnected)
 //
-// We release the lock held by m whenever we call markKilled, since it may trigger CancelationSource
-// cancelation which can in turn emplace a SharedPromise which then may acquire a mutex.
+// We release the lock held by m whenever we call markKilled, since it may trigger
+// CancellationSource cancellation which can in turn emplace a SharedPromise which then may acquire
+// a mutex.
 StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAssertUntil(
     stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept {
     invariant(getClient());

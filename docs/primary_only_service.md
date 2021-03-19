@@ -91,7 +91,7 @@ Instance is explicitly interrupted, so that it can unblock any work running on t
 *not* a part of an executor owned by the PrimaryOnlyService that are dependent on that Instance
 signaling them (e.g. commands that are waiting on the Instance to reach a certain state). Currently
 this happens via a call to an interrupt() method that each Instance must override, but in the future
-this is likely to change to signaling a CancelationToken owned by the Instance instead.
+this is likely to change to signaling a CancellationToken owned by the Instance instead.
 
 ## Instance lifetime
 

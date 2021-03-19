@@ -44,12 +44,12 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    const ReadPreferenceSetting& readPref, const CancelationToken& cancelToken) {
+    const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) {
     return {_hostAndPort};
 }
 
 SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterStandalone::findHosts(
-    const ReadPreferenceSetting& readPref, const CancelationToken& cancelToken) {
+    const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) {
     return {{_hostAndPort}};
 }
 

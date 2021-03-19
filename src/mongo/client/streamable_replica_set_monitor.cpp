@@ -304,7 +304,7 @@ void StreamableReplicaSetMonitor::drop() {
 SemiFuture<HostAndPort> StreamableReplicaSetMonitor::getHostOrRefresh(
     const ReadPreferenceSetting& criteria,
     const std::vector<HostAndPort>& excludedHosts,
-    const CancelationToken& cancelToken) {
+    const CancellationToken& cancelToken) {
     return getHostsOrRefresh(criteria, excludedHosts, cancelToken)
         .thenRunOn(_executor)
         .then([self = shared_from_this()](const std::vector<HostAndPort>& result) {
@@ -326,7 +326,7 @@ std::vector<HostAndPort> StreamableReplicaSetMonitor::_extractHosts(
 SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefresh(
     const ReadPreferenceSetting& criteria,
     const std::vector<HostAndPort>& excludedHosts,
-    const CancelationToken& cancelToken) {
+    const CancellationToken& cancelToken) {
     // In the fast case (stable topology), we avoid mutex acquisition.
     if (_isDropped.load()) {
         return makeReplicaSetMonitorRemovedError(getName());
@@ -353,7 +353,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
                 "replicaSet"_attr = getName(),
                 "readPref"_attr = readPrefToStringFull(criteria));
 
-    // Fail fast on timeout or cancelation.
+    // Fail fast on timeout or cancellation.
     const Date_t& now = _executor->now();
     if (deadline <= now || cancelToken.isCanceled()) {
         return makeUnsatisfiedReadPrefError(getName(), criteria);
@@ -385,7 +385,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
     WithLock,
     const ReadPreferenceSetting& criteria,
     const std::vector<HostAndPort>& excludedHosts,
-    const CancelationToken& cancelToken,
+    const CancellationToken& cancelToken,
     const Date_t& deadline) {
 
     auto query = std::make_shared<HostQuery>();
@@ -397,7 +397,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
 
     // Make the deadline task cancelable for when the query is satisfied or when the input
     // cancelToken is canceled.
-    query->deadlineCancelSource = CancelationSource(cancelToken);
+    query->deadlineCancelSource = CancellationSource(cancelToken);
     query->start = _executor->now();
 
     // Add the query to the list of outstanding queries.
@@ -407,11 +407,11 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_enqueueOutsta
     // It will be removed as a listener when all waiting queries have been satisfied.
     _eventsPublisher->registerListener(_queryProcessor);
 
-    // After a deadline or when the input cancelation token is canceled, cancel this query. If the
+    // After a deadline or when the input cancellation token is canceled, cancel this query. If the
     // query completes first, the deadlineCancelSource will be used to cancel this task.
     _executor->sleepUntil(deadline, query->deadlineCancelSource.token())
         .getAsync([this, query, queryIter, self = shared_from_this(), cancelToken](Status status) {
-            // If the deadline was reached or cancelation occurred on the input cancelation token,
+            // If the deadline was reached or cancellation occurred on the input cancellation token,
             // mark the query as canceled. Otherwise, the deadlineCancelSource must have been
             // canceled due to the query completing successfully.
             if (status.isOK() || cancelToken.isCanceled()) {
@@ -456,7 +456,7 @@ boost::optional<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_getHosts
 
 HostAndPort StreamableReplicaSetMonitor::getPrimaryOrUassert() {
     return ReplicaSetMonitorInterface::getHostOrRefresh(kPrimaryOnlyReadPreference,
-                                                        CancelationToken::uncancelable())
+                                                        CancellationToken::uncancelable())
         .get();
 }
 
@@ -799,7 +799,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
 
     // Iterate through the outstanding queries and try to resolve them via calls to _getHosts. If we
     // succeed in resolving a query, the query is removed from the list. If a query has already been
-    // canceled, or there are no results, it will be skipped. Cancelation logic elsewhere will
+    // canceled, or there are no results, it will be skipped. Cancellation logic elsewhere will
     // handle removing the canceled queries from the list.
     while (it != _outstandingQueries.end()) {
         auto& query = *it;
