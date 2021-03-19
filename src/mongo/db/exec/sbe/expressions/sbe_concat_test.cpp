@@ -33,7 +33,8 @@
 namespace mongo::sbe {
 class SBEConcatTest : public EExpressionTestFixture {
 protected:
-    void runAndAssertExpression(const vm::CodeFragment* compiledExpr, StringData expectedVal) {
+    void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
+                                std::string_view expectedVal) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
         value::ValueGuard guard(tag, val);
 

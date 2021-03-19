@@ -79,8 +79,10 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
 
-        auto result =
-            op(comparator ? comparator->compare(lhsStr, rhsStr) : lhsStr.compare(rhsStr), 0);
+        auto result = op(comparator ? comparator->compare(StringData{lhsStr.data(), lhsStr.size()},
+                                                          StringData{rhsStr.data(), rhsStr.size()})
+                                    : lhsStr.compare(rhsStr),
+                         0);
 
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Date && rhsTag == value::TypeTags::Date) {

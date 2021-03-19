@@ -1161,7 +1161,7 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
                 std::move(inputStage),
                 getCurrentPlanNodeId(),
                 outputSlot,
-                makeE<EFunction>("getField"_sd,
+                makeE<EFunction>("getField"sv,
                                  makeEs(makeE<EVariable>(inputSlot),
                                         makeE<EConstant>(ast.nodes[0]->identifier))));
         }
@@ -1172,7 +1172,7 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
             makeProjectStage(std::move(inputStage),
                              getCurrentPlanNodeId(),
                              traverseIn,
-                             makeE<EFunction>("getField"_sd,
+                             makeE<EFunction>("getField"sv,
                                               makeEs(makeE<EVariable>(inputSlot),
                                                      makeE<EConstant>(ast.nodes[0]->identifier))));
         auto in = makeS<LimitSkipStage>(

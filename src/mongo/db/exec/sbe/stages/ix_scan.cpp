@@ -39,7 +39,7 @@
 
 namespace mongo::sbe {
 IndexScanStage::IndexScanStage(CollectionUUID collUuid,
-                               StringData indexName,
+                               std::string_view indexName,
                                bool forward,
                                boost::optional<value::SlotId> recordSlot,
                                boost::optional<value::SlotId> recordIdSlot,

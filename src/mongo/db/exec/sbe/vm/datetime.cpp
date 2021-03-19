@@ -45,7 +45,9 @@ bool isValidTimezone(value::TypeTags timezoneTag,
         return false;
     }
     auto timezoneStringView = value::getStringView(timezoneTag, timezoneValue);
-    return timezoneStringView.empty() || timezoneDB->isTimeZoneIdentifier(timezoneStringView);
+    return timezoneStringView.empty() ||
+        timezoneDB->isTimeZoneIdentifier(
+            StringData{timezoneStringView.data(), timezoneStringView.size()});
 }
 
 TimeZone getTimezone(value::TypeTags timezoneTag,
@@ -55,7 +57,7 @@ TimeZone getTimezone(value::TypeTags timezoneTag,
     if (timezoneStr.empty()) {
         return timezoneDB->utcZone();
     } else {
-        return timezoneDB->getTimeZone(timezoneStr);
+        return timezoneDB->getTimeZone(StringData{timezoneStr.data(), timezoneStr.size()});
     }
 }
 

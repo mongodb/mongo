@@ -33,6 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string_view>
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
@@ -114,7 +115,7 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
 
     auto [expectedTag, expectedVal] = value::makeNewArray();
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
-    for (auto&& sv : std::array<StringData, 4>{"Aa", "BB", "cc", "dD"}) {
+    for (auto&& sv : std::array<std::string_view, 4>{"Aa", "BB", "cc", "dD"}) {
         auto [tag, val] = value::makeNewString(sv);
         value::getArrayView(expectedVal)->push_back(tag, val);
     }
