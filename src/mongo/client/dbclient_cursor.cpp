@@ -606,7 +606,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
                                 aggregation_request_helper::serializeToCommandObj(aggRequest),
                                 ret,
                                 secondaryOk ? QueryOption_SecondaryOk : 0)) {
-            return {ErrorCodes::CommandFailed, ret.toString()};
+            return getStatusFromCommandResult(ret);
         }
     } catch (...) {
         return exceptionToStatus();
