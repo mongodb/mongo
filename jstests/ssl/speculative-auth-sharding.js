@@ -26,8 +26,7 @@ const st = new ShardingTest({
         configOptions: options,
         mongosOptions: options,
         rsOptions: options,
-        shardOptions: options,
-        shardAsReplicaSet: false,
+        shardOptions: options
     }
 });
 

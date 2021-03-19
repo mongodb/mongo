@@ -4,6 +4,9 @@ selector:
   roots:
   - jstests/ssl/*.js
   exclude_files:
+  # TODO SERVER-55273: remove once x509 authentication is available for ReplSetTest
+  - jstests/ssl/sharding_with_x509.js
+  - jstests/ssl/speculative-auth-sharding.js
 
 # ssl tests start their own mongod's.
 executor:
