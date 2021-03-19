@@ -2046,39 +2046,51 @@ elif env.TargetOSIs('windows'):
     env['LINK_WHOLE_ARCHIVE_LIB_END'] = ''
     env['LIBDEPS_FLAG_SEPARATORS'] = {env['LINK_WHOLE_ARCHIVE_LIB_START']:{'suffix':':'}}
 
-def init_no_global_add_flags(env, start_flag, end_flag):
+if env.TargetOSIs('darwin') and link_model.startswith('dynamic'):
+
+    def init_no_global_libdeps_tag_expansion(source, target, env, for_signature):
+        """
+        This callable will be expanded by scons and modify the environment by
+        adjusting the prefix and postfix flags to account for linking options
+        related to the use of global static initializers for any given libdep.
+        """
+
+        if "init-no-global-side-effects" in env.get(libdeps.Constants.LibdepsTags, []):
+            # macos as-needed flag is used on the library directly when it is built
+            return env.get('LINK_AS_NEEDED_LIB_START', '')
+
+    env['LIBDEPS_TAG_EXPANSIONS'].append(init_no_global_libdeps_tag_expansion)
+
+def init_no_global_add_flags(target, start_flag, end_flag):
     """ Helper function for init_no_global_libdeps_tag_expand"""
-    env['LIBDEPS_PREFIX_FLAGS']=[start_flag]
-    env['LIBDEPS_POSTFIX_FLAGS']=[end_flag]
+
+    setattr(target[0].attributes, "libdeps_prefix_flags", [start_flag])
+    setattr(target[0].attributes, "libdeps_postfix_flags", [end_flag])
     if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
-        env.AppendUnique(
-            LIBDEPS_SWITCH_FLAGS=[{
+        setattr(target[0].attributes, "libdeps_switch_flags", [{
                 'on':start_flag,
                 'off':end_flag
         }])
 
-def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
+def init_no_global_libdeps_tag_emitter(target, source, env):
     """
-    This callable will be expanded by scons and modify the environment by
-    adjusting the prefix and postfix flags to account for linking options
-    related to the use of global static initializers for any given libdep.
+    This emitter will be attached the correct pre and post fix flags to
+    a given library to cause it to have certain flags before or after on the link
+    line.
     """
 
-    if link_model.startswith("dynamic"):
+    if link_model.startswith('dynamic'):
         start_flag = env.get('LINK_AS_NEEDED_LIB_START', '')
         end_flag = env.get('LINK_AS_NEEDED_LIB_END', '')
 
         # In the dynamic case, any library that is known to not have global static
         # initializers can supply the flag and be wrapped in --as-needed linking,
         # allowing the linker to be smart about linking libraries it may not need.
-        if "init-no-global-side-effects" in env.get(libdeps.Constants.LibdepsTags, []):
-            if env.TargetOSIs('darwin'):
-                # macos as-needed flag is used on the library directly when it is built
-                env.AppendUnique(SHLINKFLAGS=[start_flag])
-            else:
-                init_no_global_add_flags(env, start_flag, end_flag)
+        if ("init-no-global-side-effects" in env.get(libdeps.Constants.LibdepsTags, [])
+            and not env.TargetOSIs('darwin')):
+            init_no_global_add_flags(target, start_flag, end_flag)
         else:
-            init_no_global_add_flags(env, "", "")
+            init_no_global_add_flags(target, "", "")
 
     else:
         start_flag = env.get('LINK_WHOLE_ARCHIVE_LIB_START', '')
@@ -2089,12 +2101,16 @@ def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
         # allowing the linker to bring in all those symbols which may not be directly needed
         # at link time.
         if "init-no-global-side-effects" not in env.get(libdeps.Constants.LibdepsTags, []):
-            init_no_global_add_flags(env, start_flag, end_flag)
+            init_no_global_add_flags(target, start_flag, end_flag)
         else:
-            init_no_global_add_flags(env, "", "")
-    return []
+            init_no_global_add_flags(target, "", "")
+    return target, source
 
-env['LIBDEPS_TAG_EXPANSIONS'].append(init_no_global_libdeps_tag_expand)
+for target_builder in ['SharedLibrary', 'SharedArchive', 'StaticLibrary']:
+    builder = env['BUILDERS'][target_builder]
+    base_emitter = builder.emitter
+    new_emitter = SCons.Builder.ListEmitter([base_emitter, init_no_global_libdeps_tag_emitter])
+    builder.emitter = new_emitter
 
 link_guard_rules = {
     "test" : ["dist"]
