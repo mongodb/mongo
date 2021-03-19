@@ -88,6 +88,11 @@ public:
 };
 
 /**
+ * Logs the metadata for a client connection once it is finalized.
+ */
+void logClientMetadata(Client* client);
+
+/**
  * AuthenticateEvent is a opaque view into a finished authentication handshake.
  *
  * This object is only valid within its initial stack context.

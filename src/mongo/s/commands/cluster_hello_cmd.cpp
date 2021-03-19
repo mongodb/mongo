@@ -32,6 +32,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -106,7 +107,9 @@ public:
         waitInHello.pauseWhileSet(opCtx);
 
         auto client = opCtx->getClient();
-        ClientMetadata::tryFinalize(client);
+        if (ClientMetadata::tryFinalize(client)) {
+            audit::logClientMetadata(client);
+        }
 
         // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
