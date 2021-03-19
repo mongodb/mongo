@@ -301,10 +301,10 @@ generateOptimizedMultiIntervalIndexScan(
     for (auto&& [lowKey, highKey] : intervals) {
         auto [tag, val] = sbe::value::makeNewObject();
         auto obj = sbe::value::getObjectView(val);
-        obj->push_back("l"sv,
+        obj->push_back("l"_sd,
                        sbe::value::TypeTags::ksValue,
                        sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
-        obj->push_back("h"sv,
+        obj->push_back("h"_sd,
                        sbe::value::TypeTags::ksValue,
                        sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
         arr->push_back(tag, val);
@@ -334,13 +334,13 @@ generateOptimizedMultiIntervalIndexScan(
         std::move(unwind),
         planNodeId,
         lowKeySlot,
-        sbe::makeE<sbe::EFunction>(
-            "getField"sv,
-            sbe::makeEs(sbe::makeE<sbe::EVariable>(unwindSlot), sbe::makeE<sbe::EConstant>("l"sv))),
-        highKeySlot,
-        sbe::makeE<sbe::EFunction>("getField"sv,
+        sbe::makeE<sbe::EFunction>("getField"_sd,
                                    sbe::makeEs(sbe::makeE<sbe::EVariable>(unwindSlot),
-                                               sbe::makeE<sbe::EConstant>("h"sv))));
+                                               sbe::makeE<sbe::EConstant>("l"_sd))),
+        highKeySlot,
+        sbe::makeE<sbe::EFunction>("getField"_sd,
+                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(unwindSlot),
+                                               sbe::makeE<sbe::EConstant>("h"_sd))));
 
     auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
                                                   indexName,
@@ -609,14 +609,14 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
         std::move(unionStage),
         spoolId,
         makeSlotVector(resultSlot, std::move(indexKeySlots)),
-        makeNot(makeFunction("isRecordId"sv, sbe::makeE<sbe::EVariable>(resultSlot))),
+        makeNot(makeFunction("isRecordId"_sd, sbe::makeE<sbe::EVariable>(resultSlot))),
         ixn->nodeId());
 
     // Finally, add a filter stage on top to filter out seek keys and return only recordIds.
     return {resultSlot,
             sbe::makeS<sbe::FilterStage<false>>(
                 std::move(spool),
-                sbe::makeE<sbe::EFunction>("isRecordId"sv,
+                sbe::makeE<sbe::EFunction>("isRecordId"_sd,
                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(resultSlot))),
                 ixn->nodeId())};
 }

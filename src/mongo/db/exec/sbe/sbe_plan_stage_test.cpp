@@ -36,7 +36,6 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 
-#include <string_view>
 
 #include "mongo/logv2/log.h"
 

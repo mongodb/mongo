@@ -188,7 +188,7 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpre
  * Creates an EFunction expression with the given name and arguments.
  */
 template <typename... Args>
-inline std::unique_ptr<sbe::EExpression> makeFunction(std::string_view name, Args&&... args) {
+inline std::unique_ptr<sbe::EExpression> makeFunction(StringData name, Args&&... args) {
     return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
 }
 
@@ -197,7 +197,7 @@ inline auto makeConstant(sbe::value::TypeTags tag, T value) {
     return sbe::makeE<sbe::EConstant>(tag, sbe::value::bitcastFrom<T>(value));
 }
 
-inline auto makeConstant(std::string_view str) {
+inline auto makeConstant(StringData str) {
     auto [tag, value] = sbe::value::makeNewString(str);
     return sbe::makeE<sbe::EConstant>(tag, value);
 }

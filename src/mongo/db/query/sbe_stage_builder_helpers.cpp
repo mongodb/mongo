@@ -197,7 +197,7 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
-    return makeFunction("fillEmpty"sv,
+    return makeFunction("fillEmpty"_sd,
                         std::move(e),
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
                                                    sbe::value::bitcastFrom<bool>(false)));
@@ -212,13 +212,13 @@ std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId,
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
     return makeFunction(
-        "fillEmpty"sv, std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
+        "fillEmpty"_sd, std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
 }
 
 std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
     std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise) {
     using namespace std::literals;
-    return sbe::makeE<sbe::EIf>(makeFunction("isArray"sv, std::move(isArrayInput)),
+    return sbe::makeE<sbe::EIf>(makeFunction("isArray"_sd, std::move(isArrayInput)),
                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
                                 std::move(otherwise));
 }
@@ -228,15 +228,11 @@ std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     sbe::value::FrameIdGenerator& frameIdGenerator,
     std::unique_ptr<sbe::EExpression> inputExpr,
     int level) {
-    using namespace std::literals;
     invariant(level >= 0);
 
     auto makeGetFieldKeyPattern = [&](std::unique_ptr<sbe::EExpression> slot) {
-        return makeFillEmptyNull(
-            makeFunction("getField"sv, std::move(slot), sbe::makeE<sbe::EConstant>([&]() {
-                             const auto fieldName = keyPatternField[level];
-                             return std::string_view{fieldName.rawData(), fieldName.size()};
-                         }())));
+        return makeFillEmptyNull(makeFunction(
+            "getField"_sd, std::move(slot), sbe::makeE<sbe::EConstant>(keyPatternField[level])));
     };
 
     if (level == keyPatternField.numParts() - 1) {
@@ -531,7 +527,7 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
         projectSlots.emplace_back(slotIdGenerator->generate());
         projections.emplace(
             projectSlots.back(),
-            makeFunction("getElement"sv,
+            makeFunction("getElement"_sd,
                          sbe::makeE<sbe::EVariable>(scanSlot),
                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                     sbe::value::bitcastFrom<int32_t>(i))));

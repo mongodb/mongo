@@ -32,8 +32,7 @@
 namespace mongo::sbe {
 class SBERegexTest : public EExpressionTestFixture {
 protected:
-    void runAndAssertRegexCompile(const vm::CodeFragment* compiledExpr,
-                                  std::string_view regexString) {
+    void runAndAssertRegexCompile(const vm::CodeFragment* compiledExpr, StringData regexString) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
         value::ValueGuard guard(tag, val);
 
@@ -53,7 +52,7 @@ protected:
     }
 
     void runAndAssertFindExpression(const vm::CodeFragment* compiledExpr,
-                                    std::string_view expectedMatch,
+                                    StringData expectedMatch,
                                     int idx) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
         value::ValueGuard guard(tag, val);
@@ -72,7 +71,7 @@ protected:
         ASSERT_EQUALS(value::numericCast<int32_t>(idxTag, idxVal), idx);
     }
 
-    void addMatchResult(value::Array* arrayPtr, std::string_view matchStr, int32_t idx) {
+    void addMatchResult(value::Array* arrayPtr, StringData matchStr, int32_t idx) {
         auto [objTag, objVal] = value::makeNewObject();
         value::ValueGuard objGuard{objTag, objVal};
         auto obj = value::getObjectView(objVal);

@@ -463,7 +463,7 @@ public:
 
                 childLevelStage = sbe::makeS<sbe::FilterStage<true>>(
                     std::move(mkBsonStage),
-                    makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(childLevelInputSlot)),
+                    makeFunction("isObject"_sd, sbe::makeE<sbe::EVariable>(childLevelInputSlot)),
                     _context->planNodeId);
             }
 
@@ -497,7 +497,7 @@ public:
                 sbe::makeProjectStage(std::move(parentLevelStage),
                                       _context->planNodeId,
                                       childLevelInputSlot,
-                                      makeFunction("getField"sv,
+                                      makeFunction("getField"_sd,
                                                    sbe::makeE<sbe::EVariable>(parentLevelInputSlot),
                                                    makeConstant(_context->topFrontField())));
         }
@@ -603,8 +603,8 @@ public:
 
                 auto isObjectOrArrayExpr = makeBinaryOp(
                     sbe::EPrimBinary::logicOr,
-                    makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)),
-                    makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)));
+                    makeFunction("isObject"_sd, sbe::makeE<sbe::EVariable>(inputArraySlot)),
+                    makeFunction("isArray"_sd, sbe::makeE<sbe::EVariable>(inputArraySlot)));
                 return sbe::makeS<sbe::FilterStage<true>>(std::move(elemMatchPredicateTree),
                                                           std::move(isObjectOrArrayExpr),
                                                           _context->planNodeId);
@@ -680,7 +680,7 @@ public:
             std::move(_context->topLevel().evalStage),
             _context->planNodeId,
             inputArraySlot,
-            makeFunction("getField"sv,
+            makeFunction("getField"_sd,
                          inputDocumentVariable.clone(),
                          sbe::makeE<sbe::EConstant>(_context->topFrontField())));
 
@@ -688,7 +688,7 @@ public:
             std::move(fromBranch),
             _context->planNodeId,
             traversingAnArrayFlagSlot,
-            makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)));
+            makeFunction("isArray"_sd, sbe::makeE<sbe::EVariable>(inputArraySlot)));
 
         auto filteredArraySlot = _context->slotIdGenerator->generate();
         auto traverseStage =
@@ -813,7 +813,7 @@ public:
         childLevelStage = sbe::makeS<sbe::BranchStage>(
             std::move(childLevelStage),
             makeLimitCoScanTree(_context->planNodeId),
-            makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(childLevelInputSlot)),
+            makeFunction("isObject"_sd, sbe::makeE<sbe::EVariable>(childLevelInputSlot)),
             sbe::makeSV(childLevelObjSlot),
             sbe::makeSV(childLevelInputSlot),
             sbe::makeSV(childLevelResultSlot),
@@ -831,7 +831,7 @@ public:
                 sbe::makeProjectStage(std::move(parentLevelStage),
                                       _context->planNodeId,
                                       childLevelInputSlot,
-                                      makeFunction("getField"sv,
+                                      makeFunction("getField"_sd,
                                                    sbe::makeE<sbe::EVariable>(parentLevelInputSlot),
                                                    makeConstant(_context->topFrontField())));
         } else {
@@ -869,7 +869,7 @@ public:
         using namespace std::literals;
 
         auto arrayFromField =
-            makeFunction("getField"sv,
+            makeFunction("getField"_sd,
                          sbe::makeE<sbe::EVariable>(_context->topLevel().inputSlot),
                          makeConstant(_context->topFrontField()));
         auto binds = sbe::makeEs(std::move(arrayFromField));
@@ -884,7 +884,7 @@ public:
         }
 
         auto extractSubArrayExpr = sbe::makeE<sbe::EIf>(
-            makeFunction("isArray"sv, arrayVariable.clone()),
+            makeFunction("isArray"_sd, arrayVariable.clone()),
             sbe::makeE<sbe::EFunction>("extractSubArray", std::move(arguments)),
             arrayVariable.clone());
 

@@ -182,15 +182,12 @@ std::pair<sbe::value::SlotId, EvalStage> generateTraverseHelper(
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldSlot'.
-    inputStage = makeProject(
-        std::move(inputStage),
-        planNodeId,
-        fieldSlot,
-        makeFunction(
-            "getField"sv, sbe::makeE<sbe::EVariable>(inputSlot), sbe::makeE<sbe::EConstant>([&]() {
-                auto fieldName = fp.getFieldName(level);
-                return std::string_view{fieldName.rawData(), fieldName.size()};
-            }())));
+    inputStage = makeProject(std::move(inputStage),
+                             planNodeId,
+                             fieldSlot,
+                             makeFunction("getField"_sd,
+                                          sbe::makeE<sbe::EVariable>(inputSlot),
+                                          sbe::makeE<sbe::EConstant>(fp.getFieldName(level))));
 
     EvalStage innerBranch;
     if (level == fp.getPathLength() - 1) {
@@ -1228,7 +1225,7 @@ public:
         // Get child expressions.
         auto startOfWeekExpression = expr->isStartOfWeekSpecified() ? _context->popExpr() : nullptr;
         auto timezoneExpression =
-            expr->isTimezoneSpecified() ? _context->popExpr() : makeConstant("UTC"sv);
+            expr->isTimezoneSpecified() ? _context->popExpr() : makeConstant("UTC"_sd);
         auto unitExpression = _context->popExpr();
         auto endDateExpression = _context->popExpr();
         auto startDateExpression = _context->popExpr();
@@ -1247,7 +1244,7 @@ public:
             // "dateDiff" built-in function does not accept non-string type values for this
             // parameter.
             arguments.push_back(sbe::makeE<sbe::EIf>(
-                unitIsWeekRef.clone(), startOfWeekRef.clone(), makeConstant("sun"sv)));
+                unitIsWeekRef.clone(), startOfWeekRef.clone(), makeConstant("sun"_sd)));
         }
 
         // Set bindings for the frame.
@@ -1257,11 +1254,11 @@ public:
         bindings.push_back(std::move(timezoneExpression));
         if (expr->isStartOfWeekSpecified()) {
             bindings.push_back(std::move(startOfWeekExpression));
-            bindings.push_back(generateIsEqualToStringCheck(unitRef, "week"sv));
+            bindings.push_back(generateIsEqualToStringCheck(unitRef, "week"_sd));
         }
 
         // Create an expression to invoke built-in "dateDiff" function.
-        auto dateDiffFunctionCall = sbe::makeE<sbe::EFunction>("dateDiff"sv, std::move(arguments));
+        auto dateDiffFunctionCall = sbe::makeE<sbe::EFunction>("dateDiff"_sd, std::move(arguments));
 
         // Create expressions to check that each argument to "dateDiff" function exists, is not
         // null, and is of the correct type.
@@ -2853,7 +2850,7 @@ private:
      * Creates a boolean expression to check if 'variable' is equal to string 'string'.
      */
     static std::unique_ptr<sbe::EExpression> generateIsEqualToStringCheck(
-        const sbe::EVariable& variable, std::string_view string) {
+        const sbe::EVariable& variable, StringData string) {
         return sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
                                             makeFunction("isString", variable.clone()),
                                             sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
@@ -3078,14 +3075,15 @@ private:
             switch (setOp) {
                 case SetOperation::Difference:
                     return std::make_pair("setDifference"_sd,
-                                          collatorSlot ? "collSetDifference"sv : "setDifference"sv);
+                                          collatorSlot ? "collSetDifference"_sd
+                                                       : "setDifference"_sd);
                 case SetOperation::Intersection:
                     return std::make_pair("setIntersection"_sd,
-                                          collatorSlot ? "collSetIntersection"sv
-                                                       : "setIntersection"sv);
+                                          collatorSlot ? "collSetIntersection"_sd
+                                                       : "setIntersection"_sd);
                 case SetOperation::Union:
                     return std::make_pair("setUnion"_sd,
-                                          collatorSlot ? "collSetUnion"sv : "setUnion"sv);
+                                          collatorSlot ? "collSetUnion"_sd : "setUnion"_sd);
                 default:
                     MONGO_UNREACHABLE;
             }
