@@ -317,7 +317,7 @@ auto makeSV(Args&&... args) {
 class EConstant final : public EExpression {
 public:
     EConstant(value::TypeTags tag, value::Value val) : _tag(tag), _val(val) {}
-    EConstant(StringData str) {
+    EConstant(std::string_view str) {
         // Views are non-owning so we have to make a copy.
         std::tie(_tag, _val) = value::makeNewString(str);
     }
@@ -448,7 +448,7 @@ private:
  */
 class EFunction final : public EExpression {
 public:
-    EFunction(StringData name, std::vector<std::unique_ptr<EExpression>> args) : _name(name) {
+    EFunction(std::string_view name, std::vector<std::unique_ptr<EExpression>> args) : _name(name) {
         _nodes = std::move(args);
         validateNodes();
     }
@@ -513,7 +513,7 @@ private:
  */
 class EFail final : public EExpression {
 public:
-    EFail(ErrorCodes::Error code, StringData message) : _code(code) {
+    EFail(ErrorCodes::Error code, std::string_view message) : _code(code) {
         std::tie(_messageTag, _messageVal) = value::makeNewString(message);
     }
 

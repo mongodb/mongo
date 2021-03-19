@@ -332,13 +332,13 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldSlot'.
-    auto fieldName = fp.getPart(level);
+    std::string_view fieldName{fp.getPart(level).rawData(), fp.getPart(level).size()};
     auto fieldSlot{slotIdGenerator->generate()};
     auto fromBranch =
         makeProject(std::move(inputStage),
                     planNodeId,
                     fieldSlot,
-                    sbe::makeE<sbe::EFunction>("getField"_sd,
+                    sbe::makeE<sbe::EFunction>("getField"sv,
                                                sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
                                                            sbe::makeE<sbe::EConstant>(fieldName))));
 

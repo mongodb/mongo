@@ -60,7 +60,7 @@ namespace mongo::sbe {
 class IndexScanStage final : public PlanStage {
 public:
     IndexScanStage(CollectionUUID collUuid,
-                   StringData indexName,
+                   std::string_view indexName,
                    bool forward,
                    boost::optional<value::SlotId> recordSlot,
                    boost::optional<value::SlotId> recordIdSlot,

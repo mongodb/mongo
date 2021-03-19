@@ -454,10 +454,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         for (auto&& field : vsn->indexKeyPattern) {
             if (reqs.getIndexKeyBitset()->test(indexKeyPos)) {
                 indexKeySlots.push_back(_slotIdGenerator.generate());
-                projections.emplace(indexKeySlots.back(),
-                                    makeFunction("getField"_sd,
-                                                 sbe::makeE<sbe::EVariable>(resultSlot),
-                                                 makeConstant(field.fieldName())));
+                projections.emplace(
+                    indexKeySlots.back(),
+                    makeFunction("getField"sv,
+                                 sbe::makeE<sbe::EVariable>(resultSlot),
+                                 makeConstant(std::string_view{field.fieldName()})));
             }
             ++indexKeyPos;
         }
@@ -514,7 +515,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         size_t i = 0;
         for (auto&& elem : ixn->index.keyPattern) {
-            mkObjArgs.emplace_back(sbe::makeE<sbe::EConstant>(elem.fieldNameStringData()));
+            auto fieldName = elem.fieldNameStringData();
+
+            mkObjArgs.emplace_back(sbe::makeE<sbe::EConstant>(
+                std::string_view{fieldName.rawData(), fieldName.size()}));
             mkObjArgs.emplace_back(sbe::makeE<sbe::EVariable>((*outputs.getIndexKeySlots())[i++]));
         }
 
@@ -714,19 +718,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // Generate projection to get the value of the sort key. Ideally, this should be
         // tracked by a 'reference tracker' at higher level.
         auto fieldName = part.fieldPath->getFieldName(0);
+        auto fieldNameSV = std::string_view{fieldName.rawData(), fieldName.size()};
 
-        auto getSortFieldExpr = makeFunction("getField"_sd,
+        auto getSortFieldExpr = makeFunction("getField"sv,
                                              sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
-                                             sbe::makeE<sbe::EConstant>(fieldName));
+                                             sbe::makeE<sbe::EConstant>(fieldNameSV));
 
         if (auto collatorSlot = _data.env->getSlotIfExists("collator"_sd); collatorSlot) {
-            getSortFieldExpr = makeFunction("collComparisonKey"_sd,
+            getSortFieldExpr = makeFunction("collComparisonKey"sv,
                                             std::move(getSortFieldExpr),
                                             sbe::makeE<sbe::EVariable>(*collatorSlot));
         }
 
         // According to MQL semantics, missing values are treated as nulls during sorting.
-        getSortFieldExpr = makeFunction("fillEmpty"_sd,
+        getSortFieldExpr = makeFunction("fillEmpty"sv,
                                         std::move(getSortFieldExpr),
                                         makeConstant(sbe::value::TypeTags::Null, 0));
 
@@ -1362,7 +1367,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     auto&& [anchorBranchSlots, anchorBranch] = makeUnionBranch(false);
     anchorBranch = sbe::makeS<sbe::FilterStage<true>>(
         std::move(anchorBranch),
-        makeNot(makeFunction("exists"_sd, sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))),
+        makeNot(makeFunction("exists"sv, sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))),
         root->nodeId());
 
     // Build a resume branch of the union and add a constant filter on op of it, so that it would
@@ -1370,7 +1375,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     auto&& [resumeBranchSlots, resumeBranch] = makeUnionBranch(true);
     resumeBranch = sbe::makeS<sbe::FilterStage<true>>(
         sbe::makeS<sbe::LimitSkipStage>(std::move(resumeBranch), boost::none, 1, root->nodeId()),
-        sbe::makeE<sbe::EFunction>("exists"_sd,
+        sbe::makeE<sbe::EFunction>("exists"sv,
                                    sbe::makeEs(sbe::makeE<sbe::EVariable>(resumeRecordIdSlot))),
         root->nodeId());
 

@@ -290,7 +290,8 @@ void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {
             case value::TypeTags::StringSmall:
             case value::TypeTags::StringBig:
             case value::TypeTags::bsonString: {
-                builder.append(value::getStringView(tag, val));
+                auto sv = value::getStringView(tag, val);
+                builder.append(StringData{sv.data(), sv.size()});
                 break;
             }
             case value::TypeTags::Array: {
@@ -384,9 +385,11 @@ template void convertToBsonObj<UniqueBSONObjBuilder>(UniqueBSONObjBuilder& build
 
 template <class ObjBuilder>
 void appendValueToBsonObj(ObjBuilder& builder,
-                          StringData name,
+                          std::string_view nameSV,
                           value::TypeTags tag,
                           value::Value val) {
+    StringData name{nameSV.data(), nameSV.size()};
+
     switch (tag) {
         case value::TypeTags::Nothing:
             break;
@@ -418,7 +421,8 @@ void appendValueToBsonObj(ObjBuilder& builder,
         case value::TypeTags::StringSmall:
         case value::TypeTags::StringBig:
         case value::TypeTags::bsonString: {
-            builder.append(name, value::getStringView(tag, val));
+            auto sv = value::getStringView(tag, val);
+            builder.append(name, StringData{sv.data(), sv.size()});
             break;
         }
         case value::TypeTags::Array: {
@@ -481,11 +485,11 @@ void appendValueToBsonObj(ObjBuilder& builder,
 }
 
 template void appendValueToBsonObj<BSONObjBuilder>(BSONObjBuilder& builder,
-                                                   StringData name,
+                                                   std::string_view name,
                                                    value::TypeTags tag,
                                                    value::Value val);
 template void appendValueToBsonObj<UniqueBSONObjBuilder>(UniqueBSONObjBuilder& builder,
-                                                         StringData name,
+                                                         std::string_view name,
                                                          value::TypeTags tag,
                                                          value::Value val);
 }  // namespace bson
