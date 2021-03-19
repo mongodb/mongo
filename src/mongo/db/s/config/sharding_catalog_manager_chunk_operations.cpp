@@ -511,7 +511,7 @@ std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
 
     const auto valuesElem = distinctResult.response.getField("values");
     std::vector<ShardId> shardIds;
-    for (const auto shard : valuesElem.Array()) {
+    for (const auto& shard : valuesElem.Array()) {
         shardIds.emplace_back(shard.String());
     }
     uassert(ErrorCodes::IncompatibleShardingMetadata,
