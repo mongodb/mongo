@@ -202,6 +202,11 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
 
             assert.soon(
                 () => {
+                    assert.neq(
+                        cursor.id,
+                        NumberLong(0),
+                        "Cursor has been closed unexpectedly. Observed change stream events: " +
+                            tojson(changes));
                     cursor = self.getNextBatch(cursor);
                     changes[i] = getNextDocFromCursor(cursor);
                     return changes[i] !== null;
