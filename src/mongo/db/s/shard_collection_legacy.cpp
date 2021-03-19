@@ -48,7 +48,9 @@
 #include "mongo/db/s/active_shard_collection_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -542,8 +544,8 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
     {
         pauseShardCollectionBeforeCriticalSection.pauseWhileSet();
 
-        // Make the distlocks boost::optional so that they can be emplaced only on the non legacy
-        // path.
+        // Make the distlocks boost::optional so that they can be emplaced only if the request came
+        // from the router.
         boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
         boost::optional<DistLockManager::ScopedDistLock> collDistLock;
         if (mustTakeDistLock) {
@@ -564,9 +566,9 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
             return *createCollectionResponseOpt;
         }
 
-        // If DistLock must not be taken, then the request came from the config server, there is no
-        // need to check this here.
         if (mustTakeDistLock) {
+            // If DistLock must be taken, then the request came from a router, there is no need to
+            // check for the count here because it was already done on the config server.
             if (nss.db() == NamespaceString::kConfigDb) {
                 auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -588,6 +590,13 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
             } else {
                 const auto dbInfo = uassertStatusOK(
                     Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss.db()));
+
+                // Check under the dbLock if this is still the primary shard for the database. This
+                // is an unstable check because the shard version might change right after the
+                // check, this is added to fix some tests where a movePrimary might be issued from a
+                // stale router.
+                DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss.db());
+
                 auto shardId = ShardingState::get(opCtx)->shardId();
 
                 uassert(ErrorCodes::IllegalOperation,
