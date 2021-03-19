@@ -58,11 +58,6 @@ struct BucketSpec {
  */
 class BucketUnpacker {
 public:
-    // These are hard-coded constants in the bucket schema.
-    static constexpr StringData kBucketIdFieldName = "_id"_sd;
-    static constexpr StringData kBucketDataFieldName = "data"_sd;
-    static constexpr StringData kBucketMetaFieldName = "meta"_sd;
-
     // A table that is useful for interpolations between the number of measurements in a bucket and
     // the byte size of a bucket's data section timestamp column. Each table entry is a pair (b_i,
     // S_i), where b_i is the number of measurements in the bucket and S_i is the byte size of the
@@ -181,10 +176,6 @@ public:
     static constexpr StringData kStageName = "$_internalUnpackBucket"_sd;
     static constexpr StringData kInclude = "include"_sd;
     static constexpr StringData kExclude = "exclude"_sd;
-    static constexpr StringData kTimeFieldName = "timeField"_sd;
-    static constexpr StringData kMetaFieldName = "metaField"_sd;
-    static constexpr StringData kControlMaxFieldNamePrefix = "control.max."_sd;
-    static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
