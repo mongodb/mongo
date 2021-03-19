@@ -13,6 +13,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -51,6 +52,11 @@ const initialSyncNode = recipientRst.add({rsConfig: {priority: 0, votes: 0}});
 recipientRst.reInitiate();
 jsTestLog("Waiting for initial sync to finish.");
 recipientRst.awaitSecondaryNodes();
+recipientRst.awaitReplication();
+
+// Stop replication on the node so that the TenantMigrationAccessBlocker cannot transition its state
+// past what is reflected in the state doc read below.
+stopServerReplication(initialSyncNode);
 
 const configRecipientsColl = initialSyncNode.getCollection(TenantMigrationTest.kConfigRecipientsNS);
 const recipientDoc = configRecipientsColl.findOne({tenantId: kTenantId});
@@ -84,6 +90,8 @@ if (recipientDoc) {
             throw new Error(`Invalid state "${state}" from recipient doc.`);
     }
 }
+
+restartServerReplication(initialSyncNode);
 
 tenantMigrationTest.stop();
 })();
