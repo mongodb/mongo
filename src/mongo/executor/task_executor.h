@@ -40,7 +40,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/baton.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
@@ -281,7 +281,7 @@ public:
      * Otherwise, if the executor shuts down or the token is canceled prior to the deadline being
      * reached, the resulting ExecutorFuture will be set with ErrorCodes::CallbackCanceled.
      */
-    ExecutorFuture<void> sleepUntil(Date_t when, const CancelationToken& token);
+    ExecutorFuture<void> sleepUntil(Date_t when, const CancellationToken& token);
 
     /**
      * Returns an ExecutorFuture that will be resolved with success after the given duration has
@@ -293,7 +293,7 @@ public:
      * Otherwise, if the executor shuts down or the token is canceled prior to the deadline being
      * reached, the resulting ExecutorFuture will be set with ErrorCodes::CallbackCanceled.
      */
-    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancelationToken& token) {
+    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancellationToken& token) {
         return sleepUntil(now() + duration, token);
     }
 
@@ -318,14 +318,14 @@ public:
      * resulting future will be set with an error only if there is a failure to send the request.
      * Errors from the remote node will be contained in the ResponseStatus object.
      *
-     * The input CancelationToken may be used to cancel sending the request. There is no guarantee
+     * The input CancellationToken may be used to cancel sending the request. There is no guarantee
      * that this will succeed in canceling the request and the resulting ExecutorFuture may contain
-     * either success or error. If cancelation is successful, the resulting ExecutorFuture will be
+     * either success or error. If cancellation is successful, the resulting ExecutorFuture will be
      * set with an error.
      */
     ExecutorFuture<TaskExecutor::ResponseStatus> scheduleRemoteCommand(
         const RemoteCommandRequest& request,
-        const CancelationToken& token,
+        const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
     virtual StatusWith<CallbackHandle> scheduleRemoteCommandOnAny(
@@ -335,7 +335,7 @@ public:
 
     ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleRemoteCommandOnAny(
         const RemoteCommandRequestOnAny& request,
-        const CancelationToken& token,
+        const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
 
@@ -368,9 +368,9 @@ public:
      *
      * May be called by client threads or callbacks running in the executor.
      *
-     * The input CancelationToken may be used to cancel sending the request. There is no guarantee
+     * The input CancellationToken may be used to cancel sending the request. There is no guarantee
      * that this will succeed in canceling the request and the resulting ExecutorFuture may contain
-     * either success or error. If cancelation is successful, the resulting ExecutorFuture will be
+     * either success or error. If cancellation is successful, the resulting ExecutorFuture will be
      * set with a CallbackCanceled error.
      *
      * Cancelling the future will also result in cancelling any outstanding invocations of the
@@ -379,13 +379,13 @@ public:
     ExecutorFuture<TaskExecutor::ResponseStatus> scheduleExhaustRemoteCommand(
         const RemoteCommandRequest& request,
         const RemoteCommandCallbackFn& cb,
-        const CancelationToken& token,
+        const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
     ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> scheduleExhaustRemoteCommandOnAny(
         const RemoteCommandRequestOnAny& request,
         const RemoteCommandOnAnyCallbackFn& cb,
-        const CancelationToken& token,
+        const CancellationToken& token,
         const BatonHandle& baton = nullptr);
 
     /**

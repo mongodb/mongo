@@ -31,15 +31,15 @@
 
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 
 namespace mongo {
 namespace {
 
-TEST(CancelTest, CancelSourceDestructorDoesNotCauseCancelation) {
+TEST(CancelTest, CancelSourceDestructorDoesNotCauseCancellation) {
     bool ran{false};
     {
-        CancelationSource source;
+        CancellationSource source;
         source.token().onCancel().unsafeToInlineFuture().getAsync([&ran](Status s) mutable {
             ASSERT_EQ(s, detail::getCancelNeverCalledOnSourceError());
             ran = true;
@@ -49,39 +49,39 @@ TEST(CancelTest, CancelSourceDestructorDoesNotCauseCancelation) {
     ASSERT_TRUE(ran);
 }
 
-TEST(CancelTest, CancelTokenIsCanceledIsFalseBeforeCancelation) {
-    CancelationSource source;
+TEST(CancelTest, CancelTokenIsCanceledIsFalseBeforeCancellation) {
+    CancellationSource source;
     ASSERT_FALSE(source.token().isCanceled());
 }
 
-TEST(CancelTest, CancelTokenOnCancelFutureIsNotReadyBeforeCancelation) {
-    CancelationSource source;
+TEST(CancelTest, CancelTokenOnCancelFutureIsNotReadyBeforeCancellation) {
+    CancellationSource source;
     ASSERT_FALSE(source.token().onCancel().isReady());
 }
 
 TEST(CancelTest, CancelingSourceMakesExistingCancelTokenIsCanceledTrue) {
-    CancelationSource source;
+    CancellationSource source;
     auto token = source.token();
     source.cancel();
     ASSERT_TRUE(token.isCanceled());
 }
 
-TEST(CancelTest, CancelingSourceMakesCancelTokenIsCanceledTrueForTokensCreatedAfterCancelation) {
-    CancelationSource source;
+TEST(CancelTest, CancelingSourceMakesCancelTokenIsCanceledTrueForTokensCreatedAfterCancellation) {
+    CancellationSource source;
     source.cancel();
     ASSERT_TRUE(source.token().isCanceled());
 }
 
-TEST(CancelTest, CallingCancelOnCancelationSourceTwiceIsSafe) {
-    CancelationSource source;
+TEST(CancelTest, CallingCancelOnCancellationSourceTwiceIsSafe) {
+    CancellationSource source;
     source.cancel();
     source.cancel();
     ASSERT_TRUE(source.token().isCanceled());
 }
 
 TEST(CancelTest,
-     CallingCancelOnACopyOfACancelationSourceTriggersCancelationInTokensObtainedFromOriginal) {
-    CancelationSource source;
+     CallingCancelOnACopyOfACancellationSourceTriggersCancellationInTokensObtainedFromOriginal) {
+    CancellationSource source;
     auto token = source.token();
     auto copy = source;
     copy.cancel();
@@ -89,15 +89,16 @@ TEST(CancelTest,
 }
 
 TEST(CancelTest,
-     DestroyingACopyOfACancelationSourceDoesNotSetErrorOnCancelationFutureFromOriginalSource) {
-    CancelationSource source;
+     DestroyingACopyOfACancellationSourceDoesNotSetErrorOnCancellationFutureFromOriginalSource) {
+    CancellationSource source;
     auto token = source.token();
     { auto copy = source; }
     ASSERT_FALSE(token.onCancel().isReady());
 }
 
-TEST(CancelTest, DestroyingACancelationSourceWithAnExistingCopyDoesNotSetErrorOnCancelationFuture) {
-    boost::optional<CancelationSource> source;
+TEST(CancelTest,
+     DestroyingACancellationSourceWithAnExistingCopyDoesNotSetErrorOnCancellationFuture) {
+    boost::optional<CancellationSource> source;
     source.emplace();
     auto copy = *source;
     source.reset();
@@ -105,7 +106,7 @@ TEST(CancelTest, DestroyingACancelationSourceWithAnExistingCopyDoesNotSetErrorOn
 }
 
 TEST(CancelTest, CancelingSourceTriggersOnCancelCallbacksOnSingleCancelToken) {
-    CancelationSource source;
+    CancellationSource source;
     auto token = source.token();
     bool cancelCallbackRan{false};
     auto result = token.onCancel().unsafeToInlineFuture().then([&] { cancelCallbackRan = true; });
@@ -115,7 +116,7 @@ TEST(CancelTest, CancelingSourceTriggersOnCancelCallbacksOnSingleCancelToken) {
 }
 
 TEST(CancelTest, CancelingSourceTriggersOnCancelCallbacksOnMultipleCancelTokens) {
-    CancelationSource source;
+    CancellationSource source;
     auto token1 = source.token();
     auto token2 = source.token();
     bool cancelCallback1Ran{false};
@@ -131,8 +132,8 @@ TEST(CancelTest, CancelingSourceTriggersOnCancelCallbacksOnMultipleCancelTokens)
     ASSERT_TRUE(cancelCallback2Ran);
 }
 
-TEST(CancelTest, CancelTokenOnCancelFutureIsReadyAndRunsCallbacksOnTokensCreatedAfterCancelation) {
-    CancelationSource source;
+TEST(CancelTest, CancelTokenOnCancelFutureIsReadyAndRunsCallbacksOnTokensCreatedAfterCancellation) {
+    CancellationSource source;
     source.cancel();
     bool cancelCallbackRan{false};
     auto token = source.token();
@@ -142,10 +143,10 @@ TEST(CancelTest, CancelTokenOnCancelFutureIsReadyAndRunsCallbacksOnTokensCreated
 }
 
 TEST(CancelTest, CancelingSourceConstructedFromATokenDoesNotCancelThatToken) {
-    CancelationSource parent;
+    CancellationSource parent;
     auto parentToken = parent.token();
 
-    CancelationSource child(parentToken);
+    CancellationSource child(parentToken);
     child.cancel();
 
     ASSERT_FALSE(parentToken.isCanceled());
@@ -153,8 +154,8 @@ TEST(CancelTest, CancelingSourceConstructedFromATokenDoesNotCancelThatToken) {
 }
 
 TEST(CancelTest, CancelingTokenUsedToConstructASourceCallsCancelOnThatSource) {
-    CancelationSource parent;
-    CancelationSource child(parent.token());
+    CancellationSource parent;
+    CancellationSource child(parent.token());
     parent.cancel();
 
     ASSERT_TRUE(parent.token().isCanceled());
@@ -163,7 +164,7 @@ TEST(CancelTest, CancelingTokenUsedToConstructASourceCallsCancelOnThatSource) {
 
 TEST(CancelTest, CancelTokenRemembersIsCanceledForCanceledSourceEvenAfterSourceIsDestroyed) {
     auto token = [] {
-        CancelationSource source;
+        CancellationSource source;
         auto token = source.token();
         source.cancel();
         return token;
@@ -175,7 +176,7 @@ TEST(CancelTest, CancelTokenRemembersIsCanceledForCanceledSourceEvenAfterSourceI
 
 TEST(CancelTest, CancelTokenRemembersNotCanceledForNotCanceledSourceEvenAfterSourceIsDestroyed) {
     auto token = [] {
-        CancelationSource source;
+        CancellationSource source;
         auto token = source.token();
         return token;
     }();
@@ -185,31 +186,31 @@ TEST(CancelTest, CancelTokenRemembersNotCanceledForNotCanceledSourceEvenAfterSou
 }
 
 TEST(CancelTest, UncancelableTokenReturnsFalseForIsCanceled) {
-    auto token = CancelationToken::uncancelable();
+    auto token = CancellationToken::uncancelable();
     ASSERT_FALSE(token.isCanceled());
 }
 
 TEST(CancelTest, UncancelableTokenNeverRunsCallbacks) {
-    auto token = CancelationToken::uncancelable();
+    auto token = CancellationToken::uncancelable();
     auto cancelFuture = token.onCancel();
     ASSERT_TRUE(cancelFuture.isReady());
     ASSERT_EQ(cancelFuture.getNoThrow(), detail::getCancelNeverCalledOnSourceError());
 }
 
 TEST(CancelTest, UncancelableTokenReturnsFalseForIsCancelable) {
-    auto token = CancelationToken::uncancelable();
+    auto token = CancellationToken::uncancelable();
     ASSERT_FALSE(token.isCancelable());
 }
 
 TEST(CancelTest, TokenIsCancelableReturnsTrueIfSourceIsAlreadyCanceled) {
-    CancelationSource source;
+    CancellationSource source;
     auto token = source.token();
     ASSERT_TRUE(token.isCancelable());
 }
 
 TEST(CancelTest, TokenIsCancelableReturnsFalseIfSourceHasBeenDestroyedWithoutCancelBeingCalled) {
     auto token = [] {
-        CancelationSource source;
+        CancellationSource source;
         auto token = source.token();
         return token;
     }();
@@ -217,7 +218,7 @@ TEST(CancelTest, TokenIsCancelableReturnsFalseIfSourceHasBeenDestroyedWithoutCan
 }
 
 TEST(CancelTest, TokenIsCancelableReturnsTrueIfSourceExistsAndIsNotYetCanceled) {
-    CancelationSource source;
+    CancellationSource source;
     auto token = source.token();
     ASSERT_TRUE(token.isCancelable());
 }

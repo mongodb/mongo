@@ -83,7 +83,7 @@ template <typename Callback>
 auto SingleServerPingMonitor::_scheduleWorkAt(Date_t when, Callback&& cb) const {
     auto wrappedCallback = [cb = std::forward<Callback>(cb),
                             anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
-        if (ErrorCodes::isCancelationError(cbArgs.status)) {
+        if (ErrorCodes::isCancellationError(cbArgs.status)) {
             return;
         }
 
@@ -145,7 +145,7 @@ void SingleServerPingMonitor::_doServerPing() {
         std::move(request),
         [anchor = shared_from_this(),
          timer = Timer()](const executor::TaskExecutor::RemoteCommandCallbackArgs& result) mutable {
-            if (ErrorCodes::isCancelationError(result.response.status)) {
+            if (ErrorCodes::isCancellationError(result.response.status)) {
                 // Do no more work if the SingleServerPingMonitor is removed or the request is
                 // canceled.
                 return;

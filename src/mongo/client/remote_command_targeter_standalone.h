@@ -48,11 +48,11 @@ public:
                                      const ReadPreferenceSetting& readPref) override;
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancelationToken& cancelToken) override;
+                                     const CancellationToken& cancelToken) override;
 
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
-                                                   const CancelationToken& cancelToken) override;
+                                                   const CancellationToken& cancelToken) override;
 
     void markHostNotPrimary(const HostAndPort& host, const Status& status) override;
 

@@ -71,7 +71,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion)
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
-bool shouldStopAttemptingToCreateIndex(Status status, const CancelationToken& token) {
+bool shouldStopAttemptingToCreateIndex(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
 }
 
@@ -794,7 +794,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
 
@@ -815,7 +815,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
            })
         .until([token](Status status) { return shouldStopAttemptingToCreateIndex(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(const BSONObj& state)
@@ -859,7 +859,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
 }
 
 ExecutorFuture<void> waitForMinimumOperationDuration(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& token) {
     // Ensure to have at least `minDuration` elapsed after starting the operation and before
     // engaging the critical section, unless the operation is already interrupted or canceled.
     const auto minDuration =
@@ -906,7 +906,7 @@ BSONObj createFinishReshardCollectionCommand(const NamespaceString& nss) {
 
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor] { _insertCoordDocAndChangeOrigCollEntry(); })
         .then([this, executor] { _calculateParticipantsAndChunksThenWriteToDisk(); })
@@ -966,7 +966,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             // Wait for all participants to acknowledge the operation reached an unrecoverable
             // error.
-            future_util::withCancelation(
+            future_util::withCancellation(
                 _reshardingCoordinatorObserver->awaitAllParticipantsDoneAborting(), token)
                 .get();
 

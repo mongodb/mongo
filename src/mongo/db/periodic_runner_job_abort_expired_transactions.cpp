@@ -109,7 +109,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
             try {
                 killAllExpiredTransactions(opCtx.get());
-            } catch (ExceptionForCat<ErrorCategory::CancelationError>& ex) {
+            } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }
         },

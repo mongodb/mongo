@@ -53,7 +53,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -78,35 +78,35 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOn
 
 const int kMaxRecipientKeyDocsFindAttempts = 10;
 
-bool shouldStopCreatingTTLIndex(Status status, const CancelationToken& token) {
+bool shouldStopCreatingTTLIndex(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
 }
 
-bool shouldStopInsertingDonorStateDoc(Status status, const CancelationToken& token) {
+bool shouldStopInsertingDonorStateDoc(Status status, const CancellationToken& token) {
     return status.isOK() || status == ErrorCodes::ConflictingOperationInProgress ||
         token.isCanceled();
 }
 
-bool shouldStopUpdatingDonorStateDoc(Status status, const CancelationToken& token) {
+bool shouldStopUpdatingDonorStateDoc(Status status, const CancellationToken& token) {
     return status.isOK() || token.isCanceled();
 }
 
-bool shouldStopSendingRecipientCommand(Status status, const CancelationToken& token) {
+bool shouldStopSendingRecipientCommand(Status status, const CancellationToken& token) {
     return status.isOK() ||
         !(ErrorCodes::isRetriableError(status) ||
           status == ErrorCodes::FailedToSatisfyReadPreference) ||
         token.isCanceled();
 }
 
-bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status, const CancelationToken& token) {
+bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status, const CancellationToken& token) {
     // TODO (SERVER-54926): Convert HostUnreachable error in
     // _fetchAndStoreRecipientClusterTimeKeyDocs to specific error.
     return status.isOK() || !ErrorCodes::isRetriableError(status) ||
         status.code() == ErrorCodes::HostUnreachable || token.isCanceled();
 }
 
-void checkIfReceivedDonorAbortMigration(const CancelationToken& serviceToken,
-                                        const CancelationToken& instanceToken) {
+void checkIfReceivedDonorAbortMigration(const CancellationToken& serviceToken,
+                                        const CancellationToken& instanceToken) {
     // If only the instance token was canceled, then we must have gotten donorAbortMigration.
     uassert(ErrorCodes::TenantMigrationAborted,
             "Migration aborted due to receiving donorAbortMigration.",
@@ -150,7 +150,7 @@ void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
 // will copy cluster time keys from the other. The donor service is set up on all mongods on stepup
 // to primary, so this index will be created on both donors and recipients.
 ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
 
@@ -171,11 +171,11 @@ ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
            })
         .until([token](Status status) { return shouldStopCreatingTTLIndex(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
                const auto nss = NamespaceString::kExternalKeysCollectionNamespace;
 
@@ -197,11 +197,11 @@ ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
            })
         .until([token](Status status) { return shouldStopCreatingTTLIndex(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return createStateDocumentTTLIndex(executor, token).then([this, executor, token] {
         return createExternalKeysTTLIndex(executor, token);
     });
@@ -257,7 +257,7 @@ TenantMigrationDonorService::Instance::~Instance() {
     // Unlike the TenantMigrationDonorService's scoped task executor which is shut down on stepdown
     // and joined on stepup, _recipientCmdExecutor is only shut down and joined when the Instance
     // is destroyed. This is safe since ThreadPoolTaskExecutor::shutdown() only cancels the
-    // outstanding work on the task executor which the cancelation token will already do, and the
+    // outstanding work on the task executor which the cancellation token will already do, and the
     // Instance will be destroyed on stepup so this is equivalent to joining the task executor on
     // stepup.
     _recipientCmdExecutor->shutdown();
@@ -280,7 +280,7 @@ TenantMigrationDonorService::Instance::_makeRecipientCmdExecutor() {
         // require passing the pointer to the TenantMigrationService into the Instance and making
         // constructInstance not const so we can set the client's decoration here. Right now there
         // is no need for that since the task executor is only used with scheduleRemoteCommand and
-        // no opCtx will be created (the cancelation token is responsible for canceling the
+        // no opCtx will be created (the cancellation token is responsible for canceling the
         // outstanding work on the task executor).
         stdx::lock_guard<Client> lk(*client);
         client->setSystemOperationKillableByStepdown(lk);
@@ -330,7 +330,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     BSONObjBuilder bob;
     bob.append("desc", "tenant donor migration");
     bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
-    bob.append("receivedCancelation", _abortMigrationSource.token().isCanceled());
+    bob.append("receivedCancellation", _abortMigrationSource.token().isCanceled());
     bob.append("instanceID", _migrationUuid.toBSON());
     bob.append("tenantId", _tenantId);
     bob.append("recipientConnectionString", _recipientConnectionString);
@@ -416,8 +416,8 @@ ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancelationToken& serviceToken,
-    const CancelationToken& instanceToken) {
+    const CancellationToken& serviceToken,
+    const CancellationToken& instanceToken) {
     return AsyncTry([this,
                      self = shared_from_this(),
                      executor,
@@ -530,19 +530,19 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        auto writeConcernFuture = repl::ReplicationCoordinator::get(_serviceContext)
                                                      ->awaitReplicationAsyncNoWTimeout(
                                                          lastKeyOpTime, votingMembersWriteConcern);
-                       return future_util::withCancelation(std::move(writeConcernFuture),
-                                                           instanceToken);
+                       return future_util::withCancellation(std::move(writeConcernFuture),
+                                                            instanceToken);
                    });
            })
         .until([instanceToken](Status status) {
             return shouldStopFetchingRecipientClusterTimeKeyDocs(status, instanceToken);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertStateDoc(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
@@ -576,13 +576,13 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
             return shouldStopInsertingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateStateDoc(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const TenantMigrationDonorStateEnum nextState,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     const auto originalStateDocBson = _stateDoc.toBSON();
@@ -685,12 +685,12 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
@@ -726,13 +726,13 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus(), token);
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancelationToken::uncancelable());
+        .on(**executor, CancellationToken::uncancelable());
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWriteConcern(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, repl::OpTime opTime) {
     return WaitForMajorityService::get(_serviceContext)
-        .waitUntilMajority(std::move(opTime), CancelationToken::uncancelable())
+        .waitUntilMajority(std::move(opTime), CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -759,7 +759,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const BSONObj& cmdObj,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
     return AsyncTry(
                [this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj, token] {
                    return recipientTargeterRS->findHost(kPrimaryOnlyReadPreference, token)
@@ -796,7 +796,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -827,7 +827,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForgetMigrationCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const CancelationToken& token) {
+    const CancellationToken& token) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -848,7 +848,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& serviceToken) noexcept {
+    const CancellationToken& serviceToken) noexcept {
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (!_stateDoc.getMigrationStart()) {
@@ -858,7 +858,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
     pauseTenantMigrationBeforeEnteringFutureChain.pauseWhileSet();
 
-    _abortMigrationSource = CancelationSource(serviceToken);
+    _abortMigrationSource = CancellationSource(serviceToken);
     {
         stdx::lock_guard<Latch> lg(_mutex);
         setPromiseOkIfNotReady(lg, _migrationCancelablePromise);
@@ -881,7 +881,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             return _insertStateDoc(executor, _abortMigrationSource.token())
                 .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
-                    // use its base PrimaryOnlyService's cancelation source to pass tokens
+                    // use its base PrimaryOnlyService's cancellation source to pass tokens
                     // in calls to WaitForMajorityService::waitUntilMajority.
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 })
@@ -932,7 +932,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
                 .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
-                    // use its base PrimaryOnlyService's cancelation source to pass tokens
+                    // use its base PrimaryOnlyService's cancellation source to pass tokens
                     // in calls to WaitForMajorityService::waitUntilMajority.
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
@@ -964,7 +964,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                         .then([this, self = shared_from_this(), executor, serviceToken](
                                   repl::OpTime opTime) {
                             // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
-                            // use its base PrimaryOnlyService's cancelation source to pass tokens
+                            // use its base PrimaryOnlyService's cancellation source to pass tokens
                             // in calls to WaitForMajorityService::waitUntilMajority.
                             checkIfReceivedDonorAbortMigration(serviceToken,
                                                                _abortMigrationSource.token());
@@ -989,7 +989,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             }
 
             // Source to cancel the timeout if the operation completed in time.
-            CancelationSource cancelTimeoutSource;
+            CancellationSource cancelTimeoutSource;
 
             auto deadlineReachedFuture = (*executor)->sleepFor(
                 Milliseconds(repl::tenantMigrationBlockingStateTimeoutMS.load()),
@@ -1057,7 +1057,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                         .then([this, self = shared_from_this(), executor, serviceToken](
                                   repl::OpTime opTime) {
                             // TODO (SERVER-53389): TenantMigration{Donor, Recipient}Service should
-                            // use its base PrimaryOnlyService's cancelation source to pass tokens
+                            // use its base PrimaryOnlyService's cancellation source to pass tokens
                             // in calls to WaitForMajorityService::waitUntilMajority.
                             return _waitForMajorityWriteConcern(executor, std::move(opTime))
                                 .then([this, self = shared_from_this()] {

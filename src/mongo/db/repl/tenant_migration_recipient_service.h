@@ -83,7 +83,7 @@ public:
                           BSONObj stateDoc);
 
         SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                             const CancelationToken& token) noexcept final;
+                             const CancellationToken& token) noexcept final;
 
         /*
          * Interrupts the running instance and cause the completion future to complete with
@@ -338,7 +338,7 @@ public:
          * Fetches all key documents from the donor's admin.system.keys collection, stores them in
          * config.external_validation_keys, and refreshes the keys cache.
          */
-        void _fetchAndStoreDonorClusterTimeKeyDocs(const CancelationToken& token);
+        void _fetchAndStoreDonorClusterTimeKeyDocs(const CancellationToken& token);
 
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
@@ -568,7 +568,7 @@ public:
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                         const CancelationToken& token) override;
+                                         const CancellationToken& token) override;
 
     ServiceContext* const _serviceContext;
 

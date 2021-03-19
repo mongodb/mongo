@@ -108,7 +108,7 @@ public:
      * Enqueue a request to wait for the given opTime to be majority committed.
      */
     SemiFuture<void> waitUntilMajority(const repl::OpTime& opTime,
-                                       const CancelationToken& cancelToken);
+                                       const CancellationToken& cancelToken);
 
 private:
     enum class State { kNotStarted, kRunning, kShutdown };
@@ -145,7 +145,7 @@ private:
 
     // Manages the Client responsible for the thread that cancels existing requests to wait on
     // opTimes.
-    ClientStrandPtr _waitForMajorityCancelationClient;
+    ClientStrandPtr _waitForMajorityCancellationClient;
 
     // This mutex synchronizes access to the members declared below.
     Mutex _mutex = MONGO_MAKE_LATCH("WaitForMajorityService::_mutex");

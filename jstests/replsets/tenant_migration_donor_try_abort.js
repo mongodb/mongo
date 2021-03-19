@@ -242,7 +242,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.soon(() => {
         const res = assert.commandWorked(tmt.getDonorPrimary().adminCommand(
             {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancelation;
+        return res.inprog[0].receivedCancellation;
     });
     barrierBeforeFetchingKeys.off();
 
@@ -351,7 +351,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.soon(() => {
         const res = assert.commandWorked(donorPrimary.adminCommand(
             {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancelation;
+        return res.inprog[0].receivedCancellation;
     });
 
     fp.off();
@@ -399,7 +399,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     assert.soon(() => {
         const res = assert.commandWorked(donorPrimary.adminCommand(
             {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
-        return res.inprog[0].receivedCancelation;
+        return res.inprog[0].receivedCancellation;
     });
 
     fp.off();

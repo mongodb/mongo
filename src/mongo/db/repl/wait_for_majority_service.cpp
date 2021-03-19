@@ -86,7 +86,7 @@ void WaitForMajorityService::startup(ServiceContext* ctx) {
     invariant(_state == State::kNotStarted);
     _pool = makeThreadPool();
     _waitForMajorityClient = ClientStrand::make(ctx->makeClient(kWaitClientName));
-    _waitForMajorityCancelationClient = ClientStrand::make(ctx->makeClient(kCancelClientName));
+    _waitForMajorityCancellationClient = ClientStrand::make(ctx->makeClient(kCancelClientName));
     _backgroundWorkComplete = _periodicallyWaitForMajority();
     _pool->startup();
     _state = State::kRunning;
@@ -102,7 +102,7 @@ void WaitForMajorityService::shutDown() {
         _state = State::kShutdown;
 
         _waitForMajorityClient->getClientPointer()->setKilled();
-        _waitForMajorityCancelationClient->getClientPointer()->setKilled();
+        _waitForMajorityCancellationClient->getClientPointer()->setKilled();
 
         for (auto&& request : _queuedOpTimes) {
             if (!request.second->hasBeenProcessed.swap(true)) {
@@ -119,11 +119,11 @@ void WaitForMajorityService::shutDown() {
     // in the thread pool to complete since that work might be using the client
     // objects.
     _waitForMajorityClient.reset();
-    _waitForMajorityCancelationClient.reset();
+    _waitForMajorityCancellationClient.reset();
 }
 
 SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& opTime,
-                                                           const CancelationToken& cancelToken) {
+                                                           const CancellationToken& cancelToken) {
 
     auto [promise, future] = makePromiseFuture<void>();
     auto request = std::make_shared<Request>(std::move(promise));
@@ -172,7 +172,7 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
         if (!s.isOK()) {
             return;
         }
-        auto clientGuard = _waitForMajorityCancelationClient->bind();
+        auto clientGuard = _waitForMajorityCancellationClient->bind();
         if (!request->hasBeenProcessed.swap(true)) {
             request->result.setError(waitUntilMajorityCanceledStatus());
             stdx::lock_guard lk(_mutex);
@@ -229,7 +229,7 @@ SemiFuture<void> WaitForMajorityService::_periodicallyWaitForMajority() {
             // TODO (SERVER-53766): Replace with condition-free looping utility.
             return false;
         })
-        .on(_pool, CancelationToken::uncancelable())
+        .on(_pool, CancellationToken::uncancelable())
         .semi();
 }
 

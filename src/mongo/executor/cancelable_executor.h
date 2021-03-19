@@ -30,17 +30,16 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 
 /**
- * An executor supporting cancelation via a cancelation token.  Given an existing OutOfLineExecutor
- * "exec" and a cancelation token "token", you can create a CancelableExecutor using
- * CancelableExecutor::make(exec, token). This executor will use "exec"
- * to actually execute any scheduled work, but will refuse to run any work
- * after "token" has been cancelled.
+ * An executor supporting cancellation via a cancellation token.  Given an existing
+ * OutOfLineExecutor "exec" and a cancellation token "token", you can create a CancelableExecutor
+ * using CancelableExecutor::make(exec, token). This executor will use "exec" to actually execute
+ * any scheduled work, but will refuse to run any work after "token" has been cancelled.
  *
  * Refusal to run work is similar to any other executor's refusal: the callback is still
  * invoked, but with a non-OK status (the kCallbackCanceledErrorStatus defined below), and
@@ -69,7 +68,7 @@ namespace mongo {
  */
 class CancelableExecutor : public OutOfLineExecutor {
 public:
-    CancelableExecutor(ExecutorPtr exec, CancelationToken tok)
+    CancelableExecutor(ExecutorPtr exec, CancellationToken tok)
         : _exec(std::move(exec)), _source(std::move(tok)) {}
 
     CancelableExecutor(const CancelableExecutor&) = delete;
@@ -81,7 +80,7 @@ public:
      * This is the preferred way to get a CancelableExecutor, since the ExecutorFuture interface
      * expects shared_ptrs to executors it recieves in its constructor or .thenRunOn.
      */
-    static std::shared_ptr<CancelableExecutor> make(ExecutorPtr exec, CancelationToken token) {
+    static std::shared_ptr<CancelableExecutor> make(ExecutorPtr exec, CancellationToken token) {
         return std::make_shared<CancelableExecutor>(std::move(exec), std::move(token));
     }
     void schedule(OutOfLineExecutor::Task func) override {
@@ -96,6 +95,6 @@ public:
 
 private:
     ExecutorPtr _exec;
-    CancelationSource _source;
+    CancellationSource _source;
 };
 }  // namespace mongo

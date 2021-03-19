@@ -72,21 +72,21 @@ public:
     void drop() override;
 
     /**
-     * NOTE: Cancelation via CancelationTokens is not implemented for the ScanningReplicaSetMonitor,
-     * so any token passed in will be ignored.
+     * NOTE: Cancellation via CancellationTokens is not implemented for the
+     * ScanningReplicaSetMonitor, so any token passed in will be ignored.
      */
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const std::vector<HostAndPort>& excludedHosts,
-                                             const CancelationToken&) override;
+                                             const CancellationToken&) override;
 
     /**
-     * NOTE: Cancelation via CancelationTokens is not implemented for the ScanningReplicaSetMonitor,
-     * so any token passed in will be ignored.
+     * NOTE: Cancellation via CancellationTokens is not implemented for the
+     * ScanningReplicaSetMonitor, so any token passed in will be ignored.
      */
     SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
         const std::vector<HostAndPort>& excludedHosts,
-        const CancelationToken&) override;
+        const CancellationToken&) override;
 
     HostAndPort getPrimaryOrUassert() override;
 

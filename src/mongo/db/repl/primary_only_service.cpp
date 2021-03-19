@@ -338,7 +338,7 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
                   str::stream() << "term " << newTerm << " is not greater than " << _term);
         _term = newTerm;
         _state = State::kRebuilding;
-        _source = CancelationSource();
+        _source = CancellationSource();
 
         // Install a new executor, while moving the old one into 'newThenOldScopedExecutor' so it
         // can be accessed outside of _mutex.
@@ -678,7 +678,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
 
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInstance(
     WithLock wl, std::shared_ptr<Instance> instance, InstanceID instanceID) {
-    CancelationSource instanceSource(_source.token());
+    CancellationSource instanceSource(_source.token());
     auto instanceCompleteFuture =
         ExecutorFuture<void>(**_scopedExecutor)
             .then([serviceName = getServiceName(),

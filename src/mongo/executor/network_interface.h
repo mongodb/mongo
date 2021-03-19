@@ -185,7 +185,7 @@ public:
     }
 
     /**
-     * Requests cancelation of the network activity associated with "cbHandle" if it has not yet
+     * Requests cancellation of the network activity associated with "cbHandle" if it has not yet
      * completed.
      *
      * Note that the work involved in onFinish may run locally as a result of invoking this

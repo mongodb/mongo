@@ -139,7 +139,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbNam
     }
 
     // Source to cancel the timeout if the operation completed in time.
-    CancelationSource cancelTimeoutSource;
+    CancellationSource cancelTimeoutSource;
 
     auto canReadFuture = mtab->getCanReadFuture(opCtx);
 

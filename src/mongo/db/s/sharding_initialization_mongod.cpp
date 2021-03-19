@@ -174,7 +174,7 @@ private:
     void _updateShardIdentityConfigString(Status status,
                                           std::string setName,
                                           ConnectionString update) {
-        if (ErrorCodes::isCancelationError(status.code())) {
+        if (ErrorCodes::isCancellationError(status.code())) {
             LOGV2_DEBUG(22067,
                         2,
                         "Unable to schedule confirmed replica set update due to {error}",

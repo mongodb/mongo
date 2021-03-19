@@ -42,7 +42,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/background.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
@@ -96,7 +96,7 @@ public:
      * will be rescheduled in a way that resumes where it had left off from.
      */
     ExecutorFuture<void> schedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                  const CancelationToken& cancelToken);
+                                  const CancellationToken& cancelToken);
 
     /**
      * Given a shard, fetches and copies oplog entries until
@@ -138,7 +138,7 @@ private:
     void _ensureCollection(Client* client, const NamespaceString nss);
     AggregateCommand _makeAggregateCommand(Client* client);
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
-                                     const CancelationToken& cancelToken);
+                                     const CancellationToken& cancelToken);
 
     ServiceContext* _service() const {
         return _env->service();

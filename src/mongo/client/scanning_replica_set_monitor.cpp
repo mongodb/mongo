@@ -213,7 +213,7 @@ template <typename Callback>
 auto ScanningReplicaSetMonitor::SetState::scheduleWorkAt(Date_t when, Callback&& cb) const {
     auto wrappedCallback = [cb = std::forward<Callback>(cb),
                             anchor = shared_from_this()](const CallbackArgs& cbArgs) mutable {
-        if (ErrorCodes::isCancelationError(cbArgs.status)) {
+        if (ErrorCodes::isCancellationError(cbArgs.status)) {
             // Do no more work if we're removed or canceled
             return;
         }
@@ -309,7 +309,7 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
 SemiFuture<HostAndPort> ScanningReplicaSetMonitor::getHostOrRefresh(
     const ReadPreferenceSetting& criteria,
     const std::vector<HostAndPort>& excludedHosts,
-    const CancelationToken&) {
+    const CancellationToken&) {
     return _getHostsOrRefresh(
                criteria, ReplicaSetMonitorInterface::kDefaultFindHostTimeout, excludedHosts)
         .then([](const auto& hosts) {
@@ -322,7 +322,7 @@ SemiFuture<HostAndPort> ScanningReplicaSetMonitor::getHostOrRefresh(
 SemiFuture<std::vector<HostAndPort>> ScanningReplicaSetMonitor::getHostsOrRefresh(
     const ReadPreferenceSetting& criteria,
     const std::vector<HostAndPort>& excludedHosts,
-    const CancelationToken&) {
+    const CancellationToken&) {
     return _getHostsOrRefresh(
                criteria, ReplicaSetMonitorInterface::kDefaultFindHostTimeout, excludedHosts)
         .semi();
@@ -367,7 +367,7 @@ Future<std::vector<HostAndPort>> ScanningReplicaSetMonitor::_getHostsOrRefresh(
 
 HostAndPort ScanningReplicaSetMonitor::getPrimaryOrUassert() {
     return ReplicaSetMonitorInterface::getHostOrRefresh(kPrimaryOnlyReadPreference,
-                                                        CancelationToken::uncancelable())
+                                                        CancellationToken::uncancelable())
         .get();
 }
 

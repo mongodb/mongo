@@ -72,7 +72,7 @@ public:
     }
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken) override {
+        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) override {
         // This operation context is unused by the function but confirms that the Client calling
         // getNextBatch() doesn't already have an operation context.
         auto opCtx = cc().makeOperationContext();
@@ -336,7 +336,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -380,7 +380,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -440,7 +440,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledCloningBatch) {
                     writerPool.get());
 
     // Cancel the rescheduling of the next batch.
-    auto abortSource = CancelationSource();
+    auto abortSource = CancellationSource();
     abortSource.cancel();
 
     auto future = applier->applyUntilCloneFinishedTs(abortSource.token());
@@ -484,7 +484,7 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                     executor,
                     writerPool.get());
 
-    auto abortSource = CancelationSource();
+    auto abortSource = CancellationSource();
     auto future = applier->applyUntilCloneFinishedTs(abortSource.token());
     future.get();
 
@@ -521,7 +521,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -582,7 +582,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
@@ -631,7 +631,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -681,7 +681,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
@@ -728,7 +728,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -775,7 +775,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
@@ -826,7 +826,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -878,7 +878,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
@@ -941,7 +941,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -997,7 +997,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
 
     executor->shutdown();
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -1041,7 +1041,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1086,7 +1086,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
 
     writerPool->shutdown();
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -1130,7 +1130,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1187,7 +1187,7 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1246,7 +1246,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << 1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1300,7 +1300,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1367,7 +1367,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1433,7 +1433,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1501,7 +1501,7 @@ TEST_F(ReshardingOplogApplierTest,
                     writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1573,7 +1573,7 @@ TEST_F(ReshardingOplogApplierTest,
     DBDirectClient client(operationContext());
     client.insert(stashCollections()[1].toString(), BSON("_id" << 1 << "sk" << -3));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1662,7 +1662,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardin
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1727,7 +1727,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplication
     DBDirectClient client(operationContext());
     client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1794,7 +1794,7 @@ TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules
                     writerPool.get());
 
     // Apply the inserts first so there exists docs in the output collection.
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1854,7 +1854,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -1900,7 +1900,7 @@ TEST_F(ReshardingOplogApplierTest,
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
@@ -2361,7 +2361,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, GroupInserts) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2449,7 +2449,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2536,7 +2536,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2597,7 +2597,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2651,7 +2651,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2716,7 +2716,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2771,7 +2771,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2828,7 +2828,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2886,7 +2886,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -2943,7 +2943,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
@@ -3008,7 +3008,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
@@ -3080,7 +3080,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3147,7 +3147,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3197,7 +3197,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3248,7 +3248,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3308,7 +3308,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3362,7 +3362,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithActiveUnpreparedTxnSameT
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3420,7 +3420,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnActiveUnpreparedTxnWithLower
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
     future.get();
 
@@ -3477,7 +3477,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommi
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
@@ -3538,7 +3538,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
                     executor,
                     writerPool.get());
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
     auto future = applier->applyUntilCloneFinishedTs(cancelToken);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
@@ -3595,7 +3595,7 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
 
     ASSERT_EQ(metricsAppliedCount(), 0);
 
-    auto cancelToken = operationContext()->getCancelationToken();
+    auto cancelToken = operationContext()->getCancellationToken();
 
     applier.applyUntilCloneFinishedTs(cancelToken).get();  // Stop at clone timestamp 7
     ASSERT_EQ(metricsAppliedCount(),

@@ -56,10 +56,10 @@ public:
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancelationToken& cancelToken) override;
+                                     const CancellationToken& cancelToken) override;
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
-                                                   const CancelationToken& cancelToken) override;
+                                                   const CancellationToken& cancelToken) override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
                                      const ReadPreferenceSetting& readPref) override;

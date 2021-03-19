@@ -420,7 +420,7 @@ private:
     // NetworkInterfaceMock.
     NetworkOperationList _operations;  // (M)
 
-    // The list of responses that have been enqueued from scheduleResponse(), cancelation, or
+    // The list of responses that have been enqueued from scheduleResponse(), cancellation, or
     // timeout. This list is ordered by NetworkResponse::when and is drained front to back by
     // runReadyNetworkOperations().
     NetworkResponseList _responses;  // (M)

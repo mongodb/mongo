@@ -44,7 +44,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/str.h"
 
@@ -407,7 +407,7 @@ COMMON_EXECUTOR_TEST(SleepUntilReturnsReadyFutureWithSuccessWhenDeadlineAlreadyP
 
     const Date_t now = net->now();
 
-    auto alarm = executor.sleepUntil(now, CancelationToken::uncancelable());
+    auto alarm = executor.sleepUntil(now, CancellationToken::uncancelable());
     ASSERT(alarm.isReady());
     ASSERT_OK(alarm.getNoThrow());
     shutdownExecutorThread();
@@ -425,7 +425,7 @@ COMMON_EXECUTOR_TEST(
     const Date_t now = net->now();
     const Milliseconds sleepDuration{1000};
     const auto deadline = now + sleepDuration;
-    auto alarm = executor.sleepUntil(deadline, CancelationToken::uncancelable());
+    auto alarm = executor.sleepUntil(deadline, CancellationToken::uncancelable());
 
     ASSERT(alarm.isReady());
     ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::ShutdownInProgress);
@@ -437,7 +437,7 @@ COMMON_EXECUTOR_TEST(SleepUntilReturnsReadyFutureWithCallbackCanceledWhenTokenAl
     const Date_t now = net->now();
     const Milliseconds sleepDuration{1000};
     const auto deadline = now + sleepDuration;
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     cancelSource.cancel();
     auto alarm = executor.sleepUntil(deadline, cancelSource.token());
 
@@ -454,7 +454,7 @@ COMMON_EXECUTOR_TEST(
     const Date_t now = net->now();
     const Milliseconds sleepDuration{1000};
     const auto deadline = now + sleepDuration;
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto alarm = executor.sleepUntil(deadline, cancelSource.token());
 
     ASSERT_FALSE(alarm.isReady());
@@ -467,7 +467,7 @@ COMMON_EXECUTOR_TEST(
 
     // Cancel before deadline.
     cancelSource.cancel();
-    // Required to process the cancelation.
+    // Required to process the cancellation.
     net->enterNetwork();
     net->exitNetwork();
 
@@ -487,7 +487,7 @@ COMMON_EXECUTOR_TEST(
     const Date_t now = net->now();
     const Milliseconds sleepDuration{1000};
     const auto deadline = now + sleepDuration;
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto alarm = executor.sleepUntil(deadline, cancelSource.token());
 
     ASSERT_FALSE(alarm.isReady());
@@ -515,7 +515,7 @@ COMMON_EXECUTOR_TEST(SleepUntilResolvesOutputFutureWithSuccessWhenDeadlinePasses
     const Milliseconds sleepDuration{1000};
     const auto deadline = now + sleepDuration;
 
-    auto alarm = executor.sleepUntil(deadline, CancelationToken::uncancelable());
+    auto alarm = executor.sleepUntil(deadline, CancellationToken::uncancelable());
     ASSERT_FALSE(alarm.isReady());
 
     net->enterNetwork();
@@ -602,9 +602,9 @@ COMMON_EXECUTOR_TEST(ScheduleAndCancelRemoteCommand) {
 }
 
 COMMON_EXECUTOR_TEST(
-    ScheduleRemoteCommandWithCancelationTokenSuccessfullyCancelsRequestIfCanceledAfterFunctionCallButBeforeProcessing) {
+    ScheduleRemoteCommandWithCancellationTokenSuccessfullyCancelsRequestIfCanceledAfterFunctionCallButBeforeProcessing) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
 
     cancelSource.cancel();
@@ -614,7 +614,7 @@ COMMON_EXECUTOR_TEST(
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
 
-    // Wait for cancelation to happen and expect error status on future.
+    // Wait for cancellation to happen and expect error status on future.
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, responseFuture.getNoThrow());
 
     shutdownExecutorThread();
@@ -622,10 +622,10 @@ COMMON_EXECUTOR_TEST(
 }
 
 COMMON_EXECUTOR_TEST(
-    ScheduleRemoteCommandWithCancelationTokenSuccessfullyCancelsRequestIfCanceledBeforeFunctionCallAndBeforeProcessing) {
+    ScheduleRemoteCommandWithCancellationTokenSuccessfullyCancelsRequestIfCanceledBeforeFunctionCallAndBeforeProcessing) {
     TaskExecutor& executor = getExecutor();
 
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     // Cancel before calling scheduleRemoteCommand.
     cancelSource.cancel();
     auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
@@ -635,9 +635,9 @@ COMMON_EXECUTOR_TEST(
 }
 
 COMMON_EXECUTOR_TEST(
-    ScheduleRemoteCommandWithCancelationTokenDoesNotCancelRequestIfCanceledAfterProcessing) {
+    ScheduleRemoteCommandWithCancellationTokenDoesNotCancelRequestIfCanceledAfterProcessing) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
 
     launchExecutorThread();
@@ -659,7 +659,7 @@ COMMON_EXECUTOR_TEST(
 }
 
 COMMON_EXECUTOR_TEST(
-    ScheduleRemoteCommandWithCancelationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelNotCalled) {
+    ScheduleRemoteCommandWithCancellationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelNotCalled) {
     TaskExecutor& executor = getExecutor();
 
     launchExecutorThread();
@@ -667,15 +667,15 @@ COMMON_EXECUTOR_TEST(
     joinExecutorThread();
 
     auto responseFuture =
-        executor.scheduleRemoteCommand(kDummyRequest, CancelationToken::uncancelable());
+        executor.scheduleRemoteCommand(kDummyRequest, CancellationToken::uncancelable());
     ASSERT_EQ(responseFuture.getNoThrow().getStatus().code(), ErrorCodes::ShutdownInProgress);
 }
 
 COMMON_EXECUTOR_TEST(
-    ScheduleRemoteCommandWithCancelationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelCalled) {
+    ScheduleRemoteCommandWithCancellationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelCalled) {
     TaskExecutor& executor = getExecutor();
 
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
     auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
 
     launchExecutorThread();
@@ -893,7 +893,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandSwallowsErrorsWhenMoreToComeFla
 COMMON_EXECUTOR_TEST(
     ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeFlagIsFalseOnFirstResponse) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
     size_t numTimesCallbackCalled = 0;
     auto cb = [&numTimesCallbackCalled](const TaskExecutor::RemoteCommandCallbackArgs&) {
@@ -932,7 +932,7 @@ COMMON_EXECUTOR_TEST(
 
 COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeFlagIsFalse) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
     size_t numTimesCallbackCalled = 0;
     auto cb = [&numTimesCallbackCalled](const TaskExecutor::RemoteCommandCallbackArgs&) {
@@ -979,7 +979,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenMoreToComeF
 
 COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenErrorResponseReceived) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
     size_t numTimesCallbackCalled = 0;
     auto cb = [&numTimesCallbackCalled](const TaskExecutor::RemoteCommandCallbackArgs&) {
@@ -1017,7 +1017,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWhenErrorRespon
 
 COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureSwallowsErrorsWhenMoreToCome) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
     size_t numTimesCallbackCalled = 0;
     auto cb = [&numTimesCallbackCalled](const TaskExecutor::RemoteCommandCallbackArgs&) {
@@ -1064,9 +1064,9 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureSwallowsErrorsWhenMoreToC
     joinExecutorThread();
 }
 
-COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCancelation) {
+COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCancellation) {
     TaskExecutor& executor = getExecutor();
-    CancelationSource cancelSource;
+    CancellationSource cancelSource;
 
     size_t numTimesCallbackCalled = 0;
     auto cb = [&numTimesCallbackCalled](const TaskExecutor::RemoteCommandCallbackArgs&) {

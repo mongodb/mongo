@@ -38,52 +38,52 @@ namespace detail {
 inline Status getCancelNeverCalledOnSourceError() {
     static const StaticImmortal<Status> cancelNeverCalledOnSourceError{
         ErrorCodes::CallbackCanceled,
-        "Cancel was never called on the CancelationSource for this token."};
+        "Cancel was never called on the CancellationSource for this token."};
     return *cancelNeverCalledOnSourceError;
 }
 
 /**
- * Holds the main state shared between CancelationSource/CancelationToken.
+ * Holds the main state shared between CancellationSource/CancellationToken.
  *
- * CancelationState objects are held by intrusive_ptr, and the ownership of a CancelationState
- * object is shared between all CancelationSource objects and CancelationToken objects which point
+ * CancellationState objects are held by intrusive_ptr, and the ownership of a CancellationState
+ * object is shared between all CancellationSource objects and CancellationToken objects which point
  * to it.
  *
- * When the last CancelationSource that points to a CancelationState object is destroyed,
- * CancelationState::dismiss() is called, which sets an error on its cancelation promise if
- * CancelationState::cancel() has not already been called. This serves to clean up the memory for
+ * When the last CancellationSource that points to a CancellationState object is destroyed,
+ * CancellationState::dismiss() is called, which sets an error on its cancellation promise if
+ * CancellationState::cancel() has not already been called. This serves to clean up the memory for
  * all callbacks associated with that promise once it is no longer possible for cancel() to be
  * called on the source.
  */
-class CancelationState : public RefCountable {
+class CancellationState : public RefCountable {
     enum class State : int { kInit, kCanceled, kDismissed };
 
 public:
-    CancelationState() = default;
+    CancellationState() = default;
 
-    ~CancelationState() {
+    ~CancellationState() {
         auto state = _state.load();
         invariant(state == State::kCanceled || state == State::kDismissed);
-        invariant(_cancelationPromise.getFuture().isReady());
+        invariant(_cancellationPromise.getFuture().isReady());
     }
 
-    CancelationState(const CancelationState& other) = delete;
-    CancelationState& operator=(const CancelationState& other) = delete;
+    CancellationState(const CancellationState& other) = delete;
+    CancellationState& operator=(const CancellationState& other) = delete;
 
-    CancelationState(CancelationState&& other) = delete;
-    CancelationState& operator=(CancelationState&& other) = delete;
+    CancellationState(CancellationState&& other) = delete;
+    CancellationState& operator=(CancellationState&& other) = delete;
 
     void dismiss() {
         State precondition{State::kInit};
         if (_state.compareAndSwap(&precondition, State::kDismissed)) {
-            _cancelationPromise.setError(getCancelNeverCalledOnSourceError());
+            _cancellationPromise.setError(getCancelNeverCalledOnSourceError());
         }
     }
 
     void cancel() {
         State precondition{State::kInit};
         if (_state.compareAndSwap(&precondition, State::kCanceled)) {
-            _cancelationPromise.emplaceValue();
+            _cancellationPromise.emplaceValue();
         }
     }
 
@@ -92,7 +92,7 @@ public:
     }
 
     SharedSemiFuture<void> onCancel() const {
-        return _cancelationPromise.getFuture();
+        return _cancellationPromise.getFuture();
     }
 
     /**
@@ -112,67 +112,67 @@ private:
      * A promise that will be signaled with success when cancel() is called and with an error when
      * dismiss() is called.
      */
-    SharedPromise<void> _cancelationPromise;
+    SharedPromise<void> _cancellationPromise;
 };
 
 /**
- * Wrapper around an intrusive_ptr<CancelationState> which, when destroyed, dismisses the
- * CancelationState. These used to track how many CancelationSource objects point to the same
- * CancelationState and call dismiss() on the CancelationState when the last CancelationSource
+ * Wrapper around an intrusive_ptr<CancellationState> which, when destroyed, dismisses the
+ * CancellationState. These used to track how many CancellationSource objects point to the same
+ * CancellationState and call dismiss() on the CancellationState when the last CancellationSource
  * pointing to it is destroyed.
  */
-class CancelationStateHolder : public RefCountable {
+class CancellationStateHolder : public RefCountable {
 public:
-    CancelationStateHolder() = default;
+    CancellationStateHolder() = default;
 
-    ~CancelationStateHolder() {
+    ~CancellationStateHolder() {
         _state->dismiss();
     }
 
-    CancelationStateHolder(const CancelationStateHolder&) = delete;
-    CancelationStateHolder& operator=(const CancelationStateHolder&) = delete;
+    CancellationStateHolder(const CancellationStateHolder&) = delete;
+    CancellationStateHolder& operator=(const CancellationStateHolder&) = delete;
 
-    CancelationStateHolder(CancelationStateHolder&&) = delete;
-    CancelationStateHolder& operator=(CancelationStateHolder&&) = delete;
+    CancellationStateHolder(CancellationStateHolder&&) = delete;
+    CancellationStateHolder& operator=(CancellationStateHolder&&) = delete;
 
-    boost::intrusive_ptr<CancelationState> get() const {
+    boost::intrusive_ptr<CancellationState> get() const {
         return _state;
     }
 
 private:
-    boost::intrusive_ptr<CancelationState> _state{make_intrusive<CancelationState>()};
+    boost::intrusive_ptr<CancellationState> _state{make_intrusive<CancellationState>()};
 };
 
 }  // namespace detail
 
 /**
- * Type used to check for cancelation of a task. Tokens are normally obtained through an associated
- * CancelationSource by calling CancelationSource::token(), but an uncancelable token can also be
- * constructed by using the CancelationToken::uncancelable() static factory function.
+ * Type used to check for cancellation of a task. Tokens are normally obtained through an associated
+ * CancellationSource by calling CancellationSource::token(), but an uncancelable token can also be
+ * constructed by using the CancellationToken::uncancelable() static factory function.
  */
-class CancelationToken {
+class CancellationToken {
 public:
     // Constructs an uncancelable token, i.e. a token without an associated source.
-    static CancelationToken uncancelable() {
-        auto state = make_intrusive<detail::CancelationState>();
+    static CancellationToken uncancelable() {
+        auto state = make_intrusive<detail::CancellationState>();
         // Make the state uncancelable.
         state->dismiss();
-        return CancelationToken(std::move(state));
+        return CancellationToken(std::move(state));
     }
 
-    explicit CancelationToken(boost::intrusive_ptr<const detail::CancelationState> state)
+    explicit CancellationToken(boost::intrusive_ptr<const detail::CancellationState> state)
         : _state(std::move(state)) {}
 
-    ~CancelationToken() = default;
+    ~CancellationToken() = default;
 
-    CancelationToken(const CancelationToken& other) = default;
-    CancelationToken& operator=(const CancelationToken& other) = default;
+    CancellationToken(const CancellationToken& other) = default;
+    CancellationToken& operator=(const CancellationToken& other) = default;
 
-    CancelationToken(CancelationToken&& other) = default;
-    CancelationToken& operator=(CancelationToken&& other) = default;
+    CancellationToken(CancellationToken&& other) = default;
+    CancellationToken& operator=(CancellationToken&& other) = default;
 
     /**
-     * Returns whether or not cancel() has been called on the CancelationSource object from which
+     * Returns whether or not cancel() has been called on the CancellationSource object from which
      * this token was constructed.
      */
     bool isCanceled() const {
@@ -181,9 +181,9 @@ public:
 
     /**
      * Returns a future that will be resolved with success when cancel() has been called on the
-     * CancelationSource object from which this token was constructed, or with an error containing
-     * CallbackCanceled if that CancelationSource object is destroyed without having cancel() called
-     * on it.
+     * CancellationSource object from which this token was constructed, or with an error containing
+     * CallbackCanceled if that CancellationSource object is destroyed without having cancel()
+     * called on it.
      */
     SemiFuture<void> onCancel() const {
         return _state->onCancel().semi();
@@ -199,38 +199,38 @@ public:
 
 private:
     /**
-     * Points to the object containing the status of cancelation.
+     * Points to the object containing the status of cancellation.
      */
-    boost::intrusive_ptr<const detail::CancelationState> _state;
+    boost::intrusive_ptr<const detail::CancellationState> _state;
 };
 
 /**
- * Type used to manage the cancelation of a task. CancelationSource is used to cancel a task, and
- * CancelationTokens obtained via CancelationSource::token() are used to check for and handle
- * cancelation.
+ * Type used to manage the cancellation of a task. CancellationSource is used to cancel a task, and
+ * CancellationTokens obtained via CancellationSource::token() are used to check for and handle
+ * cancellation.
  */
-class CancelationSource {
+class CancellationSource {
 public:
-    CancelationSource() = default;
+    CancellationSource() = default;
     /**
-     * Creates a CancelationSource that will be canceled when the input token is canceled. This
-     * allows the construction of cancelation hierarchies.
+     * Creates a CancellationSource that will be canceled when the input token is canceled. This
+     * allows the construction of cancellation hierarchies.
      *
      * For example, if we have:
      *
-     * CancelationSource first;
-     * CancelationSource second(first.token());
-     * CancelationSource third(second.token());
+     * CancellationSource first;
+     * CancellationSource second(first.token());
+     * CancellationSource third(second.token());
      *
      * Calling third.cancel() will only cancel tokens obtained from third.
      * Calling second.cancel() will cancel tokens obtained from second, and call third.cancel().
      * Calling first.cancel() will thus cancel the whole hierarchy.
      */
-    explicit CancelationSource(const CancelationToken& token) {
+    explicit CancellationSource(const CancellationToken& token) {
         // Cancel the source when the input token is canceled.
         //
-        // Note that because this captures the CancelationState object directly, and not the
-        // CancelationStateHolder, this will still allow callback state attached to this
+        // Note that because this captures the CancellationState object directly, and not the
+        // CancellationStateHolder, this will still allow callback state attached to this
         // source's tokens to be cleaned up as soon as the last source is destroyed, even if the
         // parent token still exists.. This means that long-lived tokens can have many sub-sources
         // for tasks which start and complete without worrying about too much memory build-up.
@@ -242,15 +242,15 @@ public:
 
     /**
      * Destroys shared state associated with any tokens obtained from this source, and does not run
-     * cancelation callbacks.
+     * cancellation callbacks.
      */
-    ~CancelationSource() = default;
+    ~CancellationSource() = default;
 
-    CancelationSource(const CancelationSource& other) = default;
-    CancelationSource& operator=(const CancelationSource& other) = default;
+    CancellationSource(const CancellationSource& other) = default;
+    CancellationSource& operator=(const CancellationSource& other) = default;
 
-    CancelationSource(CancelationSource&& other) = default;
-    CancelationSource& operator=(CancelationSource&& other) = default;
+    CancellationSource(CancellationSource&& other) = default;
+    CancellationSource& operator=(CancellationSource&& other) = default;
 
     /**
      * Cancel the token. If no call to cancel has previously been made, this will cause all
@@ -261,16 +261,16 @@ public:
     }
 
     /**
-     * Returns a CancelationToken which will be canceled when this source is
+     * Returns a CancellationToken which will be canceled when this source is
      * canceled.
      */
-    CancelationToken token() const {
-        return CancelationToken{_stateHolder->get()};
+    CancellationToken token() const {
+        return CancellationToken{_stateHolder->get()};
     }
 
 private:
-    boost::intrusive_ptr<detail::CancelationStateHolder> _stateHolder{
-        make_intrusive<detail::CancelationStateHolder>()};
+    boost::intrusive_ptr<detail::CancellationStateHolder> _stateHolder{
+        make_intrusive<detail::CancellationStateHolder>()};
 };
 
 }  // namespace mongo

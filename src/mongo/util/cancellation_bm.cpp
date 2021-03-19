@@ -32,13 +32,13 @@
 #include <benchmark/benchmark.h>
 #include <forward_list>
 
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 
 namespace mongo {
 
 
 void BM_create_single_token_from_source(benchmark::State& state) {
-    CancelationSource source;
+    CancellationSource source;
     for (auto _ : state) {
         benchmark::DoNotOptimize(source.token());
     }
@@ -46,14 +46,14 @@ void BM_create_single_token_from_source(benchmark::State& state) {
 
 void BM_uncancelable_token_ctor(benchmark::State& state) {
     for (auto _ : state) {
-        benchmark::DoNotOptimize(CancelationToken::uncancelable());
+        benchmark::DoNotOptimize(CancellationToken::uncancelable());
     }
 }
 
 void BM_cancel_tokens_from_single_source(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();  // Do not time the construction and set-up of the source + tokens.
-        CancelationSource source;
+        CancellationSource source;
         for (int i = 0; i < state.range(0); ++i) {
             source.token().onCancel().unsafeToInlineFuture().getAsync([](auto) {});
         }
@@ -63,44 +63,44 @@ void BM_cancel_tokens_from_single_source(benchmark::State& state) {
 }
 
 void BM_check_if_token_from_source_canceled(benchmark::State& state) {
-    CancelationSource source;
+    CancellationSource source;
     auto token = source.token();
     for (auto _ : state) {
         benchmark::DoNotOptimize(token.isCanceled());
     }
 }
 
-void BM_cancelation_source_from_token_ctor(benchmark::State& state) {
-    CancelationSource source;
+void BM_cancellation_source_from_token_ctor(benchmark::State& state) {
+    CancellationSource source;
     for (auto _ : state) {
-        CancelationSource child(source.token());
+        CancellationSource child(source.token());
         benchmark::DoNotOptimize(child);
     }
 }
 
-void BM_cancelation_source_default_ctor(benchmark::State& state) {
+void BM_cancellation_source_default_ctor(benchmark::State& state) {
     for (auto _ : state) {
-        CancelationSource source;
+        CancellationSource source;
         benchmark::DoNotOptimize(source);
     }
 }
 
 /**
- * Constructs a cancelation 'hierarchy' of depth state.range(0), with one cancelation source at
+ * Constructs a cancellation 'hierarchy' of depth state.range(0), with one cancellation source at
  * each level and one token obtained from each source. When root.cancel() is called, the whole
  * hierarchy (all sources in the hierarchy, and any tokens obtained from any source in the
  * hierarchy) will be canceled.
  */
-void BM_ranged_depth_cancelation_hierarchy(benchmark::State& state) {
+void BM_ranged_depth_cancellation_hierarchy(benchmark::State& state) {
     for (auto _ : state) {
         state.PauseTiming();
-        CancelationSource root;
-        CancelationSource parent = root;
-        // We use list to keep every cancelation source in the hierarchy in scope.
-        std::forward_list<CancelationSource> list;
+        CancellationSource root;
+        CancellationSource parent = root;
+        // We use list to keep every cancellation source in the hierarchy in scope.
+        std::forward_list<CancellationSource> list;
         for (int i = 0; i < state.range(0); ++i) {
             list.push_front(parent);
-            CancelationSource child(parent.token());
+            CancellationSource child(parent.token());
             child.token().onCancel().unsafeToInlineFuture().getAsync([](auto) {});
             parent = child;
         }
@@ -113,8 +113,8 @@ BENCHMARK(BM_create_single_token_from_source);
 BENCHMARK(BM_uncancelable_token_ctor);
 BENCHMARK(BM_cancel_tokens_from_single_source)->RangeMultiplier(10)->Range(1, 100 * 100 * 100);
 BENCHMARK(BM_check_if_token_from_source_canceled);
-BENCHMARK(BM_cancelation_source_from_token_ctor);
-BENCHMARK(BM_cancelation_source_default_ctor);
-BENCHMARK(BM_ranged_depth_cancelation_hierarchy)->RangeMultiplier(10)->Range(1, 1000);
+BENCHMARK(BM_cancellation_source_from_token_ctor);
+BENCHMARK(BM_cancellation_source_default_ctor);
+BENCHMARK(BM_ranged_depth_cancellation_hierarchy)->RangeMultiplier(10)->Range(1, 1000);
 
 }  // namespace mongo

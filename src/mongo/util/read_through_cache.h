@@ -484,7 +484,7 @@ private:
         auto& inProgressLookup = *it->second;
         auto [promisesToSet, result, mustDoAnotherLoop] = [&] {
             // The thread pool is shutting down, so terminate the loop
-            if (ErrorCodes::isCancelationError(sw.getStatus()))
+            if (ErrorCodes::isCancellationError(sw.getStatus()))
                 return std::make_tuple(inProgressLookup.getAllPromisesOnError(ul),
                                        StatusWith<ValueHandle>(sw.getStatus()),
                                        false);
@@ -496,7 +496,7 @@ private:
                     StatusWith<ValueHandle>(Status(ErrorCodes::Error(461541), "")),
                     true);
 
-            // Lookup resulted in an error, which is not cancelation
+            // Lookup resulted in an error, which is not cancellation
             if (!sw.isOK())
                 return std::make_tuple(inProgressLookup.getAllPromisesOnError(ul),
                                        StatusWith<ValueHandle>(sw.getStatus()),

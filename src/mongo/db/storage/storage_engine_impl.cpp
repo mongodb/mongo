@@ -1196,7 +1196,7 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                 _currentTimestamps.stable = stable;
                 _currentTimestamps.minOfCheckpointAndOldest = minOfCheckpointAndOldest;
             } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
-                if (!ErrorCodes::isCancelationError(ex))
+                if (!ErrorCodes::isCancellationError(ex))
                     throw;
                 // If we're interrupted at shutdown or after PeriodicRunner's client has been
                 // killed, it's fine to give up on future notifications.

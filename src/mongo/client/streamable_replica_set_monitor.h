@@ -97,12 +97,12 @@ public:
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const std::vector<HostAndPort>& excludedHosts,
-                                             const CancelationToken& cancelToken) override;
+                                             const CancellationToken& cancelToken) override;
 
     SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
         const std::vector<HostAndPort>& excludedHosts,
-        const CancelationToken& cancelToken) override;
+        const CancellationToken& cancelToken) override;
 
     HostAndPort getPrimaryOrUassert() override;
 
@@ -178,7 +178,7 @@ private:
             return !wasAlreadyDone;
         }
 
-        CancelationSource deadlineCancelSource;
+        CancellationSource deadlineCancelSource;
 
         ReadPreferenceSetting criteria;
 
@@ -206,7 +206,7 @@ private:
         WithLock,
         const ReadPreferenceSetting& criteria,
         const std::vector<HostAndPort>& excludedHosts,
-        const CancelationToken& cancelToken,
+        const CancellationToken& cancelToken,
         const Date_t& deadline);
 
     // Removes the query pointed to by iter and returns an iterator to the next item in the list.

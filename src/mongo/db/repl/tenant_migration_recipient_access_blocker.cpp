@@ -39,7 +39,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/cancelation.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 

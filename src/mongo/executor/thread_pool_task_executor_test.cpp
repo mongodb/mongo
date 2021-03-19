@@ -55,7 +55,7 @@ MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
     });
 }
 
-TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
+TEST_F(ThreadPoolExecutorTest, TimelyCancellationOfScheduleWorkAt) {
     auto net = getNet();
     auto& executor = getExecutor();
     launchExecutorThread();

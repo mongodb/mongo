@@ -613,7 +613,7 @@ icuEnv.CppUnitTest(
         'background_job_test.cpp',
         'background_thread_clock_source_test.cpp',
         'base64_test.cpp',
-        'cancelation_test.cpp',
+        'cancellation_test.cpp',
         'clock_source_mock_test.cpp',
         'concepts_test.cpp',
         'container_size_helper_test.cpp',
@@ -776,8 +776,8 @@ env.Benchmark(
 )
 
 env.Benchmark(
-    target='cancelation_bm',
-    source='cancelation_bm.cpp',
+    target='cancellation_bm',
+    source='cancellation_bm.cpp',
 )
 
 env.Benchmark(

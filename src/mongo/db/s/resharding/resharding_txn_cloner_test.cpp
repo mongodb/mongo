@@ -346,11 +346,11 @@ protected:
     ExecutorFuture<void> runCloner(
         ReshardingTxnCloner& cloner,
         std::shared_ptr<executor::ThreadPoolTaskExecutor> executor,
-        boost::optional<CancelationToken> customCancelToken = boost::none) {
-        // Allows callers to control the cancelation of the cloner's run() function when specified.
+        boost::optional<CancellationToken> customCancelToken = boost::none) {
+        // Allows callers to control the cancellation of the cloner's run() function when specified.
         auto cancelToken = customCancelToken.is_initialized()
             ? customCancelToken.get()
-            : operationContext()->getCancelationToken();
+            : operationContext()->getCancellationToken();
 
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
@@ -551,8 +551,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerOneBatchThenCanceled) {
     const auto txns = makeSortedTxns(4);
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto opCtxToken = operationContext()->getCancelationToken();
-    auto cancelSource = CancelationSource(opCtxToken);
+    auto opCtxToken = operationContext()->getCancellationToken();
+    auto cancelSource = CancellationSource(opCtxToken);
     auto future = runCloner(cloner, executor, cancelSource.token());
 
     onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
@@ -620,7 +620,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto cancelSource = CancelationSource(operationContext()->getCancelationToken());
+    auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
     auto future = runCloner(cloner, executor, cancelSource.token());
 
     // The progress document is updated asynchronously after the session record is updated. We fake
@@ -633,8 +633,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
         // Simulate a stepdown.
         cancelSource.cancel();
 
-        // With a non-mock network, disposing of the pipeline upon cancelation would also cancel the
-        // original request.
+        // With a non-mock network, disposing of the pipeline upon cancellation would also cancel
+        // the original request.
         return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
     auto status = future.getNoThrow();
@@ -670,7 +670,7 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
 
     auto executor = makeTaskExecutorForCloner();
     ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
-    auto cancelSource = CancelationSource(operationContext()->getCancelationToken());
+    auto cancelSource = CancellationSource(operationContext()->getCancellationToken());
     auto future = runCloner(cloner, executor, cancelSource.token());
 
     onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
@@ -685,8 +685,8 @@ TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
         // Simulate a stepdown.
         cancelSource.cancel();
 
-        // With a non-mock network, disposing of the pipeline upon cancelation would also cancel the
-        // original request.
+        // With a non-mock network, disposing of the pipeline upon cancellation would also cancel
+        // the original request.
         return Status{ErrorCodes::CallbackCanceled, "Simulate cancellation"};
     });
 

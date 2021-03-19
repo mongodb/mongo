@@ -123,7 +123,7 @@ void DropCollectionCoordinator::_removeStateDocument() {
 
 ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancelationToken& token) noexcept {
+    const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(Phase::kFreezeCollection,
                             [this, anchor = shared_from_this()] {

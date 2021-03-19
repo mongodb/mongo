@@ -132,7 +132,7 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::schedule(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancelationToken& cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
     return ExecutorFuture(executor)
         .then(
             [this, executor, cancelToken] { return _reschedule(std::move(executor), cancelToken); })
@@ -143,7 +143,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancelationToken& cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
     return ExecutorFuture(executor)
         .then([this, executor, cancelToken] {
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",

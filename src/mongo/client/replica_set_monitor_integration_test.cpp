@@ -160,7 +160,7 @@ TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
     // Schedule isMaster requests and wait for the responses.
     auto primaryFuture =
         rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly),
-                              CancelationToken::uncancelable());
+                              CancellationToken::uncancelable());
     primaryFuture.get();
 
     ASSERT_EQ(rsm->getMinWireVersion(), WireVersion::LATEST_WIRE_VERSION);

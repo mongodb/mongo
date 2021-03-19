@@ -252,7 +252,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
     assert.soon(() => {
         const res = assert.commandWorked(
             donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
-        return res.inprog[0].receivedCancelation;
+        return res.inprog[0].receivedCancellation;
     });
 
     interruptFunc(donorRst);
