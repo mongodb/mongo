@@ -90,12 +90,6 @@ public:
     StringData(const std::string& s) : StringData(s.data(), s.length(), TrustedInitTag()) {}
 
     /**
-     * Implicitly convert a std::string_view to a StringData. We can use the trusted
-     * init path because string_view::data() points to length() bytes of data.
-     */
-    StringData(std::string_view s) : StringData(s.data(), s.length(), TrustedInitTag()) {}
-
-    /**
      * Constructs a StringData with an explicit length. 'c' must
      * either be nullptr (in which case len must be zero), or be a
      * pointer into a character array. The StringData will refer to
@@ -109,18 +103,6 @@ public:
 
     explicit operator std::string() const {
         return toString();
-    }
-
-    /**
-     * Implicitly convert to a std::string_view.
-     */
-    operator std::string_view() const {
-        // std::string_view produces undefined behaviour if [pointer, pointer + size) is not a valid
-        // range. To fix this we explicitly use default constructor if StringData contains nullptr.
-        if (MONGO_unlikely(rawData() == nullptr)) {
-            return {};
-        }
-        return {rawData(), size()};
     }
 
     /**

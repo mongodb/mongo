@@ -44,21 +44,32 @@ namespace mongo {
 namespace sbe {
 namespace value {
 
+namespace {
+template <typename T>
+auto abslHash(const T& val) {
+    if constexpr (std::is_same_v<T, StringData>) {
+        return absl::Hash<absl::string_view>{}(absl::string_view{val.rawData(), val.size()});
+    } else {
+        return absl::Hash<T>{}(val);
+    }
+}
+}  // namespace
+
 std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex) {
     auto buffer = std::make_unique<char[]>(regex.byteSize());
     memcpy(buffer.get(), regex.data(), regex.byteSize());
     return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::string_view flags) {
+std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags) {
     // Add 2 to account NULL bytes after pattern and flags.
     auto totalSize = pattern.size() + flags.size() + 2;
     auto buffer = std::make_unique<char[]>(totalSize);
     auto rawBuffer = buffer.get();
 
     // Copy pattern first and flags after it.
-    memcpy(rawBuffer, pattern.data(), pattern.size());
-    memcpy(rawBuffer + pattern.size() + 1, flags.data(), flags.size());
+    memcpy(rawBuffer, pattern.rawData(), pattern.size());
+    memcpy(rawBuffer + pattern.size() + 1, flags.rawData(), flags.size());
 
     // Ensure NULL byte is placed after each part.
     rawBuffer[pattern.size()] = '\0';
@@ -66,7 +77,7 @@ std::pair<TypeTags, Value> makeNewBsonRegex(std::string_view pattern, std::strin
     return {TypeTags::bsonRegex, bitcastFrom<char*>(buffer.release())};
 }
 
-std::pair<TypeTags, Value> makeCopyBsonJavascript(std::string_view code) {
+std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code) {
     auto [_, strVal] = makeBigString(code);
     return {TypeTags::bsonJavascript, strVal};
 }
@@ -76,7 +87,7 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
     return {TypeTags::ksValue, bitcastFrom<KeyString::Value*>(k)};
 }
 
-std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options) {
+std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options) {
     auto regex = std::make_unique<PcreRegex>(pattern, options);
     return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
 }
@@ -94,11 +105,11 @@ void PcreRegex::_compile() {
     uassert(5073402, str::stream() << "Invalid Regex: " << compile_error, _pcrePtr != nullptr);
 }
 
-int PcreRegex::execute(std::string_view stringView, int startPos, std::vector<int>& buf) {
+int PcreRegex::execute(StringData stringView, int startPos, std::vector<int>& buf) {
     return pcre_exec(_pcrePtr,
                      nullptr,
-                     stringView.data(),
-                     stringView.length(),
+                     stringView.rawData(),
+                     stringView.size(),
                      startPos,
                      0,
                      &(buf.front()),
@@ -417,11 +428,11 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
             auto sv = getStringView(tag, val);
-            if (sv.length() <= kStringMaxDisplayLength) {
-                stream << '"' << StringData{sv.data(), sv.size()} << '"';
+            if (sv.size() <= kStringMaxDisplayLength) {
+                stream << '"' << sv << '"';
             } else {
                 auto sub = sv.substr(0, kStringMaxDisplayLength);
-                stream << '"' << StringData{sub.data(), sub.size()} << '"' << "...";
+                stream << '"' << sub << '"' << "...";
             }
             break;
         }
@@ -595,36 +606,35 @@ BSONType tagToType(TypeTags tag) noexcept {
 std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator) noexcept {
     switch (tag) {
         case TypeTags::NumberInt32:
-            return absl::Hash<int32_t>{}(bitcastTo<int32_t>(val));
+            return abslHash(bitcastTo<int32_t>(val));
         case TypeTags::RecordId:
         case TypeTags::NumberInt64:
-            return absl::Hash<int64_t>{}(bitcastTo<int64_t>(val));
+            return abslHash(bitcastTo<int64_t>(val));
         case TypeTags::NumberDouble: {
             // Force doubles to integers for hashing.
             auto dbl = bitcastTo<double>(val);
             if (auto asInt = representAs<int64_t>(dbl); asInt) {
-                return absl::Hash<int64_t>{}(*asInt);
+                return abslHash(*asInt);
             } else {
                 // Doubles not representable as int64_t will hash as doubles.
-                return absl::Hash<double>{}(dbl);
+                return abslHash(dbl);
             }
         }
         case TypeTags::NumberDecimal: {
             // Force decimals to integers for hashing.
             auto dec = bitcastTo<Decimal128>(val);
             if (auto asInt = representAs<int64_t>(dec); asInt) {
-                return absl::Hash<int64_t>{}(*asInt);
+                return abslHash(*asInt);
             } else if (auto asDbl = representAs<double>(dec); asDbl) {
-                return absl::Hash<double>{}(*asDbl);
+                return abslHash(*asDbl);
             } else {
-                return absl::Hash<uint64_t>{}(dec.getValue().low64) ^
-                    absl::Hash<uint64_t>{}(dec.getValue().high64);
+                return abslHash(dec.getValue().low64) ^ abslHash(dec.getValue().high64);
             }
         }
         case TypeTags::Date:
-            return absl::Hash<int64_t>{}(bitcastTo<int64_t>(val));
+            return abslHash(bitcastTo<int64_t>(val));
         case TypeTags::Timestamp:
-            return absl::Hash<uint64_t>{}(bitcastTo<uint64_t>(val));
+            return abslHash(bitcastTo<uint64_t>(val));
         case TypeTags::Boolean:
             return bitcastTo<bool>(val);
         case TypeTags::Null:
@@ -637,18 +647,15 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         case TypeTags::bsonString: {
             auto sv = getStringView(tag, val);
             if (collator) {
-                auto key = collator->getComparisonKey(StringData{sv.data(), sv.size()});
-                auto keyData = key.getKeyData();
-                return absl::Hash<std::string_view>{}(
-                    std::string_view{keyData.rawData(), keyData.size()});
+                return abslHash(collator->getComparisonKey(sv).getKeyData());
             } else {
-                return absl::Hash<std::string_view>{}(sv);
+                return abslHash(sv);
             }
         }
         case TypeTags::ObjectId: {
             auto id = getObjectIdView(val);
-            return absl::Hash<uint64_t>{}(readFromMemory<uint64_t>(id->data())) ^
-                absl::Hash<uint32_t>{}(readFromMemory<uint32_t>(id->data() + 8));
+            return abslHash(readFromMemory<uint64_t>(id->data())) ^
+                abslHash(readFromMemory<uint32_t>(id->data() + 8));
         }
         case TypeTags::ksValue: {
             return getKeyStringView(val)->hash();
@@ -690,19 +697,19 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 memcpy(buffer, getRawPointerView(val), size);
 
                 // Hash as if it is 64bit integer.
-                return absl::Hash<uint64_t>{}(readFromMemory<uint64_t>(buffer));
+                return abslHash(readFromMemory<uint64_t>(buffer));
             } else {
                 // Hash only the first 8 bytes. It should be enough.
-                return absl::Hash<uint64_t>{}(
+                return abslHash(
                     readFromMemory<uint64_t>(getRawPointerView(val) + sizeof(uint32_t)));
             }
         }
         case TypeTags::bsonRegex: {
             auto regex = getBsonRegexView(val);
-            return absl::Hash<std::string_view>{}(regex.dataView());
+            return abslHash(regex.dataView());
         }
         case TypeTags::bsonJavascript:
-            return absl::Hash<std::string_view>{}(getBsonJavascriptView(val));
+            return abslHash(getBsonJavascriptView(val));
         default:
             break;
     }
@@ -715,7 +722,7 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
  * guarantees that the result will be exactlty -1, 0, or 1, which is important, because not all
  * comparison functions make that guarantee.
  *
- * The std::string_view::compare(basic_string_view s) function, for example, only promises that it
+ * The StringData::compare(basic_string_view s) function, for example, only promises that it
  * will return a value less than 0 in the case that 'this' is less than 's,' whereas we want to
  * return exactly -1.
  */
@@ -761,9 +768,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
 
-        auto result = comparator ? comparator->compare(StringData{lhsStr.data(), lhsStr.size()},
-                                                       StringData{rhsStr.data(), rhsStr.size()})
-                                 : lhsStr.compare(rhsStr);
+        auto result = comparator ? comparator->compare(lhsStr, rhsStr) : lhsStr.compare(rhsStr);
 
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::Date && rhsTag == TypeTags::Date) {
@@ -969,19 +974,19 @@ bool ObjectEnumerator::advance() {
     }
 }
 
-std::string_view ObjectEnumerator::getFieldName() const {
+StringData ObjectEnumerator::getFieldName() const {
     using namespace std::literals;
     if (_object) {
         if (_index < _object->size()) {
             return _object->field(_index);
         } else {
-            return ""sv;
+            return ""_sd;
         }
     } else {
         if (*_objectCurrent != 0) {
             return bson::fieldNameView(_objectCurrent);
         } else {
-            return ""sv;
+            return ""_sd;
         }
     }
 }

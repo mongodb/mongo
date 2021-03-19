@@ -33,7 +33,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <string_view>
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -148,7 +147,7 @@ TEST_F(FilterStageTest, FilterIsNumberTest) {
         // Build a FilterStage whose filter expression is "isNumber(scanSlot)".
         auto filter = makeS<FilterStage<false>>(
             std::move(scanStage),
-            makeE<EFunction>("isNumber"sv, makeEs(makeE<EVariable>(scanSlot))),
+            makeE<EFunction>("isNumber"_sd, makeEs(makeE<EVariable>(scanSlot))),
             kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));

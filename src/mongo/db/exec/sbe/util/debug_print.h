@@ -60,16 +60,16 @@ public:
         Command cmd;
         std::string str;
 
-        Block(std::string_view s) : cmd(cmdNone), str(s) {}
+        Block(StringData s) : cmd(cmdNone), str(s) {}
 
-        Block(Command c, std::string_view s) : cmd(c), str(s) {}
+        Block(Command c, StringData s) : cmd(c), str(s) {}
 
         Block(Command c) : cmd(c) {}
     };
 
     DebugPrinter(bool colorConsole = false) : _colorConsole(colorConsole) {}
 
-    static void addKeyword(std::vector<Block>& ret, std::string_view k) {
+    static void addKeyword(std::vector<Block>& ret, StringData k) {
         ret.emplace_back(Block::cmdColorCyan);
         ret.emplace_back(Block{Block::cmdNoneNoSpace, k});
         ret.emplace_back(Block::cmdColorNone);
@@ -92,7 +92,7 @@ public:
         ret.emplace_back(Block{Block::cmdNoneNoSpace, " "});
     }
 
-    static void addIdentifier(std::vector<Block>& ret, std::string_view k) {
+    static void addIdentifier(std::vector<Block>& ret, StringData k) {
         ret.emplace_back(Block::cmdColorGreen);
         ret.emplace_back(Block{Block::cmdNoneNoSpace, k});
         ret.emplace_back(Block::cmdColorNone);

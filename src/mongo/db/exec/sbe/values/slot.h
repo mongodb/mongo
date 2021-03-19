@@ -633,7 +633,7 @@ void readKeyStringValueIntoAccessors(
 template <typename T>
 using SlotMap = absl::flat_hash_map<SlotId, T>;
 using SlotAccessorMap = SlotMap<SlotAccessor*>;
-using FieldAccessorMap = absl::flat_hash_map<std::string, std::unique_ptr<ViewOfValueAccessor>>;
+using FieldAccessorMap = StringMap<std::unique_ptr<ViewOfValueAccessor>>;
 using SlotSet = absl::flat_hash_set<SlotId>;
 using SlotVector = std::vector<SlotId>;
 
