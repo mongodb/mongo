@@ -128,26 +128,36 @@ var $config = (function() {
             }
 
             mutexLock(db, data.CRUDMutex, tid);
-            jsTestLog('CRUD - Insert tid: ' + tid + ' currentTid: ' + this.tid);
-            // Check if insert succeeded
-            assertAlways.commandWorked(insertBulkOp.execute());
-            let currentDocs = coll.countDocuments({generation: generation});
-            // Check guarantees IF NO CONCURRENT DROP is running.
-            // If a concurrent rename came in, then either the full operation succeded (meaning
-            // there will be 0 documents left) or the insert came in first.
-            assertAlways(currentDocs === numDocs || currentDocs === 0);
+            try {
+                jsTestLog('CRUD - Insert tid: ' + tid + ' currentTid: ' + this.tid);
+                // Check if insert succeeded
+                assertAlways.commandWorked(insertBulkOp.execute());
+                let currentDocs = coll.countDocuments({generation: generation});
+                // Check guarantees IF NO CONCURRENT DROP is running.
+                // If a concurrent rename came in, then either the full operation succeded (meaning
+                // there will be 0 documents left) or the insert came in first.
+                assertAlways(currentDocs === numDocs || currentDocs === 0);
 
-            jsTestLog('CRUD - Update tid: ' + tid + ' currentTid: ' + this.tid);
-            assertAlways.commandWorked(
-                coll.update({generation: generation}, {$set: {updated: true}}, {multi: true}));
+                jsTestLog('CRUD - Update tid: ' + tid + ' currentTid: ' + this.tid);
+                assertAlways.commandWorked(
+                    coll.update({generation: generation}, {$set: {updated: true}}, {multi: true}));
 
-            // Delete Data
-            jsTestLog('CRUD - Remove tid: ' + tid + ' currentTid: ' + this.tid);
-            // Check if delete succeeded
-            coll.remove({generation: generation}, {multi: true});
-            // Check guarantees IF NO CONCURRENT DROP is running.
-            assertAlways.eq(coll.countDocuments({generation: generation}), 0);
-            mutexUnlock(db, data.CRUDMutex, tid);
+                // Delete Data
+                jsTestLog('CRUD - Remove tid: ' + tid + ' currentTid: ' + this.tid);
+                // Check if delete succeeded
+                coll.remove({generation: generation}, {multi: true});
+                // Check guarantees IF NO CONCURRENT DROP is running.
+                assertAlways.eq(coll.countDocuments({generation: generation}), 0);
+            } catch (e) {
+                if (e.writeError && e.writeError === ErrorCodes.QueryPlanKilled) {
+                    // It is fine for a CRUD operation to throw ErrorCodes::QueryPlanKilled if
+                    // performed concurrently with a rename (SERVER-31695).
+                    return;
+                }
+                throw e;
+            } finally {
+                mutexUnlock(db, data.CRUDMutex, tid);
+            }
         }
     };
 
