@@ -42,6 +42,12 @@ const secondary = replSet.getSecondary();
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
 
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Skipping test because two phase index builds are not supported.');
+    replSet.stopSet();
+    return;
+}
+
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({a: i, b: i}));
 }
