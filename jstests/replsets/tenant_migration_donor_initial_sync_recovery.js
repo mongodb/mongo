@@ -14,6 +14,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
@@ -73,6 +74,11 @@ jsTestLog("Waiting for initial sync to finish: " + initialSyncNode.port);
 initialSyncNode.getDB('admin').adminCommand(
     {configureFailPoint: 'initialSyncHangBeforeChoosingSyncSource', mode: "off"});
 donorRst.awaitSecondaryNodes();
+donorRst.awaitReplication();
+
+// Stop replication on the node so that the TenantMigrationAccessBlocker cannot transition its state
+// past what is reflected in the state doc read below.
+stopServerReplication(initialSyncNode);
 
 let configDonorsColl = initialSyncNode.getCollection(TenantMigrationTest.kConfigDonorsNS);
 let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
@@ -134,6 +140,8 @@ if (donorDoc) {
 if (fp) {
     fp.off();
 }
+
+restartServerReplication(initialSyncNode);
 
 assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
