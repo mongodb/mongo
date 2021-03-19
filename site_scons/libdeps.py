@@ -109,8 +109,8 @@ class FlaggedLibdep:
 
         # We need to maintain our own copy so as not to disrupt the env's original list.
         try:
-            self.prefix_flags = copy.copy(libnode.get_env().get('LIBDEPS_PREFIX_FLAGS', []))
-            self.postfix_flags = copy.copy(libnode.get_env().get('LIBDEPS_POSTFIX_FLAGS', []))
+            self.prefix_flags = copy.copy(getattr(libnode.attributes, 'libdeps_prefix_flags', []))
+            self.postfix_flags = copy.copy(getattr(libnode.attributes, 'libdeps_postfix_flags', []))
         except AttributeError:
             self.prefix_flags = []
             self.postfix_flags = []
@@ -858,7 +858,7 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
         #   -Wl--on-flag libA.a -Wl--off-flag -Wl--on-flag libA.a -Wl--off-flag
         # This loop below will spot the cases were the flag was turned off and then
         # immediately turned back on
-        for switch_flag in env.get('LIBDEPS_SWITCH_FLAGS', []):
+        for switch_flag in getattr(flagged_libdep.libnode.attributes, 'libdeps_switch_flags', []):
             if (prev_libdep and switch_flag['on'] in flagged_libdep.prefix_flags
                 and switch_flag['off'] in prev_libdep.postfix_flags):
 
