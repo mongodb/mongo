@@ -53,6 +53,10 @@ commands:
                 optional: true
             fromConfigServer:
                 description: "A boolean that indicates whether the command is being requested by a
-                              config server."
+                              config server. Normally FCV upgrades between last-lts and anything
+                              less than latest are not allowed, but in a sharded cluster, newly
+                              started shard nodes start in lastLTS and this parameter is required in
+                              order to be able to add such a shard to a cluster, which is currently
+                              running at last-continuous."
                 type: safeBool
                 optional: true
