@@ -15,8 +15,6 @@ var x509_options = {
 // Start ShardingTest with enableBalancer because ShardingTest attempts to turn off the balancer
 // otherwise, which it will not be authorized to do. Once SERVER-14017 is fixed the
 // "enableBalancer" line could be removed.
-// TODO: SERVER-43899 Make sharding_with_x509.js and mixed_mode_sharded_transition.js start shards
-// as replica sets.
 var st = new ShardingTest({
     shards: 2,
     mongos: 1,
@@ -25,8 +23,7 @@ var st = new ShardingTest({
         configOptions: x509_options,
         mongosOptions: x509_options,
         rsOptions: x509_options,
-        shardOptions: x509_options,
-        shardAsReplicaSet: false
+        shardOptions: x509_options
     }
 });
 
