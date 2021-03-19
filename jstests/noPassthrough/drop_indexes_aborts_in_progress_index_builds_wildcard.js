@@ -26,7 +26,6 @@ testDB.getCollection(collName).drop();
 assert.commandWorked(testDB.createCollection(collName));
 const coll = testDB.getCollection(collName);
 
-jsTest.log("Aborting all index builders and ready indexes with '*' wildcard");
 assert.commandWorked(testDB.getCollection(collName).insert({a: 1}));
 assert.commandWorked(testDB.getCollection(collName).insert({b: 1}));
 
@@ -42,18 +41,15 @@ const awaitSecondIndexBuild = IndexBuildTest.startIndexBuild(
     testDB.getMongo(), coll.getFullName(), {b: 1}, {}, [ErrorCodes.IndexBuildAborted]);
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, collName, "b_1");
 
-const awaitDropIndex = startParallelShell(() => {
-    const testDB = db.getSiblingDB(TestData.dbName);
-    assert.commandWorked(testDB.runCommand({dropIndexes: TestData.collName, index: "*"}));
-}, conn.port);
-
+jsTest.log("Aborting all index builders and ready indexes with '*' wildcard");
+assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: "*"}));
 checkLog.containsJson(testDB.getMongo(), 23879);  // "About to abort all index builders"
+
 IndexBuildTest.resumeIndexBuilds(testDB.getMongo());
 awaitFirstIndexBuild();
 awaitSecondIndexBuild();
-awaitDropIndex();
 
-assert.eq(1, testDB.getCollection(collName).getIndexes().length);
+assert.eq(1, testDB.getCollection(collName).getIndexes().length);  // _id index
 
 MongoRunner.stopMongod(conn);
 }());
