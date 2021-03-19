@@ -32,7 +32,7 @@
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/timeseries/timeseries_field_names.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/redaction.h"
 
@@ -82,22 +82,14 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
             // the buckets collection for more efficient querying of buckets.
             if (elem.number() >= 0) {
                 builder.appendAs(
-                    elem,
-                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
-                                  << timeField);
+                    elem, str::stream() << timeseries::kControlMinFieldNamePrefix << timeField);
                 builder.appendAs(
-                    elem,
-                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
-                                  << timeField);
+                    elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
             } else {
                 builder.appendAs(
-                    elem,
-                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
-                                  << timeField);
+                    elem, str::stream() << timeseries::kControlMaxFieldNamePrefix << timeField);
                 builder.appendAs(
-                    elem,
-                    str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
-                                  << timeField);
+                    elem, str::stream() << timeseries::kControlMinFieldNamePrefix << timeField);
             }
             continue;
         }
@@ -111,8 +103,8 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
 
         if (elem.fieldNameStringData() == *metaField) {
             // The time-series 'metaField' field name always maps to a field named
-            // BucketUnpacker::kBucketMetaFieldName on the underlying buckets collection.
-            builder.appendAs(elem, BucketUnpacker::kBucketMetaFieldName);
+            // timeseries::kBucketMetaFieldName on the underlying buckets collection.
+            builder.appendAs(elem, timeseries::kBucketMetaFieldName);
             continue;
         }
 
@@ -120,7 +112,7 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
         if (elem.fieldNameStringData().startsWith(*metaField + ".")) {
             builder.appendAs(elem,
                              str::stream()
-                                 << BucketUnpacker::kBucketMetaFieldName << "."
+                                 << timeseries::kBucketMetaFieldName << "."
                                  << elem.fieldNameStringData().substr(metaField->size() + 1));
             continue;
         }
@@ -141,9 +133,9 @@ BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& ti
     auto metaField = timeseriesOptions.getMetaField();
 
     const std::string controlMinTimeField = str::stream()
-        << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix << timeField;
+        << timeseries::kControlMinFieldNamePrefix << timeField;
     const std::string controlMaxTimeField = str::stream()
-        << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix << timeField;
+        << timeseries::kControlMaxFieldNamePrefix << timeField;
 
     BSONObjBuilder builder;
     for (const auto& elem : bucketsIndexSpecBSON) {
@@ -170,16 +162,16 @@ BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& ti
             return {};
         }
 
-        if (elem.fieldNameStringData() == BucketUnpacker::kBucketMetaFieldName) {
+        if (elem.fieldNameStringData() == timeseries::kBucketMetaFieldName) {
             builder.appendAs(elem, *metaField);
             continue;
         }
 
-        if (elem.fieldNameStringData().startsWith(BucketUnpacker::kBucketMetaFieldName + ".")) {
+        if (elem.fieldNameStringData().startsWith(timeseries::kBucketMetaFieldName + ".")) {
             builder.appendAs(elem,
                              str::stream() << *metaField << "."
                                            << elem.fieldNameStringData().substr(
-                                                  BucketUnpacker::kBucketMetaFieldName.size() + 1));
+                                                  timeseries::kBucketMetaFieldName.size() + 1));
             continue;
         }
 

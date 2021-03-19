@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/timeseries/timeseries_field_names.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -185,7 +186,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     std::vector<SortPattern::SortPatternPart> updatedPattern;
     for (const auto& entry : sort.getSortKeyPattern()) {
         // Repoint sort to use metadata field before renaming.
-        auto updatedFieldPath = FieldPath(BucketUnpacker::kBucketMetaFieldName);
+        auto updatedFieldPath = FieldPath(timeseries::kBucketMetaFieldName);
         if (entry.fieldPath->getPathLength() > 1) {
             updatedFieldPath = updatedFieldPath.concat(entry.fieldPath->tail());
         }
@@ -253,7 +254,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
             "The $_internalUnpackBucket stage requires the bucket to be owned",
             _bucket.isOwned());
 
-    auto&& dataRegion = _bucket.getField(kBucketDataFieldName).Obj();
+    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
     if (dataRegion.isEmpty()) {
         // If the data field of a bucket is present but it holds an empty object, there's nothing to
         // unpack.
@@ -267,7 +268,7 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
 
     _timeFieldIter = BSONObjIterator{timeFieldElem.Obj()};
 
-    _metaValue = _bucket[kBucketMetaFieldName];
+    _metaValue = _bucket[timeseries::kBucketMetaFieldName];
     if (_spec.metaField) {
         // The spec indicates that there might be a metadata region. Missing metadata in
         // measurements is expressed with missing metadata in a bucket. But we disallow undefined
@@ -348,7 +349,7 @@ Document BucketUnpacker::extractSingleMeasurement(int j) {
 
     auto rowKey = std::to_string(j);
     auto targetIdx = StringData{rowKey};
-    auto&& dataRegion = _bucket.getField(kBucketDataFieldName).Obj();
+    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
 
     if (_includeMetaField && !_metaValue.isNull()) {
         measurement.addField(*_spec.metaField, Value{_metaValue});
@@ -409,10 +410,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             unpackerBehavior = fieldName == "include" ? BucketUnpacker::Behavior::kInclude
                                                       : BucketUnpacker::Behavior::kExclude;
             hasIncludeExclude = true;
-        } else if (fieldName == kTimeFieldName) {
+        } else if (fieldName == timeseries::kTimeFieldName) {
             uassert(5346504, "timeField field must be a string", elem.type() == BSONType::String);
             bucketSpec.timeField = elem.str();
-        } else if (fieldName == kMetaFieldName) {
+        } else if (fieldName == timeseries::kMetaFieldName) {
             uassert(5346505,
                     str::stream() << "metaField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
@@ -426,7 +427,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
 
     uassert(5346508,
             "The $_internalUnpackBucket stage requires a timeField parameter",
-            specElem[kTimeFieldName].ok());
+            specElem[timeseries::kTimeFieldName].ok());
 
     auto includeTimeField = determineIncludeTimeField(unpackerBehavior, &bucketSpec);
 
@@ -450,9 +451,9 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
         fields.emplace_back(field);
     }
     out.addField(behavior, Value{fields});
-    out.addField(kTimeFieldName, Value{spec.timeField});
+    out.addField(timeseries::kTimeFieldName, Value{spec.timeField});
     if (spec.metaField) {
-        out.addField(kMetaFieldName, Value{*spec.metaField});
+        out.addField(timeseries::kMetaFieldName, Value{*spec.metaField});
     }
 
     if (!explain) {
@@ -486,7 +487,7 @@ DocumentSourceInternalUnpackBucket::sampleUniqueMeasurementFromBuckets() {
                 if (j < _bucketUnpacker.numberOfMeasurements()) {
                     auto sampledDocument = _bucketUnpacker.extractSingleMeasurement(j);
 
-                    auto bucketId = _bucketUnpacker.bucket()[BucketUnpacker::kBucketIdFieldName];
+                    auto bucketId = _bucketUnpacker.bucket()[timeseries::kBucketIdFieldName];
                     auto bucketIdMeasurementIdxKey = SampledMeasurementKey{bucketId.OID(), j};
 
                     if (_seenSet.insert(std::move(bucketIdMeasurementIdxKey)).second) {
@@ -540,12 +541,11 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     if (nextResult.isAdvanced()) {
         auto bucket = nextResult.getDocument().toBson();
         _bucketUnpacker.reset(std::move(bucket));
-        uassert(
-            5346509,
-            str::stream() << "A bucket with _id "
-                          << _bucketUnpacker.bucket()[BucketUnpacker::kBucketIdFieldName].toString()
-                          << " contains an empty data region",
-            _bucketUnpacker.hasNext());
+        uassert(5346509,
+                str::stream() << "A bucket with _id "
+                              << _bucketUnpacker.bucket()[timeseries::kBucketIdFieldName].toString()
+                              << " contains an empty data region",
+                _bucketUnpacker.hasNext());
         return _bucketUnpacker.getNext();
     }
 
@@ -636,42 +636,32 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
             auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
             andMatchExpr->add(std::make_unique<InternalExprLTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
-                              << path,
-                rhs));
+                str::stream() << timeseries::kControlMinFieldNamePrefix << path, rhs));
             andMatchExpr->add(std::make_unique<InternalExprGTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
-                              << path,
-                rhs));
+                str::stream() << timeseries::kControlMaxFieldNamePrefix << path, rhs));
 
             if (path == bucketSpec.timeField) {
                 andMatchExpr->add(std::make_unique<LTEMatchExpression>(
-                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+                    timeseries::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
             }
             return andMatchExpr;
         }
         case MatchExpression::GT: {
             return std::make_unique<InternalExprGTMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
-                              << path,
-                rhs);
+                str::stream() << timeseries::kControlMaxFieldNamePrefix << path, rhs);
         }
         case MatchExpression::GTE: {
             return std::make_unique<InternalExprGTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMaxFieldNamePrefix
-                              << path,
-                rhs);
+                str::stream() << timeseries::kControlMaxFieldNamePrefix << path, rhs);
         }
         case MatchExpression::LT: {
             auto controlPred = std::make_unique<InternalExprLTMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
-                              << path,
-                rhs);
+                str::stream() << timeseries::kControlMinFieldNamePrefix << path, rhs);
             if (path == bucketSpec.timeField) {
                 auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
                 andMatchExpr->add(std::make_unique<LTMatchExpression>(
-                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+                    timeseries::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
                 andMatchExpr->add(controlPred.release());
 
                 return andMatchExpr;
@@ -680,14 +670,12 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
         }
         case MatchExpression::LTE: {
             auto controlPred = std::make_unique<InternalExprLTEMatchExpression>(
-                str::stream() << DocumentSourceInternalUnpackBucket::kControlMinFieldNamePrefix
-                              << path,
-                rhs);
+                str::stream() << timeseries::kControlMinFieldNamePrefix << path, rhs);
             if (path == bucketSpec.timeField) {
                 auto andMatchExpr = std::make_unique<AndMatchExpression>();
 
                 andMatchExpr->add(std::make_unique<LTEMatchExpression>(
-                    BucketUnpacker::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
+                    timeseries::kBucketIdFieldName, constructObjectIdValue(matchExpr)));
                 andMatchExpr->add(controlPred.release());
 
                 return andMatchExpr;
@@ -729,7 +717,7 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
     boost::intrusive_ptr<DocumentSourceMatch> match) {
     if (auto&& metaField = _bucketUnpacker.bucketSpec().metaField) {
         return std::move(*match).extractMatchOnFieldsAndRemainder(
-            {*metaField}, {{*metaField, BucketUnpacker::kBucketMetaFieldName.toString()}});
+            {*metaField}, {{*metaField, timeseries::kBucketMetaFieldName.toString()}});
     }
     return {nullptr, match};
 }
