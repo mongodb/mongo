@@ -3473,8 +3473,13 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto storage = StorageInterface::get(opCtx->getServiceContext());
-    ASSERT_OK(storage->createCollection(
-        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions));
+    const auto status = storage->createCollection(
+        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions);
+    if (!status.isOK()) {
+        // It's possible to race with the test fixture setup in creating the tenant recipient
+        // collection.
+        ASSERT_EQ(ErrorCodes::NamespaceExists, status.code());
+    }
     ASSERT_OK(storage->insertDocument(opCtx.get(),
                                       NamespaceString::kTenantMigrationRecipientsNamespace,
                                       {initialStateDocument.toBSON()},
@@ -3520,8 +3525,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
     auto storage = StorageInterface::get(opCtx->getServiceContext());
-    ASSERT_OK(storage->createCollection(
-        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions));
+    const auto status = storage->createCollection(
+        opCtx.get(), NamespaceString::kTenantMigrationRecipientsNamespace, collectionOptions);
+    if (!status.isOK()) {
+        // It's possible to race with the test fixture setup in creating the tenant recipient
+        // collection.
+        ASSERT_EQ(ErrorCodes::NamespaceExists, status.code());
+    }
     ASSERT_OK(storage->insertDocument(opCtx.get(),
                                       NamespaceString::kTenantMigrationRecipientsNamespace,
                                       {initialStateDocument.toBSON()},
