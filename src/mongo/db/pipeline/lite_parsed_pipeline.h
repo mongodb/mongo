@@ -97,13 +97,6 @@ public:
     }
 
     /**
-     * Returns true if the pipeline begins with a $collStats stage with the count option.
-     */
-    bool startsWithCollStatsWithCount() const {
-        return startsWithCollStats() && _stageSpecs.front()->isCollStatsWithCount();
-    }
-
-    /**
      * Returns true if the pipeline has a $changeStream stage.
      */
     bool hasChangeStream() const {

@@ -171,7 +171,19 @@ const stDb = mongos.getDB(dbName);
 assert.commandFailedWithCode(
     stDb.runCommand(
         {aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
-    26);
+    ErrorCodes.NamespaceNotFound);
+
+assert.commandFailedWithCode(
+    stDb.runCommand(
+        {aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
+    40415);
+
+assert.commandFailedWithCode(stDb.runCommand({
+    aggregate: doesNotExistName,
+    pipeline: [{"$collStats": {"queryExecStats": {}}}],
+    cursor: {}
+}),
+                             ErrorCodes.NamespaceNotFound);
 
 st.stop();
 
@@ -183,7 +195,7 @@ const rstDb = rst.getPrimary().getDB(dbName);
 assert.commandFailedWithCode(
     rstDb.runCommand(
         {aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
-    26);
+    ErrorCodes.NamespaceNotFound);
 
 rst.stopSet();
 
@@ -193,7 +205,19 @@ const standaloneDb = conn.getDB(dbName);
 assert.commandFailedWithCode(
     standaloneDb.runCommand(
         {aggregate: doesNotExistName, pipeline: [{"$collStats": {"count": {}}}], cursor: {}}),
-    26);
+    ErrorCodes.NamespaceNotFound);
+
+assert.commandFailedWithCode(
+    standaloneDb.runCommand(
+        {aggregate: doesNotExistName, pipeline: [{"$collStats": {"unknown": {}}}], cursor: {}}),
+    40415);
+
+assert.commandFailedWithCode(standaloneDb.runCommand({
+    aggregate: doesNotExistName,
+    pipeline: [{"$collStats": {"queryExecStats": {}}}],
+    cursor: {}
+}),
+                             ErrorCodes.NamespaceNotFound);
 
 MongoRunner.stopMongod(conn);
 })();
