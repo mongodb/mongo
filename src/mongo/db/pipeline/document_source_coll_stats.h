@@ -80,10 +80,6 @@ public:
             return true;
         }
 
-        bool isCollStatsWithCount() const final {
-            return static_cast<bool>(_spec.getCount());
-        }
-
     private:
         const NamespaceString _nss;
         const DocumentSourceCollStatsSpec _spec;
