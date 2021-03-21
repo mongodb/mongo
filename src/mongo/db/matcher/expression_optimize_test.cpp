@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/expression.h"
 
+#include <vector>
+
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/canonical_query.h"
@@ -446,6 +448,47 @@ TEST(ExpressionOptimizeTest, NestedOrWithAlwaysTrueOptimizesToAlwaysTrue) {
     BSONObjBuilder bob;
     optimizedMatchExpression->serialize(&bob, true);
     ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysTrue: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, OrRewrittenToIn) {
+    const std::vector<std::pair<std::string, std::string>> queries = {
+        {"{$or: [{f1: 5}, {f1: 3}, {f1: 7}]}", "{ f1: { $in: [ 3, 5, 7 ] } }"},
+        {"{$or: [{f1: {$eq: 5}}, {f1: {$eq: 3}}, {f1: {$eq: 7}}]}", "{ f1: { $in: [ 3, 5, 7 ] } }"},
+        {"{$or: [{f1: 42}, {f1: NaN}, {f1: 99}]}", "{ f1: { $in: [ NaN, 42, 99 ] } }"},
+        {"{$or: [{f1: /^x/}, {f1:'ab'}]}", "{ f1: { $in: [ \"ab\", /^x/ ] } }"},
+        {"{$or: [{f1: /^x/}, {f1:'^a'}]}", "{ f1: { $in: [ \"^a\", /^x/ ] } }"},
+        {"{$or: [{f1: 42}, {f1: null}, {f1: 99}]}",
+         "{ $or: [ { f1: { $in: [ 42, 99 ] } }, { f1: { $eq: null } } ] }"},
+        {"{$or: [{f1: 1}, {f2: 9}, {f1: 99}]}",
+         "{ $or: [ { f1: { $in: [ 1, 99 ] } }, { f2: { $eq: 9 } } ] }"},
+        {"{$and: [{$or: [{f1: 7}, {f1: 3}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]}",
+         "{ $and: [ { f1: { $in: [ 3, 5, 7 ] } }, { f1: { $in: [ 1, 2, 3 ] } } ] }"},
+        {"{$or: [{$or: [{f1: 7}, {f1: 3}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]}",
+         "{ $or: [ { f1: { $in: [ 3, 5, 7 ] } }, { f1: { $in: [ 1, 2, 3 ] } } ] }"},
+        {"{$or: [{$and: [{f1: 7}, {f2: 7}, {f1: 5}]}, {$or: [{f1: 1}, {f1: 2}, {f1: 3}]}]}",
+         "{ $or: [ { $and: [ { f1: { $eq: 7 } }, { f2: { $eq: 7 } }, { f1: { $eq: 5 } } ] },"
+         " { f1: { $in: [ 1, 2, 3 ] } } ] }"},
+    };
+
+    auto optimizeExpr = [](std::string exprStr) {
+        auto obj = fromjson(exprStr);
+        std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+        auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+        BSONObjBuilder bob;
+        optimizedMatchExpression->serialize(&bob, true);
+        return bob.obj();
+    };
+
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[0].first), fromjson(queries[0].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[1].first), fromjson(queries[1].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[2].first), fromjson(queries[2].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[3].first), fromjson(queries[3].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[4].first), fromjson(queries[4].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[5].first), fromjson(queries[5].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[6].first), fromjson(queries[6].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[7].first), fromjson(queries[7].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[8].first), fromjson(queries[8].second));
+    ASSERT_BSONOBJ_EQ(optimizeExpr(queries[9].first), fromjson(queries[9].second));
 }
 
 }  // namespace

@@ -278,10 +278,12 @@ TEST_F(QueryPlannerHashedTest, OrWithMultipleEqualityPredicatesOnHashedPrefixUse
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {$or: [{a: 5}, {a: 10}]}, node: {ixscan:{pattern: {a: 'hashed', b:1}, "
-        "bounds: {a:[" +
+        "{fetch: {filter: {a: {$in: [5, 10]}}, node: {ixscan:{pattern: {a: 'hashed', b:1}, "
+        "bounds: "
+        "{a: [" +
         getHashedBound(5) + "," + getHashedBound(10) +
-        "], b: [['MinKey','MaxKey',true,true]] }}}}}");
+        + "], "
+        " b: [['MinKey','MaxKey',true,true]] }}}}}");
 }
 
 TEST_F(QueryPlannerHashedTest,

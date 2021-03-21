@@ -389,6 +389,7 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     next->_hasEmptyArray = _hasEmptyArray;
     next->_equalitySet = _equalitySet;
     next->_originalEqualityVector = _originalEqualityVector;
+    next->_equalityStorage = _equalityStorage;
     for (auto&& regex : _regexes) {
         std::unique_ptr<RegexMatchExpression> clonedRegex(
             static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
@@ -544,6 +545,10 @@ Status InMatchExpression::setEqualities(std::vector<BSONElement> equalities) {
                      _eltCmp.makeEqualTo());
 
     return Status::OK();
+}
+
+void InMatchExpression::setBackingBSON(BSONObj equalityStorage) {
+    _equalityStorage = std::move(equalityStorage);
 }
 
 Status InMatchExpression::addRegex(std::unique_ptr<RegexMatchExpression> expr) {

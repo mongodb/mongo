@@ -152,6 +152,142 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             }
         }
 
+        // Rewrite an OR with EQ conditions on the same path as an IN-list. Example:
+        // {$or: [{name: "Don"}, {name: "Alice"}]}
+        // is rewritten as:
+        // {name: {$in: ["Alice", "Don"]}}
+        if (matchType == MatchExpression::OR && children.size() > 1) {
+            size_t countEquivEqPaths = 0;
+            size_t countNonEquivExpr = 0;
+            boost::optional<std::string> childPath;
+            const CollatorInterface* eqCollator = nullptr;
+
+            auto isNullOrRegEx = [](const BSONElement& elm) {
+                return (elm.isNull() || elm.type() == BSONType::RegEx);
+            };
+
+            // Check if all children are equality conditions or regular expressions with the
+            // same path argument, and same collation.
+            for (auto& childExpression : children) {
+                if (childExpression->matchType() != MatchExpression::EQ &&
+                    childExpression->matchType() != MatchExpression::REGEX) {
+                    ++countNonEquivExpr;
+                    continue;
+                }
+
+                // Disjunctions of equalities use $eq comparison, which has different semantics
+                // from $in equality comparison in two cases:
+                // (1) ('null' $eq 'undefined' = true), while ('null' $in 'undefined' = false),
+                //     that is, when comparing a 'null' argument to an 'undefined' value, the
+                //     result is different for $eq vs $in.
+                // (2) the regex under the equality is matched literally as a string constant,
+                //     while a regex inside $in is matched as a regular expression.
+                //     $lookup processing explicitly depends on this different semantics.
+                // Both these cases should not be rewritten into $in because of the different
+                // comparison semantics.
+                const CollatorInterface* curCollator = nullptr;
+                if (childExpression->matchType() == MatchExpression::EQ) {
+                    auto eqExpression =
+                        static_cast<EqualityMatchExpression*>(childExpression.get());
+                    curCollator = eqExpression->getCollator();
+                    if (isNullOrRegEx(eqExpression->getData())) {
+                        ++countNonEquivExpr;
+                        continue;
+                    }
+                }
+
+                // childExpression is an equality with $in comparison semantics.
+                // The current approach assumes there is one (large) group of $eq disjuncts
+                // that are on the same path.
+                if (!childPath) {
+                    // The path of the first equality.
+                    childPath = childExpression->path().toString();
+                    eqCollator = curCollator;
+                    countEquivEqPaths = 1;
+                } else if (*childPath == childExpression->path() && eqCollator == curCollator) {
+                    ++countEquivEqPaths;  // subsequent equality on the same path
+                } else {
+                    ++countNonEquivExpr;  // equality on another path
+                }
+            }
+            tassert(3401201,
+                    "All expressions must be classified as either eq-equiv or non-eq-equiv.",
+                    countEquivEqPaths + countNonEquivExpr == children.size());
+
+            // The condition above checks that there are at least two equalities that can be
+            // rewritten to an $in, and the we have classified all $or conditions into two disjunct
+            // groups.
+            if (countEquivEqPaths > 1) {
+                tassert(3401202, "There must be a common path.", childPath);
+                auto inExpression = std::make_unique<InMatchExpression>(StringData(*childPath));
+                auto nonEquivOrExpr =
+                    (countNonEquivExpr > 0) ? std::make_unique<OrMatchExpression>() : nullptr;
+                BSONArrayBuilder bab;
+
+                for (auto& childExpression : children) {
+                    if (*childPath != childExpression->path()) {
+                        nonEquivOrExpr->add(std::move(childExpression));
+                    } else if (childExpression->matchType() == MatchExpression::EQ) {
+                        std::unique_ptr<EqualityMatchExpression> eqExpressionPtr{
+                            static_cast<EqualityMatchExpression*>(childExpression.release())};
+                        if (isNullOrRegEx(eqExpressionPtr->getData()) ||
+                            eqExpressionPtr->getCollator() != eqCollator) {
+                            nonEquivOrExpr->add(std::move(eqExpressionPtr));
+                        } else {
+                            bab.append(eqExpressionPtr->getData());
+                        }
+                    } else if (childExpression->matchType() == MatchExpression::REGEX) {
+                        std::unique_ptr<RegexMatchExpression> regexExpressionPtr{
+                            static_cast<RegexMatchExpression*>(childExpression.release())};
+                        // Reset the path because when we parse a $in expression which contains a
+                        // regexp, we create a RegexMatchExpression with an empty path.
+                        regexExpressionPtr->setPath({});
+                        auto status = inExpression->addRegex(std::move(regexExpressionPtr));
+                        tassert(3401203,  // TODO SERVER-55449 convert to tassertStatusOK.
+                                "Conversion from OR to IN should always succeed.",
+                                status == Status::OK());
+                    } else {
+                        nonEquivOrExpr->add(std::move(childExpression));
+                    }
+                }
+                children.clear();
+                tassert(3401204,
+                        "Incorrect number of non-equivalent expressions",
+                        !nonEquivOrExpr || nonEquivOrExpr->numChildren() == countNonEquivExpr);
+
+                auto backingArr = bab.arr();
+                std::vector<BSONElement> inEqualities;
+                backingArr.elems(inEqualities);
+                tassert(3401205,
+                        "Incorrect number of in-equivalent expressions",
+                        !countEquivEqPaths ||
+                            (inEqualities.size() + inExpression->getRegexes().size()) ==
+                                countEquivEqPaths);
+
+                auto status = inExpression->setEqualities(std::move(inEqualities));
+                tassert(3401206,  // TODO SERVER-55449 convert to tassertStatusOK.
+                        "Conversion from OR to IN should always succeed.",
+                        status == Status::OK());
+
+                inExpression->setBackingBSON(std::move(backingArr));
+                if (eqCollator) {
+                    inExpression->setCollator(eqCollator);
+                }
+
+                if (countNonEquivExpr > 0) {
+                    auto parentOrExpr = std::make_unique<OrMatchExpression>();
+                    parentOrExpr->add(std::move(inExpression));
+                    if (countNonEquivExpr == 1) {
+                        parentOrExpr->add(nonEquivOrExpr->releaseChild(0));
+                    } else {
+                        parentOrExpr->add(std::move(nonEquivOrExpr));
+                    }
+                    return parentOrExpr;
+                }
+                return inExpression;
+            }
+        }
+
         return expression;
     };
 }

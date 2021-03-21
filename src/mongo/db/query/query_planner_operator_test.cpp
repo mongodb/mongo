@@ -621,7 +621,7 @@ TEST_F(QueryPlannerTest, SkipEvaluatesBeforeFetchForIndexedOr) {
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
         "{skip: {n: 8, node: "
-        "{cscan: {dir: 1, filter: {$or: [{a: 5}, {a: 7}]}}}}}");
+        "{cscan: {dir: 1, filter: {a: {$in: [5, 7]}}}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {skip: {n: 8, node: "
         "{ixscan: {filter: null, pattern: {a: 1}}}}}}}");
@@ -1008,10 +1008,10 @@ TEST_F(QueryPlannerTest, NonPrefixRegexOrCovering) {
     ASSERT_EQUALS(getNumSolutions(), 2U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: "
-        "{cscan: {dir: 1, filter: {$or: [{a: /0/}, {a: /1/}]}}}}}");
+        "{cscan: {dir: 1, filter: {a: {$in: [/0/, /1/]}}}}}}");
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: "
-        "{ixscan: {filter: {$or: [{a: /0/}, {a: /1/}]}, pattern: {a: 1}}}}}");
+        "{ixscan: {filter: {a: {$in: [/0/, /1/]}}, pattern: {a: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, NonPrefixRegexInCovering) {

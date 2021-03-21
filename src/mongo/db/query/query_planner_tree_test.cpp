@@ -57,7 +57,7 @@ TEST_F(QueryPlannerTest, SimpleOr) {
     runQuery(fromjson("{$or: [{a: 20}, {a: 21}]}"));
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {$or: [{a: 20}, {a: 21}]}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [20, 21]}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: "
         "{filter: null, pattern: {a:1}}}}}");
@@ -442,7 +442,7 @@ TEST_F(QueryPlannerTest, OrInexactWithExact) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {node: {ixscan: {filter:"
-        "{$or: [{name: 'thomas'}, {name: /^alexand(er|ra)/}]},"
+        "{name: {$in: ['thomas', /^alexand(er|ra)/]}},"
         "pattern: {name: 1}}}}}");
 }
 
@@ -456,10 +456,9 @@ TEST_F(QueryPlannerTest, OrInexactWithExact2) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {node: {or: {nodes: ["
-        "{ixscan: {filter: {$or:[{a:'foo'},{a:/bar/}]},"
-        "pattern: {a: 1}}},"
-        "{ixscan: {filter: {$or:[{b:'foo'},{b:/bar/}]},"
-        "pattern: {b: 1}}}]}}}}");
+        "{ixscan: {filter: {$or: [{b:'foo'},{b:/bar/}]},      pattern: {b: 1}}},"
+        "{ixscan: {filter: {$or: [{a: {$in:['foo',/bar/]}}]}, pattern: {a: 1}}}"
+        "]}}}}");
 }
 
 // SERVER-13960: an exact, inexact covered, and inexact fetch predicate.
@@ -473,8 +472,8 @@ TEST_F(QueryPlannerTest, OrAllThreeTightnesses) {
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
         "{fetch: {filter: "
-        "{$or: [{names: 'frank'}, {names: /^al(ice)|(ex)/},"
-        "{names: {$elemMatch: {$eq: 'thomas'}}}]}, "
+        "{$or: [{names: {$in: ['frank', /^al(ice)|(ex)/]}},"
+        "       {names: {$elemMatch: {$eq: 'thomas'}}}]}, "
         "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
 }
 
@@ -504,7 +503,7 @@ TEST_F(QueryPlannerTest, OrInexactCoveredMultikey) {
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {$or: [{names: 'dave'}, {names: /joe/}]}, "
+        "{fetch: {filter: {names: {$in: ['dave', /joe/]}}, "
         "node: {ixscan: {filter: null, pattern: {names: 1}}}}}");
 }
 
@@ -563,7 +562,7 @@ TEST_F(QueryPlannerTest, OrBelowElemMatchInexactCovered) {
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a: {$elemMatch: {$or: [{b: 'x'}, {b: /z/}]}}},"
+        "{fetch: {filter: {a: {$elemMatch: {b: {$in: ['x', /z/]}}}},"
         "node: {ixscan: {filter: null, pattern: {'a.b': 1}}}}}");
 }
 
@@ -678,7 +677,7 @@ TEST_F(QueryPlannerTest, InBasicOrEquivalent) {
     runQuery(fromjson("{$or: [{a: 1}, {a: 2}]}"));
 
     assertNumSolutions(2U);
-    assertSolutionExists("{cscan: {dir: 1, filter: {$or: [{a: 1}, {a: 2}]}}}");
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: {$in: [1, 2]}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, "
         "node: {ixscan: {pattern: {a: 1}}}}}");
@@ -2364,18 +2363,13 @@ TEST_F(QueryPlannerTest, ContainedOrPushdownIndexedExpr) {
     runQuery(
         fromjson("{$expr: {$and: [{$eq: ['$d', 'd']}, {$eq: ['$a', 'a']}]},"
                  "$or: [{b: 'b'}, {b: 'c'}]}"));
-    assertNumSolutions(3);
+    assertNumSolutions(2);
     // When we have path-level multikey info, we ensure that predicates are assigned in order of
     // index position.
     assertSolutionExists(
-        "{fetch: {node: {or: {nodes: ["
-        "{ixscan: {pattern: {a: 1, b: 1}, filter: null, bounds: {a: [['a', 'a', true, true]], b: "
-        "[['b', 'b', true, true]]}}},"
-        "{ixscan: {pattern: {a: 1, b: 1}, filter: null, bounds: {a: [['a', 'a', true, true]], b: "
-        "[['c', 'c', true, true]]}}}]}}}}");
-    assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, filter: null,"
-        "bounds: {a: [['a', 'a', true, true]], b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+        "bounds: {a: [['a', 'a', true, true]], b: [['b', 'b', true, true], ['c', 'c', true, "
+        "true]]}}}}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
 }
 

@@ -584,6 +584,8 @@ public:
 
     Status setEqualities(std::vector<BSONElement> equalities);
 
+    void setBackingBSON(BSONObj equalityStorage);
+
     Status addRegex(std::unique_ptr<RegexMatchExpression> expr);
 
     const std::vector<BSONElement>& getEqualities() const {
@@ -648,6 +650,10 @@ private:
 
     // Container of regex elements this object owns.
     std::vector<std::unique_ptr<RegexMatchExpression>> _regexes;
+
+    // When this $in is generated internally, e.g. via a rewrite, this is where we store the
+    // data of the corresponding equality elements.
+    BSONObj _equalityStorage;
 };
 
 /**

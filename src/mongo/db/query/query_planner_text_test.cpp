@@ -258,7 +258,7 @@ TEST_F(QueryPlannerTest, TextInsideOrWithAnotherOr) {
 
     assertNumSolutions(1U);
     assertSolutionExists(
-        "{fetch: {filter: {$or: [{a: 3}, {a: 4}]}, node: "
+        "{fetch: {filter: {a: {$in: [3, 4]}}, node: "
         "{or: {nodes: ["
         "{text: {search: 'foo'}}, "
         "{ixscan: {filter: null, pattern: {a: 1}}}]}}}}");

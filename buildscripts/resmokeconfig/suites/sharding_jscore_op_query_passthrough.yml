@@ -24,6 +24,7 @@ selector:
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
   - jstests/core/top.js  # top.
+  - jstests/core/or_to_in.js # queryPlanner in different spot in explain()
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
   - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.

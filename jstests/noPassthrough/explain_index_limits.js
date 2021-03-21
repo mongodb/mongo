@@ -73,7 +73,7 @@ FixtureHelpers.runCommandOnEachPrimary({
         "internalQueryEnumerationMaxOrSolutions": 1,
     }
 });
-const comboResult = coll.find({common: 1, one: 10, $or: [{two: 1}, {two: 2}]}).explain();
+const comboResult = coll.find({common: 1, one: 10, $or: [{one: 1}, {two: 2}]}).explain();
 assert(comboResult.queryPlanner.maxIndexedAndSolutionsReached, tojson(comboResult));
 assert(comboResult.queryPlanner.maxIndexedOrSolutionsReached, tojson(comboResult));
 

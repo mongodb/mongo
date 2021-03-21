@@ -529,12 +529,9 @@ TEST_F(QueryPlannerTest, IndexBoundsAndWithNestedOr) {
 
     // It's kind of iffy to look for indexed solutions so we don't...
     size_t matches = 0;
-    matches += numSolutionMatches(
-        "{cscan: {dir: 1, filter: "
-        "{$or: [{a: 2, a:1}, {a: 3, a:1}]}}}");
-    matches += numSolutionMatches(
-        "{cscan: {dir: 1, filter: "
-        "{$and: [{$or: [{a: 2}, {a: 3}]}, {a: 1}]}}}");
+    matches += numSolutionMatches("{cscan: {dir: 1, filter: {$or: [{a: 2, a:1}, {a: 3, a:1}]}}}");
+    matches +=
+        numSolutionMatches("{cscan: {dir: 1, filter: {$and: [{a: {$in: [2, 3]}}, {a: 1}]}}}");
     ASSERT_GREATER_THAN_OR_EQUALS(matches, 1U);
 }
 
@@ -545,7 +542,7 @@ TEST_F(QueryPlannerTest, IndexBoundsIndexedSort) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{sort: {pattern: {a:1}, limit: 0, type: 'simple', node: "
-        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}");
+        "{cscan: {filter: {a: {$in: [1,2]}}, dir: 1}}}}");
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: {filter: null, "
         "pattern: {a:1}, bounds: {a: [[1,1,true,true], [2,2,true,true]]}}}}}");
@@ -558,7 +555,7 @@ TEST_F(QueryPlannerTest, IndexBoundsUnindexedSort) {
     assertNumSolutions(2U);
     assertSolutionExists(
         "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: "
-        "{cscan: {filter: {$or:[{a:1},{a:2}]}, dir: 1}}}}");
+        "{cscan: {filter: {a: {$in: [1,2]}}, dir: 1}}}}");
     assertSolutionExists(
         "{sort: {pattern: {b:1}, limit: 0, type: 'simple', node: {fetch: "
         "{filter: null, node: {ixscan: {filter: null, "

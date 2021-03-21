@@ -177,6 +177,11 @@ testSingleDocument(
 testSingleDocument(
     {$and: [{a: 3}, {a: 2}, {a: 1}]}, {'b.$': 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [4]});
 
+// Positional projection must use the first matching index both for $in, and for $or
+// equivalent to an $in.
+testSingleDocument({a: {$in: [2, 3]}}, {'b.$': 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [5]});
+testSingleDocument({$or: [{a: 2}, {a: 3}]}, {'b.$': 1}, {a: [1, 2, 3], b: [4, 5, 6]}, {b: [5]});
+
 // Tests involving getMore. Test the $-positional operator across multiple batches.
 assert.commandWorked(coll.insert([
     {
@@ -228,11 +233,12 @@ assert.commandWorked(coll.insert({a: [1, 2, 3], b: [4, 5, 6], c: [7, 8, 9]}));
 err = assert.throws(() => coll.find({b: [4, 5, 6]}, {"c.$": 1}).toArray());
 assert.commandFailedWithCode(err, 51246);
 
-// $or, $nor and $not operators disable positional projection index recording for its children.
-err = assert.throws(() => coll.find({$or: [{a: 1}, {a: 0}]}, {'a.$': 1}).toArray());
+// $or with different fields, $nor and $not operators disable positional projection index
+// recording for its children.
+err = assert.throws(() => coll.find({$or: [{a: 1}, {b: 5}]}, {'a.$': 1}).toArray());
 assert.commandFailedWithCode(err, 51246);
 
-err = assert.throws(() => coll.find({$or: [{a: 0}, {a: 2}]}, {'a.$': 1}).toArray());
+err = assert.throws(() => coll.find({$or: [{a: 0}, {b: 5}]}, {'a.$': 1}).toArray());
 assert.commandFailedWithCode(err, 51246);
 
 err = assert.throws(() => coll.find({$nor: [{a: -1}, {a: -2}]}, {'a.$': 1}).toArray());

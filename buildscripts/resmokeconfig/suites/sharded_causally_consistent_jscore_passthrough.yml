@@ -34,6 +34,7 @@ selector:
   - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
   - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
   - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+  - jstests/core/or_to_in.js # queryPlanner in different spot in explain()
   # The following tests fail because they count indexes. These counts do not take into account the
   # additional hashed shard key indexes that are automatically added by this passthrough.
   - jstests/core/bad_index_plugin.js
