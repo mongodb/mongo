@@ -51,6 +51,7 @@ ShardingDDLCoordinator::ShardingDDLCoordinator(const BSONObj& coorDoc)
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
     invariant(_constructionCompletionPromise.getFuture().isReady());
+    invariant(_completionPromise.getFuture().isReady());
 }
 
 void ShardingDDLCoordinator::interrupt(Status status) {
@@ -64,6 +65,9 @@ void ShardingDDLCoordinator::interrupt(Status status) {
     stdx::lock_guard<Latch> lg(_mutex);
     if (!_constructionCompletionPromise.getFuture().isReady()) {
         _constructionCompletionPromise.setError(status);
+    }
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
     }
 }
 
@@ -122,6 +126,10 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             while (!_scopedLocks.empty()) {
                 _scopedLocks.top().assignNewOpCtx(opCtx);
                 _scopedLocks.pop();
+            }
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (!_completionPromise.getFuture().isReady()) {
+                _completionPromise.setFrom(status);
             }
             return status;
         })

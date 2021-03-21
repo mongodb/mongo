@@ -48,25 +48,6 @@ DropCollectionCoordinator::DropCollectionCoordinator(const BSONObj& initialState
       _doc(DropCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("DropCollectionCoordinatorDocument"), initialState)) {}
 
-DropCollectionCoordinator::~DropCollectionCoordinator() {
-    stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_completionPromise.getFuture().isReady());
-}
-
-void DropCollectionCoordinator::_interruptImpl(Status status) {
-    LOGV2_DEBUG(5390505,
-                1,
-                "Drop collection coordinator received an interrupt",
-                "namespace"_attr = nss(),
-                "reason"_attr = redact(status));
-
-    // Resolve any unresolved promises to avoid hanging.
-    stdx::lock_guard<Latch> lg(_mutex);
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
-    }
-}
-
 boost::optional<BSONObj> DropCollectionCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
@@ -94,7 +75,7 @@ void DropCollectionCoordinator::_insertStateDocument(StateDoc&& doc) {
     auto opCtx = cc().makeOperationContext();
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
     store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
-    _doc = doc;
+    _doc = std::move(doc);
 }
 
 void DropCollectionCoordinator::_updateStateDocument(StateDoc&& newDoc) {
@@ -105,7 +86,7 @@ void DropCollectionCoordinator::_updateStateDocument(StateDoc&& newDoc) {
                  newDoc.toBSON(),
                  WriteConcerns::kMajorityWriteConcern);
 
-    _doc = newDoc;
+    _doc = std::move(newDoc);
 }
 
 void DropCollectionCoordinator::_enterPhase(Phase newPhase) {
@@ -235,16 +216,12 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
 
             try {
                 _removeStateDocument();
-            } catch (const DBException& ex) {
-                _interruptImpl(
-                    ex.toStatus("Failed to remove drop collection coordinator state document"));
-                return;
+            } catch (DBException& ex) {
+                ex.addContext("Failed to remove drop collection coordinator state document"_sd);
+                throw;
             }
 
-            stdx::lock_guard<Latch> lg(_mutex);
-            if (!_completionPromise.getFuture().isReady()) {
-                _completionPromise.setFrom(status);
-            }
+            uassertStatusOK(status);
         });
 }
 

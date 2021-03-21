@@ -69,6 +69,16 @@ public:
         return _constructionCompletionPromise.getFuture();
     }
 
+    /*
+     * Returns a future that will be ready when all the work associated with this coordinator
+     * isntances will be completed.
+     *
+     * In particular the returned future will be ready after this coordinator will succesfully
+     * release all the aquired locks.
+     */
+    SharedSemiFuture<void> getCompletionFuture() {
+        return _completionPromise.getFuture();
+    }
     const NamespaceString& nss() const {
         return _coorMetadata.getId().getNss();
     }
@@ -80,7 +90,6 @@ public:
 
 protected:
     ShardingDDLCoordinatorMetadata _coorMetadata;
-    std::stack<DistLockManager::ScopedDistLock> _scopedLocks;
 
 private:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -91,10 +100,13 @@ private:
 
     void interrupt(Status status) override final;
 
-    virtual void _interruptImpl(Status status) = 0;
+    virtual void _interruptImpl(Status status) {}
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
+    SharedPromise<void> _completionPromise;
+
+    std::stack<DistLockManager::ScopedDistLock> _scopedLocks;
 };
 
 class ShardingDDLCoordinator_NORESILIENT {
