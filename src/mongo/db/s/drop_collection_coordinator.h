@@ -40,7 +40,7 @@ public:
     using Phase = DropCollectionCoordinatorPhaseEnum;
 
     DropCollectionCoordinator(const BSONObj& initialState);
-    ~DropCollectionCoordinator() override;
+    ~DropCollectionCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}
 
@@ -48,19 +48,9 @@ public:
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
         MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
-    /**
-     * Returns a Future that will be resolved when all work associated with this Instance has
-     * completed running.
-     */
-    SharedSemiFuture<void> getCompletionFuture() const {
-        return _completionPromise.getFuture();
-    }
-
 private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancelationToken& token) noexcept override;
-
-    void _interruptImpl(Status status) override;
 
     template <typename Func>
     auto _executePhase(const Phase& newPhase, Func&& func) {
@@ -85,9 +75,6 @@ private:
     void _enterPhase(Phase newPhase);
 
     DropCollectionCoordinatorDocument _doc;
-
-    Mutex _mutex = MONGO_MAKE_LATCH("DropCollectionCoordinator::_mutex");
-    SharedPromise<void> _completionPromise;
 };
 
 }  // namespace mongo
