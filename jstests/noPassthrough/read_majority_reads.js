@@ -189,6 +189,13 @@ replTest.initiateWithAnyNodeAsPrimary(
 
 var mongod = replTest.getPrimary();
 
+// Do a majority write to wait for a valid committed snapshot before starting the test. This is
+// needed to make sure no oplog holes behind the clusterTime and all internal writes as part of the
+// server startup are committed. Otherwise, manually setting the committed snapshot to the latest
+// clusterTime using the `setCommittedSnapshot` command could result in reading ahead of the
+// all_durable.
+assert.commandWorked(mongod.getDB("test")["coll"].insert({x: 1}, {writeConcern: {w: "majority"}}));
+
 (function testSingleNode() {
     var db = mongod.getDB("singleNode");
     runTests(db.collection, mongod);
