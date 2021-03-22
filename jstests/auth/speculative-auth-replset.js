@@ -8,10 +8,12 @@
 const rst = new ReplSetTest({nodes: 1, keyFile: 'jstests/libs/key1'});
 rst.startSet();
 rst.initiate();
+rst.awaitReplication();
 
 const admin = rst.getPrimary().getDB('admin');
 admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 admin.auth('admin', 'pwd');
+assert.commandWorked(admin.setLogLevel(3, 'accessControl'));
 
 function getMechStats(db) {
     return assert.commandWorked(db.runCommand({serverStatus: 1}))
@@ -53,12 +55,14 @@ Object.keys(initialMechStats).forEach(function(mech) {
     const newNode = rst.add({});
     rst.reInitiate();
     rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+    rst.awaitReplication();
 
     rst.stop(newNode);
     rst.remove(newNode);
     admin.auth('admin', 'pwd');
     singleNodeConfig.version = rst.getReplSetConfigFromNode(0).version + 1;
     assert.commandWorked(admin.runCommand({replSetReconfig: singleNodeConfig, force: true}));
+    rst.awaitReplication();
 }
 
 {
