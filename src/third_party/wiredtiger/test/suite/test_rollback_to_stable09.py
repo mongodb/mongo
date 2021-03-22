@@ -69,8 +69,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
         self.pr('create table')
         session = self.session
         session.begin_transaction()
-        session.create(self.uri, 'key_format=5s,value_format=HQ,' +
-                            'columns=(country,year,population),' )
+        session.create(self.uri, 'key_format=5s,value_format=HQ,columns=(country,year,population)')
         if commit_ts == 0:
                 session.commit_transaction()
         elif self.prepare:

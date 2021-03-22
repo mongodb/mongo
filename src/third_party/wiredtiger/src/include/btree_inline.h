@@ -1791,8 +1791,15 @@ static inline int
 __wt_bt_col_var_cursor_walk_txn_read(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page,
   WT_CELL_UNPACK_KV *unpack, WT_COL *cip)
 {
+    WT_UPDATE *upd;
+
+    upd = NULL;
+
+    if (cbt->ins)
+        upd = cbt->ins->upd;
+
     cbt->slot = WT_COL_SLOT(page, cip);
-    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, NULL, unpack));
+    WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, upd, unpack));
     if (cbt->upd_value->type == WT_UPDATE_INVALID || cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
         return (0);
 

@@ -41,12 +41,17 @@ def timestamp_str(t):
 class test_rollback_to_stable13(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(prepare_values)
+    scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all),log=(enabled=true)'
@@ -55,10 +60,14 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         uri = "table:rollback_to_stable13"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='split_pct=50,log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='split_pct=50,log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -69,13 +78,13 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         value_b = "bbbbb" * 100
 
         # Perform several updates.
-        self.large_updates(uri, value_a, ds, nrows, 20)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
 
         # Perform several removes.
-        self.large_removes(uri, ds, nrows, 30)
+        self.large_removes(uri, ds, nrows, self.prepare, 30)
 
         # Perform several updates.
-        self.large_updates(uri, value_b, ds, nrows, 60)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 60)
 
         # Verify data is visible and correct.
         self.check(value_a, uri, nrows, 20)

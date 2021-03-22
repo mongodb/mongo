@@ -42,6 +42,11 @@ def timestamp_str(t):
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
         ('inmem', dict(in_memory=True))
@@ -52,7 +57,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(in_memory_values, prepare_values)
+    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=4GB,statistics=(all)'
@@ -65,10 +70,14 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         uri = "table:rollback_to_stable03"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
@@ -78,15 +87,15 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         valuea = "aaaaa" * 100
         valueb = "bbbbb" * 100
         valuec = "ccccc" * 100
-        self.large_updates(uri, valuea, ds, nrows, 10)
+        self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
         self.check(valuea, uri, nrows, 10)
 
-        self.large_updates(uri, valueb, ds, nrows, 20)
+        self.large_updates(uri, valueb, ds, nrows, self.prepare, 20)
         # Check that all updates are seen.
         self.check(valueb, uri, nrows, 20)
 
-        self.large_updates(uri, valuec, ds, nrows, 30)
+        self.large_updates(uri, valuec, ds, nrows, self.prepare, 30)
         # Check that all updates are seen.
         self.check(valuec, uri, nrows, 30)
 
@@ -117,10 +126,10 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         if self.in_memory:
+            self.assertEqual(upd_aborted, nrows)
             self.assertEqual(hs_removed, 0)
         else:
-            self.assertEqual(hs_removed, nrows)
-        self.assertEqual(upd_aborted, nrows)
+            self.assertGreaterEqual(upd_aborted + hs_removed, nrows)
         self.assertGreater(pages_visited, 0)
 
 if __name__ == '__main__':

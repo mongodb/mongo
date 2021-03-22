@@ -735,6 +735,9 @@ __rollback_abort_col_var(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t r
     if ((ins = WT_COL_APPEND(page)) != NULL)
         __rollback_abort_insert_list(session, ins, rollback_timestamp);
 
+    /* Mark the page as dirty to reconcile the page. */
+    if (page->modify)
+        __wt_page_modify_set(session, page);
     return (0);
 }
 
@@ -755,6 +758,10 @@ __rollback_abort_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, wt_timestamp_t
     /* Review the append list */
     if ((ins = WT_COL_APPEND(page)) != NULL)
         __rollback_abort_insert_list(session, ins, rollback_timestamp);
+
+    /* Mark the page as dirty to reconcile the page. */
+    if (page->modify)
+        __wt_page_modify_set(session, page);
 }
 
 /*
@@ -919,6 +926,10 @@ __rollback_abort_row_leaf(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
      */
     if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_RET(__rollback_abort_row_reconciled_page(session, page, rollback_timestamp));
+
+    /* Mark the page as dirty to reconcile the page. */
+    if (page->modify)
+        __wt_page_modify_set(session, page);
     return (0);
 }
 
