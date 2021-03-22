@@ -90,6 +90,7 @@ static constexpr auto kSyntax = R"(
                                IDENT? # optional variable name of the record id delivered by the scan
                                IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                IDENT # collection name to scan
+                               FORWARD_FLAG # forward scan or not
 
                 IXSCAN <- 'ixscan' IDENT? # optional variable name of the root object (record) delivered by the scan
                                    IDENT? # optional variable name of the record id delivered by the scan
@@ -138,12 +139,15 @@ static constexpr auto kSyntax = R"(
                                    MKOBJ_FLAG # Return old object
                                    OPERATOR # child
 
-                GROUP <- 'group' IDENT_LIST PROJECT_LIST OPERATOR ( EXPR )? # optional collator
-                HJOIN <- 'hj' ( EXPR )? # optional collator
-                              LEFT RIGHT
+                GROUP <- 'group' IDENT_LIST 
+                                 PROJECT_LIST 
+                                 IDENT? # optional collator slot
+                                 OPERATOR
+                HJOIN <- 'hj' IDENT? # optional collator slot
+                              LEFT 
+                              RIGHT
                 LEFT <- 'left' IDENT_LIST IDENT_LIST OPERATOR
                 RIGHT <- 'right' IDENT_LIST IDENT_LIST OPERATOR
-
                 NLJOIN <- 'nlj' IDENT_LIST # projected outer variables
                                 IDENT_LIST # correlated parameters
                                 ('{' EXPR '}')? # optional predicate
@@ -151,17 +155,22 @@ static constexpr auto kSyntax = R"(
                                 'right' OPERATOR # inner side
 
                 LIMIT <- 'limit' NUMBER OPERATOR
-                SKIP <- 'skip' NUMBER NUMBER? OPERATOR
+                SKIP <- 'limitskip' (NUMBER / 'none') NUMBER OPERATOR
                 COSCAN <- 'coscan'
                 TRAVERSE <- 'traverse' IDENT # output of traverse
                                        IDENT # output of traverse as seen inside the 'in' branch
                                        IDENT # input of traverse
-                                       ('{' EXPR '}')? # optional fold expression
-                                       ('{' EXPR '}')? # optional final expression
+                                       IDENT_LIST? # optional correlated slots
+                                       (('{' (EXPR) '}') / EMPTY_EXPR_TOK) # optional fold expression
+                                       (('{' (EXPR) '}') / EMPTY_EXPR_TOK) # optional final expression
                                        'from' OPERATOR
                                        'in' OPERATOR
                 EXCHANGE <- 'exchange' IDENT_LIST NUMBER IDENT OPERATOR
-                SORT <- 'sort' IDENT_LIST IDENT_LIST OPERATOR
+                SORT <- 'sort' IDENT_LIST 
+                               SORT_DIR_LIST # sort directions
+                               IDENT_LIST
+                               NUMBER? # optional 'limit'
+                               OPERATOR 
                 UNWIND <- 'unwind' IDENT IDENT IDENT UNWIND_FLAG OPERATOR
                 UNWIND_FLAG <- <'true'> / <'false'>
                 UNION <- 'union' IDENT_LIST UNION_BRANCH_LIST
@@ -216,8 +225,8 @@ static constexpr auto kSyntax = R"(
                 PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
                 ASSIGN <- IDENT '=' EXPR
 
-                EXPR <- EQOP_EXPR LOG_TOK EXPR / EQOP_EXPR
-                LOG_TOK <- <'&&'> / <'||'>
+                EXPR <- EQOP_EXPR? LOG_TOK EXPR / EQOP_EXPR
+                LOG_TOK <- <'&&'> / <'||'> / <'!'>
 
                 EQOP_EXPR <- RELOP_EXPR EQ_TOK ('[' EXPR ']')? EQOP_EXPR / RELOP_EXPR
                 EQ_TOK <- <'=='> / <'!='>
@@ -232,14 +241,16 @@ static constexpr auto kSyntax = R"(
                 MUL_TOK <- <'*'> / <'/'>
 
                 PRIMARY_EXPR <- '(' EXPR ')' / CONST_TOK / IF_EXPR / LET_EXPR / FUN_CALL / IDENT / NUMBER / STRING
-                CONST_TOK <- <'true'> / <'false'> / <'null'> / <'#'>
+                CONST_TOK <- <'true'> / <'false'> / <'null'> / <'#'> / EMPTY_EXPR_TOK
+                EMPTY_EXPR_TOK <- <'{}'>
 
                 IF_EXPR <- 'if' '(' EXPR ',' EXPR ',' EXPR ')'
 
                 LET_EXPR <- 'let' FRAME_PROJECT_LIST EXPR
                 FRAME_PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
 
-                FUN_CALL <- IDENT '(' (EXPR (',' EXPR)*)? ')'
+                FUN_CALL <- IDENT # function call identifier
+                            '(' (EXPR (',' EXPR)*)? ')' # function call arguments
 
                 IDENT_LIST_WITH_RENAMES <- '[' (IDENT_WITH_RENAME (',' IDENT_WITH_RENAME)*)? ']'
                 IDENT_WITH_RENAME <- IDENT ('=' IDENT)?
@@ -255,12 +266,14 @@ static constexpr auto kSyntax = R"(
 
                 NUMBER      <- < [0-9]+ >
 
-                RAW_IDENT <- < [$a-zA-Z_] [$a-zA-Z0-9-_]* >
+                RAW_IDENT <- < !STAGE_KEYWORDS ([$a-zA-Z_] [$a-zA-Z0-9-_]*) >
 
                 ESC_IDENT <- < '@' '"' (!'"' .)* '"' >
 
                 SORT_DIR <- <'asc'> / <'desc'>
                 SORT_DIR_LIST <- '[' (SORT_DIR (',' SORT_DIR)* )? ']'
+
+                STAGE_KEYWORDS <- <'left'> / <'right'> # reserved keywords to avoid collision with IDENT names
 
                 %whitespace  <-  ([ \t\r\n]* ('#' (!'\n' .)* '\n' [ \t\r\n]*)*)
                 %word        <-  [a-z]+
@@ -272,7 +285,7 @@ std::pair<IndexKeysInclusionSet, sbe::value::SlotVector> Parser::lookupIndexKeyR
 
     // Each indexKey is associated with the parallel remap from the 'renames' vector. This
     // map explicitly binds each indexKey with its remap and sorts them by 'indexKey' order.
-    stdx::unordered_map<int, sbe::value::SlotId> slotsByKeyIndex;
+    std::map<int, sbe::value::SlotId> slotsByKeyIndex;
     invariant(renames.size() == indexKeys.size());
     for (size_t idx = 0; idx < renames.size(); idx++) {
         uassert(4872100,
@@ -398,13 +411,25 @@ void Parser::walkExpr(AstQuery& ast) {
     walkChildren(ast);
     if (ast.nodes.size() == 1) {
         ast.expr = std::move(ast.nodes[0]->expr);
+    } else if (ast.nodes.size() == 2) {
+        // Check if it is an expression with a unary op.
+        EPrimUnary::Op op;
+        if (ast.nodes[0]->token == "!") {
+            op = EPrimUnary::logicNot;
+        } else {
+            MONGO_UNREACHABLE_TASSERT(5088501);
+        }
+
+        ast.expr = makeE<EPrimUnary>(op, std::move(ast.nodes[1]->expr));
     } else {
+        // Otherwise we have an expression with a binary op.
         EPrimBinary::Op op;
         if (ast.nodes[1]->token == "&&") {
             op = EPrimBinary::logicAnd;
-        }
-        if (ast.nodes[1]->token == "||") {
+        } else if (ast.nodes[1]->token == "||") {
             op = EPrimBinary::logicOr;
+        } else {
+            MONGO_UNREACHABLE_TASSERT(5088502);
         }
 
         ast.expr =
@@ -816,15 +841,23 @@ void Parser::walkCFilter(AstQuery& ast) {
 void Parser::walkSort(AstQuery& ast) {
     walkChildren(ast);
 
-    // TODO parse asc/desc
-    std::vector<value::SortDirection> dirs(ast.nodes[0]->identifiers.size(),
-                                           value::SortDirection::Ascending);
+    int inputStagePos;
+    size_t limit = std::numeric_limits<std::size_t>::max();
 
-    ast.stage = makeS<SortStage>(std::move(ast.nodes[2]->stage),
+    // Check if 'limit' was specified.
+    if (ast.nodes.size() == 5) {
+        limit = std::stoi(ast.nodes[3]->token);
+        inputStagePos = 4;
+    } else {
+        inputStagePos = 3;
+    }
+    auto dirs = parseSortDirList(*ast.nodes[1]);
+
+    ast.stage = makeS<SortStage>(std::move(ast.nodes[inputStagePos]->stage),
                                  lookupSlots(ast.nodes[0]->identifiers),
                                  std::move(dirs),
-                                 lookupSlots(ast.nodes[1]->identifiers),
-                                 std::numeric_limits<std::size_t>::max(),
+                                 lookupSlots(ast.nodes[2]->identifiers),
+                                 limit,
                                  std::numeric_limits<std::size_t>::max(),
                                  true /* allowDiskUse */,
                                  getCurrentPlanNodeId());
@@ -979,16 +1012,23 @@ void Parser::walkMkObj(AstQuery& ast) {
 void Parser::walkGroup(AstQuery& ast) {
     walkChildren(ast);
 
-    boost::optional<value::SlotId> collatorSlot;
-    if (ast.nodes.size() == 3) {
-        collatorSlot = lookupSlot(std::move(ast.nodes[2]->identifier));
+    size_t collatorSlotPos = 0;
+    size_t inputPos = 0;
+    // Check if an optional collator slot was provided.
+    if (ast.nodes.size() == 4) {
+        inputPos = 3;
+        collatorSlotPos = 2;
+    } else {
+        inputPos = 2;
     }
 
-    ast.stage = makeS<HashAggStage>(std::move(ast.nodes[2]->stage),
-                                    lookupSlots(std::move(ast.nodes[0]->identifiers)),
-                                    lookupSlots(std::move(ast.nodes[1]->projects)),
-                                    collatorSlot,
-                                    getCurrentPlanNodeId());
+    ast.stage = makeS<HashAggStage>(
+        std::move(ast.nodes[inputPos]->stage),
+        lookupSlots(std::move(ast.nodes[0]->identifiers)),
+        lookupSlots(std::move(ast.nodes[1]->projects)),
+        collatorSlotPos ? lookupSlot(std::move(ast.nodes[collatorSlotPos]->identifier))
+                        : boost::none,
+        getCurrentPlanNodeId());
 }
 
 void Parser::walkHashJoin(AstQuery& ast) {
@@ -1050,9 +1090,10 @@ void Parser::walkSkip(AstQuery& ast) {
     walkChildren(ast);
 
     if (ast.nodes.size() == 3) {
+        // This is a case where we have both a 'limit' and a 'skip'.
         ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[2]->stage),
-                                          std::stoi(ast.nodes[1]->token),
-                                          std::stoi(ast.nodes[0]->token),
+                                          std::stoi(ast.nodes[0]->token),  // limit
+                                          std::stoi(ast.nodes[1]->token),  // skip
                                           getCurrentPlanNodeId());
     } else {
         ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[1]->stage),
@@ -1074,30 +1115,37 @@ void Parser::walkTraverse(AstQuery& ast) {
     size_t fromPos;
     size_t foldPos = 0;
     size_t finalPos = 0;
+    size_t correlatedPos = 0;
 
-    if (ast.nodes.size() == 5) {
-        fromPos = 3;
-        inPos = 4;
-    } else if (ast.nodes.size() == 6) {
-        foldPos = 3;
-        fromPos = 4;
-        inPos = 5;
+    // The ast for the traverse stage has three nodes of 'inField', 'outField', and 'outFieldInner',
+    // two nodes for an 'from' and 'in' child stages, and two nodes for 'foldExpr' and 'finalExpr'.
+    // Note that even if one of these expressions is not specified, we output a '{}' token in order
+    // to parse the string correctly. This leaves us with two cases: correlated slot vector
+    // specified or unspecified. If 'outerCorrelated' is specified, then we have an extra child node
+    // and thus eight children, otherwise we are in the original case.
+    if (ast.nodes.size() == 8) {
+        correlatedPos = 3;
+        foldPos = 4;
+        finalPos = 5;
+        fromPos = 6;
+        inPos = 7;
     } else {
         foldPos = 3;
         finalPos = 4;
         fromPos = 5;
         inPos = 6;
     }
-    ast.stage = makeS<TraverseStage>(std::move(ast.nodes[fromPos]->stage),
-                                     std::move(ast.nodes[inPos]->stage),
-                                     lookupSlotStrict(ast.nodes[2]->identifier),
-                                     lookupSlotStrict(ast.nodes[0]->identifier),
-                                     lookupSlotStrict(ast.nodes[1]->identifier),
-                                     sbe::makeSV(),
-                                     foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
-                                     finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr,
-                                     getCurrentPlanNodeId(),
-                                     boost::none);
+    ast.stage = makeS<TraverseStage>(
+        std::move(ast.nodes[fromPos]->stage),
+        std::move(ast.nodes[inPos]->stage),
+        lookupSlotStrict(ast.nodes[2]->identifier),
+        lookupSlotStrict(ast.nodes[0]->identifier),
+        lookupSlotStrict(ast.nodes[1]->identifier),
+        correlatedPos ? lookupSlots(ast.nodes[correlatedPos]->identifiers) : makeSV(),
+        foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
+        finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr,
+        getCurrentPlanNodeId(),
+        boost::none);
 }
 
 void Parser::walkExchange(AstQuery& ast) {
@@ -1718,6 +1766,12 @@ CollectionUUID Parser::getCollectionUuid(const std::string& collName) {
         return uuid.getValue();
     }
 
+    // Try to parse the collection name as a UUID directly, otherwise fallback to lookup by
+    // NamespaceString.
+    auto parsedUuid = UUID::parse(collName);
+    if (parsedUuid.isOK()) {
+        return parsedUuid.getValue();
+    }
     auto uuid = CollectionCatalog::get(_opCtx)->lookupUUIDByNSS(_opCtx, NamespaceString{collName});
     uassert(5162900,
             str::stream() << "SBE command parser could not find collection: " << collName,

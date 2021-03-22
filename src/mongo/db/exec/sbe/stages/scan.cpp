@@ -341,6 +341,8 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     DebugPrinter::addIdentifier(ret, _collUuid.toString());
     ret.emplace_back("`\"");
 
+    ret.emplace_back(_forward ? "true" : "false");
+
     return ret;
 }
 

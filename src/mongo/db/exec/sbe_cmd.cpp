@@ -78,6 +78,10 @@ public:
 
         NamespaceString nss{dbname};
 
+        // Create a trivial cannonical query for the 'sbe' command execution.
+        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::make_unique<FindCommand>(nss));
+        std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+
         stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
 
         if (resultSlot) {
@@ -87,8 +91,10 @@ public:
             data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *recordIdSlot);
         }
 
+        root->attachToOperationContext(opCtx);
+
         exec = uassertStatusOK(plan_executor_factory::make(opCtx,
-                                                           nullptr,
+                                                           std::move(cq),
                                                            nullptr,
                                                            {std::move(root), std::move(data)},
                                                            &CollectionPtr::null,

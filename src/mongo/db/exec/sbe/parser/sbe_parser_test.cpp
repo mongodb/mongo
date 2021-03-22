@@ -53,37 +53,115 @@
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
+#include <regex>
+
 namespace mongo {
 namespace {
+/**
+ * Normalizes an SBE plan string by iterating and deterministically replacing every occurance
+ * of every unique slot ID with a monotonically increasing slot counter. The SBE plan string
+ * remains logically unchanged, but allows us to compare SBE plans string-to-string in test.
+ */
+std::string normalizeSbePlanString(const std::string& sbePlanString) {
+    str::stream normalizedPlanString;
+
+    std::map<std::string, size_t> slotsMap;
+    sbe::value::SlotId slotCounter = 1;
+
+    const std::regex slotMatchRegex("s[0-9]+");
+
+    auto remapSlotsCallback = [&](const std::string& token) {
+        std::istringstream iss(token);
+        std::string n;
+        if (iss >> n) {
+            if (std::regex_match(token, slotMatchRegex)) {
+                // If already saw this slot, replace with the one that was remapped, otherwise
+                // record this new encountered slot in the map and update the counter.
+                if (slotsMap.find(token) != slotsMap.end()) {
+                    normalizedPlanString << "s" << std::to_string(slotsMap[token]);
+                } else {
+                    slotsMap[token] = slotCounter;
+                    normalizedPlanString << "s" << std::to_string(slotCounter++);
+                }
+            } else {
+                normalizedPlanString << token;
+            }
+        } else {
+            normalizedPlanString << token;
+        }
+    };
+
+    std::sregex_token_iterator begin(
+        sbePlanString.begin(), sbePlanString.end(), slotMatchRegex, {-1, 0}),
+        end;
+    std::for_each(begin, end, remapSlotsCallback);
+    return normalizedPlanString;
+}
 
 /**
  * SIMPLE_PROJ and PFO stages are transformed into multiple stages by the parser. They do
  * not have a direct PlanStage analogue and are not included in these tests.
- *
- * TODO(SERVER-50885): Several stages were omitted from the tests because of inconsistencies between
- * 'debugPrint()' result and parser rules:
- * - IXSCAN, IXSEEK - slots are assigned to different values after serialization/deserialization
- *   loop
- * - PROJECT - serialization works correct, but the order of slot assignments is not preserved which
- *   prevents us from comparing debug outputs as strings
- * - MKOBJ - parser does not recognize 'forceNewObject' and 'returnOldObject' flags from debug print
- * - GROUP - slots are assigned to different values after serialization/deserialization loop
- * - LIMIT, SKIP - parser does not recognize 'limitskip' keyword produced by 'LimitSkipStage'
- * - TRAVERSE - parser does not recognize correlated slots from debug print
- * - SORT - parser does not recognize 'limit' field from debug print
- * - UNION - debug print does not output square braces around union branches list
- * - SCAN, SEEK - parser expects forward flag which is not included in the debug print
- * - HJOIN - inner and outer projects are swapped after serialization/deserialization loop
  */
 class SBEParserTest : public unittest::Test {
 protected:
     SBEParserTest() : planNodeId(12345) {
         auto fakeUuid = unittest::assertGet(UUID::parse("00000000-0000-0000-0000-000000000000"));
         stages = makeVector(
-            // PSCAN
+            // IXSCAN with 'recordSlot' and 'recordIdSlot' slots only.
+            sbe::makeS<sbe::IndexScanStage>(fakeUuid,
+                                            "_id",
+                                            true,
+                                            sbe::value::SlotId{3},
+                                            sbe::value::SlotId{4},
+                                            sbe::IndexKeysInclusionSet{},
+                                            sbe::makeSV(),
+                                            boost::none,
+                                            boost::none,
+                                            nullptr,
+                                            planNodeId,
+                                            nullptr),
+            // IXSCAN with 'seekKeySlotLow' / 'seekKeySlotHigh' present.
+            sbe::makeS<sbe::IndexScanStage>(fakeUuid,
+                                            "_id",
+                                            true,
+                                            sbe::value::SlotId{3},
+                                            sbe::value::SlotId{4},
+                                            sbe::IndexKeysInclusionSet{},
+                                            sbe::makeSV(),
+                                            sbe::value::SlotId{1},
+                                            sbe::value::SlotId{2},
+                                            nullptr,
+                                            planNodeId,
+                                            nullptr),
+            // IXSCAN with 'recordIdSlot' missing and 'seekKeySlotLow' present.
+            sbe::makeS<sbe::IndexScanStage>(fakeUuid,
+                                            "_id",
+                                            true,
+                                            sbe::value::SlotId{1},
+                                            boost::none,
+                                            sbe::IndexKeysInclusionSet{},
+                                            sbe::makeSV(),
+                                            sbe::value::SlotId{2},
+                                            boost::none,
+                                            nullptr,
+                                            planNodeId,
+                                            nullptr),
+            // SCAN with 'recordSlot' and 'recordIdSlot' slots only.
+            sbe::makeS<sbe::ScanStage>(fakeUuid,
+                                       sbe::value::SlotId{1},
+                                       sbe::value::SlotId{2},
+                                       std::vector<std::string>{},
+                                       sbe::makeSV(),
+                                       boost::none,
+                                       true /* forward */,
+                                       nullptr,
+                                       planNodeId,
+                                       nullptr),
+            // PSCAN with both 'recordSlot' and 'recordIdSlot' slots present.
             sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
                                                sbe::value::SlotId{2},
@@ -91,6 +169,179 @@ protected:
                                                sbe::makeSV(1, 2),
                                                nullptr,
                                                planNodeId),
+            // PSCAN with 'recordSlot' missing.
+            sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
+                                               sbe::value::SlotId{1},
+                                               boost::none,
+                                               std::vector<std::string>{"a", "b"},
+                                               sbe::makeSV(1, 2),
+                                               nullptr,
+                                               planNodeId),
+            // COSCAN
+            sbe::makeS<sbe::CoScanStage>(planNodeId),
+            // PROJECT
+            sbe::makeProjectStage(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                planNodeId,
+                sbe::value::SlotId{1},
+                stage_builder::makeConstant(sbe::value::TypeTags::NumberInt32, 123),
+                sbe::value::SlotId{2},
+                stage_builder::makeConstant(sbe::value::TypeTags::NumberInt32, 456)),
+            // TRAVERSE with only 'from' and 'in' child stages present
+            sbe::makeS<sbe::TraverseStage>(sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::value::SlotId{1},
+                                           sbe::value::SlotId{2},
+                                           sbe::value::SlotId{3},
+                                           sbe::makeSV(),
+                                           nullptr,
+                                           nullptr,
+                                           planNodeId,
+                                           1 /* nestedArraysDepth */
+                                           ),
+            // TRAVERSE with 'outerCorrelated' slot vector present.
+            sbe::makeS<sbe::TraverseStage>(sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::value::SlotId{1},
+                                           sbe::value::SlotId{2},
+                                           sbe::value::SlotId{3},
+                                           sbe::makeSV(4, 5, 6),
+                                           nullptr,
+                                           nullptr,
+                                           planNodeId,
+                                           1 /* nestedArraysDepth */
+                                           ),
+            // TRAVERSE with both 'foldExpr' and 'finalExpr' present.
+            sbe::makeS<sbe::TraverseStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::value::SlotId{1},
+                sbe::value::SlotId{2},
+                sbe::value::SlotId{3},
+                sbe::makeSV(4, 5, 6),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 123),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 456),
+                planNodeId,
+                1 /* nestedArraysDepth */
+                ),
+            // TRAVERSE with 'foldExpr' present but 'finalExpr' missing.
+            sbe::makeS<sbe::TraverseStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::value::SlotId{1},
+                sbe::value::SlotId{2},
+                sbe::value::SlotId{3},
+                sbe::makeSV(4, 5, 6),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 123),
+                nullptr,
+                planNodeId,
+                1 /* nestedArraysDepth */
+                ),
+            // TRAVERSE with 'finalExpr' present but 'foldExpr' missing.
+            sbe::makeS<sbe::TraverseStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::value::SlotId{1},
+                sbe::value::SlotId{2},
+                sbe::value::SlotId{3},
+                sbe::makeSV(4, 5, 6),
+                nullptr,
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 123),
+                planNodeId,
+                1 /* nestedArraysDepth */
+                ),
+            // MAKEOBJ
+            sbe::makeS<sbe::MakeObjStage>(sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                          sbe::value::SlotId{1},
+                                          sbe::value::SlotId{2},
+                                          sbe::MakeObjFieldBehavior::keep,
+                                          std::vector<std::string>{"a", "b"},
+                                          std::vector<std::string>{"c", "d"},
+                                          sbe::makeSV(3, 4),
+                                          false,
+                                          false,
+                                          planNodeId),
+            // GROUP
+            sbe::makeS<sbe::HashAggStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeSV(),
+                sbe::makeEM(sbe::value::SlotId{2},
+                            stage_builder::makeFunction(
+                                "min", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1})),
+                            sbe::value::SlotId{3},
+                            stage_builder::makeFunction(
+                                "max", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1}))),
+                boost::none, /* optional collator slot */
+                planNodeId),
+            // GROUP with a collator slot.
+            sbe::makeS<sbe::HashAggStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeSV(),
+                sbe::makeEM(sbe::value::SlotId{2},
+                            stage_builder::makeFunction(
+                                "min", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1})),
+                            sbe::value::SlotId{3},
+                            stage_builder::makeFunction(
+                                "max", sbe::makeE<sbe::EVariable>(sbe::value::SlotId{1}))),
+                sbe::value::SlotId{4}, /* optional collator slot */
+                planNodeId),
+            // LIMIT
+            sbe::makeS<sbe::LimitSkipStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId), 100, boost::none, planNodeId),
+            // SKIP
+            sbe::makeS<sbe::LimitSkipStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId), boost::none, 100, planNodeId),
+            // LIMIT SKIP
+            sbe::makeS<sbe::LimitSkipStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId), 100, 200, planNodeId),
+            // SORT
+            sbe::makeS<sbe::SortStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeSV(1),
+                std::vector<sbe::value::SortDirection>{sbe::value::SortDirection::Ascending},
+                sbe::makeSV(2),
+                std::numeric_limits<size_t>::max(),
+                std::numeric_limits<size_t>::max(),
+                true,
+                planNodeId),
+            // SORT with sort direction 'Descending'.
+            sbe::makeS<sbe::SortStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeSV(1),
+                std::vector<sbe::value::SortDirection>{sbe::value::SortDirection::Descending},
+                sbe::makeSV(2),
+                std::numeric_limits<size_t>::max(),
+                std::numeric_limits<size_t>::max(),
+                true,
+                planNodeId),
+            // SORT with 'limit' other than size_t max.
+            sbe::makeS<sbe::SortStage>(
+                sbe::makeS<sbe::CoScanStage>(planNodeId),
+                sbe::makeSV(1),
+                std::vector<sbe::value::SortDirection>{sbe::value::SortDirection::Ascending},
+                sbe::makeSV(2),
+                100 /* limit other than std::numeric_limits<size_t>::max() */,
+                std::numeric_limits<size_t>::max(),
+                true,
+                planNodeId),
+            // HJOIN
+            sbe::makeS<sbe::HashJoinStage>(sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeSV(1, 2) /* outer conditions */,
+                                           sbe::makeSV(3, 4) /* outer projections */,
+                                           sbe::makeSV(1, 2) /* inner conditions */,
+                                           sbe::makeSV(5, 6) /* inner projections */,
+                                           boost::none, /* optional collator slot */
+                                           planNodeId),
+            // HJOIN with a collator slot.
+            sbe::makeS<sbe::HashJoinStage>(sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeS<sbe::CoScanStage>(planNodeId),
+                                           sbe::makeSV(1, 2) /* outer conditions */,
+                                           sbe::makeSV(3, 4) /* outer projections */,
+                                           sbe::makeSV(1, 2) /* inner conditions */,
+                                           sbe::makeSV(5, 6) /* inner projections */,
+                                           sbe::value::SlotId{7}, /* optional collator slot */
+                                           planNodeId),
             // FILTER
             sbe::makeS<sbe::FilterStage<false>>(
                 sbe::makeS<sbe::CoScanStage>(planNodeId),
@@ -112,8 +363,6 @@ protected:
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
                                            sbe::value::bitcastFrom<bool>(true)),
                 planNodeId),
-            // COSCAN
-            sbe::makeS<sbe::CoScanStage>(planNodeId),
             // EXCHANGE
             sbe::makeS<sbe::ExchangeConsumer>(sbe::makeS<sbe::CoScanStage>(planNodeId),
                                               2,
@@ -238,9 +487,7 @@ protected:
                                                        sbe::value::SortDirection::Ascending},
                 std::vector<sbe::value::SlotVector>{sbe::makeSV(1, 2), sbe::makeSV(3, 4)},
                 sbe::makeSV(5, 6),
-                planNodeId)
-
-        );
+                planNodeId));
     }
 
     PlanNodeId planNodeId;
@@ -249,13 +496,15 @@ protected:
 
 TEST_F(SBEParserTest, TestIdenticalDebugOutputAfterParse) {
     sbe::DebugPrinter printer;
-    sbe::Parser parser;
 
     for (const auto& stage : stages) {
+        sbe::Parser parser;
         const auto stageText = printer.print(*stage);
+
         const auto parsedStage = parser.parse(nullptr, "testDb", stageText);
         const auto stageTextAfterParse = printer.print(*parsedStage);
-        ASSERT_EQ(stageText, stageTextAfterParse);
+
+        ASSERT_EQ(normalizeSbePlanString(stageText), normalizeSbePlanString(stageTextAfterParse));
     }
 }
 
