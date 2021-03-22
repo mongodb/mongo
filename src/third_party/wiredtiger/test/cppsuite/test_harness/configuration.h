@@ -41,22 +41,20 @@ class configuration {
         int ret = wiredtiger_test_config_validate(
           nullptr, nullptr, test_config_name.c_str(), config.c_str());
         if (ret != 0)
-            throw std::invalid_argument(
-              "failed to validate given config, ensure test config exists");
-        if (wiredtiger_config_parser_open(
-              nullptr, config.c_str(), config.size(), &_config_parser) != 0)
-            throw std::invalid_argument(
-              "failed to create configuration parser for provided config");
+            testutil_die(EINVAL, "failed to validate given config, ensure test config exists");
+        ret =
+          wiredtiger_config_parser_open(nullptr, config.c_str(), config.size(), &_config_parser);
+        if (ret != 0)
+            testutil_die(EINVAL, "failed to create configuration parser for provided config");
     }
 
     configuration(const WT_CONFIG_ITEM &nested)
     {
         if (nested.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT)
-            throw std::invalid_argument("provided config item isn't a structure");
+            testutil_die(EINVAL, "provided config item isn't a structure");
         int ret = wiredtiger_config_parser_open(nullptr, nested.str, nested.len, &_config_parser);
         if (ret != 0)
-            throw std::invalid_argument(
-              "failed to create configuration parser for provided sub config");
+            testutil_die(EINVAL, "failed to create configuration parser for provided sub config");
     }
 
     ~configuration()

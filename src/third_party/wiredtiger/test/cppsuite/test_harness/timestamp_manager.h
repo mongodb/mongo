@@ -45,13 +45,10 @@ class timestamp_manager : public component {
     public:
     timestamp_manager(configuration *config)
         : /* _periodic_update_s is hardcoded to 1 second for now. */
-          component(config), _increment_ts(0U), _is_enabled(false), _latest_ts(0U), _oldest_lag(0),
-          _oldest_ts(0U), _periodic_update_s(1), _stable_lag(0), _stable_ts(0U)
+          component(config), _increment_ts(0U), _latest_ts(0U), _oldest_lag(0), _oldest_ts(0U),
+          _periodic_update_s(1), _stable_lag(0), _stable_ts(0U)
     {
     }
-
-    /* Delete the copy constructor. */
-    timestamp_manager(const timestamp_manager &) = delete;
 
     void
     load()
@@ -61,7 +58,7 @@ class timestamp_manager : public component {
         testutil_assert(_oldest_lag >= 0);
         testutil_check(_config->get_int(STABLE_LAG, _stable_lag));
         testutil_assert(_stable_lag >= 0);
-        testutil_check(_config->get_bool(ENABLE_TIMESTAMP, _is_enabled));
+        testutil_check(_config->get_bool(ENABLE_TIMESTAMP, _enabled));
         component::load();
     }
 
@@ -72,7 +69,7 @@ class timestamp_manager : public component {
         /* latest_ts_s represents the time component of the latest timestamp provided. */
         wt_timestamp_t latest_ts_s;
 
-        while (_is_enabled && _running) {
+        while (_enabled && _running) {
             /* Timestamps are checked periodically. */
             std::this_thread::sleep_for(std::chrono::seconds(_periodic_update_s));
             latest_ts_s = (_latest_ts >> 32);
@@ -104,12 +101,6 @@ class timestamp_manager : public component {
                 config = "";
             }
         }
-    }
-
-    bool
-    is_enabled() const
-    {
-        return _is_enabled;
     }
 
     /*
@@ -148,7 +139,6 @@ class timestamp_manager : public component {
     }
 
     private:
-    bool _is_enabled;
     const wt_timestamp_t _periodic_update_s;
     std::atomic<wt_timestamp_t> _increment_ts;
     wt_timestamp_t _latest_ts, _oldest_ts, _stable_ts;

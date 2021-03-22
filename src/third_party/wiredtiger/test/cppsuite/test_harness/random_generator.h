@@ -38,7 +38,7 @@ class random_generator {
     public:
     /* No copies of the singleton allowed. */
     random_generator(random_generator const &) = delete;
-    void operator=(random_generator const &) = delete;
+    random_generator &operator=(random_generator const &) = delete;
 
     static random_generator &
     instance()

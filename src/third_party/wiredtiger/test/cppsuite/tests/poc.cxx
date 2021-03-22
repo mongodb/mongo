@@ -110,8 +110,7 @@ int
 main(int argc, char *argv[])
 {
     std::string cfg, filename;
-    int64_t trace_level = 0;
-    int64_t error_code = 0;
+    int64_t trace_level = 0, error_code = 0;
 
     /* Parse args
      * -C   : Configuration. Cannot be used with -f.
