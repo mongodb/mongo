@@ -165,6 +165,22 @@ TEST(Find, Char1) {
     ASSERT_EQUALS(string::npos, StringData("foo").find('a'));
     ASSERT_EQUALS(0U, StringData("foo").find('f'));
     ASSERT_EQUALS(1U, StringData("foo").find('o'));
+
+    using namespace std::literals;
+    const std::string haystacks[]{"foo", "f", "", "\0"s, "f\0"s, "\0f"s, "ffoo", "afoo"};
+    const char needles[]{'a', 'f', 'o', '\0'};
+    for (const auto& s : haystacks) {
+        for (const auto& ch : needles) {
+            // Try all possibly-relevent `pos` arguments.
+            for (size_t pos = 0; pos < s.size() + 2; ++pos) {
+                // All expectations should be consistent with std::string::find.
+                auto withStdString = s.find(ch, pos);
+                auto withStringData = StringData{s}.find(ch, pos);
+                ASSERT_EQUALS(withStdString, withStringData)
+                    << format(FMT_STRING(R"(s:'{}', ch:'{}', pos:{})"), s, StringData{&ch, 1}, pos);
+            }
+        }
+    }
 }
 
 TEST(Find, Str1) {
@@ -180,6 +196,23 @@ TEST(Find, Str1) {
     ASSERT_EQUALS(1U, StringData("foo").find("oo"));
 
     ASSERT_EQUALS(string("foo").find(""), StringData("foo").find(""));
+
+    using namespace std::literals;
+    const std::string haystacks[]{"", "x", "foo", "fffoo", "\0"s};
+    const std::string needles[]{
+        "", "x", "asdsadasda", "a", "f", "fo", "foo", "food", "o", "oo", "ooo", "\0"s};
+    for (const auto& s : haystacks) {
+        for (const auto& sub : needles) {
+            // Try all possibly-relevent `pos` arguments.
+            for (size_t pos = 0; pos < std::max(s.size(), sub.size()) + 2; ++pos) {
+                // All expectations should be consistent with std::string::find.
+                auto withStdString = s.find(sub, pos);
+                auto withStringData = StringData{s}.find(StringData{sub}, pos);
+                ASSERT_EQUALS(withStdString, withStringData)
+                    << format(FMT_STRING(R"(s:'{}', sub:'{}', pos:{})"), s, sub, pos);
+            }
+        }
+    }
 }
 
 // Helper function for Test(Hasher, Str1)
@@ -224,6 +257,25 @@ TEST(Rfind, Char1) {
     ASSERT_EQUALS(1U, StringData("foo", 2).rfind('o'));
     ASSERT_EQUALS(string::npos, StringData("foo", 1).rfind('o'));
     ASSERT_EQUALS(string::npos, StringData("foo", 0).rfind('o'));
+
+    using namespace std::literals;
+    const std::string haystacks[]{"", "x", "foo", "fffoo", "oof", "\0"s};
+    const char needles[]{'f', 'o', '\0'};
+    for (const auto& s : haystacks) {
+        for (const auto& ch : needles) {
+            auto validate = [&](size_t pos) {
+                // All expectations should be consistent with std::string::rfind.
+                auto withStdString = s.rfind(ch, pos);
+                auto withStringData = StringData{s}.rfind(ch, pos);
+                ASSERT_EQUALS(withStdString, withStringData)
+                    << format(FMT_STRING(R"(s:'{}', ch:'{}', pos:{})"), s, StringData{&ch, 1}, pos);
+            };
+            // Try all possibly-relevent `pos` arguments.
+            for (size_t pos = 0; pos < s.size() + 2; ++pos)
+                validate(pos);
+            validate(std::string::npos);
+        }
+    }
 }
 
 // this is to verify we match std::string

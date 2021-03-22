@@ -264,14 +264,13 @@ inline size_t StringData::find(char c, size_t fromPos) const {
 
 inline size_t StringData::find(StringData needle, size_t fromPos) const {
     size_t mx = size();
+    if (fromPos > mx)
+        return std::string::npos;
     size_t needleSize = needle.size();
 
     if (needleSize == 0)
-        return 0;
+        return fromPos;
     else if (needleSize > mx)
-        return std::string::npos;
-
-    if (fromPos > size())
         return std::string::npos;
 
     mx -= needleSize;
@@ -285,8 +284,9 @@ inline size_t StringData::find(StringData needle, size_t fromPos) const {
 
 inline size_t StringData::rfind(char c, size_t fromPos) const {
     const size_t sz = size();
-    if (fromPos > sz)
-        fromPos = sz;
+    if (sz < 1)
+        return std::string::npos;
+    fromPos = std::min(fromPos, sz - 1) + 1;
 
     for (const char* cur = _data + fromPos; cur > _data; --cur) {
         if (*(cur - 1) == c)
