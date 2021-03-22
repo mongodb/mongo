@@ -445,7 +445,7 @@ functions:
         # Create the Evergreen API credentials
         cat > .selected_tests.yml <<END_OF_CREDS
         url: "https://selected-tests.server-tig.prod.corp.mongodb.com"
-        project: "${project}"
+        project: "${project_identifier}"
         auth_user: "${selected_tests_auth_user}"
         auth_token: "${selected_tests_auth_token}"
         END_OF_CREDS
@@ -462,7 +462,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
 
@@ -471,7 +471,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
       bucket: mciuploads
       extract_to: src
       build_variants: *package_variants
@@ -481,7 +481,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+      remote_file: ${project_identifier}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
@@ -490,7 +490,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+      remote_file: ${project_identifier}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
 
@@ -533,7 +533,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
 
@@ -542,7 +542,7 @@ functions:
     params:
       aws_key: ${s3_access_key_id}
       aws_secret: ${s3_secret_access_key}
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
+      remote_file: ${project_identifier}/corpus/mongo-${build_variant}-latest.tgz
       bucket: fuzzer-artifacts
       local_file: src/corpus.tgz
 
@@ -566,7 +566,7 @@ functions:
       aws_key: ${s3_access_key_id}
       aws_secret: ${s3_secret_access_key}
       local_file: corpus.tgz
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
+      remote_file: ${project_identifier}/corpus/mongo-${build_variant}-latest.tgz
       bucket: fuzzer-artifacts
       permissions: private
       visibility: signed
@@ -833,7 +833,7 @@ functions:
         # removes files from the shared scons cache.
 
         # Only prune on master branch
-        if [[ "${project}" == "mongodb-mongo-master" ]]; then
+        if [[ "${project_identifier}" == "mongodb-mongo-master" ]]; then
 
 
           set +o errexit
@@ -1078,21 +1078,21 @@ functions:
             set -o errexit
           fi
       - key: mongo_binaries
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
       - key: mongo_cryptd
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-cryptd-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mongo-cryptd-${build_id}.${ext|tgz}
       - key: mongo_cryptd_debugsymbols
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-cryptd-debugsymbols-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mongo-cryptd-debugsymbols-${build_id}.${ext|tgz}
       - key: mh_archive
-        value: ${project}/${build_variant}/${revision}/binaries/mh-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mh-${build_id}.${ext|tgz}
       - key: mh_debugsymbols
-        value: ${project}/${build_variant}/${revision}/debugsymbols/mh-debugsymbols-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/debugsymbols/mh-debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_debugsymbols
-        value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       - key: mongo_shell
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
       - key: mongo_shell_debugsymbols
-        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-debugsymbols-${build_id}.${ext|tgz}
+        value: ${project_identifier}/${build_variant}/${revision}/binaries/mongo-shell-debugsymbols-${build_id}.${ext|tgz}
       - key: skip_tests
         value: skip_test-${build_id}
 
@@ -1160,7 +1160,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: pip-requirements.txt
-      remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
+      remote_file: ${project_identifier}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
       bucket: mciuploads
       permissions: public-read
       content_type: atext-plain
@@ -1435,7 +1435,7 @@ functions:
                 --buildId=${build_id}                     \
                 --distroId=${distro_id}                   \
                 --executionNumber=${execution}            \
-                --projectName=${project}                  \
+                --projectName=${project_identifier}                  \
                 --gitRevision=${revision}                 \
                 --revisionOrderId=${revision_order_id}    \
                 --taskId=${task_id}                       \
@@ -1477,7 +1477,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       bucket: mciuploads
-      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task}_gen-${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task}_gen-${build_id}.tgz
       local_file: "generate_tasks_config.tgz"
 
   "extract generated test configuration": &extract_generated_test_configuration
@@ -1512,7 +1512,7 @@ functions:
           set -o verbose
 
           # Only run on master branch
-          if [ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]; then
+          if [ "${project_identifier}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]; then
             ${activate_virtualenv}
             PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --selected-tests-config .selected_tests.yml
           fi
@@ -1527,7 +1527,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
@@ -1569,7 +1569,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: burn_in_tags_gen.tgz
-        remote_file: ${project}/${build_variant}/${revision}/burn_in_tags_gen/burn_in_tags_gen-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/burn_in_tags_gen/burn_in_tags_gen-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -1622,7 +1622,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -1673,7 +1673,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -2102,7 +2102,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -2153,7 +2153,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${task_name}-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -2206,7 +2206,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: generate_tasks_config.tgz
-        remote_file: ${project}/${build_variant}/${revision}/generate_tasks/${name}_gen-${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/${name}_gen-${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/gzip
@@ -2305,7 +2305,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: jstests.tgz
-        remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: private
         visibility: signed
@@ -2494,7 +2494,7 @@ functions:
       script: |
         set -o errexit
 
-        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
+        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
@@ -2622,7 +2622,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/ec2_artifacts.tgz
-      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/remote_ec2/remote_ec2_artifacts-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
@@ -2635,7 +2635,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/ec2_monitor_files.tgz
-      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
@@ -2664,7 +2664,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/client-logs.tgz
-      remote_file: ${project}/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/client_logs/mongo-client-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/gzip}
@@ -2738,7 +2738,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: "src/gcov-intermediate-files.tgz"
-      remote_file: ${project}/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -2764,7 +2764,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/jepsen-mongod-logs.tgz
-      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -2785,7 +2785,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/jepsen-results.tgz
-      remote_file: ${project}/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -2830,7 +2830,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: mongo-coredumps.tgz
-      remote_file: ${project}/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -2931,7 +2931,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: mongo-unittests.tgz
-      remote_file: ${project}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -2949,7 +2949,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: dbtest-binary.tgz
-      remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/tar
@@ -2962,7 +2962,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: dbtest-debugsymbols.tgz
-      remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/tar
@@ -3043,7 +3043,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/mongo-hanganalyzer.tgz
-      remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -3070,7 +3070,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: diskstats.tgz
-      remote_file: ${project}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -3096,7 +3096,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: system-resource-info.tgz
-      remote_file: ${project}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/systemresourceinfo/mongo-system-resource-info-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -3121,7 +3121,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: undodb-recordings.tgz
-      remote_file: ${project}/${build_variant}/${revision}/undo/undodb-recordings-${task_id}-execution-${execution}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/undo/undodb-recordings-${task_id}-execution-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -3140,7 +3140,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/build/scons/config.log
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-config.log.${build_id}-${task_name}-${execution}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/scons-config.log.${build_id}-${task_name}-${execution}
         bucket: mciuploads
         permissions: public-read
         content_type: text/plain
@@ -3153,7 +3153,7 @@ functions:
         aws_secret: ${aws_secret}
         local_file: src/scons_cache.log
         content_type: text/plain
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-cache.log.${build_id}-${task_name}.${execution}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/scons-cache.log.${build_id}-${task_name}.${execution}
         bucket: mciuploads
         permissions: public-read
         display_name: SCons cache debug log
@@ -3301,7 +3301,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: artifacts.tgz
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: mciuploads
         permissions: private
         visibility: signed
@@ -3430,7 +3430,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/results.txt
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps-results.txt.${build_id}-${task_name}.${execution}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/libdeps-results.txt.${build_id}-${task_name}.${execution}
         bucket: mciuploads
         permissions: public-read
         content_type: text/plain
@@ -3441,7 +3441,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/libdeps.graphml.gz
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/libdeps.graphml.${build_id}-${task_name}.${execution}.gz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/libdeps.graphml.${build_id}-${task_name}.${execution}.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
@@ -3522,7 +3522,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/fuzzertests-runtime.tgz"
-        remote_file: "${project}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
+        remote_file: "${project_identifier}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
         bucket: mciuploads
         permissions: private
         visibility: signed
@@ -3613,7 +3613,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/visibility-test-meta.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/visibility-test-meta-${build_id}-${task_name}-${execution}.${ext|tgz}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/visibility-test-meta-${build_id}-${task_name}-${execution}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
@@ -3706,7 +3706,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/${build_variant}/${revision}/mongo-embedded-sdk-${version}.tgz
+        remote_file: ${project_identifier}/embedded-sdk/${build_variant}/${revision}/mongo-embedded-sdk-${version}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3746,7 +3746,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk-tests.tgz"
-        remote_file: ${project}/embedded-sdk-test/${build_variant}/${revision}/mongo-embedded-sdk-test-${version}.tgz
+        remote_file: ${project_identifier}/embedded-sdk-test/${build_variant}/${revision}/mongo-embedded-sdk-test-${version}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3790,7 +3790,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk.tgz"
-        remote_file: ${project}/embedded-sdk/mongo-${build_variant}-latest.tgz
+        remote_file: ${project_identifier}/embedded-sdk/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -3806,7 +3806,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/embedded-sdk-tests.tgz"
-        remote_file: ${project}/embedded-sdk-test/mongo-${build_variant}-latest.tgz
+        remote_file: ${project_identifier}/embedded-sdk-test/mongo-${build_variant}-latest.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -3838,7 +3838,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: "src/build/stitch-support.tgz"
-        remote_file: "${project}/stitch-support/${build_variant}/${revision}/stitch-support-${version}.tgz"
+        remote_file: "${project_identifier}/stitch-support/${build_variant}/${revision}/stitch-support-${version}.tgz"
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -3906,7 +3906,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: benchmarks.tgz
-        remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -4062,7 +4062,7 @@ tasks:
         fi
         burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests.py --project=${project_identifier} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz
@@ -4075,7 +4075,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/burn_in_tests_gen.tgz
-      remote_file: ${project}/${build_variant}/${revision}/burn_in_tests_gen/burn_in_tests_gen-${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/burn_in_tests_gen/burn_in_tests_gen-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -4114,7 +4114,7 @@ tasks:
 
         burn_in_args="$burn_in_args"
         # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
+        PATH=$PATH:$HOME $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project_identifier} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
         $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion
 
 
@@ -4137,7 +4137,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: generate_tasks_config.tgz
-      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen-${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -4149,7 +4149,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/burn_in_tests_multiversion_gen.tgz
-      remote_file: ${project}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
+      remote_file: ${project_identifier}/${build_variant}/${revision}/generate_tasks/burn_in_tests_multiversion_gen_config-${build_id}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: application/gzip
@@ -7501,7 +7501,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/distsrc.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/gzip}
@@ -7515,7 +7515,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb-dist.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -7526,7 +7526,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb-dist-debugsymbols.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -7611,7 +7611,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: packages.tgz
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -7651,7 +7651,7 @@ tasks:
           CURATOR_RELEASE=${curator_release|"latest"}
           curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
           tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-          ./curator repo submit --service ${barque_url} --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+          ./curator repo submit --service ${barque_url} --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages https://s3.amazonaws.com/mciuploads/${project_identifier}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
 
 - name: push
   tags: ["publish"]
@@ -7697,7 +7697,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: ${project_identifier}/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [rhel70, windows]
@@ -8348,7 +8348,7 @@ task_groups:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/all.build.ninja
-        remote_file: ${project}/${build_variant}/${revision}/artifacts/all.${build_id}.build.ninja
+        remote_file: ${project_identifier}/${build_variant}/${revision}/artifacts/all.${build_id}.build.ninja
         bucket: mciuploads
         permissions: public-read
         content_type: text/plain
