@@ -35,12 +35,15 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(primary)) {
 const timeFieldName = 'time';
 let collCount = 0;
 
+let retriedCommandsCount = 0;
+let retriedStatementsCount = 0;
+
 /**
- * Accepts three measurements. The first measurement is used to create a new bucket. The second and
- * third measurements are used to appendto the bucket that was just created. We should see one
- * bucket created in the time-series collection.
+ * Accepts three arrays of measurements. The first set of measurements is used to create a new
+ * bucket. The second and third sets of measurements are used to append to the bucket that was just
+ * created. We should see one bucket created in the time-series collection.
  */
-const runTest = function(docInsert, docUpdateA, docUpdateB) {
+const runTest = function(docsInsert, docsUpdateA, docsUpdateB) {
     const session = primary.startSession({retryWrites: true});
     const testDB = session.getDatabase('test');
 
@@ -49,9 +52,9 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
     coll.drop();
 
     jsTestLog('Running test: collection: ' + coll.getFullName() + '; bucket collection: ' +
-              bucketsColl.getFullName() + '; initial measurement: ' + tojson(docInsert) +
-              '; measurement to append A: ' + tojson(docUpdateA) +
-              '; measurement to append B: ' + tojson(docUpdateB));
+              bucketsColl.getFullName() + '; initial measurements: ' + tojson(docsInsert) +
+              '; measurements to append A: ' + tojson(docsUpdateA) +
+              '; measurements to append B: ' + tojson(docsUpdateB));
 
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
@@ -62,59 +65,49 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
     assert.commandWorked(
         testDB.runCommand({
             insert: coll.getName(),
-            documents: [docInsert],
+            documents: docsInsert,
             lsid: session.getSessionId(),
             txnNumber: NumberLong(0),
         }),
-        'failed to create bucket with initial doc (first write): ' + tojson(docInsert));
+        'failed to create bucket with initial docs (first write): ' + tojson(docsInsert));
     assert.commandWorked(
         testDB.runCommand({
             insert: coll.getName(),
-            documents: [docInsert],
+            documents: docsInsert,
             lsid: session.getSessionId(),
             txnNumber: NumberLong(0),
         }),
-        'failed to create bucket with initial doc (retry write): ' + tojson(docInsert));
+        'failed to create bucket with initial docs (retry write): ' + tojson(docsInsert));
 
     assert.commandWorked(testDB.runCommand({
         insert: coll.getName(),
-        documents: [docUpdateA],
+        documents: docsUpdateA,
         lsid: session.getSessionId(),
         txnNumber: NumberLong(1),
     }),
-                         'failed to append doc A to bucket (first write): ' + tojson(docUpdateA));
+                         'failed to append docs A to bucket (first write): ' + tojson(docsUpdateA));
     assert.commandWorked(testDB.runCommand({
         insert: coll.getName(),
-        documents: [docUpdateA],
+        documents: docsUpdateA,
         lsid: session.getSessionId(),
         txnNumber: NumberLong(1),
     }),
-                         'failed to append doc A to bucket (retry write): ' + tojson(docUpdateA));
+                         'failed to append docs A to bucket (retry write): ' + tojson(docsUpdateA));
 
     assert.commandWorked(testDB.runCommand({
         insert: coll.getName(),
-        documents: [docUpdateB],
+        documents: docsUpdateB,
         lsid: session.getSessionId(),
         txnNumber: NumberLong(2),
     }),
-                         'failed to append doc B to bucket (first write): ' + tojson(docUpdateB));
+                         'failed to append docs B to bucket (first write): ' + tojson(docsUpdateB));
     assert.commandWorked(testDB.runCommand({
         insert: coll.getName(),
-        documents: [docUpdateB],
+        documents: docsUpdateB,
         lsid: session.getSessionId(),
         txnNumber: NumberLong(2),
     }),
-                         'failed to append doc B to bucket (retry write): ' + tojson(docUpdateB));
-
-    // Retryable writes on time-series collections with more than one measurement are not allowed.
-    let docs = [docInsert, docUpdateA, docUpdateB];
-    assert.commandFailedWithCode(testDB.runCommand({
-        insert: coll.getName(),
-        documents: docs,
-        lsid: session.getSessionId(),
-        txnNumber: NumberLong(3),
-    }),
-                                 ErrorCodes.OperationFailed);
+                         'failed to append docs B to bucket (retry write): ' + tojson(docsUpdateB));
 
     // This test case ensures that the batch size error handling is consistent with non-time-series
     // collections.
@@ -125,6 +118,8 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
         txnNumber: NumberLong(4),
     }),
                                  ErrorCodes.InvalidLength);
+
+    const docs = docsInsert.concat(docsUpdateA, docsUpdateB);
 
     // Check view.
     const viewDocs = coll.find({}).sort({_id: 1}).toArray();
@@ -156,10 +151,10 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
     }
 
     const transactionsServerStatus = testDB.serverStatus().transactions;
-    assert.eq(docs.length,
+    assert.eq(retriedCommandsCount += 3,
               transactionsServerStatus.retriedCommandsCount,
               'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
-    assert.eq(docs.length,
+    assert.eq(retriedStatementsCount += docs.length,
               transactionsServerStatus.retriedStatementsCount,
               'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
 
@@ -169,11 +164,17 @@ const runTest = function(docInsert, docUpdateA, docUpdateB) {
 const t = [
     ISODate("2021-01-20T00:00:00.000Z"),
     ISODate("2021-01-20T00:10:00.000Z"),
-    ISODate("2021-01-20T00:20:00.000Z")
+    ISODate("2021-01-20T00:20:00.000Z"),
+    ISODate("2021-01-20T00:30:00.000Z"),
+    ISODate("2021-01-20T00:40:00.000Z"),
+    ISODate("2021-01-20T00:50:00.000Z"),
 ];
 
 // One measurement per write operation.
-runTest({_id: 0, time: t[0], x: 0}, {_id: 1, time: t[1], x: 1}, {_id: 2, time: t[2], x: 2});
+runTest([{_id: 0, time: t[0], x: 0}], [{_id: 1, time: t[1], x: 1}], [{_id: 2, time: t[2], x: 2}]);
+runTest([{_id: 0, time: t[0], x: 0}, {_id: 1, time: t[1], x: 1}],
+        [{_id: 2, time: t[2], x: 2}, {_id: 3, time: t[3], x: 3}],
+        [{_id: 4, time: t[4], x: 4}, {_id: 5, time: t[5], x: 5}]);
 
 rst.stopSet();
 })();
