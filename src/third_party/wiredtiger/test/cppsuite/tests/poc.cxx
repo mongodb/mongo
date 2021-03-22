@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -47,47 +48,121 @@ class poc_test : public test_harness::test {
 };
 
 const std::string poc_test::test::name = "poc_test";
-const std::string poc_test::test::default_config =
-  "collection_count=2,key_count=5,value_size=10,read_threads=1,duration_seconds=10,"
-  "cache_size_mb=1000,stat_cache_size=(enabled=true,limit=100),rate_per_second=10,"
-  "enable_tracking=true,enable_timestamp=true,oldest_lag=1,stable_lag=1,"
-  "min_operation_per_transaction=1,max_operation_per_transaction=1";
+const std::string poc_test::test::default_config = "config_poc_default.txt";
+
+std::string
+parse_configuration_from_file(const std::string &filename)
+{
+    std::string cfg, line, prev_line, error;
+    std::ifstream cFile(filename);
+
+    if (cFile.is_open()) {
+        while (getline(cFile, line)) {
+
+            if (line[0] == '#' || line.empty())
+                continue;
+
+            /* Whitespaces are only for readability, they can be removed safely. */
+            line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
+
+            if (prev_line == line) {
+                error =
+                  "Error when parsing configuration. Two consecutive lines are equal to " + line;
+                testutil_die(EINVAL, error.c_str());
+                break;
+            }
+
+            /* Start of a sub config. */
+            if (line == "{")
+                cfg += "(";
+            /* End of a sub config. */
+            else if (line == "}")
+                cfg += ")";
+            else {
+                /* First line. */
+                if (cfg.empty())
+                    cfg += line;
+                /* No comma needed at the start of a subconfig. */
+                else if (prev_line == "{")
+                    cfg += line;
+                else
+                    cfg += "," + line;
+            }
+
+            prev_line = line;
+        }
+
+    } else {
+        error = "Couldn't open " + filename + " file for reading.";
+        testutil_die(EINVAL, error.c_str());
+    }
+
+    return (cfg);
+}
+
+void
+print_error(const std::string &str)
+{
+    std::cerr << "No value given for option " << str << std::endl;
+}
 
 int
 main(int argc, char *argv[])
 {
-    std::string cfg = "";
+    std::string cfg, filename;
     int64_t trace_level = 0;
     int64_t error_code = 0;
 
-    // Parse args
-    // -C   : Configuration
-    // -t   : Trace level
-    for (int i = 1; i < argc; ++i) {
+    /* Parse args
+     * -C   : Configuration. Cannot be used with -f.
+     * -f   : Filename that contains the configuration. Cannot be used with -C.
+     * -t   : Trace level.
+     */
+    for (int i = 1; (i < argc) && (error_code == 0); ++i) {
         if (std::string(argv[i]) == "-C") {
-            if ((i + 1) < argc)
+            if (!filename.empty()) {
+                std::cerr << "Option -C cannot be used with -f" << std::endl;
+                error_code = -1;
+            } else if ((i + 1) < argc)
                 cfg = argv[++i];
             else {
-                std::cerr << "No value given for option " << argv[i] << std::endl;
-                return (-1);
+                print_error(argv[i]);
+                error_code = -1;
+            }
+        } else if (std::string(argv[i]) == "-f") {
+            if (!cfg.empty()) {
+                std::cerr << "Option -f cannot be used with -C" << std::endl;
+                error_code = -1;
+            } else if ((i + 1) < argc)
+                filename = argv[++i];
+            else {
+                print_error(argv[i]);
+                error_code = -1;
             }
         } else if (std::string(argv[i]) == "-t") {
             if ((i + 1) < argc)
                 trace_level = std::stoi(argv[++i]);
             else {
-                std::cerr << "No value given for option " << argv[i] << std::endl;
-                return (-1);
+                print_error(argv[i]);
+                error_code = -1;
             }
         }
     }
 
-    // Check if default configuration should be used
-    if (cfg.empty())
-        cfg = poc_test::test::default_config;
+    if (error_code == 0) {
+        /* Check if default configuration should be used. */
+        if (cfg.empty() && filename.empty())
+            cfg = parse_configuration_from_file(
+              "../../../test/cppsuite/configurations/" + poc_test::test::default_config);
+        else if (!filename.empty())
+            cfg =
+              parse_configuration_from_file("../../../test/cppsuite/configurations/" + filename);
 
-    std::cout << "Configuration\t:" << cfg << std::endl;
-    std::cout << "Trace level\t:" << trace_level << std::endl;
+        std::cout << "Configuration\t:" << cfg << std::endl;
+        std::cout << "Trace level\t:" << trace_level << std::endl;
 
-    poc_test(cfg, trace_level).run();
-    return (0);
+        poc_test(cfg, trace_level).run();
+    }
+
+    return (error_code);
 }

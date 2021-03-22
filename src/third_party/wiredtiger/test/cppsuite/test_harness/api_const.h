@@ -37,6 +37,7 @@ static const char *CACHE_SIZE_MB = "cache_size_mb";
 static const char *COLLECTION_COUNT = "collection_count";
 static const char *DURATION_SECONDS = "duration_seconds";
 static const char *ENABLED = "enabled";
+static const char *ENABLE_LOGGING = "enable_logging";
 static const char *ENABLE_TIMESTAMP = "enable_timestamp";
 static const char *ENABLE_TRACKING = "enable_tracking";
 static const char *KEY_COUNT = "key_count";

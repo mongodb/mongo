@@ -10,6 +10,7 @@ static const WT_CONFIG_CHECK confchk_poc_test[] = {
   {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
   {"collection_count", "int", NULL, "min=0,max=200000", NULL, 0},
   {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
   {"enable_timestamp", "boolean", NULL, NULL, NULL, 0},
   {"enable_tracking", "boolean", NULL, NULL, NULL, 0},
   {"insert_config", "string", NULL, NULL, NULL, 0},
@@ -30,13 +31,13 @@ static const WT_CONFIG_CHECK confchk_poc_test[] = {
 static const WT_CONFIG_ENTRY config_entries[] = {
   {"poc_test",
     "cache_size_mb=0,collection_count=1,duration_seconds=0,"
-    "enable_timestamp=true,enable_tracking=true,insert_config=,"
-    "insert_threads=0,key_count=0,key_size=0,"
+    "enable_logging=true,enable_timestamp=true,enable_tracking=true,"
+    "insert_config=,insert_threads=0,key_count=0,key_size=0,"
     "max_operation_per_transaction=1,min_operation_per_transaction=1,"
     "oldest_lag=0,rate_per_second=1,read_threads=0,stable_lag=0,"
     "stat_cache_size=(enabled=false,limit=),update_config=,"
     "update_threads=0,value_size=0",
-    confchk_poc_test, 19},
+    confchk_poc_test, 20},
   {NULL, NULL, NULL, 0}};
 
 /*

@@ -122,7 +122,12 @@ timestamp_config = [
         The duration between the latest and stable timestamps''', min=0, max=1000000),
 ]
 
+logging_config = [
+    Config('enable_logging', 'true', r'''
+        Enables write ahead logs''', type='boolean'),
+]
+
 methods = {
     'poc_test' : Method(load_config + workload_config + runtime_monitor_config + transaction_config
-        + timestamp_config + test_config),
+        + timestamp_config + logging_config + test_config),
 }
