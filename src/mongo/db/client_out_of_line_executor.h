@@ -33,6 +33,8 @@
 #include <memory>
 
 #include "mongo/db/client.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/producer_consumer_queue.h"
 
@@ -78,10 +80,19 @@ public:
     };
 
     auto getHandle() noexcept {
+        // We always acquire a handle before scheduling tasks on the executor. The following ensures
+        // that acquiring a handle, thus exposing the executor to the outside world, always requires
+        // shutdown. A combination of load/store is preferred over using CAS due to performance
+        // considerations, and considering the fact that overwriting `_requireShutdown` is safe.
+        if (MONGO_unlikely(!_requireShutdown.load()))
+            _requireShutdown.store(true);
         return QueueHandle(_taskQueue);
     }
 
 private:
+    // Shutdown is not required so long as the executor is not exposed to the outside world.
+    AtomicWord<bool> _requireShutdown{false};
+
     class Impl;
     std::unique_ptr<Impl> _impl;
 
