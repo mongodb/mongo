@@ -4006,7 +4006,7 @@ def doConfigure(myenv):
         conf.FindSysLibDep("pcre", ["pcre"])
         conf.FindSysLibDep("pcrecpp", ["pcrecpp"])
     else:
-        env.Prepend(CPPDEFINES=['PCRE_STATIC'])
+        conf.env.Prepend(CPPDEFINES=['PCRE_STATIC'])
 
     if use_system_version_of_library("snappy"):
         conf.FindSysLibDep("snappy", ["snappy"])
