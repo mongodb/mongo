@@ -63,7 +63,7 @@ public:
                   "UMCInfoCommandArg only valid with T = UserName | RoleName");
 
     static UMCInfoCommandArg parseFromBSON(const BSONElement& elem) {
-        if (elem.numberInt() == 1) {
+        if (elem.isNumber() && (elem.safeNumberLong() == 1)) {
             return UMCInfoCommandArg(AllOnCurrentDB{});
         }
         if (enableForAllDBs && (elem.type() == Object) && (elem.Obj()[kForAllDBs].trueValue())) {
