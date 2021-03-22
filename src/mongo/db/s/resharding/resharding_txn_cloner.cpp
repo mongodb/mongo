@@ -53,6 +53,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
@@ -134,37 +135,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
 
     return sharded_agg_helpers::runPipelineDirectlyOnSingleShard(
         pipeline.getContext(), std::move(request), _sourceId.getShardId());
-}
-
-template <typename Callable>
-boost::optional<SharedSemiFuture<void>> ReshardingTxnCloner::_withSessionCheckedOut(
-    OperationContext* opCtx, const SessionTxnRecord& donorRecord, Callable&& callable) {
-    opCtx->setLogicalSessionId(donorRecord.getSessionId());
-    opCtx->setTxnNumber(donorRecord.getTxnNum());
-
-    MongoDOperationContextSession ocs(opCtx);
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-
-    try {
-        txnParticipant.beginOrContinue(opCtx, donorRecord.getTxnNum(), boost::none, boost::none);
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::TransactionTooOld) {
-            // donorRecord.getTxnNum() < recipientTxnNumber
-            return boost::none;
-        } else if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
-            // donorRecord.getTxnNum() == recipientTxnNumber &&
-            // !txnParticipant.transactionIsInRetryableWriteMode()
-            return boost::none;
-        } else if (ex.code() == ErrorCodes::PreparedTransactionInProgress) {
-            // txnParticipant.transactionIsPrepared()
-            return txnParticipant.onExitPrepare();
-        } else {
-            throw;
-        }
-    }
-
-    callable();
-    return boost::none;
 }
 
 void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
@@ -327,8 +297,12 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
                }
 
                auto hitPreparedTxn = _withTemporaryOperationContext([&](auto* opCtx) {
-                   return _withSessionCheckedOut(
-                       opCtx, *chainCtx->donorRecord, [&] { _updateSessionRecord(opCtx); });
+                   return resharding::data_copy::withSessionCheckedOut(
+                       opCtx,
+                       chainCtx->donorRecord->getSessionId(),
+                       chainCtx->donorRecord->getTxnNum(),
+                       boost::none /* stmtId */,
+                       [&] { _updateSessionRecord(opCtx); });
                });
 
                if (hitPreparedTxn) {

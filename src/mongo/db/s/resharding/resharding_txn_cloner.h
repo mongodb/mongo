@@ -37,8 +37,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/future.h"
 
@@ -88,10 +86,6 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
-
-    template <typename Callable>
-    boost::optional<SharedSemiFuture<void>> _withSessionCheckedOut(
-        OperationContext* opCtx, const SessionTxnRecord& donorRecord, Callable&& callable);
 
     void _updateSessionRecord(OperationContext* opCtx);
 
