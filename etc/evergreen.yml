@@ -10078,7 +10078,7 @@ buildvariants:
       --variables-files=etc/scons/xcode_macosx.vars
       -j$(sysctl -n hw.logicalcpu)
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
-    cdriver_cmake_osx_deployment_target: "10.12"
+    cdriver_cmake_osx_deployment_target: "10.14"
     cdriver_cmake_flags: >-
         -DCMAKE_BUILD_TYPE=RelWithDebInfo
         -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)"
