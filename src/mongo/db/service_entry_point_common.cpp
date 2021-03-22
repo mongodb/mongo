@@ -600,6 +600,10 @@ public:
                 // Ensure the lifetime of `_scopedMetrics` ends here.
                 _scopedMetrics = boost::none;
 
+                auto authzSession = AuthorizationSession::get(_execContext->client());
+                authzSession->verifyContract(
+                    _execContext->getCommand()->getAuthorizationContract());
+
                 if (status.isOK())
                     return;
                 _handleFailure(std::move(status));
@@ -1332,6 +1336,11 @@ void ExecCommandDatabase::_initiateCommand() {
                                                      replCoord->getReplicationMode() ==
                                                          repl::ReplicationCoordinator::modeReplSet);
 
+    // Start authz contract tracking before we evaluate failpoints
+    auto authzSession = AuthorizationSession::get(client);
+
+    authzSession->startContractTracking();
+
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
     const auto dbname = request.getDatabase().toString();
@@ -1394,6 +1403,13 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _impersonationSessionGuard.emplace(opCtx);
+
+    // Restart contract tracking afer the impersonation guard checks for impersonate if using
+    // impersonation.
+    if (_impersonationSessionGuard->isActive()) {
+        authzSession->startContractTracking();
+    }
+
     _invocation->checkAuthorization(opCtx, request);
 
     const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);

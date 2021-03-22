@@ -68,6 +68,11 @@ public:
     }
 
     /**
+     * Clear the authorization contract
+     */
+    void clear();
+
+    /**
      * Add a access check to the contract.
      */
     void addAccessCheck(AccessCheckEnum check);

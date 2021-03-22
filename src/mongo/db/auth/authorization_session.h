@@ -47,6 +47,7 @@
 namespace mongo {
 
 class Client;
+class AuthorizationContract;
 
 /**
  * Contains all the authorization logic for a single client connection.  It contains a set of
@@ -136,6 +137,11 @@ public:
     virtual void startRequest(OperationContext* opCtx) = 0;
 
     /**
+     * Start tracking permissions and privileges in the authorization contract.
+     */
+    virtual void startContractTracking() = 0;
+
+    /**
      * Adds the User identified by "UserName" to the authorization session, acquiring privileges
      * for it in the process.
      */
@@ -177,13 +183,6 @@ public:
     // as a parameter so it can take out a lock on the client.
     virtual void grantInternalAuthorization(Client* client) = 0;
     virtual void grantInternalAuthorization(OperationContext* opCtx) = 0;
-
-    // Generates a vector of default privileges that are granted to any user,
-    // regardless of which roles that user does or does not possess.
-    // If localhost exception is active, the permissions include the ability to create
-    // the first user and the ability to run the commands needed to bootstrap the system
-    // into a state where the first user can be created.
-    virtual PrivilegeVector getDefaultPrivileges() = 0;
 
     // Checks if the current session is authorized to list the collections in the given
     // database. If it is, return a privilegeVector containing the privileges used to authorize
@@ -289,6 +288,9 @@ public:
     // nature of session inaccessibility when the session is not accessible.
     virtual Status checkCursorSessionPrivilege(
         OperationContext* const opCtx, boost::optional<LogicalSessionId> cursorSessionId) = 0;
+
+    // Verify the authorization contract. If contract == nullptr, no check is performed.
+    virtual void verifyContract(const AuthorizationContract* contract) const = 0;
 
 protected:
     virtual std::tuple<std::vector<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;

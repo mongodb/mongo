@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_contract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
@@ -74,6 +75,8 @@ public:
 
     void startRequest(OperationContext* opCtx) override;
 
+    void startContractTracking() override;
+
     Status addAndAuthorizeUser(OperationContext* opCtx, const UserName& userName) override;
 
     User* lookupUser(const UserName& name) override;
@@ -94,8 +97,6 @@ public:
     void grantInternalAuthorization(Client* client) override;
 
     void grantInternalAuthorization(OperationContext* opCtx) override;
-
-    PrivilegeVector getDefaultPrivileges() override;
 
     StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData dbname,
                                                                  const BSONObj& cmdObj) override;
@@ -149,6 +150,8 @@ public:
     Status checkCursorSessionPrivilege(OperationContext* const opCtx,
                                        boost::optional<LogicalSessionId> cursorSessionId) override;
 
+    void verifyContract(const AuthorizationContract* contract) const override;
+
 protected:
     // Builds a vector of all roles held by users who are authenticated on this connection. The
     // vector is stored in _authenticatedRoleNames. This function is called when users are
@@ -177,6 +180,15 @@ private:
         return std::make_tuple(&_impersonatedUserNames, &_impersonatedRoleNames);
     }
 
+
+    // Generates a vector of default privileges that are granted to any user,
+    // regardless of which roles that user does or does not possess.
+    // If localhost exception is active, the permissions include the ability to create
+    // the first user and the ability to run the commands needed to bootstrap the system
+    // into a state where the first user can be created.
+    PrivilegeVector _getDefaultPrivileges();
+
+private:
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 
     // A vector of impersonated UserNames and a vector of those users' RoleNames.
@@ -184,5 +196,11 @@ private:
     std::vector<UserName> _impersonatedUserNames;
     std::vector<RoleName> _impersonatedRoleNames;
     bool _impersonationFlag;
+
+    // A record of privilege checks and other authorization like function calls made on
+    // AuthorizationSession. IDL Typed Commands can optionally define a contract declaring the set
+    // of authorization checks they perform. After a command completes running, MongoDB verifies the
+    // set of checks performed is a subset of the checks declared in the contract.
+    AuthorizationContract _contract;
 };
 }  // namespace mongo

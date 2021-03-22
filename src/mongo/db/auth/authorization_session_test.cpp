@@ -50,6 +50,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -125,6 +126,7 @@ protected:
     AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
     BSONObj credentials;
+    RAIIServerParameterControllerForTest controller{"featureFlagAuthorizationContract", 1};
 };
 
 const NamespaceString testFooNss("test.foo");
@@ -238,6 +240,26 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::collMod));
+
+    // Verify we recorded the all the auth checks correctly
+    AuthorizationContract ac(
+        std::initializer_list<AccessCheckEnum>{},
+        std::initializer_list<Privilege>{
+            Privilege(ResourcePattern::forDatabaseName("ignored"),
+                      {ActionType::insert, ActionType::dbStats}),
+            Privilege(ResourcePattern::forExactNamespace(NamespaceString("ignored.ignored")),
+                      {ActionType::insert, ActionType::collMod}),
+        });
+
+    authzSession->verifyContract(&ac);
+
+    // Verify against a smaller contract that verifyContract fails
+    AuthorizationContract acMissing(std::initializer_list<AccessCheckEnum>{},
+                                    std::initializer_list<Privilege>{
+                                        Privilege(ResourcePattern::forDatabaseName("ignored"),
+                                                  {ActionType::insert, ActionType::dbStats}),
+                                    });
+    ASSERT_THROWS_CODE(authzSession->verifyContract(&acMissing), AssertionException, 5452401);
 }
 
 TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
@@ -1343,6 +1365,15 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
     ASSERT_THROWS_CODE(authzSession->isAuthorizedToParseNamespaceElement(invalidObj.firstElement()),
                        AssertionException,
                        ErrorCodes::InvalidNamespace);
+
+    // Verify we recorded the all the auth checks correctly
+    AuthorizationContract ac(
+        std::initializer_list<AccessCheckEnum>{
+            AccessCheckEnum::kIsAuthorizedToParseNamespaceElement},
+        std::initializer_list<Privilege>{
+            Privilege(ResourcePattern::forClusterResource(), ActionType::useUUID)});
+
+    authzSession->verifyContract(&ac);
 }
 
 

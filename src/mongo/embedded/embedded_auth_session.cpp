@@ -68,6 +68,8 @@ public:
         // It is always okay to start a request in embedded.
     }
 
+    void startContractTracking() override {}
+
     Status addAndAuthorizeUser(OperationContext*, const UserName&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
@@ -111,10 +113,6 @@ public:
     }
 
     void logoutDatabase(Client*, StringData, StringData) override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
-    PrivilegeVector getDefaultPrivileges() override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -211,6 +209,10 @@ public:
 
     bool isAuthorizedForAnyActionOnResource(const ResourcePattern&) override {
         return true;
+    }
+
+    void verifyContract(const AuthorizationContract* contract) const override {
+        // Do nothing
     }
 
 protected:
