@@ -803,6 +803,21 @@ public:
                 return;
             }
 
+            auto& curOp = *CurOp::get(opCtx);
+            ON_BLOCK_EXIT([&] {
+                // This is the only part of finishCurOp we need to do for inserts because they reuse
+                // the top-level curOp. The rest is handled by the top-level entrypoint.
+                curOp.done();
+                Top::get(opCtx->getServiceContext())
+                    .record(opCtx,
+                            request().getNamespace().ns(),
+                            LogicalOp::opInsert,
+                            Top::LockType::WriteLocked,
+                            durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
+                            curOp.isCommand(),
+                            curOp.getReadWriteType());
+            });
+
             std::vector<BSONObj> errors;
             boost::optional<repl::OpTime> opTime;
             boost::optional<OID> electionId;
