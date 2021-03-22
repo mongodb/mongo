@@ -42,6 +42,11 @@ def timestamp_str(t):
 class test_rollback_to_stable02(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
         ('inmem', dict(in_memory=True))
@@ -52,7 +57,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(in_memory_values, prepare_values)
+    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all)'
@@ -65,10 +70,14 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         uri = "table:rollback_to_stable02"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
@@ -79,19 +88,19 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         valueb = "bbbbb" * 100
         valuec = "ccccc" * 100
         valued = "ddddd" * 100
-        self.large_updates(uri, valuea, ds, nrows, 10)
+        self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
         self.check(valuea, uri, nrows, 10)
 
-        self.large_updates(uri, valueb, ds, nrows, 20)
+        self.large_updates(uri, valueb, ds, nrows, self.prepare, 20)
         # Check that the new updates are only seen after the update timestamp.
         self.check(valueb, uri, nrows, 20)
 
-        self.large_updates(uri, valuec, ds, nrows, 30)
+        self.large_updates(uri, valuec, ds, nrows, self.prepare, 30)
         # Check that the new updates are only seen after the update timestamp.
         self.check(valuec, uri, nrows, 30)
 
-        self.large_updates(uri, valued, ds, nrows, 40)
+        self.large_updates(uri, valued, ds, nrows, self.prepare, 40)
         # Check that the new updates are only seen after the update timestamp.
         self.check(valued, uri, nrows, 40)
 

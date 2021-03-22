@@ -69,12 +69,17 @@ def retry_rollback(self, name, txn_session, code):
 class test_rollback_to_stable10(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     prepare_values = [
         ('no_prepare', dict(prepare=False)),
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(prepare_values)
+    scenarios = make_scenarios(key_format_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=6MB,statistics=(all),statistics_log=(json,on_close,wait=1),log=(enabled=true),timing_stress_for_test=[history_store_checkpoint_delay]'
@@ -83,11 +88,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         self.pr("create/populate tables")
         uri_1 = "table:rollback_to_stable10_1"
         ds_1 = SimpleDataSet(
-            self, uri_1, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri_1, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds_1.populate()
 
         # Create another table without logging.
@@ -109,15 +118,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
 
         # Perform several updates.
         self.pr("large updates")
-        self.large_updates(uri_1, value_d, ds_1, nrows, 20)
-        self.large_updates(uri_1, value_c, ds_1, nrows, 30)
-        self.large_updates(uri_1, value_b, ds_1, nrows, 40)
-        self.large_updates(uri_1, value_a, ds_1, nrows, 50)
+        self.large_updates(uri_1, value_d, ds_1, nrows, self.prepare, 20)
+        self.large_updates(uri_1, value_c, ds_1, nrows, self.prepare, 30)
+        self.large_updates(uri_1, value_b, ds_1, nrows, self.prepare, 40)
+        self.large_updates(uri_1, value_a, ds_1, nrows, self.prepare, 50)
 
-        self.large_updates(uri_2, value_d, ds_2, nrows, 20)
-        self.large_updates(uri_2, value_c, ds_2, nrows, 30)
-        self.large_updates(uri_2, value_b, ds_2, nrows, 40)
-        self.large_updates(uri_2, value_a, ds_2, nrows, 50)
+        self.large_updates(uri_2, value_d, ds_2, nrows, self.prepare, 20)
+        self.large_updates(uri_2, value_c, ds_2, nrows, self.prepare, 30)
+        self.large_updates(uri_2, value_b, ds_2, nrows, self.prepare, 40)
+        self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
         self.check(value_d, uri_1, nrows, 20)
@@ -147,13 +156,13 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             # Rollbacks may occur when checkpoint is running, so retry as needed.
             self.pr("updates")
             retry_rollback(self, 'update ds1, e', None,
-                           lambda: self.large_updates(uri_1, value_e, ds_1, nrows, 70))
+                           lambda: self.large_updates(uri_1, value_e, ds_1, nrows, self.prepare, 70))
             retry_rollback(self, 'update ds2, e', None,
-                           lambda: self.large_updates(uri_2, value_e, ds_2, nrows, 70))
+                           lambda: self.large_updates(uri_2, value_e, ds_2, nrows, self.prepare, 70))
             retry_rollback(self, 'update ds1, f', None,
-                           lambda: self.large_updates(uri_1, value_f, ds_1, nrows, 80))
+                           lambda: self.large_updates(uri_1, value_f, ds_1, nrows, self.prepare, 80))
             retry_rollback(self, 'update ds2, f', None,
-                           lambda: self.large_updates(uri_2, value_f, ds_2, nrows, 80))
+                           lambda: self.large_updates(uri_2, value_f, ds_2, nrows, self.prepare, 80))
         finally:
             done.set()
             ckpt.join()
@@ -224,15 +233,15 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
 
         # Perform several updates.
         self.pr("large updates")
-        self.large_updates(uri_1, value_d, ds_1, nrows, 20)
-        self.large_updates(uri_1, value_c, ds_1, nrows, 30)
-        self.large_updates(uri_1, value_b, ds_1, nrows, 40)
-        self.large_updates(uri_1, value_a, ds_1, nrows, 50)
+        self.large_updates(uri_1, value_d, ds_1, nrows, self.prepare, 20)
+        self.large_updates(uri_1, value_c, ds_1, nrows, self.prepare, 30)
+        self.large_updates(uri_1, value_b, ds_1, nrows, self.prepare, 40)
+        self.large_updates(uri_1, value_a, ds_1, nrows, self.prepare, 50)
 
-        self.large_updates(uri_2, value_d, ds_2, nrows, 20)
-        self.large_updates(uri_2, value_c, ds_2, nrows, 30)
-        self.large_updates(uri_2, value_b, ds_2, nrows, 40)
-        self.large_updates(uri_2, value_a, ds_2, nrows, 50)
+        self.large_updates(uri_2, value_d, ds_2, nrows, self.prepare, 20)
+        self.large_updates(uri_2, value_c, ds_2, nrows, self.prepare, 30)
+        self.large_updates(uri_2, value_b, ds_2, nrows, self.prepare, 40)
+        self.large_updates(uri_2, value_a, ds_2, nrows, self.prepare, 50)
 
         # Verify data is visible and correct.
         self.check(value_d, uri_1, nrows, 20)
