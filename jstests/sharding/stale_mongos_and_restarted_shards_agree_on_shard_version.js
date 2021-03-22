@@ -215,7 +215,9 @@ const staleMongoS = st.s1;
     // Check for the expected number of refreshes.
     const catalogCacheStatistics =
         st.shard0.adminCommand({serverStatus: 1}).shardingStatistics.catalogCache;
-    assert.eq(kNumThreadsForConvoyTest, catalogCacheStatistics.countFullRefreshesStarted);
+    assert.eq(kNumThreadsForConvoyTest,
+              catalogCacheStatistics.countFullRefreshesStarted -
+                  catalogCacheStatistics.countFailedRefreshes);
     assert.eq(0, catalogCacheStatistics.countIncrementalRefreshesStarted);
 }
 
