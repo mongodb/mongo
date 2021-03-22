@@ -26,6 +26,10 @@ selector:
   - jstests/concurrency/fsm_workloads/invalidated_cursors.js
   - jstests/concurrency/fsm_workloads/globally_managed_cursors.js
 
+  # TODO SERVER-55411: to enable capped collection workloads for backup.
+  - jstests/concurrency/fsm_workloads/create_capped_collection.js
+  - jstests/concurrency/fsm_workloads/create_capped_collection_maxdocs.js
+
   exclude_with_any_tags:
   # The ability to shut down a node while its in the middle of applying ops is required for
   # backup_restore. The workloads which perform certain operations which can cause the test to fail
