@@ -754,8 +754,6 @@ struct UpdateStats : public SpecificStats {
 };
 
 struct TextMatchStats : public SpecificStats {
-    TextMatchStats() : parsedTextQuery(), textIndexVersion(0) {}
-
     std::unique_ptr<SpecificStats> clone() const final {
         return std::make_unique<TextMatchStats>(*this);
     }
@@ -770,12 +768,12 @@ struct TextMatchStats : public SpecificStats {
     // Human-readable form of the FTSQuery associated with the text stage.
     BSONObj parsedTextQuery;
 
-    int textIndexVersion;
+    int textIndexVersion{0};
 
     // Index keys that precede the "text" index key.
     BSONObj indexPrefix;
 
-    size_t docsRejected;
+    size_t docsRejected{0};
 };
 
 struct TextOrStats : public SpecificStats {
