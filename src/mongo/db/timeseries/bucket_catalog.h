@@ -47,6 +47,11 @@ class BucketCatalog {
     using IdleList = std::list<Bucket*>;
 
 public:
+    enum class CombineWithInsertsFromOtherClients {
+        kAllow,
+        kDisallow,
+    };
+
     class BucketId {
         friend class BucketCatalog;
 
@@ -93,8 +98,9 @@ public:
 
     public:
         WriteBatch() = delete;
-        explicit WriteBatch(const std::shared_ptr<Bucket>& bucket,
-                            const std::shared_ptr<ExecutionStats>& stats);
+        WriteBatch(const std::shared_ptr<Bucket>& bucket,
+                   const UUID& lsid,
+                   const std::shared_ptr<ExecutionStats>& stats);
 
         /**
          * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
@@ -146,7 +152,7 @@ public:
          * that have previously been committed to the bucket, and marks the batch inactive. Must
          * have commit rights.
          */
-        void _prepareCommit(MinMax* min, MinMax* max, uint32_t numMeasurementsCommitted);
+        void _prepareCommit();
 
         /**
          * Report the result and status of a commit, and notify anyone waiting on getResult(). Must
@@ -162,6 +168,7 @@ public:
 
         std::shared_ptr<Bucket> _bucket;
         const BucketId _bucketId;
+        const UUID _lsid;
         std::shared_ptr<ExecutionStats> _stats;
 
         std::vector<BSONObj> _measurements;
@@ -201,7 +208,8 @@ public:
      */
     StatusWith<std::shared_ptr<WriteBatch>> insert(OperationContext* opCtx,
                                                    const NamespaceString& ns,
-                                                   const BSONObj& doc);
+                                                   const BSONObj& doc,
+                                                   CombineWithInsertsFromOtherClients combine);
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state.
@@ -214,10 +222,10 @@ public:
     void finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
 
     /**
-     * Clears the given bucket. Aborts any unfinished WriteBatches. If non-null, the operation
-     * assumes the caller already has commit rights on batchWithRights.
+     * Aborts the given write batch and any other outstanding batches on the same bucket. Caller
+     * must already have commit rights on batch, and batch must not be finished.
      */
-    void clear(std::shared_ptr<Bucket> bucket, std::shared_ptr<WriteBatch> batchWithRights);
+    void abort(std::shared_ptr<WriteBatch> batch);
 
     /**
      * Clears the buckets for the given namespace.
@@ -279,6 +287,10 @@ private:
         bool operator==(const BucketMetadata& other) const;
 
         const BSONObj& toBSON() const;
+
+        StringData getMetaField() const;
+
+        const CollatorInterface* getCollator() const;
 
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
@@ -404,6 +416,13 @@ private:
         // range.
         bool full = false;
 
+        // The batch that has been prepared and is currently in the process of being committed, if
+        // any.
+        std::shared_ptr<WriteBatch> preparedBatch;
+
+        // Per-logical session batches that are actively being inserted into.
+        stdx::unordered_map<UUID, std::shared_ptr<WriteBatch>, UUID::Hash> batches;
+
         // If the bucket is in the _idleList, then its position is recorded here.
         boost::optional<IdleList::iterator> idleListEntry = boost::none;
 
@@ -431,24 +450,8 @@ private:
          */
         bool allCommitted() const;
 
-        /**
-         * Return a pointer to the current, open batch.
-         */
-        std::shared_ptr<WriteBatch> activeBatch(const std::shared_ptr<ExecutionStats>& stats);
-
-        /**
-         * Return a pointer to the earliest uncommitted batch.
-         */
-        std::shared_ptr<WriteBatch> oldestUncommittedBatch() const;
-
-        /**
-         * Remove the oldest batch. Takes a batch parameter as confirmation that the caller knows
-         * what batch is being removed.
-         */
-        void removeOldestBatch(const std::shared_ptr<WriteBatch>& batch);
-
-    private:
-        std::queue<std::shared_ptr<WriteBatch>> _batches;
+        std::shared_ptr<WriteBatch> activeBatch(const UUID& lsid,
+                                                const std::shared_ptr<ExecutionStats>& stats);
     };
 
     struct ExecutionStats {
