@@ -273,6 +273,16 @@ std::vector<DebugPrinter::Block> SortStage::debugPrint() const {
     ret.emplace_back(DebugPrinter::Block("`]"));
 
     ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _dirs.size(); idx++) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+        DebugPrinter::addIdentifier(ret,
+                                    _dirs[idx] == value::SortDirection::Ascending ? "asc" : "desc");
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _vals.size(); ++idx) {
         if (idx) {
             ret.emplace_back(DebugPrinter::Block("`,"));

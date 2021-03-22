@@ -95,6 +95,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     }
 
     const auto isMultiPlan = candidates.plans.size() > 0;
+
+    uassert(5088500, "Query does not have a valid CanonicalQuery", _cq);
     if (!_cq->getExpCtx()->explain) {
         // If we're not in explain mode, there is no need to keep rejected candidate plans around.
         candidates.plans.clear();

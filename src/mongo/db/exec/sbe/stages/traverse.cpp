@@ -318,17 +318,18 @@ std::vector<DebugPrinter::Block> TraverseStage::debugPrint() const {
         }
         ret.emplace_back("`]");
     }
-    if (_fold) {
-        ret.emplace_back("{`");
-        DebugPrinter::addBlocks(ret, _fold->debugPrint());
-        ret.emplace_back("`}");
-    }
 
-    if (_final) {
-        ret.emplace_back("{`");
-        DebugPrinter::addBlocks(ret, _final->debugPrint());
-        ret.emplace_back("`}");
+    ret.emplace_back("{`");
+    if (_fold) {
+        DebugPrinter::addBlocks(ret, _fold->debugPrint());
     }
+    ret.emplace_back("`}");
+
+    ret.emplace_back("{`");
+    if (_final) {
+        DebugPrinter::addBlocks(ret, _final->debugPrint());
+    }
+    ret.emplace_back("`}");
 
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addIdentifier(ret, "from");

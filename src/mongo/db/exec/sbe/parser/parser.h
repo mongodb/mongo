@@ -54,7 +54,9 @@ struct ParsedQueryTree {
     std::unique_ptr<PlanStage> stage;
     std::unique_ptr<EExpression> expr;
 
-    stdx::unordered_map<std::string, std::unique_ptr<EExpression>> projects;
+    // Sorted map for projects. Since by default the map will be sorted by the string, we will get
+    // deterministic order as we insert symbol string keys and expression values.
+    std::map<std::string, std::unique_ptr<EExpression>> projects;
 };
 
 using AstQuery = peg::AstBase<ParsedQueryTree>;
@@ -72,8 +74,8 @@ public:
     }
 
 private:
-    using SymbolTable = stdx::unordered_map<std::string, value::SlotId>;
-    using SpoolBufferLookupTable = stdx::unordered_map<std::string, SpoolId>;
+    using SymbolTable = std::map<std::string, value::SlotId>;
+    using SpoolBufferLookupTable = std::map<std::string, SpoolId>;
     peg::parser _parser;
     OperationContext* _opCtx{nullptr};
     std::string _defaultDb;
@@ -151,10 +153,10 @@ private:
     }
 
     template <typename T>
-    sbe::value::SlotMap<T> lookupSlots(stdx::unordered_map<std::string, T> map) {
+    sbe::value::SlotMap<T> lookupSlots(std::map<std::string, T> indentifiers) {
         sbe::value::SlotMap<T> result;
-        for (auto&& [k, v] : map) {
-            result[lookupSlotStrict(k)] = std::move(v);
+        for (auto&& [name, value] : indentifiers) {
+            result[lookupSlotStrict(name)] = std::move(value);
         }
         return result;
     }
