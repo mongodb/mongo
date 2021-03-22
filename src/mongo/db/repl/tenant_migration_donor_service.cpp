@@ -1173,7 +1173,15 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         // Fulfill the promise since the state doc failed to insert.
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
-        return ExecutorFuture(**executor);
+        return ExecutorFuture<void>(**executor, status);
+    } else if (status == ErrorCodes::PrimarySteppedDown) {
+        // The node started stepping down while the instance was waiting for key docs to
+        // to replicate. Do not abort the migration since the migration can safely resume
+        // when the new primary steps up.
+        stdx::lock_guard<Latch> lg(_mutex);
+        setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
+
+        return ExecutorFuture<void>(**executor, status);
     } else {
         // Enter "abort" state.
         _abortReason.emplace(status);

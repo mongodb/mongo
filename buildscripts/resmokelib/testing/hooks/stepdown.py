@@ -14,6 +14,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
+from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -32,7 +33,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
 
         Args:
             hook_logger: the logger instance for this hook.
-            fixture: the target fixture (a replica set or sharded cluster).
+            fixture: the target fixture (replica sets or a sharded cluster).
             config_stepdown: whether to stepdown the CSRS.
             shard_stepdown: whether to stepdown the shard replica sets in a sharded cluster.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
@@ -127,6 +128,14 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             if self._wait_for_mongos_retarget:
                 for mongos_fixture in fixture.mongos:
                     self._mongos_fixtures.append(mongos_fixture)
+        elif isinstance(fixture, tenant_migration.TenantMigrationFixture):
+            if not fixture.all_nodes_electable:
+                raise ValueError(
+                    "The replica sets that are the target of the ContinuousStepdown hook must have"
+                    " the 'all_nodes_electable' option set.")
+            # TODO (SERVER-52713): Allow tenant migration stepdown/kill/terminate suites to commit
+            # migrations and interrupt all replica sets.
+            self._rs_fixtures.append(fixture.get_replsets()[0])
 
 
 class FlagBasedStepdownLifecycle(object):

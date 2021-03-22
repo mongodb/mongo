@@ -95,7 +95,7 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
         futures.push_back(std::move(deadlineReachedFuture));
     }
 
-    auto waitResult = whenAny(std::move(futures)).getNoThrow();
+    auto waitResult = whenAny(std::move(futures)).getNoThrow(opCtx);
     if (!waitResult.isOK()) {
         return waitResult.getStatus();
     }
