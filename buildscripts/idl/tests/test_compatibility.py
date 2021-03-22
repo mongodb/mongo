@@ -126,7 +126,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 139)
+        self.assertTrue(error_collection.count() == 160)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -245,6 +245,69 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL)
         self.assertRegex(
             str(command_parameter_cpp_type_not_equal_error), "commandParameterCppTypeNotEqual")
+
+        old_command_parameter_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "oldCommandParamTypeBsonAnyUnstable")
+        self.assertTrue(
+            old_command_parameter_type_bson_any_unstable_error.error_id == idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(old_command_parameter_type_bson_any_unstable_error),
+            "oldCommandParamTypeBsonAnyUnstable")
+
+        new_command_parameter_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "newCommandParamTypeBsonAnyUnstable")
+        self.assertTrue(
+            new_command_parameter_type_bson_any_unstable_error.error_id == idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(new_command_parameter_type_bson_any_unstable_error),
+            "newCommandParamTypeBsonAnyUnstable")
+
+        command_parameter_type_bson_any_not_allowed_unstable_error = error_collection.get_error_by_command_name(
+            "commandParamTypeBsonAnyNotAllowedUnstable")
+        self.assertTrue(command_parameter_type_bson_any_not_allowed_unstable_error.error_id ==
+                        idl_compatibility_errors.
+                        ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(command_parameter_type_bson_any_not_allowed_unstable_error),
+            "commandParamTypeBsonAnyNotAllowedUnstable")
+
+        command_parameter_cpp_type_not_equal_unstable_error = error_collection.get_error_by_command_name(
+            "commandParameterCppTypeNotEqualUnstable")
+        self.assertTrue(command_parameter_cpp_type_not_equal_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL)
+        self.assertRegex(
+            str(command_parameter_cpp_type_not_equal_unstable_error),
+            "commandParameterCppTypeNotEqualUnstable")
+
+        parameter_field_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariantUnstable", idl_compatibility_errors.
+            ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(parameter_field_type_bson_any_with_variant_unstable_error.error_id ==
+                        idl_compatibility_errors.
+                        ERROR_ID_OLD_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_unstable_error),
+            "parameterFieldTypeBsonAnyWithVariantUnstable")
+
+        parameter_field_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "parameterFieldTypeBsonAnyWithVariantUnstable", idl_compatibility_errors.
+            ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(parameter_field_type_bson_any_with_variant_unstable_error.error_id ==
+                        idl_compatibility_errors.
+                        ERROR_ID_NEW_COMMAND_PARAMETER_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(parameter_field_type_bson_any_with_variant_unstable_error),
+            "parameterFieldTypeBsonAnyWithVariantUnstable")
+
+        newly_added_param_bson_any_not_allowed_error = error_collection.get_error_by_command_name(
+            "newlyAddedParamBsonAnyNotAllowed")
+        self.assertTrue(
+            newly_added_param_bson_any_not_allowed_error.error_id == idl_compatibility_errors.
+            ERROR_ID_COMMAND_PARAMETER_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(newly_added_param_bson_any_not_allowed_error), "newlyAddedParamBsonAnyNotAllowed")
 
         new_command_parameter_type_enum_not_superset = error_collection.get_error_by_command_name(
             "newCommandParameterTypeEnumNotSuperset")
@@ -417,6 +480,67 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
         self.assertRegex(
             str(reply_field_type_bson_any_with_variant_error), "replyFieldTypeBsonAnyWithVariant")
+
+        old_reply_field_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "oldReplyFieldTypeBsonAnyUnstable")
+        self.assertTrue(
+            old_reply_field_type_bson_any_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(old_reply_field_type_bson_any_unstable_error), "oldReplyFieldTypeBsonAnyUnstable")
+
+        new_reply_field_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "newReplyFieldTypeBsonAnyUnstable")
+        self.assertTrue(
+            new_reply_field_type_bson_any_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(new_reply_field_type_bson_any_unstable_error), "newReplyFieldTypeBsonAnyUnstable")
+
+        reply_field_type_bson_any_not_allowed_unstable_error = error_collection.get_error_by_command_name(
+            "replyFieldTypeBsonAnyNotAllowedUnstable")
+        self.assertTrue(
+            reply_field_type_bson_any_not_allowed_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(reply_field_type_bson_any_not_allowed_unstable_error),
+            "replyFieldTypeBsonAnyNotAllowedUnstable")
+
+        reply_field_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "replyFieldTypeBsonAnyWithVariantUnstable",
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            reply_field_type_bson_any_with_variant_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(reply_field_type_bson_any_with_variant_unstable_error),
+            "replyFieldTypeBsonAnyWithVariantUnstable")
+
+        reply_field_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "replyFieldTypeBsonAnyWithVariantUnstable",
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            reply_field_type_bson_any_with_variant_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(reply_field_type_bson_any_with_variant_unstable_error),
+            "replyFieldTypeBsonAnyWithVariantUnstable")
+
+        reply_field_cpp_type_not_equal_unstable_error = error_collection.get_error_by_command_name(
+            "replyFieldCppTypeNotEqualUnstable")
+        self.assertTrue(reply_field_cpp_type_not_equal_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL)
+        self.assertRegex(
+            str(reply_field_cpp_type_not_equal_unstable_error), "replyFieldCppTypeNotEqualUnstable")
+
+        newly_added_reply_field_bson_any_not_allowed_error = error_collection.get_error_by_command_name(
+            "newlyAddedReplyFieldTypeBsonAnyNotAllowed")
+        self.assertTrue(
+            newly_added_reply_field_bson_any_not_allowed_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_REPLY_FIELD_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(newly_added_reply_field_bson_any_not_allowed_error),
+            "newlyAddedReplyFieldTypeBsonAnyNotAllowed")
 
         reply_field_type_bson_any_with_variant_with_array_error = error_collection.get_error_by_command_name_and_error_id(
             "replyFieldTypeBsonAnyWithVariantWithArray",
@@ -596,6 +720,62 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(command_cpp_type_not_equal_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL)
         self.assertRegex(str(command_cpp_type_not_equal_error), "commandCppTypeNotEqual")
+
+        old_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "oldTypeBsonAnyUnstable")
+        self.assertTrue(old_type_bson_any_unstable_error.error_id == idl_compatibility_errors.
+                        ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(old_type_bson_any_unstable_error), "oldTypeBsonAnyUnstable")
+
+        new_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
+            "newTypeBsonAnyUnstable")
+        self.assertTrue(new_type_bson_any_unstable_error.error_id == idl_compatibility_errors.
+                        ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(str(new_type_bson_any_unstable_error), "newTypeBsonAnyUnstable")
+
+        type_bson_any_not_allowed_unstable_error = error_collection.get_error_by_command_name(
+            "typeBsonAnyNotAllowedUnstable")
+        self.assertTrue(
+            type_bson_any_not_allowed_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(type_bson_any_not_allowed_unstable_error), "typeBsonAnyNotAllowedUnstable")
+
+        command_cpp_type_not_equal_unstable_error = error_collection.get_error_by_command_name(
+            "commandCppTypeNotEqualUnstable")
+        self.assertTrue(command_cpp_type_not_equal_unstable_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL)
+        self.assertRegex(
+            str(command_cpp_type_not_equal_unstable_error), "commandCppTypeNotEqualUnstable")
+
+        command_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariantUnstable",
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_OLD_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_unstable_error),
+            "commandTypeBsonAnyWithVariantUnstable")
+
+        command_type_bson_any_with_variant_unstable_error = error_collection.get_error_by_command_name_and_error_id(
+            "commandTypeBsonAnyWithVariantUnstable",
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertTrue(
+            command_type_bson_any_with_variant_unstable_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY)
+        self.assertRegex(
+            str(command_type_bson_any_with_variant_unstable_error),
+            "commandTypeBsonAnyWithVariantUnstable")
+
+        newly_added_type_field_bson_any_not_allowed_error = error_collection.get_error_by_command_name(
+            "newlyAddedTypeFieldBsonAnyNotAllowed")
+        self.assertTrue(
+            newly_added_type_field_bson_any_not_allowed_error.error_id ==
+            idl_compatibility_errors.ERROR_ID_COMMAND_TYPE_BSON_SERIALIZATION_TYPE_ANY_NOT_ALLOWED)
+        self.assertRegex(
+            str(newly_added_type_field_bson_any_not_allowed_error),
+            "newlyAddedTypeFieldBsonAnyNotAllowed")
 
         new_type_not_enum_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_NEW_COMMAND_TYPE_NOT_ENUM)
