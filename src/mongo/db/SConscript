@@ -590,6 +590,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/collection_options_idl',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/query/explain_options',
@@ -1405,6 +1406,7 @@ env.Library(
         'create_indexes.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_idl',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

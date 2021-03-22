@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/auth/action_type.idl"
     - "mongo/db/catalog/commit_quorum.idl"
     - "mongo/idl/basic_types.idl"
 
@@ -158,6 +159,11 @@ commands:
         namespace: concatenate_with_db
         cpp_name: CreateIndexesCommand
         api_version: "1"
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: createIndex
         reply_type: CreateIndexesReply
         strict: true
         fields:

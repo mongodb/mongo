@@ -32,6 +32,7 @@ global:
         - "mongo/util/uuid.h"
 
 imports:
+    - "mongo/db/auth/action_type.idl"
     - "mongo/idl/basic_types.idl"
 
 structs:
@@ -61,3 +62,8 @@ commands:
         strict: true
         api_version: "1"
         reply_type: DropReply
+        access_check:
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: dropCollection
