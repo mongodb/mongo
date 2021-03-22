@@ -56,22 +56,20 @@ constexpr auto kReshardFinalOpLogType = "reshardFinalOp"_sd;
  * Emplaces the 'fetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
  * emplaced inside the boost::optional.
  */
-template <class ClassWithFetchTimestamp>
-void emplaceFetchTimestampIfExists(ClassWithFetchTimestamp& c,
-                                   boost::optional<Timestamp> fetchTimestamp) {
-    if (!fetchTimestamp) {
+template <typename ClassWithCloneTimestamp>
+void emplaceCloneTimestampIfExists(ClassWithCloneTimestamp& c,
+                                   boost::optional<Timestamp> cloneTimestamp) {
+    if (!cloneTimestamp) {
         return;
     }
 
-    invariant(!fetchTimestamp->isNull());
+    invariant(!cloneTimestamp->isNull());
 
-    if (auto alreadyExistingFetchTimestamp = c.getFetchTimestamp()) {
-        invariant(fetchTimestamp == alreadyExistingFetchTimestamp);
+    if (auto alreadyExistingCloneTimestamp = c.getCloneTimestamp()) {
+        invariant(cloneTimestamp == alreadyExistingCloneTimestamp);
     }
 
-    FetchTimestamp fetchTimestampStruct;
-    fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
-    c.setFetchTimestampStruct(std::move(fetchTimestampStruct));
+    c.setCloneTimestamp(*cloneTimestamp);
 }
 
 /**

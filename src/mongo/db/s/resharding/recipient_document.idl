@@ -41,18 +41,21 @@ structs:
         inline_chained_structs: true
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
-            FetchTimestamp: FetchTimestampStruct
         generate_comparison_operators: false
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.
         strict: false
         fields:
+            cloneTimestamp:
+                type: timestamp
+                optional: true
+                description:  "The timestamp for the snapshot read while cloning from the donors."
             # We intentionally have the mutable state nested in a subobject to make it easy to
             # overwrite with a single $set.
             mutableState: RecipientShardContext
             donorShards:
-                type: array<shard_id>
+                type: array<DonorShardFetchTimestamp>
                 description: "The list of donor shards that report to this recipient."
             minimumOperationDurationMillis:
                 type: long

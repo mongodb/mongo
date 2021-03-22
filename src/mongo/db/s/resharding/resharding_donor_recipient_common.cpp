@@ -334,14 +334,14 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
     const ReshardingFields& reshardingFields) {
     // The recipient state machines are created before the donor shards are prepared to donate but
     // will remain idle until the donor shards are prepared to donate.
-    invariant(!reshardingFields.getRecipientFields()->getFetchTimestamp());
+    invariant(!reshardingFields.getRecipientFields()->getCloneTimestamp());
 
     RecipientShardContext recipientCtx;
     recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
     auto recipientDoc = ReshardingRecipientDocument{
         std::move(recipientCtx),
-        reshardingFields.getRecipientFields()->getDonorShardIds(),
+        reshardingFields.getRecipientFields()->getDonorShards(),
         reshardingFields.getRecipientFields()->getMinimumOperationDurationMillis()};
 
     auto sourceNss = reshardingFields.getRecipientFields()->getSourceNss();

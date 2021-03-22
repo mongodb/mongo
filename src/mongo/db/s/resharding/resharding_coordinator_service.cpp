@@ -140,10 +140,10 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                     setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
                                       CoordinatorState_serializer(coordinatorDoc.getState()));
 
-                    if (auto fetchTimestamp = coordinatorDoc.getFetchTimestamp()) {
-                        // If the fetchTimestamp exists, include it in the update.
-                        setBuilder.append(ReshardingCoordinatorDocument::kFetchTimestampFieldName,
-                                          *fetchTimestamp);
+                    if (auto cloneTimestamp = coordinatorDoc.getCloneTimestamp()) {
+                        // If the cloneTimestamp exists, include it in the update.
+                        setBuilder.append(ReshardingCoordinatorDocument::kCloneTimestampFieldName,
+                                          *cloneTimestamp);
                     }
 
                     if (auto abortReason = coordinatorDoc.getAbortReason()) {
@@ -201,13 +201,21 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
  */
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
+    std::vector<DonorShardFetchTimestamp> donorShards;
+
+    for (const auto& donor : coordinatorDoc.getDonorShards()) {
+        DonorShardFetchTimestamp donorFetchTimestamp(donor.getId());
+        donorFetchTimestamp.setMinFetchTimestamp(donor.getMutableState().getMinFetchTimestamp());
+        donorShards.push_back(std::move(donorFetchTimestamp));
+    }
+
     TypeCollectionRecipientFields recipientFields(
-        extractShardIdsFromParticipantEntries(coordinatorDoc.getDonorShards()),
+        std::move(donorShards),
         coordinatorDoc.getSourceUUID(),
         coordinatorDoc.getSourceNss(),
         resharding::gReshardingMinimumOperationDurationMillis.load());
 
-    emplaceFetchTimestampIfExists(recipientFields, coordinatorDoc.getFetchTimestamp());
+    emplaceCloneTimestampIfExists(recipientFields, coordinatorDoc.getCloneTimestamp());
 
     return recipientFields;
 }
@@ -346,9 +354,18 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 return BatchedCommandRequest::buildInsertOp(
                     CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
             }
-            case CoordinatorStateEnum::kCloning:
-                // Update the 'state' and 'fetchTimestamp' fields in the
+            case CoordinatorStateEnum::kCloning: {
+                // Update the 'state', 'donorShards' and 'cloneTimestamp' fields in the
                 // 'reshardingFields.recipient' section
+
+                BSONArrayBuilder donorShardsBuilder;
+                for (const auto& donor : coordinatorDoc.getDonorShards()) {
+                    DonorShardFetchTimestamp donorShardFetchTimestamp(donor.getId());
+                    donorShardFetchTimestamp.setMinFetchTimestamp(
+                        donor.getMutableState().getMinFetchTimestamp());
+                    donorShardsBuilder.append(donorShardFetchTimestamp.toBSON());
+                }
+
                 return BatchedCommandRequest::buildUpdateOp(
                     CollectionType::ConfigNS,
                     BSON(CollectionType::kNssFieldName
@@ -356,12 +373,15 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     BSON("$set" << BSON(
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString()
-                             << "reshardingFields.recipientFields.fetchTimestamp"
-                             << coordinatorDoc.getFetchTimestamp().get() << "lastmod"
+                             << "reshardingFields.recipientFields.cloneTimestamp"
+                             << coordinatorDoc.getCloneTimestamp().get()
+                             << "reshardingFields.recipientFields.donorShards"
+                             << donorShardsBuilder.arr() << "lastmod"
                              << opCtx->getServiceContext()->getPreciseClockSource()->now())),
                     false,  // upsert
                     false   // multi
                 );
+            }
             case CoordinatorStateEnum::kDecisionPersisted:
                 // Remove the entry for the temporary nss
                 return BatchedCommandRequest::buildDeleteOp(
@@ -1396,13 +1416,13 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     _updateCoordinatorDocStateAndCatalogEntries(
         CoordinatorStateEnum nextState,
         ReshardingCoordinatorDocument coordinatorDoc,
-        boost::optional<Timestamp> fetchTimestamp,
+        boost::optional<Timestamp> cloneTimestamp,
         boost::optional<ReshardingApproxCopySize> approxCopySize,
         boost::optional<Status> abortReason) {
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(nextState);
-    emplaceFetchTimestampIfExists(updatedCoordinatorDoc, std::move(fetchTimestamp));
+    emplaceCloneTimestampIfExists(updatedCoordinatorDoc, std::move(cloneTimestamp));
     emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
     emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 

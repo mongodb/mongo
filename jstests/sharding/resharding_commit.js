@@ -39,12 +39,7 @@ reshardingTest.withReshardingInBackground(
     },
     () => {
         const mongos = inputCollection.getMongo();
-        assert.soon(() => {
-            const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
-                ns: inputCollection.getFullName()
-            });
-            return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
-        });
+        reshardingTest.awaitCloneTimestampChosen();
         assert.commandWorked(mongos.adminCommand({commitReshardCollection: sourceNs}));
     });
 

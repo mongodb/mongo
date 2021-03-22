@@ -121,6 +121,9 @@ const NamespaceString NamespaceString::kReshardingTxnClonerProgressNamespace(
 const NamespaceString NamespaceString::kCollectionCriticalSectionsNamespace(
     NamespaceString::kConfigDb, "collection_critical_sections");
 
+const NamespaceString NamespaceString::kForceOplogBatchBoundaryNamespace(
+    NamespaceString::kConfigDb, "system.forceOplogBatchBoundary");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }
@@ -185,7 +188,8 @@ bool NamespaceString::isLegalClientSystemNS(
  * processing each operation matches the primary's when committing that operation.
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
-    return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection();
+    return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
+        _ns == kForceOplogBatchBoundaryNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeListCollectionsNSS(StringData dbName) {

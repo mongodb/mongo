@@ -164,6 +164,20 @@ structs:
                 description: "Number of documents on this donor shard in the collection being
                               resharded."
                 optional: true
+                
+    DonorShardFetchTimestamp:
+        description: "Used for tracking donor min fetch timestamp"
+        strict: false
+        generate_comparison_operators: false
+        fields:
+            shardId:
+                type: shard_id
+                description: "A shard identifier."
+            minFetchTimestamp:
+                type: timestamp
+                optional: true
+                description: "Timestamp after which this donor shard has guaranteed that oplog
+                                entries contain recipient shard information."
 
     RecipientShardContext:
         description: "Mutable state for a recipient shard tracked both locally by a recipient shard
@@ -180,20 +194,6 @@ structs:
             state:
                 type: RecipientState
                 default: kUnused
-
-    FetchTimestamp:
-        description: "Not meant to be used directly. Only use internal fields."
-        # Use strict:false to avoid complications around upgrade/downgrade. This setting has no
-        # practical effect because this type is only meant to be used as a chained struct with
-        # inline_chained_structs:true and only the strictness setting of the wrapping struct type
-        # applies.
-        strict: false
-        fields:
-            fetchTimestamp:
-                type: timestamp
-                description: "Timestamp after which it is acceptable for recipient shards to
-                              retrieve documents from donor shards."
-                optional: true
 
     ReshardingApproxCopySize:
         description: "Not meant to be used directly. Only use internal fields."

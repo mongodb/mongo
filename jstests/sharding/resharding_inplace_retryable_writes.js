@@ -86,10 +86,10 @@ reshardingTest.withReshardingInBackground(  //
                 ns: sourceCollection.getFullName()
             });
 
-            return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+            return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
-        runRetryableWrite("during resharding after fetchTimestamp was chosen");
+        runRetryableWrite("during resharding after cloneTimestamp was chosen");
 
         let startTime = Date.now();
 

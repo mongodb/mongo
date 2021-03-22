@@ -55,16 +55,18 @@ structs:
 
     TypeCollectionRecipientFields:
         description: "Resharding-related fields specific to recipient shards."
-        inline_chained_structs: true
-        chained_structs:
-            FetchTimestamp: FetchTimestampStruct
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.
         strict: false
         fields:
-            donorShardIds:
-                type: array<shard_id>
+            cloneTimestamp:
+                type: timestamp
+                optional: true
+                description: "The timestamp for the snapshot read while cloning from the donors."
+            donorShards:
+                type: array<DonorShardFetchTimestamp>
+                description: "The list of donors to clone from."
             sourceUUID:
                 cpp_name: sourceUUID
                 type: uuid

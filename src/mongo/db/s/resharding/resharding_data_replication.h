@@ -144,8 +144,8 @@ public:
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
         CommonReshardingMetadata metadata,
-        std::vector<ShardId> donorShardIds,
-        Timestamp fetchTimestamp,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        Timestamp cloneTimestamp,
         bool cloningDone,
         ShardId myShardId,
         ChunkManager sourceChunkMgr,
@@ -189,15 +189,13 @@ private:
 
     static std::vector<std::unique_ptr<ReshardingTxnCloner>> _makeTxnCloners(
         const CommonReshardingMetadata& metadata,
-        const std::vector<ShardId>& donorShardIds,
-        Timestamp fetchTimestamp);
+        const std::vector<DonorShardFetchTimestamp>& donorShards);
 
     static std::vector<std::unique_ptr<ReshardingOplogFetcher>> _makeOplogFetchers(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
-        const std::vector<ShardId>& donorShardIds,
-        Timestamp fetchTimestamp,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
         const ShardId& myShardId);
 
     static std::shared_ptr<executor::TaskExecutor> _makeOplogFetcherExecutor(size_t numDonors);
@@ -208,8 +206,8 @@ private:
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
         CommonReshardingMetadata metadata,
-        const std::vector<ShardId>& donorShardIds,
-        Timestamp fetchTimestamp,
+        const std::vector<DonorShardFetchTimestamp>& donorShards,
+        Timestamp cloneTimestamp,
         ChunkManager sourceChunkMgr,
         std::shared_ptr<executor::TaskExecutor> executor,
         const std::vector<NamespaceString>& stashCollections,

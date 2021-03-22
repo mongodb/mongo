@@ -53,10 +53,11 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                                                 const UUID& existingUUID,
                                                 Timestamp fetchTimestamp);
 
-std::vector<NamespaceString> ensureStashCollectionsExist(OperationContext* opCtx,
-                                                         const ChunkManager& cm,
-                                                         const UUID& existingUUID,
-                                                         std::vector<ShardId> donorShards);
+std::vector<NamespaceString> ensureStashCollectionsExist(
+    OperationContext* opCtx,
+    const ChunkManager& cm,
+    const UUID& existingUUID,
+    const std::vector<DonorShardFetchTimestamp>& donorShards);
 
 ReshardingDonorOplogId getFetcherIdToResumeFrom(OperationContext* opCtx,
                                                 NamespaceString oplogBufferNss,
@@ -101,6 +102,11 @@ public:
 class ReshardingRecipientService::RecipientStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
+    struct CloneDetails {
+        Timestamp cloneTimestamp;
+        std::vector<DonorShardFetchTimestamp> donorShards;
+    };
+
     explicit RecipientStateMachine(const ReshardingRecipientService* recipientService,
                                    const BSONObj& recipientDoc,
                                    ReshardingDataReplicationFactory dataReplicationFactory);
@@ -162,10 +168,10 @@ private:
     void _transitionState(RecipientStateEnum newState);
 
     void _transitionState(RecipientShardContext&& newRecipientCtx,
-                          boost::optional<Timestamp>&& fetchTimestamp);
+                          boost::optional<CloneDetails>&& cloneDetails);
 
     // Transitions the on-disk and in-memory state to RecipientStateEnum::kCreatingCollection.
-    void _transitionToCreatingCollection(Timestamp fetchTimestamp);
+    void _transitionToCreatingCollection(CloneDetails cloneDetails);
 
     // Transitions the on-disk and in-memory state to RecipientStateEnum::kError.
     void _transitionToError(Status abortReason);
@@ -176,9 +182,9 @@ private:
         OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // Updates the mutable portion of the on-disk and in-memory recipient document with
-    // 'newRecipientCtx' and 'fetchTimestamp'.
+    // 'newRecipientCtx', 'fetchTimestamp and 'donorShards'.
     void _updateRecipientDocument(RecipientShardContext&& newRecipientCtx,
-                                  boost::optional<Timestamp>&& fetchTimestamp);
+                                  boost::optional<CloneDetails>&& cloneDetails);
 
     // Removes the local recipient document from disk.
     void _removeRecipientDocument();
@@ -214,13 +220,13 @@ private:
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.recipient.
     const CommonReshardingMetadata _metadata;
-    const std::vector<ShardId> _donorShardIds;
     const Milliseconds _minimumOperationDuration;
 
     // The in-memory representation of the mutable portion of the document in
     // config.localReshardingOperations.recipient.
     RecipientShardContext _recipientCtx;
-    boost::optional<Timestamp> _fetchTimestamp;
+    std::vector<DonorShardFetchTimestamp> _donorShards;
+    boost::optional<Timestamp> _cloneTimestamp;
 
     // ThreadPool used by CancelableOperationContext.
     // CancelableOperationContext must have a thread that is always available to it to mark its
@@ -246,7 +252,7 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<Timestamp> _allDonorsPreparedToDonate;
+    SharedPromise<CloneDetails> _allDonorsPreparedToDonate;
 
     SharedPromise<void> _coordinatorHasDecisionPersisted;
 
