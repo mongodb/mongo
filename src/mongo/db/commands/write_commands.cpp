@@ -602,7 +602,7 @@ public:
                                      std::vector<BSONObj>* errors,
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
-                                     std::vector<size_t>* updatesToRetryAsInserts) const {
+                                     std::vector<size_t>* updatesToRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             auto metadata = bucketCatalog.getMetadata(batch->bucket());
@@ -616,7 +616,7 @@ public:
                 result.getValue().getNModified() == 0) {
                 // No bucket was found to update, meaning that it was manually removed.
                 bucketCatalog.abort(batch);
-                updatesToRetryAsInserts->push_back(index);
+                updatesToRetry->push_back(index);
                 return;
             }
 
@@ -642,8 +642,8 @@ public:
         /**
          * Writes to the underlying system.buckets collection. Returns the indices, relative to
          * 'start', of the batch which were attempted in an update operation, but found no bucket to
-         * update. These indices can be passed as the optional 'indices' parameter in a subsequent
-         * call to this function, in order to to be retried as inserts.
+         * update. These indices can be passed as the 'indices' parameter in a subsequent
+         * call to this function, in order to to be retried.
          */
         std::vector<size_t> _performUnorderedTimeseriesWrites(
             OperationContext* opCtx,
@@ -653,7 +653,8 @@ public:
             boost::optional<repl::OpTime>* opTime,
             boost::optional<OID>* electionId,
             bool* containsRetry,
-            const boost::optional<std::vector<size_t>>& indices = boost::none) const {
+            const std::vector<size_t>& indices) const {
+
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             std::vector<std::pair<std::shared_ptr<BucketCatalog::WriteBatch>, size_t>> batches;
@@ -686,8 +687,8 @@ public:
                 }
             };
 
-            if (indices) {
-                std::for_each(indices->begin(), indices->end(), insert);
+            if (!indices.empty()) {
+                std::for_each(indices.begin(), indices.end(), insert);
             } else {
                 for (size_t i = 0; i < numDocs; i++) {
                     insert(i);
@@ -696,7 +697,7 @@ public:
 
             hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-            std::vector<size_t> updatesToRetryAsInserts;
+            std::vector<size_t> updatesToRetry;
 
             for (auto& [batch, index] : batches) {
                 bool shouldCommit = batch->claimCommitRights();
@@ -720,7 +721,7 @@ public:
                                             errors,
                                             opTime,
                                             electionId,
-                                            &updatesToRetryAsInserts);
+                                            &updatesToRetry);
                     batch.reset();
                 }
             }
@@ -738,7 +739,7 @@ public:
                                   << ") waiting for time-series bucket to be committed for " << ns()
                                   << ": " << redact(request().toBSON({})));
 
-                    updatesToRetryAsInserts.push_back(index);
+                    updatesToRetry.push_back(index);
                     continue;
                 }
 
@@ -755,7 +756,7 @@ public:
                 }
             }
 
-            return updatesToRetryAsInserts;
+            return updatesToRetry;
         }
 
         void _performTimeseriesWritesSubset(OperationContext* opCtx,
@@ -765,22 +766,17 @@ public:
                                             boost::optional<repl::OpTime>* opTime,
                                             boost::optional<OID>* electionId,
                                             bool* containsRetry) const {
-            auto updatesToRetryAsInserts = _performUnorderedTimeseriesWrites(
-                opCtx, start, numDocs, errors, opTime, electionId, containsRetry);
-            invariant(_performUnorderedTimeseriesWrites(opCtx,
-                                                        start,
-                                                        numDocs,
-                                                        errors,
-                                                        opTime,
-                                                        electionId,
-                                                        containsRetry,
-                                                        updatesToRetryAsInserts)
-                          .empty(),
-                      str::stream()
-                          << "Time-series insert on " << ns()
-                          << " unexpectedly returned returned updates to retry as inserts "
-                             "after already retrying updates as inserts: "
-                          << redact(request().toBSON({})));
+            std::vector<size_t> updatesToRetry;
+            do {
+                updatesToRetry = _performUnorderedTimeseriesWrites(opCtx,
+                                                                   start,
+                                                                   numDocs,
+                                                                   errors,
+                                                                   opTime,
+                                                                   electionId,
+                                                                   containsRetry,
+                                                                   updatesToRetry);
+            } while (!updatesToRetry.empty());
         }
 
         void _performTimeseriesWrites(OperationContext* opCtx,
