@@ -52,6 +52,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -277,12 +278,12 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         index->accessMethod()->getSortedDataInterface()->getKeyStringVersion();
 
     auto& executionCtx = StorageExecutionContext::get(opCtx);
-    KeyString::PooledBuilder firstKeyString(executionCtx.pooledBufferBuilder(),
-                                            version,
-                                            BSONObj(),
-                                            indexInfo.ord,
-                                            KeyString::Discriminator::kExclusiveBefore);
-
+    KeyString::PooledBuilder firstKeyStringBuilder(executionCtx.pooledBufferBuilder(),
+                                                   version,
+                                                   BSONObj(),
+                                                   indexInfo.ord,
+                                                   KeyString::Discriminator::kExclusiveBefore);
+    KeyString::Value firstKeyString = firstKeyStringBuilder.release();
     KeyString::Value prevIndexKeyStringValue;
 
     // Ensure that this index has an open index cursor.
@@ -290,15 +291,26 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
     invariant(indexCursorIt != _validateState->getIndexCursors().end());
 
     const std::unique_ptr<SortedDataInterfaceThrottleCursor>& indexCursor = indexCursorIt->second;
-    for (auto indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString.release());
-         indexEntry;
-         indexEntry = indexCursor->nextKeyString(opCtx)) {
 
+    boost::optional<KeyStringEntry> indexEntry;
+    try {
+        indexEntry = indexCursor->seekForKeyString(opCtx, firstKeyString);
+    } catch (const DBException& ex) {
+        if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict) {
+            LOGV2_FATAL(5318400,
+                        "Error seeking to first key",
+                        "error"_attr = ex.toString(),
+                        "index"_attr = indexName,
+                        "key"_attr = firstKeyString.toString());
+        }
+        throw;
+    }
+
+    while (indexEntry) {
         if (!isFirstEntry) {
             _validateKeyOrder(
                 opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
         }
-
 
         const RecordId kWildcardMultikeyMetadataRecordId = [&]() {
             auto keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
@@ -314,20 +326,17 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
             indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
             _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);
-            _progress->hit();
-            numKeys++;
-            continue;
-        }
-        try {
-            _indexConsistency->addIndexKey(
-                opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
-        } catch (const DBException& e) {
-            StringBuilder ss;
-            ss << "Parsing index key for " << indexInfo.indexName << " recId " << indexEntry->loc
-               << " threw exception " << e.toString();
-            results->errors.push_back(ss.str());
-            results->valid = false;
-            continue;
+        } else {
+            try {
+                _indexConsistency->addIndexKey(
+                    opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
+            } catch (const DBException& e) {
+                StringBuilder ss;
+                ss << "Parsing index key for " << indexInfo.indexName << " recId "
+                   << indexEntry->loc << " threw exception " << e.toString();
+                results->errors.push_back(ss.str());
+                results->valid = false;
+            }
         }
 
         _progress->hit();
@@ -339,6 +348,19 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
             // Periodically checks for interrupts and yields.
             opCtx->checkForInterrupt();
             _validateState->yield(opCtx);
+        }
+
+        try {
+            indexEntry = indexCursor->nextKeyString(opCtx);
+        } catch (const DBException& ex) {
+            if (TestingProctor::instance().isEnabled() && ex.code() != ErrorCodes::WriteConflict) {
+                LOGV2_FATAL(5318401,
+                            "Error advancing index cursor",
+                            "error"_attr = ex.toString(),
+                            "index"_attr = indexName,
+                            "prevKey"_attr = prevIndexKeyStringValue.toString());
+            }
+            throw;
         }
     }
 
