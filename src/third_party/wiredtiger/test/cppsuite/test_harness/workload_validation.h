@@ -110,7 +110,7 @@ class workload_validation {
         /* Clean the allocated memory. */
         clean_memory(collections);
 
-        return is_valid;
+        return (is_valid);
     }
 
     /* Clean the memory used to represent the collections after the test. */
@@ -165,7 +165,7 @@ class workload_validation {
             }
         }
 
-        return created_collections;
+        return (created_collections);
     }
 
     /*
@@ -245,7 +245,8 @@ class workload_validation {
             error_code = cursor->next(cursor);
         }
 
-        error_code = cursor->reset(cursor);
+        if (cursor->reset(cursor) != 0)
+            debug_info("Cursor could not be reset !", _trace_level, DEBUG_ERROR);
     }
 
     /*
@@ -257,7 +258,7 @@ class workload_validation {
       WT_SESSION *session, std::map<std::string, std::map<int, std::string *> *> &collections)
     {
 
-        bool collection_exists, is_valid;
+        bool collection_exists, is_valid = true;
         std::map<int, std::string *> *collection;
         workload_validation wv;
         std::string *value;
@@ -302,7 +303,7 @@ class workload_validation {
             }
         }
 
-        return is_valid;
+        return (is_valid);
     }
 
     /* Check what is present on disk against what has been tracked. */
@@ -359,7 +360,7 @@ class workload_validation {
             }
         }
 
-        return is_valid;
+        return (is_valid);
     }
 
     /*

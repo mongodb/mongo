@@ -54,8 +54,9 @@ class workload_generator : public component {
             delete it;
     }
 
-    /* Delete the copy constructor. */
+    /* Delete the copy constructor and the assignment operator. */
     workload_generator(const workload_generator &) = delete;
+    workload_generator &operator=(const workload_generator &) = delete;
 
     /*
      * Function that performs the following steps using the configuration that is defined by the
@@ -129,7 +130,6 @@ class workload_generator : public component {
     void
     run()
     {
-        WT_SESSION *session = nullptr;
         int64_t duration_seconds, read_threads, min_operation_per_transaction,
           max_operation_per_transaction, value_size;
 
@@ -204,7 +204,6 @@ class workload_generator : public component {
     update_operation(thread_context &context, WT_SESSION *session)
     {
         WT_CURSOR *cursor;
-        WT_DECL_RET;
         wt_timestamp_t ts;
         std::vector<WT_CURSOR *> cursors;
         std::vector<std::string> collection_names;
@@ -246,7 +245,6 @@ class workload_generator : public component {
     read_operation(thread_context &context, WT_SESSION *session)
     {
         WT_CURSOR *cursor;
-        WT_DECL_RET;
         std::vector<WT_CURSOR *> cursors;
 
         testutil_assert(session != nullptr);
@@ -259,7 +257,7 @@ class workload_generator : public component {
         while (context.is_running()) {
             /* Walk each cursor. */
             for (const auto &it : cursors) {
-                if ((ret = it->next(it)) != 0)
+                if (it->next(it) != 0)
                     it->reset(it);
             }
         }

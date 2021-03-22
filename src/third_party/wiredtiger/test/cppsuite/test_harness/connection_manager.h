@@ -48,7 +48,7 @@ class connection_manager {
     public:
     /* No copies of the singleton allowed. */
     connection_manager(connection_manager const &) = delete;
-    void operator=(connection_manager const &) = delete;
+    connection_manager &operator=(connection_manager const &) = delete;
 
     static connection_manager &
     instance()
