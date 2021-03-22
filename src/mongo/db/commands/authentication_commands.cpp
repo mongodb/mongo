@@ -377,8 +377,6 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        void doCheckAuthorization(OperationContext*) const final {}
-
         Reply typedRun(OperationContext* opCtx) final {
             return AuthenticationSession::doStep(
                 opCtx, AuthenticationSession::StepType::kAuthenticate, [&](auto session) {
