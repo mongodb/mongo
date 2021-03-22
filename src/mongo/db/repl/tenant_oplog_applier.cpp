@@ -860,11 +860,22 @@ std::vector<std::vector<const OplogEntry*>> TenantOplogApplier::_fillWriterVecto
 
         if (op.expansionsEntry >= 0) {
             // This is an applyOps or transaction; add the expansions to the writer vectors.
+
+            auto isTransactionWithCommand = false;
+            auto expansions = &batch->expansions[op.expansionsEntry];
+            for (auto&& op : *expansions) {
+                if (op.isCommand()) {
+                    // If the transaction contains a command, serialize the operations.
+                    isTransactionWithCommand = true;
+                    break;
+                }
+            }
+
             OplogApplierUtils::addDerivedOps(opCtx,
-                                             &batch->expansions[op.expansionsEntry],
+                                             expansions,
                                              &writerVectors,
                                              &collPropertiesCache,
-                                             false /* serial */);
+                                             isTransactionWithCommand /* serial */);
         } else {
             // Add a single op to the writer vectors.
             OplogApplierUtils::addToWriterVector(
