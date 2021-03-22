@@ -65,8 +65,7 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss,
-                                    const CollectionUUID& sourceUUID) {
+Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss) {
     auto opCtx = cc().makeOperationContext();
 
     // Do a no-op write and use the OpTime as the minFetchTimestamp
@@ -86,8 +85,8 @@ Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss,
             WriteUnitOfWork wuow(opCtx.get());
             opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
                 opCtx.get(),
-                sourceNss,
-                sourceUUID,
+                NamespaceString::kForceOplogBatchBoundaryNamespace,
+                boost::none,
                 BSON("msg" << msg),
                 boost::none,
                 boost::none,
@@ -442,8 +441,7 @@ void ReshardingDonorService::DonorStateMachine::
         _externalState->waitForCollectionFlush(opCtx.get(), _metadata.getTempReshardingNss());
     }
 
-    Timestamp minFetchTimestamp =
-        generateMinFetchTimestamp(_metadata.getSourceNss(), _metadata.getSourceUUID());
+    Timestamp minFetchTimestamp = generateMinFetchTimestamp(_metadata.getSourceNss());
 
     LOGV2_DEBUG(5390702,
                 2,

@@ -154,7 +154,7 @@ public:
             recipientFields.setSourceUUID(uuid);
             // Populating the set of donor shard ids isn't necessary to test the functionality of
             // creating the temporary resharding collection.
-            recipientFields.setDonorShardIds({});
+            recipientFields.setDonorShards({});
             recipientFields.setMinimumOperationDurationMillis(5000);
 
             reshardingFields.setRecipientFields(recipientFields);

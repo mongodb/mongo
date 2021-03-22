@@ -80,7 +80,7 @@ function verifyCurrentOpOutput(reshardingTest, inputCollection) {
         const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
             ns: inputCollection.getFullName()
         });
-        return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+        return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
     });
 
     const topology = DiscoverTopology.findConnectedNodes(mongos);

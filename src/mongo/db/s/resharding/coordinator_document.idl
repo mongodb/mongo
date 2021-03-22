@@ -69,7 +69,6 @@ structs:
         inline_chained_structs: true
         chained_structs:
             CommonReshardingMetadata: CommonReshardingMetadata
-            FetchTimestamp: FetchTimestampStruct
             ReshardingApproxCopySize: ReshardingApproxCopySizeStruct
             AbortReason: AbortReasonStruct
         generate_comparison_operators: false
@@ -79,6 +78,10 @@ structs:
         strict: false
         fields:
             state: CoordinatorState
+            cloneTimestamp:
+                type: timestamp
+                description: "The timestamp for the snapshot read while cloning from the donors."
+                optional: true
             donorShards:
                 type: array<DonorShardEntry>
                 description: "The list of all donor shards for this resharding operation."

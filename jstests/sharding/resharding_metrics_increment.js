@@ -56,13 +56,13 @@ assert.commandWorked(inputCollection.insert([
     {_id: "stays on shard1", oldKey: 10, newKey: 10},
 ]));
 
-function awaitEstablishmentOfFetchTimestamp(inputCollection) {
+function awaitEstablishmentOfCloneTimestamp(inputCollection) {
     const mongos = inputCollection.getMongo();
     assert.soon(() => {
         const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
             ns: inputCollection.getFullName()
         });
-        return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+        return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
     });
 }
 
@@ -80,7 +80,7 @@ reshardingTest.withReshardingInBackground(  //
     },
     (tempNs) => {
         jsTest.log(`tempNs: ${tempNs}`);
-        awaitEstablishmentOfFetchTimestamp(inputCollection);
+        awaitEstablishmentOfCloneTimestamp(inputCollection);
         for (var i = 0; i < 10; ++i)
             assert.commandWorked(
                 inputCollection.insert({_id: `late ${i}`, oldKey: 10, newKey: 10}));

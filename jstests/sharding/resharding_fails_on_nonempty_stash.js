@@ -46,7 +46,7 @@ reshardingTest.withReshardingInBackground(
             const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
                 ns: inputCollection.getFullName()
             });
-            return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+            return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
         // The following documents violate the global _id uniqueness assumption of sharded

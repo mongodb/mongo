@@ -27,13 +27,13 @@ assert.commandWorked(whileReshardingCollection.insert({_id: 0, oldKey: -20, newK
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 
-function awaitEstablishmentOfFetchTimestamp(inputCollection) {
+function awaitEstablishmentOfCloneTimestamp(inputCollection) {
     const mongos = inputCollection.getMongo();
     assert.soon(() => {
         const coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
             ns: inputCollection.getFullName()
         });
-        return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+        return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
     });
 }
 
@@ -43,7 +43,7 @@ reshardingTest.withReshardingInBackground(
         newChunks: [{min: {newKey: MinKey}, max: {newKey: MaxKey}, shard: recipientShardNames[0]}],
     },
     (tempNs) => {
-        awaitEstablishmentOfFetchTimestamp(whileReshardingCollection);
+        awaitEstablishmentOfCloneTimestamp(whileReshardingCollection);
 
         const testDB = whileReshardingCollection.getDB();
         let session = testDB.getMongo().startSession({retryWrites: true});

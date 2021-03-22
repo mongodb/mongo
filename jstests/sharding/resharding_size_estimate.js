@@ -90,7 +90,7 @@ reshardingTest.withReshardingInBackground(
             coordinatorDoc = mongos.getCollection("config.reshardingOperations").findOne({
                 ns: inputCollection.getFullName()
             });
-            return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+            return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
         jsTest.log("Check size estimate on resharding coordinator document:\n" +

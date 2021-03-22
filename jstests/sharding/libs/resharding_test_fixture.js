@@ -690,4 +690,28 @@ var ReshardingTest = class {
 
         this._st.stop();
     }
+
+    /**
+     * @returns the timestamp chosen by the resharding operation for cloning.
+     *
+     * Should also be used in tandem with retryableWriteManager when calling this method in a
+     * jstestfuzzer code for backwards compatibility, like so:
+     *
+     * if (reshardingTest.awaitCloneTimestampChosen !== undefined) {
+     *     fetchTimestamp = reshardingTest.awaitCloneTimestampChosen();
+     * } else {
+     *     fetchTimestamp = retryableWriteManager.awaitFetchTimestampChosen();
+     * }
+     */
+    awaitCloneTimestampChosen() {
+        let cloneTimestamp;
+
+        assert.soon(() => {
+            const coordinatorDoc = this._st.config.reshardingOperations.findOne({ns: this._ns});
+            cloneTimestamp = coordinatorDoc !== null ? coordinatorDoc.cloneTimestamp : undefined;
+            return cloneTimestamp !== undefined;
+        });
+
+        return cloneTimestamp;
+    }
 };

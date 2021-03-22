@@ -1,6 +1,6 @@
 /**
  * Test to make sure that if there are uncommitted transactions right when the resharding command
- * begins, it will select a minFetchTimestamp that is greater than the operation time of those
+ * begins, it will select a cloneTimestamp that is greater than the operation time of those
  * transactions when they commit.
  *
  * @tags: [requires_fcv_49, uses_atclustertime]
@@ -61,7 +61,7 @@ reshardingTest.withReshardingInBackground(
         });
 
         assert.neq(null, coordinatorDoc);
-        assert.eq(undefined, coordinatorDoc.fetchTimestamp);
+        assert.eq(undefined, coordinatorDoc.cloneTimestamp);
 
         let res = assert.commandWorked(session.commitTransaction_forTesting());
         let commitOperationTS = res.operationTime;
@@ -71,11 +71,11 @@ reshardingTest.withReshardingInBackground(
                 ns: sourceCollection.getFullName()
             });
 
-            return coordinatorDoc !== null && coordinatorDoc.fetchTimestamp !== undefined;
+            return coordinatorDoc !== null && coordinatorDoc.cloneTimestamp !== undefined;
         });
 
         assert.eq(1,
-                  timestampCmp(coordinatorDoc.fetchTimestamp, commitOperationTS),
+                  timestampCmp(coordinatorDoc.cloneTimestamp, commitOperationTS),
                   'coordinatorDoc: ' + tojson(coordinatorDoc) +
                       ', commit opTs: ' + tojson(commitOperationTS));
     });

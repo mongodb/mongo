@@ -172,6 +172,9 @@ public:
     // Namespace for storing config.collectionCriticalSections documents
     static const NamespaceString kCollectionCriticalSectionsNamespace;
 
+    // Dummy namespace used for forcing secondaries to handle an oplog entry on its own batch.
+    static const NamespaceString kForceOplogBatchBoundaryNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

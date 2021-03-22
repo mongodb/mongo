@@ -307,8 +307,9 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
               ErrorCodes::InterruptedDueToReplStateChange);
 
     DBDirectClient client(opCtx.get());
-    auto cursor = client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
-                               BSON("ns" << doc.getSourceNss().toString()));
+    auto cursor =
+        client.query(NamespaceString(NamespaceString::kRsOplogNamespace.ns()),
+                     BSON("ns" << NamespaceString::kForceOplogBatchBoundaryNamespace.ns()));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
     repl::OplogEntry op(cursor->next());
@@ -317,7 +318,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
 
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();
-    ASSERT_EQ(op.getUuid(), doc.getSourceUUID()) << op.getEntry();
+    ASSERT_FALSE(op.getUuid()) << op.getEntry();
     ASSERT_EQ(op.getObject()["msg"].type(), BSONType::String) << op.getEntry();
     ASSERT_FALSE(bool(op.getObject2())) << op.getEntry();
     ASSERT_FALSE(bool(op.getDestinedRecipient())) << op.getEntry();
@@ -347,9 +348,6 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
                                BSON("ns" << doc.getSourceNss().toString()));
 
     ASSERT_TRUE(cursor->more()) << "Found no oplog entries for source collection";
-    // Skip the first oplog entry returned because it is the no-op from generating the
-    // minFetchTimestamp value.
-    cursor->next();
 
     for (const auto& recipientShardId : doc.getRecipientShards()) {
         ASSERT_TRUE(cursor->more()) << "Didn't find finalReshardOp entry for source collection";
