@@ -55,6 +55,8 @@ ClientOutOfLineExecutor::ClientOutOfLineExecutor() noexcept
     : _impl{std::make_unique<Impl>()}, _taskQueue{std::make_shared<QueueType>()} {}
 
 ClientOutOfLineExecutor::~ClientOutOfLineExecutor() noexcept {
+    if (!_requireShutdown.load())
+        return;
     invariant(_isShutdown);
 }
 
@@ -83,7 +85,7 @@ ClientOutOfLineExecutor* ClientOutOfLineExecutor::get(const Client* client) noex
 }
 
 void ClientOutOfLineExecutor::schedule(Task task) {
-    _taskQueue->push(std::move(task));
+    getHandle().schedule(std::move(task));
 }
 
 void ClientOutOfLineExecutor::consumeAllTasks() noexcept {

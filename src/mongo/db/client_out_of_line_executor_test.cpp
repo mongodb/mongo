@@ -35,6 +35,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -165,6 +166,20 @@ TEST_F(ClientOutOfLineExecutorTest, ScheduleAfterClientThreadReturns) {
         taskCalled = true;
     });
     ASSERT(taskCalled);
+}
+
+TEST_F(ClientOutOfLineExecutorTest, SkipShutdownWhenNoTaskIsScheduled) {
+    ClientOutOfLineExecutor executor;
+}
+
+DEATH_TEST_F(ClientOutOfLineExecutorTest, RequireShutdownAfterAcquiringHandles, "invariant") {
+    ClientOutOfLineExecutor executor;
+    executor.getHandle();
+}
+
+DEATH_TEST_F(ClientOutOfLineExecutorTest, RequireShutdownAfterSchedulingTasks, "invariant") {
+    ClientOutOfLineExecutor executor;
+    executor.schedule([](Status) {});
 }
 
 }  // namespace
