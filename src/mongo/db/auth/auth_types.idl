@@ -72,5 +72,9 @@ structs:
     fields:
       resolveRolesDelayMS:
         type: int
-        default: 0
         validator: { gte: 0 }
+  waitForUserCacheInvalidationFailPoint:
+    description: Data for waitForUserCacheInvalidation fail point
+    fields:
+      userName:
+        type: UserName

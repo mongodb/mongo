@@ -306,9 +306,8 @@ public:
     /**
      * Validate the ID associated with a known user while refreshing session cache.
      */
-    virtual StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext* opCtx,
-                                                                const UserName& userName,
-                                                                const User::UserId& uid) = 0;
+    virtual StatusWith<UserHandle> reacquireUser(OperationContext* opCtx,
+                                                 const UserHandle& user) = 0;
 
     /**
      * Marks the given user as invalid and removes it from the user cache.

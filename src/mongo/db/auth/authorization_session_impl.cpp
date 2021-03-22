@@ -502,59 +502,33 @@ bool AuthorizationSessionImpl::isAuthenticated() {
 void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx) {
     AuthorizationManager& authMan = getAuthorizationManager();
     UserSet::iterator it = _authenticatedUsers.begin();
+    auto removeUser = [&](const auto& it) {
+        // Take out a lock on the client here to ensure that no one reads while
+        // _authenticatedUsers is being modified.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+
+        // The user is invalid, so make sure that we erase it from _authenticateUsers.
+        _authenticatedUsers.removeAt(it);
+    };
+
+    auto replaceUser = [&](const auto& it, UserHandle updatedUser) {
+        // Take out a lock on the client here to ensure that no one reads while
+        // _authenticatedUsers is being modified.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        _authenticatedUsers.replaceAt(it, std::move(updatedUser));
+    };
 
     while (it != _authenticatedUsers.end()) {
-        auto& user = *it;
-        if (!user.isValid()) {
-            // Make a good faith effort to acquire an up-to-date user object, since the one
-            // we've cached is marked "out-of-date."
-            UserName name = user->getName();
-            UserHandle updatedUser;
-
-            auto swUser = authMan.acquireUserForSessionRefresh(opCtx, name, user->getID());
+        // Anchor the UserHandle on the stack so we can refer to it throughout this iteration.
+        const auto currentUser = *it;
+        const auto& name = currentUser->getName();
+        auto swUser = authMan.reacquireUser(opCtx, currentUser);
+        if (!swUser.isOK()) {
             auto& status = swUser.getStatus();
-
-            // Take out a lock on the client here to ensure that no one reads while
-            // _authenticatedUsers is being modified.
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-
-            // The user is invalid, so make sure that we erase it from _authenticateUsers at the
-            // end of this block.
-            auto removeGuard = makeGuard([&] { _authenticatedUsers.removeAt(it++); });
-
             switch (status.code()) {
-                case ErrorCodes::OK: {
-                    updatedUser = std::move(swUser.getValue());
-                    try {
-                        auto restrictionStatus = updatedUser->validateRestrictions(opCtx);
-                        if (!restrictionStatus.isOK()) {
-                            LOGV2(20242,
-                                  "Removed user with unmet authentication restrictions from "
-                                  "session cache of user information. Restriction failed",
-                                  "user"_attr = name,
-                                  "reason"_attr = restrictionStatus.reason());
-                            // If we remove from the UserSet, we cannot increment the iterator.
-                            continue;
-                        }
-                    } catch (...) {
-                        LOGV2(20243,
-                              "Evaluating authentication restrictions for user resulted in an "
-                              "unknown exception. Removing user from the session cache",
-                              "user"_attr = name);
-                        continue;
-                    }
-
-                    // Success! Replace the old User object with the updated one.
-                    removeGuard.dismiss();
-                    _authenticatedUsers.replaceAt(it, std::move(updatedUser));
-                    LOGV2_DEBUG(20244,
-                                1,
-                                "Updated session cache of user information for user",
-                                "user"_attr = name);
-                    break;
-                }
                 case ErrorCodes::UserNotFound: {
                     // User does not exist anymore; remove it from _authenticatedUsers.
+                    removeUser(it++);
                     LOGV2(20245,
                           "Removed deleted user from session cache of user information",
                           "user"_attr = name);
@@ -562,6 +536,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                 }
                 case ErrorCodes::UnsupportedFormat: {
                     // An auth subsystem has explicitly indicated a failure.
+                    removeUser(it++);
                     LOGV2(20246,
                           "Removed user from session cache of user information because of "
                           "refresh failure",
@@ -579,10 +554,38 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                                   "to use old information",
                                   "user"_attr = name,
                                   "error"_attr = redact(status));
-                    removeGuard.dismiss();
                     break;
             }
+        } else if (!currentUser.isValid()) {
+            // Our user handle has changed, update the our list of users.
+            auto updatedUser = std::move(swUser.getValue());
+            try {
+                uassertStatusOK(updatedUser->validateRestrictions(opCtx));
+            } catch (const DBException& ex) {
+                removeUser(it++);
+
+                LOGV2(20242,
+                      "Removed user with unmet authentication restrictions from "
+                      "session cache of user information. Restriction failed",
+                      "user"_attr = name,
+                      "reason"_attr = ex.reason());
+                continue;  // No need to advance "it" in this case.
+            } catch (...) {
+                removeUser(it++);
+
+                LOGV2(20243,
+                      "Evaluating authentication restrictions for user resulted in an "
+                      "unknown exception. Removing user from the session cache",
+                      "user"_attr = name);
+                continue;  // No need to advance "it" in this case.
+            }
+
+            replaceUser(it, std::move(updatedUser));
+
+            LOGV2_DEBUG(
+                20244, 1, "Updated session cache of user information for user", "user"_attr = name);
         }
+
         ++it;
     }
     _buildAuthenticatedRolesVector();

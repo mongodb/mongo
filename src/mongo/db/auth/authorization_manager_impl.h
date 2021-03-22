@@ -98,9 +98,7 @@ public:
                                     std::vector<BSONObj>* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
-    StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext* opCtx,
-                                                        const UserName& userName,
-                                                        const User::UserId& uid) override;
+    StatusWith<UserHandle> reacquireUser(OperationContext* opCtx, const UserHandle& user) override;
 
     /**
      * Invalidate a user, and repin it if necessary.

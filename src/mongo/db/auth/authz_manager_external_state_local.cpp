@@ -318,6 +318,12 @@ StatusWith<User> AuthzManagerExternalStateLocal::getUserObject(OperationContext*
     user.addPrivileges(data.privileges.get());
     user.setIndirectRestrictions(data.restrictions.get());
 
+    LOGV2_DEBUG(5517200,
+                3,
+                "Acquired new user object",
+                "userName"_attr = userName,
+                "directRoles"_attr = directRoles);
+
     return std::move(user);
 } catch (const AssertionException& ex) {
     return ex.toStatus();

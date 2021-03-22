@@ -6,6 +6,11 @@
 
 // Pull in Thread.
 load('jstests/libs/parallelTester.js');
+load("jstests/libs/fail_point_util.js");
+
+const testUser = "user1";
+const testDB = "user_cache_invalidation";
+const testRole = "read";
 
 function authFailureEvent(log) {
     const kAuthFailureEventID = 20436;
@@ -13,8 +18,12 @@ function authFailureEvent(log) {
 }
 
 function resolveRolesDelayEvent(log) {
-    const kResolveRolesDelayID = 4859400;
-    return log.id === kResolveRolesDelayID;
+    const kResolveRolesDelayID = 5517200;
+    if (log.id !== kResolveRolesDelayID) {
+        return false;
+    }
+    const user = log.attr.userName;
+    return (user.user === testUser) && (user.db === testDB);
 }
 
 function invalidateUserEvent(log) {
@@ -23,7 +32,7 @@ function invalidateUserEvent(log) {
         return false;
     }
     const user = log.attr.user;
-    return (user.user === 'user1') && (user.db === 'test');
+    return (user.user === testUser) && (user.db === testDB);
 }
 
 function acquireUserEvent(log) {
@@ -32,7 +41,7 @@ function acquireUserEvent(log) {
         return false;
     }
     const user = log.attr.user;
-    return (user.user === 'user1') && (user.db === 'test');
+    return (user.user === testUser) && (user.db === testDB);
 }
 
 /**
@@ -61,6 +70,8 @@ function assertHasLog(conn, cond, after) {
         }
         return ret !== undefined;
     });
+
+    jsTest.log(`Found log entry: ${tojson(ret)}`);
     return ret;
 }
 
@@ -68,12 +79,12 @@ function assertHasLog(conn, cond, after) {
  * Negative of assertHasLog() above.
  * Does not return a log line (because there isn't one).
  */
-function assertLacksLog(conn, cond, after) {
+function assertLacksLog(conn, cond, start, end) {
     const log = checkLog.getGlobalLog(conn);
     log.forEach(function(line) {
         line = JSON.parse(line);
         line.t = Date.parse(line.t['$date']);
-        if (line.t <= after) {
+        if (line.t < start || line.t > end) {
             return;
         }
         assert(!cond(line), 'Found entry which should not exist: ' + tojson(line));
@@ -98,7 +109,7 @@ function assertLacksLog(conn, cond, after) {
  * the cache anyway.
  *
  * If the snapshot is advanced, then our parallel shell user
- * sees 'read' successfully revoked, and our query fails.
+ * sees testRole successfully revoked, and our query fails.
  */
 function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     const writeAdmin = writeNode.getDB('admin');
@@ -106,75 +117,89 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
 
     writeAdmin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
     assert(writeAdmin.auth('admin', 'pwd'));
+
     assert.soon(() => readAdmin.auth('admin', 'pwd'));
+    assert.commandWorked(readNode.setLogLevel(3, 'accessControl'));
 
-    const kResolveRolesDelayMS = 5 * 1000;
-    assert.commandWorked(readAdmin.runCommand({
-        configureFailPoint: 'authLocalGetUser',
-        mode: 'alwaysOn',
-        data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
-    }));
-    readNode.setLogLevel(3, 'accessControl');
-
-    const writeTest = writeNode.getDB('test');
-    writeTest.createUser({user: 'user1', pwd: 'pwd', roles: ['read']});
+    const writeTest = writeNode.getDB(testDB);
+    writeTest.createUser({user: testUser, pwd: 'pwd', roles: [testRole]});
     assert.writeOK(writeTest.coll.insert({x: 1}));
 
     awaitReplication();
     lock();
 
-    jsTest.log('Starting parallel thread');
     const startTime = Date.now();
-    const thread = new Thread(function(port) {
+    let currentTime = startTime;
+    function assertHasLogAndAdvance(conn, cond) {
+        const entry = assertHasLog(conn, cond, currentTime);
+        currentTime = entry.t;
+        return entry;
+    }
+
+    // Set the failpoint before we start the parallel thread.
+    let fp = configureFailPoint(
+        readNode, 'waitForUserCacheInvalidation', {userName: {db: testDB, user: testUser}});
+
+    const thread = new Thread(function(port, testUser, testDB) {
         const mongo = new Mongo('localhost:' + port);
         assert(mongo);
-        const test = mongo.getDB('test');
+        const test = mongo.getDB(testDB);
         assert(test);
 
         jsTest.log('Starting auth');
-        test.auth('user1', 'pwd');
+        assert(test.auth(testUser, 'pwd'));
         jsTest.log('Completed auth');
-        // This should fail since read was revoked during mutation.
-        assert.throws(() => test.coll.findOne({}));
+
+        assert.throws(() => test.coll.findOne({}), [], "Find succeeded despite revokeRoleFromUser");
         jsTest.log('Ran command');
-    }, readNode.port);
+    }, readNode.port, testUser, testDB);
     thread.start();
 
     // Wait for initial auth to start.
-    jsTest.log('Waiting for auth start');
-    const sleep1 = assertHasLog(readNode, resolveRolesDelayEvent, startTime);
-    jsTest.log(sleep1);
-    // Our initial acquisition has the read role.
-    assert.eq(sleep1.attr.directRoles.length, 1);
-    assert.eq(sleep1.attr.directRoles[0].role, 'read');
-    assert.eq(sleep1.attr.directRoles[0].db, 'test');
-    assertLacksLog(readNode, invalidateUserEvent, startTime);
+    jsTest.log('Waiting for initial resolve roles');
+    {
+        const entry = assertHasLogAndAdvance(readNode, resolveRolesDelayEvent);
+
+        // Our initial acquisition has the read role.
+        assert.eq(entry.attr.userName.db, testDB);
+        assert.eq(entry.attr.userName.user, testUser);
+        assert.eq(entry.attr.directRoles.length, 1);
+        assert.eq(entry.attr.directRoles[0].role, testRole);
+        assert.eq(entry.attr.directRoles[0].db, testDB);
+    }
+    assertLacksLog(readNode, invalidateUserEvent, startTime, currentTime);
+
+    // Wait for our find to hit the fail point.
+    fp.wait();
 
     // Mutate the user to cause an invalidation.
     // Use writeConcern 1 to avoid blocking on the secondary applications.
     jsTest.log('Mutating');
-    writeTest.revokeRolesFromUser('user1', ['read'], {w: 1});
+    writeTest.revokeRolesFromUser(testUser, [testRole], {w: 1});
 
     jsTest.log('Looking for invalidation');
-    const invalidation = assertHasLog(readNode, invalidateUserEvent, sleep1.t);
-    jsTest.log(invalidation);
+    assertHasLogAndAdvance(readNode, invalidateUserEvent);
 
     jsTest.log('Looking for new acquisiiton');
-    const reacquire = assertHasLog(readNode, acquireUserEvent, invalidation.t);
-    jsTest.log(reacquire);
+    assertHasLogAndAdvance(readNode, acquireUserEvent);
     unlock();
 
-    jsTest.log('Looking for second acquire sleep');
-    const sleep2 = assertHasLog(readNode, resolveRolesDelayEvent, reacquire.t);
-    jsTest.log(sleep2);
-    // This acquisition comes from a later snapshot which has no roles.
-    assert.eq(sleep2.attr.directRoles.length, 0);
+    jsTest.log('Waiting for second resolve roles');
+    assertHasLogAndAdvance(readNode, function(entry) {
+        if (!resolveRolesDelayEvent(entry)) {
+            return false;
+        }
 
-    jsTest.log('Looking for authZ failure for parallel shell write after reacquire');
-    const failure = assertHasLog(readNode, authFailureEvent, sleep2.t);
-    jsTest.log(failure);
+        // This acquisition comes from a later snapshot which has no roles.
+        return entry.attr.directRoles.length == 0;
+    });
 
+    jsTest.log('Looking for authZ failure for read after revokeRolesFromUser');
+    assertHasLogAndAdvance(readNode, authFailureEvent);
+
+    fp.off();
     thread.join();
+
     jsTest.log('Thread complete');
 
     writeAdmin.logout();

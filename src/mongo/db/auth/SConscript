@@ -87,7 +87,6 @@ env.Library(
 env.Library(
     target='auth_impl_internal_local',
     source=[
-        'auth_types.idl',
         'authz_manager_external_state_local.cpp',
     ],
     LIBDEPS=[
@@ -97,6 +96,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
+        'auth_types',
     ]
 )
 
@@ -165,6 +165,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/ssl_types',
         'address_restriction',
         'auth',
+        'auth_types',
         'auth_umc',
         'authorization_manager_global',
         'authprivilege',
@@ -226,6 +227,19 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',
+    ],
+)
+
+env.Library(
+    target='auth_types',
+    source=[
+        'auth_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'auth',
+        'authprivilege',
     ],
 )
 
