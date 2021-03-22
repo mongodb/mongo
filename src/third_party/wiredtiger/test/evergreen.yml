@@ -130,6 +130,89 @@ functions:
               --enable-strict --enable-diagnostic --with-builtins=lz4,snappy,zlib
           fi
     - *make_wiredtiger
+  "compile wiredtiger docs":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/build_posix"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [[ "${branch_name}" != "develop" ]]; then
+            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
+            exit 0
+          fi
+
+          # Go through each supported WiredTiger Github branch to build the docs.
+          #   Please note the "branch" variable used here is a normal shell variable to store the name of
+          #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
+          #   to store the name of the branch being tested by the Evergreen project.
+          for branch in develop mongodb-4.4 mongodb-4.2 mongodb-4.0 mongodb-3.6 ; do
+            echo "[Debug] Checking out branch $branch ..."
+            git checkout $branch && git pull --ff-only && git reset --hard origin/$branch && git clean -fdqx
+            sh reconf
+
+            # Java API is removed in newer branches via WT-6675.
+            if [ "$branch" = "mongodb-4.2" -o "$branch" = "mongodb-4.0" -o "$branch" = "mongodb-3.6" ]; then
+              ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-java --enable-python --enable-strict
+              (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
+              (cd lang/java && make ../../../lang/java/wiredtiger_wrap.c)
+            else
+              ../configure CFLAGS="-DMIGHT_NOT_RUN -Wno-error" --enable-python --enable-strict
+              (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c)
+            fi
+
+            # Make sure the code fragment is in the documentation build.
+            make all-am
+            make -C test/utility
+            make -C examples/c
+
+            (cd ../dist && sh s_docs)
+            (cd .. && rm -rf docs-$branch && mv docs docs-$branch)
+          done
+  "update wiredtiger docs":
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger"
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+
+          if [[ "${branch_name}" != "develop" ]]; then
+            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
+            exit 0
+          fi
+
+          git clone git@github.com:wiredtiger/wiredtiger.github.com.git
+          cd wiredtiger.github.com
+
+          # Go through each supported WiredTiger Github branch to stage the doc changes.
+          #   Please note the "branch" variable used here is a normal shell variable to store the name of
+          #   a WiredTiger Github branch, while the "branch_name" used above is an Evergreen built-in variable
+          #   to store the name of the branch being tested by the Evergreen project.
+          for branch in mongodb-3.6 mongodb-4.0 mongodb-4.2 mongodb-4.4 develop ; do
+            echo "[Debug] Copying over doc directory for branch $branch ..."
+            rsync -avq ../docs-$branch/ $branch/
+
+            # Commit and push the changes (if any).
+            git add $branch > /dev/null
+          done
+
+          git commit -m "Update auto-generated develop docs" \
+                     --author="svc-bot-doc-build <svc-wiredtiger-doc-build@10gen.com>" > /dev/null
+    # Use separate shell.exec with "silent" directive to avoid exposing credentail in task log.
+    - command: shell.exec
+      params:
+        working_dir: "wiredtiger/wiredtiger.github.com"
+        shell: bash
+        silent: true
+        script: |
+          set -o errexit
+          set -o verbose
+
+          git push https://${doc-update-github-token}@github.com/wiredtiger/wiredtiger.github.com
   "make check directory":
     command: shell.exec
     params:
@@ -1926,6 +2009,12 @@ tasks:
             set -o verbose
             env CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:/opt/java/jdk11/bin:$PATH sh s_release `date +%Y%m%d`
 
+  - name: doc-update
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger docs"
+      - func: "update wiredtiger docs"
+
   - name: syscall-linux
     depends_on:
     - name: compile
@@ -2524,6 +2613,16 @@ buildvariants:
   - ubuntu1804-test
   tasks:
     - name: package
+
+- name: doc-update
+  display_name: "~ Documentation update"
+  batchtime: 10080 # 1 day
+  run_on:
+  - ubuntu1804-test
+  tasks:
+    - name: doc-update
+  expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH
 
 - name: linux-no-ftruncate
   display_name: Linux no ftruncate
