@@ -80,7 +80,8 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
                         replset_config_options=self.replset_config_options,
                         mixed_bin_versions=self.mixed_bin_versions,
                         replicaset_logging_prefix=rs_name,
-                        use_replica_set_connection_string=self.use_replica_set_connection_string))
+                        use_replica_set_connection_string=self.use_replica_set_connection_string,
+                        all_nodes_electable=self.all_nodes_electable))
 
             self.replica_set_with_tenant = self.replica_sets[0]
 
@@ -150,3 +151,4 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         output = []
         for replica_set in self.replica_sets:
             output += replica_set.get_node_info()
+        return output

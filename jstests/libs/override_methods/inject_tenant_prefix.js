@@ -342,15 +342,26 @@ Mongo.prototype.recordRerouteDueToTenantMigration = function() {
     assert.neq(null, this.migrationStateDoc);
     assert.neq(null, this.reroutingMongo);
 
-    assert.commandWorked(originalRunCommand.apply(this, [
-        "testTenantMigration",
-        {
-            insert: "rerouted",
-            documents: [{_id: this.migrationStateDoc._id}],
-            writeConcern: {w: "majority"}
-        },
-        0
-    ]));
+    while (true) {
+        const res = originalRunCommand.apply(this, [
+            "testTenantMigration",
+            {
+                insert: "rerouted",
+                documents: [{_id: this.migrationStateDoc._id}],
+                writeConcern: {w: "majority"}
+            },
+            0
+        ]);
+        if (res.ok) {
+            return;
+        }
+        if (ErrorCodes.isNetworkError(res.code) || ErrorCodes.isNotPrimaryError(res.code)) {
+            jsTest.log("Failed to write to testTenantMigration.rerouted due to a retryable error " +
+                       tojson(res));
+            continue;
+        }
+        assert.commandWorked(res);
+    }
 };
 
 /**
