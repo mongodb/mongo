@@ -485,7 +485,7 @@ void ShardServerOpObserver::onCreateCollection(OperationContext* opCtx,
     // If the check above passes, this means the caller is responsible to eventially set the shard
     // version for the collection
     //
-    // TODO (SERVER-52778): Delete the lines below once all usages of
+    // TODO (SERVER-55284): Delete the lines below once all usages of
     // ScopedAllowImplicitCollectionCreate_UNSAFE have been removed
     auto* const csr = CollectionShardingRuntime::get(opCtx, collectionName);
     if (!csr->getCurrentMetadataIfKnown()) {
