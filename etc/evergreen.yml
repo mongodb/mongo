@@ -329,7 +329,6 @@ variables:
   - enterprise-windows-inmem
   - enterprise-windows-nopush-template
   - enterprise-windows-required
-  - enterprise-windows-wtdevelop
   - ubuntu1804-debug-asan
   - ubuntu1804-debug-ubsan
   - ubuntu1804-debug-aubsan-lite-required
@@ -457,7 +456,6 @@ functions:
       directory: ${git_project_directory|src}
       revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
         enterprise: ${enterprise_rev}
-        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -579,7 +577,7 @@ functions:
   "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v4.9"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -820,7 +818,6 @@ functions:
         cd src/third_party
         for wtdir in dist examples ext lang src test tools ; do
           rm -rf wiredtiger/$wtdir
-          mv wtdevelop/$wtdir wiredtiger/
         done
         fi
 
@@ -8524,12 +8521,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
-
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
+  branch: v4.9
 
 #######################################
 #            Buildvariants            #
@@ -8633,19 +8625,6 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
-
-- <<: *linux-64-debug-required-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  batchtime: 240 # 4 hours
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on
-    scons_cache_mode: nolinked
-    test_flags: --excludeWithAnyTags=requires_http_client
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -9406,7 +9385,8 @@ buildvariants:
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
-  - name: powercycle_smoke_skip_compile
+# Only run on the master branch.
+#  - name: powercycle_smoke_skip_compile
     distros:
     - amazon2-test
 
@@ -9693,17 +9673,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks
-
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  batchtime: 240 # 4 hours
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
