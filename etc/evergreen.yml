@@ -239,7 +239,7 @@ variables:
 - &enterprise-windows-64-2k8-nopush-template
   name: enterprise-windows-64-2k8-nopush-template
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   modules:
   - enterprise
   expansions: &enterprise-windows-64-2k8-nopush-expansions-template
@@ -259,14 +259,14 @@ variables:
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer .common
   - name: audit
@@ -8285,7 +8285,7 @@ buildvariants:
   modules:
     - enterprise
   run_on:
-    - windows-64-vs2017-test
+    - windows-vsCurrent-small
   expansions: &enterprise_windows_64_2k8_expansions
     burn_in_tests_build_variant: enterprise-windows-64-2k8
     platform_decompress: unzip
@@ -8306,22 +8306,22 @@ buildvariants:
     build_mongoreplay: false
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
     - name: compile_TG
       distros:
-        - windows-64-vs2017-compile
+        - windows-vsCurrent-large
     - name: burn_in_tests_gen
     - name: buildscripts_test
     - name: dbtest_TG
       distros:
-        - windows-64-vs2017-compile
+        - windows-vsCurrent-large
     - name: noPassthrough_gen
 
 - name: windows-64-2k8-debug
   display_name: "* Windows 2008R2 DEBUG"
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   expansions:
     platform_decompress: unzip
     exe: ".exe"
@@ -8337,11 +8337,11 @@ buildvariants:
     multiversion_edition: enterprise
     tooltags: ""
     build_mongoreplay: false
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .aggregation !.auth !.encrypt
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: auth_gen
@@ -8353,13 +8353,13 @@ buildvariants:
     # with more RAM for these suites.
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate
     distros:
-      - windows-64-vs2017-compile
+      - windows-vsCurrent-large
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
@@ -8369,17 +8369,17 @@ buildvariants:
   - name: .read_write_concern !.large
   - name: .read_write_concern .large
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .read_only
   - name: .rollbackfuzzer
   - name: .replica_sets !.large !.encrypt !.auth
   - name: .replica_sets .large
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: session_jscore_passthrough
   - name: sharding_gen
   - name: sharding_opportunistic_secondary_targeting_gen
@@ -8390,7 +8390,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   expansions:
     <<: *enterprise_windows_64_2k8_expansions
     push_path: win32
@@ -8400,10 +8400,10 @@ buildvariants:
   tasks:
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: compile_benchmarks
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: audit
@@ -8413,7 +8413,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   - name: dbtest_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_windows
@@ -8444,11 +8444,11 @@ buildvariants:
   name: enterprise-windows-64-2k8-compile-all
   display_name: "* Enterprise Windows 2008R2 compile_all"
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   # Do not add more tasks to this list.
 
 - name: enterprise-windows-64-2k8-async
@@ -8456,7 +8456,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   stepback: true
   batchtime: 10080 # 7 days
   expansions:
@@ -8477,11 +8477,11 @@ buildvariants:
         --mongosSetParameters="adaptiveServiceExecutorReservedThreads: 8"
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: jsCore
   - name: replica_sets
   - name: sharding_gen
@@ -8491,7 +8491,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -8510,11 +8510,11 @@ buildvariants:
     multiversion_edition: enterprise
     tooltags: "ssl sasl gssapi"
     build_mongoreplay: false
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .aggfuzzer .common
   - name: audit
   - name: auth_audit_gen
@@ -8538,7 +8538,7 @@ buildvariants:
 - name: windows-64-2k8-ssl
   display_name: Windows 2008R2
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -8560,11 +8560,11 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: false
-    large_distro_name: windows-64-vs2017-compile
+    large_distro_name: windows-vsCurrent-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: .aggfuzzer .common
   - name: .aggregation !.auth !.encrypt !.unwind
   - name: auth_gen
@@ -8600,7 +8600,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   batchtime: 1440 # 1 day
   expansions:
     platform_decompress: unzip
@@ -8621,7 +8621,7 @@ buildvariants:
   # timing-sensitive tests to fail.
   - name: compile_TG
     distros:
-    - windows-64-vs2017-compile
+    - windows-vsCurrent-large
   - name: audit
   # Do not add more tasks to this list.
 
@@ -10940,7 +10940,7 @@ buildvariants:
 - name: windows-shared-scons-cache-pruning
   display_name: "Windows shared SCons Cache Pruning"
   run_on:
-  - windows-64-vs2017-test
+  - windows-vsCurrent-small
   batchtime: 1440 # 1 day
   stepback: false
   tasks:
