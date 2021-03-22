@@ -152,8 +152,10 @@ Whether to drop all tables at the end of the run, and report time taken to do th
 Whether to create the database in-memory.
 @par icount (unsigned int, default=5000)
 number of records to initially populate. If multiple tables are configured the count is spread  evenly across all tables.
-@par idle_table_cycle (unsigned int, default=0)
-Enable regular create and drop of idle tables, value is the maximum number of seconds a create  or drop is allowed before flagging an error. Default 0 which means disabled.
+@par max_idle_table_cycle (unsigned int, default=0)
+Enable regular create and drop of idle tables. Value is the maximum number of seconds a create  or drop is allowed before aborting or printing a warning based on max_idle_table_cycle_fatal  setting.
+@par max_idle_table_cycle_fatal (boolean, default=false)
+print warning (false) or abort (true) of max_idle_table_cycle failure.
 @par index (boolean, default=false)
 Whether to create an index on the value field.
 @par insert_rmw (boolean, default=false)
