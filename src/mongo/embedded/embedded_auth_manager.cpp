@@ -112,9 +112,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext*,
-                                                        const UserName&,
-                                                        const User::UserId&) override {
+    StatusWith<UserHandle> reacquireUser(OperationContext*, const UserHandle&) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

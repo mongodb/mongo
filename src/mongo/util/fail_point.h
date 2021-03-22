@@ -130,6 +130,8 @@ public:
     // please make sure that the new type is also BSON-compatible.
     using EntryCountT = long long;
 
+    using PredicateFunction = std::function<bool(const BSONObj&)>;
+
 private:
     class Impl {
     private:
@@ -162,6 +164,20 @@ private:
              */
             bool isActive() const {
                 return MONGO_unlikely(_hit);
+            }
+
+            /**
+             * Returns true if the fail point is still enabled.
+             *
+             * This function does not increment the underlying counter. Note that the fail point
+             * may have been changed in various ways while a LockHandle is held:
+             * - The fail point may be in the process of mutation which toggles to disabled until
+             *   LockHandles are released.
+             * - The fail point may have the modes "activationProbability", "skip", or
+             *   "times".
+             */
+            bool isStillEnabled() const {
+                return _impl->_shouldFail(AlreadyCounted{true}, PredicateFunction{});
             }
 
             /** May only be called if isActive() is true. */
@@ -275,7 +291,7 @@ private:
 
             // Slow path. Wrap in `std::function` to deal with nullptr_t
             // or other predicates that are not bool-convertible.
-            std::function<bool(const BSONObj&)> predWrap(std::move(pred));
+            auto predWrap = PredicateFunction(std::move(pred));
 
             // The caller-supplied predicate, if provided, can force a miss that
             // bypasses the `_evaluateByMode()` call.

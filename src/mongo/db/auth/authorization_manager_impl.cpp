@@ -44,6 +44,7 @@
 #include "mongo/config.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_types_gen.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_manager_impl_parameters_gen.h"
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -283,6 +284,40 @@ std::unique_ptr<AuthorizationManager> authorizationManagerCreateImpl(
 auto authorizationManagerCreateRegistration =
     MONGO_WEAK_FUNCTION_REGISTRATION(AuthorizationManager::create, authorizationManagerCreateImpl);
 
+MONGO_FAIL_POINT_DEFINE(waitForUserCacheInvalidation);
+void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandle& user) {
+    auto fp = waitForUserCacheInvalidation.scopedIf([&](const auto& bsonData) {
+        IDLParserErrorContext ctx("waitForUserCacheInvalidation");
+        auto data = WaitForUserCacheInvalidationFailPoint::parse(ctx, bsonData);
+
+        const auto& blockedUserName = data.getUserName();
+        return blockedUserName == user->getName();
+    });
+
+    if (!fp.isActive()) {
+        return;
+    }
+
+    // Since we do not have notifications from both the user cache and the fail point itself,
+    // loop until our condition is satisfied. To avoid this loop, we would need a way to union
+    // notifications from both. This may be possible with a CancellationToken and a condition
+    // variable or with some novel Notifiable/Waitable-like type that synthesizes multiple
+    // notifications.
+    constexpr auto kCheckPeriod = Milliseconds{1};
+    auto m = MONGO_MAKE_LATCH();
+    auto cv = stdx::condition_variable{};
+    auto pred = [&] { return !fp.isStillEnabled() || !user.isValid(); };
+    auto waitOneCycle = [&] {
+        auto lk = stdx::unique_lock(m);
+        return !opCtx->waitForConditionOrInterruptFor(cv, lk, kCheckPeriod, pred);
+    };
+
+    while (waitOneCycle()) {
+        // Not yet finished.
+    }
+}
+
+
 }  // namespace
 
 int authorizationManagerCacheSize;
@@ -465,15 +500,23 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     return ex.toStatus();
 }
 
-StatusWith<UserHandle> AuthorizationManagerImpl::acquireUserForSessionRefresh(
-    OperationContext* opCtx, const UserName& userName, const User::UserId& uid) {
+StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext* opCtx,
+                                                               const UserHandle& user) {
+    const UserName& userName = user->getName();
+    handleWaitForUserCacheInvalidation(opCtx, user);
+    if (user.isValid()) {
+        return user;
+    }
+
+    // Make a good faith effort to acquire an up-to-date user object, since the one
+    // we've cached is marked "out-of-date."
     auto swUserHandle = acquireUser(opCtx, userName);
     if (!swUserHandle.isOK()) {
         return swUserHandle.getStatus();
     }
 
     auto ret = std::move(swUserHandle.getValue());
-    if (uid != ret->getID()) {
+    if (user->getID() != ret->getID()) {
         return {ErrorCodes::UserNotFound,
                 str::stream() << "User id from privilege document '" << userName.toString()
                               << "' does not match user id in session."};
