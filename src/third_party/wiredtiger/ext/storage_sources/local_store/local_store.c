@@ -235,7 +235,7 @@ local_config_dup(LOCAL_STORAGE *local, WT_SESSION *session, WT_CONFIG_ITEM *v, c
         free(p);
         return (ret);
     }
-    (void)strncat(p, suffix, len);
+    (void)strcat(p, suffix);
     *result = p;
     return (0);
 }
@@ -630,9 +630,10 @@ local_location_handle(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     location->iface.close = local_location_handle_close;
     *location_handlep = &location->iface;
 
-    if (0)
+    if (0) {
 err:
         (void)local_location_handle_close(&location->iface, session);
+    }
 
     if (parser != NULL)
         if ((t_ret = parser->close(parser)) != 0 && ret == 0)
@@ -777,6 +778,7 @@ local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sess
     *countp = count;
 
 err:
+    free(dirp);
     if (ret == 0)
         return (0);
 
@@ -917,7 +919,8 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
 
     if (0) {
 err:
-        local_file_close_internal(local, session, local_fh, true);
+        if (local_fh != NULL)
+            local_file_close_internal(local, session, local_fh, true);
     }
     return (ret);
 }
@@ -1238,6 +1241,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
       (ret = pthread_rwlock_init(&local->flush_lock, NULL)) != 0) {
         (void)local_err(local, NULL, ret, "pthread_rwlock_init");
         free(local);
+        return (ret);
     }
 
     /*
