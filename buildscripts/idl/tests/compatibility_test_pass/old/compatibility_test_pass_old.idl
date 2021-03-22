@@ -359,6 +359,28 @@ structs:
             anyTypeField:
                 type: bsonSerializationTypeAnyAllowed
 
+    NewlyAddedBsonSerializationTypeAnyReply:
+        description: "This reply contains a newly added field whose type has a bson_serialization_type
+                        that contains 'any' that is explicitly allowed"
+
+    OldUnstableTypeChangesReply:
+        description: "This reply contains a field that is unstable in the old version and has type changes"
+        fields:
+            oldUnstableTypeChangesReplyField:
+                unstable: true
+                type: intStringToIntStringBool
+
+    NewlyAddedBsonSerializationTypeAnyStruct:
+        description: "This struct contains a newly added field whose type has a bson_serialization_type
+                        that contains 'any' that is explicitly allowed"
+
+    OldUnstableTypeChangesStruct:
+        description: "This struct contains a field that is unstable in the old version and has type changes"
+        fields:
+            oldUnstableTypeChangesField:
+                unstable: true
+                type: intStringBoolToIntString
+
     BsonSerializationTypeAnyWithVariantReply:
         description: "This reply contains a new reply field with variant types where one of the
                       bson serialization types is 'any' and is explicitly allowed"
@@ -582,6 +604,50 @@ commands:
         fields:
             supersetStructParameter:
                 type: CommandParamStructRecursiveTwo
+
+    newlyAddedParamBsonAnyAllowList:
+        description: "command passes when its parameter is newly added and has bson type 'any'
+                      that is explicitly allowed"
+        command_name: newlyAddedParamBsonAnyAllowList
+        namespace: ignored
+        cpp_name: newlyAddedParamBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldUnstableParamTypeChanges:
+        description: "command passes when it has an old unstable param with incompatible type changes"
+        command_name: oldUnstableParamTypeChanges
+        namespace: ignored
+        cpp_name: oldUnstableParamTypeChanges
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            oldUnstableTypeChangesParam:
+                type: intStringBoolToIntString
+                unstable: true
+
+    newlyAddedTypeFieldBsonAnyAllowList:
+        description: "command passes when its type field is newly added and has bson type 'any'
+                      that is explicitly allowed"
+        command_name: newlyAddedTypeFieldBsonAnyAllowList
+        namespace: type
+        type: NewlyAddedBsonSerializationTypeAnyStruct
+        cpp_name: newlyAddedTypeFieldBsonAnyAllowList
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldUnstableTypeChanges:
+        description: "command passes when it has an old unstable type field with incompatible type changes"
+        command_name: oldUnstableTypeChanges
+        namespace: type
+        type: OldUnstableTypeChangesStruct
+        cpp_name: oldUnstableParamTypeChanges
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
 
     oldCommandParameterValidator:
         description: "new command passes when it contains a parameter that does not contain a validator
@@ -947,6 +1013,25 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantStructRecursiveReply
+
+    newlyAddedReplyFieldTypeBsonAnyAllowed:
+        description: "command passes because it has a newly added reply field type has a bson_serialization_type
+                      that contains 'any' that is explicitly allowed"
+        command_name: newlyAddedReplyFieldTypeBsonAnyAllowed
+        namespace: ignored
+        cpp_name: newlyAddedReplyFieldTypeBsonAnyAllowed
+        strict: true
+        api_version: "1"
+        reply_type: NewlyAddedBsonSerializationTypeAnyReply
+
+    oldUnstableReplyFieldTypeChanges:
+        description: "command passes when it has an old unstable reply field with incompatible type changes"
+        command_name: oldUnstableReplyFieldTypeChanges
+        namespace: ignored
+        cpp_name: oldUnstableReplyFieldTypeChanges
+        strict: true
+        api_version: "1"
+        reply_type: OldUnstableTypeChangesReply
 
     commandAllowedAnyTypes:
         description: "new command that has parameter and reply type with

@@ -229,6 +229,108 @@ structs:
             cppTypeNotEqualReplyField:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
 
+    NewlyAddedBsonSerializationTypeAnyReply:
+        description: "This reply contains a newly added field whose type has a bson_serialization_type
+                        that contains 'any' that is not explicitly allowed"
+        fields:
+            newlyAddedBsonSerializationTypeAnyReplyField:
+                type:
+                    variant: [string, bsonSerializationTypeAny]
+
+    OldBsonSerializationTypeAnyUnstableReply:
+        description: "This reply contains a field that is unstable in the old version
+                      and whose old type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            oldBsonSerializationTypeAnyUnstableReplyField:
+                type: oldBsonSerializationTypeAny
+
+    NewBsonSerializationTypeAnyUnstableReply:
+        description: "This reply contains a field that is unstable in the old version
+                      and whose new type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            newBsonSerializationTypeAnyUnstableReplyField:
+                type: newBsonSerializationTypeAny
+
+    BsonSerializationTypeAnyUnstableReply:
+        description: "This reply contains a field that is unstable in the old version
+                      and whose old and new type have a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed."
+        fields:
+            bsonSerializationTypeAnyUnstableReplyField:
+                type: bsonSerializationTypeAny
+
+    BsonSerializationTypeWithVariantAnyUnstableReply:
+        description: "This reply contains a field whose old and new variant types have a bson_serialization_type
+                        that contains 'any' that is not compatible and where the old field is unstable"
+        fields:
+            bsonSerializationTypeWithVariantAnyUnstableReplyField:
+                type:
+                    variant: [oldBsonSerializationTypeAny, newBsonSerializationTypeAny]
+
+    CppTypeNotEqualUnstableReply:
+        description: "This reply contains a field whose old and new type have a bson_serialization_type
+                        that contains 'any' and the cpp_types are not equal and where the old field
+                      is unstable"
+        fields:
+            cppTypeNotEqualReplyUnstableField:
+                type: bsonSerializationTypeAnyCppTypeNotEqual
+
+    NewlyAddedBsonSerializationTypeAnyStruct:
+        description: "This struct contains a newly added field whose type has a bson_serialization_type
+                        that contains 'any' that is not explicitly allowed"
+        fields:
+            newlyAddedBsonSerializationTypeAnyStructField:
+                optional: true
+                type:
+                    variant: [string, bsonSerializationTypeAny]
+
+    OldBsonSerializationTypeAnyUnstableStruct:
+        description: "This struct contains a field that is unstable in the old version
+                      and whose old type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            oldBsonSerializationTypeAnyUnstableStructField:
+                optional: true
+                type: oldBsonSerializationTypeAny
+
+    NewBsonSerializationTypeAnyUnstableStruct:
+        description: "This struct contains a field that is unstable in the old version
+                      and whose new type has a bson_serialization_type
+                      that contains 'any'"
+        fields:
+            newBsonSerializationTypeAnyUnstableStructField:
+                optional: true
+                type: newBsonSerializationTypeAny
+
+    BsonSerializationTypeAnyUnstableStruct:
+        description: "This struct contains a field that is unstable in the old version
+                      and whose old and new type have a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed."
+        fields:
+            bsonSerializationTypeAnyUnstableStructField:
+                optional: true
+                type: bsonSerializationTypeAny
+
+    BsonSerializationTypeWithVariantAnyUnstableStruct:
+        description: "This struct contains a field whose old and new variant types have a bson_serialization_type
+                        that contains 'any' that is not compatible and where the old field is unstable"
+        fields:
+            bsonSerializationTypeWithVariantAnyUnstableStructField:
+                optional: true
+                type:
+                    variant: [oldBsonSerializationTypeAny, newBsonSerializationTypeAny]
+
+    CppTypeNotEqualUnstableStruct:
+        description: "This struct contains a field whose old and new type have a bson_serialization_type
+                        that contains 'any' and the cpp_types are not equal and where the old field
+                      is unstable"
+        fields:
+            cppTypeNotEqualStructUnstableField:
+                optional: true
+                type: bsonSerializationTypeAnyCppTypeNotEqual
+
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is not 
                       compatible with the old field type"
@@ -681,6 +783,92 @@ commands:
         fields:
             cppTypeNotEqualParam:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
+
+    oldCommandParamTypeBsonAnyUnstable:
+        description: "old command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' and the old param is unstable"
+        command_name: oldCommandParamTypeBsonAnyUnstable
+        namespace: ignored
+        cpp_name: oldCommandParamTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyUnstableParam:
+                type: oldBsonSerializationTypeAny
+                optional: true
+
+    newCommandParamTypeBsonAnyUnstable:
+        description: "new command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' and the old param is unstable"
+        command_name: newCommandParamTypeBsonAnyUnstable
+        namespace: ignored
+        cpp_name: newCommandParamTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyUnstableParam:
+                type: newBsonSerializationTypeAny
+                optional: true
+
+    commandParamTypeBsonAnyNotAllowedUnstable:
+        description: "command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' that is not
+                      explicitly allowed"
+        command_name: commandParamTypeBsonAnyNotAllowedUnstable
+        namespace: ignored
+        cpp_name: commandParamTypeBsonAnyNotAllowedUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            bsonTypeAnyUnstableParam:
+                type: bsonSerializationTypeAny
+                optional: true
+
+    commandParameterCppTypeNotEqualUnstable:
+        description: "command fails because it has a parameter type that has a
+                      bson_serialization_type that contains 'any' and where the cpp_types
+                      are not equal"
+        command_name: commandParameterCppTypeNotEqualUnstable
+        namespace: ignored
+        cpp_name: commandParameterCppTypeNotEqualUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            cppTypeNotEqualParam:
+                type: bsonSerializationTypeAnyCppTypeNotEqual
+                optional: true
+
+    parameterFieldTypeBsonAnyWithVariantUnstable:
+        description: "command fails when its paramter field variant types have bson_serialization_type
+                      'any' that is not compatible with each other"
+        command_name: parameterFieldTypeBsonAnyWithVariantUnstable
+        namespace: ignored
+        cpp_name: parameterFieldTypeBsonAnyWithVariantUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            variantAnyUnstableField:
+                type: BsonSerializationTypeWithVariantAnyStruct
+                optional: true
+
+    newlyAddedParamBsonAnyNotAllowed:
+        description: "command fails when its parameter is newly added and has bson type 'any'
+                      that is not explicitly allowed"
+        command_name: newlyAddedParamBsonAnyNotAllowed
+        namespace: ignored
+        cpp_name: newlyAddedParamBsonAnyNotAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            newlyAddedBsonAnyNotAllowedParam:
+                type: bsonSerializationTypeAny
+                optional: true
 
     newCommandParameterTypeEnumNotSuperset:
         description: "new command fails because its parameter type is an enum that is not
@@ -1193,6 +1381,72 @@ commands:
         namespace: type
         type: bsonSerializationTypeAnyCppTypeNotEqual
         cpp_name: commandCppTypeNotEqual
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    oldTypeBsonAnyUnstable:
+        description: "old command fails because its type has a bson_serialization_type
+                      that contains 'any' and the old type field is unstable"
+        command_name: oldTypeBsonAnyUnstable
+        namespace: type
+        type: OldBsonSerializationTypeAnyUnstableStruct
+        cpp_name: oldTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newTypeBsonAnyUnstable:
+        description: "new command fails because its type has a bson_serialization_type
+                      that contains 'any' and the old type field is unstable"
+        command_name: newTypeBsonAnyUnstable
+        namespace: type
+        type: NewBsonSerializationTypeAnyUnstableStruct
+        cpp_name: newTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    typeBsonAnyNotAllowedUnstable:
+        description: "command fails because its type has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed and the old type field is unstable"
+        command_name: typeBsonAnyNotAllowedUnstable
+        namespace: type
+        type: BsonSerializationTypeAnyUnstableStruct
+        cpp_name: typeBsonAnyNotAllowedUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandCppTypeNotEqualUnstable:
+        description: "command fails because its type has a bson_serialization_type
+                      that contains 'any' and the cpp_types are not equal and the old type field is unstable"
+        command_name: commandCppTypeNotEqualUnstable
+        namespace: type
+        type: CppTypeNotEqualUnstableStruct
+        cpp_name: commandCppTypeNotEqualUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    commandTypeBsonAnyWithVariantUnstable:
+        description: "command fails when its variant types have bson_serialization_type
+                      'any' that is not compatible with each other and the old type field is unstable"
+        command_name: commandTypeBsonAnyWithVariantUnstable
+        namespace: type
+        type: BsonSerializationTypeWithVariantAnyUnstableStruct
+        cpp_name: commandTypeBsonAnyWithVariantUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newlyAddedTypeFieldBsonAnyNotAllowed:
+        description: "command fails because it has a newly added type field has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed"
+        command_name: newlyAddedTypeFieldBsonAnyNotAllowed
+        namespace: type
+        type: NewlyAddedBsonSerializationTypeAnyStruct
+        cpp_name: newlyAddedTypeFieldBsonAnyNotAllowed
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -1992,3 +2246,63 @@ commands:
         reply_type: OkReply
         access_check:
             none: true
+
+    oldReplyFieldTypeBsonAnyUnstable:
+        description: "old command fails when its reply field type has a bson_serialization_type
+                      that contains 'any' and the old reply field is unstable"
+        command_name: oldReplyFieldTypeBsonAnyUnstable
+        namespace: ignored
+        cpp_name: oldReplyFieldTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: OldBsonSerializationTypeAnyUnstableReply
+
+    newReplyFieldTypeBsonAnyUnstable:
+        description: "new command fails when its reply field type has a bson_serialization_type
+                      that contains 'any' and the old reply field is unstable"
+        command_name: newReplyFieldTypeBsonAnyUnstable
+        namespace: ignored
+        cpp_name: newReplyFieldTypeBsonAnyUnstable
+        strict: true
+        api_version: "1"
+        reply_type: NewBsonSerializationTypeAnyUnstableReply
+
+    replyFieldTypeBsonAnyNotAllowedUnstable:
+        description: "command fails when its reply field type has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed and the old reply field is unstable"
+        command_name: replyFieldTypeBsonAnyNotAllowedUnstable
+        namespace: ignored
+        cpp_name: replyFieldTypeBsonAnyNotAllowedUnstable
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeAnyUnstableReply
+
+    replyFieldTypeBsonAnyWithVariantUnstable:
+        description: "command fails when its reply field variant types have bson_serialization_type
+                      'any' that is not compatible with each other and the old reply field is unstable"
+        command_name: replyFieldTypeBsonAnyWithVariantUnstable
+        namespace: ignored
+        cpp_name: replyFieldTypeBsonAnyWithVariantUnstable
+        strict: true
+        api_version: "1"
+        reply_type: BsonSerializationTypeWithVariantAnyUnstableReply
+
+    replyFieldCppTypeNotEqualUnstable:
+        description: "command fails because its reply field type has a bson_serialization_type
+                      that contains 'any', and the cpp_types are not equal and the old reply field is unstable"
+        command_name: replyFieldCppTypeNotEqualUnstable
+        namespace: ignored
+        cpp_name: replyFieldCppTypeNotEqualUnstable
+        strict: true
+        api_version: "1"
+        reply_type: CppTypeNotEqualUnstableReply
+
+    newlyAddedReplyFieldTypeBsonAnyNotAllowed:
+        description: "command fails because it has a newly added reply field type has a bson_serialization_type
+                      that contains 'any' that is not explicitly allowed"
+        command_name: newlyAddedReplyFieldTypeBsonAnyNotAllowed
+        namespace: ignored
+        cpp_name: newlyAddedReplyFieldTypeBsonAnyNotAllowed
+        strict: true
+        api_version: "1"
+        reply_type: NewlyAddedBsonSerializationTypeAnyReply
