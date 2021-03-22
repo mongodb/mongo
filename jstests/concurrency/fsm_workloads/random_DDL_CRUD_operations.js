@@ -25,22 +25,27 @@ var $config = (function() {
         return prefix + tid;
     }
 
+    let data = {numChunks: 20, documentsPerChunk: 5, CRUDMutex: 'CRUDMutex'};
+
     /**
      * Used for mutual exclusion. Uses a collection to ensure atomicity on the read and update
      * operation.
      */
-    function mutexLock(db, collName, tid) {
+    function mutexLock(db, tid, collName) {
+        jsTestLog('Trying to acquire mutexLock for resource tid:' + tid +
+                  ' collection:' + collName);
         assertAlways.soon(() => {
-            let doc = db[collName].findAndModify({query: {tid: tid}, update: {$set: {mutex: 1}}});
+            let doc =
+                db[data.CRUDMutex].findAndModify({query: {tid: tid}, update: {$set: {mutex: 1}}});
             return doc.mutex === 0;
         });
+        jsTestLog('Acquired mutexLock for tid:' + tid + ' collection:' + collName);
     }
 
-    function mutexUnlock(db, collName, tid) {
-        db[collName].update({tid: tid}, {$set: {mutex: 0}});
+    function mutexUnlock(db, tid, collName) {
+        db[data.CRUDMutex].update({tid: tid}, {$set: {mutex: 0}});
+        jsTestLog('Unlocked lock for resource tid:' + tid + ' collection:' + collName);
     }
-
-    let data = {numChunks: 20, documentsPerChunk: 5, CRUDMutex: 'CRUDMutex'};
 
     let states = {
         init: function(db, collName, connCache) {
@@ -56,9 +61,11 @@ var $config = (function() {
             const targetThreadColl = threadCollectionName(collName, tid);
             const coll = db[threadCollectionName(collName, tid)];
             const fullNs = coll.getFullName();
-            jsTestLog('create tid:' + tid + ' currentTid: ' + this.tid);
+            jsTestLog('create state tid:' + tid + ' currentTid:' + this.tid +
+                      ' collection:' + targetThreadColl);
             assertAlways.commandWorked(
                 db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
+            jsTestLog('create state finished');
         },
         drop: function(db, collName, connCache) {
             let tid = this.tid;
@@ -66,10 +73,14 @@ var $config = (function() {
             while (tid === this.tid)
                 tid = Random.randInt(this.threadCount);
 
-            jsTestLog('drop tid:' + tid + ' currentTid: ' + this.tid);
-            mutexLock(db, data.CRUDMutex, tid);
-            assertAlways.eq(db[threadCollectionName(collName, tid)].drop(), true);
-            mutexUnlock(db, data.CRUDMutex, tid);
+            const targetThreadColl = threadCollectionName(collName, tid);
+
+            jsTestLog('drop state tid:' + tid + ' currentTid:' + this.tid +
+                      ' collection:' + targetThreadColl);
+            mutexLock(db, tid, targetThreadColl);
+            assertAlways.eq(db[targetThreadColl].drop(), true);
+            mutexUnlock(db, tid, targetThreadColl);
+            jsTestLog('drop state finished');
         },
         rename: function(db, collName, connCache) {
             let tid = this.tid;
@@ -82,7 +93,8 @@ var $config = (function() {
             // Rename collection
             const destCollName = threadCollectionName(collName, new Date().getTime());
             try {
-                jsTestLog('rename tid:' + tid + ' currentTid: ' + this.tid);
+                jsTestLog('rename state tid:' + tid + ' currentTid:' + this.tid +
+                          ' collection:' + srcCollName);
                 assertAlways.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
                 if (e.code && e.code === ErrorCodes.NamespaceNotFound) {
@@ -107,6 +119,8 @@ var $config = (function() {
                     return;
                 }
                 throw e;
+            } finally {
+                jsTestLog('rename state finished');
             }
         },
         CRUD: function(db, collName, connCache) {
@@ -115,7 +129,10 @@ var $config = (function() {
             while (tid === this.tid)
                 tid = Random.randInt(this.threadCount);
 
-            const coll = db[threadCollectionName(collName, tid)];
+            const targetThreadColl = threadCollectionName(collName, tid);
+            jsTestLog('CRUD state tid:' + tid + ' currentTid:' + this.tid +
+                      ' collection:' + targetThreadColl);
+            const coll = db[targetThreadColl];
             const fullNs = coll.getFullName();
 
             const generation = new Date().getTime();
@@ -127,9 +144,10 @@ var $config = (function() {
                 insertBulkOp.insert({generation: generation, count: i, tid: tid});
             }
 
-            mutexLock(db, data.CRUDMutex, tid);
+            mutexLock(db, tid, targetThreadColl);
             try {
-                jsTestLog('CRUD - Insert tid: ' + tid + ' currentTid: ' + this.tid);
+                jsTestLog('CRUD - Insert tid:' + tid + ' currentTid:' + this.tid +
+                          ' collection:' + targetThreadColl);
                 // Check if insert succeeded
                 assertAlways.commandWorked(insertBulkOp.execute());
                 let currentDocs = coll.countDocuments({generation: generation});
@@ -138,25 +156,28 @@ var $config = (function() {
                 // there will be 0 documents left) or the insert came in first.
                 assertAlways(currentDocs === numDocs || currentDocs === 0);
 
-                jsTestLog('CRUD - Update tid: ' + tid + ' currentTid: ' + this.tid);
+                jsTestLog('CRUD - Update tid:' + tid + ' currentTid:' + this.tid +
+                          ' collection:' + targetThreadColl);
                 assertAlways.commandWorked(
                     coll.update({generation: generation}, {$set: {updated: true}}, {multi: true}));
 
                 // Delete Data
-                jsTestLog('CRUD - Remove tid: ' + tid + ' currentTid: ' + this.tid);
+                jsTestLog('CRUD - Remove tid:' + tid + ' currentTid:' + this.tid +
+                          ' collection:' + targetThreadColl);
                 // Check if delete succeeded
                 coll.remove({generation: generation}, {multi: true});
                 // Check guarantees IF NO CONCURRENT DROP is running.
                 assertAlways.eq(coll.countDocuments({generation: generation}), 0);
             } catch (e) {
-                if (e.writeError && e.writeError === ErrorCodes.QueryPlanKilled) {
+                if (e.writeError && e.writeError.code === ErrorCodes.QueryPlanKilled) {
                     // It is fine for a CRUD operation to throw ErrorCodes::QueryPlanKilled if
                     // performed concurrently with a rename (SERVER-31695).
                     return;
                 }
                 throw e;
             } finally {
-                mutexUnlock(db, data.CRUDMutex, tid);
+                mutexUnlock(db, tid, targetThreadColl);
+                jsTestLog('CRUD state finished');
             }
         }
     };

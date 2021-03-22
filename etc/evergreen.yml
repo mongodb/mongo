@@ -6648,7 +6648,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: "--suites=concurrency_sharded_ddl_operations --storageEngine=wiredTiger"
+      resmoke_args: "--suites=concurrency_sharded_ddl_operations --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2, sharding: 2}}'"
       resmoke_jobs_max: 1
 
 - <<: *task_template
