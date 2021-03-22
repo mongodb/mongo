@@ -61,6 +61,8 @@ commands:
     saslStart:
         description: "Begin a SASL based authentication session"
         api_version: "1"
+        access_check:
+            none: true
         command_name: saslStart
         namespace: ignored
         cpp_name: SaslStartCommand
@@ -86,6 +88,8 @@ commands:
     saslContinue:
         description: "Continue a SASL based authentication session"
         api_version: "1"
+        access_check:
+            none: true
         command_name: saslContinue
         namespace: ignored
         cpp_name: SaslContinueCommand

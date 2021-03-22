@@ -48,6 +48,8 @@ commands:
     authenticate:
         description: "Begin a X509 based authentication session"
         api_version: "1"
+        access_check:
+            none: true
         namespace: ignored
         command_name: authenticate
         cpp_name: AuthenticateCommand

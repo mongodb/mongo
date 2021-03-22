@@ -74,5 +74,7 @@ commands:
         command_name: ping
         strict: true
         api_version: 1
+        access_check:
+            none: true
         namespace: ignored
         reply_type: OkReply

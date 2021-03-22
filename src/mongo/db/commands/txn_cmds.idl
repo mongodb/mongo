@@ -85,6 +85,8 @@ commands:
         cpp_name: CommitTransaction
         strict: true
         api_version: "1"
+        access_check:
+            none: true
         fields:
             commitTimestamp:
                 description: "Timestamp at which to commit the transaction. Required for prepared
@@ -105,6 +107,8 @@ commands:
         cpp_name: AbortTransaction
         strict: true
         api_version: "1"
+        access_check:
+            none: true
         fields:
             recoveryToken:
                 description: "A mongos that doesn't know about this transaction can attempt to make

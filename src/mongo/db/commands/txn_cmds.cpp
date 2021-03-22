@@ -88,8 +88,6 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const final {}
-
         Reply typedRun(OperationContext* opCtx) final {
             auto txnParticipant = TransactionParticipant::get(opCtx);
             uassert(ErrorCodes::CommandFailed,
@@ -201,8 +199,6 @@ public:
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName());
         }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final {}
 
         Reply typedRun(OperationContext* opCtx) final {
             auto txnParticipant = TransactionParticipant::get(opCtx);

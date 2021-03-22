@@ -80,8 +80,6 @@ public:
             return NamespaceString(request().getDbName());
         }
 
-        void doCheckAuthorization(OperationContext*) const final {}
-
         Reply typedRun(OperationContext* opCtx);
     };
 
@@ -115,8 +113,6 @@ public:
         NamespaceString ns() const final {
             return NamespaceString(request().getDbName());
         }
-
-        void doCheckAuthorization(OperationContext*) const final {}
 
         Reply typedRun(OperationContext* opCtx);
     };

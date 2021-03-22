@@ -114,7 +114,16 @@ ERROR_ID_ADDED_ACCESS_CHECK_FIELD = "ID0067"
 # be skipped from compatibility checking.
 SKIPPED_COMMANDS = {
     "invalidReplySkippedCommand": [ERROR_ID_NEW_REPLY_FIELD_MISSING],
-    "dropDatabase": [ERROR_ID_NEW_REPLY_FIELD_MISSING]
+    "dropDatabase": [ERROR_ID_NEW_REPLY_FIELD_MISSING, ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "createIndexes": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "drop": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "saslStart": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "saslContinue": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "authenticate": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "ping": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "commitTransaction": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "abortTransaction": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
+    "hello": [ERROR_ID_ADDED_ACCESS_CHECK_FIELD],
 }
 
 

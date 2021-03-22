@@ -79,7 +79,6 @@ public:
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
         }
-        void doCheckAuthorization(OperationContext* opCtx) const override {}
         virtual Reply typedRun(OperationContext* opCtx) override {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
             return Reply{};
