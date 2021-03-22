@@ -44,6 +44,10 @@ public:
     ImpersonationSessionGuard(OperationContext* opCtx);
     ~ImpersonationSessionGuard();
 
+    bool isActive() const {
+        return _active;
+    }
+
 private:
     rpc::MaybeImpersonatedUserMetadata _oldImpersonationData;
     OperationContext* _opCtx;

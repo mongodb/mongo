@@ -42,6 +42,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_contract_gen.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -51,6 +52,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -70,6 +72,24 @@ auto authorizationSessionCreateRegistration =
 
 constexpr StringData ADMIN_DBNAME = "admin"_sd;
 
+bool checkContracts() {
+
+    // Only check contracts if the feature is enabled.
+    // TODO SERVER-52364 - Remove feature flag check
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+        !feature_flags::gFeatureFlagAuthorizationContract.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return false;
+    }
+
+    // Only check contracts in testing modes, invalid contracts should not break customers.
+    if (!TestingProctor::instance().isEnabled()) {
+        return false;
+    }
+
+    return true;
+}
+
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
@@ -88,6 +108,14 @@ AuthorizationManager& AuthorizationSessionImpl::getAuthorizationManager() {
 void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
     _externalState->startRequest(opCtx);
     _refreshUserInfoAsNeeded(opCtx);
+}
+
+void AuthorizationSessionImpl::startContractTracking() {
+    if (!checkContracts()) {
+        return;
+    }
+
+    _contract.clear();
 }
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
@@ -120,12 +148,16 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 }
 
 User* AuthorizationSessionImpl::lookupUser(const UserName& name) {
+    _contract.addAccessCheck(AccessCheckEnum::kLookupUser);
+
     auto user = _authenticatedUsers.lookup(name);
     return user ? user.get() : nullptr;
 }
 
 User* AuthorizationSessionImpl::getSingleUser() {
     UserName userName;
+
+    _contract.addAccessCheck(AccessCheckEnum::kGetSingleUser);
 
     auto userNameItr = getAuthenticatedUserNames();
     if (userNameItr.more()) {
@@ -176,10 +208,14 @@ void AuthorizationSessionImpl::logoutDatabase(Client* client,
 }
 
 UserNameIterator AuthorizationSessionImpl::getAuthenticatedUserNames() {
+    _contract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUserNames);
+
     return _authenticatedUsers.getNames();
 }
 
 RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
+    _contract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedRoleNames);
+
     return makeRoleNameIterator(_authenticatedRoleNames.begin(), _authenticatedRoleNames.end());
 }
 
@@ -197,7 +233,7 @@ void AuthorizationSessionImpl::grantInternalAuthorization(OperationContext* opCt
     grantInternalAuthorization(opCtx->getClient());
 }
 
-PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
+PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     PrivilegeVector defaultPrivileges;
 
     // If localhost exception is active (and no users exist),
@@ -242,6 +278,7 @@ PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
 
 bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONElement& element) {
     const bool isUUID = element.type() == BinData && element.binDataType() == BinDataType::newUUID;
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
     uassert(ErrorCodes::InvalidNamespace,
             "Failed to parse namespace element",
@@ -257,6 +294,8 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONEle
 
 bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
     const NamespaceStringOrUUID& nss) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
+
     if (nss.uuid()) {
         return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                 ActionType::useUUID);
@@ -265,6 +304,8 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
 }
 
 bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToCreateRole);
+
     // A user is allowed to create a role under either of two conditions.
 
     // The user may create a role if the authorization system says they are allowed to.
@@ -397,6 +438,8 @@ static int buildResourceSearchList(const ResourcePattern& target,
 
 bool AuthorizationSessionImpl::isAuthorizedToChangeAsUser(const UserName& userName,
                                                           ActionType actionType) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToChangeAsUser);
+
     User* user = lookupUser(userName);
     if (!user) {
         return false;
@@ -414,6 +457,8 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeAsUser(const UserName& userNa
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListCollections(
     StringData dbname, const BSONObj& cmdObj) {
+    _contract.addAccessCheck(AccessCheckEnum::kCheckAuthorizedToListCollections);
+
     if (cmdObj["authorizedCollections"].trueValue() && cmdObj["nameOnly"].trueValue() &&
         AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
         return PrivilegeVector();
@@ -431,6 +476,8 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthenticatedAsUserWithRole);
+
     for (UserSet::iterator it = _authenticatedUsers.begin(); it != _authenticatedUsers.end();
          ++it) {
         if ((*it)->hasRole(roleName)) {
@@ -441,10 +488,14 @@ bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& rol
 }
 
 bool AuthorizationSessionImpl::shouldIgnoreAuthChecks() {
+    _contract.addAccessCheck(AccessCheckEnum::kShouldIgnoreAuthChecks);
+
     return _externalState->shouldIgnoreAuthChecks();
 }
 
 bool AuthorizationSessionImpl::isAuthenticated() {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
+
     return _authenticatedUsers.begin() != _authenticatedUsers.end();
 }
 
@@ -550,6 +601,8 @@ void AuthorizationSessionImpl::_buildAuthenticatedRolesVector() {
 }
 
 bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringData db) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedForAnyActionOnAnyResourceInDB);
+
     if (_externalState->shouldIgnoreAuthChecks()) {
         return true;
     }
@@ -595,6 +648,8 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
 }
 
 bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnResource(const ResourcePattern& resource) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedForAnyActionOnResource);
+
     if (_externalState->shouldIgnoreAuthChecks()) {
         return true;
     }
@@ -616,6 +671,8 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnResource(const Resource
 
 
 bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privilege) {
+    _contract.addPrivilege(privilege);
+
     const ResourcePattern& target(privilege.getResourcePattern());
 
     ResourcePattern resourceSearchList[resourceSearchListCapacity];
@@ -623,7 +680,7 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
 
     ActionSet unmetRequirements = privilege.getActions();
 
-    PrivilegeVector defaultPrivileges = getDefaultPrivileges();
+    PrivilegeVector defaultPrivileges = _getDefaultPrivileges();
     for (PrivilegeVector::iterator it = defaultPrivileges.begin(); it != defaultPrivileges.end();
          ++it) {
         for (int i = 0; i < resourceSearchListLength; ++i) {
@@ -660,6 +717,7 @@ void AuthorizationSessionImpl::setImpersonatedUserData(const std::vector<UserNam
 }
 
 bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLock opClientLock) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsCoauthorizedWithClient);
     auto getUserNames = [](AuthorizationSession* authSession) {
         if (authSession->isImpersonating()) {
             return authSession->getImpersonatedUserNames();
@@ -684,6 +742,7 @@ bool AuthorizationSessionImpl::isCoauthorizedWithClient(Client* opClient, WithLo
 }
 
 bool AuthorizationSessionImpl::isCoauthorizedWith(UserNameIterator userNameIter) {
+    _contract.addAccessCheck(AccessCheckEnum::kIsCoauthorizedWith);
     if (!getAuthorizationManager().isAuthEnabled()) {
         return true;
     }
@@ -706,14 +765,20 @@ bool AuthorizationSessionImpl::isCoauthorizedWith(UserNameIterator userNameIter)
 }
 
 UserNameIterator AuthorizationSessionImpl::getImpersonatedUserNames() {
+    _contract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserNames);
+
     return makeUserNameIterator(_impersonatedUserNames.begin(), _impersonatedUserNames.end());
 }
 
 RoleNameIterator AuthorizationSessionImpl::getImpersonatedRoleNames() {
+    _contract.addAccessCheck(AccessCheckEnum::kGetImpersonatedRoleNames);
+
     return makeRoleNameIterator(_impersonatedRoleNames.begin(), _impersonatedRoleNames.end());
 }
 
 bool AuthorizationSessionImpl::isUsingLocalhostBypass() {
+    _contract.addAccessCheck(AccessCheckEnum::kIsUsingLocalhostBypass);
+
     return getAuthorizationManager().isAuthEnabled() && _externalState->shouldAllowLocalhost();
 }
 
@@ -732,6 +797,8 @@ bool AuthorizationSessionImpl::isImpersonating() const {
 auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     OperationContext* const opCtx, const boost::optional<LogicalSessionId> cursorSessionId)
     -> Status {
+    _contract.addAccessCheck(AccessCheckEnum::kCheckCursorSessionPrivilege);
+
     auto nobodyIsLoggedIn = [authSession = this] { return !authSession->isAuthenticated(); };
 
     auto authHasImpersonatePrivilege = [authSession = this] {
@@ -775,6 +842,40 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
     }
 
     return Status::OK();
+}
+
+void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contract) const {
+    if (contract == nullptr) {
+        return;
+    }
+
+    if (!checkContracts()) {
+        return;
+    }
+
+    // Make a mutable copy so that the common auth checks can be added.
+    auto tempContract = *contract;
+
+    // Certain access checks are done by code common to all commands.
+    //
+    // The first two checks are done by initializeOperationSessionInfo
+    tempContract.addAccessCheck(AccessCheckEnum::kIsUsingLocalhostBypass);
+    tempContract.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
+
+    // These checks are done by auditing
+    tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedRoleNames);
+    tempContract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUserNames);
+    tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedUserNames);
+    tempContract.addAccessCheck(AccessCheckEnum::kGetImpersonatedRoleNames);
+
+    // "internal" comes from readRequestMetadata and sharded clusters
+    // "advanceClusterTime" is an implicit check in clusters in metadata handling
+    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(),
+                                        {ActionType::advanceClusterTime, ActionType::internal}));
+
+    uassert(5452401,
+            "Authorization Session contains more authorization checks then permitted by contract.",
+            tempContract.contains(_contract));
 }
 
 }  // namespace mongo

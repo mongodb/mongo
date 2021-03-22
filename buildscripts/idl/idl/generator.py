@@ -979,7 +979,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (bool, Union[str, bool]) -> None
         """Generate an apiVersions or deprecatedApiVersions function for a command's base class."""
         fn_name = "apiVersions" if is_api_versions else "deprecatedApiVersions"
-        fn_def = 'virtual const std::set<std::string>& %s() const override' % fn_name
+        fn_def = 'virtual const std::set<std::string>& %s() const final' % fn_name
         value = "kApiVersions1" if api_version else "kNoApiVersions"
         with self._block('%s {' % (fn_def), '}'):
             self._writer.write_line('return %s;' % value)
@@ -1043,6 +1043,13 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             # Write apiVersions() and deprecatedApiVersions() functions.
             self.gen_api_version_fn(True, command.api_version)
             self.gen_api_version_fn(False, command.is_deprecated)
+
+            # Wrte authorization contract code
+            if command.access_checks is not None:
+                self._writer.write_line(
+                    'const AuthorizationContract* getAuthorizationContract() const final { return &Request::kAuthorizationContract; } '
+                )
+                self.write_empty_line()
 
             # Write InvocationBaseGen class.
             self.gen_invocation_base_class_declaration(command)
@@ -2241,8 +2248,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if struct.access_checks is None:
             return
 
-        checks = ",".join(
-            [("AccessCheckEnum::" + ac.check) for ac in struct.access_checks if ac.check])
+        checks_list = [ac.check for ac in struct.access_checks if ac.check]
+        checks = ",".join([("AccessCheckEnum::" + c) for c in checks_list])
 
         privilege_list = [ac.privilege for ac in struct.access_checks if ac.privilege]
         privileges = ",".join([

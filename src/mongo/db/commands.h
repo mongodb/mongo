@@ -67,6 +67,7 @@ extern const OperationContext::Decoration<boost::optional<BSONArray>> errorLabel
 extern const std::set<std::string> kNoApiVersions;
 extern const std::set<std::string> kApiVersions1;
 
+class AuthorizationContract;
 class Command;
 class CommandInvocation;
 class OperationContext;
@@ -575,6 +576,15 @@ public:
      */
     virtual bool auditAuthorizationFailure() const {
         return true;
+    }
+
+
+    /**
+     * Get the authorization contract for this command. nullptr means no contract has been
+     * specified.
+     */
+    virtual const AuthorizationContract* getAuthorizationContract() const {
+        return nullptr;
     }
 
 private:
