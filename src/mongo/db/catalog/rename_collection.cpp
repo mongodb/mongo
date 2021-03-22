@@ -645,10 +645,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
             // Cursor is left one past the end of the batch inside writeConflictRetry.
             auto beginBatchId = record->id;
             Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
-                // Need to reset cursor if it gets a WCE midway through.
-                if (!record || (beginBatchId != record->id)) {
-                    record = cursor->seekExact(beginBatchId);
-                }
+                // Always reposition cursor in case it gets a WCE midway through.
+                record = cursor->seekExact(beginBatchId);
                 for (int i = 0; record && (i < internalInsertMaxBatchSize.load()); i++) {
                     WriteUnitOfWork wunit(opCtx);
                     const InsertStatement stmt(record->data.releaseToBson());
