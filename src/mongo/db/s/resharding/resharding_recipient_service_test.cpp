@@ -168,10 +168,8 @@ public:
             chunk.setName(OID::gen());
             version.incMinor();
 
-
-            const auto aggResultObj =
-                coll.toBSON().addFields(BSON("chunks" << chunk.toConfigBSON()));
-            return std::vector<BSONObj>{aggResultObj};
+            const auto chunkObj = BSON("chunks" << chunk.toConfigBSON());
+            return std::vector<BSONObj>{coll.toBSON(), chunkObj};
         }());
 
         future.default_timed_get();
@@ -195,9 +193,8 @@ public:
             chunk.setName(OID::gen());
             version.incMinor();
 
-            const auto aggResultObj =
-                coll.toBSON().addFields(BSON("chunks" << chunk.toConfigBSON()));
-            return std::vector<BSONObj>{aggResultObj};
+            const auto chunkObj = BSON("chunks" << chunk.toConfigBSON());
+            return std::vector<BSONObj>{coll.toBSON(), chunkObj};
         }());
     }
 

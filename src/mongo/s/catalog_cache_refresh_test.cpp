@@ -82,14 +82,11 @@ protected:
             reshardingFields.setReshardingUUID(reshardingUUID);
             collType.setReshardingFields(std::move(reshardingFields));
 
-            std::vector<BSONObj> aggResult;
-            std::transform(chunks.begin(),
-                           chunks.end(),
-                           std::back_inserter(aggResult),
-                           [&collType](const auto& chunk) {
-                               return collType.toBSON().addFields(
-                                   BSON("chunks" << chunk.toConfigBSON()));
-                           });
+            std::vector<BSONObj> aggResult{collType.toBSON()};
+            std::transform(
+                chunks.begin(), chunks.end(), std::back_inserter(aggResult), [](const auto& chunk) {
+                    return BSON("chunks" << chunk.toConfigBSON());
+                });
             return aggResult;
         }());
     }
@@ -632,14 +629,12 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
-        ASSERT_EQ(pipeline[1]["$facet"]["collWithNsIncremental"]
-                      .Array()[0]["$match"]["lastmodEpoch"]
-                      .OID(),
-                  oldVersion.epoch());
-        ASSERT_BSONOBJ_EQ(pipeline[1]["$facet"]["collWithNsNonIncremental"]
-                              .Array()[0]["$match"]["lastmodEpoch"]
-                              .Obj(),
-                          BSON("$ne" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[1]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$eq" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[3]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$ne" << oldVersion.epoch()));
 
         const auto collBSON =
             getDefaultCollectionType(oldVersion.epoch(), shardKeyPattern).toBSON();
@@ -659,9 +654,9 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
                          {"1"});
         chunk3.setName(OID::gen());
 
-        const auto chunk1BSON = collBSON.addFields(BSON("chunks" << chunk1.toConfigBSON()));
-        const auto chunk3BSON = collBSON.addFields(BSON("chunks" << chunk3.toConfigBSON()));
-        return std::vector<BSONObj>{chunk1BSON, chunk3BSON};
+        const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
+        const auto chunk3BSON = BSON("chunks" << chunk3.toConfigBSON());
+        return std::vector<BSONObj>{collBSON, chunk1BSON, chunk3BSON};
     });
 
     // On the second retry attempt, return the correct set of chunks from the recreated collection
@@ -672,14 +667,12 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
-        ASSERT_EQ(pipeline[1]["$facet"]["collWithNsIncremental"]
-                      .Array()[0]["$match"]["lastmodEpoch"]
-                      .OID(),
-                  oldVersion.epoch());
-        ASSERT_BSONOBJ_EQ(pipeline[1]["$facet"]["collWithNsNonIncremental"]
-                              .Array()[0]["$match"]["lastmodEpoch"]
-                              .Obj(),
-                          BSON("$ne" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[1]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$eq" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[3]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$ne" << oldVersion.epoch()));
 
         const auto collBSON = getDefaultCollectionType(newEpoch, shardKeyPattern).toBSON();
 
@@ -700,10 +693,10 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
                          {"1"});
         chunk3.setName(OID::gen());
 
-        const auto chunk1BSON = collBSON.addFields(BSON("chunks" << chunk1.toConfigBSON()));
-        const auto chunk2BSON = collBSON.addFields(BSON("chunks" << chunk2.toConfigBSON()));
-        const auto chunk3BSON = collBSON.addFields(BSON("chunks" << chunk3.toConfigBSON()));
-        return std::vector<BSONObj>{chunk1BSON, chunk2BSON, chunk3BSON};
+        const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
+        const auto chunk2BSON = BSON("chunks" << chunk2.toConfigBSON());
+        const auto chunk3BSON = BSON("chunks" << chunk3.toConfigBSON());
+        return std::vector<BSONObj>{collBSON, chunk1BSON, chunk2BSON, chunk3BSON};
     });
 
     auto cm = *future.default_timed_get();
@@ -736,14 +729,12 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
             aggregation_request_helper::parseFromBSONForTests(kNss, opMsg.body));
         const auto& pipeline = aggRequest.getPipeline();
 
-        ASSERT_EQ(pipeline[1]["$facet"]["collWithNsIncremental"]
-                      .Array()[0]["$match"]["lastmodEpoch"]
-                      .OID(),
-                  oldVersion.epoch());
-        ASSERT_BSONOBJ_EQ(pipeline[1]["$facet"]["collWithNsNonIncremental"]
-                              .Array()[0]["$match"]["lastmodEpoch"]
-                              .Obj(),
-                          BSON("$ne" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[1]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$eq" << oldVersion.epoch()));
+        ASSERT_BSONOBJ_EQ(
+            pipeline[3]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$ne" << oldVersion.epoch()));
 
         const auto collBSON =
             getDefaultCollectionType(newVersion.epoch(), shardKeyPattern).toBSON();
@@ -761,9 +752,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
                          {"1"});
         chunk2.setName(OID::gen());
 
-        const auto chunk1BSON = collBSON.addFields(BSON("chunks" << chunk1.toConfigBSON()));
-        const auto chunk2BSON = collBSON.addFields(BSON("chunks" << chunk2.toConfigBSON()));
-        return std::vector<BSONObj>{chunk1BSON, chunk2BSON};
+        const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
+        const auto chunk2BSON = BSON("chunks" << chunk2.toConfigBSON());
+        return std::vector<BSONObj>{collBSON, chunk1BSON, chunk2BSON};
     });
 
     auto cm = *future.default_timed_get();
@@ -794,16 +785,15 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
         const auto& pipeline = aggRequest.getPipeline();
 
         ASSERT_BSONOBJ_EQ(
-            pipeline[1]["$facet"]["collWithNsIncremental"]
-                .Array()[1]["$lookup"]["pipeline"]
-                .Array()[0]["$match"]["lastmod"]
+            pipeline[1]["$unionWith"]["pipeline"]
+                .Array()[3]["$lookup"]["pipeline"]
+                .Array()[1]["$match"]["lastmod"]
                 .Obj(),
             BSON("$gte" << Timestamp(version.majorVersion(), version.minorVersion())));
 
-        ASSERT_EQ(pipeline[1]["$facet"]["collWithNsIncremental"]
-                      .Array()[0]["$match"]["lastmodEpoch"]
-                      .OID(),
-                  version.epoch());
+        ASSERT_BSONOBJ_EQ(
+            pipeline[1]["$unionWith"]["pipeline"].Array()[2]["$match"]["lastmodEpoch"].Obj(),
+            BSON("$eq" << version.epoch()));
 
         const auto collBSON = getDefaultCollectionType(version.epoch(), shardKeyPattern).toBSON();
 
@@ -817,9 +807,9 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
             kNss, {BSON("_id" << 0), shardKeyPattern.getKeyPattern().globalMax()}, version, {"0"});
         chunk2.setName(OID::gen());
 
-        const auto chunk1BSON = collBSON.addFields(BSON("chunks" << chunk1.toConfigBSON()));
-        const auto chunk2BSON = collBSON.addFields(BSON("chunks" << chunk2.toConfigBSON()));
-        return std::vector<BSONObj>{chunk1BSON, chunk2BSON};
+        const auto chunk1BSON = BSON("chunks" << chunk1.toConfigBSON());
+        const auto chunk2BSON = BSON("chunks" << chunk2.toConfigBSON());
+        return std::vector<BSONObj>{collBSON, chunk1BSON, chunk2BSON};
     });
 
     auto cm = *future.default_timed_get();

@@ -181,13 +181,11 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
     expectFindSendBSONObjVector(kConfigHostAndPort, {databaseBSON});
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        std::vector<BSONObj> aggResult;
+        std::vector<BSONObj> aggResult{collectionBSON};
         std::transform(initialChunks.begin(),
                        initialChunks.end(),
                        std::back_inserter(aggResult),
-                       [&collectionBSON](const auto& chunk) {
-                           return collectionBSON.addFields(BSON("chunks" << chunk));
-                       });
+                       [](const auto& chunk) { return BSON("chunks" << chunk); });
         return aggResult;
     }());
 
@@ -223,15 +221,12 @@ void CatalogCacheTestFixture::expectCollectionAndChunksAggregation(
         CollectionType collType(nss, epoch, Date_t::now(), uuid);
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
-        const auto collObj = collType.toBSON();
 
-        std::vector<BSONObj> aggResult;
+        std::vector<BSONObj> aggResult{collType.toBSON()};
         std::transform(chunks.begin(),
                        chunks.end(),
                        std::back_inserter(aggResult),
-                       [&collObj](const auto& chunk) {
-                           return collObj.addFields(BSON("chunks" << chunk.toConfigBSON()));
-                       });
+                       [](const auto& chunk) { return BSON("chunks" << chunk.toConfigBSON()); });
         return aggResult;
     }());
 }
@@ -285,10 +280,9 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         chunk2.setName(OID::gen());
         version.incMinor();
 
-        const auto collObj = collType.toBSON();
-        const auto chunk1Obj = collObj.addFields(BSON("chunks" << chunk1.toConfigBSON()));
-        const auto chunk2Obj = collObj.addFields(BSON("chunks" << chunk2.toConfigBSON()));
-        return std::vector<BSONObj>{chunk1Obj, chunk2Obj};
+        const auto chunk1Obj = BSON("chunks" << chunk1.toConfigBSON());
+        const auto chunk2Obj = BSON("chunks" << chunk2.toConfigBSON());
+        return std::vector<BSONObj>{collType.toBSON(), chunk1Obj, chunk2Obj};
     }());
 
     return *future.default_timed_get();

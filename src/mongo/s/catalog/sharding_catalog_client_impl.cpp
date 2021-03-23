@@ -45,11 +45,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_replace_root.h"
-#include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -153,252 +150,258 @@ AggregateCommand makeCollectionAndChunksAggregation(OperationContext* opCtx,
 
     Pipeline::SourceContainer stages;
 
-    // 1. Match config.collections entries with {_id: nss}. At most one will match.
+    // 1. Match config.collections entries with {_id: nss}. This stage will produce, at most, one
+    // config.collections document.
     // {
-    //     "$match": {
-    //         "_id": nss
+    //     $match: {
+    //         _id: <nss>
     //     }
     // }
-    stages.emplace_back(DocumentSourceMatch::create(Doc{{"_id", nss.toString()}}.toBson(), expCtx));
+    stages.emplace_back(DocumentSourceMatch::create(
+        Doc{{CollectionType::kNssFieldName, nss.toString()}}.toBson(), expCtx));
 
-    // 2. Lookup chunks in config.chunks for the matched collection. Match chunks by 'uuid' or 'ns'
-    // depending on whether the collection entry has 'timestamp' or not. If the collection entry has
-    // the same 'lastmodEpoch' as 'sinceVersion', then match only chunks with 'lastmod' greater or
-    // equal to Timestamp(sinceVersion).
-    // Because of SERVER-34926, a $lookup that uses an $expr operator together with a range match
-    // query won't be able to use indexes. To work around this, we use a $facet to create 4
-    // different 'branches' depending on whether we match by 'ns' or 'uuid' and whether the refresh
-    // is incremental or not. This way, in each one of the $facet subpipelines we don't need to use
-    // the $expr operator in the $gte range comparison. Since the match conditions in each one of
-    // the $facet branches are mutually exclusive, only one of them will execute.
+    // 2. Four $unionWith stages, each one of them guarded by a mutually exclusive condition on
+    // metadata format ('timestamp' exists) and whether the refresh is incremental ('lastmodEpoch'
+    // matches sinceVersion.epoch), so that only a single one of them will possibly execute their
+    // $lookup stage. This is necessary because the query optimizer is not able to use indexes when
+    // a $match inside a $lookup includes a $cond operator. Also note that depending on the metadata
+    // format (indicated by the presence of 'timestamp'), we have different guarantees about what
+    // indexes are present (ns_1_lastmod_1 or uuid_1_lastmod_1), so we must avoid possibly executing
+    // a $lookup that would need an inexistent index, even if it was to return empty results.
+    //
+    // The $lookup stages get the config.chunks documents according to the metadata format and the
+    // type of refresh (incremental or full), sorted by ascending 'lastmod'. The $lookup is
+    // immediately followed by $unwind to take advantage of the $lookup + $unwind coalescence
+    // optimization which avoids creating large intermediate documents.
+    //
+    // This $unionWith stage will produce one result document for each config.chunks document
+    // matching the refresh query.
+    // Note that we must not make any assumption on where the document produced by stage 1 will be
+    // placed in the response in relation with the documents produced by stage 2. The
+    // config.collections document produced in stage 1 could be interleaved between the
+    // config.chunks documents produced by stage 2.
     //
     // {
-    //     "$facet": {
-    //         "collWithUUIDIncremental": [
+    //     $unionWith: {
+    //         coll: "collections",
+    //         pipeline: [
+    //             { $match: { _id: <nss> } },
+    //             { $match: { timestamp: { $exists: 0 } } },
+    //             { $match: { lastmodEpoch: <sinceVersion.epoch> } },
     //             {
-    //                 "$match": {
-    //                     "timestamp": {
-    //                         "$exists": 1
-    //                     },
-    //                     "lastmodEpoch": <sinceVersion.epoch>
-    //                 }
-    //             },
-    //             {
-    //                 "$lookup": {
-    //                     "from": "chunks",
-    //                     "as": "chunks",
-    //                     "let": {
-    //                         "local_uuid": "$uuid"
-    //                     },
-    //                     "pipeline": [
+    //                 $lookup: {
+    //                     from: "chunks",
+    //                     as: "chunks",
+    //                     let: { local_ns: "$_id" },
+    //                     pipeline: [
     //                         {
-    //                             "$match": {
-    //                                 "$expr": {
-    //                                     "$eq": [
-    //                                         "$uuid",
-    //                                         "$$local_uuid"
-    //                                     ]
+    //                             $match: {
+    //                                 $expr: {
+    //                                     $eq: ["$ns", "$$local_ns"],
     //                                 },
-    //                                 "lastmod": {
-    //                                     "$gte": <Timestamp(sinceVersion)>
-    //                                 }
     //                             }
     //                         },
+    //                         { $match: { lastmod: { $gte: <sinceVersion> } } },
     //                         {
-    //                             "$sort": {
-    //                                 "lastmod": 1
+    //                             $sort: {
+    //                                 lastmod: 1
     //                             }
     //                         }
     //                     ]
-    //                 }
-    //             }
-    //         ],
-    //         "collWithUUIDNonIncremental": [
-    //             {
-    //                 "$match": {
-    //                     "timestamp": {
-    //                         "$exists": 1
-    //                     },
-    //                     "lastmodEpoch": {
-    //                         "$ne": <sinceVersion.epoch>
-    //                     }
     //                 }
     //             },
     //             {
-    //                 "$lookup": {
-    //                     "from": "chunks",
-    //                     "as": "chunks",
-    //                     "let": {
-    //                         "local_uuid": "$uuid"
-    //                     },
-    //                     "pipeline": [
+    //                 $unwind: {
+    //                     path: "$chunks"
+    //                 }
+    //             },
+    //             {
+    //                 $project: { _id: false, chunks: true }
+    //             }
+    //         ]
+    //     }
+    // },
+    // {
+    //     $unionWith: {
+    //         coll: "collections",
+    //         pipeline: [
+    //             { $match: { _id: <nss> } },
+    //             { $match: { timestamp: { $exists: 1 } } },
+    //             { $match: { lastmodEpoch: <sinceVersion.epoch> } },
+    //             {
+    //                 $lookup: {
+    //                     from: "chunks",
+    //                     as: "chunks",
+    //                     let: { local_uuid: "$uuid" },
+    //                     pipeline: [
     //                         {
-    //                             "$match": {
-    //                                 "$expr": {
-    //                                     "$eq": [
-    //                                         "$uuid",
-    //                                         "$$local_uuid"
-    //                                     ]
-    //                                 }
+    //                             $match: {
+    //                                 $expr: {
+    //                                     $eq: ["$uuid", "$$local_uuid"],
+    //                                 },
     //                             }
     //                         },
+    //                         { $match: { lastmod: { $gte: <sinceVersion> } } },
     //                         {
-    //                             "$sort": {
-    //                                 "lastmod": 1
+    //                             $sort: {
+    //                                 lastmod: 1
     //                             }
     //                         }
     //                     ]
     //                 }
-    //             }
-    //         ],
-    //         "collWithNsIncremental": [...],
-    //         "collWithNsNonIncremental": [...]
+    //             },
+    //             {
+    //                 $unwind: {
+    //                     path: "$chunks"
+    //                 }
+    //             },
+    //             {
+    //                 $project: { _id: false, chunks: true }
+    //             },
+    //         ]
+    //     }
+    // },
+    // {
+    //     $unionWith: {
+    //         coll: "collections",
+    //         pipeline: [
+    //             { $match: { _id: <nss> } },
+    //             { $match: { timestamp: { $exists: 0 } } },
+    //             { $match: { lastmodEpoch: { $ne: <sinceVersion.epoch> } } },
+    //             {
+    //                 $lookup: {
+    //                     from: "chunks",
+    //                     as: "chunks",
+    //                     let: { local_ns: "$_id" },
+    //                     pipeline: [
+    //                         {
+    //                             $match: {
+    //                                 $expr: {
+    //                                     $eq: ["$ns", "$$local_ns"],
+    //                                 },
+    //                             }
+    //                         },
+    //                         {
+    //                             $sort: {
+    //                                 lastmod: 1
+    //                             }
+    //                         }
+    //                     ]
+    //                 }
+    //             },
+    //             {
+    //                 $unwind: {
+    //                     path: "$chunks"
+    //                 }
+    //             },
+    //             {
+    //                 $project: { _id: false, chunks: true }
+    //             },
+    //         ]
+    //     }
+    // },
+    // {
+    //     $unionWith: {
+    //         coll: "collections",
+    //         pipeline: [
+    //             { $match: { _id: <nss> } },
+    //             { $match: { timestamp: { $exists: 1 } } },
+    //             { $match: { lastmodEpoch: { $ne: <sinceVersion.epoch> } } },
+    //             {
+    //                 $lookup: {
+    //                     from: "chunks",
+    //                     as: "chunks",
+    //                     let: { local_uuid: "$uuid" },
+    //                     pipeline: [
+    //                         {
+    //                             $match: {
+    //                                 $expr: {
+    //                                     $eq: ["$uuid", "$$local_uuid"],
+    //                                 },
+    //                             }
+    //                         },
+    //                         {
+    //                             $sort: {
+    //                                 lastmod: 1
+    //                             }
+    //                         }
+    //                     ]
+    //                 }
+    //             },
+    //             {
+    //                 $unwind: {
+    //                     path: "$chunks"
+    //                 }
+    //             },
+    //             {
+    //                 $project: { _id: false, chunks: true }
+    //             },
+    //         ]
     //     }
     // }
-    constexpr auto chunksLookupOutputFieldName = "chunks"_sd;
-    const auto buildLookUpStageFn = [&](bool withUUID, bool incremental) {
-        const auto letExpr =
-            withUUID ? Doc{{"local_uuid", "$uuid"_sd}} : Doc{{"local_ns", "$_id"_sd}};
-        const auto eqNsOrUuidExpr = withUUID ? Arr{Value{"$uuid"_sd}, Value{"$$local_uuid"_sd}}
-                                             : Arr{Value{"$ns"_sd}, Value{"$$local_ns"_sd}};
-        auto pipelineMatchExpr = [&]() {
-            if (incremental) {
-                return Doc{{"$expr", Doc{{"$eq", eqNsOrUuidExpr}}},
-                           {"lastmod", Doc{{"$gte", Timestamp(sinceVersion.toLong())}}}};
-            } else {
-                return Doc{{"$expr", Doc{{"$eq", eqNsOrUuidExpr}}}};
-            }
+    const auto buildUnionWithFn = [&](bool withUUID, bool incremental) {
+        const auto lastmodEpochMatch = Doc{{incremental ? "$eq" : "$ne", sinceVersion.epoch()}};
+
+        const auto letExpr = withUUID ? Doc{{"local_uuid", "$" + CollectionType::kUuidFieldName}}
+                                      : Doc{{"local_ns", "$" + CollectionType::kNssFieldName}};
+
+        const auto eqNsOrUuidExpr = withUUID
+            ? Arr{Value{"$" + ChunkType::collectionUUID.name()}, Value{"$$local_uuid"_sd}}
+            : Arr{Value{"$" + ChunkType::ns.name()}, Value{"$$local_ns"_sd}};
+
+        constexpr auto chunksLookupOutputFieldName = "chunks"_sd;
+
+        const auto lookupPipeline = [&]() {
+            return Doc{
+                {"from", ChunkType::ConfigNS.coll()},
+                {"as", chunksLookupOutputFieldName},
+                {"let", letExpr},
+                {"pipeline",
+                 Arr{Value{Doc{{"$match", Doc{{"$expr", Doc{{"$eq", eqNsOrUuidExpr}}}}}}},
+                     incremental
+                         ? Value{Doc{{"$match",
+                                      Doc{{ChunkType::lastmod.name(),
+                                           Doc{{"$gte", Timestamp(sinceVersion.toLong())}}}}}}}
+                         : Value{/*noop*/},
+                     Value{Doc{{"$sort", Doc{{ChunkType::lastmod.name(), 1}}}}}}}};
         }();
 
-        return Doc{{"from", ChunkType::ConfigNS.coll()},
-                   {"as", chunksLookupOutputFieldName},
-                   {"let", letExpr},
-                   {"pipeline",
-                    Arr{Value{Doc{{"$match", pipelineMatchExpr}}},
-                        Value{Doc{{"$sort", Doc{{"lastmod", 1}}}}}}}};
+        return Doc{
+            {"coll", CollectionType::ConfigNS.coll()},
+            {"pipeline",
+             Arr{Value{Doc{{"$match", Doc{{CollectionType::kNssFieldName, nss.toString()}}}}},
+                 Value{
+                     Doc{{"$match",
+                          Doc{{CollectionType::kTimestampFieldName, Doc{{"$exists", withUUID}}}}}}},
+                 Value{Doc{{"$match", Doc{{CollectionType::kEpochFieldName, lastmodEpochMatch}}}}},
+                 Value{Doc{{"$lookup", lookupPipeline}}},
+                 Value{Doc{{"$unwind", Doc{{"path", "$" + chunksLookupOutputFieldName}}}}},
+                 Value{Doc{
+                     {"$project", Doc{{"_id", false}, {chunksLookupOutputFieldName, true}}}}}}}};
     };
 
-    constexpr auto collWithNsIncrementalFacetName = "collWithNsIncremental"_sd;
-    constexpr auto collWithUUIDIncrementalFacetName = "collWithUUIDIncremental"_sd;
-    constexpr auto collWithNsNonIncrementalFacetName = "collWithNsNonIncremental"_sd;
-    constexpr auto collWithUUIDNonIncrementalFacetName = "collWithUUIDNonIncremental"_sd;
-
-    stages.emplace_back(DocumentSourceFacet::createFromBson(
-        // TODO SERVER-53283: Once 5.0 has branched out, the 'collWithNsIncremental' and
-        // 'collWithNsNonIncremental' branches are no longer needed.
-        Doc{{"$facet",
-             Doc{{collWithNsIncrementalFacetName,
-                  Arr{Value{Doc{{"$match",
-                                 Doc{{"timestamp", Doc{{"$exists", 0}}},
-                                     {"lastmodEpoch", sinceVersion.epoch()}}}}},
-                      Value{Doc{
-                          {"$lookup",
-                           buildLookUpStageFn(false /* withUuid */, true /* incremental */)}}}}},
-                 {collWithUUIDIncrementalFacetName,
-                  Arr{Value{Doc{{"$match",
-                                 Doc{{"timestamp", Doc{{"$exists", 1}}},
-                                     {"lastmodEpoch", sinceVersion.epoch()}}}}},
-                      Value{
-                          Doc{{"$lookup",
-                               buildLookUpStageFn(true /* withUuid */, true /* incremental */)}}}}},
-                 {collWithNsNonIncrementalFacetName,
-                  Arr{Value{Doc{{"$match",
-                                 Doc{{"timestamp", Doc{{"$exists", 0}}},
-                                     {"lastmodEpoch", Doc{{"$ne", sinceVersion.epoch()}}}}}}},
-                      Value{Doc{
-                          {"$lookup",
-                           buildLookUpStageFn(false /* withUuid */, false /* incremental */)}}}}},
-                 {collWithUUIDNonIncrementalFacetName,
-                  Arr{Value{Doc{{"$match",
-                                 Doc{{"timestamp", Doc{{"$exists", 1}}},
-                                     {"lastmodEpoch", Doc{{"$ne", sinceVersion.epoch()}}}}}}},
-                      Value{Doc{
-                          {"$lookup",
-                           buildLookUpStageFn(true /* withUuid */, false /* incremental */)}}}}}}}}
+    // TODO SERVER-53283: Once 5.0 has branched out this stage is no longer necessary.
+    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
+        Doc{{"$unionWith", buildUnionWithFn(false /* withUUID */, true /* incremental */)}}
             .toBson()
             .firstElement(),
         expCtx));
 
-    // 3. Collapse the arrays output by $facet (only one of them has an element) into a single array
-    // 'coll'.
-    // {
-    //     "$project": {
-    //         "_id": true,
-    //         "coll": {
-    //             "$setUnion": [
-    //                 "$collWithNsIncremental",
-    //                 "$collWithUUIDIncremental",
-    //                 "$collWithNsNonIncremental",
-    //                 "$collWithUUIDNonIncremental"
-    //             ]
-    //         }
-    //     }
-    // }
-    stages.emplace_back(DocumentSourceProject::createFromBson(
-        Doc{{"$project",
-             Doc{{"coll",
-                  Doc{{"$setUnion",
-                       Arr{Value{"$" + collWithNsIncrementalFacetName},
-                           Value{"$" + collWithUUIDIncrementalFacetName},
-                           Value{"$" + collWithNsNonIncrementalFacetName},
-                           Value{"$" + collWithUUIDNonIncrementalFacetName}}}}}}}}
+    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
+        Doc{{"$unionWith", buildUnionWithFn(true /* withUUID */, true /* incremental */)}}
             .toBson()
             .firstElement(),
         expCtx));
 
-    // 4. Unwind the 'coll' array (which has at most one element).
-    // {
-    //     "$unwind": {
-    //         "path": "$coll"
-    //     }
-    // }
-    stages.emplace_back(DocumentSourceUnwind::createFromBson(
-        Doc{{"$unwind", Doc{{"path", "$coll"_sd}}}}.toBson().firstElement(), expCtx));
-
-    // 5. Promote the 'coll' document to the top level.
-    // {
-    //     "$replaceRoot": {
-    //         "newRoot": "$coll"
-    //     }
-    // }
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        Doc{{"$replaceRoot", Doc{{"newRoot", "$coll"_sd}}}}.toBson().firstElement(), expCtx));
-
-    // 6. Unwind the 'chunks' array.
-    // {
-    //     "$unwind": {
-    //         "path": "$chunks",
-    //         "preserveNullAndEmptyArrays": true,
-    //         "includeArrayIndex": "chunksArrayIndex"
-    //     }
-    // }
-    constexpr auto chunksArrayIndexFieldName = "chunksArrayIndex"_sd;
-    stages.emplace_back(DocumentSourceUnwind::createFromBson(
-        Doc{{"$unwind",
-             Doc{{"path", "$" + chunksLookupOutputFieldName},
-                 {"preserveNullAndEmptyArrays", true},
-                 {"includeArrayIndex", chunksArrayIndexFieldName}}}}
+    // TODO SERVER-53283: Once 5.0 has branched out this stage is no longer necessary.
+    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
+        Doc{{"$unionWith", buildUnionWithFn(false /* withUUID */, false /* incremental */)}}
             .toBson()
             .firstElement(),
         expCtx));
 
-    // 7. After unwinding the chunks we are left with the same collection metadata repeated for each
-    // one of the chunks. To reduce the size of the response, only keep the collection metadata for
-    // the first result entry and omit it from the following ones.
-    // {
-    //     $replaceRoot: {
-    //         newRoot: {$cond: [{$gt: ["$chunksArrayIndex", 0]}, {chunks: "$chunks"}, "$$ROOT"]}
-    //     }
-    // }
-    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
-        Doc{{"$replaceRoot",
-             Doc{{"newRoot",
-                  Doc{{"$cond",
-                       Arr{Value{
-                               Doc{{"$gt", Arr{Value{"$" + chunksArrayIndexFieldName}, Value{0}}}}},
-                           Value{Doc{
-                               {chunksLookupOutputFieldName, "$" + chunksLookupOutputFieldName}}},
-                           Value{"$$ROOT"_sd}}}}}}}}
+    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
+        Doc{{"$unionWith", buildUnionWithFn(true /* withUUID */, false /* incremental */)}}
             .toBson()
             .firstElement(),
         expCtx));
@@ -752,35 +755,36 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
             stream() << "Collection " << nss.ns() << " not found",
             !aggResult.empty());
 
-    // The first aggregation result document has the config.collections entry plus the first
-    // returned chunk. Since the CollectionType idl is 'strict: false', it will ignore the foreign
-    // 'chunks' field joined onto it.
-    const CollectionType coll(aggResult.front());
+    boost::optional<CollectionType> coll;
+    std::vector<ChunkType> chunks;
+    chunks.reserve(aggResult.size() - 1);
 
-    uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection " << nss.ns() << " is dropped.",
-            !coll.getDropped());
+    // The aggregation may return the config.collections document anywhere between the
+    // config.chunks documents.
+    for (const auto& elem : aggResult) {
+        const auto chunkElem = elem.getField("chunks");
+        if (chunkElem) {
+            auto chunkRes = uassertStatusOK(ChunkType::fromConfigBSON(chunkElem.Obj()));
+            chunks.emplace_back(std::move(chunkRes));
+        } else {
+            uassert(5520100,
+                    "Found more than one 'collections' documents in aggregation response",
+                    !coll);
+            coll.emplace(elem);
+
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "Collection " << nss.ns() << " is dropped.",
+                    !coll->getDropped());
+        }
+    }
+
+    uassert(5520101, "'collections' document not found in aggregation response", coll);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             stream() << "No chunks were found for the collection " << nss,
-            aggResult.front().hasField("chunks"));
+            !chunks.empty());
 
-    std::vector<ChunkType> chunks;
-    chunks.reserve(aggResult.size());
-    for (const auto& elem : aggResult) {
-        const auto chunkElem = elem.getField("chunks");
-        if (!chunkElem) {
-            // Only the first (and in that case, only) aggregation result may not have chunks. That
-            // case is already caught by the uassert above.
-            static constexpr auto& msg = "No chunks found in aggregation result";
-            LOGV2_ERROR(5487400, msg, "elem"_attr = elem);
-            uasserted(5487401, msg);
-        }
-
-        auto chunkRes = uassertStatusOK(ChunkType::fromConfigBSON(chunkElem.Obj()));
-        chunks.emplace_back(std::move(chunkRes));
-    }
-    return {std::move(coll), std::move(chunks)};
+    return {std::move(*coll), std::move(chunks)};
 };
 
 StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
