@@ -63,51 +63,6 @@ namespace mongo {
 namespace {
 
 /**
- * Converts buckets collection index specs to the time-series collection schema.
- * Returns a list of index specs mapped from the bucket collection schema.
- */
-std::list<BSONObj> makeTimeseriesIndexSpecs(const TimeseriesOptions& timeseriesOptions,
-                                            const std::list<BSONObj>& bucketsIndexSpecs) {
-    std::list<BSONObj> indexSpecs;
-    for (const auto& bucketsIndexSpec : bucketsIndexSpecs) {
-        // TODO(SERVER-54639): Map index specs from bucket collection using helper function.
-        BSONObjBuilder builder;
-        bool skip = false;
-        for (const auto& elem : bucketsIndexSpec) {
-            if (elem.fieldNameStringData() == ListIndexesReplyItem::kKeyFieldName) {
-                auto key = timeseries::convertBucketsIndexSpecToTimeseriesIndexSpec(
-                    timeseriesOptions, elem.Obj());
-                if (key.isEmpty()) {
-                    // Skip index spec due to failed conversion.
-                    skip = true;
-                    break;
-                }
-                builder.append(ListIndexesReplyItem::kKeyFieldName, key);
-                continue;
-            }
-            // Besides 'key', fields such as 'v' and 'name' commonly appear in the spec.
-            // Depending on the index options, other fields that may be appended here
-            // include 'sparse', 'hidden', 'collation'.
-            // {
-            //    v: 2,
-            //    name: 'mm_1',
-            //    ...
-            //    sparse: true,
-            //    ...
-            // }
-            // For a complete list, refer to:
-            // https://docs.mongodb.com/manual/reference/method/db.collection.createIndex/#options-for-all-index-types
-            builder.append(elem);
-        }
-        if (skip) {
-            continue;
-        }
-        indexSpecs.push_back(builder.obj());
-    }
-    return indexSpecs;
-}
-
-/**
  * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.
  */
 using IndexSpecsWithNamespaceString = std::pair<std::list<BSONObj>, NamespaceString>;
@@ -128,7 +83,7 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
                     coll);
 
             return std::make_pair(
-                makeTimeseriesIndexSpecs(
+                timeseries::createTimeseriesIndexesFromBucketsIndexes(
                     *timeseriesOptions,
                     listIndexesInLock(opCtx, coll, bucketsNss, cmd.getIncludeBuildUUIDs())),
                 *origNss);

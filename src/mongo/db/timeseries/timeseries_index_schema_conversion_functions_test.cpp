@@ -70,7 +70,7 @@ void testBothWaysIndexSpecConversion(const TimeseriesOptions& timeseriesOptions,
                                      bool testShouldSucceed = true) {
     // Test time-series => buckets schema conversion.
 
-    auto swBucketsIndexSpecs = timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(
+    auto swBucketsIndexSpecs = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
         timeseriesOptions, timeseriesIndexSpec);
 
     if (testShouldSucceed) {
@@ -82,15 +82,16 @@ void testBothWaysIndexSpecConversion(const TimeseriesOptions& timeseriesOptions,
 
     // Test buckets => time-series schema conversion.
 
-    auto timeseriesIndexSpecResult = timeseries::convertBucketsIndexSpecToTimeseriesIndexSpec(
+    auto timeseriesIndexSpecResult = timeseries::createTimeseriesIndexSpecFromBucketsIndexSpec(
         timeseriesOptions, bucketsIndexSpec);
 
     if (testShouldSucceed) {
-        ASSERT_BSONOBJ_EQ(timeseriesIndexSpec, timeseriesIndexSpecResult);
+        ASSERT(timeseriesIndexSpecResult);
+        ASSERT_BSONOBJ_EQ(timeseriesIndexSpec, timeseriesIndexSpecResult.get());
     } else {
         // A buckets collection index spec that does not conform to the supported time-series index
         // spec schema should be converted to an empty time-series index spec result.
-        ASSERT(timeseriesIndexSpecResult.isEmpty());
+        ASSERT(!timeseriesIndexSpecResult);
     }
 }
 
