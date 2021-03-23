@@ -161,13 +161,10 @@ Status ShardingLogging::_log(OperationContext* opCtx,
         opCtx, nss, changeLogBSON, writeConcern);
 
     if (!result.isOK()) {
-        LOGV2_WARNING(22081,
-                      "Error encountered while logging config change with ID [{changeId}] into "
-                      "collection {namespace}: {error}",
-                      "Error encountered while logging config change",
-                      "changeId"_attr = changeId,
-                      "namespace"_attr = logCollName,
-                      "error"_attr = redact(result));
+        LOGV2_ERROR(5538900,
+                    "Error encountered while logging config change",
+                    "changeDocument"_attr = changeLog,
+                    "error"_attr = redact(result));
     }
 
     return result;

@@ -34,6 +34,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -186,6 +187,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     dropShardedCollection(opCtx, coll, executor);
                 }
 
+                ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase.start", _dbName);
+
                 // Drop all collections under this DB
                 auto const catalogClient = Grid::get(opCtx)->catalogClient();
                 const auto allCollectionsForDb = catalogClient->getCollections(
@@ -237,6 +240,8 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                         allShardIds,
                         **executor);
                 }
+
+                ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isOK() &&

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 
@@ -53,17 +54,19 @@ public:
                      const StringData ns,
                      const BSONObj& detail);
 
-    Status logChangeChecked(OperationContext* opCtx,
-                            const StringData what,
-                            const StringData ns,
-                            const BSONObj& detail,
-                            const WriteConcernOptions& writeConcern);
+    Status logChangeChecked(
+        OperationContext* opCtx,
+        const StringData what,
+        const StringData ns,
+        const BSONObj& detail = BSONObj(),
+        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern);
 
-    void logChange(OperationContext* const opCtx,
-                   const StringData what,
-                   const StringData ns,
-                   const BSONObj& detail,
-                   const WriteConcernOptions& writeConcern) {
+    void logChange(
+        OperationContext* const opCtx,
+        const StringData what,
+        const StringData ns,
+        const BSONObj& detail = BSONObj(),
+        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern) {
         // It is safe to ignore the results of `logChangeChecked` in many cases, as the
         // failure to log a change is often of no consequence.
         logChangeChecked(opCtx, what, ns, detail, writeConcern).ignore();
