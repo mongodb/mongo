@@ -284,6 +284,7 @@ TenantMigrationRecipientService::Instance::Instance(
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _donorUri(uassertStatusOK(MongoURI::parse(_stateDoc.getDonorConnectionString().toString()))),
       _readPreference(_stateDoc.getReadPreference()),
+      _recipientCertificateForDonor(_stateDoc.getRecipientCertificateForDonor()),
       _transientSSLParams([&]() -> boost::optional<TransientSSLParams> {
           if (auto recipientCertificate = _stateDoc.getRecipientCertificateForDonor()) {
               invariant(!repl::tenantMigrationDisableX509Auth);
@@ -381,22 +382,21 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
 }
 
 Status TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
-    const TenantMigrationRecipientDocument& requestedStateDoc) const {
-    invariant(requestedStateDoc.getId() == _migrationUuid);
+    const TenantMigrationRecipientDocument& stateDoc) const {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(stateDoc.getId() == _migrationUuid);
 
-    if (requestedStateDoc.getTenantId() == _tenantId &&
-        requestedStateDoc.getDonorConnectionString() == _donorConnectionString &&
-        requestedStateDoc.getReadPreference().equals(_readPreference)) {
+    if (stateDoc.getTenantId() == _tenantId &&
+        stateDoc.getDonorConnectionString() == _donorConnectionString &&
+        stateDoc.getReadPreference().equals(_readPreference) &&
+        stateDoc.getRecipientCertificateForDonor() == _recipientCertificateForDonor) {
         return Status::OK();
     }
 
     return Status(ErrorCodes::ConflictingOperationInProgress,
-                  str::stream() << "Requested options for tenant migration doesn't match"
-                                << " the active migration options, migrationId: " << _migrationUuid
-                                << ", tenantId: " << _tenantId
-                                << ", connectionString: " << _donorConnectionString
-                                << ", readPreference: " << _readPreference.toString()
-                                << ", requested options:" << requestedStateDoc.toBSON());
+                  str::stream() << "Found active migration for migrationId \""
+                                << _migrationUuid.toBSON() << "\" with different options "
+                                << tenant_migration_util::redactStateDoc(_stateDoc.toBSON()));
 }
 
 OpTime TenantMigrationRecipientService::Instance::waitUntilMigrationReachesConsistentState(

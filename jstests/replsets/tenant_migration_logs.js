@@ -20,26 +20,6 @@ function assertNoCertificateOrPrivateKeyLogsForCmd(conn, cmdName) {
            "found private key in the logs");
 }
 
-function assertNoCertificateOrPrivateKeyFields(doc) {
-    for (let k of Object.keys(doc)) {
-        let v = doc[k];
-        if (typeof v === "string") {
-            assert(!v.match(/BEGIN CERTIFICATE(.*\n.*)*END CERTIFICATE/m),
-                   `found certificate field`);
-            assert(!v.match(/BEGIN PRIVATE KEY(.*\n.*)*END PRIVATE KEY/m),
-                   `found private key field`);
-        } else if (Array.isArray(v)) {
-            v.forEach((item) => {
-                if (typeof item === "object" && item !== null) {
-                    assertNoCertificateOrPrivateKeyFields(v);
-                }
-            });
-        } else if (typeof v === "object" && v !== null) {
-            assertNoCertificateOrPrivateKeyFields(v);
-        }
-    }
-}
-
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");

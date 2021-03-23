@@ -37,6 +37,7 @@ structs:
     TenantMigrationPEMPayload:
         description: "Contains SSL certificate and private key PEM blobs for a replica set."
         strict: true
+        generate_comparison_operators: true
         fields:
             certificate:
                 type: string
