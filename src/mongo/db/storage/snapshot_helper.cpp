@@ -116,6 +116,16 @@ bool shouldReadAtLastApplied(OperationContext* opCtx,
         return false;
     }
 
+    // Linearizable read concern should never be read at lastApplied, they must always read from
+    // latest and are only allowed on primaries.
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kLinearizableReadConcern) {
+        if (reason) {
+            *reason = "linearizable read concern";
+        }
+        return false;
+    }
+
     return true;
 }
 }  // namespace
