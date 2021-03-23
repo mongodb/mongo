@@ -7,7 +7,7 @@ table_count=15000
 max_idle_table_cycle=2
 # Uncomment to fail instead of generating a warning
 # max_idle_table_cycle_fatal=true
-random_range=1000000000
+random_range=1500000000
 pareto=10
 range_partition=true
 report_interval=5
@@ -17,7 +17,7 @@ populate_threads=1
 pre_load_data=true
 # Uncomment to skip the populate phase, and use a database from a previous run as the baseline.
 # create=false
-icount=10000000
+icount=15000000
 run_time=900
 threads=((count=10,inserts=1,throttle=1000),(count=10,reads=1))
 max_latency=1000

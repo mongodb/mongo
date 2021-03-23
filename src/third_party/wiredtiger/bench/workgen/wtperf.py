@@ -649,7 +649,7 @@ for arg in sys.argv[1:]:
             print(pysrc)
         else:
             (outfd, tmpfile) = tempfile.mkstemp(suffix='.py')
-            os.write(outfd, pysrc)
+            os.write(outfd, pysrc.encode())
             os.close(outfd)
             # We make a copy of the configuration file in the home
             # directory after the run, because the wiredtiger_open
