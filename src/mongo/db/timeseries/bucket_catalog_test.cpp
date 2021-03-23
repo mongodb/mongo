@@ -43,10 +43,10 @@ namespace {
 class BucketCatalogTest : public CatalogTestFixture {
 protected:
     class Task {
+        AtomicWord<bool> _running{false};
         stdx::packaged_task<void()> _task;
         stdx::future<void> _future;
         stdx::thread _taskThread;
-        AtomicWord<bool> _running{false};
 
     public:
         Task(std::function<void()>&& fn);
