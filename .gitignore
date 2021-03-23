@@ -1,6 +1,7 @@
 /build
 /src/mongo/db/modules
 /.jsdbshell
+/.cache
 /.dbshell
 /*.ninja
 /*.ninja.*
