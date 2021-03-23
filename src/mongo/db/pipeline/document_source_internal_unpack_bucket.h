@@ -88,9 +88,6 @@ public:
     // Set of field names reserved for time-series buckets.
     static const std::set<StringData> reservedBucketFieldNames;
 
-    static bool isReservedBucketFieldName(const StringData& name) {
-        return (reservedBucketFieldNames.count(name) > 0);
-    }
     // When BucketUnpacker is created with kInclude it must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
     // set difference between all fields in the bucket and the provided fields.
@@ -317,9 +314,12 @@ public:
         return _sampleSize;
     }
 
-    void pushDownAddFieldsMetaProjection(Pipeline::SourceContainer::iterator itr);
-
-    void pushDownComputedMetaProjection(Pipeline::SourceContainer::iterator itr,
+    /**
+     * If the stage after $_internalUnpackBucket is $project, $addFields, or $set, try to extract
+     * from it computed meta projections and push them pass the current stage. Return true if the
+     * next stage was removed as a result of the optimization.
+     */
+    bool pushDownComputedMetaProjection(Pipeline::SourceContainer::iterator itr,
                                         Pipeline::SourceContainer* container);
 
 private:

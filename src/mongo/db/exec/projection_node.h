@@ -133,17 +133,6 @@ public:
     void serialize(boost::optional<ExplainOptions::Verbosity> explain,
                    MutableDocument* output) const;
 
-    /**
-     * Extract computed projections that depend only on the 'oldName' field. Extraction is not
-     * allowed if the name of the projection is in the 'reservedNames' set.
-     * The function returns a BSONObj with computed projections, if such exist, or an empty BSONObj.
-     * Each extracted computed projection is replaced with a projected field or with an identity
-     * projection.
-     */
-    BSONObj extractComputedProjections(const StringData& oldName,
-                                       const StringData& newName,
-                                       const std::set<StringData>& reservedNames);
-
 protected:
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns
@@ -179,6 +168,16 @@ protected:
 
     // Whether this node or any child of this node contains a computed field.
     bool _subtreeContainsComputedFields{false};
+
+    // Our projection semantics are such that all field additions need to be processed in the order
+    // specified. '_orderToProcessAdditionsAndChildren' tracks that order.
+    //
+    // For example, for the specification {a: <expression>, "b.c": <expression>, d: <expression>},
+    // we need to add the top level fields in the order "a", then "b", then "d". This ordering
+    // information needs to be tracked separately, since "a" and "d" will be tracked via
+    // '_expressions', and "b.c" will be tracked as a child ProjectionNode in '_children'. For the
+    // example above, '_orderToProcessAdditionsAndChildren' would be ["a", "b", "d"].
+    std::vector<std::string> _orderToProcessAdditionsAndChildren;
 
 private:
     // Iterates 'inputDoc' for each projected field, adding to or removing from 'outputDoc'. Also
@@ -222,16 +221,6 @@ private:
      * Internal helper function for addProjectionForPath().
      */
     void _addProjectionForPath(const FieldPath& path);
-
-    // Our projection semantics are such that all field additions need to be processed in the order
-    // specified. '_orderToProcessAdditionsAndChildren' tracks that order.
-    //
-    // For example, for the specification {a: <expression>, "b.c": <expression>, d: <expression>},
-    // we need to add the top level fields in the order "a", then "b", then "d". This ordering
-    // information needs to be tracked separately, since "a" and "d" will be tracked via
-    // '_expressions', and "b.c" will be tracked as a child ProjectionNode in '_children'. For the
-    // example above, '_orderToProcessAdditionsAndChildren' would be ["a", "b", "d"].
-    std::vector<std::string> _orderToProcessAdditionsAndChildren;
 
     // Maximum number of fields that need to be projected. This allows for an "early" return
     // optimization which means we don't have to iterate over an entire document. The value is

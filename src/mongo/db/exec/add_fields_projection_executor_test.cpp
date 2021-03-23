@@ -604,5 +604,86 @@ TEST(AddFieldsProjectionExecutorExecutionTest, AlwaysKeepsMetadataFromOriginalDo
     expectedDoc.copyMetaDataFrom(inputDoc);
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }
+
+// Extract computed projections depending on a given field.
+TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjections) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("meta1" << BSON("$toUpper"
+                                         << "$myMeta.x")));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 1);
+    ASSERT_EQ(deleteFlag, true);
+    auto expectedAddFields = BSON("meta1" << BSON("$toUpper" << BSON_ARRAY("$meta.x")));
+    ASSERT_BSONOBJ_EQ(expectedAddFields, extractedAddFields);
+
+    ASSERT_DOCUMENT_EQ(Document(fromjson("{}")), addFields.serializeTransformation(boost::none));
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjectionsPrefix) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("meta1" << BSON("$toUpper"
+                                         << "$myMeta.x")
+                                 << "computed2" << BSON("$add" << BSON_ARRAY("$c" << 1))));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 1);
+    ASSERT_EQ(deleteFlag, false);
+    auto expectedAddFields = BSON("meta1" << BSON("$toUpper" << BSON_ARRAY("$meta.x")));
+    ASSERT_BSONOBJ_EQ(expectedAddFields, extractedAddFields);
+
+    ASSERT_DOCUMENT_EQ(Document(fromjson("{computed2: {$add: [\"$c\", {$const: 1}]}}")),
+                       addFields.serializeTransformation(boost::none));
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest, DoNotExtractComputedProjectionsSuffix) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("computed1" << BSON("$add" << BSON_ARRAY("$c" << 1)) << "meta2"
+                                     << BSON("$toUpper"
+                                             << "$myMeta.x")));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedResult = Document(fromjson(
+        "{computed1: {$add: [\"$c\", {$const: 1}]}, meta2 : {$toUpper : [\"$myMeta.x\"]}}"));
+    ASSERT_DOCUMENT_EQ(expectedResult, addFields.serializeTransformation(boost::none));
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest, DoNotExtractComputedProjectionWithReservedName) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("meta1" << BSON("$toUpper"
+                                         << "$myMeta.x")
+                                 << "data"
+                                 << BSON("$toUpper"
+                                         << "$myMeta.y")));
+
+    const std::set<StringData> reservedNames{"data"};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 1);
+    ASSERT_EQ(deleteFlag, false);
+    auto expectedAddFields = BSON("meta1" << BSON("$toUpper" << BSON_ARRAY("$meta.x")));
+    ASSERT_BSONOBJ_EQ(expectedAddFields, extractedAddFields);
+
+    ASSERT_DOCUMENT_EQ(Document(fromjson("{data: {$toUpper: [\"$myMeta.y\"]}}")),
+                       addFields.serializeTransformation(boost::none));
+}
+
 }  // namespace
 }  // namespace mongo::projection_executor

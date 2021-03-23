@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/projection_node.h"
-#include "mongo/db/pipeline/expression_walker.h"
 
 namespace mongo::projection_executor {
 using ArrayRecursionPolicy = ProjectionPolicies::ArrayRecursionPolicy;
@@ -306,90 +305,4 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
         }
     }
 }
-
-BSONObj ProjectionNode::extractComputedProjections(const StringData& oldName,
-                                                   const StringData& newName,
-                                                   const std::set<StringData>& reservedNames) {
-    if (_policies.computedFieldsPolicy != ComputedFieldsPolicy::kAllowComputedFields) {
-        return BSONObj{};
-    }
-    // Auxiliary vector with extracted computed projections: <name, expression, replacement
-    // strategy>. If the replacement strategy flag is true, the expression is replaced with a
-    // projected field. If it is false - the expression is replaced with an identity projection.
-    std::vector<std::tuple<StringData, boost::intrusive_ptr<Expression>, bool>>
-        addFieldsExpressions;
-    bool replaceWithProjField = true;
-    for (auto&& field : _orderToProcessAdditionsAndChildren) {
-        if (reservedNames.count(field) > 0) {
-            // Do not pushdown computed projection with reserved name.
-            replaceWithProjField = false;
-            continue;
-        }
-        auto expressionIt = _expressions.find(field);
-        if (expressionIt == _expressions.end()) {
-            // After seeing the first dotted path expression we need to replace computed
-            // projections with identity projections to preserve the field order.
-            replaceWithProjField = false;
-            continue;
-        }
-        DepsTracker deps;
-        expressionIt->second->addDependencies(&deps);
-        auto topLevelFieldNames =
-            deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes)
-                .getFieldNames<std::set<std::string>>();
-        topLevelFieldNames.erase("_id");
-
-        if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(oldName.toString()) == 1) {
-            // Substitute newName for oldName in the expression.
-            StringMap<std::string> renames;
-            renames[oldName] = newName.toString();
-            auto substituteInExpr =
-                [&renames](
-                    boost::intrusive_ptr<Expression> ex) -> boost::intrusive_ptr<Expression> {
-                SubstituteFieldPathWalker substituteWalker(renames);
-                auto substExpr = expression_walker::walk(&substituteWalker, ex.get());
-                if (substExpr.get() != nullptr) {
-                    return substExpr.release();
-                }
-                return ex;
-            };
-            addFieldsExpressions.emplace_back(
-                expressionIt->first, substituteInExpr(expressionIt->second), replaceWithProjField);
-        } else {
-            // After seeing a computed expression that depends on other fields, we need to preserve
-            // the order by replacing following computed projections with identity projections.
-            replaceWithProjField = false;
-        }
-    }
-
-    if (!addFieldsExpressions.empty()) {
-        BSONObjBuilder bb;
-        for (const auto& expressionSpec : addFieldsExpressions) {
-            auto&& fieldName = std::get<0>(expressionSpec).toString();
-            auto oldExpr = std::get<1>(expressionSpec);
-            oldExpr->serialize(false).addToBsonObj(&bb, fieldName);
-
-            if (std::get<2>(expressionSpec)) {
-                // Replace the expression with an inclusion projected field.
-                _projectedFields.insert(fieldName);
-                _expressions.erase(fieldName);
-                // Only computed projections at the beginning of the list were marked to become
-                // projected fields. The new projected field is at the beginning of the
-                // _orderToProcessAdditionsAndChildren list.
-                _orderToProcessAdditionsAndChildren.erase(
-                    _orderToProcessAdditionsAndChildren.begin());
-            } else {
-                // Replace the expression with identity projection.
-                auto newExpr = ExpressionFieldPath::createPathFromString(
-                    oldExpr->getExpressionContext(),
-                    fieldName,
-                    oldExpr->getExpressionContext()->variablesParseState);
-                _expressions[fieldName] = newExpr;
-            }
-        }
-        return bb.obj();
-    }
-    return BSONObj{};
-}
-
 }  // namespace mongo::projection_executor
