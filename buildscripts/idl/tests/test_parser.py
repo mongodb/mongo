@@ -936,14 +936,14 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """))
 
-        # All fields with false for bools, except strict
+        # All fields with false for bools
         self.assert_parse(
             textwrap.dedent("""
         commands:
             foo:
                 description: foo
                 command_name: foo
-                strict: true
+                strict: false
                 namespace: ignored
                 api_version: 1
                 is_deprecated: false
@@ -1166,21 +1166,6 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
-
-        # strict:true required if api_version set
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                command_name: foo
-                namespace: ignored
-                api_version: "1"
-                strict: false
-                fields:
-                    foo: bar
-                reply_type: foo_reply_struct
-            """), idl.errors.ERROR_ID_API_VERSION_NO_STRICT)
 
         # Must specify reply_type if api_version is non-empty
         self.assert_parse_fail(
