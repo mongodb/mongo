@@ -50,6 +50,7 @@
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
@@ -229,6 +230,15 @@ public:
     bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
         noexcept override {
         return onShardVersionMismatchNoExcept(opCtx, se.getNss(), se.getVersionReceived()).isOK();
+    }
+
+    bool refreshCatalogCache(OperationContext* opCtx,
+                             const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const
+        noexcept override {
+        return Grid::get(opCtx)
+            ->catalogCache()
+            ->getCollectionRoutingInfo(opCtx, refreshInfo.getNss())
+            .isOK();
     }
 
     void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {

@@ -51,6 +51,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/router_transactions_metrics.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
@@ -1561,13 +1562,15 @@ void TransactionRouter::Router::_updateLastClientInfo(Client* client) {
 bool TransactionRouter::Router::_errorAllowsRetryOnStaleShardOrDb(const Status& status) const {
     const auto staleInfo = status.extraInfo<StaleConfigInfo>();
     const auto staleDB = status.extraInfo<StaleDbRoutingVersion>();
+    const auto shardCannotRefreshDueToLocksHeldInfo =
+        status.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
 
     // We can retry on the first operation of stale config or db routing version error if there was
     // only one participant in the transaction because there would only be one request sent, and at
     // this point that request has finished so there can't be any outstanding requests that would
     // race with a retry
-    return (staleInfo || staleDB) && o().participants.size() == 1 &&
-        p().latestStmtId == p().firstStmtId;
+    return (staleInfo || staleDB || shardCannotRefreshDueToLocksHeldInfo) &&
+        o().participants.size() == 1 && p().latestStmtId == p().firstStmtId;
 }
 
 Microseconds TransactionRouter::TimingStats::getDuration(TickSource* tickSource,

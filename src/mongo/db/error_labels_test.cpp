@@ -69,6 +69,12 @@ TEST(IsTransientTransactionErrorTest, TenantMigrationAbortedIsTransient) {
                                             false /* isCommitOrAbort */));
 }
 
+TEST(IsTransientTransactionErrorTest, ShardCannotRefreshDueToLocksHeldIsTransient) {
+    ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardCannotRefreshDueToLocksHeld,
+                                            false /* hasWriteConcernError */,
+                                            false /* isCommitOrAbort */));
+}
+
 TEST(IsTransientTransactionErrorTest, ShardInvalidatedForTargetingIsTransient) {
     ASSERT_TRUE(isTransientTransactionError(ErrorCodes::ShardInvalidatedForTargeting,
                                             false /* hasWriteConcernError */,

@@ -129,6 +129,12 @@ public:
         return false;
     }
 
+    bool refreshCatalogCache(OperationContext* opCtx,
+                             const ShardCannotRefreshDueToLocksHeldInfo& refreshInfo) const
+        noexcept override {
+        return false;
+    }
+
     void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {}
 
     std::unique_ptr<PolymorphicScoped> scopedOperationCompletionShardingActions(

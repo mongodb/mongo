@@ -48,6 +48,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/scopeguard.h"
@@ -184,7 +185,7 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
                                     collEntryFuture.get(opCtx),
                                     atClusterTime);
             } else {
-                return Status{ErrorCodes::StaleShardVersion,
+                return Status{ShardCannotRefreshDueToLocksHeldInfo(nss),
                               "Routing info refresh did not complete"};
             }
         }
