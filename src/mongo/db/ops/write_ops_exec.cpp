@@ -302,6 +302,10 @@ bool handleError(OperationContext* opCtx,
         return false;
     }
 
+    if (ex.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
+        throw;
+    }
+
     out->results.emplace_back(ex.toStatus());
     return !wholeOp.getOrdered();
 }

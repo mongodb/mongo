@@ -188,7 +188,8 @@ Future<void> invokeInTransactionRouter(std::shared_ptr<RequestExecutionContext> 
             if (auto code = status.code(); ErrorCodes::isSnapshotError(code) ||
                 ErrorCodes::isNeedRetargettingError(code) ||
                 code == ErrorCodes::ShardInvalidatedForTargeting ||
-                code == ErrorCodes::StaleDbVersion) {
+                code == ErrorCodes::StaleDbVersion ||
+                code == ErrorCodes::ShardCannotRefreshDueToLocksHeld) {
                 // Don't abort on possibly retryable errors.
                 return;
             }
@@ -466,6 +467,7 @@ private:
     void _onNeedRetargetting(Status& status);
     void _onStaleDbVersion(Status& status);
     void _onSnapshotError(Status& status);
+    void _onShardCannotRefreshDueToLocksHeldError(Status& status);
 
     ParseAndRunCommand* const _parc;
 
@@ -888,7 +890,8 @@ void ParseAndRunCommand::RunAndRetry::_checkRetryForTransaction(Status& status) 
     } else {
         invariant(ErrorCodes::isA<ErrorCategory::NeedRetargettingError>(status) ||
                   status.code() == ErrorCodes::ShardInvalidatedForTargeting ||
-                  status.code() == ErrorCodes::StaleDbVersion);
+                  status.code() == ErrorCodes::StaleDbVersion ||
+                  status.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
 
         if (!txnRouter.canContinueOnStaleShardOrDbError(_parc->_commandName, status)) {
             if (status.code() == ErrorCodes::ShardInvalidatedForTargeting) {
@@ -980,6 +983,15 @@ void ParseAndRunCommand::RunAndRetry::_onSnapshotError(Status& status) {
         iassert(status);
 }
 
+void ParseAndRunCommand::RunAndRetry::_onShardCannotRefreshDueToLocksHeldError(Status& status) {
+    invariant(status.code() == ErrorCodes::ShardCannotRefreshDueToLocksHeld);
+
+    _checkRetryForTransaction(status);
+
+    if (!_canRetry())
+        iassert(status);
+}
+
 void ParseAndRunCommand::RunInvocation::_tapOnError(const Status& status) {
     auto opCtx = _parc->_rec->getOpCtx();
     const auto command = _parc->_rec->getCommand();
@@ -1025,6 +1037,10 @@ Future<void> ParseAndRunCommand::RunAndRetry::run() {
         })
         .onErrorCategory<ErrorCategory::SnapshotError>([this](Status status) {
             _onSnapshotError(status);
+            return run();  // Retry
+        })
+        .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status status) {
+            _onShardCannotRefreshDueToLocksHeldError(status);
             return run();  // Retry
         });
 }

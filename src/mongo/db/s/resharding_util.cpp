@@ -475,22 +475,15 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
         return boost::none;
 
     bool allowLocks = true;
-    auto tempNssRoutingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-        opCtx,
-        constructTemporaryReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
-        allowLocks);
-
-    uassert(ShardInvalidatedForTargetingInfo(sourceNss),
-            "Routing information is not available for the temporary resharding collection.",
-            tempNssRoutingInfo.getStatus() != ErrorCodes::StaleShardVersion);
-
-    uassertStatusOK(tempNssRoutingInfo);
+    auto tempNssRoutingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+            opCtx,
+            constructTemporaryReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
+            allowLocks));
 
     auto shardKey = reshardingKeyPattern->extractShardKeyFromDocThrows(fullDocument);
 
-    return tempNssRoutingInfo.getValue()
-        .findIntersectingChunkWithSimpleCollation(shardKey)
-        .getShardId();
+    return tempNssRoutingInfo.findIntersectingChunkWithSimpleCollation(shardKey).getShardId();
 }
 
 bool isFinalOplog(const repl::OplogEntry& oplog) {

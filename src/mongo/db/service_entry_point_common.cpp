@@ -99,6 +99,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
@@ -688,6 +689,7 @@ private:
     std::unique_ptr<PolymorphicScoped> _scoped;
     bool _refreshedDatabase = false;
     bool _refreshedCollection = false;
+    bool _refreshedCatalogCache = false;
 };
 
 class RunCommandImpl {
@@ -1657,6 +1659,31 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     const auto refreshed = _execContext->behaviors->refreshCollection(opCtx, *sce);
                     if (refreshed) {
                         _refreshedCollection = true;
+                        return _commandExec();
+                    }
+                }
+            }
+
+            return s;
+        })
+        .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status s) -> Future<void> {
+            // This exception can never happen on the config server. Config servers can't receive
+            // SSV either, because they never have commands with shardVersion sent.
+            invariant(serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+
+            auto opCtx = _execContext->getOpCtx();
+            if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {
+                invariant(!opCtx->lockState()->isLocked());
+
+                auto refreshInfo = s.extraInfo<ShardCannotRefreshDueToLocksHeldInfo>();
+                invariant(refreshInfo);
+
+                const auto refreshed =
+                    _execContext->behaviors->refreshCatalogCache(opCtx, *refreshInfo);
+
+                if (refreshed) {
+                    _refreshedCatalogCache = true;
+                    if (!opCtx->inMultiDocumentTransaction()) {
                         return _commandExec();
                     }
                 }
