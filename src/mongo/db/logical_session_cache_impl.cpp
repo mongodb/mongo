@@ -182,19 +182,11 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
         try {
             _sessionsColl->checkSessionsCollectionExists(opCtx);
         } catch (const DBException& ex) {
-            if (ex.code() != ErrorCodes::NamespaceNotFound ||
-                ex.code() != ErrorCodes::NamespaceNotSharded) {
-                LOGV2(
-                    20712,
-                    "Sessions collection is not set up: {error}; waiting until next sessions reap "
-                    "interval",
-                    "Sessions collection is not set up; waiting until next sessions reap interval",
-                    "error"_attr = redact(ex));
-            } else {
-                LOGV2(20713,
-                      "Sessions collection is not set up because the namespace is either not found"
-                      "or not sharded; waiting until next sessions reap interval");
-            }
+            LOGV2(20712,
+                  "Sessions collection is not set up: {error}; waiting until next sessions reap "
+                  "interval",
+                  "Sessions collection is not set up; waiting until next sessions reap interval",
+                  "error"_attr = redact(ex));
             return Status::OK();
         }
         numReaped = _reapSessionsOlderThanFn(opCtx,
@@ -235,6 +227,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
 
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().arbiter()) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _activeSessions.clear();
         return;
     }
 

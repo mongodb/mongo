@@ -1197,7 +1197,9 @@ function appendSetParameterArgs(argArray) {
             }
 
             // Disable background cache refreshing to avoid races in tests
-            argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
+            if (!argArrayContainsSetParameterValue('disableLogicalSessionCacheRefresh=')) {
+                argArray.push(...['--setParameter', "disableLogicalSessionCacheRefresh=true"]);
+            }
         }
 
         // Since options may not be backward compatible, mongos options are not
