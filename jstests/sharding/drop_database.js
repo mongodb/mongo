@@ -230,5 +230,44 @@ jsTest.log("Tests that dropping a database doesn't affects other database with t
     });
 }
 
+jsTest.log(
+    "Test that dropping a non-sharded database, relevant events are properly logged on CSRS");
+{
+    // Create a non-sharded database
+    const db = getNewDb();
+    assert.commandWorked(db.foo.insert({}));
+
+    // Drop the database
+    assert.commandWorked(db.dropDatabase());
+
+    // Verify that the drop database start event has been logged
+    const startLogCount =
+        configDB.changelog.countDocuments({what: 'dropDatabase.start', ns: db.getName()});
+    assert.gte(1, startLogCount, "dropDatabase start event not found in changelog");
+
+    // Verify that the drop database end event has been logged
+    const endLogCount = configDB.changelog.countDocuments({what: 'dropDatabase', ms: db.getName()});
+    assert.gte(1, endLogCount, "dropDatabase end event not found in changelog");
+}
+
+jsTest.log("Test that dropping a sharded database, relevant events are properly logged on CSRS");
+{
+    // Create a sharded database
+    const db = getNewDb();
+    st.s.adminCommand({enableSharding: db.getName()});
+
+    // Drop the database
+    assert.commandWorked(db.dropDatabase());
+
+    // Verify that the drop database start event has been logged
+    const startLogCount =
+        configDB.changelog.countDocuments({what: 'dropDatabase.start', ns: db.getName()});
+    assert.gte(1, startLogCount, "dropDatabase start event not found in changelog");
+
+    // Verify that the drop database end event has been logged
+    const endLogCount = configDB.changelog.countDocuments({what: 'dropDatabase', ns: db.getName()});
+    assert.gte(1, endLogCount, "dropDatabase end event not found in changelog");
+}
+
 st.stop();
 })();
