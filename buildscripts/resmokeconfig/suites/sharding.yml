@@ -7,6 +7,9 @@ selector:
   - jstests/sharding/query/*.js
 
 executor:
+  archive:
+    tests:
+      - jstests/sharding/*reshard*.js
   config:
     shell_options:
       nodb: ''
