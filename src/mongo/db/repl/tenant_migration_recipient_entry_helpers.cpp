@@ -80,8 +80,9 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
             invariant(!updateResult.numDocsModified);
             if (updateResult.upsertedId.isEmpty()) {
                 return {ErrorCodes::ConflictingOperationInProgress,
-                        str::stream() << "Failed to insert the state doc: " << stateDoc.toBSON()
-                                      << "; Active tenant migration found for tenantId: "
+                        str::stream() << "Failed to insert the state doc: "
+                                      << tenant_migration_util::redactStateDoc(stateDoc.toBSON())
+                                      << "; Found active tenant migration for tenantId: "
                                       << stateDoc.getTenantId()};
             }
             return Status::OK();

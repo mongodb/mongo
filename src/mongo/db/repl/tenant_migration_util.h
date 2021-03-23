@@ -181,6 +181,11 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
     const Timestamp& startFetchingTimestamp,
     const std::string& tenantId);
 
+/**
+ * Returns a new BSONObj created from 'stateDoc' with sensitive fields redacted.
+ */
+BSONObj redactStateDoc(BSONObj stateDoc);
+
 }  // namespace tenant_migration_util
 
 }  // namespace mongo

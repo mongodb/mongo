@@ -31,15 +31,22 @@ function getTenantMigrationDonorCurrentOpEntries(donorPrimary, query) {
     return assert.commandWorked(donorPrimary.adminCommand(cmdObj)).inprog;
 }
 
-const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-let charIndex = 0;
+/**
+ * Asserts that the string does not contain certificate or private pem string.
+ */
+function assertNoCertificateOrPrivateKey(string) {
+    assert(!string.includes("CERTIFICATE"), "found certificate");
+    assert(!string.includes("PRIVATE KEY"), "found private key");
+}
+
+const kTenantIdPrefix = "testTenantId";
+let tenantCounter = 0;
 
 /**
  * Returns a tenantId that will not match any existing prefix.
  */
 function generateUniqueTenantId() {
-    assert.lt(charIndex, chars.length);
-    return chars[charIndex++];
+    return kTenantIdPrefix + tenantCounter++;
 }
 
 const donorRst = new ReplSetTest(
@@ -109,8 +116,9 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     tenantMigrationTest0, migrationOpts0, tenantMigrationTest1, migrationOpts1) {
     tenantMigrationTest0.runMigration(
         migrationOpts0, false /* retryOnRetryableErrors */, false /* automaticForgetMigration */);
-    assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
-                                 ErrorCodes.ConflictingOperationInProgress);
+    const res1 = assert.commandFailedWithCode(tenantMigrationTest1.runMigration(migrationOpts1),
+                                              ErrorCodes.ConflictingOperationInProgress);
+    assertNoCertificateOrPrivateKey(res1.errmsg);
 
     // If the second donorStartMigration had started a duplicate migration, there would be two donor
     // state docs and TenantMigrationDonorService instances.
@@ -150,6 +158,7 @@ function testConcurrentConflictingMigrations(
 
     if (res0.ok) {
         assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
+        assertNoCertificateOrPrivateKey(res1.errmsg);
         assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
         assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
                          "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
@@ -170,6 +179,7 @@ function testConcurrentConflictingMigrations(
             tenantMigrationTest0.forgetMigration(migrationOpts0.migrationIdString));
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
+        assertNoCertificateOrPrivateKey(res0.errmsg);
         assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
         assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
                          "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
@@ -255,6 +265,51 @@ function testConcurrentConflictingMigrations(
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
         migrationOpts1.readPreference = {mode: "secondary"};
+        return [tenantMigrationTest0, migrationOpts0, tenantMigrationTest0, migrationOpts1];
+    };
+
+    testStartingConflictingMigrationAfterInitialMigrationCommitted(...makeTestParams());
+    testConcurrentConflictingMigrations(...makeTestParams());
+})();
+
+const kDonorCertificateAndPrivateKey =
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
+const kExpiredDonorCertificateAndPrivateKey = TenantMigrationUtil.getCertificateAndPrivateKey(
+    "jstests/libs/tenant_migration_donor_expired.pem");
+const kRecipientCertificateAndPrivateKey =
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
+const kExpiredRecipientCertificateAndPrivateKey = TenantMigrationUtil.getCertificateAndPrivateKey(
+    "jstests/libs/tenant_migration_recipient_expired.pem");
+
+// Test different donor certificates.
+(() => {
+    let makeTestParams = () => {
+        const migrationOpts0 = {
+            migrationIdString: extractUUIDFromObject(UUID()),
+            tenantId: generateUniqueTenantId() + "DiffDonorCertificate",
+            donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
+            recipientCertificateForDonor: kRecipientCertificateAndPrivateKey
+        };
+        const migrationOpts1 = Object.extend({}, migrationOpts0, true);
+        migrationOpts1.donorCertificateForRecipient = kExpiredDonorCertificateAndPrivateKey;
+        return [tenantMigrationTest0, migrationOpts0, tenantMigrationTest0, migrationOpts1];
+    };
+
+    testStartingConflictingMigrationAfterInitialMigrationCommitted(...makeTestParams());
+    testConcurrentConflictingMigrations(...makeTestParams());
+})();
+
+// Test different recipient certificates.
+(() => {
+    let makeTestParams = () => {
+        const migrationOpts0 = {
+            migrationIdString: extractUUIDFromObject(UUID()),
+            tenantId: generateUniqueTenantId() + "DiffRecipientCertificate",
+            donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
+            recipientCertificateForDonor: kRecipientCertificateAndPrivateKey
+        };
+        const migrationOpts1 = Object.extend({}, migrationOpts0, true);
+        migrationOpts1.recipientCertificateForDonor = kExpiredRecipientCertificateAndPrivateKey;
         return [tenantMigrationTest0, migrationOpts0, tenantMigrationTest0, migrationOpts1];
     };
 
