@@ -12,8 +12,8 @@
 (function() {
 "use strict";
 
-function checkResponseFields(commandString) {
-    var res = db.runCommand(commandString);
+function checkResponseFields(command, commandType) {
+    var res = db.runCommand(command);
     // check that the fields that should be there are there and have proper values
     assert(res.maxBsonObjectSize && isNumber(res.maxBsonObjectSize) && res.maxBsonObjectSize > 0,
            "maxBsonObjectSize possibly missing:" + tojson(res));
@@ -23,7 +23,7 @@ function checkResponseFields(commandString) {
     assert(res.maxWriteBatchSize && isNumber(res.maxWriteBatchSize) && res.maxWriteBatchSize > 0,
            "maxWriteBatchSize possibly missing:" + tojson(res));
 
-    if (commandString === "hello") {
+    if (commandType === "hello") {
         assert.eq("boolean",
                   typeof res.isWritablePrimary,
                   "isWritablePrimary field is not a boolean" + tojson(res));
@@ -70,9 +70,12 @@ function checkResponseFields(commandString) {
     }
 }
 
-checkResponseFields("hello");
-checkResponseFields("ismaster");
-checkResponseFields("isMaster");
+checkResponseFields("hello", "hello");
+checkResponseFields("ismaster", "ismaster");
+checkResponseFields("isMaster", "isMaster");
+checkResponseFields({hello: 1, unknownField: 1}, "hello");
+checkResponseFields({ismaster: 1, unknownField: 1}, "ismaster");
+checkResponseFields({isMaster: 1, unknownField: 1}, "isMaster");
 
 // As operations happen concurrently, the response objects may have different timestamps. To compare
 // response objects returned from calling commands directly and shell helpers below, we must remove
