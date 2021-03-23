@@ -49,6 +49,7 @@ each of which is ordered by one or more columns.
 - @subpage custom_extractors
 - @subpage custom_data_sources
 - @subpage custom_file_systems
+- @subpage custom_storage_sources
 
 <h2>Performance monitoring and tuning</h2>
 - @subpage_single tune_statistics

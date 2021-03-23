@@ -37,7 +37,7 @@ different \c keyid.
 Overriding the system encryption for a table does not override
 the system encryption for indices on that table, nor does it override
 the system encryption for column groups specified on that table.
-Encryption for column groups and indices must specified when they
+Encryption for column groups and indices must be specified when they
 are created, if they are to be different than the system encryption.
 
 It is an error to specify encryption in a WT_SESSION::create call when it

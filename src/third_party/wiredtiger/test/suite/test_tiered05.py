@@ -26,25 +26,31 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wtscenario, wttest
+import os, wiredtiger, wttest
 from wiredtiger import stat
+StorageSource = wiredtiger.StorageSource  # easy access to constants
 
 # test_tiered05.py
-#    Basic tiered storage API test.
+#    Basic tiered storage API test error for tiered manager and flush_tier.
 class test_tiered05(wttest.WiredTigerTestCase):
     uri = "table:test_tiered05"
 
     auth_token = "test_token"
-    extension_name = "test"
+    extension_name = "local_store"
+
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('storage_sources', self.extension_name)
+
     def conn_config(self):
         return \
           'statistics=(fast),' + \
           'tiered_manager=(wait=10),' + \
-          'tiered_storage=(enabled,object_target_size=20M,' + \
+          'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'name=%s,' % self.extension_name + \
-          'auth_token=%s)' % self.auth_token
+          'object_target_size=20M)'
 
-    # Test calling the flush_tier API.
+    # Test calling the flush_tier API with a tiered manager. Should get an error.
     def test_tiered(self):
         self.session.create(self.uri, 'key_format=S')
         msg = "/storage manager thread is configured/"

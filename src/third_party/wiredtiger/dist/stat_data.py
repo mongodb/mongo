@@ -500,6 +500,11 @@ connection_stats = [
     SessionOpStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
 
     ##########################################
+    # Tiered storage statistics
+    ##########################################
+    StorageStat('flush_tier', 'flush_tier operation calls'),
+
+    ##########################################
     # Thread Count statistics
     ##########################################
     ThreadStat('thread_fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
@@ -852,7 +857,7 @@ conn_dsrc_stats = [
     ##########################################
     # Tiered storage statistics
     ##########################################
-    StorageStat('flush_tier', 'flush_tier operation calls'),
+    StorageStat('tiered_object_size', 'tiered storage object size', 'no_clear,no_scale,size'),
     StorageStat('tiered_retention', 'tiered storage local retention time (secs)', 'no_clear,no_scale,size'),
 
     ##########################################

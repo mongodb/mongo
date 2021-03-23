@@ -156,6 +156,7 @@ struct __wt_btree {
     bool intlpage_compadjust;     /* Run-time compression adjustment */
     uint64_t maxintlpage_precomp; /* Internal page pre-compression size */
 
+    WT_BUCKET_STORAGE *bstorage;    /* Tiered storage source */
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
 
     WT_RWLOCK ovfl_lock; /* Overflow lock */
