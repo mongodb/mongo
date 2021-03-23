@@ -108,6 +108,7 @@ ERROR_ID_NEW_COMPLEX_PRIVILEGES_NOT_SUBSET = "ID0064"
 ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK = "ID0065"
 ERROR_ID_REMOVED_ACCESS_CHECK_FIELD = "ID0066"
 ERROR_ID_ADDED_ACCESS_CHECK_FIELD = "ID0067"
+ERROR_ID_COMMAND_STRICT_TRUE_ERROR = "ID0068"
 
 # TODO (SERVER-55203): Remove SKIPPED_COMMANDS logic.
 # Any breaking changes added to API V1 before releasing 5.0 should be added to SKIPPED_COMMANDS to
@@ -305,6 +306,13 @@ class IDLCompatibilityContext(object):
         """Add an error about a command that was removed."""
         self._add_error(ERROR_ID_REMOVED_COMMAND, command_name,
                         "Old command '%s' was removed from new commands." % (command_name), file)
+
+    def add_command_strict_true_error(self, command_name: str, file: str) -> None:
+        """Add an error about a command that changes from strict: false to strict: true."""
+        self._add_error(
+            ERROR_ID_COMMAND_STRICT_TRUE_ERROR, command_name,
+            "'%s' changes from strict: false in the old version to strict: true in the new version."
+            % (command_name), file)
 
     def add_duplicate_command_name_error(self, command_name: str, dir_name: str, file: str) -> None:
         """Add an error about a duplicate command name within a directory."""

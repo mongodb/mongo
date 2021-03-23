@@ -840,6 +840,9 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
                     new_idl_file = new_command_file[old_cmd.command_name]
                     new_idl_file_path = new_command_file_path[old_cmd.command_name]
 
+                    if not old_cmd.strict and new_cmd.strict:
+                        ctxt.add_command_strict_true_error(new_cmd.command_name, new_idl_file_path)
+
                     # Check compatibility of command's parameters.
                     check_command_params_or_type_struct_fields(
                         ctxt, old_cmd, new_cmd, old_cmd.command_name, old_idl_file, new_idl_file,
