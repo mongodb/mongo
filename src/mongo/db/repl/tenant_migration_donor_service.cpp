@@ -69,6 +69,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterFetchingAndStoringKeys);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -996,6 +997,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterDataSyncState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancelationToken& serviceToken,
     const CancelationToken& instanceToken) {
+    pauseTenantMigrationAfterFetchingAndStoringKeys.pauseWhileSet();
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
