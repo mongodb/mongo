@@ -203,8 +203,9 @@ TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                      .getValue();
     ASSERT(batch->claimCommitRights());
+    auto bucket = batch->bucket();
     _bucketCatalog->abort(batch);
-    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(batch->bucketId()));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucket));
 }
 
 TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
@@ -231,11 +232,11 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
 
     // Check metadata in buckets.
     ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"),
-                      _bucketCatalog->getMetadata(result1.getValue()->bucketId()));
+                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
-                      _bucketCatalog->getMetadata(result2.getValue()->bucketId()));
+                      _bucketCatalog->getMetadata(result2.getValue()->bucket()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
-                      _bucketCatalog->getMetadata(result3.getValue()->bucketId()));
+                      _bucketCatalog->getMetadata(result3.getValue()->bucket()));
 
     // Committing one bucket should only return the one document in that bucket and shoukd not
     // affect the other bucket.
@@ -328,7 +329,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
                      .getValue();
 
-    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(batch->bucketId()));
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(batch->bucket()));
 
     _commit(batch, 0);
 }
@@ -341,6 +342,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                                          BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     ASSERT_OK(result);
     auto batch = result.getValue();
+    auto oldId = batch->bucket()->id();
     _commit(batch, 0);
     ASSERT_EQ(2U, batch->newFieldNamesToBeInserted().size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted().count(_timeField)) << batch->toBSON();
@@ -388,7 +390,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
         BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     auto& batch2 = result2.getValue();
-    ASSERT_NE(*batch->bucketId(), *batch2->bucketId());
+    ASSERT_NE(oldId, batch2->bucket()->id());
     _commit(batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted().size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted().count(_timeField)) << batch2->toBSON();

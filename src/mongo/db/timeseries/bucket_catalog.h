@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <deque>
 #include <queue>
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
@@ -37,44 +36,21 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 class BucketCatalog {
-    struct Bucket;
     struct ExecutionStats;
     class MinMax;
-    using IdleList = std::list<Bucket*>;
 
 public:
+    class Bucket;
+
     enum class CombineWithInsertsFromOtherClients {
         kAllow,
         kDisallow,
-    };
-
-    class BucketId {
-        friend class BucketCatalog;
-
-    public:
-        const OID& operator*() const;
-        const OID* operator->() const;
-
-        bool operator==(const BucketId& other) const;
-        bool operator!=(const BucketId& other) const;
-        bool operator<(const BucketId& other) const;
-
-        template <typename H>
-        friend H AbslHashValue(H h, const BucketId& bucketId) {
-            return H::combine(std::move(h), bucketId._num);
-        }
-
-        static BucketId min();
-
-    private:
-        BucketId(uint64_t num);
-
-        std::shared_ptr<OID> _id{std::make_shared<OID>(OID::gen())};
-        uint64_t _num;
     };
 
     struct CommitInfo {
@@ -98,9 +74,8 @@ public:
 
     public:
         WriteBatch() = delete;
-        WriteBatch(const std::shared_ptr<Bucket>& bucket,
-                   const UUID& lsid,
-                   const std::shared_ptr<ExecutionStats>& stats);
+
+        WriteBatch(Bucket* bucket, const UUID& lsid, const std::shared_ptr<ExecutionStats>& stats);
 
         /**
          * Attempt to claim the right to commit (or abort) a batch. If it returns true, rights are
@@ -115,8 +90,7 @@ public:
          */
         StatusWith<CommitInfo> getResult() const;
 
-        std::shared_ptr<Bucket> bucket() const;
-        BucketId bucketId() const;
+        Bucket* bucket() const;
 
         const std::vector<BSONObj>& measurements() const;
         const BSONObj& min() const;
@@ -166,8 +140,8 @@ public:
          */
         void _abort();
 
-        std::shared_ptr<Bucket> _bucket;
-        const BucketId _bucketId;
+
+        Bucket* _bucket;
         const UUID _lsid;
         std::shared_ptr<ExecutionStats> _stats;
 
@@ -182,7 +156,6 @@ public:
         AtomicWord<bool> _commitRights{false};
         SharedPromise<CommitInfo> _promise;
     };
-
 
     static BucketCatalog& get(ServiceContext* svcCtx);
     static BucketCatalog& get(OperationContext* opCtx);
@@ -200,11 +173,12 @@ public:
      * Returns an empty document if the given bucket cannot be found or if this time-series
      * collection was not created with a metadata field name.
      */
-    BSONObj getMetadata(const BucketId& bucketId) const;
+    BSONObj getMetadata(Bucket* bucket) const;
 
     /**
      * Returns the WriteBatch into which the document was inserted. Any caller who receives the same
-     * batch may commit or abort the batch. See WriteBatch for more details.
+     * batch may commit or abort the batch after claiming commit rights. See WriteBatch for more
+     * details.
      */
     StatusWith<std::shared_ptr<WriteBatch>> insert(OperationContext* opCtx,
                                                    const NamespaceString& ns,
@@ -212,12 +186,14 @@ public:
                                                    CombineWithInsertsFromOtherClients combine);
 
     /**
-     * Prepares a batch for commit, transitioning it to an inactive state.
+     * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
+     * commit rights on batch.
      */
     void prepareCommit(std::shared_ptr<WriteBatch> batch);
 
     /**
-     * Records the result of a batch commit.
+     * Records the result of a batch commit. Caller must already have commit rights on batch, and
+     * batch must have been previously prepared.
      */
     void finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info);
 
@@ -374,86 +350,100 @@ private:
         uint64_t _memoryUsage = 0;
     };
 
-    struct Bucket : public std::enable_shared_from_this<Bucket> {
-        explicit Bucket(const BucketId&);
+    using IdleList = std::list<Bucket*>;
 
-        // Access to the bucket is controlled by this lock
-        mutable Mutex mutex;
+public:
+    class Bucket {
+    public:
+        friend class BucketCatalog;
 
-        // The ID of the bucket
-        BucketId id;
+        /**
+         * Returns the ID for the underlying bucket.
+         */
+        const OID& id() const;
 
-        // The namespace that this bucket is used for.
-        NamespaceString ns;
+        /**
+         * Returns whether all measurements have been committed.
+         */
+        bool allCommitted() const;
 
-        // The metadata of the data that this bucket contains.
-        BucketMetadata metadata;
-
-        // Top-level field names of the measurements that have been inserted into the bucket.
-        StringSet fieldNames;
-
-        // The minimum values for each field in the bucket.
-        MinMax min;
-
-        // The maximum values for each field in the bucket.
-        MinMax max;
-
-        // The latest time that has been inserted into the bucket.
-        Date_t latestTime;
-
-        // The total size in bytes of the bucket's BSON serialization, including measurements to be
-        // inserted.
-        uint64_t size = 0;
-
-        // The total number of measurements in the bucket, including uncommitted measurements and
-        // measurements to be inserted.
-        uint32_t numMeasurements = 0;
-
-        // The number of committed measurements in the bucket.
-        uint32_t numCommittedMeasurements = 0;
-
-        // Whether the bucket is full. This can be due to number of measurements, size, or time
-        // range.
-        bool full = false;
-
-        // The batch that has been prepared and is currently in the process of being committed, if
-        // any.
-        std::shared_ptr<WriteBatch> preparedBatch;
-
-        // Per-logical session batches that are actively being inserted into.
-        stdx::unordered_map<UUID, std::shared_ptr<WriteBatch>, UUID::Hash> batches;
-
-        // If the bucket is in the _idleList, then its position is recorded here.
-        boost::optional<IdleList::iterator> idleListEntry = boost::none;
-
-        // Approximate memory usage of this bucket.
-        uint64_t memoryUsage = sizeof(*this);
-
+    private:
         /**
          * Determines the effect of adding 'doc' to this bucket. If adding 'doc' causes this bucket
          * to overflow, we will create a new bucket and recalculate the change to the bucket size
          * and data fields.
          */
-        void calculateBucketFieldsAndSizeChange(const BSONObj& doc,
-                                                boost::optional<StringData> metaField,
-                                                StringSet* newFieldNamesToBeInserted,
-                                                uint32_t* newFieldNamesSize,
-                                                uint32_t* sizeToBeAdded) const;
+        void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
+                                                 boost::optional<StringData> metaField,
+                                                 StringSet* newFieldNamesToBeInserted,
+                                                 uint32_t* newFieldNamesSize,
+                                                 uint32_t* sizeToBeAdded) const;
 
         /**
          * Returns whether BucketCatalog::commit has been called at least once on this bucket.
          */
-        bool hasBeenCommitted() const;
+        bool _hasBeenCommitted() const;
 
         /**
-         * Returns whether all measurements have been committed
+         * Return a pointer to the current, open batch.
          */
-        bool allCommitted() const;
+        std::shared_ptr<WriteBatch> _activeBatch(const UUID& lsid,
+                                                 const std::shared_ptr<ExecutionStats>& stats);
 
-        std::shared_ptr<WriteBatch> activeBatch(const UUID& lsid,
-                                                const std::shared_ptr<ExecutionStats>& stats);
+        // Access to the bucket is controlled by this lock
+        mutable Mutex _mutex;
+
+        // The bucket ID for the underlying document
+        OID _id = OID::gen();
+
+        // The namespace that this bucket is used for.
+        NamespaceString _ns;
+
+        // The metadata of the data that this bucket contains.
+        BucketMetadata _metadata;
+
+        // Top-level field names of the measurements that have been inserted into the bucket.
+        StringSet _fieldNames;
+
+        // The minimum values for each field in the bucket.
+        MinMax _min;
+
+        // The maximum values for each field in the bucket.
+        MinMax _max;
+
+        // The latest time that has been inserted into the bucket.
+        Date_t _latestTime;
+
+        // The total size in bytes of the bucket's BSON serialization, including measurements to be
+        // inserted.
+        uint64_t _size = 0;
+
+        // The total number of measurements in the bucket, including uncommitted measurements and
+        // measurements to be inserted.
+        uint32_t _numMeasurements = 0;
+
+        // The number of committed measurements in the bucket.
+        uint32_t _numCommittedMeasurements = 0;
+
+        // Whether the bucket is full. This can be due to number of measurements, size, or time
+        // range.
+        bool _full = false;
+
+        // The batch that has been prepared and is currently in the process of being committed, if
+        // any.
+        std::shared_ptr<WriteBatch> _preparedBatch;
+
+        // Batches, per logical session, that haven't been committed or aborted yet.
+        stdx::unordered_map<UUID, std::shared_ptr<WriteBatch>, UUID::Hash> _batches;
+
+        // If the bucket is in the _idleList, then its position is recorded here.
+        boost::optional<IdleList::iterator> _idleListEntry = boost::none;
+
+        // Approximate memory usage of this bucket.
+        uint64_t _memoryUsage = sizeof(*this);
     };
 
+private:
     struct ExecutionStats {
         AtomicWord<long long> numBucketInserts;
         AtomicWord<long long> numBucketUpdates;
@@ -481,14 +471,13 @@ private:
                      const std::tuple<NamespaceString, BucketMetadata>& key,
                      ExecutionStats* stats,
                      const Date_t& time);
-        BucketAccess(BucketCatalog* catalog, const BucketId& bucketId);
-        BucketAccess(BucketCatalog* catalog, const std::shared_ptr<Bucket>& bucket);
+        BucketAccess(BucketCatalog* catalog, Bucket* bucket);
         ~BucketAccess();
 
         bool isLocked() const;
         Bucket* operator->();
         operator bool() const;
-        operator std::shared_ptr<Bucket>() const;
+        operator Bucket*() const;
 
         // Release the bucket lock, typically in order to reacquire the catalog lock.
         void release();
@@ -528,8 +517,7 @@ private:
         ExecutionStats* _stats = nullptr;
         const Date_t* _time = nullptr;
 
-        BucketId _id = BucketId::min();
-        std::shared_ptr<Bucket> _bucket;
+        Bucket* _bucket;
         stdx::unique_lock<Mutex> _guard;
     };
 
@@ -543,23 +531,23 @@ private:
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
-    bool _removeBucket(const BucketId& bucketId, bool bucketIsUnused);
+    bool _removeBucket(Bucket* bucket, bool bucketIsUnused);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date
      */
-    void _markBucketIdle(const std::shared_ptr<Bucket>& bucket);
+    void _markBucketIdle(Bucket* bucket);
 
     /**
      * Remove the bucket from the list of idle buckets
      */
-    void _markBucketNotIdle(const std::shared_ptr<Bucket>& bucket);
+    void _markBucketNotIdle(Bucket* bucket);
 
     /**
      * Verify the bucket is currently unused by taking a lock on it. Must hold exclusive lock from
      * the outside for the result to be meaningful.
      */
-    void _verifyBucketIsUnused(const Bucket* bucket) const;
+    void _verifyBucketIsUnused(Bucket* bucket) const;
 
     /**
      * Expires idle buckets until the bucket catalog's memory usage is below the expiry threshold.
@@ -569,15 +557,15 @@ private:
     std::size_t _numberOfIdleBuckets() const;
 
     // Allocate a new bucket (and ID) and add it to the catalog
-    std::shared_ptr<Bucket> _allocateBucket(const std::tuple<NamespaceString, BucketMetadata>& key,
-                                            const Date_t& time,
-                                            ExecutionStats* stats,
-                                            bool openedDuetoMetadata);
+    Bucket* _allocateBucket(const std::tuple<NamespaceString, BucketMetadata>& key,
+                            const Date_t& time,
+                            ExecutionStats* stats,
+                            bool openedDuetoMetadata);
 
     std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns);
     const std::shared_ptr<ExecutionStats> _getExecutionStats(const NamespaceString& ns) const;
 
-    void _setIdTimestamp(BucketId* id, const Date_t& time);
+    void _setIdTimestamp(Bucket* bucket, const Date_t& time);
 
     /**
      * You must hold a lock on _bucketMutex when accessing _allBuckets or _openBuckets.
@@ -598,11 +586,10 @@ private:
     mutable StripedMutex _bucketMutex;
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
-    stdx::unordered_map<BucketId, std::shared_ptr<Bucket>> _allBuckets;
+    stdx::unordered_set<std::unique_ptr<Bucket>> _allBuckets;
 
     // The current open bucket for each namespace and metadata pair.
-    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, std::shared_ptr<Bucket>>
-        _openBuckets;
+    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, Bucket*> _openBuckets;
 
     // This mutex protects access to _idleBuckets
     mutable Mutex _idleMutex = MONGO_MAKE_LATCH("BucketCatalog::_idleMutex");
