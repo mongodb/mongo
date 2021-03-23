@@ -9,7 +9,6 @@
  *     does_not_support_stepdowns,
  *     requires_fcv_49,
  *     requires_wiredtiger,
- *     sbe_incompatible,
  * ]
  */
 (function() {

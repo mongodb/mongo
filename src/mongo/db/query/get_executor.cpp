@@ -1120,8 +1120,10 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
         });
     // OP_QUERY style find commands are not currently supported by SBE.
     const bool isNotLegacy = !CurOp::get(opCtx)->isLegacyQuery();
+    // Queries against a time-series collection are not currently supported by SBE.
+    const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        doesNotSortOnDottedPath && isNotLegacy;
+        doesNotSortOnDottedPath && isNotLegacy && isQueryNotAgainstTimeseriesCollection;
 }
 }  // namespace
 
