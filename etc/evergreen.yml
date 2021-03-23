@@ -10803,6 +10803,26 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
 
+- name: ubuntu1804-container
+  display_name: "Ubuntu 18.04 Container"
+  run_on:
+  - ubuntu1804-container-server
+  expansions:
+    resmoke_jobs_factor: 1
+    disable_shared_scons_cache: true
+    compile_flags: MONGO_DISTMOD=ubuntu1804 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    tooltags: ""
+    build_mongoreplay: true
+    test_flags: >-
+      --excludeWithAnyTags=requires_os_access
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+    distros:
+    - ubuntu1804-build
+  - name: jsCore
+  - name: sharding_gen
+  - name: replica_sets
+
 - name: rhel70
   display_name: RHEL 7.0
   run_on:
