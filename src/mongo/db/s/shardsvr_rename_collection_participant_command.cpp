@@ -34,10 +34,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -103,8 +105,20 @@ public:
             const RenameCollectionOptions options{req.getDropTarget(), req.getStayTemp()};
 
             // Acquire source/target critical sections
-            sharding_ddl_util::acquireCriticalSection(opCtx, fromNss);
-            sharding_ddl_util::acquireCriticalSection(opCtx, toNss);
+            const auto reason = BSON("command"
+                                     << "rename"
+                                     << "from" << fromNss.toString() << "to" << toNss.toString());
+            sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(opCtx, fromNss, reason);
+            sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(opCtx, fromNss, reason);
+            sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(opCtx, toNss, reason);
+            sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(opCtx, toNss, reason);
+
+            // Wait until both persisted critical sections are majority committed
+            WriteConcernResult ignoreResult;
+            const auto latestOpTime =
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            uassertStatusOK(waitForWriteConcern(
+                opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
             dropCollectionLocally(opCtx, toNss);
 
@@ -184,8 +198,18 @@ public:
             const auto& toNss = request().getTo();
 
             // Release source/target critical sections
-            sharding_ddl_util::releaseCriticalSection(opCtx, fromNss);
-            sharding_ddl_util::releaseCriticalSection(opCtx, toNss);
+            const auto reason = BSON("command"
+                                     << "rename"
+                                     << "from" << fromNss.toString() << "to" << toNss.toString());
+            sharding_ddl_util::releaseRecoverableCriticalSection(opCtx, fromNss, reason);
+            sharding_ddl_util::releaseRecoverableCriticalSection(opCtx, toNss, reason);
+
+            // Wait until both persisted critical sections are majority committed
+            WriteConcernResult ignoreResult;
+            const auto latestOpTime =
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+            uassertStatusOK(waitForWriteConcern(
+                opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
             auto catalog = Grid::get(opCtx)->catalogCache();
             uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, toNss));
