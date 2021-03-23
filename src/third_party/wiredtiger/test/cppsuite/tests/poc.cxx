@@ -65,7 +65,7 @@ parse_configuration_from_file(const std::string &filename)
             /* Whitespaces are only for readability, they can be removed safely. */
             line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
 
-            if (prev_line == line) {
+            if (prev_line == line && line != "}") {
                 error =
                   "Error when parsing configuration. Two consecutive lines are equal to " + line;
                 testutil_die(EINVAL, error.c_str());

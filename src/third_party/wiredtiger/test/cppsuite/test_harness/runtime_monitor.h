@@ -133,15 +133,15 @@ class runtime_monitor : public component {
     void
     load()
     {
-        WT_CONFIG_ITEM nested;
+        configuration *sub_config;
         std::string statistic_list;
         /* Parse the configuration for the runtime monitor. */
         testutil_check(_config->get_int(RATE_PER_SECOND, _ops));
 
         /* Load known statistics. */
-        testutil_check(_config->get(STAT_CACHE_SIZE, &nested));
-        configuration sub_config = configuration(nested);
-        _stats.push_back(new cache_limit_statistic(&sub_config));
+        sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
+        _stats.push_back(new cache_limit_statistic(sub_config));
+        delete sub_config;
         component::load();
     }
 
