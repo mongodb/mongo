@@ -30,15 +30,19 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <vector>
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
 
 class NamespaceString;
 class OperationContext;
+class Pipeline;
 
 namespace resharding::data_copy {
 
@@ -62,7 +66,28 @@ void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<CollectionUUID>& uuid = boost::none);
 
+/**
+ * Returns the largest _id value in the collection.
+ */
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);
+
+/**
+ * Returns a batch of documents suitable for being inserted with insertBatch().
+ *
+ * The batch of documents is returned once its size exceeds batchSizeLimitBytes or the pipeline has
+ * been exhausted.
+ */
+std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes);
+
+/**
+ * Atomically inserts a batch of documents in a single storage transaction. Returns the number of
+ * bytes inserted.
+ *
+ * Throws NamespaceNotFound if the collection doesn't already exist.
+ */
+int insertBatch(OperationContext* opCtx,
+                const NamespaceString& nss,
+                std::vector<InsertStatement>& batch);
 
 /**
  * Checks out the logical session and acts in one of the following ways depending on the state of

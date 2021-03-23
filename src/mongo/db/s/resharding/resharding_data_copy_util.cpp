@@ -33,12 +33,15 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo::resharding::data_copy {
 
@@ -99,6 +102,61 @@ Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collec
             !value.missing());
 
     return value;
+}
+
+std::vector<InsertStatement> fillBatchForInsert(Pipeline& pipeline, int batchSizeLimitBytes) {
+    // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
+    // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
+    // to be marked as having started.
+    auto* curOp = CurOp::get(pipeline.getContext()->opCtx);
+    curOp->ensureStarted();
+    ON_BLOCK_EXIT([curOp] { curOp->done(); });
+
+    std::vector<InsertStatement> batch;
+
+    int numBytes = 0;
+    do {
+        auto doc = pipeline.getNext();
+        if (!doc) {
+            break;
+        }
+
+        auto obj = doc->toBson();
+        batch.emplace_back(obj.getOwned());
+        numBytes += obj.objsize();
+    } while (numBytes < batchSizeLimitBytes);
+
+    return batch;
+}
+
+int insertBatch(OperationContext* opCtx,
+                const NamespaceString& nss,
+                std::vector<InsertStatement>& batch) {
+    return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss.ns(), [&] {
+        AutoGetCollection outputColl(opCtx, nss, MODE_IX);
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection '" << nss << "' did not already exist",
+                outputColl);
+
+        int numBytes = 0;
+        WriteUnitOfWork wuow(opCtx);
+
+        // Populate 'slots' with new optimes for each insert.
+        // This also notifies the storage engine of each new timestamp.
+        auto oplogSlots = repl::getNextOpTimes(opCtx, batch.size());
+        for (auto [insert, slot] = std::make_pair(batch.begin(), oplogSlots.begin());
+             slot != oplogSlots.end();
+             ++insert, ++slot) {
+            invariant(insert != batch.end());
+            insert->oplogSlot = *slot;
+            numBytes += insert->doc.objsize();
+        }
+
+        uassertStatusOK(outputColl->insertDocuments(opCtx, batch.begin(), batch.end(), nullptr));
+        wuow.commit();
+
+        return numBytes;
+    });
 }
 
 boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* opCtx,

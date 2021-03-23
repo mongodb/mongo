@@ -508,7 +508,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return whenAllSucceed(_collectionCloner->run(**executor, abortToken),
+    return whenAllSucceed(_collectionCloner->run(**executor, abortToken).thenRunOn(**executor),
                           (*executor)
                               ->sleepFor(_minimumOperationDuration, abortToken)
                               .then([this, executor, abortToken] {
