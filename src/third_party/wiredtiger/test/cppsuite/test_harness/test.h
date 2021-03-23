@@ -57,12 +57,15 @@ class test {
     test(const std::string &config)
     {
         _configuration = new configuration(name, config);
-        _runtime_monitor = new runtime_monitor(_configuration);
-        _timestamp_manager = new timestamp_manager(_configuration);
-        _workload_tracking = new workload_tracking(_configuration, OPERATION_TRACKING_TABLE_CONFIG,
-          TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG, TABLE_SCHEMA_TRACKING);
+        _runtime_monitor = new runtime_monitor(_configuration->get_subconfig(RUNTIME_MONITOR));
+        _timestamp_manager =
+          new timestamp_manager(_configuration->get_subconfig(TIMESTAMP_MANAGER));
+        _workload_tracking = new workload_tracking(_configuration->get_subconfig(WORKLOAD_TRACKING),
+          OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
+          TABLE_SCHEMA_TRACKING);
         _workload_generator =
-          new workload_generator(_configuration, _timestamp_manager, _workload_tracking);
+          new workload_generator(_configuration->get_subconfig(WORKLOAD_GENERATOR),
+            _timestamp_manager, _workload_tracking);
         _thread_manager = new thread_manager();
         /*
          * Ordering is not important here, any dependencies between components should be resolved

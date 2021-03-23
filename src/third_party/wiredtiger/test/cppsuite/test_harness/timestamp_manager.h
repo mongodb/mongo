@@ -58,7 +58,7 @@ class timestamp_manager : public component {
         testutil_assert(_oldest_lag >= 0);
         testutil_check(_config->get_int(STABLE_LAG, _stable_lag));
         testutil_assert(_stable_lag >= 0);
-        testutil_check(_config->get_bool(ENABLE_TIMESTAMP, _enabled));
+        testutil_check(_config->get_bool(ENABLED, _enabled));
         component::load();
     }
 

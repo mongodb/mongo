@@ -130,23 +130,23 @@ class workload_generator : public component {
     void
     run()
     {
-        int64_t duration_seconds, read_threads, min_operation_per_transaction,
-          max_operation_per_transaction, value_size;
+        configuration *sub_config;
+        int64_t read_threads, min_operation_per_transaction, max_operation_per_transaction,
+          value_size;
 
         /* Populate the database. */
         populate();
 
         /* Retrieve useful parameters from the test configuration. */
-        testutil_check(_config->get_int(DURATION_SECONDS, duration_seconds));
-        testutil_assert(duration_seconds >= 0);
         testutil_check(_config->get_int(READ_THREADS, read_threads));
-        testutil_check(
-          _config->get_int(MIN_OPERATION_PER_TRANSACTION, min_operation_per_transaction));
-        testutil_check(
-          _config->get_int(MAX_OPERATION_PER_TRANSACTION, max_operation_per_transaction));
+        sub_config = _config->get_subconfig(OPS_PER_TRANSACTION);
+        testutil_check(sub_config->get_int(MIN, min_operation_per_transaction));
+        testutil_check(sub_config->get_int(MAX, max_operation_per_transaction));
         testutil_assert(max_operation_per_transaction >= min_operation_per_transaction);
         testutil_check(_config->get_int(VALUE_SIZE, value_size));
         testutil_assert(value_size >= 0);
+
+        delete sub_config;
 
         /* Generate threads to execute read operations on the collections. */
         for (int i = 0; i < read_threads; ++i) {

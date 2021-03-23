@@ -39,6 +39,16 @@ namespace test_harness {
 class component {
     public:
     component(configuration *config) : _enabled(true), _running(false), _config(config) {}
+
+    ~component()
+    {
+        delete _config;
+    }
+
+    /* Delete the copy constructor and the assignment operator. */
+    component(const component &) = delete;
+    component &operator=(const component &) = delete;
+
     /*
      * The load function should perform all tasks required to setup the component for the main phase
      * of the test. An example operation performed in the load phase would be populating a database.
@@ -70,6 +80,8 @@ class component {
     {
         _running = false;
     }
+
+    static const std::string name;
 
     protected:
     bool _enabled;
