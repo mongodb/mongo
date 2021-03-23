@@ -89,8 +89,17 @@ void OperationShardingState::initializeClientRoutingVersions(
     const boost::optional<ChunkVersion>& shardVersion,
     const boost::optional<DatabaseVersion>& dbVersion) {
     if (shardVersion) {
-        invariant(_shardVersionsChecked.find(nss.ns()) == _shardVersionsChecked.end(), nss.ns());
-        _shardVersions[nss.ns()] = *shardVersion;
+        // Changing the shardVersion expected for a namespace is not safe to happen in the
+        // middle of execution, but for the cases where operation is retried on the same
+        // OperationContext it can be set twice to the same value.
+        if (_shardVersionsChecked.contains(nss.ns())) {
+            invariant(_shardVersions[nss.ns()] == *shardVersion,
+                      str::stream()
+                          << "Trying to set " << shardVersion->toString() << " for " << nss.ns()
+                          << " but it already has " << _shardVersions[nss.ns()].toString());
+        } else {
+            _shardVersions.emplace(nss.ns(), *shardVersion);
+        }
     }
     if (dbVersion) {
         invariant(_databaseVersions.find(nss.db()) == _databaseVersions.end());
