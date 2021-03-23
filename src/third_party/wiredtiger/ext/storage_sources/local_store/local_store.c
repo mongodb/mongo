@@ -101,8 +101,8 @@ typedef struct local_flush_item {
     /*
      * These fields would be used in performing a flush.
      */
-    char *bucket; /* Bucket name */
-    char *kmsid;  /* Identifier for key management system */
+    char *auth_token; /* Identifier for key management system */
+    char *bucket;     /* Bucket name */
 
     TAILQ_ENTRY(local_flush_item) q; /* Queue of items */
 } LOCAL_FLUSH_ITEM;
@@ -123,8 +123,8 @@ typedef struct local_location {
     WT_LOCATION_HANDLE iface; /* Must come first */
 
     char *cluster_prefix; /* Cluster prefix */
+    char *auth_token;     /* Identifier for key management system */
     char *bucket;         /* Actually a directory path for local implementation */
-    char *kmsid;          /* Identifier for key management system */
 } LOCAL_LOCATION;
 
 /*
@@ -344,8 +344,8 @@ static void
 local_flush_free(LOCAL_FLUSH_ITEM *flush)
 {
     if (flush != NULL) {
+        free(flush->auth_token);
         free(flush->bucket);
-        free(flush->kmsid);
         free(flush->marker_path);
         free(flush->src_path);
         free(flush);
@@ -358,7 +358,7 @@ local_flush_free(LOCAL_FLUSH_ITEM *flush)
  */
 static int
 local_location_decode(LOCAL_STORAGE *local, WT_LOCATION_HANDLE *location_handle, char **bucket_name,
-  char **cluster_prefix, char **kmsid)
+  char **cluster_prefix, char **auth_token)
 {
     LOCAL_LOCATION *location;
     char *p;
@@ -375,10 +375,10 @@ local_location_decode(LOCAL_STORAGE *local, WT_LOCATION_HANDLE *location_handle,
             return (local_err(local, NULL, ENOMEM, "local_location_decode"));
         *cluster_prefix = p;
     }
-    if (kmsid != NULL) {
-        if ((p = strdup(location->kmsid)) == NULL)
+    if (auth_token != NULL) {
+        if ((p = strdup(location->auth_token)) == NULL)
             return (local_err(local, NULL, ENOMEM, "local_location_decode"));
-        *kmsid = p;
+        *auth_token = p;
     }
 
     return (0);
@@ -548,8 +548,8 @@ local_flush_one(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FLUSH_ITEM *flu
         object_name++;
 
         /* Here's where we would copy the file to a cloud object. */
-        VERBOSE(local, "Flush object: from=%s, bucket=%s, object=%s, kmsid=%s, \n", flush->src_path,
-          flush->bucket, object_name, flush->kmsid);
+        VERBOSE(local, "Flush object: from=%s, bucket=%s, object=%s, auth_token=%s, \n",
+          flush->src_path, flush->bucket, object_name, flush->auth_token);
         local->object_flushes++;
 
         if ((ret = local_delay(local)) != 0)
@@ -616,16 +616,18 @@ local_location_handle(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     if ((ret = local_config_dup(local, session, &value, "_", "_/", &location->cluster_prefix)) != 0)
         goto err;
 
-    if ((ret = parser->get(parser, "kmsid", &value)) != 0) {
+    if ((ret = parser->get(parser, "auth_token", &value)) != 0) {
         if (ret == WT_NOTFOUND)
-            ret = local_err(local, session, EINVAL, "ss_location_handle: missing kmsid parameter");
+            ret =
+              local_err(local, session, EINVAL, "ss_location_handle: missing auth_token parameter");
         goto err;
     }
-    if ((ret = local_config_dup(local, session, &value, NULL, NULL, &location->kmsid)) != 0)
+    if ((ret = local_config_dup(local, session, &value, NULL, NULL, &location->auth_token)) != 0)
         goto err;
 
-    VERBOSE(local, "Location: (bucket=%s,cluster=%s,kmsid=%s)\n", SHOW_STRING(location->bucket),
-      SHOW_STRING(location->cluster_prefix), SHOW_STRING(location->kmsid));
+    VERBOSE(local, "Location: (bucket=%s,cluster=%s,auth_token=%s)\n",
+      SHOW_STRING(location->bucket), SHOW_STRING(location->cluster_prefix),
+      SHOW_STRING(location->auth_token));
 
     location->iface.close = local_location_handle_close;
     *location_handlep = &location->iface;
@@ -654,9 +656,9 @@ local_location_handle_close(WT_LOCATION_HANDLE *location_handle, WT_SESSION *ses
     (void)session; /* Unused */
 
     location = (LOCAL_LOCATION *)location_handle;
+    free(location->auth_token);
     free(location->bucket);
     free(location->cluster_prefix);
-    free(location->kmsid);
     free(location);
     return (0);
 }
@@ -852,7 +854,7 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
             goto err;
         }
         if ((ret = local_location_decode(
-               local, location_handle, &flush->bucket, NULL, &flush->kmsid)) != 0)
+               local, location_handle, &flush->bucket, NULL, &flush->auth_token)) != 0)
             goto err;
 
         /*

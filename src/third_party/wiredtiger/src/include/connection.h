@@ -32,6 +32,28 @@ struct __wt_process {
 extern WT_PROCESS __wt_process;
 
 /*
+ * WT_BUCKET_STORAGE --
+ *	A list entry for a storage source with a unique (name, bucket).
+ */
+struct __wt_bucket_storage {
+    const char *bucket;                /* Bucket location */
+    int owned;                         /* Storage needs to be terminated */
+    uint64_t object_size;              /* Tiered object size */
+    uint64_t retain_secs;              /* Tiered period */
+    const char *auth_token;            /* Tiered authentication cookie */
+    WT_FILE_SYSTEM *file_system;       /* File system for bucket */
+    WT_STORAGE_SOURCE *storage_source; /* Storage source callbacks */
+    /* Linked list of bucket storage entries */
+    TAILQ_ENTRY(__wt_bucket_storage) hashq;
+    TAILQ_ENTRY(__wt_bucket_storage) q;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_BUCKET_FREE 0x1u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
+};
+
+/*
  * WT_KEYED_ENCRYPTOR --
  *	A list entry for an encryptor with a unique (name, keyid).
  */
@@ -108,7 +130,9 @@ struct __wt_named_extractor {
 struct __wt_named_storage_source {
     const char *name;                  /* Name of storage source */
     WT_STORAGE_SOURCE *storage_source; /* User supplied callbacks */
-    /* Linked list of compressors */
+    TAILQ_HEAD(__wt_buckethash, __wt_bucket_storage) * buckethashqh;
+    TAILQ_HEAD(__wt_bucket_qh, __wt_bucket_storage) bucketqh;
+    /* Linked list of storage sources */
     TAILQ_ENTRY(__wt_named_storage_source) q;
 };
 
@@ -354,6 +378,8 @@ struct __wt_connection_impl {
 
     WT_LSM_MANAGER lsm_manager; /* LSM worker thread information */
 
+    WT_BUCKET_STORAGE *bstorage; /* Bucket storage for the connection */
+
     WT_KEYED_ENCRYPTOR *kencryptor; /* Encryptor for metadata and log */
 
     bool evict_server_running; /* Eviction server operating */
@@ -380,20 +406,14 @@ struct __wt_connection_impl {
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
-    uint64_t tiered_object_size;     /* Tiered object size */
-    uint64_t tiered_retain_secs;     /* Tiered period */
-    const char *tiered_auth_token;   /* Tiered authentication cookie */
 
+    const char *tiered_cluster;       /* Tiered storage cluster name */
+    const char *tiered_member;        /* Tiered storage member name */
     WT_TIERED_MANAGER tiered_manager; /* Tiered worker thread information */
     bool tiered_server_running;       /* Internal tiered server operating */
 
     uint32_t tiered_threads_max; /* Max tiered threads */
     uint32_t tiered_threads_min; /* Min tiered threads */
-
-/* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_CONN_TIERED_ENABLED 0x1u /* Shared tiered is configured */
-                                    /* AUTOMATIC FLAG VALUE GENERATION STOP */
-    uint32_t tiered_flags;          /* Global tiered configuration */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_CONN_LOG_ARCHIVE 0x001u         /* Archive is enabled */
@@ -467,6 +487,7 @@ struct __wt_connection_impl {
     TAILQ_HEAD(__wt_extractor_qh, __wt_named_extractor) extractorqh;
 
     /* Locked: storage source list */
+    WT_SPINLOCK storage_lock; /* Storage source list lock */
     TAILQ_HEAD(__wt_storage_source_qh, __wt_named_storage_source) storagesrcqh;
 
     void *lang_private; /* Language specific private storage */

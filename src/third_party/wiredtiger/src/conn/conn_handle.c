@@ -53,6 +53,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
     WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
     WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
     WT_SPIN_INIT_SESSION_TRACKED(session, &conn->schema_lock, schema);
+    WT_RET(__wt_spin_init(session, &conn->storage_lock, "tiered storage"));
     WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
     /* Read-write locks */
@@ -117,6 +118,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->metadata_lock);
     __wt_spin_destroy(session, &conn->reconfig_lock);
     __wt_spin_destroy(session, &conn->schema_lock);
+    __wt_spin_destroy(session, &conn->storage_lock);
     __wt_rwlock_destroy(session, &conn->table_lock);
     __wt_spin_destroy(session, &conn->turtle_lock);
 
