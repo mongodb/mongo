@@ -163,16 +163,15 @@ void ReplSetDistLockManager::doTask() {
                 _catalog->ping(opCtx, _processID, _serviceContext->getFastClockSource()->now());
             if (!pingStatus.isOK() && pingStatus != ErrorCodes::NotWritablePrimary) {
                 LOGV2_WARNING(22668,
-                              "Pinging failed for distributed lock pinger caused by {error}",
-                              "Pinging failed for distributed lock pinger",
+                              "Unable to ping distributed locks",
+                              "processId"_attr = _processID,
                               "error"_attr = pingStatus);
             }
 
             const Milliseconds elapsed(elapsedSincelastPing.millis());
             if (elapsed > 10 * _pingInterval) {
                 LOGV2_WARNING(22669,
-                              "Lock pinger for process {processId} was inactive for {duration}",
-                              "Lock pinger was inactive for multiple intervals",
+                              "Lock pinger was inactive for too long",
                               "processId"_attr = _processID,
                               "duration"_attr = elapsed);
             }
