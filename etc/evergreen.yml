@@ -347,6 +347,7 @@ variables:
   - enterprise-rhel-71-ppc64le
   - enterprise-rhel-81-ppc64le
   - enterprise-rhel-72-s390x
+  - ubi8
   - rhel80
   - rhel-82-arm64
   - enterprise-rhel-80-64-bit
@@ -10562,6 +10563,26 @@ buildvariants:
   - name: .publish
     distros:
     - rhel70-small
+
+- name: ubi8
+  display_name: "UBI 8"
+  run_on:
+  - ubi8
+  expansions:
+    resmoke_jobs_factor: 1
+    disable_shared_scons_cache: true
+    compile_flags: MONGO_DISTMOD=rhel80 --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    tooltags: ""
+    build_mongoreplay: true
+    test_flags: >-
+      --excludeWithAnyTags=requires_os_access
+  tasks:
+  - name: compile_and_archive_dist_test_then_package_TG
+    distros:
+    - rhel80-large
+  - name: jsCore
+  - name: sharding_gen
+  - name: replica_sets
 
 - &enterprise-rhel-80-64-bit-suggested-template
   name: enterprise-rhel-80-64-bit-suggested
