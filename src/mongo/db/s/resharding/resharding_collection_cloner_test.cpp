@@ -39,6 +39,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"

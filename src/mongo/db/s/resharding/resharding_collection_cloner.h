@@ -30,17 +30,15 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -52,6 +50,8 @@ class TaskExecutor;
 }  // namespace executor
 
 class OperationContext;
+class MongoProcessInterface;
+class ReshardingMetrics;
 class ServiceContext;
 
 /**
@@ -63,12 +63,13 @@ public:
     class Env {
     public:
         explicit Env(ReshardingMetrics* metrics) : _metrics(metrics) {}
+
         ReshardingMetrics* metrics() const {
             return _metrics;
         }
 
     private:
-        ReshardingMetrics* _metrics;
+        ReshardingMetrics* const _metrics;
     };
 
     ReshardingCollectionCloner(std::unique_ptr<Env> env,
@@ -84,20 +85,34 @@ public:
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
         Value resumeId = Value());
 
-    ExecutorFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
-                             CancelationToken cancelToken);
+    /**
+     * Schedules work to repeatedly fetch and insert batches of documents.
+     *
+     * Returns a future that becomes ready when either:
+     *   (a) all documents have been fetched and inserted, or
+     *   (b) the cancellation token was canceled due to a stepdown or abort.
+     */
+    SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
+                         CancelationToken cancelToken);
+
+    /**
+     * Fetches and inserts a single batch of documents.
+     *
+     * Returns true if there are more documents to be fetched and inserted, and returns false
+     * otherwise.
+     */
+    bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
 
-    std::vector<InsertStatement> _fillBatch(Pipeline& pipeline);
-    void _insertBatch(OperationContext* opCtx, std::vector<InsertStatement>& batch);
+    std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 
     template <typename Callable>
     auto _withTemporaryOperationContext(Callable&& callable);
 
-    std::unique_ptr<Env> _env;
+    const std::unique_ptr<Env> _env;
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const CollectionUUID _sourceUUID;
