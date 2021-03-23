@@ -48,18 +48,21 @@ clearOCSPCache();
 
 test();
 
-mock_ocsp.stop();
-
 // We don't want to invoke the hang analyzer because we
 // expect this test to fail by timing out
 MongoRunner.runHangAnalyzer.disable();
 
 clearOCSPCache();
 
+// Leave the OCSP responder on so that the other nodes all have valid responses.
 var st = new ShardingTest(sharding_config);
 
+mock_ocsp.stop();
 mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 1);
 mock_ocsp.start();
+
+clearOCSPCache();
+sleep(2000);
 
 const err = assert.throws(() => {
     st.restartMongos(0);
