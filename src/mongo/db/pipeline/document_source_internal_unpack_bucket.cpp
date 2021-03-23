@@ -255,6 +255,15 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
     container->erase(container->begin(), itr);
     container->splice(itr, prefix);
 }
+
+// Returns whether 'field' depends on a pushed down $addFields or computed $project.
+bool fieldIsComputed(BucketSpec spec, std::string field) {
+    return std::any_of(
+        spec.computedMetaProjFields.begin(), spec.computedMetaProjFields.end(), [&](auto& s) {
+            return s == field || expression::isPathPrefixOf(field, s) ||
+                expression::isPathPrefixOf(s, field);
+        });
+}
 }  // namespace
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -521,6 +530,11 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
          expression::isPathPrefixOf(bucketSpec.metaField.get(), matchExpr->path())))
         return nullptr;
 
+    // We must avoid mapping predicates on fields computed via $addFields or a computed $project.
+    if (fieldIsComputed(bucketSpec, matchExpr->path().toString())) {
+        return nullptr;
+    }
+
     switch (matchExpr->matchType()) {
         case MatchExpression::EQ:
             // For $eq, make both a $lt against 'control.min' and a $gt predicate against
@@ -646,9 +660,15 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         return container->end();
     }
 
+    // Some optimizations may not be safe to do if we have computed the metaField via an $addFields
+    // or a computed $project. We won't do those optimizations if 'haveComputedMetaField' is true.
+    bool haveComputedMetaField = _bucketUnpacker.bucketSpec().metaField &&
+        fieldIsComputed(_bucketUnpacker.bucketSpec(), _bucketUnpacker.bucketSpec().metaField.get());
+
     // Before any other rewrites for the current stage, consider reordering with $sort.
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
-        if (auto metaField = _bucketUnpacker.bucketSpec().metaField) {
+        if (auto metaField = _bucketUnpacker.bucketSpec().metaField;
+            metaField && !haveComputedMetaField) {
             if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.get())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
@@ -669,8 +689,11 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    // Optimize the pipeline after the $unpackBucket.
-    optimizeEndOfPipeline(itr, container);
+    // Optimize the pipeline after this stage to merge $match stages and push them forward.
+    if (!_optimizedEndOfPipeline) {
+        _optimizedEndOfPipeline = true;
+        optimizeEndOfPipeline(itr, container);
+    }
 
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
@@ -687,64 +710,79 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
-        // Attempt to push predicates on the metaField past $_internalUnpackBucket.
+    // Attempt to push predicates on the metaField past $_internalUnpackBucket.
+    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
+        nextMatch && !haveComputedMetaField) {
         auto [metaMatch, remainingMatch] = splitMatchOnMetaAndRename(nextMatch);
-
-        // 'metaMatch' is safe to move before $_internalUnpackBucket.
-        if (metaMatch) {
-            container->insert(itr, metaMatch);
-        }
 
         // The old $match can be removed and potentially replaced with 'remainingMatch'.
         container->erase(std::next(itr));
         if (remainingMatch) {
             container->insert(std::next(itr), remainingMatch);
-
-            // Attempt to map predicates on bucketed fields to predicates on the control field.
-            if (auto match =
-                    createPredicatesOnBucketLevelField(remainingMatch->getMatchExpression())) {
-                BSONObjBuilder bob;
-                match->serialize(&bob);
-                container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
-            }
         }
-    }
 
-    // TODO: SERVER-54766: replace this logic.
-    if (std::next(itr) == container->end()) {
-        return container->end();
-    }
-
-    // Attempt to push down a $project on the metaField past $_internalUnpackBucket.
-    if (auto [metaProject, deleteRemainder] = extractProjectForPushDown(std::next(itr)->get());
-        !metaProject.isEmpty()) {
-        container->insert(itr,
-                          DocumentSourceProject::createFromBson(
-                              BSON("$project" << metaProject).firstElement(), getContext()));
-
-        if (deleteRemainder) {
-            // We have pushed down the entire $project. Remove the old $project from the pipeline,
-            // then attempt to optimize this stage again.
-            container->erase(std::next(itr));
+        // 'metaMatch' can be pushed down and given a chance to optimize with other stages.
+        if (metaMatch) {
+            container->insert(itr, metaMatch);
             return std::prev(itr) == container->begin() ? std::prev(itr)
                                                         : std::prev(std::prev(itr));
         }
     }
 
-    // Attempt to extract computed meta projections from subsequent $project, $addFields, or $set
-    // and push them before the $_internalunpackBucket.
-    pushDownComputedMetaProjection(itr, container);
+    // Attempt to map predicates on bucketed fields to predicates on the control field.
+    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>(std::next(itr)->get());
+        nextMatch && !_triedBucketLevelFieldsPredicatesPushdown) {
+        _triedBucketLevelFieldsPredicatesPushdown = true;
 
-    // Attempt to build a $project based on dependency analysis or extract one from the
-    // pipeline. We can internalize the result so we can handle projections during unpacking.
-    if (auto [project, isInclusion] = extractOrBuildProjectToInternalize(itr, container);
-        !project.isEmpty()) {
-        internalizeProject(project, isInclusion);
+        if (auto match = createPredicatesOnBucketLevelField(nextMatch->getMatchExpression())) {
+            BSONObjBuilder bob;
+            match->serialize(&bob);
+            container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
+
+            // Give other stages a chance to optimize with the new $match.
+            return std::prev(itr) == container->begin() ? std::prev(itr)
+                                                        : std::prev(std::prev(itr));
+        }
     }
 
-    // Optimize the prefix of the pipeline, now that all optimizations have been completed.
-    optimizePrefix(itr, container);
+    // Attempt to push down a $project on the metaField past $_internalUnpackBucket.
+    if (!haveComputedMetaField) {
+        if (auto [metaProject, deleteRemainder] = extractProjectForPushDown(std::next(itr)->get());
+            !metaProject.isEmpty()) {
+            container->insert(itr,
+                              DocumentSourceProject::createFromBson(
+                                  BSON("$project" << metaProject).firstElement(), getContext()));
+
+            if (deleteRemainder) {
+                // We have pushed down the entire $project. Remove the old $project from the
+                // pipeline, then attempt to optimize this stage again.
+                container->erase(std::next(itr));
+                return std::prev(itr) == container->begin() ? std::prev(itr)
+                                                            : std::prev(std::prev(itr));
+            }
+        }
+    }
+
+    // Attempt to extract computed meta projections from subsequent $project, $addFields, or $set
+    // and push them before the $_internalunpackBucket.
+    if (pushDownComputedMetaProjection(itr, container)) {
+        // We've pushed down and removed a stage after this one. Try to optimize the new stage.
+        return std::prev(itr) == container->begin() ? std::prev(itr) : std::prev(std::prev(itr));
+    }
+
+    // Attempt to build a $project based on dependency analysis or extract one from the pipeline. We
+    // can internalize the result so we can handle projections during unpacking.
+    if (!_triedInternalizeProject) {
+        if (auto [project, isInclusion] = extractOrBuildProjectToInternalize(itr, container);
+            !project.isEmpty()) {
+            _triedInternalizeProject = true;
+            internalizeProject(project, isInclusion);
+
+            // We may have removed a $project after this stage, so we try to optimize this stage
+            // again.
+            return itr;
+        }
+    }
 
     return container->end();
 }

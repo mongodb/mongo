@@ -194,5 +194,11 @@ private:
 
     int _bucketMaxCount = 0;
     boost::optional<long long> _sampleSize;
+
+    // Used to avoid infinite loops after we step backwards to optimize a $match on bucket level
+    // fields, otherwise we may do an infinite number of $match pushdowns.
+    bool _triedBucketLevelFieldsPredicatesPushdown = false;
+    bool _optimizedEndOfPipeline = false;
+    bool _triedInternalizeProject = false;
 };
 }  // namespace mongo

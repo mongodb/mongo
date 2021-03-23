@@ -169,6 +169,12 @@ const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
 void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
     for (auto&& field : computedFieldNames) {
         _spec.computedMetaProjFields.emplace_back(field.toString());
+
+        // If we're already specifically including fields, we need to add the computed fields to
+        // the included field set to ensure they are unpacked.
+        if (_unpackerBehavior == BucketUnpacker::Behavior::kInclude) {
+            _spec.fieldSet.emplace(field);
+        }
     }
 }
 
