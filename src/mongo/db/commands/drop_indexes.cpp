@@ -90,7 +90,7 @@ std::unique_ptr<DropIndexes> makeTimeseriesDropIndexesCommand(OperationContext* 
     const auto& origIndex = origCmd.getIndex();
     if (auto keyPtr = stdx::get_if<BSONObj>(&origIndex)) {
         auto bucketsIndexSpecWithStatus =
-            timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(*timeseriesOptions, *keyPtr);
+            timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*timeseriesOptions, *keyPtr);
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()

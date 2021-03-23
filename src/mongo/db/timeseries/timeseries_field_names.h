@@ -41,5 +41,8 @@ static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
 static constexpr StringData kTimeFieldName = "timeField"_sd;
 static constexpr StringData kMetaFieldName = "metaField"_sd;
 
+// These are hard-coded field names in index specs.
+static constexpr StringData kKeyFieldName = "key"_sd;
+
 }  // namespace timeseries
 }  // namespace mongo

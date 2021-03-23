@@ -57,7 +57,7 @@ boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
     return view->timeseries();
 }
 
-StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
+StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
@@ -127,8 +127,8 @@ StatusWith<BSONObj> convertTimeseriesIndexSpecToBucketsIndexSpec(
     return builder.obj();
 }
 
-BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& timeseriesOptions,
-                                                     const BSONObj& bucketsIndexSpecBSON) {
+boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndexSpecBSON) {
     auto timeField = timeseriesOptions.getTimeField();
     auto metaField = timeseriesOptions.getMetaField();
 
@@ -181,6 +181,34 @@ BSONObj convertBucketsIndexSpecToTimeseriesIndexSpec(const TimeseriesOptions& ti
     }
 
     return builder.obj();
+}
+
+boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
+    const TimeseriesOptions& timeseriesOptions, const BSONObj& bucketsIndex) {
+    if (bucketsIndex.hasField(kKeyFieldName)) {
+        auto timeseriesKeyValue = createTimeseriesIndexSpecFromBucketsIndexSpec(
+            timeseriesOptions, bucketsIndex.getField(kKeyFieldName).Obj());
+        if (timeseriesKeyValue) {
+            // This creates a bsonobj copy with a modified kKeyFieldName field set to
+            // timeseriesKeyValue.
+            return bucketsIndex.addFields(BSON(kKeyFieldName << timeseriesKeyValue.get()),
+                                          StringDataSet{kKeyFieldName});
+        }
+    }
+    return boost::none;
+}
+
+std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
+    const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes) {
+    std::list<BSONObj> indexSpecs;
+    for (const auto& bucketsIndex : bucketsIndexes) {
+        auto timeseriesIndex =
+            createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndex);
+        if (timeseriesIndex) {
+            indexSpecs.push_back(timeseriesIndex->getOwned());
+        }
+    }
+    return indexSpecs;
 }
 
 }  // namespace timeseries

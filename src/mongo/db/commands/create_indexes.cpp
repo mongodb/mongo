@@ -638,8 +638,8 @@ std::unique_ptr<CreateIndexesCommand> makeTimeseriesCreateIndexesCommand(
         for (const auto& elem : origIndex) {
             if (elem.fieldNameStringData() == NewIndexSpec::kKeyFieldName) {
                 auto bucketsIndexSpecWithStatus =
-                    timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(*timeseriesOptions,
-                                                                             elem.Obj());
+                    timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(*timeseriesOptions,
+                                                                              elem.Obj());
                 uassert(ErrorCodes::CannotCreateIndex,
                         str::stream() << bucketsIndexSpecWithStatus.getStatus().toString()
                                       << " Command request: " << redact(origCmd.toBSON({})),

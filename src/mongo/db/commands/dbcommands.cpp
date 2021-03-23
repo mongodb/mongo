@@ -122,7 +122,7 @@ std::unique_ptr<CollMod> makeTimeseriesCollModCommand(OperationContext* opCtx,
 
     auto index = origCmd.getIndex();
     if (index && index->getKeyPattern()) {
-        auto bucketsIndexSpecWithStatus = timeseries::convertTimeseriesIndexSpecToBucketsIndexSpec(
+        auto bucketsIndexSpecWithStatus = timeseries::createBucketsIndexSpecFromTimeseriesIndexSpec(
             *timeseriesOptions, *index->getKeyPattern());
 
         uassert(ErrorCodes::IndexNotFound,
