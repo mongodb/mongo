@@ -30,6 +30,8 @@
 #include "mongo/db/repl/tenant_migration_util.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -53,7 +55,14 @@ namespace mongo {
 
 namespace tenant_migration_util {
 
+namespace {
+
+const std::set<std::string> kSensitiveFieldNames{"donorCertificateForRecipient",
+                                                 "recipientCertificateForDonor"};
+
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable);
+
+}  // namespace
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -389,6 +398,19 @@ ExecutorFuture<void> markExternalKeysAsGarbageCollectable(
         //
         // TODO SERVER-54735: Stop using the parent executor here.
         .on(parentExecutor, CancellationToken::uncancelable());
+}
+
+BSONObj redactStateDoc(BSONObj stateDoc) {
+    mutablebson::Document stateDocToLog(stateDoc, mutablebson::Document::kInPlaceDisabled);
+    for (auto& sensitiveField : kSensitiveFieldNames) {
+        for (mutablebson::Element element =
+                 mutablebson::findFirstChildNamed(stateDocToLog.root(), sensitiveField);
+             element.ok();
+             element = mutablebson::findElementNamed(element.rightSibling(), sensitiveField)) {
+            uassertStatusOK(element.setValueString("xxx"));
+        }
+    }
+    return stateDocToLog.getObject();
 }
 
 }  // namespace tenant_migration_util
