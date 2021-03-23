@@ -4,7 +4,6 @@
  *
  * @tags: [
  *     assumes_unsharded_collection,
- *     assumes_against_mongod_not_mongos,
  *     requires_timeseries,
  *     requires_fcv_49,
  * ]
