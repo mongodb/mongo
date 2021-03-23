@@ -152,10 +152,10 @@ main(int argc, char *argv[])
         /* Check if default configuration should be used. */
         if (cfg.empty() && filename.empty())
             cfg = parse_configuration_from_file(
-              "../../../test/cppsuite/configurations/" + poc_test::test::default_config);
+              "configs/" + poc_test::test::default_config);
         else if (!filename.empty())
             cfg =
-              parse_configuration_from_file("../../../test/cppsuite/configurations/" + filename);
+              parse_configuration_from_file(filename);
 
         std::cout << "Configuration\t:" << cfg << std::endl;
         std::cout << "Trace level\t:" << trace_level << std::endl;
