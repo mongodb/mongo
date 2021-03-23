@@ -131,10 +131,11 @@ public:
         return boost::none;
     }
 
-    void substituteFieldPathElement(const StringData& oldName, const StringData& newName) final {
-        StringMap<std::string> renames;
-        renames[oldName] = newName.toString();
-        _root->substituteFieldPathElement(renames);
+    std::pair<BSONObj, bool> extractComputedProjections(
+        const StringData& oldName,
+        const StringData& newName,
+        const std::set<StringData>& reservedNames) final {
+        return _root->extractComputedProjectionsInAddFields(oldName, newName, reservedNames);
     }
 
 private:

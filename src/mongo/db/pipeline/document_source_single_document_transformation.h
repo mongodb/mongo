@@ -95,26 +95,25 @@ public:
     }
 
     /**
-     * Substitute the occurence of 'oldName' as first field path element for a 'newName' in all
-     * expressions in the transformation object.
+     * Extract computed projection(s) depending on the 'oldName' argument if the transformation is
+     * of type inclusion projection or computed projection. Extraction is not allowed if the name of
+     * the projection is in the 'reservedNames' set. The function returns a pair of <BSONObj, bool>.
+     * The BSONObj contains the computed projections in which the 'oldName' is substituted for the
+     * 'newName'. The boolean flag is true if the original projection has become empty after the
+     * extraction and can be deleted by the caller.
+     *
+     * For transformation of type inclusion projection the computed projections are replaced with a
+     * projected field or an identity projection depending on their position in the order of
+     * additional fields.
+     * For transformation of type computed projection the extracted computed projections are
+     * removed.
+     *
+     * The function has no effect for exclusion projections, or if there are no computed
+     * projections, or the computed expression depends on other fields than the oldName.
      */
-    void substituteFieldPathElement(const std::string& oldName, const std::string& newName) {
-        _parsedTransform->substituteFieldPathElement(oldName, newName);
-    }
-
-    /**
-     * If this transformation is an inclusion projection, the function extracts the computed
-     * projection(s) depending on the oldName argument. Extraction is not allowed if the name of the
-     * projection is in the 'reservedNames' set. The computed projection is returned as a BSONObj,
-     * where the oldName is substituted for the newName. In the original inclusion projection it is
-     * replaced with a projected field or an identity projection depending on its position in the
-     * order of additional fields. The function has no effect for exclusion projections, or if there
-     * are no computed projections, or the computed expression depends on other fields than the
-     * oldName.
-     */
-    BSONObj extractComputedProjections(const std::string& oldName,
-                                       const std::string& newName,
-                                       const std::set<StringData>& reservedNames) {
+    std::pair<BSONObj, bool> extractComputedProjections(const StringData& oldName,
+                                                        const StringData& newName,
+                                                        const std::set<StringData>& reservedNames) {
         return _parsedTransform->extractComputedProjections(oldName, newName, reservedNames);
     }
 

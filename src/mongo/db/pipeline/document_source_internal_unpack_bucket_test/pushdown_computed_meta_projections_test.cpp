@@ -52,8 +52,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, true);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: {$toUpper: ['$meta']}}}"), serialized[0]);
@@ -69,8 +70,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaPro
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, true);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: {$concat: ['$meta.a', '$meta.b']}}}"),
@@ -87,13 +89,51 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaPr
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, true);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a', deviceType: '$meta.b'}}"),
                       serialized[0]);
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProjectionFields) {
+    auto unpackSpecObj =
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto addFieldsSpecObj =
+        fromjson("{$addFields: {device: '$myMeta.a', temp: {$add: ['$temperature', '$offset']}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto& container = pipeline->getSources();
+    auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
+
+    ASSERT_EQ(nextStageIsRemoved, false);
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a'}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {temp: {$add: ['$temperature', '$offset']}}}"),
+                      serialized[2]);
+}
+
+TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotSplitAddFieldsWithMetaProjectionInSuffix) {
+    auto unpackSpecObj =
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'foo', metaField: 'myMeta'}}");
+    auto addFieldsSpecObj = fromjson("{$addFields: {temp: '$temperature', device: '$myMeta.a'}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
+    auto& container = pipeline->getSources();
+    auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
+
+    ASSERT_EQ(nextStageIsRemoved, false);
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(addFieldsSpecObj, serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMixedProjection) {
@@ -105,8 +145,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
@@ -120,8 +161,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotOptimizeAddFieldsWithMi
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
@@ -137,8 +179,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
@@ -154,8 +197,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, addFieldsSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownAddFieldsMetaProjection(container.begin());
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
@@ -174,8 +218,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownComputedMetaProjection(container.begin(), &container);
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: { device: '$meta.a'}}"), serialized[0]);
@@ -193,8 +238,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownComputedMetaProjection(container.begin(), &container);
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: { device: '$meta.a'}}"), serialized[0]);
@@ -213,8 +259,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownMixedProjection
     auto& container = pipeline->getSources();
 
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownComputedMetaProjection(container.begin(), &container);
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
@@ -230,8 +277,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownComputedMetaProjection(container.begin(), &container);
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);
@@ -246,8 +294,9 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, DoNotPushDownNestedProjectio
     auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj), getExpCtx());
     auto& container = pipeline->getSources();
     auto unpack = dynamic_cast<DocumentSourceInternalUnpackBucket*>(container.begin()->get());
-    unpack->pushDownComputedMetaProjection(container.begin(), &container);
+    auto nextStageIsRemoved = unpack->pushDownComputedMetaProjection(container.begin(), &container);
 
+    ASSERT_EQ(nextStageIsRemoved, false);
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(projectSpecObj, serialized[1]);

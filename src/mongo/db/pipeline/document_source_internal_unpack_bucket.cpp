@@ -94,6 +94,24 @@ auto determineIncludeField(StringData fieldName,
 }
 
 /**
+ * Erase computed meta projection fields if they are present in the exclusion field set.
+ */
+void eraseExcludedComputedMetaProjFields(BucketUnpacker::Behavior unpackerBehavior,
+                                         BucketSpec* bucketSpec) {
+    if (unpackerBehavior == BucketUnpacker::Behavior::kExclude &&
+        bucketSpec->computedMetaProjFields.size() > 0) {
+        for (auto it = bucketSpec->computedMetaProjFields.begin();
+             it != bucketSpec->computedMetaProjFields.end();) {
+            if (bucketSpec->fieldSet.find(*it) != bucketSpec->fieldSet.end()) {
+                it = bucketSpec->computedMetaProjFields.erase(it);
+            } else {
+                it++;
+            }
+        }
+    }
+}
+
+/**
  * A projection can be internalized if every field corresponds to a boolean value. Note that this
  * correctly rejects dotted fieldnames, which are mapped to objects internally.
  */
@@ -304,7 +322,6 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         }
     }
 
-
     // Update computed meta projections with values from this bucket.
     if (!_spec.computedMetaProjFields.empty()) {
         for (auto&& name : _spec.computedMetaProjFields) {
@@ -320,6 +337,7 @@ void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior 
     _includeMetaField = eraseMetaFromFieldSetAndDetermineIncludeMeta(behavior, &bucketSpec);
     _includeTimeField = determineIncludeTimeField(behavior, &bucketSpec);
     _unpackerBehavior = behavior;
+    eraseExcludedComputedMetaProjFields(behavior, &bucketSpec);
     _spec = std::move(bucketSpec);
 }
 
@@ -587,42 +605,56 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     return nextResult;
 }
 
-void DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
+bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    bool nextStageWasRemoved = false;
     if (std::next(itr) == container->end()) {
-        return;
+        return nextStageWasRemoved;
     }
-    if (!_bucketUnpacker.bucketSpec().metaField || !_bucketUnpacker.includeMetaField()) {
-        return;
+    if (!_bucketUnpacker.bucketSpec().metaField) {
+        return nextStageWasRemoved;
     }
-    auto nextProject =
-        dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
-    if (!nextProject ||
-        nextProject->getType() != TransformerInterface::TransformerType::kInclusionProjection) {
-        return;
-    }
-    auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
-    auto addFieldsSpec =
-        nextProject->extractComputedProjections(metaName,
-                                                timeseries::kBucketMetaFieldName.toString(),
-                                                BucketUnpacker::reservedBucketFieldNames);
 
-    if (!addFieldsSpec.isEmpty()) {
-        std::vector<StringData> computedMetaProjFields;
-        for (auto&& elem : addFieldsSpec) {
-            computedMetaProjFields.emplace_back(elem.fieldName());
+    if (auto nextTransform =
+            dynamic_cast<DocumentSourceSingleDocumentTransformation*>(std::next(itr)->get());
+        nextTransform &&
+        (nextTransform->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
+         nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection)) {
+
+        auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
+        auto [addFieldsSpec, deleteStage] =
+            nextTransform->extractComputedProjections(metaName,
+                                                      timeseries::kBucketMetaFieldName.toString(),
+                                                      BucketUnpacker::reservedBucketFieldNames);
+        nextStageWasRemoved = deleteStage;
+
+        if (!addFieldsSpec.isEmpty()) {
+            // Extend bucket specification of this stage to include the computed meta projections
+            // that are passed through.
+            std::vector<StringData> computedMetaProjFields;
+            for (auto&& elem : addFieldsSpec) {
+                computedMetaProjFields.emplace_back(elem.fieldName());
+            }
+            _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
+            // Insert extracted computed projections before the $_internalUnpackBucket.
+            container->insert(
+                itr,
+                DocumentSourceAddFields::createFromBson(
+                    BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
+            // Remove the next stage if it became empty after the field extraction.
+            if (deleteStage) {
+                container->erase(std::next(itr));
+            }
         }
-        _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
-        container->insert(itr,
-                          DocumentSourceAddFields::createFromBson(
-                              BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
     }
+    return nextStageWasRemoved;
 }
 
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
                                                             bool isInclusion) {
     // 'fields' are the top-level fields to be included/excluded by the unpacker. We handle the
-    // special case of _id, which may be excluded in an inclusion $project (or vice versa), here.
+    // special case of _id, which may be excluded in an inclusion $project (or vice versa),
+    // here.
     auto fields = project.getFieldNames<std::set<std::string>>();
     if (auto elt = project.getField("_id"); (elt.isBoolean() && elt.Bool() != isInclusion) ||
         (elt.isNumber() && (elt.Int() == 1) != isInclusion)) {
@@ -640,7 +672,8 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
     if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet.empty()) {
-        // There is no project to internalize or there are already fields being included/excluded.
+        // There is no project to internalize or there are already fields being
+        // included/excluded.
         return {BSONObj{}, false};
     }
 
@@ -651,9 +684,9 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
         return {existingProj, isInclusion};
     }
 
-    // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
-    // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
-    // finite.
+    // Attempt to get an inclusion $project representing the root-level dependencies of the
+    // pipeline after the $_internalUnpackBucket. If this $project is not empty, then the
+    // dependency set was finite.
     Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
     auto deps = Pipeline::getDependenciesForContainer(pExpCtx, restOfPipeline, boost::none);
     if (auto dependencyProj =
@@ -676,17 +709,18 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     auto path = matchExpr->path();
     auto rhs = matchExpr->getData();
 
-    // The control field's min and max are chosen using a field-order insensitive comparator, while
-    // MatchExpressions use a comparator that treats field-order as significant. Because of this we
-    // will not perform this optimization on queries with operands of compound types.
+    // The control field's min and max are chosen using a field-order insensitive comparator,
+    // while MatchExpressions use a comparator that treats field-order as significant. Because
+    // of this we will not perform this optimization on queries with operands of compound types.
     if (rhs.type() == BSONType::Object || rhs.type() == BSONType::Array) {
         return nullptr;
     }
 
-    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null} will
-    // match all documents where the field is either null or missing. Because this is different
-    // from both the comparison semantics that InternalExprComparison expressions and the control's
-    // min and max fields use, we will not perform this optimization on queries with null operands.
+    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null}
+    // will match all documents where the field is either null or missing. Because this is
+    // different from both the comparison semantics that InternalExprComparison expressions and
+    // the control's min and max fields use, we will not perform this optimization on queries
+    // with null operands.
     if (rhs.type() == BSONType::jstNULL) {
         return nullptr;
     }
@@ -789,58 +823,6 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
     return {nullptr, match};
 }
 
-// Push down computed projections over meta fields ($addFields or $set).
-void DocumentSourceInternalUnpackBucket::pushDownAddFieldsMetaProjection(
-    Pipeline::SourceContainer::iterator itr) {
-    if (!_bucketUnpacker.bucketSpec().metaField) {
-        return;
-    }
-    auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
-    if (auto nextTransform =
-            dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
-        nextTransform &&
-        nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection) {
-        // Check if the transformation works exclusively over metafields.
-        DepsTracker deps;
-        nextTransform->getDependencies(&deps);
-        auto topLevelFields =
-            deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
-        auto topLevelFieldNames = topLevelFields.getFieldNames<std::set<std::string>>();
-        topLevelFieldNames.erase("_id");
-
-        // Do not pushdown if a computed field name is (or starts with) a reserved bucket field
-        // name.
-        auto newNames = nextTransform->getModifiedPaths().getNewNames();
-        for (auto&& name : newNames) {
-            auto pos = name.find('.');
-            auto prefix = (pos == std::string::npos) ? name : name.substr(0, pos);
-            if (BucketUnpacker::isReservedBucketFieldName(prefix)) {
-                return;
-            }
-        }
-
-        if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(metaName) == 1) {
-            // a) Rename the user metaField name into bucket's "meta" name in all expressions in
-            // the transformation phase.
-            nextTransform->substituteFieldPathElement(metaName,
-                                                      timeseries::kBucketMetaFieldName.toString());
-
-            // b) Modify this stage to include the computed meta projections from the next
-            // stage.
-            auto computedMetaProj =
-                nextTransform->getTransformer().serializeTransformation(boost::none).toBson();
-            std::vector<StringData> computedMetaProjFields;
-            for (auto&& elem : computedMetaProj) {
-                computedMetaProjFields.emplace_back(elem.fieldName());
-            }
-            _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
-
-            // c) Swap the $_internalUnpackBucket stage with the $addFields stage.
-            std::swap(*itr, *std::next(itr));
-        }
-    }
-}
-
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -914,17 +896,12 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
-    // Attempt to extract computed meta projections from subsequent $project and push them before
-    // the $_internalunpackBucket.
+    // Attempt to extract computed meta projections from subsequent $project, $addFields, or $set
+    // and push them before the $_internalunpackBucket.
     pushDownComputedMetaProjection(itr, container);
-    // If there is $addFields or $set that operate only on metadata, push it before the
-    // $_internalUnpackBucket.
-    if (std::next(itr) != container->end()) {
-        pushDownAddFieldsMetaProjection(itr);
-    }
 
-    // Attempt to build a $project based on dependency analysis or extract one from the pipeline. We
-    // can internalize the result so we can handle projections during unpacking.
+    // Attempt to build a $project based on dependency analysis or extract one from the
+    // pipeline. We can internalize the result so we can handle projections during unpacking.
     if (auto [project, isInclusion] = extractOrBuildProjectToInternalize(itr, container);
         !project.isEmpty()) {
         internalizeProject(project, isInclusion);

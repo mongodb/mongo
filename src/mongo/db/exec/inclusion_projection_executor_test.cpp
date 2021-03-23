@@ -1055,13 +1055,15 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedPro
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
-    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
     ASSERT_EQ(addFields.nFields(), 2);
     auto expectedAddFields =
         BSON("computedMeta1" << BSON("$toUpper" << BSON_ARRAY("$meta.x")) << "computedMeta3"
                              << "$meta");
     ASSERT_BSONOBJ_EQ(expectedAddFields, addFields);
+    ASSERT_EQ(deleteFlag, false);
 
     auto expectedProjection =
         Document(fromjson("{_id: true, computedMeta1: true, computed2: {$add: [\"$c\", {$const: "
@@ -1080,7 +1082,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAft
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{};
-    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
     // Assuming the document was produced by the $_internalUnpackBucket.
     auto result = inclusion->applyTransformation(
@@ -1100,12 +1103,14 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReserv
 
     auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
     const std::set<StringData> reservedNames{"meta", "data", "_id"};
-    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
 
     ASSERT_EQ(addFields.nFields(), 1);
     auto expectedAddFields = BSON("newMeta"
                                   << "$meta");
     ASSERT_BSONOBJ_EQ(expectedAddFields, addFields);
+    ASSERT_EQ(deleteFlag, false);
 
     auto expectedProjection = Document(fromjson(
         "{_id: true, a: true, data: {\"$toUpper\" : [\"$myMeta.x\"]}, newMeta: \"$newMeta\"}"));

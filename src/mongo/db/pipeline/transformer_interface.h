@@ -68,12 +68,17 @@ public:
     virtual Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const = 0;
 
-    virtual void substituteFieldPathElement(const StringData& oldName, const StringData& newName) {}
-
-    virtual BSONObj extractComputedProjections(const std::string& oldName,
-                                               const std::string& newName,
-                                               const std::set<StringData>& reservedNames) {
-        return BSONObj{};
+    /**
+     * Method used by inclusion and add fields projecton executors to extract computed projections
+     * that depend only on the 'oldName' field. Returns a pair of <BSONObj, bool>. The BSONObj
+     * contains the extracted projections. The boolean flag is true if the original projection has
+     * become empty after the extraction and can be deleted by the caller.
+     */
+    virtual std::pair<BSONObj, bool> extractComputedProjections(
+        const StringData& oldName,
+        const StringData& newName,
+        const std::set<StringData>& reservedNames) {
+        return {BSONObj{}, false};
     }
 };
 }  // namespace mongo
