@@ -12499,27 +12499,28 @@ buildvariants:
   - name: jsCore
   - name: jsCore_txns
 
-- name: ubuntu1804-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1804-build
-  stepback: false
-  expansions:
-    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
-    lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-  display_tasks:
-  - *libfuzzertests
-  tasks:
-   - name: libfuzzertests_TG
+# TODO(SERVER-51335) Reenable once s3_secret_access_key and s3_access_key_id are available.
+#- name: ubuntu1804-debug-aubsan-lite_fuzzer
+#  display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
+#  modules:
+#  - enterprise
+#  run_on:
+#  - ubuntu1804-build
+#  stepback: false
+#  expansions:
+#    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+#    lang_environment: LANG=C
+#    # If you add anything to san_options, make sure the appropriate changes are
+#    # also made to SConstruct.
+#    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+#    compile_flags: LINKFLAGS=-nostdlib++ LIBS=stdc++ --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address,fuzzer --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+#    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
+#    hang_analyzer_dump_core: false
+#    scons_cache_scope: shared
+#  display_tasks:
+#  - *libfuzzertests
+#  tasks:
+#   - name: libfuzzertests_TG
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
