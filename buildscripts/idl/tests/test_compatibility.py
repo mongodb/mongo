@@ -126,7 +126,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 138)
+        self.assertTrue(error_collection.count() == 139)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -155,6 +155,12 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         removed_command_error = error_collection.get_error_by_error_id(
             idl_compatibility_errors.ERROR_ID_REMOVED_COMMAND)
         self.assertRegex(str(removed_command_error), "removedCommand")
+
+        strict_false_to_true_command_error = error_collection.get_error_by_command_name(
+            "strictFalseToTrueCommand")
+        self.assertTrue(strict_false_to_true_command_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_STRICT_TRUE_ERROR)
+        self.assertRegex(str(strict_false_to_true_command_error), "strictFalseToTrueCommand")
 
         removed_command_parameter_error = error_collection.get_error_by_command_name(
             "removedCommandParameter")

@@ -398,6 +398,23 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    strictFalseCommand:
+        description: "command passes with strict: false in both versions of the command"
+        command_name: strictFalseCommand
+        namespace: ignored
+        cpp_name: strictFalseCommand
+        strict: false
+        api_version: "1"
+        reply_type: OkReply
+
+    strictTrueToFalseCommand:
+        description: "command passes when it switches from strict: true to switch: false"
+        command_name: strictTrueToFalseCommand
+        namespace: ignored
+        cpp_name: strictTrueToFalseCommand
+        strict: false
+        api_version: "1"
+        reply_type: OkReply
 
     addedCommandParameter:
         description: "new optional command parameter is added and should pass"
