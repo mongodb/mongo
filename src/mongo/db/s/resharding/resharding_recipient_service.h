@@ -212,6 +212,11 @@ private:
     RecipientShardContext _recipientCtx;
     boost::optional<Timestamp> _fetchTimestamp;
 
+    // ThreadPool used by CancelableOperationContext.
+    // CancelableOperationContext must have a thread that is always available to it to mark its
+    // opCtx as killed when the cancelToken has been cancelled.
+    const std::shared_ptr<ThreadPool> _markKilledExecutor;
+
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
     std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
 

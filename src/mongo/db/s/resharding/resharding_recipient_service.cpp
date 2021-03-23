@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -228,7 +229,14 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _donorShardIds{recipientDoc.getDonorShards()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
       _recipientCtx{recipientDoc.getMutableState()},
-      _fetchTimestamp{recipientDoc.getFetchTimestamp()} {}
+      _fetchTimestamp{recipientDoc.getFetchTimestamp()},
+      _markKilledExecutor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "RecipientStateMachineCancelableOpCtxPool";
+          options.minThreads = 1;
+          options.maxThreads = 1;
+          return options;
+      }())) {}
 
 ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
@@ -241,6 +249,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
+    _markKilledExecutor->startup();
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor] {
@@ -517,24 +526,29 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return whenAllSucceed(_collectionCloner->run(**executor, abortToken).thenRunOn(**executor),
-                          (*executor)
-                              ->sleepFor(_minimumOperationDuration, abortToken)
-                              .then([this, executor, abortToken] {
-                                  if (_txnCloners.empty()) {
-                                      return SemiFuture<void>::makeReady();
-                                  }
+    return whenAllSucceed(
+               _collectionCloner
+                   ->run(**executor,
+                         abortToken,
+                         CancelableOperationContextFactory(abortToken, _markKilledExecutor))
+                   .thenRunOn(**executor),
+               (*executor)
+                   ->sleepFor(_minimumOperationDuration, abortToken)
+                   .then([this, executor, abortToken] {
+                       if (_txnCloners.empty()) {
+                           return SemiFuture<void>::makeReady();
+                       }
 
-                                  auto serviceContext = Client::getCurrent()->getServiceContext();
+                       auto serviceContext = Client::getCurrent()->getServiceContext();
 
-                                  std::vector<ExecutorFuture<void>> txnClonerFutures;
-                                  for (auto&& txnCloner : _txnCloners) {
-                                      txnClonerFutures.push_back(
-                                          txnCloner->run(serviceContext, **executor, abortToken));
-                                  }
+                       std::vector<ExecutorFuture<void>> txnClonerFutures;
+                       for (auto&& txnCloner : _txnCloners) {
+                           txnClonerFutures.push_back(
+                               txnCloner->run(serviceContext, **executor, abortToken));
+                       }
 
-                                  return whenAllSucceed(std::move(txnClonerFutures));
-                              }))
+                       return whenAllSucceed(std::move(txnClonerFutures));
+                   }))
         .thenRunOn(**executor)
         .then([this] {
             // ReshardingTxnCloners must complete before the recipient transitions to kApplying to

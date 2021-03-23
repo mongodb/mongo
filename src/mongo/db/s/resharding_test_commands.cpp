@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
@@ -99,7 +100,23 @@ public:
                 request().getAtClusterTime(),
                 request().getOutputNs());
 
-            cloner.run(executor, opCtx->getCancellationToken()).get(opCtx);
+            std::shared_ptr<ThreadPool> cancelableOperationContextPool = [] {
+                ThreadPool::Options options;
+                options.poolName = "TestReshardingCollectionClonerCancelableOpCtxPool";
+                options.minThreads = 1;
+                options.maxThreads = 1;
+
+                auto threadPool = std::make_shared<ThreadPool>(std::move(options));
+                threadPool->startup();
+                return threadPool;
+            }();
+
+            cloner
+                .run(executor,
+                     opCtx->getCancellationToken(),
+                     CancelableOperationContextFactory(opCtx->getCancellationToken(),
+                                                       cancelableOperationContextPool))
+                .get(opCtx);
         }
 
     private:
