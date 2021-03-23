@@ -44,15 +44,20 @@ structs:
         generate_comparison_operators: false
         strict: false
         fields:
-            nss:
+            _id:
                 type: namespacestring
                 description: "The namespace of the collection that is under the collection critical
                               section."
+                cpp_name: nss
             reason:
                 type: object
                 description: "An identifier of the operation that is holding the critical section.
 
                               Only used for diagnostic purposes."
+            blockReads:
+                type: bool
+                description: "It states whether this critical section should block reads
+                              (CS in commit phase) or not (CS in catch up phase)."
             additionalInfo:
                 type: object 
                 description: "Additional information associated to the operation that is holding

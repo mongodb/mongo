@@ -92,15 +92,45 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     bool unique);
 
 /**
- * Acquires the critical section for the specified namespace.
- * It works even if the namespace's current metadata are UNKNOWN.
+ * Acquires the collection critical section in the catch-up phase (i.e. blocking writes) for the
+ * specified namespace and reason. It works even if the namespace's current metadata are UNKNOWN.
+ *
+ * It adds a doc to config.collectionCriticalSections with local write concern.
+ *
+ * Do nothing if the collection critical section is taken for that nss and reason, and will
+ * invariant otherwise since it is the responsibility of the caller to ensure that only one thread
+ * is taking the critical section.
  */
-void acquireCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
+void acquireRecoverableCriticalSectionBlockWrites(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& reason,
+    const boost::optional<BSONObj>& additionalInfo = boost::none);
 
 /**
- * Releases the critical section for the specified namespace.
+ * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to the
+ * commit phase (i.e. blocking reads) for the specified nss and reason. The recoverable critical
+ * section must have been acquired first through 'acquireRecoverableCriticalSectionBlockWrites'
+ * function.
+ *
+ * It updates a doc from config.collectionCriticalSections with local write concern.
+ *
+ * Do nothing if the collection critical section is already taken in commit phase.
  */
-void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss);
+void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const BSONObj& reason);
+
+/**
+ * Releases the recoverable critical section for the given nss and reason.
+ *
+ * It removes a doc from config.collectionCriticalSections with local write concern.
+ *
+ * Do nothing if the collection critical section is not taken for that nss and reason.
+ */
+void releaseRecoverableCriticalSection(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const BSONObj& reason);
 
 /**
  * Stops ongoing migrations and prevents future ones to start for the given nss.

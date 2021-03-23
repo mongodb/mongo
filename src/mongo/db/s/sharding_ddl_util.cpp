@@ -35,6 +35,8 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
@@ -259,19 +261,186 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     return response;
 }
 
-void acquireCriticalSection(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollection cCollLock(opCtx, nss, MODE_X);
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-    csr->enterCriticalSectionCatchUpPhase(csrLock);
-    csr->enterCriticalSectionCommitPhase(csrLock);
+void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const BSONObj& reason,
+                                                  const boost::optional<BSONObj>& additionalInfo) {
+    invariant(!opCtx->lockState()->isLocked());
+
+    Lock::GlobalLock lk(opCtx, MODE_IX);
+    AutoGetCollection cCollLock(opCtx, nss, MODE_S);
+
+    DBDirectClient dbClient(opCtx);
+    auto cursor =
+        dbClient.query(NamespaceString::kCollectionCriticalSectionsNamespace,
+                       BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+
+    // if there is a doc with the same nss -> in order to not fail it must have the same reason
+    if (cursor->more()) {
+        const auto collCSDoc = CollectionCriticalSectionDocument::parse(
+            IDLParserErrorContext("AcquireRecoverableCSBW"), cursor->next());
+
+        invariant(
+            collCSDoc.getReason().woCompare(reason) == 0,
+            str::stream() << "Trying to acquire a  critical section blocking writes for namespace "
+                          << nss << " and reason " << reason
+                          << " but it is already taken by another operation with different reason "
+                          << collCSDoc.getReason());
+
+        // Do nothing, the persisted document is already there!
+        return;
+    }
+
+    // The collection critical section is not taken, try to acquire it.
+
+    // The following code will try to add a doc to config.criticalCollectionSections:
+    // - If everything goes well, the shard server op observer will acquire the in-memory CS.
+    // - Otherwise this call will fail and the CS won't be taken (neither persisted nor in-mem)
+    CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
+    newDoc.setAdditionalInfo(additionalInfo);
+
+    const auto commandResponse = dbClient.runCommand([&] {
+        write_ops::Insert insertOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+        insertOp.setDocuments({newDoc.toBSON()});
+        return insertOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    BatchedCommandResponse batchedResponse;
+    std::string unusedErrmsg;
+    batchedResponse.parseBSON(commandReply, &unusedErrmsg);
+    invariant(batchedResponse.getN() > 0,
+              str::stream() << "Insert did not add any doc to collection "
+                            << NamespaceString::kCollectionCriticalSectionsNamespace
+                            << " for namespace " << nss << " and reason " << reason);
 }
 
-void releaseCriticalSection(OperationContext* opCtx, const NamespaceString& nss) {
+void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const BSONObj& reason) {
+    invariant(!opCtx->lockState()->isLocked());
+
+    AutoGetCollection cCollLock(opCtx, nss, MODE_X);
+
+    DBDirectClient dbClient(opCtx);
+    auto cursor =
+        dbClient.query(NamespaceString::kCollectionCriticalSectionsNamespace,
+                       BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
+
+    invariant(cursor->more(),
+              str::stream() << "Trying to acquire a critical section blocking reads for namespace "
+                            << nss << " and reason " << reason
+                            << " but the critical section wasn't acquired first blocking writers.");
+    BSONObj bsonObj = cursor->next();
+    const auto collCSDoc = CollectionCriticalSectionDocument::parse(
+        IDLParserErrorContext("AcquireRecoverableCSBR"), bsonObj);
+
+    invariant(
+        collCSDoc.getReason().woCompare(reason) == 0,
+        str::stream() << "Trying to acquire a critical section blocking reads for namespace " << nss
+                      << " and reason " << reason
+                      << " but it is already taken by another operation with different reason "
+                      << collCSDoc.getReason());
+
+    // if there is a document with the same nss, reason and blocking reads -> do nothing, the CS is
+    // already taken!
+    if (collCSDoc.getBlockReads())
+        return;
+
+    // The CS is in the catch-up phase, try to advance it to the commit phase.
+
+    // The following code will try to update a doc from config.criticalCollectionSections:
+    // - If everything goes well, the shard server op observer will advance the in-memory CS to the
+    //   commit phase (blocking readers).
+    // - Otherwise this call will fail and the CS won't be advanced (neither persisted nor in-mem)
+    auto commandResponse = dbClient.runCommand([&] {
+        const auto query = BSON(CollectionCriticalSectionDocument::kNssFieldName
+                                << nss.toString()
+                                << CollectionCriticalSectionDocument::kReasonFieldName << reason);
+        const auto update =
+            BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName << true));
+
+        write_ops::Update updateOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+        auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
+        write_ops::UpdateOpEntry updateEntry(query, updateModification);
+        updateOp.setUpdates({updateEntry});
+
+        return updateOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    BatchedCommandResponse batchedResponse;
+    std::string unusedErrmsg;
+    batchedResponse.parseBSON(commandReply, &unusedErrmsg);
+    invariant(batchedResponse.getNModified() > 0,
+              str::stream() << "Update did not modify any doc from collection "
+                            << NamespaceString::kCollectionCriticalSectionsNamespace
+                            << " for namespace " << nss << " and reason " << reason);
+}
+
+
+void releaseRecoverableCriticalSection(OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const BSONObj& reason) {
+    invariant(!opCtx->lockState()->isLocked());
+
     AutoGetCollection collLock(opCtx, nss, MODE_X);
-    auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-    csr->exitCriticalSection(opCtx);
-    csr->clearFilteringMetadata(opCtx);
+
+    DBDirectClient dbClient(opCtx);
+
+    const auto queryNss = BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString());
+    auto cursor = dbClient.query(NamespaceString::kCollectionCriticalSectionsNamespace, queryNss);
+
+    // if there is no document with the same nss -> do nothing!
+    if (!cursor->more())
+        return;
+
+    BSONObj bsonObj = cursor->next();
+    const auto collCSDoc = CollectionCriticalSectionDocument::parse(
+        IDLParserErrorContext("ReleaseRecoverableCS"), bsonObj);
+
+    invariant(
+        collCSDoc.getReason().woCompare(reason) == 0,
+        str::stream() << "Trying to release a critical for namespace " << nss << " and reason "
+                      << reason
+                      << " but it is already taken by another operation with different reason "
+                      << collCSDoc.getReason());
+
+
+    // The collection critical section is taken (in any phase), try to release it.
+
+    // The following code will try to remove a doc from config.criticalCollectionSections:
+    // - If everything goes well, the shard server op observer will release the in-memory CS
+    // - Otherwise this call will fail and the CS won't be released (neither persisted nor
+    // in-mem)
+
+    auto commandResponse = dbClient.runCommand([&] {
+        write_ops::Delete deleteOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(queryNss);
+            entry.setMulti(true);
+            return entry;
+        }()});
+
+        return deleteOp.serialize({});
+    }());
+
+    const auto commandReply = commandResponse->getCommandReply();
+    uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+
+    BatchedCommandResponse batchedResponse;
+    std::string unusedErrmsg;
+    batchedResponse.parseBSON(commandReply, &unusedErrmsg);
+    invariant(batchedResponse.getN() > 0,
+              str::stream() << "Delete did not remove any doc from collection "
+                            << NamespaceString::kCollectionCriticalSectionsNamespace
+                            << " for namespace " << nss << " and reason " << reason);
 }
 
 void stopMigrations(OperationContext* opCtx, const NamespaceString& nss) {
