@@ -587,9 +587,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
      * transaction ids are retained only on the pages that are written after the restart.
      *
      * Rollback to stable does not operate on logged tables and metadata, so it is skipped.
+     *
+     * The only scenario where the checkpoint run write generation number is less than the
+     * connection last checkpoint base write generation number is when rollback to stable doesn't
+     * happen during the recovery due to the unavailability of history store file.
      */
     if (!F_ISSET(conn, WT_CONN_RECOVERING) || WT_IS_METADATA(btree->dhandle) ||
-      __wt_btree_immediately_durable(session))
+      __wt_btree_immediately_durable(session) ||
+      ckpt->run_write_gen < conn->last_ckpt_base_write_gen)
         btree->base_write_gen = btree->run_write_gen;
     else
         btree->base_write_gen = ckpt->run_write_gen;
