@@ -7,7 +7,6 @@
  *     assumes_against_mongod_not_mongos,
  *     requires_timeseries,
  *     requires_fcv_49,
- *     sbe_incompatible,
  * ]
  */
 (function() {

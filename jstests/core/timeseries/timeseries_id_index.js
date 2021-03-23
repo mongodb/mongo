@@ -8,7 +8,6 @@
  *     requires_find_command,
  *     requires_getmore,
  *     requires_wiredtiger,
- *     sbe_incompatible,
  * ]
  */
 (function() {
