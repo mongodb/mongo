@@ -36,6 +36,7 @@
 #include <utility>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -256,6 +257,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
         return resharding::data_copy::findHighestInsertedId(opCtx, *outputColl);
     }();
 
+    // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
+    // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
+    // to be marked as having started.
+    auto* curOp = CurOp::get(opCtx);
+    curOp->ensureStarted();
+    ON_BLOCK_EXIT([curOp] { curOp->done(); });
+
     auto pipeline = _targetAggregationRequest(
         opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom));
 
@@ -301,49 +309,9 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     return true;
 }
 
-/**
- * Invokes the 'callable' function with a fresh OperationContext.
- *
- * The OperationContext is configured so the RstlKillOpThread would always interrupt the operation
- * on step-up or stepdown, regardless of whether the operation has acquired any locks. This
- * interruption is best-effort to stop doing wasteful work on stepdown as quickly as possible. It
- * isn't required for the ReshardingCollectionCloner's correctness. In particular, it is possible
- * for an OperationContext to be constructed after stepdown has finished, for the
- * ReshardingCollectionCloner to run a getMore on the aggregation against the donor shards, and for
- * the ReshardingCollectionCloner to only discover afterwards the recipient had already stepped down
- * from a NotPrimary error when inserting a batch of documents locally.
- *
- * Note that the recipient's primary-only service is responsible for managing the
- * ReshardingCollectionCloner and would shut down the ReshardingCollectionCloner's task executor
- * following the recipient stepping down.
- *
- * Also note that the ReshardingCollectionCloner is only created after step-up as part of the
- * recipient's primary-only service and therefore would never be interrupted by step-up.
- */
-template <typename Callable>
-auto ReshardingCollectionCloner::_withTemporaryOperationContext(Callable&& callable) {
-    auto& client = cc();
-    {
-        stdx::lock_guard<Client> lk(client);
-        invariant(client.canKillSystemOperationInStepdown(lk));
-    }
-
-    auto opCtx = client.makeOperationContext();
-    opCtx->setAlwaysInterruptAtStepDownOrUp();
-
-    // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
-    // recipient spent waiting for documents from the donor shards. It doing so requires the CurOp
-    // to be marked as having started.
-    auto* curOp = CurOp::get(opCtx.get());
-    curOp->ensureStarted();
-    {
-        ON_BLOCK_EXIT([curOp] { curOp->done(); });
-        return callable(opCtx.get());
-    }
-}
-
 SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskExecutor> executor,
-                                                 CancellationToken cancelToken) {
+                                                 CancellationToken cancelToken,
+                                                 CancelableOperationContextFactory factory) {
     struct ChainContext {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
         bool moreToCome = true;
@@ -351,25 +319,25 @@ SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskE
 
     auto chainCtx = std::make_shared<ChainContext>();
 
-    return AsyncTry([this, chainCtx] {
+    return AsyncTry([this, chainCtx, factory] {
                if (!chainCtx->pipeline) {
-                   chainCtx->pipeline = _withTemporaryOperationContext(
-                       [&](auto* opCtx) { return _restartPipeline(opCtx); });
+                   auto opCtx = factory.makeOperationContext(&cc());
+                   chainCtx->pipeline = _restartPipeline(opCtx.get());
                }
 
-               chainCtx->moreToCome = _withTemporaryOperationContext(
-                   [&](auto* opCtx) { return doOneBatch(opCtx, *chainCtx->pipeline); });
+               auto opCtx = factory.makeOperationContext(&cc());
+               chainCtx->moreToCome = doOneBatch(opCtx.get(), *chainCtx->pipeline);
            })
-        .until([this, chainCtx, cancelToken](Status status) {
+        .until([this, chainCtx, cancelToken, factory](Status status) {
             if (status.isOK() && chainCtx->moreToCome) {
                 return false;
             }
 
             if (chainCtx->pipeline) {
-                _withTemporaryOperationContext([&](auto* opCtx) {
-                    chainCtx->pipeline->dispose(opCtx);
-                    chainCtx->pipeline.reset();
-                });
+                auto opCtx = factory.makeOperationContext(&cc());
+
+                chainCtx->pipeline->dispose(opCtx.get());
+                chainCtx->pipeline.reset();
             }
 
             if (status.isA<ErrorCategory::CancellationError>() ||
@@ -411,11 +379,11 @@ SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskE
         .on(executor, cancelToken)
         .onCompletion([this, chainCtx](Status status) {
             if (chainCtx->pipeline) {
+                auto opCtx = cc().makeOperationContext();
+
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
-                _withTemporaryOperationContext([&](auto* opCtx) {
-                    chainCtx->pipeline->dispose(opCtx);
-                    chainCtx->pipeline.reset();
-                });
+                chainCtx->pipeline->dispose(opCtx.get());
+                chainCtx->pipeline.reset();
             }
 
             // Propagate the result of the AsyncTry.

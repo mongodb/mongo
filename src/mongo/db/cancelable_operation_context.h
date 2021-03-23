@@ -31,14 +31,15 @@
 
 #include <memory>
 
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 
-class CancellationToken;
 class OperationContext;
 
 /**
@@ -90,6 +91,24 @@ private:
     const std::shared_ptr<SharedBlock> _sharedBlock;
     const ServiceContext::UniqueOperationContext _opCtx;
     const SemiFuture<void> _markKilledFinished;
+};
+
+/**
+ * A factory to create CancelableOperationContext objects that use the same CancelationToken and
+ * executor.
+ */
+class CancelableOperationContextFactory {
+public:
+    CancelableOperationContextFactory(CancellationToken cancelToken, ExecutorPtr executor)
+        : _cancelToken{std::move(cancelToken)}, _executor{std::move(executor)} {}
+
+    CancelableOperationContext makeOperationContext(Client* client) const {
+        return CancelableOperationContext{client->makeOperationContext(), _cancelToken, _executor};
+    }
+
+private:
+    const CancellationToken _cancelToken;
+    const ExecutorPtr _executor;
 };
 
 }  // namespace mongo

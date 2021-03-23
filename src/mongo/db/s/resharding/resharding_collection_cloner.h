@@ -49,6 +49,7 @@ class TaskExecutor;
 
 }  // namespace executor
 
+class CancelableOperationContextFactory;
 class OperationContext;
 class MongoProcessInterface;
 class ReshardingMetrics;
@@ -93,7 +94,8 @@ public:
      *   (b) the cancellation token was canceled due to a stepdown or abort.
      */
     SemiFuture<void> run(std::shared_ptr<executor::TaskExecutor> executor,
-                         CancellationToken cancelToken);
+                         CancellationToken cancelToken,
+                         CancelableOperationContextFactory factory);
 
     /**
      * Fetches and inserts a single batch of documents.
@@ -108,9 +110,6 @@ private:
                                                                          const Pipeline& pipeline);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
-
-    template <typename Callable>
-    auto _withTemporaryOperationContext(Callable&& callable);
 
     const std::unique_ptr<Env> _env;
     const ShardKeyPattern _newShardKeyPattern;
