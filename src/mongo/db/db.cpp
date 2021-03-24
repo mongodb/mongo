@@ -338,7 +338,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto runner = makePeriodicRunner(serviceContext);
     serviceContext->setPeriodicRunner(std::move(runner));
 
+#ifdef MONGO_CONFIG_SSL
     OCSPManager::get()->startThreadPool();
+#endif
 
     if (!storageGlobalParams.repair) {
         auto tl =

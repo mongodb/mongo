@@ -640,7 +640,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         serviceContext->setPeriodicRunner(std::move(runner));
     }
 
+#ifdef MONGO_CONFIG_SSL
     OCSPManager::get()->startThreadPool();
+#endif
 
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongos>(serviceContext));
 
