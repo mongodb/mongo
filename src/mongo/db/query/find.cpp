@@ -268,6 +268,16 @@ Message getMore(OperationContext* opCtx,
     uassertStatusOK(statusWithCursorPin.getStatus());
     auto cursorPin = std::move(statusWithCursorPin.getValue());
 
+    // Set kMajorityCommitted before we instantiate readLock. We should not override readSource
+    // after storage snapshot is setup.
+    const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+    if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+        cursorPin->getReadConcernArgs().getLevel() ==
+            repl::ReadConcernLevel::kMajorityReadConcern) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
+        uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
+    }
+
     opCtx->setExhaust(cursorPin->queryOptions() & QueryOption_Exhaust);
 
     if (cursorPin->getExecutor()->lockPolicy() == PlanExecutor::LockPolicy::kLocksInternally) {
@@ -359,16 +369,6 @@ Message getMore(OperationContext* opCtx,
                                                          dropAndReaquireReadLock,
                                                          nss);
     });
-
-
-    const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
-
-    if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
-        cursorPin->getReadConcernArgs().getLevel() ==
-            repl::ReadConcernLevel::kMajorityReadConcern) {
-        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
-    }
 
     uassert(40548,
             "OP_GET_MORE operations are not supported on tailable aggregations. Only clients "
