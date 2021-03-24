@@ -2,7 +2,6 @@
 //   does_not_support_stepdowns,
 //   requires_getmore,
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 
 // Confirms that profiled getMore execution contains all expected metrics with proper values.
@@ -12,30 +11,30 @@
 
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
-var testDB = db.getSiblingDB("profile_getmore");
+const testDB = db.getSiblingDB("profile_getmore");
 assert.commandWorked(testDB.dropDatabase());
-var coll = testDB.getCollection("test");
+const coll = testDB.getCollection("test");
 
 testDB.setProfilingLevel(2);
 
+let i;
 //
 // Confirm basic metrics on getMore with a not-exhausted cursor.
 //
-var i;
 for (i = 0; i < 10; ++i) {
     assert.commandWorked(coll.insert({a: i}));
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-var cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
+let cursor = coll.find({a: {$gt: 0}}).sort({a: 1}).batchSize(2);
 cursor.next();  // Perform initial query and consume first of 2 docs returned.
 
-var cursorId = getLatestProfilerEntry(testDB, {op: "query"}).cursorid;  // Save cursorid from find.
+let cursorId = getLatestProfilerEntry(testDB, {op: "query"}).cursorid;  // Save cursorid from find.
 
 cursor.next();  // Consume second of 2 docs from initial query.
 cursor.next();  // getMore performed, leaving open cursor.
 
-var profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
+let profileObj = getLatestProfilerEntry(testDB, {op: "getmore"});
 
 assert.eq(profileObj.ns, coll.getFullName(), tojson(profileObj));
 assert.eq(profileObj.op, "getmore", tojson(profileObj));
@@ -105,8 +104,8 @@ for (i = 0; i < 20; ++i) {
 }
 assert.commandWorked(coll.createIndex({a: 1}));
 
-var cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}, hint: {a: 1}});
-var cursorId = getLatestProfilerEntry(testDB, {"command.aggregate": coll.getName()}).cursorid;
+cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}, hint: {a: 1}});
+cursorId = getLatestProfilerEntry(testDB, {"command.aggregate": coll.getName()}).cursorid;
 assert.neq(0, cursorId);
 
 cursor.next();  // Consume the result set.
