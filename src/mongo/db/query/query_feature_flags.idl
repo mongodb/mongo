@@ -45,3 +45,8 @@ feature_flags:
       description: "Feature flag for enabling change streams optimization"
       cpp_varname: gFeatureFlagChangeStreamsOptimization
       default: false
+
+    featureFlagDotsAndDollars:
+      description: "Feature flag for allowing use of field names containing dots and dollars"
+      cpp_varname: gFeatureFlagDotsAndDollars
+      default: false
