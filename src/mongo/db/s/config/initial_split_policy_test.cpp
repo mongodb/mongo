@@ -1772,7 +1772,7 @@ TEST_F(ReshardingInitSplitTest, NoZones) {
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+        4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
@@ -1809,7 +1809,7 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+        4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << -9117533237618642180LL)),
@@ -1842,7 +1842,7 @@ TEST_F(ReshardingInitSplitTest, SingleInitialChunk) {
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 1 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+        1 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << MAXKEY))};
@@ -1878,7 +1878,7 @@ TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -1917,7 +1917,7 @@ TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 10), BSON("y" << 20)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 10)),
@@ -1958,7 +1958,7 @@ TEST_F(ReshardingInitSplitTest, ZoneWithHoles) {
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 30), BSON("y" << 40)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -2001,7 +2001,7 @@ TEST_F(ReshardingInitSplitTest, UnsortedZoneWithHoles) {
     zones.emplace_back(nss(), "zoneB", ChunkRange(BSON("y" << 0), BSON("y" << 20)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 4 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        4 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY), BSON("y" << 0)),
@@ -2043,7 +2043,7 @@ TEST_F(ReshardingInitSplitTest, ZonesIsPrefixOfReshardKey) {
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("y" << 0), BSON("y" << MAXKEY)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 2 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        2 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
         ChunkRange(BSON("y" << MINKEY << "z" << MINKEY), BSON("y" << 0 << "z" << MINKEY)),
@@ -2082,7 +2082,7 @@ TEST_F(ReshardingInitSplitTest, ZonesHasIncompatibleReshardKey) {
     zones.emplace_back(nss(), "zoneA", ChunkRange(BSON("x" << 0), BSON("x" << MAXKEY)));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 2 /* numInitialChunks */, zones, std::move(mockSampleSource));
+        2 /* numInitialChunks */, zones, std::move(mockSampleSource));
 
     SplitPolicyParams params{nss(), boost::none, shardId("0")};
     ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
@@ -2107,7 +2107,7 @@ TEST_F(ReshardingInitSplitTest, InsufficientSamples) {
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
     ReshardingSplitPolicy initSplitPolicy(
-        nss(), 10 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
+        10 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
 
     SplitPolicyParams params{nss(), boost::none, shardId("0")};
     ASSERT_THROWS(initSplitPolicy.createFirstChunks(operationContext(), shardKey, params),
@@ -2130,10 +2130,10 @@ TEST_F(ReshardingInitSplitTest, ZeroInitialChunks) {
     std::list<BSONObj> mockSamples;
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
-    ASSERT_THROWS(
-        ReshardingSplitPolicy(
-            nss(), 0 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource)),
-        DBException);
+    ASSERT_THROWS(ReshardingSplitPolicy(0 /* numInitialChunks */,
+                                        boost::none /* zones */,
+                                        std::move(mockSampleSource)),
+                  DBException);
 }
 
 }  // namespace

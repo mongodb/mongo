@@ -317,8 +317,7 @@ public:
                                       boost::optional<std::vector<TagsType>> zones,
                                       int samplesPerChunk = kDefaultSamplesPerChunk);
 
-    ReshardingSplitPolicy(const NamespaceString& ns,
-                          int numInitialChunks,
+    ReshardingSplitPolicy(int numInitialChunks,
                           boost::optional<std::vector<TagsType>> zones,
                           std::unique_ptr<SampleDocumentSource> samples);
 
