@@ -593,7 +593,8 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
     if (!_jumboChunkCloneState->clonerExec) {
-        auto exec = uassertStatusOK(_getIndexScanExecutor(opCtx, collection));
+        auto exec = uassertStatusOK(_getIndexScanExecutor(
+            opCtx, collection, InternalPlanner::IndexScanOptions::IXSCAN_FETCH));
         _jumboChunkCloneState->clonerExec = std::move(exec);
     } else {
         _jumboChunkCloneState->clonerExec->reattachToOperationContext(opCtx);
@@ -605,8 +606,7 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
         BSONObj obj;
         RecordId recordId;
         while (PlanExecutor::ADVANCED ==
-               (execState = _jumboChunkCloneState->clonerExec->getNext(
-                    &obj, _jumboChunkCloneState->stashedRecordId ? nullptr : &recordId))) {
+               (execState = _jumboChunkCloneState->clonerExec->getNext(&obj, nullptr))) {
 
             stdx::unique_lock<Latch> lk(_mutex);
             _jumboChunkCloneState->clonerState = execState;
@@ -619,21 +619,10 @@ void MigrationChunkClonerSourceLegacy::_nextCloneBatchFromIndexScan(OperationCon
             if (arrBuilder->arrSize() &&
                 (arrBuilder->len() + obj.objsize() + 1024) > BSONObjMaxUserSize) {
                 _jumboChunkCloneState->clonerExec->enqueue(obj);
-
-                // Stash the recordId we just read to add to the next batch.
-                if (!recordId.isNull()) {
-                    invariant(!_jumboChunkCloneState->stashedRecordId);
-                    _jumboChunkCloneState->stashedRecordId = std::move(recordId);
-                }
-
                 break;
             }
 
-            Snapshotted<BSONObj> doc;
-            invariant(collection->findDoc(
-                opCtx, _jumboChunkCloneState->stashedRecordId.value_or(recordId), &doc));
-            arrBuilder->append(doc.value());
-            _jumboChunkCloneState->stashedRecordId = boost::none;
+            arrBuilder->append(obj);
 
             lk.lock();
             _jumboChunkCloneState->docsCloned++;
@@ -801,8 +790,10 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
-MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
-                                                        const CollectionPtr& collection) {
+MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    InternalPlanner::IndexScanOptions scanOption) {
     // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore, any
     // multi-key index prefixed by shard key cannot be multikey over the shard key fields.
     const IndexDescriptor* idx =
@@ -829,7 +820,9 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
                                       min,
                                       max,
                                       BoundInclusion::kIncludeStartKeyOnly,
-                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+                                      PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                      InternalPlanner::Direction::FORWARD,
+                                      scanOption);
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
@@ -839,7 +832,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
                 str::stream() << "Collection " << _args.getNss().ns() << " does not exist."};
     }
 
-    auto swExec = _getIndexScanExecutor(opCtx, collection.getCollection());
+    auto swExec = _getIndexScanExecutor(
+        opCtx, collection.getCollection(), InternalPlanner::IndexScanOptions::IXSCAN_DEFAULT);
     if (!swExec.isOK()) {
         return swExec.getStatus();
     }

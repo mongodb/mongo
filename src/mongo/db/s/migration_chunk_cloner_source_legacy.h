@@ -222,7 +222,9 @@ private:
     StatusWith<BSONObj> _callRecipient(const BSONObj& cmdObj);
 
     StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getIndexScanExecutor(
-        OperationContext* opCtx, const CollectionPtr& collection);
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        InternalPlanner::IndexScanOptions scanOption);
 
     void _nextCloneBatchFromIndexScan(OperationContext* opCtx,
                                       const CollectionPtr& collection,
@@ -384,10 +386,6 @@ private:
 
         // The current state of 'clonerExec'.
         PlanExecutor::ExecState clonerState;
-
-        // RecordId of the last doc read in by 'clonerExec' if collection scan yields during
-        // cloning.
-        boost::optional<RecordId> stashedRecordId;
 
         // Number docs in jumbo chunk cloned so far
         int docsCloned = 0;
