@@ -1812,10 +1812,10 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
         nss(), 4 /* numInitialChunks */, boost::none /* zones */, std::move(mockSampleSource));
 
     std::vector<ChunkRange> expectedChunkRanges = {
-        ChunkRange(BSON("y" << MINKEY), BSON("y" << -9117533237618642180)),
-        ChunkRange(BSON("y" << -9117533237618642180), BSON("y" << -1196399207910989725)),
-        ChunkRange(BSON("y" << -1196399207910989725), BSON("y" << 7766103514953448109)),
-        ChunkRange(BSON("y" << 7766103514953448109), BSON("y" << MAXKEY))};
+        ChunkRange(BSON("y" << MINKEY), BSON("y" << -9117533237618642180LL)),
+        ChunkRange(BSON("y" << -9117533237618642180LL), BSON("y" << -1196399207910989725LL)),
+        ChunkRange(BSON("y" << -1196399207910989725LL), BSON("y" << 7766103514953448109LL)),
+        ChunkRange(BSON("y" << 7766103514953448109LL), BSON("y" << MAXKEY))};
 
     std::vector<ShardId> expectedShardForEachChunk = {
         shardId("0"), shardId("1"), shardId("0"), shardId("1")};
