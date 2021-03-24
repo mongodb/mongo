@@ -58,6 +58,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -1777,7 +1778,10 @@ Status retryTransactionOps(OperationContext* opCtx,
     // since its populated with the return from ops(),
     // but guard against bit-rot by pre-populating a generic failure.
     Status status(ErrorCodes::OperationFailed, "Operation was never attempted");
-    constexpr int kMaxAttempts = 3;
+
+    // Be more patient with our test runner which is likely to be
+    // doing aggressive reelections and failovers and replication shenanigans.
+    const int kMaxAttempts = getTestCommandsEnabled() ? 10 : 3;
 
     for (int tries = kMaxAttempts; tries > 0; --tries) {
         if (tries < kMaxAttempts) {
