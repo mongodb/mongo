@@ -41,8 +41,7 @@ class thread_manager {
     {
         for (auto &it : _workers) {
             if (it != nullptr && it->joinable()) {
-                debug_info(
-                  "You should've called join on the thread manager", _trace_level, DEBUG_ERROR);
+                debug_print("You should've called join on the thread manager", DEBUG_ERROR);
                 it->join();
             }
             delete it;

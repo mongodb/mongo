@@ -70,8 +70,8 @@ class connection_manager {
     create(const std::string &config, const std::string &home = DEFAULT_DIR)
     {
         if (_conn != nullptr) {
-            debug_info("connection is not NULL, cannot be re-opened.", _trace_level, DEBUG_ERROR);
-            testutil_die(EINVAL, "connection is not NULL");
+            debug_print("Connection is not NULL, cannot be re-opened.", DEBUG_ERROR);
+            testutil_die(EINVAL, "Connection is not NULL");
         }
 
         /* Create the working dir. */
@@ -87,9 +87,9 @@ class connection_manager {
         WT_SESSION *session;
 
         if (_conn == nullptr) {
-            debug_info("connection is NULL, did you forget to call connection_manager::create ?",
-              _trace_level, DEBUG_ERROR);
-            testutil_die(EINVAL, "connection is NULL");
+            debug_print("Connection is NULL, did you forget to call connection_manager::create ?",
+              DEBUG_ERROR);
+            testutil_die(EINVAL, "Connection is NULL");
         }
 
         _conn_mutex.lock();

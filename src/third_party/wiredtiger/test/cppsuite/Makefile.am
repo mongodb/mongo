@@ -11,9 +11,9 @@ all:
 all_TESTS=
 noinst_PROGRAMS=
 
-test_poc_SOURCES = tests/poc.cxx
-noinst_PROGRAMS += test_poc
-all_TESTS += test_poc
+run_SOURCES = tests/run.cxx
+noinst_PROGRAMS += run
+all_TESTS += run
 
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)
