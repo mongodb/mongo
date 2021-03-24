@@ -59,13 +59,20 @@ for (const db of dbsToClone) {
 // correct.
 function checkStandardFieldsOK(res) {
     assert.eq(res.inprog.length, 1, res);
-    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, kMigrationId), 0, res);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID, kMigrationId), 0, res);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0, res);
     assert.eq(res.inprog[0].donorConnectionString, tenantMigrationTest.getDonorRst().getURL(), res);
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0, res);
     // We don't test failovers in this test so we don't expect these counters to be incremented.
     assert.eq(res.inprog[0].numRestartsDueToDonorConnectionFailure, 0, res);
     assert.eq(res.inprog[0].numRestartsDueToRecipientFailure, 0, res);
+}
+
+// Validates the fields of an optime object.
+function checkOptime(optime) {
+    assert(optime.ts instanceof Timestamp);
+    assert(optime.t instanceof NumberLong);
+    return true;
 }
 
 // Set all failPoints up on the recipient's end to block the migration at certain points. The
@@ -131,9 +138,13 @@ assert(!currOp.hasOwnProperty("approxTotalBytesCopied"), res);
 assert(!currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
 assert(!currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
 // Must exist now.
-assert(currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("donorSyncSource"), res);
+assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
+           checkOptime(currOp.startFetchingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
+           checkOptime(currOp.startApplyingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("donorSyncSource") && typeof currOp.donorSyncSource === 'string', res);
 fpAfterRetrievingStartOpTime.off();
 
 // Wait until collection cloning is done, and cloneFinishedRecipientOpTime
@@ -149,15 +160,31 @@ assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
 // Must exist now.
-assert(currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("donorSyncSource"), res);
-assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
-assert(currOp.hasOwnProperty("approxTotalDataSize"), res);
-assert(currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-assert(currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
+           checkOptime(currOp.startFetchingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
+           checkOptime(currOp.startApplyingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("donorSyncSource") && typeof currOp.donorSyncSource === 'string', res);
+assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
+           checkOptime(currOp.dataConsistentStopDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
+           checkOptime(currOp.cloneFinishedRecipientOpTime),
+       res);
+assert(currOp.hasOwnProperty("approxTotalDataSize") &&
+           currOp.approxTotalDataSize instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
+           currOp.approxTotalBytesCopied instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
+           currOp.totalReceiveElapsedMillis instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
+           currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
+       res);
 fpAfterCollectionCloner.off();
 
 // Wait for the "kConsistent" state to be reached.
@@ -171,14 +198,30 @@ currOp = res.inprog[0];
 assert.eq(currOp.state, migrationStates.kConsistent, res);
 assert.eq(currOp.migrationCompleted, false, res);
 assert.eq(currOp.dataSyncCompleted, false, res);
-assert(currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
-assert(currOp.hasOwnProperty("approxTotalDataSize"), res);
-assert(currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-assert(currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
+           checkOptime(currOp.startFetchingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
+           checkOptime(currOp.startApplyingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
+           checkOptime(currOp.dataConsistentStopDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
+           checkOptime(currOp.cloneFinishedRecipientOpTime),
+       res);
+assert(currOp.hasOwnProperty("approxTotalDataSize") &&
+           currOp.approxTotalDataSize instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
+           currOp.approxTotalBytesCopied instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
+           currOp.totalReceiveElapsedMillis instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
+           currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
+       res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
 // The oplog applier should have applied at least the noop resume token.
 assert.gte(currOp.numOpsApplied, 1, tojson(res));
@@ -205,14 +248,30 @@ assert.eq(currOp.state, migrationStates.kConsistent, res);
 assert.eq(currOp.migrationCompleted, false, res);
 // dataSyncCompleted should have changed.
 assert.eq(currOp.dataSyncCompleted, true, res);
-assert(currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
-assert(currOp.hasOwnProperty("approxTotalDataSize"), res);
-assert(currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-assert(currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
+           checkOptime(currOp.startFetchingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
+           checkOptime(currOp.startApplyingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
+           checkOptime(currOp.dataConsistentStopDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
+           checkOptime(currOp.cloneFinishedRecipientOpTime),
+       res);
+assert(currOp.hasOwnProperty("approxTotalDataSize") &&
+           currOp.approxTotalDataSize instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
+           currOp.approxTotalBytesCopied instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
+           currOp.totalReceiveElapsedMillis instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
+           currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
+       res);
 assert(!currOp.hasOwnProperty("expireAt"), res);
 
 jsTestLog("Allow the forgetMigration to complete.");
@@ -223,19 +282,34 @@ res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient mi
 checkStandardFieldsOK(res);
 currOp = res.inprog[0];
 assert.eq(currOp.dataSyncCompleted, true, res);
-assert(currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
-assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime"), res);
-assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
-assert(currOp.hasOwnProperty("approxTotalDataSize"), res);
-assert(currOp.hasOwnProperty("approxTotalBytesCopied"), res);
-assert(currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
-assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+assert(currOp.hasOwnProperty("startFetchingDonorOpTime") &&
+           checkOptime(currOp.startFetchingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("startApplyingDonorOpTime") &&
+           checkOptime(currOp.startApplyingDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("dataConsistentStopDonorOpTime") &&
+           checkOptime(currOp.dataConsistentStopDonorOpTime),
+       res);
+assert(currOp.hasOwnProperty("cloneFinishedRecipientOpTime") &&
+           checkOptime(currOp.cloneFinishedRecipientOpTime),
+       res);
+assert(currOp.hasOwnProperty("approxTotalDataSize") &&
+           currOp.approxTotalDataSize instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("approxTotalBytesCopied") &&
+           currOp.approxTotalBytesCopied instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("totalReceiveElapsedMillis") &&
+           currOp.totalReceiveElapsedMillis instanceof NumberLong,
+       res);
+assert(currOp.hasOwnProperty("remainingReceiveEstimatedMillis") &&
+           currOp.remainingReceiveEstimatedMillis instanceof NumberLong,
+       res);
 // State, completion status and expireAt should have changed.
 assert.eq(currOp.state, migrationStates.kDone, res);
 assert.eq(currOp.migrationCompleted, true, res);
-assert(currOp.hasOwnProperty("expireAt"), res);
-
+assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
 assert(currOp.hasOwnProperty("databases"));
 assert.eq(0, currOp.databases.databasesClonedBeforeFailover, tojson(res));
 assert.eq(dbsToClone.length, currOp.databases.databasesToClone, tojson(res));

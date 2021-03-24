@@ -202,12 +202,12 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
         assertNoCertificateOrPrivateKey(res1.errmsg);
         assert.eq(1, configRecipientsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
         assert.eq(1, getTenantMigrationRecipientCurrentOpEntries(primary, {
-                         "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                         "instanceID": UUID(migrationOpts0.migrationIdString)
                      }).length);
         if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
             assert.eq(0, configRecipientsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
             assert.eq(0, getTenantMigrationRecipientCurrentOpEntries(primary, {
-                             "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                             "instanceID": UUID(migrationOpts1.migrationIdString)
                          }).length);
         } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configRecipientsColl.count({tenantId: migrationOpts1.tenantId}));
@@ -221,12 +221,12 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
         assertNoCertificateOrPrivateKey(res0.errmsg);
         assert.eq(1, configRecipientsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
         assert.eq(1, getTenantMigrationRecipientCurrentOpEntries(primary, {
-                         "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                         "instanceID": UUID(migrationOpts1.migrationIdString)
                      }).length);
         if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
             assert.eq(0, configRecipientsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
             assert.eq(0, getTenantMigrationRecipientCurrentOpEntries(primary, {
-                             "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                             "instanceID": UUID(migrationOpts0.migrationIdString)
                          }).length);
         } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configRecipientsColl.count({tenantId: migrationOpts0.tenantId}));

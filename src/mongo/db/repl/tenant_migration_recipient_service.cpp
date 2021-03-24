@@ -317,7 +317,7 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
 
     stdx::lock_guard lk(_mutex);
     bob.append("desc", "tenant recipient migration");
-    bob.append("instanceID", _stateDoc.getId().toBSON());
+    _migrationUuid.appendToBuilder(&bob, "instanceID"_sd);
     bob.append("tenantId", _stateDoc.getTenantId());
     bob.append("donorConnectionString", _stateDoc.getDonorConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
@@ -346,15 +346,13 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     }
 
     if (_stateDoc.getStartFetchingDonorOpTime())
-        bob.append("startFetchingDonorOpTime", _stateDoc.getStartFetchingDonorOpTime()->toBSON());
+        _stateDoc.getStartFetchingDonorOpTime()->append(&bob, "startFetchingDonorOpTime");
     if (_stateDoc.getStartApplyingDonorOpTime())
-        bob.append("startApplyingDonorOpTime", _stateDoc.getStartApplyingDonorOpTime()->toBSON());
+        _stateDoc.getStartApplyingDonorOpTime()->append(&bob, "startApplyingDonorOpTime");
     if (_stateDoc.getDataConsistentStopDonorOpTime())
-        bob.append("dataConsistentStopDonorOpTime",
-                   _stateDoc.getDataConsistentStopDonorOpTime()->toBSON());
+        _stateDoc.getDataConsistentStopDonorOpTime()->append(&bob, "dataConsistentStopDonorOpTime");
     if (_stateDoc.getCloneFinishedRecipientOpTime())
-        bob.append("cloneFinishedRecipientOpTime",
-                   _stateDoc.getCloneFinishedRecipientOpTime()->toBSON());
+        _stateDoc.getCloneFinishedRecipientOpTime()->append(&bob, "cloneFinishedRecipientOpTime");
 
     if (_stateDoc.getExpireAt())
         bob.append("expireAt", *_stateDoc.getExpireAt());
