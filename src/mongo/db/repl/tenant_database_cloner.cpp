@@ -141,7 +141,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
                     .reason());
         }
         NamespaceString collectionNamespace(_dbName, result.getName());
-        if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
+        if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(4881602,
                         1,
                         "Database cloner skipping 'system' collection",
@@ -194,7 +194,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
                     .reason());
         }
         NamespaceString collectionNamespace(_dbName, result.getName());
-        if (collectionNamespace.isSystem() && !collectionNamespace.isLegalClientSystemNS()) {
+        if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             LOGV2_DEBUG(5271600,
                         1,
                         "Tenant database cloner skipping 'system' collection",

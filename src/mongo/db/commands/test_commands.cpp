@@ -264,7 +264,7 @@ public:
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx,
                 kDurableHistoryTestNss)) {  // someone else may have beat us to it.
-            uassertStatusOK(userAllowedCreateNS(kDurableHistoryTestNss));
+            uassertStatusOK(userAllowedCreateNS(opCtx, kDurableHistoryTestNss));
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
             uassertStatusOK(

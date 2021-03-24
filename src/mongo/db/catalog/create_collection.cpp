@@ -390,7 +390,7 @@ Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
                         CollectionOptions&& options,
                         boost::optional<BSONObj> idIndex) {
-    auto status = userAllowedCreateNS(ns);
+    auto status = userAllowedCreateNS(opCtx, ns);
     if (!status.isOK()) {
         return status;
     }

@@ -522,6 +522,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         // This code path is only executed on secondaries and initial syncing nodes,
                         // so it is safe to exclude any writes from Flow Control.
                         opCtx->setShouldParticipateInFlowControl(false);
+                        opCtx->setEnforceConstraints(false);
 
                         status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
                             return applyOplogBatchPerWorker(opCtx.get(), &writer, &multikeyVector);

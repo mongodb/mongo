@@ -2148,7 +2148,7 @@ TEST_F(StorageInterfaceImplTest,
     // Checks that we can update collections with namespaces not considered "legal client system"
     // namespaces.
     NamespaceString nss("local.system.rollback.docs");
-    ASSERT_FALSE(nss.isLegalClientSystemNS());
+    ASSERT_FALSE(nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
 
     auto opCtx = getOperationContext();
     auto options = generateOptionsWithUuid();
@@ -2441,7 +2441,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterRemovesDocumentsInIllegalClientSy
     // Checks that we can remove documents from collections with namespaces not considered "legal
     // client system" namespaces.
     NamespaceString nss("local.system.rollback.docs");
-    ASSERT_FALSE(nss.isLegalClientSystemNS());
+    ASSERT_FALSE(nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
 
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;

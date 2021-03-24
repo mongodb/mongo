@@ -244,7 +244,7 @@ private:
             return;
         }
 
-        uassertStatusOK(userAllowedWriteNS(nss));
+        uassertStatusOK(userAllowedWriteNS(opCtx, nss));
 
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         // The collection with `uuid` might be renamed before the lock and the wrong namespace would

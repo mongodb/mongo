@@ -330,9 +330,8 @@ StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
         }
 
         const NamespaceString ns(fromDBName, collectionName.c_str());
-
         if (ns.isSystem()) {
-            if (!ns.isLegalClientSystemNS()) {
+            if (!ns.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 LOGV2_DEBUG(20419, 2, "\t\t not cloning because system collection");
                 continue;
             }
@@ -364,7 +363,7 @@ Status Cloner::_createCollectionsForDb(
 
         const NamespaceString nss(dbName, params.collectionName);
 
-        uassertStatusOK(userAllowedCreateNS(nss));
+        uassertStatusOK(userAllowedCreateNS(opCtx, nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);

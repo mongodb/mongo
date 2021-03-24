@@ -1304,7 +1304,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     const NamespaceString& nss(request->getNsString());
     if (!request->getGod()) {
         if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            uassert(12050, "cannot delete from system namespace", nss.isLegalClientSystemNS());
+            uassert(12050,
+                    "cannot delete from system namespace",
+                    nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
         }
     }
 
@@ -1478,7 +1480,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         uassert(10156,
                 str::stream() << "cannot update a system namespace: " << nss.ns(),
-                nss.isLegalClientSystemNS());
+                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
     }
 
     // If there is no collection and this is an upsert, callers are supposed to create

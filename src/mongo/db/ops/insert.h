@@ -49,10 +49,10 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj&
  * Returns Status::OK() if this namespace is valid for user write operations.  If not, returns
  * an error Status.
  */
-Status userAllowedWriteNS(const NamespaceString& ns);
+Status userAllowedWriteNS(OperationContext* opCtx, const NamespaceString& ns);
 
 /**
  * Checks if the namespace is valid for user create operations.
  */
-Status userAllowedCreateNS(const NamespaceString& ns);
+Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns);
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -390,7 +391,7 @@ public:
      * Returns true if a client can modify this namespace even though it is under ".system."
      * For example <dbname>.system.users is ok for regular clients to update.
      */
-    bool isLegalClientSystemNS() const;
+    bool isLegalClientSystemNS(const ServerGlobalParams::FeatureCompatibility& currentFCV) const;
 
     /**
      * Returns true if this namespace refers to a drop-pending collection.

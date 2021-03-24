@@ -371,7 +371,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
 CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                    const CreateIndexesCommand& cmd) {
     const auto ns = cmd.getNamespace();
-    uassertStatusOK(userAllowedWriteNS(ns));
+    uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
     // Disallow users from creating new indexes on config.transactions since the sessions code
     // was optimized to not update indexes
