@@ -29,11 +29,12 @@
 #ifndef TIMESTAMP_MANAGER_H
 #define TIMESTAMP_MANAGER_H
 
-#include "component.h"
 #include <atomic>
 #include <chrono>
 #include <sstream>
 #include <thread>
+
+#include "component.h"
 
 namespace test_harness {
 /*

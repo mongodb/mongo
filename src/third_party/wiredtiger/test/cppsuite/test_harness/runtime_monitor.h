@@ -101,10 +101,10 @@ class cache_limit_statistic : public statistic {
             std::string error_string =
               "runtime_monitor: Cache usage exceeded during test! Limit: " + std::to_string(limit) +
               " usage: " + std::to_string(use_percent);
-            debug_info(error_string, _trace_level, DEBUG_ERROR);
+            debug_print(error_string, DEBUG_ERROR);
             testutil_assert(use_percent < limit);
         } else
-            debug_info("Usage: " + std::to_string(use_percent), _trace_level, DEBUG_TRACE);
+            debug_print("Usage: " + std::to_string(use_percent), DEBUG_TRACE);
     }
 
     private:

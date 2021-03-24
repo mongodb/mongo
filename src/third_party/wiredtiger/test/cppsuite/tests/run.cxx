@@ -33,22 +33,7 @@
 #include "test_harness/debug_utils.h"
 #include "test_harness/test.h"
 
-class poc_test : public test_harness::test {
-    public:
-    poc_test(const std::string &config, int64_t trace_level) : test(config)
-    {
-        test_harness::_trace_level = trace_level;
-    }
-
-    void
-    run()
-    {
-        test::run();
-    }
-};
-
-const std::string poc_test::test::name = "poc_test";
-const std::string poc_test::test::default_config = "config_poc_default.txt";
+#include "poc_test.cxx"
 
 std::string
 parse_configuration_from_file(const std::string &filename)
@@ -101,66 +86,108 @@ parse_configuration_from_file(const std::string &filename)
 }
 
 void
-print_error(const std::string &str)
+value_missing_error(const std::string &str)
 {
-    std::cerr << "No value given for option " << str << std::endl;
+    test_harness::debug_print("Value missing for option " + str, DEBUG_ERROR);
+}
+
+/*
+ * Run a specific test.
+ * config_name is the configuration name. The default configuration is used if it is left empty.
+ */
+int64_t
+run_test(const std::string &test_name, const std::string &config_name = "")
+{
+    std::string cfg, cfg_path;
+    int error_code = 0;
+
+    if (config_name.empty())
+        cfg_path = "configs/config_" + test_name + "_default.txt";
+    else
+        cfg_path = config_name;
+    cfg = parse_configuration_from_file(cfg_path);
+
+    test_harness::debug_print("Configuration\t: " + cfg, DEBUG_INFO);
+
+    if (test_name == "poc_test")
+        poc_test(cfg, test_name).run();
+    else {
+        test_harness::debug_print("Test not found: " + test_name, DEBUG_ERROR);
+        error_code = -1;
+    }
+
+    if (error_code == 0)
+        test_harness::debug_print("Test " + test_name + " done.", DEBUG_INFO);
+
+    return (error_code);
 }
 
 int
 main(int argc, char *argv[])
 {
-    std::string cfg, filename;
-    int64_t trace_level = 0, error_code = 0;
+    std::string cfg, config_name, test_name;
+    int64_t error_code = 0;
+    const std::vector<std::string> all_tests = {"poc_test"};
 
     /* Parse args
      * -C   : Configuration. Cannot be used with -f.
      * -f   : Filename that contains the configuration. Cannot be used with -C.
-     * -t   : Trace level.
+     * -l   : Trace level.
+     * -t   : Test to run. All tests are run if not specified.
      */
     for (int i = 1; (i < argc) && (error_code == 0); ++i) {
         if (std::string(argv[i]) == "-C") {
-            if (!filename.empty()) {
-                std::cerr << "Option -C cannot be used with -f" << std::endl;
+            if (!config_name.empty()) {
+                test_harness::debug_print("Option -C cannot be used with -f", DEBUG_ERROR);
                 error_code = -1;
             } else if ((i + 1) < argc)
                 cfg = argv[++i];
             else {
-                print_error(argv[i]);
+                value_missing_error(argv[i]);
                 error_code = -1;
             }
         } else if (std::string(argv[i]) == "-f") {
             if (!cfg.empty()) {
-                std::cerr << "Option -f cannot be used with -C" << std::endl;
+                test_harness::debug_print("Option -f cannot be used with -C", DEBUG_ERROR);
                 error_code = -1;
             } else if ((i + 1) < argc)
-                filename = argv[++i];
+                config_name = argv[++i];
             else {
-                print_error(argv[i]);
+                value_missing_error(argv[i]);
                 error_code = -1;
             }
         } else if (std::string(argv[i]) == "-t") {
             if ((i + 1) < argc)
-                trace_level = std::stoi(argv[++i]);
+                test_name = argv[++i];
             else {
-                print_error(argv[i]);
+                value_missing_error(argv[i]);
+                error_code = -1;
+            }
+        } else if (std::string(argv[i]) == "-l") {
+            if ((i + 1) < argc)
+                test_harness::_trace_level = std::stoi(argv[++i]);
+            else {
+                value_missing_error(argv[i]);
                 error_code = -1;
             }
         }
     }
 
     if (error_code == 0) {
-        /* Check if default configuration should be used. */
-        if (cfg.empty() && filename.empty())
-            cfg = parse_configuration_from_file(
-              "configs/" + poc_test::test::default_config);
-        else if (!filename.empty())
-            cfg =
-              parse_configuration_from_file(filename);
-
-        std::cout << "Configuration\t:" << cfg << std::endl;
-        std::cout << "Trace level\t:" << trace_level << std::endl;
-
-        poc_test(cfg, trace_level).run();
+        test_harness::debug_print(
+          "Trace level\t:" + std::to_string(test_harness::_trace_level), DEBUG_INFO);
+        if (test_name.empty()) {
+            /* Run all tests. */
+            test_harness::debug_print("Running all tests.", DEBUG_INFO);
+            for (auto const &it : all_tests) {
+                error_code = run_test(it);
+                if (error_code != 0) {
+                    test_harness::debug_print("Test " + it + " failed.", DEBUG_ERROR);
+                    break;
+                }
+            }
+        } else
+            error_code = run_test(test_name, config_name);
     }
 
     return (error_code);

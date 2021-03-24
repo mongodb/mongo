@@ -29,6 +29,8 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
+#include <string>
+
 extern "C" {
 #include "test_util.h"
 }
