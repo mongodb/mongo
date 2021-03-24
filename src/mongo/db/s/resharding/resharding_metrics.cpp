@@ -327,6 +327,7 @@ BSONObj ReshardingMetrics::reportForCurrentOp(const ReporterOptions& options) co
 }
 
 boost::optional<Milliseconds> ReshardingMetrics::getOperationElapsedTime() const {
+    stdx::lock_guard<Latch> lk(_mutex);
     if (!_currentOp)
         return boost::none;
     return _currentOp->runningOperation.duration();
