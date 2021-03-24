@@ -149,7 +149,6 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
         switch (rcArgs.getMajorityReadMechanism()) {
             case repl::ReadConcernArgs::MajorityReadMechanism::kMajoritySnapshot: {
                 // Make sure we read from the majority snapshot.
-                opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->recoveryUnit()->setTimestampReadSource(
                     RecoveryUnit::ReadSource::kMajorityCommitted);
                 uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
@@ -158,7 +157,6 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
             case repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative: {
                 // Mark the operation as speculative and select the correct read source.
                 repl::SpeculativeMajorityReadInfo::get(opCtx).setIsSpeculativeRead();
-                opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoOverlap);
                 break;
             }
@@ -170,7 +168,6 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
         !opCtx->inMultiDocumentTransaction()) {
         auto atClusterTime = rcArgs.getArgsAtClusterTime();
         invariant(atClusterTime && *atClusterTime != LogicalTime::kUninitialized);
-        opCtx->recoveryUnit()->abandonSnapshot();
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                       atClusterTime->asTimestamp());
     }
@@ -397,6 +394,20 @@ public:
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
             int64_t cursorId = _cmd.getCommandParameter();
 
+            // Setup OperationContext state for this operation which will set the correct read
+            // source if needed. Do this before instantiating the AutoGetCollection* object so we
+            // don't attept to override the state that has been setup. Ensure the lsid and txnNumber
+            // of the getMore match that of the originating command.
+            validateLSID(opCtx, cursorId, cursorPin.getCursor());
+            validateTxnNumber(opCtx, cursorId, cursorPin.getCursor());
+
+            const bool disableAwaitDataFailpointActive =
+                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
+
+            // Inherit properties like readConcern and maxTimeMS from our originating cursor.
+            setUpOperationContextStateForGetMore(
+                opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
+
             if (cursorPin->getExecutor()->lockPolicy() ==
                 PlanExecutor::LockPolicy::kLocksInternally) {
                 if (!nss.isCollectionlessCursorNamespace()) {
@@ -459,10 +470,6 @@ public:
                                         << cursorPin->nss().ns());
             }
 
-            // Ensure the lsid and txnNumber of the getMore match that of the originating command.
-            validateLSID(opCtx, cursorId, cursorPin.getCursor());
-            validateTxnNumber(opCtx, cursorId, cursorPin.getCursor());
-
             if (nss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
                 uasserted(ErrorCodes::CommandFailed,
                           str::stream() << "getMore on " << nss.ns()
@@ -506,13 +513,6 @@ public:
                     dropAndReacquireReadLockIfLocked,
                     nss);
             }
-
-            const bool disableAwaitDataFailpointActive =
-                MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());
-
-            // Inherit properties like readConcern and maxTimeMS from our originating cursor.
-            setUpOperationContextStateForGetMore(
-                opCtx, *cursorPin.getCursor(), _cmd, disableAwaitDataFailpointActive);
 
             if (!cursorPin->isAwaitData()) {
                 opCtx->checkForInterrupt();  // May trigger maxTimeAlwaysTimeOut fail point.
