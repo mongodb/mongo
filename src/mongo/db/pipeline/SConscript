@@ -276,6 +276,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/mongo/db/exec/bucket_unpacker',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/exec/projection_executor',
         '$BUILD_DIR/mongo/db/exec/scoped_timer',

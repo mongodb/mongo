@@ -878,4 +878,29 @@ struct UnionWithStats final : public SpecificStats {
     PlanSummaryStats planSummaryStats;
 };
 
+struct UnpackTimeseriesBucketStats final : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<UnpackTimeseriesBucketStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this);
+    }
+
+    size_t nBucketsUnpacked = 0u;
+};
+
+struct SampleFromTimeseriesBucketStats final : public SpecificStats {
+    std::unique_ptr<SpecificStats> clone() const final {
+        return std::make_unique<SampleFromTimeseriesBucketStats>(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const {
+        return sizeof(*this);
+    }
+
+    size_t nBucketsDiscarded = 0u;
+    size_t dupsTested = 0u;
+    size_t dupsDropped = 0u;
+};
 }  // namespace mongo

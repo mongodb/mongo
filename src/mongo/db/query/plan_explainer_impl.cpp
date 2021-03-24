@@ -427,6 +427,15 @@ void statsToBSON(const PlanStageStats& stats,
             bob->appendNumber("nCounted", spec->nCounted);
             bob->appendNumber("nSkipped", spec->nSkipped);
         }
+    } else if (STAGE_SAMPLE_FROM_TIMESERIES_BUCKET == stats.stageType) {
+        SampleFromTimeseriesBucketStats* spec =
+            static_cast<SampleFromTimeseriesBucketStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("nBucketsDiscarded", static_cast<long long>(spec->nBucketsDiscarded));
+            bob->appendNumber("dupsTested", static_cast<long long>(spec->dupsTested));
+            bob->appendNumber("dupsDropped", static_cast<long long>(spec->dupsDropped));
+        }
     } else if (STAGE_SHARDING_FILTER == stats.stageType) {
         ShardingFilterStats* spec = static_cast<ShardingFilterStats*>(stats.specific.get());
 
@@ -476,6 +485,13 @@ void statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("docsExamined", static_cast<long long>(spec->fetches));
+        }
+    } else if (STAGE_UNPACK_TIMESERIES_BUCKET == stats.stageType) {
+        UnpackTimeseriesBucketStats* spec =
+            static_cast<UnpackTimeseriesBucketStats*>(stats.specific.get());
+
+        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+            bob->appendNumber("nBucketsUnpacked", static_cast<long long>(spec->nBucketsUnpacked));
         }
     } else if (STAGE_UPDATE == stats.stageType) {
         UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
