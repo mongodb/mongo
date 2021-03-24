@@ -377,6 +377,9 @@ private:
 
     // Promise that is resolved when the chain of work kicked off by run() has completed.
     SharedPromise<void> _completionPromise;
+
+    // Callback handle for scheduled work to handle critical section timeout.
+    boost::optional<executor::TaskExecutor::CallbackHandle> _criticalSectionTimeoutCbHandle;
 };
 
 }  // namespace mongo

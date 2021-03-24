@@ -275,6 +275,15 @@ void ReshardingCoordinatorObserver::interrupt(Status status) {
     }
 }
 
+void ReshardingCoordinatorObserver::onCriticalSectionTimeout() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {
+        _allRecipientsReportedStrictConsistencyTimestamp.setError(
+            Status{ErrorCodes::ReshardingCriticalSectionTimeout,
+                   "Resharding critical section timed out."});
+    }
+}
+
 void ReshardingCoordinatorObserver::_onAbortOrStepdown(WithLock, Status status) {
     if (!_allDonorsReportedMinFetchTimestamp.getFuture().isReady()) {
         _allDonorsReportedMinFetchTimestamp.setError(status);
