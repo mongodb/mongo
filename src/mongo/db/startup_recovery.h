@@ -32,8 +32,6 @@
 #include "mongo/db/storage/storage_engine_init.h"  // for LastStorageEngineShutdownState
 
 namespace mongo {
-class OperationContext;
-
 namespace startup_recovery {
 
 /**
@@ -42,6 +40,6 @@ namespace startup_recovery {
  */
 void repairAndRecoverDatabases(OperationContext* opCtx,
                                LastStorageEngineShutdownState lastStorageEngineShutdownState);
-}  // namespace startup_recovery
 
+}  // namespace startup_recovery
 }  // namespace mongo

@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "startup_recovery.h"
+#include "mongo/db/startup_recovery.h"
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -65,13 +65,12 @@
 #endif
 
 namespace mongo {
+namespace {
 
 // Exit after repair has started, but before data is repaired.
 MONGO_FAIL_POINT_DEFINE(exitBeforeDataRepair);
 // Exit after repairing data, but before the replica set configuration is invalidated.
 MONGO_FAIL_POINT_DEFINE(exitBeforeRepairInvalidatesConfig);
-
-namespace {
 
 // Returns true if storage engine is writable.
 bool isWriteableStorageEngine() {
@@ -302,7 +301,6 @@ void assertFilesCompatible(OperationContext* opCtx, StorageEngine* storageEngine
     quickExit(EXIT_NEED_UPGRADE);
     MONGO_UNREACHABLE;
 }
-
 
 /**
  * Returns 'true' if this server has a configuration document in local.system.replset.
@@ -599,6 +597,7 @@ void startupRecovery(OperationContext* opCtx,
 }  // namespace
 
 namespace startup_recovery {
+
 /**
  * Recovers or repairs all databases from a previous shutdown. May throw a MustDowngrade error
  * if data files are incompatible with the current binary version.
@@ -625,5 +624,6 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
 
     assertFilesCompatible(opCtx, storageEngine);
 }
+
 }  // namespace startup_recovery
 }  // namespace mongo
