@@ -378,6 +378,7 @@ InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChu
                                                      shardKeyPattern.getKeyPattern().globalMax()),
                                           balancerConfig->getMaxChunkSizeBytes(),
                                           0));
+
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     return generateShardCollectionInitialChunks(params,
                                                 shardKeyPattern,
@@ -726,21 +727,16 @@ ReshardingSplitPolicy ReshardingSplitPolicy::make(OperationContext* opCtx,
                                                   boost::optional<std::vector<TagsType>> zones,
                                                   int samplesPerChunk) {
     uassert(4952603, "samplesPerChunk should be > 0", samplesPerChunk > 0);
-    return ReshardingSplitPolicy(reshardingTempNs,
-                                 numInitialChunks,
-                                 zones,
-                                 ReshardingSplitPolicy::_makePipelineDocumentSource(
-                                     opCtx, origNs, shardKey, numInitialChunks, samplesPerChunk));
+    return ReshardingSplitPolicy(
+        numInitialChunks,
+        zones,
+        _makePipelineDocumentSource(opCtx, origNs, shardKey, numInitialChunks, samplesPerChunk));
 }
 
-ReshardingSplitPolicy::ReshardingSplitPolicy(const NamespaceString& ns,
-                                             int numInitialChunks,
+ReshardingSplitPolicy::ReshardingSplitPolicy(int numInitialChunks,
                                              boost::optional<std::vector<TagsType>> zones,
                                              std::unique_ptr<SampleDocumentSource> samples)
-    : _ns(ns),
-      _numInitialChunks(numInitialChunks),
-      _zones(std::move(zones)),
-      _samples(std::move(samples)) {
+    : _numInitialChunks(numInitialChunks), _zones(std::move(zones)), _samples(std::move(samples)) {
     uassert(4952602, "numInitialChunks should be > 0", numInitialChunks > 0);
     uassert(4952604, "provided zones should not be empty", !_zones || _zones->size());
 }
@@ -814,7 +810,7 @@ InitialSplitPolicy::ShardCollectionConfig ReshardingSplitPolicy::createFirstChun
     for (const auto& splitPoint : splitPoints) {
         auto bestShard = selectBestShard(
             chunkDistribution, zoneInfo, zoneToShardMap, {lastChunkMax, splitPoint});
-        appendChunk(_ns,
+        appendChunk(params.nss,
                     collectionUUID,
                     lastChunkMax,
                     splitPoint,
