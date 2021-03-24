@@ -1001,7 +1001,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                   const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
             return _persistDecisionAndFinishReshardOperation(executor, updatedCoordinatorDoc);
         })
-        .onCompletion([this, self = shared_from_this()](Status status) {
+        .onCompletion([this, self = shared_from_this(), executor](Status status) {
             // TODO SERVER-53914 depending on where we load metrics at the start of the operation,
             // this may need to change
             if (_coordinatorDoc.getState() != CoordinatorStateEnum::kUnused) {
@@ -1019,6 +1019,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 _completionPromise.emplaceValue();
             } else {
                 _completionPromise.setError(status);
+            }
+
+            if (_criticalSectionTimeoutCbHandle) {
+                (*executor)->cancel(*_criticalSectionTimeoutCbHandle);
             }
 
             return status;
@@ -1243,7 +1247,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
                _reshardingCoordinatorObserver->awaitAllRecipientsFinishedApplying(),
                _ctHolder->getAbortToken())
         .thenRunOn(**executor)
-        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+        .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             {
                 auto opCtx = cc().makeOperationContext();
                 reshardingPauseCoordinatorInSteadyState.pauseWhileSetAndNotCanceled(
@@ -1252,6 +1256,23 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               coordinatorDocChangedOnDisk);
+
+            const auto criticalSectionTimeout =
+                Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
+            auto swCbHandle = (*executor)->scheduleWorkAt(
+                (*executor)->now() + criticalSectionTimeout,
+                [this](const executor::TaskExecutor::CallbackArgs& cbData) {
+                    if (!cbData.status.isOK()) {
+                        return;
+                    }
+                    _reshardingCoordinatorObserver->onCriticalSectionTimeout();
+                });
+
+            if (!swCbHandle.isOK()) {
+                _reshardingCoordinatorObserver->interrupt(swCbHandle.getStatus());
+            }
+
+            _criticalSectionTimeoutCbHandle = swCbHandle.getValue();
         });
 }
 

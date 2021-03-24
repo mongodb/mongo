@@ -119,3 +119,15 @@ server_parameters:
             expr: 5 * 60 * 1000
         validator:
             gte: 0
+    
+    reshardingCriticalSectionTimeoutMillis:
+        description: >-
+            The upper limit on how long to wait to hear back from recipient shards reaching strict
+            consistency after engaging the critical section.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingCriticalSectionTimeoutMillis
+        default:
+            expr: 5 * 1000
+        validator:
+            gte: 0

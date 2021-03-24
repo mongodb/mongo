@@ -110,6 +110,12 @@ public:
     SharedSemiFuture<void> awaitAllParticipantsDoneAborting();
 
     /**
+     * Checks if all recipients are in steady state. Otherwise, sets an error state so that
+     * resharding is aborted.
+     */
+    void onCriticalSectionTimeout();
+
+    /**
      * Sets errors on any promises that have not yet been fulfilled.
      */
     void interrupt(Status status);
