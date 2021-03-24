@@ -72,8 +72,10 @@ constexpr auto kMirroredReadsSeenKey = "seen"_sd;
 constexpr auto kMirroredReadsSentKey = "sent"_sd;
 constexpr auto kMirroredReadsResolvedKey = "resolved"_sd;
 constexpr auto kMirroredReadsResolvedBreakdownKey = "resolvedBreakdown"_sd;
+constexpr auto kMirroredReadsPendingKey = "pending"_sd;
 
 MONGO_FAIL_POINT_DEFINE(mirrorMaestroExpectsResponse);
+MONGO_FAIL_POINT_DEFINE(mirrorMaestroTracksPending);
 
 class MirrorMaestroImpl {
 public:
@@ -186,7 +188,9 @@ public:
             section.append(kMirroredReadsResolvedKey, resolved.loadRelaxed());
             section.append(kMirroredReadsResolvedBreakdownKey, resolvedBreakdown.toBSON());
         }
-
+        if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
+            section.append(kMirroredReadsPendingKey, pending.loadRelaxed());
+        }
         return section.obj();
     };
 
@@ -227,6 +231,8 @@ public:
     AtomicWord<CounterT> seen;
     AtomicWord<CounterT> sent;
     AtomicWord<CounterT> resolved;
+    // Counts the number of operations that are scheduled to be mirrored, but haven't yet been sent.
+    AtomicWord<CounterT> pending;
 } gMirroredReadsSection;
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
@@ -330,9 +336,20 @@ void MirrorMaestroImpl::tryMirror(std::shared_ptr<CommandInvocation> invocation)
     // building new bsons and evaluating randomness in a less important context.
     auto requestState = std::make_unique<MirroredRequestState>(
         this, std::move(hosts), std::move(invocation), std::move(params));
+    if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
+        // We've scheduled the operation to be mirrored; it is now "pending" until it has actually
+        // been sent to a secondary.
+        gMirroredReadsSection.pending.fetchAndAdd(1);
+    }
     ExecutorFuture(_executor)  //
         .getAsync([clientExecutorHandle,
                    requestState = std::move(requestState)](const auto& status) mutable {
+            ON_BLOCK_EXIT([&] {
+                if (MONGO_unlikely(mirrorMaestroTracksPending.shouldFail())) {
+                    // The read has been sent to at least one secondary, so it's no longer pending
+                    gMirroredReadsSection.pending.fetchAndSubtract(1);
+                }
+            });
             if (!ErrorCodes::isShutdownError(status)) {
                 invariant(status.isOK());
                 requestState->mirror();
