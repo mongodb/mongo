@@ -237,7 +237,8 @@ commands:
                 type: array<string>
                 optional: true
             saslSupportedMechs:
-                type: UserName
+                type: 
+                    variant: [string, object_owned]
                 optional: true
             speculativeAuthenticate:
                 type: object

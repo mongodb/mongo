@@ -39,6 +39,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo {
 
@@ -54,16 +55,29 @@ public:
 
     /**
      * Parses a string of the form "db.username" into a UserName object.
+     * Don't change the logic of this function as it will break stable API version 1.
      */
     static StatusWith<UserName> parse(StringData userNameStr);
 
-    /*
+    /**
      * These methods support parsing usernames from IDL
+     * Don't change the logic of this function as it will break stable API version 1.
      */
+    static UserName parseFromVariant(
+        const stdx::variant<std::string, mongo::BSONObj>& helloUserName);
+    static UserName parseFromBSONObj(const BSONObj& obj);
     static UserName parseFromBSON(const BSONElement& elem);
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
     void serializeToBSON(BSONArrayBuilder* bob) const;
+
+    /**
+     * Don't change the logic of this function as it will break stable API version 1.
+     */
     void appendToBSON(BSONObjBuilder* bob) const;
+
+    /**
+     * Don't change the logic of this function as it will break stable API version 1.
+     */
     BSONObj toBSON() const;
 
     /**

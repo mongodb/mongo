@@ -124,10 +124,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'findAndModify-reply-upserted',
     'explain-param-collation',
     'explain-param-use44SortKeys',
-    'explain-param-useNewUpsert',
-
-    # TODO (SERVER-54927): Decide what to do with commands: (hello).
-    'hello-param-saslSupportedMechs'
+    'explain-param-useNewUpsert'
 ]
 
 SKIPPED_FILES = ["unittest.idl"]
