@@ -72,33 +72,6 @@ private:
     std::unique_ptr<PartitionIterator> _iter;
 };
 
-class WindowFunctionExecRemovableDocumentTest : public AggregationContextFixture {
-public:
-    WindowFunctionExecRemovableDocumentTest() {}
-    WindowFunctionExecRemovableDocument createForFieldPath(
-        std::deque<DocumentSource::GetNextResult> docs,
-        const std::string& inputPath,
-        WindowBounds::DocumentBased bounds) {
-        _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter =
-            std::make_unique<PartitionIterator>(getExpCtx().get(), _docSource.get(), boost::none);
-        auto input = ExpressionFieldPath::parse(
-            getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
-        std::unique_ptr<WindowFunctionState> maxFunc =
-            std::make_unique<WindowFunctionMax>(getExpCtx().get());
-        return WindowFunctionExecRemovableDocument(
-            _iter.get(), std::move(input), std::move(maxFunc), bounds);
-    }
-
-    auto advanceIterator() {
-        return _iter->advance();
-    }
-
-private:
-    boost::intrusive_ptr<DocumentSourceMock> _docSource;
-    std::unique_ptr<PartitionIterator> _iter;
-};
-
 TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithoutLookahead) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
@@ -176,6 +149,26 @@ TEST_F(WindowFunctionExecNonRemovableTest, FullPartitionWindow) {
     ASSERT_VALUE_EQ(Value(6), mgr.getNext());
     advanceIterator();
     ASSERT_VALUE_EQ(Value(6), mgr.getNext());
+}
+
+TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariables) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
+    auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto iter =
+        std::make_unique<PartitionIterator>(getExpCtx().get(), docSource.get(), boost::none);
+    auto filterBSON =
+        fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
+    auto input = ExpressionFilter::parse(
+        getExpCtx().get(), filterBSON.firstElement(), getExpCtx()->variablesParseState);
+    auto exec = WindowFunctionExecNonRemovable<AccumulatorState>(
+        iter.get(), std::move(input), AccumulatorFirst::create(getExpCtx().get()), 1);
+    // The input is a constant [2, 3] for each document.
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
+    iter->advance();
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
+    iter->advance();
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
 }
 
 }  // namespace

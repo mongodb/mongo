@@ -306,5 +306,26 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, CanResetFunction) {
     }
 }
 
+TEST_F(WindowFunctionExecRemovableDocumentTest, InputExpressionAllowedToCreateVariables) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
+    auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
+    auto iter =
+        std::make_unique<PartitionIterator>(getExpCtx().get(), docSource.get(), boost::none);
+    auto filterBSON =
+        fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
+    auto input = ExpressionFilter::parse(
+        getExpCtx().get(), filterBSON.firstElement(), getExpCtx()->variablesParseState);
+    auto maxFunc = std::make_unique<WindowFunctionMax>(getExpCtx().get());
+    auto mgr = WindowFunctionExecRemovableDocument(
+        iter.get(), std::move(input), std::move(maxFunc), WindowBounds::DocumentBased{-1, 0});
+    // The input is a constant [2, 3] for each document.
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+    iter->advance();
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+    iter->advance();
+    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+}
+
 }  // namespace
 }  // namespace mongo

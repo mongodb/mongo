@@ -68,7 +68,7 @@ void WindowFunctionExecRemovableDocument::initialize() {
     for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[i]) {
-            addValue(_input->evaluate(*doc, nullptr));
+            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         } else {
             break;
         }
@@ -80,7 +80,7 @@ void WindowFunctionExecRemovableDocument::processDocumentsToUpperBound() {
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[_upperBound.get()]) {
-            addValue(_input->evaluate(*doc, nullptr));
+            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         }
     }
 }
