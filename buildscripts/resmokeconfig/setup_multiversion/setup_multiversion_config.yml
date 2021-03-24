@@ -1,3 +1,10 @@
+# This file contains the list of all build variants running on *ALL* Evergreen mongo waterfalls.
+# This enables arbitrary versions of mongo binaries/artifacts/debug symbols to be downloaded
+# with `python buildscripts/resmoke.py setup-multiversion`
+#
+# PLEASE DO NOT REMOVE ANYTHING, unless a build variant no longer runs in any Evergreen project.
+
+
 evergreen_projects:
   - mongodb-mongo-master
   - mongodb-mongo-v4.8
@@ -10,6 +17,15 @@ evergreen_projects:
 
 
 evergreen_buildvariants:
+  - name: ubuntu1604
+    edition: targeted
+    platform: ubuntu1604
+    architecture: x86_64
+
+  - name: enterprise-ubuntu1604-64
+    edition: enterprise
+    platform: ubuntu1604
+    architecture: x86_64
 
   - name: ubuntu1804
     edition: targeted
@@ -84,6 +100,16 @@ evergreen_buildvariants:
   - name: enterprise-amazon2
     edition: enterprise
     platform: amazon2
+    architecture: x86_64
+
+  - name: rhel62
+    edition: targeted
+    platform: rhel62
+    architecture: x86_64
+
+  - name: enterprise-rhel-62-64-bit
+    edition: enterprise
+    platform: rhel62
     architecture: x86_64
 
   - name: rhel70
