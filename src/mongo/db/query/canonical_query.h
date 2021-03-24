@@ -77,7 +77,7 @@ public:
      */
     static StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(
         OperationContext* opCtx,
-        std::unique_ptr<FindCommand> findCommand,
+        std::unique_ptr<FindCommandRequest> findCommand,
         bool explain = false,
         const boost::intrusive_ptr<ExpressionContext>& expCtx = nullptr,
         const ExtensionsCallback& extensionsCallback = ExtensionsCallbackNoop(),
@@ -118,7 +118,7 @@ public:
      * error.
      */
     static StatusWith<QueryMetadataBitSet> isValid(MatchExpression* root,
-                                                   const FindCommand& findCommand);
+                                                   const FindCommandRequest& findCommand);
 
     const NamespaceString nss() const {
         invariant(_findCommand->getNamespaceOrUUID().nss());
@@ -137,7 +137,7 @@ public:
     const BSONObj& getQueryObj() const {
         return _findCommand->getFilter();
     }
-    const FindCommand& getFindCommand() const {
+    const FindCommandRequest& getFindCommandRequest() const {
         return *_findCommand;
     }
 
@@ -237,7 +237,7 @@ private:
 
     Status init(OperationContext* opCtx,
                 boost::intrusive_ptr<ExpressionContext> expCtx,
-                std::unique_ptr<FindCommand> findCommand,
+                std::unique_ptr<FindCommandRequest> findCommand,
                 bool canHaveNoopMatchNodes,
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies);
@@ -250,7 +250,7 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    std::unique_ptr<FindCommand> _findCommand;
+    std::unique_ptr<FindCommandRequest> _findCommand;
 
     std::unique_ptr<MatchExpression> _root;
 

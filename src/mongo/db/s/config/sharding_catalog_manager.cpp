@@ -102,7 +102,7 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
 void startTransactionWithNoopFind(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   TxnNumber txnNumber) {
-    FindCommand findCommand(nss);
+    FindCommandRequest findCommand(nss);
     findCommand.setBatchSize(0);
     findCommand.setSingleBatch(true);
 
@@ -188,7 +188,7 @@ void updateConfigDocumentDBDirect(OperationContext* opCtx,
 
     DBDirectClient client(opCtx);
 
-    write_ops::Update updateOp(nss, [&] {
+    write_ops::UpdateCommandRequest updateOp(nss, [&] {
         write_ops::UpdateOpEntry u;
         u.setQ(query);
         u.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
@@ -196,8 +196,8 @@ void updateConfigDocumentDBDirect(OperationContext* opCtx,
         u.setUpsert(upsert);
         return std::vector{u};
     }());
-    updateOp.setWriteCommandBase([] {
-        write_ops::WriteCommandBase base;
+    updateOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase base;
         base.setOrdered(false);
         return base;
     }());
@@ -1014,7 +1014,7 @@ void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
 
     auto doBatchInsert = [&]() {
         BatchedCommandRequest request([&] {
-            write_ops::Insert insertOp(nss);
+            write_ops::InsertCommandRequest insertOp(nss);
             insertOp.setDocuments(workingBatch);
             return insertOp;
         }());

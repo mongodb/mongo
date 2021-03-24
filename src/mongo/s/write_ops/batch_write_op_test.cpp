@@ -127,7 +127,7 @@ TEST_F(BatchWriteOpTest, SingleOp) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -160,7 +160,7 @@ TEST_F(BatchWriteOpTest, SingleError) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({buildDelete(BSON("x" << 1), false)});
         return deleteOp;
     }());
@@ -199,7 +199,7 @@ TEST_F(BatchWriteOpTest, SingleTargetError) {
 
     // Do untargetable delete op
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({buildDelete(BSON("x" << 1), false)});
         return deleteOp;
     }());
@@ -233,7 +233,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -275,7 +275,7 @@ TEST_F(BatchWriteOpTest, SingleStaleError) {
     auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -330,7 +330,7 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardOrdered) {
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
+        write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates(
             {buildUpdate(BSON("x" << 1), false), buildUpdate(BSON("x" << 2), false)});
         return updateOp;
@@ -367,9 +367,9 @@ TEST_F(BatchWriteOpTest, MultiOpSameShardUnordered) {
 
     // Do single-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -411,7 +411,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsOrdered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 1)});
         return insertOp;
     }());
@@ -478,9 +478,9 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsUnordered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -524,7 +524,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachOrdered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 2), true),
                              buildDelete(BSON("x" << GTE << -2 << LT << 1), true)});
         return deleteOp;
@@ -580,9 +580,9 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardsEachUnordered) {
 
     // Do multi-target, multi-doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -627,7 +627,7 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsOrdered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({
             // These go to the same shard
             buildDelete(BSON("x" << -1), false),
@@ -722,9 +722,9 @@ TEST_F(BatchWriteOpTest, MultiOpOneOrTwoShardsUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -776,9 +776,9 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -837,9 +837,9 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -895,9 +895,9 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
-        deleteOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -958,7 +958,7 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 2), true),
                              buildDelete(BSON("x" << GTE << -2 << LT << 1), true)});
         return deleteOp;
@@ -1019,9 +1019,9 @@ TEST_F(BatchWriteOpTest, MultiOpErrorAndWriteConcernErrorUnordered) {
     auto targeter = initTargeterFullRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1064,9 +1064,9 @@ TEST_F(BatchWriteOpTest, SingleOpErrorAndWriteConcernErrorOrdered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1119,7 +1119,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetOrdered) {
     auto targeter = initTargeterHalfRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2), BSON("x" << -2)});
         return insertOp;
     }());
@@ -1174,9 +1174,9 @@ TEST_F(BatchWriteOpTest, MultiOpFailedTargetUnordered) {
     auto targeter = initTargeterHalfRange(nss, endpoint);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1229,7 +1229,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2), BSON("x" << 3)});
         return insertOp;
     }());
@@ -1277,9 +1277,9 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1334,7 +1334,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2), BSON("x" << 3)});
         return insertOp;
     }());
@@ -1379,9 +1379,9 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1420,7 +1420,7 @@ TEST_F(BatchWriteOpTest, MultiOpTwoWCErrors) {
     auto targeter = initTargeterSplitRange(nss, endpointA, endpointB);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({BSON("x" << -1), BSON("x" << 2)});
         return insertOp;
     }());
@@ -1473,9 +1473,9 @@ TEST_F(BatchWriteOpLimitTests, OneBigDoc) {
 
     // Do single-target, single doc batch write op
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase wcb;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
             wcb.setOrdered(false);
             return wcb;
         }());
@@ -1508,7 +1508,7 @@ TEST_F(BatchWriteOpLimitTests, OneBigOneSmall) {
     const std::string bigString(BSONObjMaxUserSize, 'x');
 
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
+        write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({buildUpdate(BSON("x" << 1), BSON("data" << bigString), false),
                              buildUpdate(BSON("x" << 2), BSONObj(), false)});
         return updateOp;
@@ -1575,7 +1575,7 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Delete) {
 
     // Untargetable delete op.
     BatchedCommandRequest deleteRequest([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({buildDelete(BSON("x" << 1), false)});
         return deleteOp;
     }());
@@ -1605,7 +1605,7 @@ TEST_F(BatchWriteOpTransactionTest, ThrowTargetingErrorsInTransaction_Update) {
 
     // Untargetable update op.
     BatchedCommandRequest updateRequest([&] {
-        write_ops::Update updateOp(nss);
+        write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({buildUpdate(BSON("x" << 1), BSONObj(), false)});
         return updateOp;
     }());

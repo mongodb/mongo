@@ -71,7 +71,7 @@ public:
                                                const boost::optional<BSONObj>& hint = boost::none);
 
     Status runAggregation(OperationContext* opCtx,
-                          const AggregateCommand& aggRequest,
+                          const AggregateCommandRequest& aggRequest,
                           std::function<bool(const std::vector<BSONObj>& batch)> callback);
 
 private:

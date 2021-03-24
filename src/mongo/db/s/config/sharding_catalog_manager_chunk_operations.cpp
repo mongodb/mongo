@@ -494,7 +494,7 @@ std::vector<ShardId> getShardsOwningChunksForCollection(OperationContext* opCtx,
     const CollectionType coll(findCollResponse.docs[0]);
     const auto nsOrUUID = getNsOrUUIDForChunkTargeting(coll);
 
-    DistinctCommand distinctCmd(ChunkType::ConfigNS, ChunkType::shard.name());
+    DistinctCommandRequest distinctCmd(ChunkType::ConfigNS, ChunkType::shard.name());
     if (nsOrUUID.uuid()) {
         distinctCmd.setQuery(BSON(ChunkType::collectionUUID << *(nsOrUUID.uuid())));
     } else {

@@ -118,7 +118,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     // expensive createDatabase flow.
     while (true) {
         auto response = client.findAndModify([&] {
-            write_ops::FindAndModifyCommand findAndModify(DatabaseType::ConfigNS);
+            write_ops::FindAndModifyCommandRequest findAndModify(DatabaseType::ConfigNS);
             findAndModify.setQuery([&] {
                 BSONObjBuilder queryFilterBuilder;
                 queryFilterBuilder.append(DatabaseType::name.name(), dbName);

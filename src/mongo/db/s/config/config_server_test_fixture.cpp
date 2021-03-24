@@ -193,16 +193,17 @@ std::shared_ptr<Shard> ConfigServerTestFixture::getConfigShard() const {
 Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc) {
-    auto insertResponse = getConfigShard()->runCommand(opCtx,
-                                                       kReadPref,
-                                                       ns.db().toString(),
-                                                       [&]() {
-                                                           write_ops::Insert insertOp(ns);
-                                                           insertOp.setDocuments({doc});
-                                                           return insertOp.toBSON({});
-                                                       }(),
-                                                       Shard::kDefaultConfigCommandTimeout,
-                                                       Shard::RetryPolicy::kNoRetry);
+    auto insertResponse =
+        getConfigShard()->runCommand(opCtx,
+                                     kReadPref,
+                                     ns.db().toString(),
+                                     [&]() {
+                                         write_ops::InsertCommandRequest insertOp(ns);
+                                         insertOp.setDocuments({doc});
+                                         return insertOp.toBSON({});
+                                     }(),
+                                     Shard::kDefaultConfigCommandTimeout,
+                                     Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
     auto status = Shard::CommandResponse::processBatchWriteResponse(insertResponse, &batchResponse);
@@ -219,7 +220,7 @@ Status ConfigServerTestFixture::updateToConfigCollection(OperationContext* opCtx
         kReadPref,
         ns.db().toString(),
         [&]() {
-            write_ops::Update updateOp(ns);
+            write_ops::UpdateCommandRequest updateOp(ns);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
@@ -242,21 +243,22 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc,
                                                          const bool multi) {
-    auto deleteResponse = getConfigShard()->runCommand(opCtx,
-                                                       kReadPref,
-                                                       ns.db().toString(),
-                                                       [&]() {
-                                                           write_ops::Delete deleteOp(ns);
-                                                           deleteOp.setDeletes({[&] {
-                                                               write_ops::DeleteOpEntry entry;
-                                                               entry.setQ(doc);
-                                                               entry.setMulti(multi);
-                                                               return entry;
-                                                           }()});
-                                                           return deleteOp.toBSON({});
-                                                       }(),
-                                                       Shard::kDefaultConfigCommandTimeout,
-                                                       Shard::RetryPolicy::kNoRetry);
+    auto deleteResponse =
+        getConfigShard()->runCommand(opCtx,
+                                     kReadPref,
+                                     ns.db().toString(),
+                                     [&]() {
+                                         write_ops::DeleteCommandRequest deleteOp(ns);
+                                         deleteOp.setDeletes({[&] {
+                                             write_ops::DeleteOpEntry entry;
+                                             entry.setQ(doc);
+                                             entry.setMulti(multi);
+                                             return entry;
+                                         }()});
+                                         return deleteOp.toBSON({});
+                                     }(),
+                                     Shard::kDefaultConfigCommandTimeout,
+                                     Shard::RetryPolicy::kNoRetry);
 
 
     BatchedCommandResponse batchResponse;

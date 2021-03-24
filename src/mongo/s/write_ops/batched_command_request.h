@@ -48,17 +48,17 @@ class BatchedCommandRequest {
 public:
     enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete };
 
-    BatchedCommandRequest(write_ops::Insert insertOp)
+    BatchedCommandRequest(write_ops::InsertCommandRequest insertOp)
         : _batchType(BatchType_Insert),
-          _insertReq(std::make_unique<write_ops::Insert>(std::move(insertOp))) {}
+          _insertReq(std::make_unique<write_ops::InsertCommandRequest>(std::move(insertOp))) {}
 
-    BatchedCommandRequest(write_ops::Update updateOp)
+    BatchedCommandRequest(write_ops::UpdateCommandRequest updateOp)
         : _batchType(BatchType_Update),
-          _updateReq(std::make_unique<write_ops::Update>(std::move(updateOp))) {}
+          _updateReq(std::make_unique<write_ops::UpdateCommandRequest>(std::move(updateOp))) {}
 
-    BatchedCommandRequest(write_ops::Delete deleteOp)
+    BatchedCommandRequest(write_ops::DeleteCommandRequest deleteOp)
         : _batchType(BatchType_Delete),
-          _deleteReq(std::make_unique<write_ops::Delete>(std::move(deleteOp))) {}
+          _deleteReq(std::make_unique<write_ops::DeleteCommandRequest>(std::move(deleteOp))) {}
 
     BatchedCommandRequest(BatchedCommandRequest&&) = default;
 
@@ -143,8 +143,8 @@ public:
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const;
     const boost::optional<BSONObj>& getLet() const;
 
-    const write_ops::WriteCommandBase& getWriteCommandBase() const;
-    void setWriteCommandBase(write_ops::WriteCommandBase writeCommandBase);
+    const write_ops::WriteCommandRequestBase& getWriteCommandRequestBase() const;
+    void setWriteCommandRequestBase(write_ops::WriteCommandRequestBase writeCommandBase);
 
     void serialize(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
@@ -216,9 +216,9 @@ private:
 
     BatchType _batchType;
 
-    std::unique_ptr<write_ops::Insert> _insertReq;
-    std::unique_ptr<write_ops::Update> _updateReq;
-    std::unique_ptr<write_ops::Delete> _deleteReq;
+    std::unique_ptr<write_ops::InsertCommandRequest> _insertReq;
+    std::unique_ptr<write_ops::UpdateCommandRequest> _updateReq;
+    std::unique_ptr<write_ops::DeleteCommandRequest> _deleteReq;
 
     boost::optional<ChunkVersion> _shardVersion;
     boost::optional<DatabaseVersion> _dbVersion;

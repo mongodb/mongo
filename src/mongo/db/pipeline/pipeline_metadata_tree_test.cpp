@@ -79,7 +79,7 @@ protected:
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
         auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         NamespaceString testNss("test", "collection");
-        AggregateCommand request(testNss, rawPipeline);
+        AggregateCommandRequest request(testNss, rawPipeline);
         getExpCtx()->ns = testNss;
 
         return Pipeline::parse(request.getPipeline(), getExpCtx());

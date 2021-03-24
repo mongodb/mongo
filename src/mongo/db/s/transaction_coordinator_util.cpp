@@ -126,7 +126,8 @@ repl::OpTime persistParticipantListBlocking(OperationContext* opCtx,
 
     // Throws if serializing the request or deserializing the response fails.
     const auto commandResponse = client.runCommand([&] {
-        write_ops::Update updateOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        write_ops::UpdateCommandRequest updateOp(
+            NamespaceString::kTransactionCoordinatorsNamespace);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
 
@@ -328,7 +329,8 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
 
     // Throws if serializing the request or deserializing the response fails.
     const auto commandResponse = client.runCommand([&] {
-        write_ops::Update updateOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        write_ops::UpdateCommandRequest updateOp(
+            NamespaceString::kTransactionCoordinatorsNamespace);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
 
@@ -499,7 +501,8 @@ void deleteCoordinatorDocBlocking(OperationContext* opCtx,
 
     // Throws if serializing the request or deserializing the response fails.
     auto commandResponse = client.runCommand([&] {
-        write_ops::Delete deleteOp(NamespaceString::kTransactionCoordinatorsNamespace);
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::kTransactionCoordinatorsNamespace);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
 

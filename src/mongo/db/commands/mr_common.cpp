@@ -62,7 +62,7 @@ namespace {
 
 using namespace std::string_literals;
 
-Status interpretTranslationError(DBException* ex, const MapReduce& parsedMr) {
+Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest& parsedMr) {
     auto status = ex->toStatus();
     auto outOptions = parsedMr.getOutOptions();
     auto outNss = NamespaceString{outOptions.getDatabaseName() ? *outOptions.getDatabaseName()
@@ -377,7 +377,7 @@ bool mrSupportsWriteConcern(const BSONObj& cmd) {
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
-    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
+    MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx) {
     auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
                                       ? *parsedMr.getOutOptions().getDatabaseName()
                                       : parsedMr.getNamespace().db(),

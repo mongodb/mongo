@@ -66,6 +66,6 @@ bool mrSupportsWriteConcern(const BSONObj& cmd);
  * returned pipeline does *not* contain a $cursor stage and thus is not runnable.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> translateFromMR(
-    MapReduce parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
+    MapReduceCommandRequest parsedMr, boost::intrusive_ptr<ExpressionContext> expCtx);
 
 }  // namespace mongo::map_reduce_common

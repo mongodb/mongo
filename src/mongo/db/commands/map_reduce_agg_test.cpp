@@ -70,10 +70,11 @@ constexpr auto finalizeJavascript = "finalize!"_sd;
 
 TEST(MapReduceAggTest, testBasicTranslate) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{nss,
-                        MapReduceJavascriptCode{mapJavascript.toString()},
-                        MapReduceJavascriptCode{reduceJavascript.toString()},
-                        MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
+    auto mr =
+        MapReduceCommandRequest{nss,
+                                MapReduceJavascriptCode{mapJavascript.toString()},
+                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
     auto& sources = pipeline->getSources();
@@ -86,10 +87,11 @@ TEST(MapReduceAggTest, testBasicTranslate) {
 
 TEST(MapReduceAggTest, testSortWithoutLimit) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{nss,
-                        MapReduceJavascriptCode{mapJavascript.toString()},
-                        MapReduceJavascriptCode{reduceJavascript.toString()},
-                        MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
+    auto mr =
+        MapReduceCommandRequest{nss,
+                                MapReduceJavascriptCode{mapJavascript.toString()},
+                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setSort(BSON("foo" << 1));
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -106,10 +108,11 @@ TEST(MapReduceAggTest, testSortWithoutLimit) {
 
 TEST(MapReduceAggTest, testSortWithLimit) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{nss,
-                        MapReduceJavascriptCode{mapJavascript.toString()},
-                        MapReduceJavascriptCode{reduceJavascript.toString()},
-                        MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
+    auto mr =
+        MapReduceCommandRequest{nss,
+                                MapReduceJavascriptCode{mapJavascript.toString()},
+                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setSort(BSON("foo" << 1));
     mr.setLimit(23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
@@ -130,10 +133,11 @@ TEST(MapReduceAggTest, testSortWithLimit) {
 
 TEST(MapReduceAggTest, testLimitNoSort) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{nss,
-                        MapReduceJavascriptCode{mapJavascript.toString()},
-                        MapReduceJavascriptCode{reduceJavascript.toString()},
-                        MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
+    auto mr =
+        MapReduceCommandRequest{nss,
+                                MapReduceJavascriptCode{mapJavascript.toString()},
+                                MapReduceJavascriptCode{reduceJavascript.toString()},
+                                MapReduceOutOptions{boost::none, "", OutputType::InMemory, false}};
     mr.setLimit(23);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
     auto pipeline = map_reduce_common::translateFromMR(mr, expCtx);
@@ -150,7 +154,7 @@ TEST(MapReduceAggTest, testLimitNoSort) {
 
 TEST(MapReduceAggTest, testFeatureLadenTranslate) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -176,7 +180,7 @@ TEST(MapReduceAggTest, testFeatureLadenTranslate) {
 
 TEST(MapReduceAggTest, testOutMergeTranslate) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -196,7 +200,7 @@ TEST(MapReduceAggTest, testOutMergeTranslate) {
 
 TEST(MapReduceAggTest, testOutReduceTranslate) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -218,7 +222,7 @@ TEST(MapReduceAggTest, testOutReduceTranslate) {
 
 TEST(MapReduceAggTest, testOutSameCollection) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -236,7 +240,7 @@ TEST(MapReduceAggTest, testOutSameCollection) {
 
 TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeDoesNotFail) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -247,7 +251,7 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsEqualMergeDoesNotFail) {
 
 TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -258,7 +262,7 @@ TEST(MapReduceAggTest, testSourceDestinationCollectionsNotEqualMergeDoesNotFail)
 
 TEST(MapReduceAggTest, testShardedTrueWithReplaceActionIsNotAllowed) {
     auto nss = NamespaceString{"db", "coll"};
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},
@@ -272,7 +276,7 @@ TEST(MapReduceAggTest, testErrorMessagesTranslated) {
     // Verifies that agg specific error messages are translated to be mapReduce specific.
     auto nss = NamespaceString{"db", "coll1"};
 
-    auto mr = MapReduce{
+    auto mr = MapReduceCommandRequest{
         nss,
         MapReduceJavascriptCode{mapJavascript.toString()},
         MapReduceJavascriptCode{reduceJavascript.toString()},

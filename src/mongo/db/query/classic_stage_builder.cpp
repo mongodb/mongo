@@ -161,30 +161,33 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_PROJECTION_DEFAULT: {
             auto pn = static_cast<const ProjectionNodeDefault*>(root);
             auto childStage = build(pn->children[0]);
-            return std::make_unique<ProjectionStageDefault>(_cq.getExpCtx(),
-                                                            _cq.getFindCommand().getProjection(),
-                                                            _cq.getProj(),
-                                                            _ws,
-                                                            std::move(childStage));
+            return std::make_unique<ProjectionStageDefault>(
+                _cq.getExpCtx(),
+                _cq.getFindCommandRequest().getProjection(),
+                _cq.getProj(),
+                _ws,
+                std::move(childStage));
         }
         case STAGE_PROJECTION_COVERED: {
             auto pn = static_cast<const ProjectionNodeCovered*>(root);
             auto childStage = build(pn->children[0]);
-            return std::make_unique<ProjectionStageCovered>(_cq.getExpCtxRaw(),
-                                                            _cq.getFindCommand().getProjection(),
-                                                            _cq.getProj(),
-                                                            _ws,
-                                                            std::move(childStage),
-                                                            pn->coveredKeyObj);
+            return std::make_unique<ProjectionStageCovered>(
+                _cq.getExpCtxRaw(),
+                _cq.getFindCommandRequest().getProjection(),
+                _cq.getProj(),
+                _ws,
+                std::move(childStage),
+                pn->coveredKeyObj);
         }
         case STAGE_PROJECTION_SIMPLE: {
             auto pn = static_cast<const ProjectionNodeSimple*>(root);
             auto childStage = build(pn->children[0]);
-            return std::make_unique<ProjectionStageSimple>(_cq.getExpCtxRaw(),
-                                                           _cq.getFindCommand().getProjection(),
-                                                           _cq.getProj(),
-                                                           _ws,
-                                                           std::move(childStage));
+            return std::make_unique<ProjectionStageSimple>(
+                _cq.getExpCtxRaw(),
+                _cq.getFindCommandRequest().getProjection(),
+                _cq.getProj(),
+                _ws,
+                std::move(childStage));
         }
         case STAGE_LIMIT: {
             const LimitNode* ln = static_cast<const LimitNode*>(root);

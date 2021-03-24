@@ -309,7 +309,8 @@ void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
     newDoc.setAdditionalInfo(additionalInfo);
 
     const auto commandResponse = dbClient.runCommand([&] {
-        write_ops::Insert insertOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+        write_ops::InsertCommandRequest insertOp(
+            NamespaceString::kCollectionCriticalSectionsNamespace);
         insertOp.setDocuments({newDoc.toBSON()});
         return insertOp.serialize({});
     }());
@@ -371,7 +372,8 @@ void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
         const auto update =
             BSON("$set" << BSON(CollectionCriticalSectionDocument::kBlockReadsFieldName << true));
 
-        write_ops::Update updateOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+        write_ops::UpdateCommandRequest updateOp(
+            NamespaceString::kCollectionCriticalSectionsNamespace);
         auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
         write_ops::UpdateOpEntry updateEntry(query, updateModification);
         updateOp.setUpdates({updateEntry});
@@ -428,7 +430,8 @@ void releaseRecoverableCriticalSection(OperationContext* opCtx,
     // in-mem)
 
     auto commandResponse = dbClient.runCommand([&] {
-        write_ops::Delete deleteOp(NamespaceString::kCollectionCriticalSectionsNamespace);
+        write_ops::DeleteCommandRequest deleteOp(
+            NamespaceString::kCollectionCriticalSectionsNamespace);
 
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;

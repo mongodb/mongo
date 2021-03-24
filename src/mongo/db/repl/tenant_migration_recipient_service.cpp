@@ -870,8 +870,8 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
     _stateDoc.setStartFetchingDonorOpTime(startFetchingDonorOpTime);
 }
 
-AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation()
-    const {
+AggregateCommandRequest
+TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation() const {
 
     auto opCtx = cc().makeOperationContext();
     auto expCtx = makeExpressionContext(opCtx.get());
@@ -888,8 +888,8 @@ AggregateCommand TenantMigrationRecipientService::Instance::_makeCommittedTransa
             expCtx, startFetchingTimestamp, getTenantId())
             ->serializeToBson();
 
-    AggregateCommand aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                std::move(serializedPipeline));
+    AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                       std::move(serializedPipeline));
 
     auto readConcern = repl::ReadConcernArgs(
         boost::optional<LogicalTime>(startFetchingTimestamp),
@@ -1126,8 +1126,8 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
             expCtx, startFetchingTimestamp, getTenantId())
             ->serializeToBson();
 
-    AggregateCommand aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
-                                std::move(serializedPipeline));
+    AggregateCommandRequest aggRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                       std::move(serializedPipeline));
 
     auto readConcernArgs = repl::ReadConcernArgs(
         boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));

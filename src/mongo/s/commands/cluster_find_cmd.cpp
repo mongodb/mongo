@@ -56,11 +56,12 @@ using std::vector;
 
 const char kTermField[] = "term";
 
-// Parses the command object to a FindCommand, validates that no runtime constants were supplied
-// with the command, and sets the constant runtime values that will be forwarded to each shard.
-std::unique_ptr<FindCommand> parseCmdObjectToFindCommand(OperationContext* opCtx,
-                                                         NamespaceString nss,
-                                                         BSONObj cmdObj) {
+// Parses the command object to a FindCommandRequest, validates that no runtime constants were
+// supplied with the command, and sets the constant runtime values that will be forwarded to each
+// shard.
+std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
+                                                                       NamespaceString nss,
+                                                                       BSONObj cmdObj) {
     auto findCommand = query_request_helper::makeFromFindCommand(
         std::move(cmdObj),
         std::move(nss),
@@ -151,8 +152,8 @@ public:
         void explain(OperationContext* opCtx,
                      ExplainOptions::Verbosity verbosity,
                      rpc::ReplyBuilderInterface* result) override {
-            // Parse the command BSON to a FindCommand.
-            auto findCommand = parseCmdObjectToFindCommand(opCtx, ns(), _request.body);
+            // Parse the command BSON to a FindCommandRequest.
+            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             try {
                 const auto explainCmd =
@@ -225,7 +226,7 @@ public:
                     opCtx, mongo::LogicalOp::opQuery);
             });
 
-            auto findCommand = parseCmdObjectToFindCommand(opCtx, ns(), _request.body);
+            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, ns(), _request.body);
 
             const boost::intrusive_ptr<ExpressionContext> expCtx;
             auto cq = uassertStatusOK(
@@ -261,7 +262,7 @@ public:
                 result->reset();
 
                 auto aggCmdOnView = uassertStatusOK(
-                    query_request_helper::asAggregationCommand(cq->getFindCommand()));
+                    query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
                 auto viewAggregationCommand =
                     OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
 

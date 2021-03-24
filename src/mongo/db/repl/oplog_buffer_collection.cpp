@@ -208,10 +208,10 @@ void OplogBufferCollection::_push(WithLock,
         DocumentValidationSettings::kDisableSchemaValidation |
             DocumentValidationSettings::kDisableInternalValidation);
 
-    write_ops::Insert insertOp(_nss);
+    write_ops::InsertCommandRequest insertOp(_nss);
     insertOp.setDocuments(std::move(docsToInsert));
-    insertOp.setWriteCommandBase([] {
-        write_ops::WriteCommandBase wcb;
+    insertOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase wcb;
         wcb.setOrdered(true);
         return wcb;
     }());

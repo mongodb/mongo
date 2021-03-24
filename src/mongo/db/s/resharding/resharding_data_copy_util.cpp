@@ -88,7 +88,7 @@ void ensureCollectionDropped(OperationContext* opCtx,
 }
 
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
-    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
     findCommand->setLimit(1);
     findCommand->setSort(BSON("_id" << -1));
 

@@ -230,7 +230,7 @@ void abortTransaction(DBClientBase* conn,
 int runQueryWithReadCommands(DBClientBase* conn,
                              const boost::optional<LogicalSessionIdToClient>& lsid,
                              boost::optional<TxnNumber> txnNumber,
-                             std::unique_ptr<FindCommand> findCommand,
+                             std::unique_ptr<FindCommandRequest> findCommand,
                              Milliseconds delayBeforeGetMore,
                              BSONObj* objOut) {
     const auto dbName =
@@ -303,11 +303,11 @@ void doNothing(const BSONObj&) {}
 Timestamp getLatestClusterTime(DBClientBase* conn) {
     // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
     // latest cluster time.
-    auto findCommand = std::make_unique<FindCommand>(NamespaceString("local.oplog.rs"));
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString("local.oplog.rs"));
     findCommand->setSort(BSON("$natural" << -1));
     findCommand->setLimit(1LL);
     findCommand->setSingleBatch(true);
-    invariant(query_request_helper::validateFindCommand(*findCommand));
+    invariant(query_request_helper::validateFindCommandRequest(*findCommand));
     const auto dbName =
         findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
@@ -1014,7 +1014,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
             if (this->useReadCmd) {
-                auto findCommand = std::make_unique<FindCommand>(NamespaceString(this->ns));
+                auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
                 findCommand->setFilter(fixedQuery);
                 findCommand->setProjection(this->projection);
                 findCommand->setLimit(1LL);
@@ -1023,7 +1023,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 if (config.useSnapshotReads) {
                     findCommand->setReadConcern(readConcernSnapshot);
                 }
-                invariant(query_request_helper::validateFindCommand(*findCommand));
+                invariant(query_request_helper::validateFindCommandRequest(*findCommand));
 
                 BenchRunEventTrace _bret(&state->stats->findOneCounter);
                 boost::optional<TxnNumber> txnNumberForOp;
@@ -1101,7 +1101,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                         "cannot use 'options' in combination with read commands",
                         !this->options);
 
-                auto findCommand = std::make_unique<FindCommand>(NamespaceString(this->ns));
+                auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
                 findCommand->setFilter(fixedQuery);
                 findCommand->setProjection(this->projection);
                 if (this->skip) {
@@ -1130,7 +1130,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 }
                 findCommand->setReadConcern(readConcernBuilder.obj());
 
-                invariant(query_request_helper::validateFindCommand(*findCommand));
+                invariant(query_request_helper::validateFindCommandRequest(*findCommand));
 
                 BenchRunEventTrace _bret(&state->stats->queryCounter);
                 boost::optional<TxnNumber> txnNumberForOp;

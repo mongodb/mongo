@@ -165,7 +165,7 @@ Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
                                            const BSONObj& doc,
                                            const WriteConcernOptions& writeConcern) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({doc});
         return insertOp;
     }());

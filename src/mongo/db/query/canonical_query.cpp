@@ -66,7 +66,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures) {
     bool explain = false;
-    // Make FindCommand.
+    // Make FindCommandRequest.
     auto status = query_request_helper::fromLegacyQueryMessage(qm, &explain);
     if (!status.isOK()) {
         return status.getStatus();
@@ -79,13 +79,13 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx,
-    std::unique_ptr<FindCommand> findCommand,
+    std::unique_ptr<FindCommandRequest> findCommand,
     bool explain,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ExtensionsCallback& extensionsCallback,
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies) {
-    auto status = query_request_helper::validateFindCommand(*findCommand);
+    auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
     }
@@ -111,7 +111,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                                       findCommand->getLet());
     } else {
         newExpCtx = expCtx;
-        // A collator can enter through both the FindCommand and ExpressionContext arguments.
+        // A collator can enter through both the FindCommandRequest and ExpressionContext arguments.
         // This invariant ensures that both collators are the same because downstream we
         // pull the collator from only one of the ExpressionContext carrier.
         if (collator.get() && expCtx->getCollator()) {
@@ -158,14 +158,14 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
-    auto findCommand = std::make_unique<FindCommand>(baseQuery.nss());
+    auto findCommand = std::make_unique<FindCommandRequest>(baseQuery.nss());
     BSONObjBuilder builder;
     root->serialize(&builder, true);
     findCommand->setFilter(builder.obj());
-    findCommand->setProjection(baseQuery.getFindCommand().getProjection().getOwned());
-    findCommand->setSort(baseQuery.getFindCommand().getSort().getOwned());
-    findCommand->setCollation(baseQuery.getFindCommand().getCollation().getOwned());
-    auto status = query_request_helper::validateFindCommand(*findCommand);
+    findCommand->setProjection(baseQuery.getFindCommandRequest().getProjection().getOwned());
+    findCommand->setSort(baseQuery.getFindCommandRequest().getSort().getOwned());
+    findCommand->setCollation(baseQuery.getFindCommandRequest().getCollation().getOwned());
+    auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
     }
@@ -188,7 +188,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 
 Status CanonicalQuery::init(OperationContext* opCtx,
                             boost::intrusive_ptr<ExpressionContext> expCtx,
-                            std::unique_ptr<FindCommand> findCommand,
+                            std::unique_ptr<FindCommandRequest> findCommand,
                             bool canHaveNoopMatchNodes,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies) {
@@ -342,7 +342,7 @@ bool hasNodeInSubtree(MatchExpression* root,
 }
 
 StatusWith<QueryMetadataBitSet> CanonicalQuery::isValid(MatchExpression* root,
-                                                        const FindCommand& findCommand) {
+                                                        const FindCommandRequest& findCommand) {
     QueryMetadataBitSet unavailableMetadata{};
 
     // There can only be one TEXT.  If there is a TEXT, it cannot appear inside a NOR.

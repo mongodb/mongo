@@ -174,8 +174,8 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const NamespaceStringOrUUID& ns
         nsOrUuid, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
 
-write_ops::FindAndModifyReply DBDirectClient::findAndModify(
-    const write_ops::FindAndModifyCommand& findAndModify) {
+write_ops::FindAndModifyCommandReply DBDirectClient::findAndModify(
+    const write_ops::FindAndModifyCommandRequest& findAndModify) {
     auto response = runCommand(findAndModify.serialize({}));
     return FindAndModifyOp::parseResponse(response->getCommandReply());
 }

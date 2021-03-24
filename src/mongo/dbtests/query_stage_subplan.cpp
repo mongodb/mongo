@@ -137,7 +137,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanGeo2dOr) {
         "{$or: [{a: {$geoWithin: {$centerSphere: [[0,0],10]}}},"
         "{a: {$geoWithin: {$centerSphere: [[1,1],10]}}}]}");
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -174,7 +174,7 @@ void assertSubplanFromCache(QueryStageSubplanTest* test, const dbtests::WriteCon
 
     CollectionPtr collection = ctx.getCollection();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(test->opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -258,7 +258,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheZeroResults) {
 
     CollectionPtr collection = ctx.getCollection();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -314,7 +314,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanDontCacheTies) {
 
     CollectionPtr collection = ctx.getCollection();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -486,7 +486,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
     insert(BSON("_id" << 3 << "a" << 3));
     insert(BSON("_id" << 4));
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or: [{a: 1}, {a: {$ne:1}}]}"));
     findCommand->setSort(BSON("d" << 1));
     auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -519,7 +519,7 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanRootedOrNE) {
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -552,7 +552,7 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
     dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
     // Build a query with a rooted $or.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -589,7 +589,7 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     }
 
     // Build a query with a rooted $or.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -635,7 +635,7 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     }
 
     // Build a query with a rooted $or.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("$or" << BSON_ARRAY(BSON("p1" << 1) << BSON("p2" << 2))));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));

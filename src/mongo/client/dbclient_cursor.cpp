@@ -136,16 +136,16 @@ Message DBClientCursor::_assembleInit() {
                 // Legacy queries don't handle readOnce.
                 findCommand.getValue()->setReadOnce(true);
             }
-            if (query.getBoolField(FindCommand::kRequestResumeTokenFieldName)) {
+            if (query.getBoolField(FindCommandRequest::kRequestResumeTokenFieldName)) {
                 // Legacy queries don't handle requestResumeToken.
                 findCommand.getValue()->setRequestResumeToken(true);
             }
-            if (query.hasField(FindCommand::kResumeAfterFieldName)) {
+            if (query.hasField(FindCommandRequest::kResumeAfterFieldName)) {
                 // Legacy queries don't handle resumeAfter.
                 findCommand.getValue()->setResumeAfter(
-                    query.getObjectField(FindCommand::kResumeAfterFieldName));
+                    query.getObjectField(FindCommandRequest::kResumeAfterFieldName));
             }
-            if (auto replTerm = query[FindCommand::kTermFieldName]) {
+            if (auto replTerm = query[FindCommandRequest::kTermFieldName]) {
                 // Legacy queries don't handle term.
                 findCommand.getValue()->setTerm(replTerm.numberLong());
             }
@@ -159,7 +159,7 @@ Message DBClientCursor::_assembleInit() {
             BSONObj cmd = findCommand.getValue()->toBSON(BSONObj());
 
             if (auto readPref = query["$readPreference"]) {
-                // FindCommand doesn't handle $readPreference.
+                // FindCommandRequest doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();
             }
             return assembleCommandRequest(_client, ns.db(), opts, std::move(cmd));
@@ -599,7 +599,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 
 /* static */
 StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(
-    DBClientBase* client, AggregateCommand aggRequest, bool secondaryOk, bool useExhaust) {
+    DBClientBase* client, AggregateCommandRequest aggRequest, bool secondaryOk, bool useExhaust) {
     BSONObj ret;
     try {
         if (!client->runCommand(aggRequest.getNamespace().db().toString(),

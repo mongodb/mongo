@@ -226,7 +226,8 @@ Status updateShardCollectionsEntry(OperationContext* opCtx,
         }
 
         auto commandResponse = client.runCommand([&] {
-            write_ops::Update updateOp(NamespaceString::kShardConfigCollectionsNamespace);
+            write_ops::UpdateCommandRequest updateOp(
+                NamespaceString::kShardConfigCollectionsNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
@@ -269,7 +270,8 @@ Status updateShardDatabasesEntry(OperationContext* opCtx,
         }
 
         auto commandResponse = client.runCommand([&] {
-            write_ops::Update updateOp(NamespaceString::kShardConfigDatabasesNamespace);
+            write_ops::UpdateCommandRequest updateOp(
+                NamespaceString::kShardConfigDatabasesNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
@@ -372,7 +374,7 @@ Status updateShardChunks(OperationContext* opCtx,
             //
             // query: { "_id" : {"$gte": chunk.min, "$lt": chunk.max}}
             auto deleteCommandResponse = client.runCommand([&] {
-                write_ops::Delete deleteOp(chunkMetadataNss);
+                write_ops::DeleteCommandRequest deleteOp(chunkMetadataNss);
                 deleteOp.setDeletes({[&] {
                     write_ops::DeleteOpEntry entry;
                     entry.setQ(BSON(ChunkType::minShardID
@@ -387,7 +389,7 @@ Status updateShardChunks(OperationContext* opCtx,
 
             // Now the document can be expected to cleanly insert without overlap
             auto insertCommandResponse = client.runCommand([&] {
-                write_ops::Insert insertOp(chunkMetadataNss);
+                write_ops::InsertCommandRequest insertOp(chunkMetadataNss);
                 insertOp.setDocuments({chunk.toShardBSON()});
                 return insertOp.serialize({});
             }());
@@ -404,15 +406,16 @@ Status updateShardChunks(OperationContext* opCtx,
 void updateTimestampOnShardCollections(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const boost::optional<Timestamp>& timestamp) {
-    write_ops::Update clearFields(NamespaceString::kShardConfigCollectionsNamespace, [&] {
-        write_ops::UpdateOpEntry u;
-        u.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
-        BSONObj updateOp = (timestamp)
-            ? BSON("$set" << BSON(CollectionType::kTimestampFieldName << *timestamp))
-            : BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""));
-        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateOp));
-        return std::vector{u};
-    }());
+    write_ops::UpdateCommandRequest clearFields(
+        NamespaceString::kShardConfigCollectionsNamespace, [&] {
+            write_ops::UpdateOpEntry u;
+            u.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
+            BSONObj updateOp = (timestamp)
+                ? BSON("$set" << BSON(CollectionType::kTimestampFieldName << *timestamp))
+                : BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""));
+            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(updateOp));
+            return std::vector{u};
+        }());
 
     DBDirectClient client(opCtx);
     const auto commandResult = client.runCommand(clearFields.serialize({}));
@@ -425,7 +428,8 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
         DBDirectClient client(opCtx);
 
         auto deleteCommandResponse = client.runCommand([&] {
-            write_ops::Delete deleteOp(NamespaceString::kShardConfigCollectionsNamespace);
+            write_ops::DeleteCommandRequest deleteOp(
+                NamespaceString::kShardConfigCollectionsNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
                 entry.setQ(BSON(ShardCollectionType::kNssFieldName << nss.ns()));
@@ -483,7 +487,8 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
         DBDirectClient client(opCtx);
 
         auto deleteCommandResponse = client.runCommand([&] {
-            write_ops::Delete deleteOp(NamespaceString::kShardConfigDatabasesNamespace);
+            write_ops::DeleteCommandRequest deleteOp(
+                NamespaceString::kShardConfigDatabasesNamespace);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
                 entry.setQ(BSON(ShardDatabaseType::name << dbName.toString()));

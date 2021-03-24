@@ -37,29 +37,29 @@ namespace mongo {
 
 class InsertOp {
 public:
-    static write_ops::Insert parse(const OpMsgRequest& request);
-    static write_ops::Insert parseLegacy(const Message& msg);
-    static void validate(const write_ops::Insert& insertOp);
+    static write_ops::InsertCommandRequest parse(const OpMsgRequest& request);
+    static write_ops::InsertCommandRequest parseLegacy(const Message& msg);
+    static void validate(const write_ops::InsertCommandRequest& insertOp);
 };
 
 class UpdateOp {
 public:
-    static write_ops::Update parse(const OpMsgRequest& request);
-    static write_ops::Update parseLegacy(const Message& msg);
-    static write_ops::UpdateReply parseResponse(const BSONObj& obj);
-    static void validate(const write_ops::Update& updateOp);
+    static write_ops::UpdateCommandRequest parse(const OpMsgRequest& request);
+    static write_ops::UpdateCommandRequest parseLegacy(const Message& msg);
+    static write_ops::UpdateCommandReply parseResponse(const BSONObj& obj);
+    static void validate(const write_ops::UpdateCommandRequest& updateOp);
 };
 
 class DeleteOp {
 public:
-    static write_ops::Delete parse(const OpMsgRequest& request);
-    static write_ops::Delete parseLegacy(const Message& msg);
-    static void validate(const write_ops::Delete& deleteOp);
+    static write_ops::DeleteCommandRequest parse(const OpMsgRequest& request);
+    static write_ops::DeleteCommandRequest parseLegacy(const Message& msg);
+    static void validate(const write_ops::DeleteCommandRequest& deleteOp);
 };
 
 class FindAndModifyOp {
 public:
-    static write_ops::FindAndModifyReply parseResponse(const BSONObj& obj);
+    static write_ops::FindAndModifyCommandReply parseResponse(const BSONObj& obj);
 };
 
 namespace write_ops {
@@ -77,11 +77,11 @@ constexpr size_t insertVectorMaxBytes = 256 * 1024;
  * Retrieves the statement id for the write at the specified position in the write batch entries
  * array.
  */
-int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t writePos);
+int32_t getStmtIdForWriteAt(const WriteCommandRequestBase& writeCommandBase, size_t writePos);
 
 template <class T>
 int32_t getStmtIdForWriteAt(const T& op, size_t writePos) {
-    return getStmtIdForWriteAt(op.getWriteCommandBase(), writePos);
+    return getStmtIdForWriteAt(op.getWriteCommandRequestBase(), writePos);
 }
 
 // TODO: Delete this getter once IDL supports defaults for object and array fields

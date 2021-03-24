@@ -101,7 +101,7 @@ namespace {
  */
 bool canOptimizeAwayPipeline(const Pipeline* pipeline,
                              const PlanExecutor* exec,
-                             const AggregateCommand& request,
+                             const AggregateCommandRequest& request,
                              bool hasGeoNearStage,
                              bool hasChangeStreamStage) {
     return pipeline && exec && !hasGeoNearStage && !hasChangeStreamStage &&
@@ -121,7 +121,7 @@ bool handleCursorCommand(OperationContext* opCtx,
                          boost::intrusive_ptr<ExpressionContext> expCtx,
                          const NamespaceString& nsForCursor,
                          std::vector<ClientCursor*> cursors,
-                         const AggregateCommand& request,
+                         const AggregateCommandRequest& request,
                          const BSONObj& cmdObj,
                          rpc::ReplyBuilderInterface* result) {
     invariant(!cursors.empty());
@@ -266,7 +266,7 @@ bool handleCursorCommand(OperationContext* opCtx,
 }
 
 StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNamespaces(
-    OperationContext* opCtx, const AggregateCommand& request) {
+    OperationContext* opCtx, const AggregateCommandRequest& request) {
     const LiteParsedPipeline liteParsedPipeline(request);
     const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
@@ -418,7 +418,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
 // versioned. This can happen in the case where we are running in a cluster with a 4.4 mongoS, which
 // does not set any shard version on a $mergeCursors pipeline.
 void setIgnoredShardVersionForMergeCursors(OperationContext* opCtx,
-                                           const AggregateCommand& request) {
+                                           const AggregateCommandRequest& request) {
     auto isMergeCursors = request.getFromMongos() && request.getPipeline().size() > 0 &&
         request.getPipeline().front().firstElementFieldNameStringData() == "$mergeCursors"_sd;
     if (isMergeCursors && !OperationShardingState::isOperationVersioned(opCtx)) {
@@ -429,7 +429,7 @@ void setIgnoredShardVersionForMergeCursors(OperationContext* opCtx,
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
-    const AggregateCommand& request,
+    const AggregateCommandRequest& request,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid) {
     setIgnoredShardVersionForMergeCursors(opCtx, request);
@@ -489,7 +489,7 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
 std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesIfNeeded(
     OperationContext* opCtx,
     boost::intrusive_ptr<ExpressionContext> expCtx,
-    const AggregateCommand& request,
+    const AggregateCommandRequest& request,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
     boost::optional<UUID> uuid) {
     std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> pipelines;
@@ -526,11 +526,11 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
  * Performs validations related to API versioning and time-series stages.
  * Throws UserAssertion if any of the validations fails
  *     - validation of API versioning on each stage on the pipeline
- *     - validation of API versioning on 'AggregateCommand' request
+ *     - validation of API versioning on 'AggregateCommandRequest' request
  *     - validation of time-series related stages
  */
 void performValidationChecks(const OperationContext* opCtx,
-                             const AggregateCommand& request,
+                             const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
@@ -540,7 +540,7 @@ void performValidationChecks(const OperationContext* opCtx,
 
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const AggregateCommand& request,
+                    const AggregateCommandRequest& request,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result) {
@@ -549,7 +549,7 @@ Status runAggregate(OperationContext* opCtx,
 
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& origNss,
-                    const AggregateCommand& request,
+                    const AggregateCommandRequest& request,
                     const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
@@ -592,7 +592,7 @@ Status runAggregate(OperationContext* opCtx,
         // If this is a change stream, perform special checks and change the execution namespace.
         if (liteParsedPipeline.hasChangeStream()) {
             uassert(4928900,
-                    str::stream() << AggregateCommand::kCollectionUUIDFieldName
+                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
                                   << " is not supported for a change stream",
                     !request.getCollectionUUID());
 
@@ -629,7 +629,7 @@ Status runAggregate(OperationContext* opCtx,
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
-                    str::stream() << AggregateCommand::kCollectionUUIDFieldName
+                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
                                   << " is not supported for a collectionless aggregation",
                     !request.getCollectionUUID());
 
@@ -662,7 +662,7 @@ Status runAggregate(OperationContext* opCtx,
             invariant(nss != NamespaceString::kRsOplogNamespace);
             invariant(!nss.isCollectionlessAggregateNS());
             uassert(ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << AggregateCommand::kCollectionUUIDFieldName
+                    str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
                                   << " is not supported against a view",
                     !request.getCollectionUUID());
 

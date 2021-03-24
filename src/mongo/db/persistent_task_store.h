@@ -65,7 +65,7 @@ public:
         DBDirectClient dbClient(opCtx);
 
         const auto commandResponse = dbClient.runCommand([&] {
-            write_ops::Insert insertOp(_storageNss);
+            write_ops::InsertCommandRequest insertOp(_storageNss);
             insertOp.setDocuments({task.toBSON()});
             return insertOp.serialize({});
         }());
@@ -109,7 +109,7 @@ public:
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
-            write_ops::Delete deleteOp(_storageNss);
+            write_ops::DeleteCommandRequest deleteOp(_storageNss);
 
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
@@ -172,7 +172,7 @@ private:
         DBDirectClient dbClient(opCtx);
 
         auto commandResponse = dbClient.runCommand([&] {
-            write_ops::Update updateOp(_storageNss);
+            write_ops::UpdateCommandRequest updateOp(_storageNss);
             auto updateModification = write_ops::UpdateModification::parseFromClassicUpdate(update);
             write_ops::UpdateOpEntry updateEntry(query.obj, updateModification);
             updateEntry.setMulti(false);

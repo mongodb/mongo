@@ -57,7 +57,8 @@ public:
      * Convert an aggregation command on a view to the equivalent command against the view's
      * underlying collection.
      */
-    AggregateCommand asExpandedViewAggregation(const AggregateCommand& aggRequest) const;
+    AggregateCommandRequest asExpandedViewAggregation(
+        const AggregateCommandRequest& aggRequest) const;
 
     const NamespaceString& getNamespace() const {
         return _namespace;

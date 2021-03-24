@@ -85,7 +85,7 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
 // 'request' on the namespace 'ns' either directly on mongoD or via mongoS.
 StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,
                                                       const NamespaceString& ns,
-                                                      const AggregateCommand& request,
+                                                      const AggregateCommandRequest& request,
                                                       bool isMongos);
 
 // Checks if this connection has the privileges necessary to create 'ns' with the options

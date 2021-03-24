@@ -188,7 +188,7 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
  */
 void setUpOperationDeadline(OperationContext* opCtx,
                             const ClientCursor& cursor,
-                            const GetMoreCommand& cmd,
+                            const GetMoreCommandRequest& cmd,
                             bool disableAwaitDataFailpointActive) {
 
     // We assume that cursors created through a DBDirectClient are always used from their
@@ -214,7 +214,7 @@ void setUpOperationDeadline(OperationContext* opCtx,
  */
 void setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                           const ClientCursor& cursor,
-                                          const GetMoreCommand& cmd,
+                                          const GetMoreCommandRequest& cmd,
                                           bool disableAwaitDataFailpointActive) {
     applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
     opCtx->setWriteConcern(cursor.getWriteConcernOptions());
@@ -254,7 +254,8 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd), _cmd(GetMoreCommand::parse({"getMore"}, request.body)) {
+            : CommandInvocation(cmd),
+              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace for getMore: " << nss.ns(),
@@ -303,7 +304,7 @@ public:
          */
         bool generateBatch(OperationContext* opCtx,
                            ClientCursor* cursor,
-                           const GetMoreCommand& cmd,
+                           const GetMoreCommandRequest& cmd,
                            const bool isTailable,
                            CursorResponseBuilder* nextBatch,
                            std::uint64_t* numResults,
@@ -520,7 +521,7 @@ public:
 
             PlanExecutor* exec = cursorPin->getExecutor();
             const auto* cq = exec->getCanonicalQuery();
-            if (cq && cq->getFindCommand().getReadOnce()) {
+            if (cq && cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
@@ -754,7 +755,7 @@ public:
             CursorGetMoreReply::parse({"CursorGetMoreReply"}, ret.removeField("ok"));
         }
 
-        const GetMoreCommand _cmd;
+        const GetMoreCommandRequest _cmd;
     };
 
     bool maintenanceOk() const override {

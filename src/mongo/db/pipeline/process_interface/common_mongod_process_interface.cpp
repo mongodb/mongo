@@ -588,13 +588,12 @@ CommonMongodProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     return {*fieldPaths, targetCollectionVersion};
 }
 
-write_ops::Insert CommonMongodProcessInterface::buildInsertOp(const NamespaceString& nss,
-                                                              std::vector<BSONObj>&& objs,
-                                                              bool bypassDocValidation) {
-    write_ops::Insert insertOp(nss);
+write_ops::InsertCommandRequest CommonMongodProcessInterface::buildInsertOp(
+    const NamespaceString& nss, std::vector<BSONObj>&& objs, bool bypassDocValidation) {
+    write_ops::InsertCommandRequest insertOp(nss);
     insertOp.setDocuments(std::move(objs));
-    insertOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
+    insertOp.setWriteCommandRequestBase([&] {
+        write_ops::WriteCommandRequestBase wcb;
         wcb.setOrdered(false);
         wcb.setBypassDocumentValidation(bypassDocValidation);
         return wcb;
@@ -602,13 +601,13 @@ write_ops::Insert CommonMongodProcessInterface::buildInsertOp(const NamespaceStr
     return insertOp;
 }
 
-write_ops::Update CommonMongodProcessInterface::buildUpdateOp(
+write_ops::UpdateCommandRequest CommonMongodProcessInterface::buildUpdateOp(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     BatchedObjects&& batch,
     UpsertType upsert,
     bool multi) {
-    write_ops::Update updateOp(nss);
+    write_ops::UpdateCommandRequest updateOp(nss);
     updateOp.setUpdates([&] {
         std::vector<write_ops::UpdateOpEntry> updateEntries;
         for (auto&& obj : batch) {
@@ -627,8 +626,8 @@ write_ops::Update CommonMongodProcessInterface::buildUpdateOp(
         }
         return updateEntries;
     }());
-    updateOp.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
+    updateOp.setWriteCommandRequestBase([&] {
+        write_ops::WriteCommandRequestBase wcb;
         wcb.setOrdered(false);
         wcb.setBypassDocumentValidation(expCtx->bypassDocumentValidation);
         return wcb;

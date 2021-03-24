@@ -257,7 +257,7 @@ public:
     Base()
         : _opCtx(makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregateCommand(NamespaceString(ns), {}))),
+                                            AggregateCommandRequest(NamespaceString(ns), {}))),
           _tempDir("DocumentSourceGroupTest") {}
 
 protected:
@@ -265,8 +265,8 @@ protected:
         BSONObj namedSpec = BSON("$group" << spec);
         BSONElement specElement = namedSpec.firstElement();
 
-        intrusive_ptr<ExpressionContextForTest> expressionContext =
-            new ExpressionContextForTest(_opCtx.get(), AggregateCommand(NamespaceString(ns), {}));
+        intrusive_ptr<ExpressionContextForTest> expressionContext = new ExpressionContextForTest(
+            _opCtx.get(), AggregateCommandRequest(NamespaceString(ns), {}));
         // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
         expressionContext->fromMongos = expressionContext->needsMerge = inShard;
         expressionContext->inMongos = inMongos;

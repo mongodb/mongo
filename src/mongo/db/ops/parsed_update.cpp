@@ -122,7 +122,7 @@ Status ParsedUpdate::parseQueryToCQ() {
 
     // The projection needs to be applied after the update operation, so we do not specify a
     // projection during canonicalization.
-    auto findCommand = std::make_unique<FindCommand>(_request->getNamespaceString());
+    auto findCommand = std::make_unique<FindCommandRequest>(_request->getNamespaceString());
     findCommand->setFilter(_request->getQuery());
     findCommand->setSort(_request->getSort());
     findCommand->setHint(_request->getHint());
@@ -150,7 +150,7 @@ Status ParsedUpdate::parseQueryToCQ() {
     }
 
     // If the update request has runtime constants or let parameters attached to it, pass them to
-    // the FindCommand.
+    // the FindCommandRequest.
     if (auto& runtimeConstants = _request->getLegacyRuntimeConstants()) {
         findCommand->setLegacyRuntimeConstants(*runtimeConstants);
     }

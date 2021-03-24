@@ -47,7 +47,7 @@ using unittest::assertGet;
 const NamespaceString kNss("TestDB", "TestColl");
 
 auto buildUpdate(const NamespaceString& nss, BSONObj query, BSONObj update, bool upsert) {
-    write_ops::Update updateOp(nss);
+    write_ops::UpdateCommandRequest updateOp(nss);
     write_ops::UpdateOpEntry entry;
     entry.setQ(query);
     entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
@@ -57,7 +57,7 @@ auto buildUpdate(const NamespaceString& nss, BSONObj query, BSONObj update, bool
 }
 
 auto buildDelete(const NamespaceString& nss, BSONObj query) {
-    write_ops::Delete deleteOp(nss);
+    write_ops::DeleteCommandRequest deleteOp(nss);
     write_ops::DeleteOpEntry entry;
     entry.setQ(query);
     entry.setMulti(false);

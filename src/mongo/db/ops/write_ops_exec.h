@@ -75,12 +75,12 @@ struct WriteResult {
  * and initial sync/tenant migration oplog buffer) inserts.
  */
 WriteResult performInserts(OperationContext* opCtx,
-                           const write_ops::Insert& op,
+                           const write_ops::InsertCommandRequest& op,
                            const OperationSource& source = OperationSource::kStandard);
 WriteResult performUpdates(OperationContext* opCtx,
-                           const write_ops::Update& op,
+                           const write_ops::UpdateCommandRequest& op,
                            const OperationSource& source = OperationSource::kStandard);
-WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& op);
+WriteResult performDeletes(OperationContext* opCtx, const write_ops::DeleteCommandRequest& op);
 
 /**
  * Populate 'opDebug' with stats describing the execution of an update operation. Illegal to call

@@ -625,7 +625,7 @@ void persistAbortDecision(OperationContext* opCtx,
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
                                         const UUID& migrationId) {
-    write_ops::Delete deleteOp(NamespaceString::kRangeDeletionNamespace);
+    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
     write_ops::DeleteOpEntry query(BSON(RangeDeletionTask::kIdFieldName << migrationId),
                                    false /*multi*/);
     deleteOp.setDeletes({query});
@@ -661,7 +661,7 @@ void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
                                              const UUID& migrationId) {
-    write_ops::Update updateOp(NamespaceString::kRangeDeletionNamespace);
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kRangeDeletionNamespace);
     auto queryFilter = BSON(RangeDeletionTask::kIdFieldName << migrationId);
     auto updateModification =
         write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
@@ -703,7 +703,7 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
                                    const ShardId& recipientId,
                                    const LogicalSessionId& lsid,
                                    TxnNumber currentTxnNumber) {
-    write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
+    write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
     auto queryFilter = BSON("_id"
                             << "migrationCoordinatorStats");
     auto updateModification = write_ops::UpdateModification(

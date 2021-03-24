@@ -101,7 +101,7 @@ std::vector<AllowedIndexEntry> QuerySettings::getAllAllowedIndices() const {
 void QuerySettings::setAllowedIndices(const CanonicalQuery& canonicalQuery,
                                       const BSONObjSet& indexKeyPatterns,
                                       const stdx::unordered_set<std::string>& indexNames) {
-    const FindCommand& findCommand = canonicalQuery.getFindCommand();
+    const FindCommandRequest& findCommand = canonicalQuery.getFindCommandRequest();
     const BSONObj& query = findCommand.getFilter();
     const BSONObj& sort = findCommand.getSort();
     const BSONObj& projection = findCommand.getProjection();

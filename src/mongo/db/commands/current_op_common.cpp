@@ -109,9 +109,9 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
 
     pipeline.push_back(groupBuilder.obj());
 
-    // Pipeline is complete; create an AggregateCommand for $currentOp.
-    const AggregateCommand request(NamespaceString::makeCollectionlessAggregateNSS("admin"),
-                                   std::move(pipeline));
+    // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
+    const AggregateCommandRequest request(NamespaceString::makeCollectionlessAggregateNSS("admin"),
+                                          std::move(pipeline));
 
     // Run the pipeline and obtain a CursorResponse.
     auto aggResults = uassertStatusOK(runAggregation(opCtx, request));

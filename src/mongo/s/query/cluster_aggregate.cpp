@@ -102,7 +102,7 @@ auto resolveInvolvedNamespaces(stdx::unordered_set<NamespaceString> involvedName
 // collection UUID if provided.
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
-    const AggregateCommand& request,
+    const AggregateCommandRequest& request,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces) {
@@ -192,11 +192,11 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
  * Performs validations related to API versioning and time-series stages.
  * Throws UserAssertion if any of the validations fails
  *     - validation of API versioning on each stage on the pipeline
- *     - validation of API versioning on 'AggregateCommand' request
+ *     - validation of API versioning on 'AggregateCommandRequest' request
  *     - validation of time-series related stages
  */
 void performValidationChecks(const OperationContext* opCtx,
-                             const AggregateCommand& request,
+                             const AggregateCommandRequest& request,
                              const LiteParsedPipeline& liteParsedPipeline) {
     liteParsedPipeline.validate(opCtx);
     aggregation_request_helper::validateRequestForAPIVersion(opCtx, request);
@@ -206,7 +206,7 @@ void performValidationChecks(const OperationContext* opCtx,
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
-                                      const AggregateCommand& request,
+                                      const AggregateCommandRequest& request,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
     return runAggregate(opCtx, namespaces, request, {request}, privileges, result);
@@ -214,7 +214,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
-                                      const AggregateCommand& request,
+                                      const AggregateCommandRequest& request,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
@@ -227,12 +227,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             "Cannot specify runtime constants option to a mongos",
             !request.getLegacyRuntimeConstants());
     uassert(51089,
-            str::stream() << "Internal parameter(s) [" << AggregateCommand::kNeedsMergeFieldName
-                          << ", " << AggregateCommand::kFromMongosFieldName
+            str::stream() << "Internal parameter(s) ["
+                          << AggregateCommandRequest::kNeedsMergeFieldName << ", "
+                          << AggregateCommandRequest::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.getNeedsMerge() && !request.getFromMongos());
     uassert(4928902,
-            str::stream() << AggregateCommand::kCollectionUUIDFieldName
+            str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
                           << " is not supported on a mongos",
             !request.getCollectionUUID());
 
@@ -394,7 +395,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 }
 
 Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
-                                          const AggregateCommand& request,
+                                          const AggregateCommandRequest& request,
                                           const ResolvedView& resolvedView,
                                           const NamespaceString& requestedNss,
                                           const PrivilegeVector& privileges,

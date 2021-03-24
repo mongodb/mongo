@@ -65,11 +65,11 @@ namespace {
 
 const auto kTermField = "term"_sd;
 
-// Parses the command object to a FindCommand. If the client request did not specify any runtime
-// constants, make them available to the query here.
-std::unique_ptr<FindCommand> parseCmdObjectToFindCommand(OperationContext* opCtx,
-                                                         NamespaceString nss,
-                                                         BSONObj cmdObj) {
+// Parses the command object to a FindCommandRequest. If the client request did not specify any
+// runtime constants, make them available to the query here.
+std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(OperationContext* opCtx,
+                                                                       NamespaceString nss,
+                                                                       BSONObj cmdObj) {
     auto findCommand = query_request_helper::makeFromFindCommand(
         std::move(cmdObj),
         std::move(nss),
@@ -82,7 +82,7 @@ std::unique_ptr<FindCommand> parseCmdObjectToFindCommand(OperationContext* opCtx
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
-    const FindCommand& findCommand,
+    const FindCommandRequest& findCommand,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
     if (!findCommand.getCollation().isEmpty()) {
@@ -248,10 +248,10 @@ public:
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
-            // Parse the command BSON to a FindCommand.
-            auto findCommand = parseCmdObjectToFindCommand(opCtx, nss, _request.body);
+            // Parse the command BSON to a FindCommandRequest.
+            auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
-            // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
+            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
             auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
             const bool isExplain = true;
@@ -269,7 +269,7 @@ public:
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                const auto& findCommand = cq->getFindCommand();
+                const auto& findCommand = cq->getFindCommandRequest();
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
@@ -329,12 +329,13 @@ public:
 
             const BSONObj& cmdObj = _request.body;
 
-            // Parse the command BSON to a FindCommand. Pass in the parsedNss in case cmdObj does
-            // not have a UUID.
+            // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
+            // does not have a UUID.
             auto parsedNss = NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, cmdObj)};
             const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
-            auto findCommand = parseCmdObjectToFindCommand(opCtx, std::move(parsedNss), cmdObj);
+            auto findCommand =
+                parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -402,7 +403,7 @@ public:
             const int ntoskip = -1;
             beginQueryOp(opCtx, nss, _request.body, ntoreturn, ntoskip);
 
-            // Finish the parsing step by using the FindCommand to create a CanonicalQuery.
+            // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
             auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
             auto cq = uassertStatusOK(
@@ -419,7 +420,7 @@ public:
 
                 // Convert the find command into an aggregation using $match (and other stages, as
                 // necessary), if possible.
-                const auto& findCommand = cq->getFindCommand();
+                const auto& findCommand = cq->getFindCommandRequest();
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
@@ -437,7 +438,7 @@ public:
 
             const auto& collection = ctx->getCollection();
 
-            if (cq->getFindCommand().getReadOnce()) {
+            if (cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan
                 // execution to assume read data will not be needed again and need not be cached.
                 opCtx->recoveryUnit()->setReadOnce(true);
@@ -466,7 +467,8 @@ public:
 
             FindCommon::waitInFindBeforeMakingBatch(opCtx, *exec->getCanonicalQuery());
 
-            const FindCommand& originalFC = exec->getCanonicalQuery()->getFindCommand();
+            const FindCommandRequest& originalFC =
+                exec->getCanonicalQuery()->getFindCommandRequest();
 
             // Stream query results, adding them to a BSONArray as we go.
             CursorResponseBuilder::Options options;

@@ -70,11 +70,11 @@ private:
     virtual void modifyPipeline(std::vector<BSONObj>* pipeline) const {};
 
     /**
-     * Runs the aggregation specified by the supplied AggregateCommand, returning a CursorResponse
-     * if successful or a Status containing the error otherwise.
+     * Runs the aggregation specified by the supplied AggregateCommandRequest, returning a
+     * CursorResponse if successful or a Status containing the error otherwise.
      */
-    virtual StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
-                                                      const AggregateCommand& request) const = 0;
+    virtual StatusWith<CursorResponse> runAggregation(
+        OperationContext* opCtx, const AggregateCommandRequest& request) const = 0;
 
     /**
      * Allows overriders to optionally write additional data to the response object before the final

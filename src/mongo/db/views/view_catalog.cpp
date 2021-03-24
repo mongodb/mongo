@@ -408,7 +408,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::validatePipeline(
     }
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
-                              AggregateCommand(viewDef.viewOn(), viewDef.pipeline()),
+                              AggregateCommandRequest(viewDef.viewOn(), viewDef.pipeline()),
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
                               // We can use a stub MongoProcessInterface because we are only parsing
                               // the Pipeline for validation here. We won't do anything with the

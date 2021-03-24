@@ -57,7 +57,7 @@ namespace mongo {
 namespace {
 
 auto makeExpressionContext(OperationContext* opCtx,
-                           const MapReduce& parsedMr,
+                           const MapReduceCommandRequest& parsedMr,
                            const ChunkManager& cm,
                            boost::optional<ExplainOptions::Verbosity> verbosity) {
     // Populate the collection UUID and the appropriate collation to use.
@@ -109,26 +109,28 @@ auto makeExpressionContext(OperationContext* opCtx,
     return expCtx;
 }
 
-Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipeline* pipeline) {
+Document serializeToCommand(BSONObj originalCmd,
+                            const MapReduceCommandRequest& parsedMr,
+                            Pipeline* pipeline) {
     MutableDocument translatedCmd;
 
     translatedCmd["aggregate"] = Value(parsedMr.getNamespace().coll());
-    translatedCmd[AggregateCommand::kPipelineFieldName] = Value(pipeline->serialize());
-    translatedCmd[AggregateCommand::kCursorFieldName] =
+    translatedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
+    translatedCmd[AggregateCommandRequest::kCursorFieldName] =
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
-    translatedCmd[AggregateCommand::kAllowDiskUseFieldName] = Value(true);
-    translatedCmd[AggregateCommand::kFromMongosFieldName] = Value(true);
-    translatedCmd[AggregateCommand::kLetFieldName] = Value(
+    translatedCmd[AggregateCommandRequest::kAllowDiskUseFieldName] = Value(true);
+    translatedCmd[AggregateCommandRequest::kFromMongosFieldName] = Value(true);
+    translatedCmd[AggregateCommandRequest::kLetFieldName] = Value(
         pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
-    translatedCmd[AggregateCommand::kIsMapReduceCommandFieldName] = Value(true);
+    translatedCmd[AggregateCommandRequest::kIsMapReduceCommandFieldName] = Value(true);
 
     if (shouldBypassDocumentValidationForCommand(originalCmd)) {
         translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);
     }
 
-    if (originalCmd[AggregateCommand::kCollationFieldName]) {
-        translatedCmd[AggregateCommand::kCollationFieldName] =
-            Value(originalCmd[AggregateCommand::kCollationFieldName]);
+    if (originalCmd[AggregateCommandRequest::kCollationFieldName]) {
+        translatedCmd[AggregateCommandRequest::kCollationFieldName] =
+            Value(originalCmd[AggregateCommandRequest::kCollationFieldName]);
     }
 
     // Append generic command options.
@@ -144,7 +146,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto parsedMr = MapReduce::parse(IDLParserErrorContext("MapReduce"), cmd);
+    auto parsedMr = MapReduceCommandRequest::parse(IDLParserErrorContext("mapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
     auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),

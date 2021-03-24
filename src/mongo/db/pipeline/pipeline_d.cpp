@@ -89,7 +89,7 @@ using boost::intrusive_ptr;
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
-using write_ops::Insert;
+using write_ops::InsertCommandRequest;
 
 namespace {
 /**
@@ -193,10 +193,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     BSONObj sortObj,
     SkipThenLimit skipThenLimit,
     boost::optional<std::string> groupIdForDistinctScan,
-    const AggregateCommand* aggRequest,
+    const AggregateCommandRequest* aggRequest,
     const size_t plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures) {
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setProjection(projectionObj.getOwned());
@@ -419,7 +419,7 @@ PipelineD::buildInnerQueryExecutorSample(DocumentSourceSample* sampleStage,
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutor(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregateCommand* aggRequest,
+                                   const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline) {
     auto expCtx = pipeline->getContext();
 
@@ -469,10 +469,11 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
     }
 }
 
-void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(const CollectionPtr& collection,
-                                                           const NamespaceString& nss,
-                                                           const AggregateCommand* aggRequest,
-                                                           Pipeline* pipeline) {
+void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
+    const CollectionPtr& collection,
+    const NamespaceString& nss,
+    const AggregateCommandRequest* aggRequest,
+    Pipeline* pipeline) {
 
     auto callback = PipelineD::buildInnerQueryExecutor(collection, nss, aggRequest, pipeline);
     PipelineD::attachInnerQueryExecutorToPipeline(
@@ -592,7 +593,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
                                           const NamespaceString& nss,
-                                          const AggregateCommand* aggRequest,
+                                          const AggregateCommandRequest* aggRequest,
                                           Pipeline* pipeline) {
     // Make a last effort to optimize pipeline stages before potentially detaching them to be pushed
     // down into the query executor.
@@ -683,7 +684,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
                                           const NamespaceString& nss,
-                                          const AggregateCommand* aggRequest,
+                                          const AggregateCommandRequest* aggRequest,
                                           Pipeline* pipeline) {
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "$geoNear requires a geo index to run, but " << nss.ns()
@@ -751,7 +752,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
     SkipThenLimit skipThenLimit,
-    const AggregateCommand* aggRequest,
+    const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool* hasNoRequirements) {
     invariant(hasNoRequirements);

@@ -74,7 +74,7 @@ unique_ptr<CanonicalQuery> canonicalize(const BSONObj& queryObj) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj);
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
@@ -100,7 +100,7 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     findCommand->setSort(sort);
     findCommand->setProjection(proj);
@@ -136,7 +136,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projStr));
@@ -173,7 +173,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projStr));
@@ -1017,7 +1017,7 @@ protected:
         // Clean up any previous state from a call to runQueryFull or runQueryAsCommand.
         solns.clear();
 
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         findCommand->setSort(sort);
         findCommand->setProjection(proj);
@@ -1052,7 +1052,7 @@ protected:
         solns.clear();
 
         const bool isExplain = false;
-        std::unique_ptr<FindCommand> findCommand(
+        std::unique_ptr<FindCommandRequest> findCommand(
             query_request_helper::makeFromFindCommandForTests(cmdObj));
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -1125,7 +1125,7 @@ protected:
         QueryTestServiceContext serviceContext;
         auto opCtx = serviceContext.makeOperationContext();
 
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(query);
         findCommand->setSort(sort);
         findCommand->setProjection(proj);

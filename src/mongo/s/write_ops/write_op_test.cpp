@@ -77,7 +77,7 @@ protected:
 // Test of basic error-setting on write op
 TEST_F(WriteOpTest, BasicError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(kNss);
+        write_ops::InsertCommandRequest insertOp(kNss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -99,7 +99,7 @@ TEST_F(WriteOpTest, TargetSingle) {
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(kNss);
+        write_ops::InsertCommandRequest insertOp(kNss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -132,7 +132,7 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
         ShardId("shardB"), ChunkVersion(20, 0, OID(), boost::none /* timestamp */), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(kNss);
+        write_ops::DeleteCommandRequest deleteOp(kNss);
         // Only hits first shard
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -2 << LT << -1), false)});
         return deleteOp;
@@ -168,7 +168,7 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
         ShardId("shardB"), ChunkVersion(20, 0, OID(), boost::none /* timestamp */), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(kNss);
+        write_ops::DeleteCommandRequest deleteOp(kNss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), false)});
         return deleteOp;
     }());
@@ -209,7 +209,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
         ShardId("shardB"), ChunkVersion(20, 0, OID(), boost::none /* timestamp */), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(kNss);
+        write_ops::DeleteCommandRequest deleteOp(kNss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), false)});
         return deleteOp;
     }());
@@ -253,7 +253,7 @@ TEST_F(WriteOpTest, ErrorSingle) {
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(kNss);
+        write_ops::InsertCommandRequest insertOp(kNss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -287,7 +287,7 @@ TEST_F(WriteOpTest, CancelSingle) {
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(kNss);
+        write_ops::InsertCommandRequest insertOp(kNss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -319,7 +319,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(kNss);
+        write_ops::InsertCommandRequest insertOp(kNss);
         insertOp.setDocuments({BSON("x" << 1)});
         return insertOp;
     }());
@@ -363,7 +363,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
         ShardId("shardB"), ChunkVersion(20, 0, OID(), boost::none /* timestamp */), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(kNss);
+        write_ops::DeleteCommandRequest deleteOp(kNss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), true /*multi*/)});
         return deleteOp;
     }());
@@ -402,7 +402,7 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
         ShardId("shardB"), ChunkVersion(20, 0, OID(), boost::none /* timestamp */), boost::none);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(kNss);
+        write_ops::DeleteCommandRequest deleteOp(kNss);
         deleteOp.setDeletes({buildDelete(BSON("x" << GTE << -1 << LT << 1), false)});
         return deleteOp;
     }());

@@ -68,7 +68,7 @@ public:
      * Builds a PlanStage using the given WorkingSet and QuerySolution.
      */
     std::unique_ptr<PlanStage> buildPlanStage(std::unique_ptr<QuerySolution> querySolution) {
-        auto findCommand = std::make_unique<FindCommand>(kNss);
+        auto findCommand = std::make_unique<FindCommandRequest>(kNss);
         auto expCtx = make_intrusive<ExpressionContext>(opCtx(), nullptr, kNss);
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);

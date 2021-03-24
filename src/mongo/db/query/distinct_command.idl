@@ -36,7 +36,7 @@ commands:
     distinct:
         description: "Parser for the 'distinct' command."
         command_name: distinct
-        cpp_name: DistinctCommand
+        cpp_name: DistinctCommandRequest
         namespace: concatenate_with_db_or_uuid
         api_version: ""
         strict: true

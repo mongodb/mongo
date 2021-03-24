@@ -267,9 +267,9 @@ void retryWriteOnStepdown(OperationContext* opCtx, const BatchedCommandRequest& 
 
 void removeChunks(OperationContext* opCtx, const UUID& uuid) {
     BatchedCommandRequest deleteRequest([&]() {
-        write_ops::Delete deleteOp(ChunkType::ConfigNS);
-        deleteOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -285,7 +285,7 @@ void removeChunks(OperationContext* opCtx, const UUID& uuid) {
 
 void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
     BatchedCommandRequest updateRequest([&]() {
-        write_ops::Update updateOp(ChunkType::ConfigNS);
+        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
         std::vector<write_ops::UpdateOpEntry> entries;
         entries.reserve(chunks.size());
         for (const auto& chunk : chunks) {
@@ -311,7 +311,7 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
     BatchWriteExecStats stats;
     BatchedCommandResponse response;
     BatchedCommandRequest updateRequest([&]() {
-        write_ops::Update updateOp(CollectionType::ConfigNS);
+        write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON(CollectionType::kNssFieldName << nss.ns()));

@@ -121,7 +121,7 @@ StringBuilder& operator<<(StringBuilder& builder, const PlanCacheKey& key) {
 //
 
 bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
-    const FindCommand& findCommand = query.getFindCommand();
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const MatchExpression* expr = query.root();
 
     // Collection scan
@@ -157,7 +157,7 @@ bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
     }
 
     // Tailable cursors won't get cached, just turn into collscans.
-    if (query.getFindCommand().getTailable()) {
+    if (query.getFindCommandRequest().getTailable()) {
         return false;
     }
 
@@ -204,7 +204,7 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
     if (includeDebugInfo) {
         // Strip projections on $-prefixed fields, as these are added by internal callers of the
         // system and are not considered part of the user projection.
-        const FindCommand& findCommand = query.getFindCommand();
+        const FindCommandRequest& findCommand = query.getFindCommandRequest();
         BSONObjBuilder projBuilder;
         for (auto elem : findCommand.getProjection()) {
             if (elem.fieldName()[0] == '$') {

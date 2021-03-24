@@ -55,7 +55,7 @@ unique_ptr<CanonicalQuery> canonicalize(BSONObj query,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query.getOwned());
     findCommand->setSort(sort.getOwned());
     findCommand->setProjection(proj.getOwned());

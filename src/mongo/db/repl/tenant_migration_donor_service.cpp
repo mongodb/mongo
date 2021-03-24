@@ -884,7 +884,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        const auto nss = NamespaceString::kKeysCollectionNamespace;
 
                        const auto cmdObj = [&] {
-                           FindCommand request(NamespaceStringOrUUID{nss});
+                           FindCommandRequest request(NamespaceStringOrUUID{nss});
                            request.setReadConcern(
                                repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern)
                                    .toBSONInner());

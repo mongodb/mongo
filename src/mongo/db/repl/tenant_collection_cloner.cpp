@@ -539,10 +539,10 @@ void TenantCollectionCloner::insertDocumentsCallback(
         DocumentValidationSettings::kDisableSchemaValidation |
             DocumentValidationSettings::kDisableInternalValidation);
 
-    write_ops::Insert insertOp(_existingNss.value_or(_sourceNss));
+    write_ops::InsertCommandRequest insertOp(_existingNss.value_or(_sourceNss));
     insertOp.setDocuments(std::move(docs));
-    insertOp.setWriteCommandBase([] {
-        write_ops::WriteCommandBase wcb;
+    insertOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase wcb;
         wcb.setOrdered(true);
         return wcb;
     }());

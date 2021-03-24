@@ -41,7 +41,7 @@ namespace mongo {
 
 class AScopedConnection;
 class DBClientBase;
-class AggregateCommand;
+class AggregateCommandRequest;
 
 /** Queries return a cursor object */
 class DBClientCursor {
@@ -164,7 +164,10 @@ public:
                    std::vector<BSONObj> initialBatch = {});
 
     static StatusWith<std::unique_ptr<DBClientCursor>> fromAggregationRequest(
-        DBClientBase* client, AggregateCommand aggRequest, bool secondaryOk, bool useExhaust);
+        DBClientBase* client,
+        AggregateCommandRequest aggRequest,
+        bool secondaryOk,
+        bool useExhaust);
 
     virtual ~DBClientCursor();
 

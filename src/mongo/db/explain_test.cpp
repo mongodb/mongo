@@ -60,58 +60,62 @@ TEST(ExplainTest, ExplainSerializeToBSONCorrectly) {
 }
 
 TEST(ExplainTest, CanParseExplainVerbosity) {
-    auto verbosity =
-        ExplainCmd::parse(IDLParserErrorContext("explain"),
-                          fromjson("{explain: {}, verbosity: 'queryPlanner', $db: 'dummy'}"))
-            .getVerbosity();
+    auto verbosity = ExplainCommandRequest::parse(
+                         IDLParserErrorContext("explain"),
+                         fromjson("{explain: {}, verbosity: 'queryPlanner', $db: 'dummy'}"))
+                         .getVerbosity();
     ASSERT(verbosity == Verbosity::kQueryPlanner);
-    verbosity =
-        ExplainCmd::parse(IDLParserErrorContext("explain"),
-                          fromjson("{explain: {}, verbosity: 'executionStats', $db: 'dummy'}"))
-            .getVerbosity();
+    verbosity = ExplainCommandRequest::parse(
+                    IDLParserErrorContext("explain"),
+                    fromjson("{explain: {}, verbosity: 'executionStats', $db: 'dummy'}"))
+                    .getVerbosity();
     ASSERT(verbosity == Verbosity::kExecStats);
-    verbosity =
-        ExplainCmd::parse(IDLParserErrorContext("explain"),
-                          fromjson("{explain: {}, verbosity: 'allPlansExecution', $db: 'dummy'}"))
-            .getVerbosity();
+    verbosity = ExplainCommandRequest::parse(
+                    IDLParserErrorContext("explain"),
+                    fromjson("{explain: {}, verbosity: 'allPlansExecution', $db: 'dummy'}"))
+                    .getVerbosity();
     ASSERT(verbosity == Verbosity::kExecAllPlans);
 }
 
 TEST(ExplainTest, ParsingFailsIfVerbosityIsNotAString) {
-    ASSERT_THROWS_CODE(ExplainCmd::parse(IDLParserErrorContext("explain"),
-                                         fromjson("{explain: {}, verbosity: 1}")),
+    ASSERT_THROWS_CODE(ExplainCommandRequest::parse(IDLParserErrorContext("explain"),
+                                                    fromjson("{explain: {}, verbosity: 1}")),
                        DBException,
                        ErrorCodes::TypeMismatch);
-    ASSERT_THROWS_CODE(ExplainCmd::parse(IDLParserErrorContext("explain"),
-                                         fromjson("{explain: {}, verbosity: {foo: 'bar'}}")),
-                       DBException,
-                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        ExplainCommandRequest::parse(IDLParserErrorContext("explain"),
+                                     fromjson("{explain: {}, verbosity: {foo: 'bar'}}")),
+        DBException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(ExplainTest, ParsingFailsIfVerbosityStringIsNotRecognized) {
-    ASSERT_THROWS_CODE(ExplainCmd::parse(IDLParserErrorContext("explain"),
-                                         fromjson("{explain: {}, verbosity: 'badVerbosity'}")),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        ExplainCommandRequest::parse(IDLParserErrorContext("explain"),
+                                     fromjson("{explain: {}, verbosity: 'badVerbosity'}")),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TEST(ExplainTest, ParsingFailsIfFirstElementIsNotAnObject) {
-    ASSERT_THROWS_CODE(ExplainCmd::parse(IDLParserErrorContext("explain"),
-                                         fromjson("{explain: 1, verbosity: 'queryPlanner'}")),
-                       DBException,
-                       40414);
+    ASSERT_THROWS_CODE(
+        ExplainCommandRequest::parse(IDLParserErrorContext("explain"),
+                                     fromjson("{explain: 1, verbosity: 'queryPlanner'}")),
+        DBException,
+        40414);
 }
 
 TEST(ExplainTest, ParsingFailsIfUnknownFieldInCommandObject) {
     ASSERT_THROWS_CODE(
-        ExplainCmd::parse(IDLParserErrorContext("explain"),
-                          fromjson("{explain: {}, verbosity: 'queryPlanner', unknownField: true}")),
+        ExplainCommandRequest::parse(
+            IDLParserErrorContext("explain"),
+            fromjson("{explain: {}, verbosity: 'queryPlanner', unknownField: true}")),
         DBException,
         40415);
 }
 
 TEST(ExplainTest, CanParseGenericCommandArguments) {
-    ExplainCmd::parse(
+    ExplainCommandRequest::parse(
         IDLParserErrorContext("explain"),
         fromjson("{explain: {}, verbosity: 'queryPlanner', comment: true, $db: 'test'}"));
 }

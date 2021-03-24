@@ -376,7 +376,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     BSONObjBuilder findCmdBuilder;
 
     {
-        FindCommand findCommand(nss);
+        FindCommandRequest findCommand(nss);
         findCommand.setFilter(query.getOwned());
         findCommand.setSort(sort.getOwned());
         findCommand.setReadConcern(readConcernObj.getOwned());
@@ -423,7 +423,7 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
 
 Status ShardRemote::runAggregation(
     OperationContext* opCtx,
-    const AggregateCommand& aggRequest,
+    const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch)> callback) {
 
     BSONObj readPrefMetadata;

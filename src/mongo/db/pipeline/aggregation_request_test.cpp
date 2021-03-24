@@ -69,7 +69,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
         "'local'}");
     auto uuid = UUID::gen();
     BSONObjBuilder uuidBob;
-    uuid.appendToBuilder(&uuidBob, AggregateCommand::kCollectionUUIDFieldName);
+    uuid.appendToBuilder(&uuidBob, AggregateCommandRequest::kCollectionUUIDFieldName);
     inputBson = inputBson.addField(uuidBob.obj().firstElement());
 
     auto request =
@@ -176,19 +176,19 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
 
 TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFieldsAreSpecified) {
     NamespaceString nss("a.collection");
-    AggregateCommand request(nss, {});
+    AggregateCommandRequest request(nss, {});
 
     auto expectedSerialization =
-        Document{{AggregateCommand::kCommandName, nss.coll()},
-                 {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
+        Document{{AggregateCommandRequest::kCommandName, nss.coll()},
+                 {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
+                 {AggregateCommandRequest::kCursorFieldName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     NamespaceString nss("a.collection");
-    AggregateCommand request(nss, {});
+    AggregateCommandRequest request(nss, {});
     request.setAllowDiskUse(true);
     request.setFromMongos(true);
     request.setNeedsMerge(true);
@@ -216,50 +216,50 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     auto uuid = UUID::gen();
     request.setCollectionUUID(uuid);
 
-    auto expectedSerialization =
-        Document{{AggregateCommand::kCommandName, nss.coll()},
-                 {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kAllowDiskUseFieldName, true},
-                 {AggregateCommand::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
-                 {query_request_helper::cmdOptionMaxTimeMS, 10},
-                 {AggregateCommand::kBypassDocumentValidationFieldName, true},
-                 {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
-                 {AggregateCommand::kCollationFieldName, collationObj},
-                 {AggregateCommand::kHintFieldName, hintObj},
-                 {AggregateCommand::kLetFieldName, letParamsObj},
-                 {AggregateCommand::kNeedsMergeFieldName, true},
-                 {AggregateCommand::kFromMongosFieldName, true},
-                 {query_request_helper::kUnwrappedReadPrefField, readPrefObj},
-                 {AggregateCommand::kRequestReshardingResumeTokenFieldName, true},
-                 {AggregateCommand::kIsMapReduceCommandFieldName, true},
-                 {AggregateCommand::kCollectionUUIDFieldName, uuid}};
+    auto expectedSerialization = Document{
+        {AggregateCommandRequest::kCommandName, nss.coll()},
+        {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
+        {AggregateCommandRequest::kAllowDiskUseFieldName, true},
+        {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))},
+        {query_request_helper::cmdOptionMaxTimeMS, 10},
+        {AggregateCommandRequest::kBypassDocumentValidationFieldName, true},
+        {repl::ReadConcernArgs::kReadConcernFieldName, readConcernObj},
+        {AggregateCommandRequest::kCollationFieldName, collationObj},
+        {AggregateCommandRequest::kHintFieldName, hintObj},
+        {AggregateCommandRequest::kLetFieldName, letParamsObj},
+        {AggregateCommandRequest::kNeedsMergeFieldName, true},
+        {AggregateCommandRequest::kFromMongosFieldName, true},
+        {query_request_helper::kUnwrappedReadPrefField, readPrefObj},
+        {AggregateCommandRequest::kRequestReshardingResumeTokenFieldName, true},
+        {AggregateCommandRequest::kIsMapReduceCommandFieldName, true},
+        {AggregateCommandRequest::kCollectionUUIDFieldName, uuid}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
     NamespaceString nss("a.collection");
-    AggregateCommand request(nss, {});
+    AggregateCommandRequest request(nss, {});
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     request.setCursor(cursor);
 
     auto expectedSerialization = Document{
-        {AggregateCommand::kCommandName, nss.coll()},
-        {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-        {AggregateCommand::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
+        {AggregateCommandRequest::kCommandName, nss.coll()},
+        {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
+        {AggregateCommandRequest::kCursorFieldName, Value(Document({{kBatchSizeFieldName, 10}}))}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
 
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
     NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS("a");
-    AggregateCommand request(nss, {});
+    AggregateCommandRequest request(nss, {});
 
     auto expectedSerialization =
-        Document{{AggregateCommand::kCommandName, 1},
-                 {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kCursorFieldName,
+        Document{{AggregateCommandRequest::kCommandName, 1},
+                 {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
+                 {AggregateCommandRequest::kCursorFieldName,
                   Value(Document({{aggregation_request_helper::kBatchSizeField,
                                    aggregation_request_helper::kDefaultBatchSize}}))}};
 
@@ -292,16 +292,16 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
 
 TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     NamespaceString nss("a.collection");
-    AggregateCommand request(nss, {});
+    AggregateCommandRequest request(nss, {});
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     request.setCursor(cursor);
     request.setExplain(ExplainOptions::Verbosity::kQueryPlanner);
 
     auto expectedSerialization =
-        Document{{AggregateCommand::kCommandName, nss.coll()},
-                 {AggregateCommand::kPipelineFieldName, std::vector<Value>{}},
-                 {AggregateCommand::kCursorFieldName, Value(Document())}};
+        Document{{AggregateCommandRequest::kCommandName, nss.coll()},
+                 {AggregateCommandRequest::kPipelineFieldName, std::vector<Value>{}},
+                 {AggregateCommandRequest::kCursorFieldName, Value(Document())}};
     ASSERT_DOCUMENT_EQ(aggregation_request_helper::serializeToCommandDoc(request),
                        expectedSerialization);
 }
@@ -320,8 +320,8 @@ BSONObj constructInvalidRequest(const BSONObj& validRequest, const BSONObj& inva
     // An aggregate command expects the first field in the request to be 'aggregate'. As such, we
     // pull out the aggregate field from whichever BSONObj supplied it and append it before any
     // other fields.
-    auto validAggregateField = validRequest.getField(AggregateCommand::kCommandName);
-    auto invalidAggregateField = invalidFields.getField(AggregateCommand::kCommandName);
+    auto validAggregateField = validRequest.getField(AggregateCommandRequest::kCommandName);
+    auto invalidAggregateField = invalidFields.getField(AggregateCommandRequest::kCommandName);
     if (!invalidAggregateField.eoo()) {
         invalidRequestBuilder.append(invalidAggregateField);
     } else {
@@ -730,7 +730,7 @@ TEST(AggregationRequestTest, ShouldRejectInvalidCollectionUUID) {
     auto uuid = UUID::gen();
     BSONObjBuilder validRequestBuilder(
         fromjson("{aggregate: 'collection', cursor: {}, pipeline: [{$match: {}}], $db: 'a'}"));
-    uuid.appendToBuilder(&validRequestBuilder, AggregateCommand::kCollectionUUIDFieldName);
+    uuid.appendToBuilder(&validRequestBuilder, AggregateCommandRequest::kCollectionUUIDFieldName);
     const BSONObj validRequest = validRequestBuilder.done();
     const BSONObj invalidCollectionUUID = fromjson("{collectionUUID: 2}");
     aggregationRequestParseFailureHelper(

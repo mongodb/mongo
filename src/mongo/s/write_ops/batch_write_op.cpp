@@ -303,7 +303,7 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
     //  [{ skey : y }, { skey : z }]
     //
 
-    const bool ordered = _clientRequest.getWriteCommandBase().getOrdered();
+    const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
     TargetedBatchMap batchMap;
     std::set<ShardId> targetedShards;
@@ -503,7 +503,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
 
         if (stmtIdsForOp) {
             stmtIdsForOp->push_back(write_ops::getStmtIdForWriteAt(
-                _clientRequest.getWriteCommandBase(), writeOpRef.first));
+                _clientRequest.getWriteCommandRequestBase(), writeOpRef.first));
         }
     }
 
@@ -511,13 +511,13 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         switch (batchType) {
             case BatchedCommandRequest::BatchType_Insert:
                 return BatchedCommandRequest([&] {
-                    write_ops::Insert insertOp(_clientRequest.getNS());
+                    write_ops::InsertCommandRequest insertOp(_clientRequest.getNS());
                     insertOp.setDocuments(std::move(*insertDocs));
                     return insertOp;
                 }());
             case BatchedCommandRequest::BatchType_Update: {
                 return BatchedCommandRequest([&] {
-                    write_ops::Update updateOp(_clientRequest.getNS());
+                    write_ops::UpdateCommandRequest updateOp(_clientRequest.getNS());
                     updateOp.setUpdates(std::move(*updates));
                     // Each child batch inherits its let params/runtime constants from the parent
                     // batch.
@@ -528,7 +528,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             }
             case BatchedCommandRequest::BatchType_Delete:
                 return BatchedCommandRequest([&] {
-                    write_ops::Delete deleteOp(_clientRequest.getNS());
+                    write_ops::DeleteCommandRequest deleteOp(_clientRequest.getNS());
                     deleteOp.setDeletes(std::move(*deletes));
                     // Each child batch inherits its let params from the parent batch.
                     deleteOp.setLet(_clientRequest.getLet());
@@ -539,12 +539,12 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         MONGO_UNREACHABLE;
     }());
 
-    request.setWriteCommandBase([&] {
-        write_ops::WriteCommandBase wcb;
+    request.setWriteCommandRequestBase([&] {
+        write_ops::WriteCommandRequestBase wcb;
 
         wcb.setBypassDocumentValidation(
-            _clientRequest.getWriteCommandBase().getBypassDocumentValidation());
-        wcb.setOrdered(_clientRequest.getWriteCommandBase().getOrdered());
+            _clientRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
+        wcb.setOrdered(_clientRequest.getWriteCommandRequestBase().getOrdered());
 
         if (_batchTxnNum) {
             wcb.setStmtIds(std::move(stmtIdsForOp));
@@ -627,7 +627,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
     // If the batch is ordered, cancel all writes after the first error for retargeting.
     //
 
-    const bool ordered = _clientRequest.getWriteCommandBase().getOrdered();
+    const bool ordered = _clientRequest.getWriteCommandRequestBase().getOrdered();
 
     std::vector<WriteErrorDetail*>::iterator itemErrorIt = itemErrors.begin();
     int index = 0;
@@ -698,8 +698,9 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
     emulatedResponse.setStatus(Status::OK());
     emulatedResponse.setN(0);
 
-    const int numErrors =
-        _clientRequest.getWriteCommandBase().getOrdered() ? 1 : targetedBatch.getWrites().size();
+    const int numErrors = _clientRequest.getWriteCommandRequestBase().getOrdered()
+        ? 1
+        : targetedBatch.getWrites().size();
 
     for (int i = 0; i < numErrors; i++) {
         auto errorClone(std::make_unique<WriteErrorDetail>());
@@ -717,7 +718,7 @@ void BatchWriteOp::abortBatch(const WriteErrorDetail& error) {
     dassert(numWriteOpsIn(WriteOpState_Pending) == 0);
 
     const size_t numWriteOps = _clientRequest.sizeWriteOps();
-    const bool orderedOps = _clientRequest.getWriteCommandBase().getOrdered();
+    const bool orderedOps = _clientRequest.getWriteCommandRequestBase().getOrdered();
     for (size_t i = 0; i < numWriteOps; ++i) {
         WriteOp& writeOp = _writeOps[i];
         // Can only be called with no outstanding batches
@@ -741,7 +742,7 @@ void BatchWriteOp::forgetTargetedBatchesOnTransactionAbortingError() {
 
 bool BatchWriteOp::isFinished() {
     const size_t numWriteOps = _clientRequest.sizeWriteOps();
-    const bool orderedOps = _clientRequest.getWriteCommandBase().getOrdered();
+    const bool orderedOps = _clientRequest.getWriteCommandRequestBase().getOrdered();
     for (size_t i = 0; i < numWriteOps; ++i) {
         WriteOp& writeOp = _writeOps[i];
         if (writeOp.getWriteState() < WriteOpState_Completed)
@@ -797,7 +798,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
 
     // Only return a write concern error if everything succeeded (unordered or ordered)
     // OR if something succeeded and we're unordered
-    const bool orderedOps = _clientRequest.getWriteCommandBase().getOrdered();
+    const bool orderedOps = _clientRequest.getWriteCommandRequestBase().getOrdered();
     const bool reportWCError =
         errOps.empty() || (!orderedOps && errOps.size() < _clientRequest.sizeWriteOps());
     if (!_wcErrors.empty() && reportWCError) {

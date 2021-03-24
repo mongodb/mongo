@@ -99,9 +99,9 @@ void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtI
     txnPart.setCommittedStmtIdsForTest(std::move(executedStmtIds));
 }
 
-write_ops::FindAndModifyCommand makeFindAndModifyRequest(
+write_ops::FindAndModifyCommandRequest makeFindAndModifyRequest(
     NamespaceString fullNs, BSONObj query, boost::optional<write_ops::UpdateModification> update) {
-    auto request = write_ops::FindAndModifyCommand(fullNs);
+    auto request = write_ops::FindAndModifyCommandRequest(fullNs);
     request.setQuery(query);
     if (update) {
         request.setUpdate(std::move(update));
@@ -192,8 +192,8 @@ TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
     setUpReplication(getServiceContext());
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(true);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(true);
     insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 1)});
     write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
 
@@ -213,12 +213,12 @@ TEST_F(WriteOpsRetryability, PerformRetryableInsertsSuccess) {
     // Set up a retryable write where statements 1 and 2 have already executed.
     setUpTxnParticipant(opCtxRaii.get(), {1, 2});
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(true);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(true);
     // Setup documents that cannot be successfully inserted to show that the retryable logic was
     // exercised.
     insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0)});
-    insertOp.getWriteCommandBase().setStmtIds({{1, 2}});
+    insertOp.getWriteCommandRequestBase().setStmtIds({{1, 2}});
     write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
 
     // Assert that both writes "succeeded". While there should have been a duplicate key error, the
@@ -240,11 +240,11 @@ TEST_F(WriteOpsRetryability, PerformRetryableInsertsWithBatchedFailure) {
     // Set up a retryable write where statement 3 has already executed.
     setUpTxnParticipant(opCtxRaii.get(), {3});
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(false);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(false);
     // Setup documents such that the second will fail insertion.
     insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0), BSON("_id" << 1)});
-    insertOp.getWriteCommandBase().setStmtIds({{1, 2, 3}});
+    insertOp.getWriteCommandRequestBase().setStmtIds({{1, 2, 3}});
     write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
 
     // Assert that the third (already executed) write succeeds, despite the second write failing
@@ -264,8 +264,8 @@ TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtError) {
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
     setUpReplication(getServiceContext());
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(true);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(true);
     // Setup documents such that the second cannot be successfully inserted.
     insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0), BSON("_id" << 1)});
     write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
@@ -285,8 +285,8 @@ TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtBadDoc) {
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
     setUpReplication(getServiceContext());
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(true);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(true);
 
     // Setup documents such that the second cannot be successfully inserted.
     auto largeBuffer = [](std::int32_t size) {
@@ -317,8 +317,8 @@ TEST_F(WriteOpsRetryability, PerformUnorderedInsertsContinuesAtBadDoc) {
     repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
     setUpReplication(getServiceContext());
 
-    write_ops::Insert insertOp(NamespaceString("foo.bar"));
-    insertOp.getWriteCommandBase().setOrdered(false);
+    write_ops::InsertCommandRequest insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandRequestBase().setOrdered(false);
 
     // Setup documents such that the second cannot be successfully inserted.
     auto largeBuffer = [](std::int32_t size) {

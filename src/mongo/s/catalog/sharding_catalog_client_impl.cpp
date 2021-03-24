@@ -111,7 +111,7 @@ void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments(docs);
         return insertOp;
     }());
@@ -135,9 +135,9 @@ void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
     uassertStatusOK(writeStatus);
 }
 
-AggregateCommand makeCollectionAndChunksAggregation(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const ChunkVersion& sinceVersion) {
+AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const ChunkVersion& sinceVersion) {
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
@@ -408,7 +408,7 @@ AggregateCommand makeCollectionAndChunksAggregation(OperationContext* opCtx,
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     auto serializedPipeline = pipeline->serializeToBson();
-    return AggregateCommand(CollectionType::ConfigNS, std::move(serializedPipeline));
+    return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
 }  // namespace
@@ -1043,7 +1043,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     const BSONElement idField = doc.getField("_id");
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
+        write_ops::InsertCommandRequest insertOp(nss);
         insertOp.setDocuments({doc});
         return insertOp;
     }());
@@ -1170,7 +1170,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     invariant(nss.db() == NamespaceString::kConfigDb);
 
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
+        write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(query);
@@ -1204,7 +1204,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     invariant(nss.db() == NamespaceString::kConfigDb);
 
     BatchedCommandRequest request([&] {
-        write_ops::Delete deleteOp(nss);
+        write_ops::DeleteCommandRequest deleteOp(nss);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(query);

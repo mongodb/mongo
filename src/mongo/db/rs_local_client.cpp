@@ -158,7 +158,7 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
 
 Status RSLocalClient::runAggregation(
     OperationContext* opCtx,
-    const AggregateCommand& aggRequest,
+    const AggregateCommandRequest& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch)> callback) {
     DBDirectClient client(opCtx);
     auto cursor = uassertStatusOKWithContext(

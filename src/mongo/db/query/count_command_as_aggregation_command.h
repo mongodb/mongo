@@ -36,9 +36,9 @@
 namespace mongo {
 
 /**
- * Converts this CountCommand into an aggregation.
+ * Converts this CountCommandRequest into an aggregation.
  */
-StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommand& cmd,
+StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& cmd,
                                                      const NamespaceString& nss);
 
 }  // namespace mongo

@@ -478,9 +478,8 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
 }
 
 /**
- * Encodes sort order into cache key.
- * Sort order is normalized because it provided by
- * FindCommand.
+ * Encodes sort order into cache key. Sort order is normalized because it provided by
+ * FindCommandRequest.
  */
 void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
     if (sortObj.isEmpty()) {
@@ -567,7 +566,7 @@ namespace canonical_query_encoder {
 CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.root(), &keyBuilder);
-    encodeKeyForSort(cq.getFindCommand().getSort(), &keyBuilder);
+    encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);
     encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
 

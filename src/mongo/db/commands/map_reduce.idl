@@ -68,9 +68,10 @@ types:
 
 
 commands:
-    MapReduce:
+    mapReduce:
         description: "The MapReduce command."
-        command_name: "MapReduce"
+        command_name: "mapReduce"
+        cpp_name: MapReduceCommandRequest
         namespace: concatenate_with_db
         api_version: ""
         strict: true

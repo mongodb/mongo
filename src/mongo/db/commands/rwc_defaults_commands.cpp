@@ -54,7 +54,7 @@ namespace {
 void updatePersistedDefaultRWConcernDocument(OperationContext* opCtx, const RWConcernDefault& rw) {
     DBDirectClient client(opCtx);
     const auto commandResponse = client.runCommand([&] {
-        write_ops::Update updateOp(NamespaceString::kConfigSettingsNamespace);
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigSettingsNamespace);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));

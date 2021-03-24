@@ -68,36 +68,36 @@ Status validateGetMoreCollectionName(StringData collectionName);
  * value) or if there is a bad combination of options (e.g. awaitData is illegal without
  * tailable).
  */
-Status validateFindCommand(const FindCommand& findCommand);
+Status validateFindCommandRequest(const FindCommandRequest& findCommand);
 
 /**
  * Parses a find command object, 'cmdObj'. Caller must indicate whether or not this lite
  * parsed query is an explained query or not via 'isExplain'. Accepts a NSS with which
- * to initialize the FindCommand if there is no UUID in cmdObj.
+ * to initialize the FindCommandRequest if there is no UUID in cmdObj.
  *
- * Returns a heap allocated FindCommand on success or an error if 'cmdObj' is not well
+ * Returns a heap allocated FindCommandRequest on success or an error if 'cmdObj' is not well
  * formed.
  */
-std::unique_ptr<FindCommand> makeFromFindCommand(const BSONObj& cmdObj,
-                                                 boost::optional<NamespaceString> nss,
-                                                 bool apiStrict);
+std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
+                                                        boost::optional<NamespaceString> nss,
+                                                        bool apiStrict);
 
-std::unique_ptr<FindCommand> makeFromFindCommandForTests(
+std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
     const BSONObj& cmdObj,
     boost::optional<NamespaceString> nss = boost::none,
     bool apiStrict = false);
 
 /**
- * If _uuid exists for this FindCommand, update the value of _nss.
+ * If _uuid exists for this FindCommandRequest, update the value of _nss.
  */
-void refreshNSS(const NamespaceString& nss, FindCommand* findCommand);
+void refreshNSS(const NamespaceString& nss, FindCommandRequest* findCommand);
 
 /**
- * Converts this FindCommand into an aggregation using $match. If this FindCommand has options
- * that cannot be satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is not
- * modified.
+ * Converts this FindCommandRequest into an aggregation using $match. If this FindCommandRequest has
+ * options that cannot be satisfied by aggregation, a non-OK status is returned and 'cmdBuilder' is
+ * not modified.
  */
-StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand);
+StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand);
 
 /**
  * Helper function to identify text search sort key
@@ -134,9 +134,9 @@ static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
 
 static constexpr auto kDefaultBatchSize = 101ll;
 
-void setTailableMode(TailableModeEnum tailableMode, FindCommand* findCommand);
+void setTailableMode(TailableModeEnum tailableMode, FindCommandRequest* findCommand);
 
-TailableModeEnum getTailableMode(const FindCommand& findCommand);
+TailableModeEnum getTailableMode(const FindCommandRequest& findCommand);
 
 /**
  * Asserts whether the cursor response adhere to the format defined in IDL.
@@ -148,29 +148,22 @@ void validateCursorResponse(const BSONObj& outputAsBson);
 //
 
 /**
- * Parse the provided QueryMessage and return a heap constructed FindCommand, which
+ * Parse the provided QueryMessage and return a heap constructed FindCommandRequest, which
  * represents it or an error.
  */
-StatusWith<std::unique_ptr<FindCommand>> fromLegacyQueryMessage(const QueryMessage& qm,
-                                                                bool* explain);
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQueryMessage(const QueryMessage& qm,
+                                                                       bool* explain);
 
 /**
- * Parse the provided legacy query object and parameters to construct a FindCommand.
+ * Parse the provided legacy query object and parameters to construct a FindCommandRequest.
  */
-StatusWith<std::unique_ptr<FindCommand>> fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
-                                                         const BSONObj& queryObj,
-                                                         const BSONObj& proj,
-                                                         int ntoskip,
-                                                         int ntoreturn,
-                                                         int queryOptions,
-                                                         bool* explain);
-
-StatusWith<std::unique_ptr<FindCommand>> fromLegacyQueryFindCommand(NamespaceStringOrUUID nsOrUuid,
-                                                                    const BSONObj& queryObj,
-                                                                    const BSONObj& proj,
-                                                                    int ntoskip,
-                                                                    int ntoreturn,
-                                                                    int queryOptions);
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nsOrUuid,
+                                                                const BSONObj& queryObj,
+                                                                const BSONObj& proj,
+                                                                int ntoskip,
+                                                                int ntoreturn,
+                                                                int queryOptions,
+                                                                bool* explain);
 
 }  // namespace query_request_helper
 }  // namespace mongo

@@ -182,7 +182,7 @@ bool isExactIdQuery(OperationContext* opCtx, const CanonicalQuery& query, const 
     }
 
     if (CollationIndexKey::isCollatableType(idElt.type()) && cm.isSharded() &&
-        !query.getFindCommand().getCollation().isEmpty() &&
+        !query.getFindCommandRequest().getCollation().isEmpty() &&
         !CollatorInterface::collatorsMatch(query.getCollator(), cm.getDefaultCollator())) {
 
         // The collation applies to the _id field, but the user specified a collation which doesn't
@@ -198,7 +198,7 @@ bool isExactIdQuery(OperationContext* opCtx,
                     const BSONObj query,
                     const BSONObj collation,
                     const ChunkManager& cm) {
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation);
@@ -509,7 +509,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetDelete(OperationContext* 
     // We failed to target a single shard.
 
     // Parse delete query.
-    auto findCommand = std::make_unique<FindCommand>(_nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(_nss);
     findCommand->setFilter(deleteOp.getQ());
     if (!collation.isEmpty()) {
         findCommand->setCollation(collation);

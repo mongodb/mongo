@@ -384,7 +384,7 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto findCommand = std::make_unique<FindCommand>(_rt->optRt->nss());
+    auto findCommand = std::make_unique<FindCommandRequest>(_rt->optRt->nss());
     findCommand->setFilter(query.getOwned());
 
     if (auto uuid = getUUID())

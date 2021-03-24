@@ -66,7 +66,7 @@ types:
 
 structs:
 
-    WriteReplyBase:
+    WriteCommandReplyBase:
         description: "Contains fields that is common in all the write commands reply."
         fields:
             n:
@@ -88,11 +88,11 @@ structs:
                 type: array<object_owned>
                 optional: true
 
-    InsertReply:
+    InsertCommandReply:
         description: "Contains information related to insert command reply."
 
         chained_structs:
-            WriteReplyBase: writeReplyBase
+            WriteCommandReplyBase: writeCommandReplyBase
 
     Upserted:
         description: "Contains documents that have been upserted."
@@ -104,7 +104,7 @@ structs:
                 description: "ID of the document."
                 type: IDLAnyTypeOwned
 
-    UpdateReply:
+    UpdateCommandReply:
         description: "Contains information related to update command reply."
         strict: false
         fields:
@@ -118,15 +118,15 @@ structs:
                 default: 0
 
         chained_structs:
-            WriteReplyBase: writeReplyBase
+            WriteCommandReplyBase: writeCommandReplyBase
 
-    DeleteReply:
+    DeleteCommandReply:
         description: "Contains information related to delete command reply."
 
         chained_structs:
-            WriteReplyBase: writeReplyBase
+            WriteCommandReplyBase: writeCommandReplyBase
 
-    WriteCommandBase:
+    WriteCommandRequestBase:
         description: "Contains basic information included by all write commands"
         strict: false
         fields:
@@ -245,7 +245,7 @@ structs:
                 description: "The _id of the inserted document."
                 optional: true
 
-    FindAndModifyReply:
+    FindAndModifyCommandReply:
         description: "Parser for the response from a `findAndModify` command"
         strict: false
         fields:
@@ -263,6 +263,7 @@ commands:
     insert:
         description: "Parser for the 'insert' command."
         command_name: insert
+        cpp_name: InsertCommandRequest
         strict: true
         namespace: concatenate_with_db
         api_version: "1"
@@ -271,9 +272,9 @@ commands:
                 privilege:
                     resource_pattern: exact_namespace
                     action_type: [bypassDocumentValidation, insert]
-        reply_type: InsertReply
+        reply_type: InsertCommandReply
         chained_structs:
-            WriteCommandBase: writeCommandBase
+            WriteCommandRequestBase: writeCommandRequestBase
         fields:
             documents:
                 description: "An array of one or more documents to insert."
@@ -283,6 +284,7 @@ commands:
     update:
         description: "Parser for the 'update' command."
         command_name: update
+        cpp_name: UpdateCommandRequest
         strict: true
         namespace: concatenate_with_db
         api_version: "1"
@@ -291,9 +293,9 @@ commands:
                 privilege:
                     resource_pattern: exact_namespace
                     action_type: [bypassDocumentValidation, insert, update]
-        reply_type: UpdateReply
+        reply_type: UpdateCommandReply
         chained_structs:
-            WriteCommandBase: writeCommandBase
+            WriteCommandRequestBase: writeCommandRequestBase
         fields:
             updates:
                 description: "An array of one or more update statements to perform."
@@ -314,6 +316,7 @@ commands:
     delete:
         description: "Parser for the 'delete' command."
         command_name: delete
+        cpp_name: DeleteCommandRequest
         strict: true
         namespace: concatenate_with_db
         api_version: "1"
@@ -322,9 +325,9 @@ commands:
                 privilege:
                     resource_pattern: exact_namespace
                     action_type: [bypassDocumentValidation, remove]
-        reply_type: DeleteReply
+        reply_type: DeleteCommandReply
         chained_structs:
-            WriteCommandBase: writeCommandBase
+            WriteCommandRequestBase: writeCommandRequestBase
         fields:
             deletes:
                 description: "An array of one or more delete statements to perform."
@@ -345,7 +348,7 @@ commands:
         description: "Parser for the 'findAndModify' command."
         command_name: findAndModify
         command_alias: findandmodify
-        cpp_name: FindAndModifyCommand
+        cpp_name: FindAndModifyCommandRequest
         strict: true
         namespace: concatenate_with_db
         api_version: "1"
@@ -354,7 +357,7 @@ commands:
                 privilege:
                     resource_pattern: exact_namespace
                     action_type: [bypassDocumentValidation, find, insert, update, remove]
-        reply_type: FindAndModifyReply
+        reply_type: FindAndModifyCommandReply
         fields:
             query:
                 description: "The query that matches documents to update. Uses the same query

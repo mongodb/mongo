@@ -146,9 +146,9 @@ public:
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 
-        CountCommand request(NamespaceStringOrUUID(NamespaceString{}));
+        CountCommandRequest request(NamespaceStringOrUUID(NamespaceString{}));
         try {
-            request = CountCommand::parse(IDLParserErrorContext("count"), opMsgRequest);
+            request = CountCommandRequest::parse(IDLParserErrorContext("count"), opMsgRequest);
         } catch (...) {
             return exceptionToStatus();
         }
@@ -225,7 +225,7 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
-        auto request = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+        auto request = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
 
         // Check whether we are allowed to read from this node after acquiring our locks.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);

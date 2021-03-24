@@ -43,13 +43,13 @@ namespace auth {
 
 void checkAuthForInsertCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Insert& op);
+                               const write_ops::InsertCommandRequest& op);
 void checkAuthForUpdateCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Update& op);
+                               const write_ops::UpdateCommandRequest& op);
 void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Delete& op);
+                               const write_ops::DeleteCommandRequest& op);
 
 }  // namespace auth
 }  // namespace mongo

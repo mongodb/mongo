@@ -48,32 +48,32 @@ namespace mongo {
 template <typename T>
 class StatusWith;
 class Document;
-class AggregateCommand;
+class AggregateCommandRequest;
 class OperationContext;
 
 namespace aggregation_request_helper {
 
 /**
- * Helpers to serialize/deserialize AggregateCommand.
+ * Helpers to serialize/deserialize AggregateCommandRequest.
  */
 static constexpr StringData kBatchSizeField = "batchSize"_sd;
 static constexpr long long kDefaultBatchSize = 101;
 
 /**
- * Create a new instance of AggregateCommand by parsing the raw command object. Throws an exception
- * if a required field was missing, if there was an unrecognized field name, or if there was a bad
- * value for one of the fields.
+ * Create a new instance of AggregateCommandRequest by parsing the raw command object. Throws an
+ * exception if a required field was missing, if there was an unrecognized field name, or if there
+ * was a bad value for one of the fields.
  *
  * If we are parsing a request for an explained aggregation with an explain verbosity provided,
  * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
  * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
  */
-AggregateCommand parseFromBSON(NamespaceString nss,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict);
+AggregateCommandRequest parseFromBSON(NamespaceString nss,
+                                      const BSONObj& cmdObj,
+                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                                      bool apiStrict);
 
-StatusWith<AggregateCommand> parseFromBSONForTests(
+StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     NamespaceString nss,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
@@ -83,12 +83,12 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
  * Convenience overload which constructs the request's NamespaceString from the given database
  * name and command object.
  */
-AggregateCommand parseFromBSON(const std::string& dbName,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict);
+AggregateCommandRequest parseFromBSON(const std::string& dbName,
+                                      const BSONObj& cmdObj,
+                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                                      bool apiStrict);
 
-StatusWith<AggregateCommand> parseFromBSONForTests(
+StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const std::string& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
@@ -110,26 +110,27 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
  * command, like: {explain: {aggregate: ...}, ...}, explain options are not part of the aggregate
  * command object.
  */
-Document serializeToCommandDoc(const AggregateCommand& request);
+Document serializeToCommandDoc(const AggregateCommandRequest& request);
 
-BSONObj serializeToCommandObj(const AggregateCommand& request);
+BSONObj serializeToCommandObj(const AggregateCommandRequest& request);
 
 /**
- * Validates if 'AggregateCommand' specs complies with API versioning. Throws uassert in case of
- * any failure.
+ * Validates if 'AggregateCommandRequest' specs complies with API versioning. Throws uassert in case
+ * of any failure.
  */
-void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request);
+void validateRequestForAPIVersion(const OperationContext* opCtx,
+                                  const AggregateCommandRequest& request);
 
 /**
  * Returns the type of resumable scan required by this aggregation, if applicable. Otherwise returns
  * ResumableScanType::kNone.
  */
-PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommand& request,
+PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
                                                              bool isChangeStream);
 }  // namespace aggregation_request_helper
 
 /**
- * Custom serializers/deserializers for AggregateCommand.
+ * Custom serializers/deserializers for AggregateCommandRequest.
  */
 
 boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(

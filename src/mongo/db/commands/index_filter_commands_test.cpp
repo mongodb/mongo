@@ -130,7 +130,7 @@ void addQueryShapeToPlanCache(OperationContext* opCtx,
                               const char* projectionStr,
                               const char* collationStr) {
     // Create canonical query.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projectionStr));
@@ -161,7 +161,7 @@ bool planCacheContains(OperationContext* opCtx,
                        const char* collationStr) {
 
     // Create canonical query.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projectionStr));
@@ -181,7 +181,7 @@ bool planCacheContains(OperationContext* opCtx,
 
         // Canonicalize the query shape stored in the cache entry in order to get the plan cache
         // key.
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(createdFromQuery.filter);
         findCommand->setSort(createdFromQuery.sort);
         findCommand->setProjection(createdFromQuery.projection);

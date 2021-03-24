@@ -74,7 +74,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projStr));

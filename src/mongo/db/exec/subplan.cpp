@@ -72,7 +72,7 @@ SubplanStage::SubplanStage(ExpressionContext* expCtx,
 }
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
-    const FindCommand& findCommand = query.getFindCommand();
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const MatchExpression* expr = query.root();
 
     // Hint provided

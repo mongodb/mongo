@@ -94,7 +94,7 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            auto countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+            auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
 
             // We only need to factor in the skip value when sending to the shards if we
             // have a value for limit, otherwise, we apply it only once we have collected all
@@ -125,7 +125,7 @@ public:
                 collation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
-            auto countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+            auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
             auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView).body;
@@ -229,9 +229,9 @@ public:
                                                            targetingQuery,
                                                            targetingCollation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            CountCommand countRequest(NamespaceStringOrUUID(NamespaceString{}));
+            CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
             try {
-                countRequest = CountCommand::parse(IDLParserErrorContext("count"), cmdObj);
+                countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
             } catch (...) {
                 return exceptionToStatus();
             }

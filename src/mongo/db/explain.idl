@@ -37,9 +37,9 @@ commands:
     explain:
         description: "Parser for the explain command"
         command_name: explain
+        cpp_name: ExplainCommandRequest
         namespace: type
         type: object
-        cpp_name: ExplainCmd
         strict: true
         api_version: "1"
         access_check:

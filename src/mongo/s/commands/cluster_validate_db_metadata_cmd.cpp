@@ -47,8 +47,8 @@ class ValidateDBMetadataCmd : public TypedCommand<ValidateDBMetadataCmd> {
         typename TypedCommand<ValidateDBMetadataCmd>::InvocationBase;
 
 public:
-    using Request = ValidateDBMetadata;
-    using Reply = ValidateDBMetadataReply;
+    using Request = ValidateDBMetadataCommandRequest;
+    using Reply = ValidateDBMetadataCommandReply;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -94,7 +94,7 @@ public:
                 uassertStatusOK(getStatusFromCommandResult(shardOutput));
 
                 auto apiVersionErrors =
-                    shardOutput[ValidateDBMetadataReply::kApiVersionErrorsFieldName];
+                    shardOutput[ValidateDBMetadataCommandReply::kApiVersionErrorsFieldName];
                 tassert(5287400,
                         "The 'apiVersionErrors' field returned from shards should be an array ",
                         apiVersionErrors && apiVersionErrors.type() == Array);
@@ -115,14 +115,14 @@ public:
                     apiVersionErrorsToReturn.push_back(std::move(apiVersionError));
                 }
                 if (hasMoreErrors ||
-                    shardOutput.getField(ValidateDBMetadataReply::kHasMoreErrorsFieldName)
+                    shardOutput.getField(ValidateDBMetadataCommandReply::kHasMoreErrorsFieldName)
                         .trueValue()) {
                     hasMoreErrors = true;
                     break;
                 }
             }
 
-            ValidateDBMetadataReply reply;
+            ValidateDBMetadataCommandReply reply;
             reply.setApiVersionErrors(std::move(apiVersionErrorsToReturn));
             if (hasMoreErrors) {
                 reply.setHasMoreErrors(true);
