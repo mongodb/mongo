@@ -8710,6 +8710,9 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
+  - name: .jepsen
+    distros:
+    - ubuntu1804-build
   - name: .jscore .common
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -8771,6 +8774,9 @@ buildvariants:
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
+  - name: .jepsen
+    distros:
+    - ubuntu1804-build
   - name: .jscore .common !.compat !.decimal !.sharding
   - name: jsCore_auth
   - name: .jstestfuzz .common
