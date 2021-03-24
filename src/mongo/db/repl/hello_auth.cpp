@@ -41,14 +41,15 @@ namespace mongo {
 
 void handleHelloAuth(OperationContext* opCtx, const HelloCommand& cmd, BSONObjBuilder* result) {
     // saslSupportedMechs: UserName -> List[String]
-    if (auto userName = cmd.getSaslSupportedMechs()) {
+    if (auto userNameVariant = cmd.getSaslSupportedMechs()) {
+        auto userName = UserName::parseFromVariant(userNameVariant.value());
         AuthenticationSession::doStep(
             opCtx, AuthenticationSession::StepType::kSaslSupportedMechanisms, [&](auto session) {
-                session->setUserNameForSaslSupportedMechanisms(*userName);
+                session->setUserNameForSaslSupportedMechanisms(userName);
 
                 auto& saslMechanismRegistry =
                     SASLServerMechanismRegistry::get(opCtx->getServiceContext());
-                saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, *userName, result);
+                saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, userName, result);
             });
     }
 

@@ -49,6 +49,9 @@ UserName::UserName(StringData user, StringData dbname) {
     _splitPoint = user.size();
 }
 
+/**
+ * Don't change the logic of this function as it will break stable API version 1.
+ */
 StatusWith<UserName> UserName::parse(StringData userNameStr) {
     size_t splitPoint = userNameStr.find('.');
 
@@ -63,29 +66,76 @@ StatusWith<UserName> UserName::parse(StringData userNameStr) {
     return UserName(userNamePortion, userDBPortion);
 }
 
+/**
+ * Don't change the logic of this function as it will break stable API version 1.
+ */
+UserName UserName::parseFromVariant(const stdx::variant<std::string, BSONObj>& helloUserName) {
+    if (stdx::holds_alternative<std::string>(helloUserName)) {
+        return uassertStatusOK(parse(stdx::get<std::string>(helloUserName)));
+    }
+
+    return parseFromBSONObj(stdx::get<BSONObj>(helloUserName));
+}
+
+/**
+ * Don't change the logic of this function as it will break stable API version 1.
+ */
+UserName UserName::parseFromBSONObj(const BSONObj& obj) {
+    std::bitset<2> usedFields;
+    const auto kUserNameFieldName = AuthorizationManager::USER_NAME_FIELD_NAME;
+    const auto kUserDbFieldName = AuthorizationManager::USER_DB_FIELD_NAME;
+    const size_t kUserNameFieldBit = 0;
+    const size_t kUserDbFieldBit = 1;
+    StringData userName, userDb;
+
+    for (const auto& element : obj) {
+        const auto fieldName = element.fieldNameStringData();
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "username contains an unknown field named: '" << fieldName,
+                fieldName == kUserNameFieldName || fieldName == kUserDbFieldName);
+
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "username must contain a string field named: " << fieldName,
+                element.type() == String);
+
+        if (fieldName == kUserNameFieldName) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "username has more than one field named: "
+                                  << kUserNameFieldName,
+                    !usedFields[kUserNameFieldBit]);
+
+            usedFields.set(kUserNameFieldBit);
+            userName = element.valueStringData();
+        } else if (fieldName == kUserDbFieldName) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "username has more than one field named: " << kUserDbFieldName,
+                    !usedFields[kUserDbFieldBit]);
+
+            usedFields.set(kUserDbFieldBit);
+            userDb = element.valueStringData();
+        }
+    }
+
+    if (!usedFields[kUserNameFieldBit]) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "username must contain a field named: " << kUserNameFieldName);
+    }
+
+    if (!usedFields[kUserDbFieldBit]) {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "username must contain a field named: " << kUserDbFieldName);
+    }
+
+    return UserName(userName, userDb);
+}
+
 UserName UserName::parseFromBSON(const BSONElement& elem) {
     if (elem.type() == String) {
         return uassertStatusOK(UserName::parse(elem.valueStringData()));
     } else if (elem.type() == Object) {
         const auto obj = elem.embeddedObject();
-        std::array<BSONElement, 2> fields;
-        obj.getFields(
-            {AuthorizationManager::USER_NAME_FIELD_NAME, AuthorizationManager::USER_DB_FIELD_NAME},
-            &fields);
-
-        const auto& nameField = fields[0];
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "username must contain a string field named: "
-                              << AuthorizationManager::USER_NAME_FIELD_NAME,
-                nameField.type() == String);
-
-        const auto& dbField = fields[1];
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "username must contain a string field named: "
-                              << AuthorizationManager::USER_DB_FIELD_NAME,
-                dbField.type() == String);
-
-        return UserName(nameField.valueStringData(), dbField.valueStringData());
+        return parseFromBSONObj(obj);
     } else {
         uasserted(ErrorCodes::BadValue, "username must be either a string or an object");
     }
@@ -101,11 +151,17 @@ void UserName::serializeToBSON(BSONArrayBuilder* bab) const {
     appendToBSON(&sub);
 }
 
+/**
+ * Don't change the logic of this function as it will break stable API version 1.
+ */
 void UserName::appendToBSON(BSONObjBuilder* bob) const {
     *bob << AuthorizationManager::USER_NAME_FIELD_NAME << getUser()
          << AuthorizationManager::USER_DB_FIELD_NAME << getDB();
 }
 
+/**
+ * Don't change the logic of this function as it will break stable API version 1.
+ */
 BSONObj UserName::toBSON() const {
     BSONObjBuilder ret;
     appendToBSON(&ret);
