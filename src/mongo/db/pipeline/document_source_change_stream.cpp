@@ -516,7 +516,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(BSONObj originalCmdObj,
                                                                 Document resumeToken) {
     Document originalCmd(originalCmdObj);
-    auto pipeline = originalCmd[AggregateCommand::kPipelineFieldName].getArray();
+    auto pipeline = originalCmd[AggregateCommandRequest::kPipelineFieldName].getArray();
     // A $changeStream must be the first element of the pipeline in order to be able
     // to replace (or add) a resume token.
     invariant(!pipeline[0][DocumentSourceChangeStream::kStageName].missing());
@@ -531,7 +531,7 @@ BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(BSONObj original
     pipeline[0] =
         Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
     MutableDocument newCmd(std::move(originalCmd));
-    newCmd[AggregateCommand::kPipelineFieldName] = Value(pipeline);
+    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline);
     return newCmd.freeze().toBson();
 }
 

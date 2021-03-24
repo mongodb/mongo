@@ -190,7 +190,7 @@ protected:
      */
     void expectUpdatesReturnSuccess(const HostAndPort& expectedHost,
                                     const NamespaceString& expectedNss,
-                                    const write_ops::Update& expectedUpdateOp) {
+                                    const write_ops::UpdateCommandRequest& expectedUpdateOp) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(expectedHost, request.target);
 
@@ -243,7 +243,7 @@ protected:
      */
     void expectUpdatesReturnFailure(const HostAndPort& expectedHost,
                                     const NamespaceString& expectedNss,
-                                    const write_ops::Update& expectedUpdateOp,
+                                    const write_ops::UpdateCommandRequest& expectedUpdateOp,
                                     const Status& statusToReturn) {
         onCommandForAddShard([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(expectedHost, request.target);

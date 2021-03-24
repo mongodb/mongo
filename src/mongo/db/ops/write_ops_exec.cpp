@@ -243,7 +243,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 bool handleError(OperationContext* opCtx,
                  const DBException& ex,
                  const NamespaceString& nss,
-                 const write_ops::WriteCommandBase& wholeOp,
+                 const write_ops::WriteCommandRequestBase& wholeOp,
                  bool isMultiUpdate,
                  WriteResult* out) {
     LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.reason());
@@ -376,7 +376,7 @@ Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const CollectionP
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
-                                const write_ops::Insert& wholeOp,
+                                const write_ops::InsertCommandRequest& wholeOp,
                                 std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out,
@@ -440,7 +440,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             auto canContinue = handleError(opCtx,
                                            ex,
                                            wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandBase(),
+                                           wholeOp.getWriteCommandRequestBase(),
                                            false /* multiUpdate */,
                                            out);
             invariant(!canContinue);
@@ -512,7 +512,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             bool canContinue = handleError(opCtx,
                                            ex,
                                            wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandBase(),
+                                           wholeOp.getWriteCommandRequestBase(),
                                            false /* multiUpdate */,
                                            out);
 
@@ -542,7 +542,7 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx,
-                           const write_ops::Insert& wholeOp,
+                           const write_ops::InsertCommandRequest& wholeOp,
                            const OperationSource& source) {
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
@@ -579,7 +579,7 @@ WriteResult performInserts(OperationContext* opCtx,
     }
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     WriteResult out;
@@ -649,7 +649,7 @@ WriteResult performInserts(OperationContext* opCtx,
                 canContinue = handleError(opCtx,
                                           ex,
                                           wholeOp.getNamespace(),
-                                          wholeOp.getWriteCommandBase(),
+                                          wholeOp.getWriteCommandRequestBase(),
                                           false /* multiUpdate */,
                                           &out);
             }
@@ -835,7 +835,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 }
 
 WriteResult performUpdates(OperationContext* opCtx,
-                           const write_ops::Update& wholeOp,
+                           const write_ops::UpdateCommandRequest& wholeOp,
                            const OperationSource& source) {
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
@@ -845,7 +845,7 @@ WriteResult performUpdates(OperationContext* opCtx,
     uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     bool containsRetry = false;
@@ -904,7 +904,7 @@ WriteResult performUpdates(OperationContext* opCtx,
             const bool canContinue = handleError(opCtx,
                                                  ex,
                                                  wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandBase(),
+                                                 wholeOp.getWriteCommandRequestBase(),
                                                  singleOp.getMulti(),
                                                  &out);
             if (!canContinue)
@@ -1006,7 +1006,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     return result;
 }
 
-WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& wholeOp) {
+WriteResult performDeletes(OperationContext* opCtx,
+                           const write_ops::DeleteCommandRequest& wholeOp) {
     // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -1015,7 +1016,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
-        opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
+        opCtx, wholeOp.getWriteCommandRequestBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
     bool containsRetry = false;
@@ -1075,7 +1076,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
             const bool canContinue = handleError(opCtx,
                                                  ex,
                                                  wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandBase(),
+                                                 wholeOp.getWriteCommandRequestBase(),
                                                  false /* multiUpdate */,
                                                  &out);
             if (!canContinue)

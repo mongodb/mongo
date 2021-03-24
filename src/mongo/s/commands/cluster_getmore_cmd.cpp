@@ -74,7 +74,8 @@ public:
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
-            : CommandInvocation(cmd), _cmd(GetMoreCommand::parse({"getMore"}, request.body)) {
+            : CommandInvocation(cmd),
+              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {
             APIParameters::uassertNoApiParameters(request.body);
         }
 
@@ -114,7 +115,7 @@ public:
             CursorGetMoreReply::parse({"CursorGetMoreReply"}, replyObj.removeField("ok"));
         }
 
-        const GetMoreCommand _cmd;
+        const GetMoreCommandRequest _cmd;
     };
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

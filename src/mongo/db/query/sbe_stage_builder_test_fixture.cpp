@@ -49,7 +49,7 @@ SbeStageBuilderTestFixture::buildPlanStage(
     std::unique_ptr<QuerySolution> querySolution,
     bool hasRecordId,
     std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererInterface) {
-    auto findCommand = std::make_unique<FindCommand>(_nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(_nss);
     const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest(_nss));
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, expCtx);

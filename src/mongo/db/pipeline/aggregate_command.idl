@@ -65,7 +65,7 @@ types:
 commands:
     aggregate:
         description: "Represents the user-supplied options to the aggregate command."
-        cpp_name: AggregateCommand
+        cpp_name: AggregateCommandRequest
         command_name: aggregate
         strict: true
         namespace: concatenate_with_db

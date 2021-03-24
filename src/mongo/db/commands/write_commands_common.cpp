@@ -63,13 +63,13 @@ NamespaceString _getIndexedNss(const std::vector<BSONObj>& documents) {
     return NamespaceString(std::move(ns));
 }
 
-void fillPrivileges(const write_ops::Insert& op,
+void fillPrivileges(const write_ops::InsertCommandRequest& op,
                     std::vector<Privilege>* privileges,
                     ActionSet* actions) {
     actions->addAction(ActionType::insert);
 }
 
-void fillPrivileges(const write_ops::Update& op,
+void fillPrivileges(const write_ops::UpdateCommandRequest& op,
                     std::vector<Privilege>* privileges,
                     ActionSet* actions) {
     actions->addAction(ActionType::update);
@@ -80,7 +80,7 @@ void fillPrivileges(const write_ops::Update& op,
     }
 }
 
-void fillPrivileges(const write_ops::Delete& op,
+void fillPrivileges(const write_ops::DeleteCommandRequest& op,
                     std::vector<Privilege>* privileges,
                     ActionSet* actions) {
     actions->addAction(ActionType::remove);
@@ -109,19 +109,19 @@ void checkAuthorizationImpl(AuthorizationSession* authzSession,
 
 void checkAuthForInsertCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Insert& op) {
+                               const write_ops::InsertCommandRequest& op) {
     checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
 }
 
 void checkAuthForUpdateCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Update& op) {
+                               const write_ops::UpdateCommandRequest& op) {
     checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
 }
 
 void checkAuthForDeleteCommand(AuthorizationSession* authzSession,
                                bool withDocumentValidationBypass,
-                               const write_ops::Delete& op) {
+                               const write_ops::DeleteCommandRequest& op) {
     checkAuthorizationImpl(authzSession, withDocumentValidationBypass, op);
 }
 

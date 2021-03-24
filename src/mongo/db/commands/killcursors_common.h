@@ -104,7 +104,7 @@ public:
             }
         }
 
-        KillCursorsReply typedRun(OperationContext* opCtx) final {
+        KillCursorsCommandReply typedRun(OperationContext* opCtx) final {
             auto killCursorsRequest = this->request();
 
             std::vector<CursorId> cursorsKilled;
@@ -122,7 +122,7 @@ public:
                 }
             }
 
-            KillCursorsReply reply;
+            KillCursorsCommandReply reply;
             reply.setCursorsKilled(std::move(cursorsKilled));
             reply.setCursorsNotFound(std::move(cursorsNotFound));
             reply.setCursorsAlive(std::move(cursorsAlive));

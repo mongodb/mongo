@@ -1111,7 +1111,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    const FindCommand& findCommand = canonicalQuery->getFindCommand();
+    const FindCommandRequest& findCommand = canonicalQuery->getFindCommandRequest();
     // Handle query option $maxTimeMS (not used with commands).
     if (findCommand.getMaxTimeMS().value_or(0) > 0) {
         uassert(50749,
@@ -1331,7 +1331,7 @@ DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss
     }
     uassertStatusOK(statusGetDb);
 
-    GetMoreCommand getMoreCmd(cursorId, nss.coll().toString());
+    GetMoreCommandRequest getMoreCmd(cursorId, nss.coll().toString());
     getMoreCmd.setDbName(nss.db());
     if (ntoreturn) {
         getMoreCmd.setBatchSize(ntoreturn);
@@ -1459,7 +1459,7 @@ void Strategy::writeOp(std::shared_ptr<RequestExecutionContext> rec) {
 
 void Strategy::explainFind(OperationContext* opCtx,
                            const BSONObj& findCommandObj,
-                           const FindCommand& findCommand,
+                           const FindCommandRequest& findCommand,
                            ExplainOptions::Verbosity verbosity,
                            const ReadPreferenceSetting& readPref,
                            BSONObjBuilder* out) {

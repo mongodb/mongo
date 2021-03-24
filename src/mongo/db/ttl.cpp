@@ -395,7 +395,7 @@ private:
         const char* keyFieldName = key.firstElement().fieldName();
         BSONObj query =
             BSON(keyFieldName << BSON("$gte" << kDawnOfTime << "$lte" << expirationDate));
-        auto findCommand = std::make_unique<FindCommand>(collection->ns());
+        auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
         findCommand->setFilter(query);
         auto canonicalQuery = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
         invariant(canonicalQuery.getStatus());

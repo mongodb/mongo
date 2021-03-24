@@ -44,7 +44,7 @@ types:
         deserializer: "mongo::BSONElement::_numberLong"
 
 structs:
-    KillCursorsReply:
+    KillCursorsCommandReply:
         description: 'Response from killCursors command'
         strict: false
         fields:
@@ -66,6 +66,8 @@ commands:
     killCursors:
         description: "Kills a specified set of cursors by ID."
         command_name: killCursors
+        cpp_name: KillCursorsCommandRequest
+        reply_type: KillCursorsCommandReply
         api_version: "1"
         access_check:
             complex:
@@ -79,8 +81,6 @@ commands:
                 - privilege:
                     resource_pattern: exact_namespace
                     action_type: killAnyCursor
-        reply_type: KillCursorsReply
-        cpp_name: KillCursorsRequest
         strict: true
         namespace: concatenate_with_db
         fields:

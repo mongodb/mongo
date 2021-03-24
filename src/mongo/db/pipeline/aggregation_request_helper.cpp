@@ -53,14 +53,14 @@ void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
-AggregateCommand parseFromBSON(const std::string& dbName,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict) {
+AggregateCommandRequest parseFromBSON(const std::string& dbName,
+                                      const BSONObj& cmdObj,
+                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                                      bool apiStrict) {
     return parseFromBSON(parseNs(dbName, cmdObj), cmdObj, explainVerbosity, apiStrict);
 }
 
-StatusWith<AggregateCommand> parseFromBSONForTests(
+StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     NamespaceString nss,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
@@ -72,7 +72,7 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
     }
 }
 
-StatusWith<AggregateCommand> parseFromBSONForTests(
+StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     const std::string& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
@@ -84,30 +84,30 @@ StatusWith<AggregateCommand> parseFromBSONForTests(
     }
 }
 
-AggregateCommand parseFromBSON(NamespaceString nss,
-                               const BSONObj& cmdObj,
-                               boost::optional<ExplainOptions::Verbosity> explainVerbosity,
-                               bool apiStrict) {
+AggregateCommandRequest parseFromBSON(NamespaceString nss,
+                                      const BSONObj& cmdObj,
+                                      boost::optional<ExplainOptions::Verbosity> explainVerbosity,
+                                      bool apiStrict) {
 
     // if the command object lacks field 'aggregate' or '$db', we will use the namespace in 'nss'.
     bool cmdObjChanged = false;
-    auto cmdObjBob = BSONObjBuilder{BSON(AggregateCommand::kCommandName << nss.coll())};
-    if (!cmdObj.hasField(AggregateCommand::kCommandName) ||
-        !cmdObj.hasField(AggregateCommand::kDbNameFieldName)) {
+    auto cmdObjBob = BSONObjBuilder{BSON(AggregateCommandRequest::kCommandName << nss.coll())};
+    if (!cmdObj.hasField(AggregateCommandRequest::kCommandName) ||
+        !cmdObj.hasField(AggregateCommandRequest::kDbNameFieldName)) {
         cmdObjBob.append("$db", nss.db());
         cmdObjBob.appendElementsUnique(cmdObj);
         cmdObjChanged = true;
     }
 
-    AggregateCommand request(nss);
-    request = AggregateCommand::parse(IDLParserErrorContext("aggregate", apiStrict),
-                                      cmdObjChanged ? cmdObjBob.obj() : cmdObj);
+    AggregateCommandRequest request(nss);
+    request = AggregateCommandRequest::parse(IDLParserErrorContext("aggregate", apiStrict),
+                                             cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,
-                str::stream() << "The '" << AggregateCommand::kExplainFieldName
+                str::stream() << "The '" << AggregateCommandRequest::kExplainFieldName
                               << "' option is illegal when a explain verbosity is also provided",
-                !cmdObj.hasField(AggregateCommand::kExplainFieldName));
+                !cmdObj.hasField(AggregateCommandRequest::kExplainFieldName));
         request.setExplain(explainVerbosity);
     }
 
@@ -141,29 +141,29 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj) {
     }
 }
 
-BSONObj serializeToCommandObj(const AggregateCommand& request) {
+BSONObj serializeToCommandObj(const AggregateCommandRequest& request) {
     return request.toBSON(BSONObj());
 }
 
-Document serializeToCommandDoc(const AggregateCommand& request) {
+Document serializeToCommandDoc(const AggregateCommandRequest& request) {
     return Document(request.toBSON(BSONObj()).getOwned());
 }
 
 void validate(const BSONObj& cmdObj,
               const NamespaceString& nss,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
-    bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommand::kAllowDiskUseFieldName);
-    bool hasCursorElem = cmdObj.hasField(AggregateCommand::kCursorFieldName);
-    bool hasExplainElem = cmdObj.hasField(AggregateCommand::kExplainFieldName);
-    bool hasExplain =
-        explainVerbosity || (hasExplainElem && cmdObj[AggregateCommand::kExplainFieldName].Bool());
-    bool hasFromMongosElem = cmdObj.hasField(AggregateCommand::kFromMongosFieldName);
-    bool hasNeedsMergeElem = cmdObj.hasField(AggregateCommand::kNeedsMergeFieldName);
+    bool hasAllowDiskUseElem = cmdObj.hasField(AggregateCommandRequest::kAllowDiskUseFieldName);
+    bool hasCursorElem = cmdObj.hasField(AggregateCommandRequest::kCursorFieldName);
+    bool hasExplainElem = cmdObj.hasField(AggregateCommandRequest::kExplainFieldName);
+    bool hasExplain = explainVerbosity ||
+        (hasExplainElem && cmdObj[AggregateCommandRequest::kExplainFieldName].Bool());
+    bool hasFromMongosElem = cmdObj.hasField(AggregateCommandRequest::kFromMongosFieldName);
+    bool hasNeedsMergeElem = cmdObj.hasField(AggregateCommandRequest::kNeedsMergeFieldName);
 
     // 'hasExplainElem' implies an aggregate command-level explain option, which does not require
     // a cursor argument.
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "The '" << AggregateCommand::kCursorFieldName
+            str::stream() << "The '" << AggregateCommandRequest::kCursorFieldName
                           << "' option is required, except for aggregate with the explain argument",
             hasCursorElem || hasExplainElem);
 
@@ -173,30 +173,31 @@ void validate(const BSONObj& cmdObj,
             !hasExplain || !cmdObj[WriteConcernOptions::kWriteConcernField]);
 
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "Cannot specify '" << AggregateCommand::kNeedsMergeFieldName
-                          << "' without '" << AggregateCommand::kFromMongosFieldName << "'",
+            str::stream() << "Cannot specify '" << AggregateCommandRequest::kNeedsMergeFieldName
+                          << "' without '" << AggregateCommandRequest::kFromMongosFieldName << "'",
             (!hasNeedsMergeElem || hasFromMongosElem));
 
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "The '" << AggregateCommand::kAllowDiskUseFieldName
+            str::stream() << "The '" << AggregateCommandRequest::kAllowDiskUseFieldName
                           << "' option is not permitted in read-only mode.",
             (!hasAllowDiskUseElem || !storageGlobalParams.readOnly));
 
     auto requestReshardingResumeTokenElem =
-        cmdObj[AggregateCommand::kRequestReshardingResumeTokenFieldName];
+        cmdObj[AggregateCommandRequest::kRequestReshardingResumeTokenFieldName];
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << AggregateCommand::kRequestReshardingResumeTokenFieldName
+            str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
                           << " must be a boolean type",
             !requestReshardingResumeTokenElem || requestReshardingResumeTokenElem.isBoolean());
     bool hasRequestReshardingResumeToken =
         requestReshardingResumeTokenElem && requestReshardingResumeTokenElem.boolean();
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << AggregateCommand::kRequestReshardingResumeTokenFieldName
+            str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
                           << " must only be set for the oplog namespace, not " << nss,
             !hasRequestReshardingResumeToken || nss.isOplog());
 }
 
-void validateRequestForAPIVersion(const OperationContext* opCtx, const AggregateCommand& request) {
+void validateRequestForAPIVersion(const OperationContext* opCtx,
+                                  const AggregateCommandRequest& request) {
     invariant(opCtx);
 
     auto apiParameters = APIParameters::get(opCtx);
@@ -221,7 +222,7 @@ void validateRequestForAPIVersion(const OperationContext* opCtx, const Aggregate
     }
 }
 
-PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommand& request,
+PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateCommandRequest& request,
                                                              bool isChangeStream) {
     // $changeStream cannot be run on the oplog, and $_requestReshardingResumeToken can only be run
     // on the oplog. An aggregation request with both should therefore never reach this point.
@@ -238,7 +239,7 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
 }
 }  // namespace aggregation_request_helper
 
-// Custom serializers/deserializers for AggregateCommand.
+// Custom serializers/deserializers for AggregateCommandRequest.
 
 boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
     const BSONElement& explainElem) {
@@ -258,7 +259,7 @@ void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
                             BSONObjBuilder* builder) {
     // Note that we do not serialize 'explain' field to the command object. This serializer only
     // serializes an empty cursor object for field 'cursor' when it is an explain command.
-    builder->append(AggregateCommand::kCursorFieldName, BSONObj());
+    builder->append(AggregateCommandRequest::kCursorFieldName, BSONObj());
 
     return;
 }
@@ -274,8 +275,9 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
             "cursor field must be missing or an object",
             cursorElem.type() == mongo::Object);
 
-    SimpleCursorOptions cursor = SimpleCursorOptions::parse(
-        IDLParserErrorContext(AggregateCommand::kCursorFieldName), cursorElem.embeddedObject());
+    SimpleCursorOptions cursor =
+        SimpleCursorOptions::parse(IDLParserErrorContext(AggregateCommandRequest::kCursorFieldName),
+                                   cursorElem.embeddedObject());
     if (!cursor.getBatchSize())
         cursor.setBatchSize(aggregation_request_helper::kDefaultBatchSize);
 

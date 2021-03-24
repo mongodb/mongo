@@ -963,8 +963,8 @@ void DBClientBase::update(const string& ns,
 }
 
 void DBClientBase::killCursor(const NamespaceString& ns, long long cursorId) {
-    runFireAndForgetCommand(
-        OpMsgRequest::fromDBAndBody(ns.db(), KillCursorsRequest(ns, {cursorId}).toBSON(BSONObj{})));
+    runFireAndForgetCommand(OpMsgRequest::fromDBAndBody(
+        ns.db(), KillCursorsCommandRequest(ns, {cursorId}).toBSON(BSONObj{})));
 }
 
 namespace {

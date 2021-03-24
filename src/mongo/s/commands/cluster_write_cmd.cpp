@@ -483,7 +483,7 @@ private:
 
         if (!response.getOk()) {
             numAttempts = 0;
-        } else if (batchedRequest.getWriteCommandBase().getOrdered() &&
+        } else if (batchedRequest.getWriteCommandRequestBase().getOrdered() &&
                    response.isErrDetailsSet()) {
             // Add one failed attempt
             numAttempts = response.getErrDetailsAt(0)->getIndex() + 1;
@@ -675,7 +675,7 @@ private:
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {
-        return &::mongo::write_ops::Insert::kAuthorizationContract;
+        return &::mongo::write_ops::InsertCommandRequest::kAuthorizationContract;
     }
 } clusterInsertCmd;
 
@@ -719,7 +719,7 @@ private:
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {
-        return &::mongo::write_ops::Update::kAuthorizationContract;
+        return &::mongo::write_ops::UpdateCommandRequest::kAuthorizationContract;
     }
 
     // Update related command execution metrics.
@@ -761,7 +761,7 @@ private:
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {
-        return &::mongo::write_ops::Delete::kAuthorizationContract;
+        return &::mongo::write_ops::DeleteCommandRequest::kAuthorizationContract;
     }
 
 } clusterDeleteCmd;

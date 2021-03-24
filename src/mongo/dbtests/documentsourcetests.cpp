@@ -77,7 +77,7 @@ class DocumentSourceCursorTest : public unittest::Test {
 public:
     DocumentSourceCursorTest()
         : client(_opCtx.get()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(), AggregateCommand(nss, {}))) {
+          _ctx(new ExpressionContextForTest(_opCtx.get(), AggregateCommandRequest(nss, {}))) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 
@@ -93,7 +93,7 @@ protected:
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
         _coll = ctx.getCollection();
 
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         if (hint) {
             findCommand->setHint(*hint);
         }
@@ -312,7 +312,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
                                           findCommand.get());
@@ -356,7 +356,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));
@@ -408,7 +408,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
                                           findCommand.get());
@@ -451,7 +451,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(findCommand), false, nullptr));

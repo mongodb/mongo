@@ -56,7 +56,7 @@
 
 namespace mongo {
 
-class AggregateCommand;
+class AggregateCommandRequest;
 
 class ExpressionContext : public RefCountable {
 public:
@@ -104,7 +104,7 @@ public:
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
     ExpressionContext(OperationContext* opCtx,
-                      const AggregateCommand& request,
+                      const AggregateCommandRequest& request,
                       std::unique_ptr<CollatorInterface> collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
@@ -113,7 +113,7 @@ public:
 
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version
-     * requires finer-grained parameters but does not require an AggregateCommand.
+     * requires finer-grained parameters but does not require an AggregateCommandRequest.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
     ExpressionContext(OperationContext* opCtx,

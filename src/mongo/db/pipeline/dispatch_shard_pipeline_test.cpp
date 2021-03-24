@@ -52,8 +52,8 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(AggregateCommand(expCtx()->ns, stages));
+    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
+        AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
 
     auto future = launchAsync([&] {
@@ -83,8 +83,8 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(AggregateCommand(expCtx()->ns, stages));
+    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
+        AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
 
     auto future = launchAsync([&] {
@@ -117,8 +117,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(AggregateCommand(expCtx()->ns, stages));
+    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
+        AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
@@ -162,8 +162,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(AggregateCommand(expCtx()->ns, stages));
+    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
+        AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
     auto future = launchAsync([&] {
         ASSERT_THROWS_CODE(sharded_agg_helpers::dispatchShardPipeline(
@@ -191,8 +191,8 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     };
     auto pipeline = Pipeline::create(
         {parseStage(stages[0]), parseStage(stages[1]), parseStage(stages[2])}, expCtx());
-    const Document serializedCommand =
-        aggregation_request_helper::serializeToCommandDoc(AggregateCommand(expCtx()->ns, stages));
+    const Document serializedCommand = aggregation_request_helper::serializeToCommandDoc(
+        AggregateCommandRequest(expCtx()->ns, stages));
     const bool hasChangeStream = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.

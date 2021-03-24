@@ -56,7 +56,7 @@ protected:
     std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr) {
         BSONObj queryObj = fromjson(queryStr);
         const NamespaceString nss("test.foo");
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(queryObj);
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(operationContext()));

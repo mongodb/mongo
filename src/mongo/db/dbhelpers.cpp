@@ -81,14 +81,14 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
     findCommand->setFilter(query);
     return findOne(opCtx, collection, std::move(findCommand), requireIndex);
 }
 
 RecordId Helpers::findOne(OperationContext* opCtx,
                           const CollectionPtr& collection,
-                          std::unique_ptr<FindCommand> findCommand,
+                          std::unique_ptr<FindCommandRequest> findCommand,
                           bool requireIndex) {
     if (!collection)
         return RecordId();

@@ -70,8 +70,8 @@ private:
         pipeline->push_back(sortBuilder.obj());
     }
 
-    virtual StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
-                                                      const AggregateCommand& request) const final {
+    virtual StatusWith<CursorResponse> runAggregation(
+        OperationContext* opCtx, const AggregateCommandRequest& request) const final {
         auto nss = request.getNamespace();
 
         BSONObjBuilder responseBuilder;

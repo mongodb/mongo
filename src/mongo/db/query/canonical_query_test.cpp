@@ -179,7 +179,7 @@ unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
 
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(),
@@ -199,7 +199,7 @@ std::unique_ptr<CanonicalQuery> canonicalize(const char* queryStr,
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson(queryStr));
     findCommand->setSort(fromjson(sortStr));
     findCommand->setProjection(fromjson(projStr));
@@ -282,11 +282,12 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
 
     BSONObjBuilder expectedFilter;
     firstClauseExpr->serialize(&expectedFilter);
-    ASSERT_BSONOBJ_EQ(childCq->getFindCommand().getFilter(), expectedFilter.obj());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getFilter(), expectedFilter.obj());
 
-    ASSERT_BSONOBJ_EQ(childCq->getFindCommand().getProjection(),
-                      baseCq->getFindCommand().getProjection());
-    ASSERT_BSONOBJ_EQ(childCq->getFindCommand().getSort(), baseCq->getFindCommand().getSort());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getProjection(),
+                      baseCq->getFindCommandRequest().getProjection());
+    ASSERT_BSONOBJ_EQ(childCq->getFindCommandRequest().getSort(),
+                      baseCq->getFindCommandRequest().getSort());
     ASSERT_TRUE(childCq->getExplain());
 }
 
@@ -294,7 +295,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromQRWithNoCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
     ASSERT_TRUE(cq->getCollator() == nullptr);
 }
@@ -303,7 +304,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromQRWithCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setCollation(BSON("locale"
                                    << "reverse"));
     auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
@@ -315,7 +316,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithNoCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     auto baseCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
@@ -328,7 +329,7 @@ TEST(CanonicalQueryTest, CanonicalQueryFromBaseQueryWithCollation) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{$or:[{a:1,b:1},{a:1,c:1}]}"));
     findCommand->setCollation(BSON("locale"
                                    << "reverse"));
@@ -344,7 +345,7 @@ TEST(CanonicalQueryTest, SettingCollatorUpdatesCollatorAndMatchExpression) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(fromjson("{a: 'foo', b: {$in: ['bar', 'baz']}}"));
     auto cq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand)));
     ASSERT_EQUALS(2U, cq->root()->numChildren());
@@ -398,7 +399,7 @@ void assertValidSortOrder(BSONObj sort, BSONObj filter = BSONObj{}) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     findCommand->setSort(sort);
     auto statusWithCQ =
@@ -424,7 +425,7 @@ void assertInvalidSortOrder(BSONObj sort) {
     QueryTestServiceContext serviceContext;
     auto opCtx = serviceContext.makeOperationContext();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setSort(sort);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_NOT_OK(statusWithCQ.getStatus());

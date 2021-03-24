@@ -326,7 +326,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
                                     const BSONObj& maxObj) {
     clearState();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     findCommand->setSort(sort);
     findCommand->setProjection(proj);
@@ -407,7 +407,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                            const BSONObj& maxObj) {
     clearState();
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(query);
     findCommand->setSort(sort);
     findCommand->setProjection(proj);
@@ -450,7 +450,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<FindCommand> findCommand(
+    std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     auto statusWithCQ =
@@ -477,7 +477,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
 
     // If there is no '$db', append it.
     auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
-    std::unique_ptr<FindCommand> findCommand(
+    std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmd, nss));
 
     auto statusWithCQ =

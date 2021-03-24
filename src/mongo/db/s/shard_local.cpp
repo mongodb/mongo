@@ -214,7 +214,7 @@ void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
 }
 
 Status ShardLocal::runAggregation(OperationContext* opCtx,
-                                  const AggregateCommand& aggRequest,
+                                  const AggregateCommandRequest& aggRequest,
                                   std::function<bool(const std::vector<BSONObj>& batch)> callback) {
     return _rsLocalClient.runAggregation(opCtx, aggRequest, callback);
 }

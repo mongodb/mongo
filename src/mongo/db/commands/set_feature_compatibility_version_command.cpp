@@ -81,7 +81,7 @@ MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     const auto commandResponse = client.runCommand([&] {
-        write_ops::Delete deleteOp(NamespaceString::kConfigSettingsNamespace);
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigSettingsNamespace);
         deleteOp.setDeletes({[&] {
             write_ops::DeleteOpEntry entry;
             entry.setQ(BSON("_id" << ReadWriteConcernDefaults::kPersistedDocumentId));

@@ -303,7 +303,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
         AllowedIndexEntry entry = *i;
 
         // Create canonical query.
-        auto findCommand = std::make_unique<FindCommand>(nss);
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(entry.query);
         findCommand->setSort(entry.sort);
         findCommand->setProjection(entry.projection);

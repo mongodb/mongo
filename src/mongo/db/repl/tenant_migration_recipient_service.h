@@ -378,7 +378,7 @@ public:
          * Creates an aggregation pipeline to fetch transaction entries with 'lastWriteOpTime' <
          * 'startFetchingDonorOpTime' and 'state: committed'.
          */
-        AggregateCommand _makeCommittedTransactionsAggregation() const;
+        AggregateCommandRequest _makeCommittedTransactionsAggregation() const;
 
         /**
          * Processes a committed transaction entry from the donor. Updates the recipient's

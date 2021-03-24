@@ -1093,10 +1093,10 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     readyEvent = unittest::assertGet(arm->nextEvent());
 
     BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
-    auto cmd = GetMoreCommand::parse({"getMore"},
-                                     scheduledCmd.addField(BSON("$db"
-                                                                << "anydbname")
-                                                               .firstElement()));
+    auto cmd = GetMoreCommandRequest::parse({"getMore"},
+                                            scheduledCmd.addField(BSON("$db"
+                                                                       << "anydbname")
+                                                                      .firstElement()));
     ASSERT_EQ(*cmd.getBatchSize(), 1LL);
     ASSERT_EQ(cmd.getCommandParameter(), 1LL);
     scheduleNetworkResponses(std::move(responses));

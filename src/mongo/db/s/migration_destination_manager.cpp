@@ -1056,8 +1056,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
                 assertNotAborted(opCtx);
 
-                write_ops::Insert insertOp(_nss);
-                insertOp.getWriteCommandBase().setOrdered(true);
+                write_ops::InsertCommandRequest insertOp(_nss);
+                insertOp.getWriteCommandRequestBase().setOrdered(true);
                 insertOp.setDocuments([&] {
                     std::vector<BSONObj> toInsert;
                     while (it != arr.end() &&

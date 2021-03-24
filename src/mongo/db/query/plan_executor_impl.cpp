@@ -145,7 +145,8 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
             _nss = collection->ns();
         } else {
             invariant(_cq);
-            _nss = _cq->getFindCommand().getNamespaceOrUUID().nss().value_or(NamespaceString());
+            _nss =
+                _cq->getFindCommandRequest().getNamespaceOrUUID().nss().value_or(NamespaceString());
         }
     }
 

@@ -50,7 +50,7 @@ public:
 
     Status insert(const NamespaceString& nss, const BSONObj& doc) {
         const auto commandResponse = _client.runCommand([&] {
-            write_ops::Insert insertOp(nss);
+            write_ops::InsertCommandRequest insertOp(nss);
             insertOp.setDocuments({doc});
             return insertOp.serialize({});
         }());

@@ -154,8 +154,8 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     CommandHelpers::uassertNoDocumentSequences(getName(), request);
 
     // To enforce API versioning
-    auto cmdObj = ExplainCmd::parse(
-        IDLParserErrorContext(ExplainCmd::kCommandName,
+    auto cmdObj = ExplainCommandRequest::parse(
+        IDLParserErrorContext(ExplainCommandRequest::kCommandName,
                               APIParameters::get(opCtx).getAPIStrict().value_or(false)),
         request.body);
     std::string dbname = cmdObj.getDbName().toString();

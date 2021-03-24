@@ -821,7 +821,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
     for (const auto& remote : _remotes) {
         if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
             BSONObj cmdObj =
-                KillCursorsRequest(_params.getNss(), {remote.cursorId}).toBSON(BSONObj{});
+                KillCursorsCommandRequest(_params.getNss(), {remote.cursorId}).toBSON(BSONObj{});
 
             executor::RemoteCommandRequest request(
                 remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, opCtx);

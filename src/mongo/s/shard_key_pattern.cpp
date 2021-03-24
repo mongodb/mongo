@@ -400,7 +400,7 @@ BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj d
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* opCtx,
                                                               const NamespaceString& nss,
                                                               const BSONObj& basicQuery) const {
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(basicQuery.getOwned());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -420,7 +420,7 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
 
 StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(
     boost::intrusive_ptr<ExpressionContext> expCtx, const BSONObj& basicQuery) const {
-    auto findCommand = std::make_unique<FindCommand>(expCtx->ns);
+    auto findCommand = std::make_unique<FindCommandRequest>(expCtx->ns);
     findCommand->setFilter(basicQuery.getOwned());
     if (!expCtx->getCollatorBSON().isEmpty()) {
         findCommand->setCollation(expCtx->getCollatorBSON().getOwned());

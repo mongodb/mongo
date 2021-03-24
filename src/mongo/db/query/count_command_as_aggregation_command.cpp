@@ -47,7 +47,7 @@ const char kMaxTimeMSField[] = "maxTimeMS";
 const char kReadConcernField[] = "readConcern";
 }  // namespace
 
-StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommand& cmd,
+StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& cmd,
                                                      const NamespaceString& nss) {
     BSONObjBuilder aggregationBuilder;
     aggregationBuilder.append("aggregate", nss.coll());

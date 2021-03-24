@@ -141,9 +141,9 @@ int removeSessionsTransactionRecords(OperationContext* opCtx,
         return 0;
 
     // Remove the session ids from the on-disk catalog
-    write_ops::Delete deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
-    deleteOp.setWriteCommandBase([] {
-        write_ops::WriteCommandBase base;
+    write_ops::DeleteCommandRequest deleteOp(NamespaceString::kSessionTransactionsTableNamespace);
+    deleteOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase base;
         base.setOrdered(false);
         return base;
     }());

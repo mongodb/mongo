@@ -58,7 +58,7 @@ MONGO_FAIL_POINT_DEFINE(failGetMoreAfterCursorCheckout);
 const OperationContext::Decoration<AwaitDataState> awaitDataState =
     OperationContext::declareDecoration<AwaitDataState>();
 
-bool FindCommon::enoughForFirstBatch(const FindCommand& findCommand, long long numDocs) {
+bool FindCommon::enoughForFirstBatch(const FindCommandRequest& findCommand, long long numDocs) {
     auto effectiveBatchSize =
         findCommand.getBatchSize() ? findCommand.getBatchSize() : findCommand.getNtoreturn();
     if (!effectiveBatchSize) {

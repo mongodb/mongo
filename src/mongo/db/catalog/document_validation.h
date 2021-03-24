@@ -57,7 +57,7 @@ public:
         kEnableValidation = 0x00,
         /*
          * Disables the schema validation during document inserts and updates.
-         * This flag should be enabled if WriteCommandBase::_bypassDocumentValidation
+         * This flag should be enabled if WriteCommandRequestBase::_bypassDocumentValidation
          * is set to true.
          */
         kDisableSchemaValidation = 0x01,

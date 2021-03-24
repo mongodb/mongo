@@ -70,7 +70,7 @@ public:
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeTailableQueryPlan(
     OperationContext* opCtx, const CollectionPtr& collection) {
-    auto findCommand = std::make_unique<FindCommand>(collection->ns());
+    auto findCommand = std::make_unique<FindCommandRequest>(collection->ns());
     query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData,
                                           findCommand.get());
 

@@ -68,7 +68,7 @@ public:
     /**
      * Increments update metrics corresponding to the supplied parameters.
      */
-    void collectMetrics(const write_ops::FindAndModifyCommand& cmd);
+    void collectMetrics(const write_ops::FindAndModifyCommandRequest& cmd);
 
 private:
     // A counter for how many times this command has been executed with an aggregation

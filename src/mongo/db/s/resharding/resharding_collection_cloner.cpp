@@ -216,7 +216,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
-    AggregateCommand request(_sourceNss, pipeline.serializeToBson());
+    AggregateCommandRequest request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
 
     auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)

@@ -78,7 +78,7 @@ public:
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
-                               const AggregateCommand& request,
+                               const AggregateCommandRequest& request,
                                const LiteParsedPipeline& liteParsedPipeline,
                                const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
@@ -88,7 +88,7 @@ public:
      */
     static Status runAggregate(OperationContext* opCtx,
                                const Namespaces& namespaces,
-                               const AggregateCommand& request,
+                               const AggregateCommandRequest& request,
                                const PrivilegeVector& privileges,
                                BSONObjBuilder* result);
 
@@ -102,7 +102,7 @@ public:
      * On success, populates 'result' with the command response.
      */
     static Status retryOnViewError(OperationContext* opCtx,
-                                   const AggregateCommand& request,
+                                   const AggregateCommandRequest& request,
                                    const ResolvedView& resolvedView,
                                    const NamespaceString& requestedNss,
                                    const PrivilegeVector& privileges,

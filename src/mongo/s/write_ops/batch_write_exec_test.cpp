@@ -293,9 +293,9 @@ public:
 
 TEST_F(BatchWriteExecTest, SingleOpUnordered) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -327,9 +327,9 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
     const auto q = BSON("x"
                         << "$$y");
     BatchedCommandRequest updateRequest([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -419,9 +419,9 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
     const auto q = BSON("x"
                         << "$$y");
     BatchedCommandRequest deleteRequest([&] {
-        write_ops::Delete deleteOp(nss);
-        deleteOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::DeleteCommandRequest deleteOp(nss);
+        deleteOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -511,9 +511,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeOrdered) {
     }
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -544,9 +544,9 @@ TEST_F(BatchWriteExecTest, SingleOpUnorderedError) {
     errResponse.setStatus({ErrorCodes::UnknownError, "mock error"});
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -585,9 +585,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
     }
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -615,9 +615,9 @@ TEST_F(BatchWriteExecTest, MultiOpLargeUnorderedWithStaleShardVersionError) {
 
 TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrite) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -723,9 +723,9 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
 TEST_F(BatchWriteExecTest,
        RetryableErrorReturnedFromMultiWriteWithShard1AllOKShard2AllStaleShardVersion) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -853,9 +853,9 @@ TEST_F(BatchWriteExecTest,
 
 TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -994,9 +994,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
 
 TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOKShard2FirstOK) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1135,9 +1135,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
 
 TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1252,9 +1252,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
 
 TEST_F(BatchWriteExecTest, StaleShardOp) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1284,9 +1284,9 @@ TEST_F(BatchWriteExecTest, StaleShardOp) {
 
 TEST_F(BatchWriteExecTest, MultiStaleShardOp) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1322,9 +1322,9 @@ TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
     // singleShardNSTargeter doesn't report progress on refresh). We should report a no progress
     // error for everything in the batch.
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1357,9 +1357,9 @@ TEST_F(BatchWriteExecTest, TooManyStaleShardOp) {
 
 TEST_F(BatchWriteExecTest, StaleDbOp) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1389,9 +1389,9 @@ TEST_F(BatchWriteExecTest, StaleDbOp) {
 
 TEST_F(BatchWriteExecTest, MultiStaleDbOp) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1427,9 +1427,9 @@ TEST_F(BatchWriteExecTest, TooManyStaleDbOp) {
     // singleShardNSTargeter doesn't report progress on refresh). We should report a no progress
     // error for everything in the batch.
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1473,9 +1473,9 @@ TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
     }
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -1508,9 +1508,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
     // A retryable error without a txnNumber is not retried.
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -1547,9 +1547,9 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
     // A retryable error with a txnNumber is automatically retried.
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -1585,9 +1585,9 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
     // A non-retryable error with a txnNumber is not retried.
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -1627,9 +1627,9 @@ TEST_F(BatchWriteExecTest, StaleEpochIsNotRetryable) {
     // A StaleEpoch error is not retried.
 
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -1717,9 +1717,9 @@ public:
 
 TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -1863,9 +1863,9 @@ private:
 
 TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorResponseInTransaction) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2012,9 +2012,9 @@ private:
 
 TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorResponseInTransaction) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(nss);
-        updateOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::UpdateCommandRequest updateOp(nss);
+        updateOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2194,9 +2194,9 @@ private:
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2226,9 +2226,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchThrows_CommandError) {
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2256,9 +2256,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteError) {
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(true);
             return writeCommandBase;
         }());
@@ -2286,9 +2286,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_WriteErrorOrdered) {
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientTxnError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2314,9 +2314,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientTxnError) {
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_DispatchError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());
@@ -2346,9 +2346,9 @@ TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_DispatchError) {
 
 TEST_F(BatchWriteExecTransactionTest, ErrorInBatchSets_TransientDispatchError) {
     BatchedCommandRequest request([&] {
-        write_ops::Insert insertOp(nss);
-        insertOp.setWriteCommandBase([] {
-            write_ops::WriteCommandBase writeCommandBase;
+        write_ops::InsertCommandRequest insertOp(nss);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase writeCommandBase;
             writeCommandBase.setOrdered(false);
             return writeCommandBase;
         }());

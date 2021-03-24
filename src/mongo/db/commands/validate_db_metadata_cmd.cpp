@@ -68,8 +68,8 @@ class ValidateDBMetadataCmd : public TypedCommand<ValidateDBMetadataCmd> {
         typename TypedCommand<ValidateDBMetadataCmd>::InvocationBase;
 
 public:
-    using Request = ValidateDBMetadata;
-    using Reply = ValidateDBMetadataReply;
+    using Request = ValidateDBMetadataCommandRequest;
+    using Reply = ValidateDBMetadataCommandReply;
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
@@ -236,7 +236,7 @@ public:
 
         ValidateDBMetadataSizeTracker _sizeTracker;
         std::vector<ErrorReplyElement> apiVersionErrors;
-        ValidateDBMetadataReply _reply;
+        ValidateDBMetadataCommandReply _reply;
     };
 } validateDBMetadataCmd;
 }  // namespace mongo

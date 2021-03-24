@@ -372,7 +372,7 @@ std::unique_ptr<QuerySolutionNode> addSortKeyGeneratorStageIfNeeded(
     const CanonicalQuery& query, bool hasSortStage, std::unique_ptr<QuerySolutionNode> solnRoot) {
     if (!hasSortStage && query.metadataDeps()[DocumentMetadataFields::kSortKey]) {
         auto keyGenNode = std::make_unique<SortKeyGeneratorNode>();
-        keyGenNode->sortSpec = query.getFindCommand().getSort();
+        keyGenNode->sortSpec = query.getFindCommandRequest().getSort();
         keyGenNode->children.push_back(solnRoot.release());
         return keyGenNode;
     }
@@ -539,8 +539,8 @@ std::unique_ptr<QuerySolutionNode> tryPushdownProjectBeneathSort(
 bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
                       const CanonicalQuery& cq,
                       const QueryPlannerParams& plannerParams) {
-    const bool splitLimitedSortEligible = cq.getFindCommand().getNtoreturn() &&
-        !cq.getFindCommand().getSingleBatch() &&
+    const bool splitLimitedSortEligible = cq.getFindCommandRequest().getNtoreturn() &&
+        !cq.getFindCommandRequest().getSingleBatch() &&
         plannerParams.options & QueryPlannerParams::SPLIT_LIMITED_SORT;
 
     // The simple sort stage discards any metadata other than sort key metadata. It can only be used
@@ -622,7 +622,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     // Find explodable nodes in the subtree rooted at 'toReplace'.
     getExplodableNodes(toReplace, &explodableNodes);
 
-    const BSONObj& desiredSort = query.getFindCommand().getSort();
+    const BSONObj& desiredSort = query.getFindCommandRequest().getSort();
 
     // How many scan leaves will result from our expansion?
     size_t totalNumScans = 0;
@@ -764,7 +764,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
                                                      bool* blockingSortOut) {
     *blockingSortOut = false;
 
-    const FindCommand& findCommand = query.getFindCommand();
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
     const BSONObj& sortObj = findCommand.getSort();
 
     if (sortObj.isEmpty()) {
@@ -974,7 +974,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     bool hasAndHashStage = solnRoot->hasNode(STAGE_AND_HASH);
     soln->hasBlockingStage = hasSortStage || hasAndHashStage;
 
-    const FindCommand& findCommand = query.getFindCommand();
+    const FindCommandRequest& findCommand = query.getFindCommandRequest();
 
     if (findCommand.getSkip()) {
         auto skip = std::make_unique<SkipNode>();

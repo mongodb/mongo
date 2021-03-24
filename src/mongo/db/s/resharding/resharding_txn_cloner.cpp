@@ -122,8 +122,8 @@ boost::optional<LogicalSessionId> ReshardingTxnCloner::_fetchProgressLsid(Operat
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
-    AggregateCommand request(NamespaceString::kSessionTransactionsTableNamespace,
-                             pipeline.serializeToBson());
+    AggregateCommandRequest request(NamespaceString::kSessionTransactionsTableNamespace,
+                                    pipeline.serializeToBson());
 
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
                                 << repl::readConcernLevels::kSnapshotName

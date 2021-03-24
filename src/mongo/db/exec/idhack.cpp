@@ -58,7 +58,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
       _workingSet(ws),
       _key(query->getQueryObj()["_id"].wrap()) {
     _specificStats.indexName = descriptor->indexName();
-    _addKeyMetadata = query->getFindCommand().getReturnKey();
+    _addKeyMetadata = query->getFindCommandRequest().getReturnKey();
 }
 
 IDHackStage::IDHackStage(ExpressionContext* expCtx,

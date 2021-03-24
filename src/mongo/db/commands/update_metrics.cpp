@@ -58,7 +58,7 @@ void UpdateMetrics::collectMetrics(const BSONObj& cmdObj) {
     }
 }
 
-void UpdateMetrics::collectMetrics(const write_ops::FindAndModifyCommand& cmd) {
+void UpdateMetrics::collectMetrics(const write_ops::FindAndModifyCommandRequest& cmd) {
     if (auto update = cmd.getUpdate()) {
         if (update->type() == write_ops::UpdateModification::Type::kPipeline) {
             _commandsWithAggregationPipeline.increment();

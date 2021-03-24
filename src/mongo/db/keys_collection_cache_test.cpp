@@ -80,7 +80,7 @@ protected:
                         const NamespaceString& nss,
                         const BSONObj& filter) {
         auto cmdObj = [&] {
-            write_ops::Delete deleteOp(nss);
+            write_ops::DeleteCommandRequest deleteOp(nss);
             deleteOp.setDeletes({[&] {
                 write_ops::DeleteOpEntry entry;
                 entry.setQ(filter);
@@ -101,7 +101,7 @@ protected:
                         const BSONObj& filter,
                         const BSONObj& update) {
         auto cmdObj = [&] {
-            write_ops::Update updateOp(nss);
+            write_ops::UpdateCommandRequest updateOp(nss);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(filter);

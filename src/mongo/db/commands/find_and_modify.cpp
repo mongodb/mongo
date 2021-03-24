@@ -87,7 +87,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeFindAndModifyPerformsUpdate);
  * boost::none if no matching document to update/remove was found. If the operation failed, throws.
  */
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
-                                         const write_ops::FindAndModifyCommand& request,
+                                         const write_ops::FindAndModifyCommandRequest& request,
                                          PlanExecutor* exec,
                                          bool isRemove) {
     BSONObj value;
@@ -117,7 +117,7 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     return boost::none;
 }
 
-void validate(const write_ops::FindAndModifyCommand& request) {
+void validate(const write_ops::FindAndModifyCommandRequest& request) {
     uassert(ErrorCodes::FailedToParse,
             "Either an update or remove=true must be specified",
             request.getRemove().value_or(false) || request.getUpdate());
@@ -148,7 +148,7 @@ void validate(const write_ops::FindAndModifyCommand& request) {
 }
 
 void makeUpdateRequest(OperationContext* opCtx,
-                       const write_ops::FindAndModifyCommand& request,
+                       const write_ops::FindAndModifyCommandRequest& request,
                        boost::optional<ExplainOptions::Verbosity> explain,
                        UpdateRequest* requestOut) {
     requestOut->setQuery(request.getQuery());
@@ -174,7 +174,7 @@ void makeUpdateRequest(OperationContext* opCtx,
 }
 
 void makeDeleteRequest(OperationContext* opCtx,
-                       const write_ops::FindAndModifyCommand& request,
+                       const write_ops::FindAndModifyCommandRequest& request,
                        bool explain,
                        DeleteRequest* requestOut) {
     requestOut->setQuery(request.getQuery());
@@ -194,9 +194,9 @@ void makeDeleteRequest(OperationContext* opCtx,
                                    : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
-write_ops::FindAndModifyReply buildResponse(const PlanExecutor* exec,
-                                            bool isRemove,
-                                            const boost::optional<BSONObj>& value) {
+write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
+                                                   bool isRemove,
+                                                   const boost::optional<BSONObj>& value) {
     write_ops::FindAndModifyLastError lastError;
     if (isRemove) {
         lastError.setNumDocs(value ? 1 : 0);
@@ -212,7 +212,7 @@ write_ops::FindAndModifyReply buildResponse(const PlanExecutor* exec,
         }
     }
 
-    write_ops::FindAndModifyReply result;
+    write_ops::FindAndModifyCommandReply result;
     result.setLastErrorObject(std::move(lastError));
     result.setValue(value);
     return result;
@@ -304,19 +304,19 @@ public:
         void appendMirrorableRequest(BSONObjBuilder* bob) const final;
 
     private:
-        static write_ops::FindAndModifyReply writeConflictRetryRemove(
+        static write_ops::FindAndModifyCommandReply writeConflictRetryRemove(
             OperationContext* opCtx,
             const NamespaceString& nsString,
-            const write_ops::FindAndModifyCommand& request,
+            const write_ops::FindAndModifyCommandRequest& request,
             int stmtId,
             CurOp* curOp,
             OpDebug* opDebug,
             bool inTransaction);
 
-        static write_ops::FindAndModifyReply writeConflictRetryUpsert(
+        static write_ops::FindAndModifyCommandReply writeConflictRetryUpsert(
             OperationContext* opCtx,
             const NamespaceString& nsString,
-            const write_ops::FindAndModifyCommand& request,
+            const write_ops::FindAndModifyCommandRequest& request,
             CurOp* curOp,
             OpDebug* opDebug,
             bool inTransaction,
@@ -330,10 +330,10 @@ private:
 
 UpdateMetrics CmdFindAndModify::_updateMetrics{"findAndModify"};
 
-write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryRemove(
+write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflictRetryRemove(
     OperationContext* opCtx,
     const NamespaceString& nsString,
-    const write_ops::FindAndModifyCommand& request,
+    const write_ops::FindAndModifyCommandRequest& request,
     int stmtId,
     CurOp* curOp,
     OpDebug* const opDebug,
@@ -406,10 +406,10 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryRe
     return buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
 }
 
-write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUpsert(
+write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflictRetryUpsert(
     OperationContext* opCtx,
     const NamespaceString& nsString,
-    const write_ops::FindAndModifyCommand& request,
+    const write_ops::FindAndModifyCommandRequest& request,
     CurOp* curOp,
     OpDebug* opDebug,
     bool inTransaction,
@@ -597,7 +597,8 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     }
 }
 
-write_ops::FindAndModifyReply CmdFindAndModify::Invocation::typedRun(OperationContext* opCtx) {
+write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
+    OperationContext* opCtx) {
     const auto& req = request();
 
     validate(req);
@@ -708,16 +709,17 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::typedRun(OperationCo
 void CmdFindAndModify::Invocation::appendMirrorableRequest(BSONObjBuilder* bob) const {
     const auto& req = request();
 
-    bob->append(FindCommand::kCommandName, req.getNamespace().coll());
+    bob->append(FindCommandRequest::kCommandName, req.getNamespace().coll());
 
     if (!req.getQuery().isEmpty()) {
-        bob->append(FindCommand::kFilterFieldName, req.getQuery());
+        bob->append(FindCommandRequest::kFilterFieldName, req.getQuery());
     }
     if (req.getSort()) {
-        bob->append(write_ops::FindAndModifyCommand::kSortFieldName, *req.getSort());
+        bob->append(write_ops::FindAndModifyCommandRequest::kSortFieldName, *req.getSort());
     }
     if (req.getCollation()) {
-        bob->append(write_ops::FindAndModifyCommand::kCollationFieldName, *req.getCollation());
+        bob->append(write_ops::FindAndModifyCommandRequest::kCollationFieldName,
+                    *req.getCollation());
     }
 
     // Prevent the find from returning multiple documents since we can

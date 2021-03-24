@@ -86,7 +86,7 @@ commands:
     count:
         description: "Parser for the 'count' command."
         command_name: count
-        cpp_name: CountCommand
+        cpp_name: CountCommandRequest
         strict: true
         namespace: concatenate_with_db_or_uuid
         fields:
@@ -111,7 +111,7 @@ we don't have to write any code to handle that.
 
 The generated file will have methods to get and set all the members, and
 will return a boost::optional for optional fields. In the example above,
-it will generate a CountCommand::getQuery() method, among others.
+it will generate a CountCommandRequest::getQuery() method, among others.
 
 ### Other actions performed during this stage
 
@@ -215,9 +215,9 @@ Once we have parsed the command and checked authorization, we move on to parsing
 parts of the query. Once again, we will focus on the find and aggregate commands.
 
 ### Find command parsing
-The find command is parsed entirely by the IDL. Initially the IDL parser creates a FindCommand. As
-mentioned above, the IDL parser does all of the required type checking and stores all options for
-the query. The FindCommand is then turned into a CanonicalQuery. The CanonicalQuery
+The find command is parsed entirely by the IDL. The IDL parser first creates a FindCommandRequest.
+As mentioned above, the IDL parser does all of the required type checking and stores all options for
+the query. The FindCommandRequest is then turned into a CanonicalQuery. The CanonicalQuery
 parses the collation and the filter while just holding the rest of the IDL parsed fields.
 The parsing of the collation is straightforward: for each field that is allowed to be in the object,
 we check for that field and then build the collation from the parsed fields.
@@ -270,7 +270,7 @@ give a summary of how each is parsed, but not get into the same level of detail.
 * count : Parsed by IDL and then turned into a CountStage which can be executed in a similar way to
   a find command.
 * distinct : The distinct specific arguments are parsed by IDL, and the generic command arguments
-  are parsed by custom code. They are then combined into a FindCommand (mentioned above),
+  are parsed by custom code. They are then combined into a FindCommandRequest (mentioned above),
   canonicalized, packaged into a ParsedDistinct, which is eventually turned into an executable
   stage.
 * mapReduce : Parsed by IDL and then turned into an equivalent aggregation command.

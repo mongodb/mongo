@@ -171,7 +171,7 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     BSONObjBuilder aggregationBuilder;
 
     invariant(_query);
-    const FindCommand& findCommand = _query->getFindCommand();
+    const FindCommandRequest& findCommand = _query->getFindCommandRequest();
     aggregationBuilder.append(
         "aggregate", findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()).coll());
 
@@ -257,14 +257,14 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
                                                  const CollatorInterface* defaultCollator) {
     IDLParserErrorContext ctx("distinct");
 
-    DistinctCommand parsedDistinct(nss);
+    DistinctCommandRequest parsedDistinct(nss);
     try {
-        parsedDistinct = DistinctCommand::parse(ctx, cmdObj);
+        parsedDistinct = DistinctCommandRequest::parse(ctx, cmdObj);
     } catch (...) {
         return exceptionToStatus();
     }
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
 
     if (parsedDistinct.getKey().find('\0') != std::string::npos) {
         return Status(ErrorCodes::Error(31032), "Key field cannot contain an embedded null byte");
@@ -325,7 +325,7 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
         return cq.getStatus();
     }
 
-    if (cq.getValue()->getFindCommand().getCollation().isEmpty() && defaultCollator) {
+    if (cq.getValue()->getFindCommandRequest().getCollation().isEmpty() && defaultCollator) {
         cq.getValue()->setCollator(defaultCollator->clone());
     }
 

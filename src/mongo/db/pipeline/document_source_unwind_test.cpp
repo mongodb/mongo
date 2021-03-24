@@ -72,7 +72,7 @@ public:
         : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregateCommand(NamespaceString(ns), {}))) {}
+                                            AggregateCommandRequest(NamespaceString(ns), {}))) {}
 
     virtual ~CheckResultsBase() {}
 

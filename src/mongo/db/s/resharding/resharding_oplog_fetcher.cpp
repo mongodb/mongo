@@ -228,7 +228,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceSt
     });
 }
 
-AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
+AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(Client* client) {
     auto opCtxRaii = client->makeOperationContext();
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
@@ -237,7 +237,8 @@ AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
         createOplogFetchingPipelineForResharding(expCtx, _startAt, _collUUID, _recipientShard)
             ->serializeToBson();
 
-    AggregateCommand aggRequest(NamespaceString::kRsOplogNamespace, std::move(serializedPipeline));
+    AggregateCommandRequest aggRequest(NamespaceString::kRsOplogNamespace,
+                                       std::move(serializedPipeline));
     if (_useReadConcern) {
         auto readConcernArgs = repl::ReadConcernArgs(
             boost::optional<LogicalTime>(_startAt.getTs()),
@@ -265,7 +266,7 @@ AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
 bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     _ensureCollection(client, _toWriteInto);
 
-    auto aggRequest = _makeAggregateCommand(client);
+    auto aggRequest = _makeAggregateCommandRequest(client);
 
     auto opCtxRaii = client->makeOperationContext();
     int batchesProcessed = 0;

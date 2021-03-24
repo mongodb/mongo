@@ -90,7 +90,8 @@ std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdRepl
     return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
-AggregateCommand ResolvedView::asExpandedViewAggregation(const AggregateCommand& request) const {
+AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
+    const AggregateCommandRequest& request) const {
     // Perform the aggregation on the resolved namespace.  The new pipeline consists of two parts:
     // first, 'pipeline' in this ResolvedView; then, the pipeline in 'request'.
     std::vector<BSONObj> resolvedPipeline;
@@ -125,7 +126,7 @@ AggregateCommand ResolvedView::asExpandedViewAggregation(const AggregateCommand&
             BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
     }
 
-    AggregateCommand expandedRequest{_namespace, resolvedPipeline};
+    AggregateCommandRequest expandedRequest{_namespace, resolvedPipeline};
 
     if (request.getExplain()) {
         expandedRequest.setExplain(request.getExplain());

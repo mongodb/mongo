@@ -124,9 +124,9 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
     MutableDocument mergeCmd(serializedCommand);
 
     mergeCmd["pipeline"] = Value(pipelineForMerging->serialize());
-    mergeCmd[AggregateCommand::kFromMongosFieldName] = Value(true);
+    mergeCmd[AggregateCommandRequest::kFromMongosFieldName] = Value(true);
 
-    mergeCmd[AggregateCommand::kLetFieldName] =
+    mergeCmd[AggregateCommandRequest::kLetFieldName] =
         Value(mergeCtx->variablesParseState.serialize(mergeCtx->variables));
 
     // If the user didn't specify a collation already, make sure there's a collation attached to

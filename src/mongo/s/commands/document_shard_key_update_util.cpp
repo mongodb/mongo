@@ -101,9 +101,9 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
  * Creates the delete op that will be used to delete the pre-image document. Will also attach the
  * original document _id retrieved from 'updatePreImage'.
  */
-write_ops::Delete createShardKeyDeleteOp(const NamespaceString& nss,
-                                         const BSONObj& updatePreImage) {
-    write_ops::Delete deleteOp(nss);
+write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& nss,
+                                                       const BSONObj& updatePreImage) {
+    write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
         entry.setQ(updatePreImage);
@@ -117,9 +117,9 @@ write_ops::Delete createShardKeyDeleteOp(const NamespaceString& nss,
 /**
  * Creates the insert op that will be used to insert the new document with the post-update image.
  */
-write_ops::Insert createShardKeyInsertOp(const NamespaceString& nss,
-                                         const BSONObj& updatePostImage) {
-    write_ops::Insert insertOp(nss);
+write_ops::InsertCommandRequest createShardKeyInsertOp(const NamespaceString& nss,
+                                                       const BSONObj& updatePostImage) {
+    write_ops::InsertCommandRequest insertOp(nss);
     insertOp.setDocuments({updatePostImage});
     return insertOp;
 }

@@ -49,7 +49,8 @@ private:
     size_t currentSize = 0;
 };
 
-void assertUserCanRunValidate(OperationContext* opCtx, const ValidateDBMetadata& request) {
+void assertUserCanRunValidate(OperationContext* opCtx,
+                              const ValidateDBMetadataCommandRequest& request) {
     const auto resource = request.getDb() ? ResourcePattern::forDatabaseName(*request.getDb())
                                           : ResourcePattern::forAnyNormalResource();
     uassert(ErrorCodes::Unauthorized,

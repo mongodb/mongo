@@ -66,8 +66,8 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
-                                                      const AggregateCommand& request) const final {
+    virtual StatusWith<CursorResponse> runAggregation(
+        OperationContext* opCtx, const AggregateCommandRequest& request) const final {
         auto aggCmdObj = aggregation_request_helper::serializeToCommandObj(request);
 
         rpc::OpMsgReplyBuilder replyBuilder;

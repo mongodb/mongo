@@ -46,7 +46,7 @@ structs:
             codeName: string
             errmsg: string
 
-    ValidateDBMetadataReply:
+    ValidateDBMetadataCommandReply:
         description: "The validateDBMetadata command's reply."
         fields:
             apiVersionErrors:
@@ -68,9 +68,10 @@ commands:
     validateDBMetadata:
         description: "Input request for validateDBMetadata command."
         command_name: validateDBMetadata
+        cpp_name: ValidateDBMetadataCommandRequest
         namespace: ignored
         api_version: ""
-        reply_type: ValidateDBMetadataReply
+        reply_type: ValidateDBMetadataCommandReply
         fields:
             db:
                 type: string

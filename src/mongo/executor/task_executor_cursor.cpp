@@ -69,7 +69,8 @@ TaskExecutorCursor::~TaskExecutorCursor() {
             // timeout if an lsid is used.
             _executor
                 ->scheduleRemoteCommand(
-                    _createRequest(nullptr, KillCursorsRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
+                    _createRequest(nullptr,
+                                   KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
                     [](const auto&) {})
                 .isOK();
         }

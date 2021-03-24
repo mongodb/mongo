@@ -43,7 +43,7 @@ struct DbResponse;
 class Message;
 class NamespaceString;
 class OperationContext;
-class FindCommand;
+class FindCommandRequest;
 
 /**
  * Legacy interface for processing client read/write/cmd requests.
@@ -94,7 +94,7 @@ public:
      */
     static void explainFind(OperationContext* opCtx,
                             const BSONObj& findCommandObj,
-                            const FindCommand& findCommand,
+                            const FindCommandRequest& findCommand,
                             ExplainOptions::Verbosity verbosity,
                             const ReadPreferenceSetting& readPref,
                             BSONObjBuilder* out);

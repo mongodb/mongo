@@ -71,7 +71,7 @@ public:
      * Executes the getMore command 'cmd', and on success returns a CursorResponse.
      */
     static StatusWith<CursorResponse> runGetMore(OperationContext* opCtx,
-                                                 const GetMoreCommand& cmd);
+                                                 const GetMoreCommandRequest& cmd);
 };
 
 }  // namespace mongo

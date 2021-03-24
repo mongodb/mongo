@@ -101,7 +101,7 @@ public:
     public:
         Invocation(Command* cmd,
                    const OpMsgRequest& request,
-                   const AggregateCommand aggregationRequest,
+                   const AggregateCommandRequest aggregationRequest,
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
@@ -180,7 +180,7 @@ public:
 
         const OpMsgRequest& _request;
         const std::string _dbName;
-        const AggregateCommand _aggregationRequest;
+        const AggregateCommandRequest _aggregationRequest;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;
     };
@@ -201,7 +201,7 @@ public:
     }
 
     const AuthorizationContract* getAuthorizationContract() const final {
-        return &::mongo::AggregateCommand::kAuthorizationContract;
+        return &::mongo::AggregateCommandRequest::kAuthorizationContract;
     }
 
 } pipelineCmd;

@@ -49,7 +49,7 @@ namespace {
  *
  * This contains flags such as tailable, exhaust, and noCursorTimeout.
  */
-void initFromInt(int options, FindCommand* findCommand) {
+void initFromInt(int options, FindCommandRequest* findCommand) {
     bool tailable = (options & QueryOption_CursorTailable) != 0;
     bool awaitData = (options & QueryOption_AwaitData) != 0;
     if (awaitData) {
@@ -70,7 +70,7 @@ void initFromInt(int options, FindCommand* findCommand) {
 /**
  * Updates the projection object with a $meta projection for the showRecordId option.
  */
-void addShowRecordIdMetaProj(FindCommand* findCommand) {
+void addShowRecordIdMetaProj(FindCommandRequest* findCommand) {
     if (findCommand->getProjection()["$recordId"]) {
         // There's already some projection on $recordId. Don't overwrite it.
         return;
@@ -86,13 +86,13 @@ void addShowRecordIdMetaProj(FindCommand* findCommand) {
 /**
  * Add the meta projection to this object if needed.
  */
-void addMetaProjection(FindCommand* findCommand) {
+void addMetaProjection(FindCommandRequest* findCommand) {
     if (findCommand->getShowRecordId()) {
         addShowRecordIdMetaProj(findCommand);
     }
 }
 
-Status initFullQuery(const BSONObj& top, FindCommand* findCommand, bool* explain) {
+Status initFullQuery(const BSONObj& top, FindCommandRequest* findCommand, bool* explain) {
     BSONObjIterator i(top);
 
     while (i.more()) {
@@ -185,14 +185,14 @@ Status initFullQuery(const BSONObj& top, FindCommand* findCommand, bool* explain
     return Status::OK();
 }
 
-Status initFindCommand(int ntoskip,
-                       int ntoreturn,
-                       int queryOptions,
-                       const BSONObj& queryObj,
-                       const BSONObj& proj,
-                       bool fromQueryMessage,
-                       FindCommand* findCommand,
-                       bool* explain) {
+Status initFindCommandRequest(int ntoskip,
+                              int ntoreturn,
+                              int queryOptions,
+                              const BSONObj& queryObj,
+                              const BSONObj& proj,
+                              bool fromQueryMessage,
+                              FindCommandRequest* findCommand,
+                              bool* explain) {
     if (!proj.isEmpty()) {
         findCommand->setProjection(proj.getOwned());
     }
@@ -244,7 +244,7 @@ Status initFindCommand(int ntoskip,
         findCommand->setFilter(queryObj.getOwned());
     }
 
-    return validateFindCommand(*findCommand);
+    return validateFindCommandRequest(*findCommand);
 }
 
 }  // namespace
@@ -265,7 +265,7 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     return Status::OK();
 }
 
-Status validateFindCommand(const FindCommand& findCommand) {
+Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
     // Min and Max objects must have the same fields.
     if (!findCommand.getMin().isEmpty() && !findCommand.getMax().isEmpty()) {
         if (!findCommand.getMin().isFieldNamePrefixOf(findCommand.getMax()) ||
@@ -327,7 +327,7 @@ Status validateFindCommand(const FindCommand& findCommand) {
     return Status::OK();
 }
 
-void refreshNSS(const NamespaceString& nss, FindCommand* findCommand) {
+void refreshNSS(const NamespaceString& nss, FindCommandRequest* findCommand) {
     if (findCommand->getNamespaceOrUUID().uuid()) {
         auto& nssOrUUID = findCommand->getNamespaceOrUUID();
         nssOrUUID.setNss(nss);
@@ -335,12 +335,12 @@ void refreshNSS(const NamespaceString& nss, FindCommand* findCommand) {
     invariant(findCommand->getNamespaceOrUUID().nss());
 }
 
-std::unique_ptr<FindCommand> makeFromFindCommand(const BSONObj& cmdObj,
-                                                 boost::optional<NamespaceString> nss,
-                                                 bool apiStrict) {
+std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
+                                                        boost::optional<NamespaceString> nss,
+                                                        bool apiStrict) {
 
-    auto findCommand = std::make_unique<FindCommand>(
-        FindCommand::parse(IDLParserErrorContext("FindCommand", apiStrict), cmdObj));
+    auto findCommand = std::make_unique<FindCommandRequest>(
+        FindCommandRequest::parse(IDLParserErrorContext("FindCommandRequest", apiStrict), cmdObj));
 
     // If there is an explicit namespace specified overwite it.
     if (nss) {
@@ -356,14 +356,13 @@ std::unique_ptr<FindCommand> makeFromFindCommand(const BSONObj& cmdObj,
     if (findCommand->getLimit() && *findCommand->getLimit() == 0) {
         findCommand->setLimit(boost::none);
     }
-    uassertStatusOK(validateFindCommand(*findCommand));
+    uassertStatusOK(validateFindCommandRequest(*findCommand));
 
     return findCommand;
 }
 
-std::unique_ptr<FindCommand> makeFromFindCommandForTests(const BSONObj& cmdObj,
-                                                         boost::optional<NamespaceString> nss,
-                                                         bool apiStrict) {
+std::unique_ptr<FindCommandRequest> makeFromFindCommandForTests(
+    const BSONObj& cmdObj, boost::optional<NamespaceString> nss, bool apiStrict) {
     return makeFromFindCommand(cmdObj, nss, apiStrict);
 }
 
@@ -395,7 +394,7 @@ bool isTextScoreMeta(BSONElement elt) {
     return true;
 }
 
-void setTailableMode(TailableModeEnum tailableMode, FindCommand* findCommand) {
+void setTailableMode(TailableModeEnum tailableMode, FindCommandRequest* findCommand) {
     if (tailableMode == TailableModeEnum::kTailableAndAwaitData) {
         findCommand->setAwaitData(true);
         findCommand->setTailable(true);
@@ -404,7 +403,7 @@ void setTailableMode(TailableModeEnum tailableMode, FindCommand* findCommand) {
     }
 }
 
-TailableModeEnum getTailableMode(const FindCommand& findCommand) {
+TailableModeEnum getTailableMode(const FindCommandRequest& findCommand) {
     return uassertStatusOK(
         tailableModeFromBools(findCommand.getTailable(), findCommand.getAwaitData()));
 }
@@ -419,18 +418,18 @@ void validateCursorResponse(const BSONObj& outputAsBson) {
 // Old QueryRequest parsing code: SOON TO BE DEPRECATED.
 //
 
-StatusWith<std::unique_ptr<FindCommand>> fromLegacyQueryMessage(const QueryMessage& qm,
-                                                                bool* explain) {
-    auto findCommand = std::make_unique<FindCommand>(NamespaceString(qm.ns));
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQueryMessage(const QueryMessage& qm,
+                                                                       bool* explain) {
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(qm.ns));
 
-    Status status = initFindCommand(qm.ntoskip,
-                                    qm.ntoreturn,
-                                    qm.queryOptions,
-                                    qm.query,
-                                    qm.fields,
-                                    true,
-                                    findCommand.get(),
-                                    explain);
+    Status status = initFindCommandRequest(qm.ntoskip,
+                                           qm.ntoreturn,
+                                           qm.queryOptions,
+                                           qm.query,
+                                           qm.fields,
+                                           true,
+                                           findCommand.get(),
+                                           explain);
     if (!status.isOK()) {
         return status;
     }
@@ -438,16 +437,16 @@ StatusWith<std::unique_ptr<FindCommand>> fromLegacyQueryMessage(const QueryMessa
     return std::move(findCommand);
 }
 
-StatusWith<std::unique_ptr<FindCommand>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
-                                                         const BSONObj& queryObj,
-                                                         const BSONObj& proj,
-                                                         int ntoskip,
-                                                         int ntoreturn,
-                                                         int queryOptions,
-                                                         bool* explain) {
-    auto findCommand = std::make_unique<FindCommand>(std::move(nssOrUuid));
+StatusWith<std::unique_ptr<FindCommandRequest>> fromLegacyQuery(NamespaceStringOrUUID nssOrUuid,
+                                                                const BSONObj& queryObj,
+                                                                const BSONObj& proj,
+                                                                int ntoskip,
+                                                                int ntoreturn,
+                                                                int queryOptions,
+                                                                bool* explain) {
+    auto findCommand = std::make_unique<FindCommandRequest>(std::move(nssOrUuid));
 
-    Status status = initFindCommand(
+    Status status = initFindCommandRequest(
         ntoskip, ntoreturn, queryOptions, queryObj, proj, true, findCommand.get(), explain);
     if (!status.isOK()) {
         return status;
@@ -456,28 +455,28 @@ StatusWith<std::unique_ptr<FindCommand>> fromLegacyQuery(NamespaceStringOrUUID n
     return std::move(findCommand);
 }
 
-StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand) {
+StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) {
     BSONObjBuilder aggregationBuilder;
 
     // First, check if this query has options that are not supported in aggregation.
     if (!findCommand.getMin().isEmpty()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kMinFieldName
+                str::stream() << "Option " << FindCommandRequest::kMinFieldName
                               << " not supported in aggregation."};
     }
     if (!findCommand.getMax().isEmpty()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kMaxFieldName
+                str::stream() << "Option " << FindCommandRequest::kMaxFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getReturnKey()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kReturnKeyFieldName
+                str::stream() << "Option " << FindCommandRequest::kReturnKeyFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getShowRecordId()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kShowRecordIdFieldName
+                str::stream() << "Option " << FindCommandRequest::kShowRecordIdFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getTailable()) {
@@ -486,12 +485,12 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand) {
     }
     if (findCommand.getNoCursorTimeout()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kNoCursorTimeoutFieldName
+                str::stream() << "Option " << FindCommandRequest::kNoCursorTimeoutFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getAllowPartialResults()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kAllowPartialResultsFieldName
+                str::stream() << "Option " << FindCommandRequest::kAllowPartialResultsFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getNtoreturn()) {
@@ -507,30 +506,31 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand) {
     // special exception if 'limit' is set to 1.
     if (findCommand.getSingleBatch() && findCommand.getLimit().value_or(0) != 1LL) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kSingleBatchFieldName
+                str::stream() << "Option " << FindCommandRequest::kSingleBatchFieldName
                               << " not supported in aggregation."};
     }
     if (findCommand.getReadOnce()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kReadOnceFieldName
+                str::stream() << "Option " << FindCommandRequest::kReadOnceFieldName
                               << " not supported in aggregation."};
     }
 
     if (findCommand.getAllowSpeculativeMajorityRead()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kAllowSpeculativeMajorityReadFieldName
+                str::stream() << "Option "
+                              << FindCommandRequest::kAllowSpeculativeMajorityReadFieldName
                               << " not supported in aggregation."};
     }
 
     if (findCommand.getRequestResumeToken()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kRequestResumeTokenFieldName
+                str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
                               << " not supported in aggregation."};
     }
 
     if (!findCommand.getResumeAfter().isEmpty()) {
         return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommand::kResumeAfterFieldName
+                str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
                               << " not supported in aggregation."};
     }
 
@@ -572,7 +572,8 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand) {
     // The aggregation 'cursor' option is always set, regardless of the presence of batchSize.
     BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
     if (findCommand.getBatchSize()) {
-        batchSizeBuilder.append(FindCommand::kBatchSizeFieldName, *findCommand.getBatchSize());
+        batchSizeBuilder.append(FindCommandRequest::kBatchSizeFieldName,
+                                *findCommand.getBatchSize());
     }
     batchSizeBuilder.doneFast();
 
@@ -583,27 +584,27 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommand& findCommand) {
         aggregationBuilder.append(cmdOptionMaxTimeMS, maxTimeMS);
     }
     if (!findCommand.getHint().isEmpty()) {
-        aggregationBuilder.append(FindCommand::kHintFieldName, findCommand.getHint());
+        aggregationBuilder.append(FindCommandRequest::kHintFieldName, findCommand.getHint());
     }
     if (findCommand.getReadConcern()) {
         aggregationBuilder.append("readConcern", *findCommand.getReadConcern());
     }
     if (!findCommand.getUnwrappedReadPref().isEmpty()) {
-        aggregationBuilder.append(FindCommand::kUnwrappedReadPrefFieldName,
+        aggregationBuilder.append(FindCommandRequest::kUnwrappedReadPrefFieldName,
                                   findCommand.getUnwrappedReadPref());
     }
     if (findCommand.getAllowDiskUse()) {
-        aggregationBuilder.append(FindCommand::kAllowDiskUseFieldName,
+        aggregationBuilder.append(FindCommandRequest::kAllowDiskUseFieldName,
                                   static_cast<bool>(findCommand.getAllowDiskUse()));
     }
     if (findCommand.getLegacyRuntimeConstants()) {
         BSONObjBuilder rtcBuilder(
-            aggregationBuilder.subobjStart(FindCommand::kLegacyRuntimeConstantsFieldName));
+            aggregationBuilder.subobjStart(FindCommandRequest::kLegacyRuntimeConstantsFieldName));
         findCommand.getLegacyRuntimeConstants()->serialize(&rtcBuilder);
         rtcBuilder.doneFast();
     }
     if (findCommand.getLet()) {
-        aggregationBuilder.append(FindCommand::kLetFieldName, *findCommand.getLet());
+        aggregationBuilder.append(FindCommandRequest::kLetFieldName, *findCommand.getLet());
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }

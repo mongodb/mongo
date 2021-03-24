@@ -85,7 +85,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
                       const CollectionPtr& collection,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
-    const FindCommand& findCommand = exec->getCanonicalQuery()->getFindCommand();
+    const FindCommandRequest& findCommand = exec->getCanonicalQuery()->getFindCommandRequest();
     if (findCommand.getSingleBatch()) {
         return false;
     }
@@ -631,7 +631,7 @@ bool runQuery(OperationContext* opCtx,
             opCtx, nss, secondaryOk));
     }
 
-    const FindCommand& findCommand = cq->getFindCommand();
+    const FindCommandRequest& findCommand = cq->getFindCommandRequest();
     // Get the execution plan for the query.
     constexpr auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
     const bool isExplain = cq->getExplain();

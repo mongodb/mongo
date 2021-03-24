@@ -61,7 +61,7 @@ AddShard createAddShardCmd(OperationContext* opCtx, const ShardId& shardName) {
 
 BSONObj createShardIdentityUpsertForAddShard(const AddShard& addShardCmd) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(NamespaceString::kServerConfigurationNamespace);
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kServerConfigurationNamespace);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON("_id" << kShardIdentityDocumentId));

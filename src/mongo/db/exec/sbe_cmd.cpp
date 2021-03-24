@@ -79,7 +79,8 @@ public:
         NamespaceString nss{dbname};
 
         // Create a trivial cannonical query for the 'sbe' command execution.
-        auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::make_unique<FindCommand>(nss));
+        auto statusWithCQ =
+            CanonicalQuery::canonicalize(opCtx, std::make_unique<FindCommandRequest>(nss));
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
         stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};

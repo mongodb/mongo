@@ -101,7 +101,7 @@ void ShardLocalTest::tearDown() {
 StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(NamespaceString nss,
                                                                               BSONObj find,
                                                                               BSONObj set) {
-    auto findAndModifyRequest = write_ops::FindAndModifyCommand(nss);
+    auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest(nss);
     findAndModifyRequest.setQuery(find);
     findAndModifyRequest.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(set));
     findAndModifyRequest.setUpsert(true);

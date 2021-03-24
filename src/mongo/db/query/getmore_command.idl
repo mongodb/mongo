@@ -38,7 +38,7 @@ imports:
 
 commands:
   getMore:
-    cpp_name: GetMoreCommand
+    cpp_name: GetMoreCommandRequest
     command_name: getMore
     description: "Parser for the getMore command."
     strict: true

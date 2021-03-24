@@ -53,137 +53,137 @@ using unittest::assertGet;
 static const NamespaceString testns("testdb.testcoll");
 
 TEST(QueryRequestTest, LimitWithNToReturn) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setLimit(1);
     findCommand.setNtoreturn(0);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, BatchSizeWithNToReturn) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(0);
     findCommand.setNtoreturn(0);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, NegativeSkip) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setSkip(-1), DBException, 51024);
 }
 
 TEST(QueryRequestTest, ZeroSkip) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSkip(0);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, PositiveSkip) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSkip(1);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, NegativeLimit) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setLimit(-1), DBException, 51024);
 }
 
 TEST(QueryRequestTest, ZeroLimit) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setLimit(0);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, PositiveLimit) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setLimit(1);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, NegativeBatchSize) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setBatchSize(-1), DBException, 51024);
 }
 
 TEST(QueryRequestTest, ZeroBatchSize) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(0);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, PositiveBatchSize) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(1);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, NegativeNToReturn) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setNtoreturn(-1), DBException, 51024);
 }
 
 TEST(QueryRequestTest, ZeroNToReturn) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setNtoreturn(0);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, PositiveNToReturn) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setNtoreturn(1);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, NegativeMaxTimeMS) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     ASSERT_THROWS_CODE(findCommand.setMaxTimeMS(-1), DBException, 51024);
 }
 
 TEST(QueryRequestTest, ZeroMaxTimeMS) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMaxTimeMS(0);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, PositiveMaxTimeMS) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMaxTimeMS(1);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ValidSortOrder) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSort(fromjson("{a: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, DoesNotErrorOnInvalidSortPattern) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSort(fromjson("{a: \"\"}"));
-    // FindCommand isn't responsible for validating the sort pattern, so it is considered valid
-    // even though the sort pattern {a: ""} is not well-formed.
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    // FindCommandRequest isn't responsible for validating the sort pattern, so it is considered
+    // valid even though the sort pattern {a: ""} is not well-formed.
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, MinFieldsNotPrefixOfMax) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMin(fromjson("{a: 1}"));
     findCommand.setMax(fromjson("{b: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, MinFieldsMoreThanMax) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMin(fromjson("{a: 1, b: 1}"));
     findCommand.setMax(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, MinFieldsLessThanMax) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMin(fromjson("{a: 1}"));
     findCommand.setMax(fromjson("{a: 1, b: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ForbidTailableWithNonNaturalSort) {
@@ -224,122 +224,122 @@ TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
 //
 
 TEST(QueryRequestTest, ValidSortProj) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setProjection(fromjson("{a: 1}"));
     findCommand.setSort(fromjson("{a: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 
-    FindCommand metaFC(testns);
+    FindCommandRequest metaFC(testns);
     metaFC.setProjection(fromjson("{a: {$meta: \"textScore\"}}"));
     metaFC.setSort(fromjson("{a: {$meta: \"textScore\"}}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(metaFC));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(metaFC));
 }
 
 TEST(QueryRequestTest, TextScoreMetaSortOnFieldDoesNotRequireMetaProjection) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setProjection(fromjson("{b: 1}"));
     findCommand.setSort(fromjson("{a: {$meta: 'textScore'}}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, TextScoreMetaProjectionDoesNotRequireTextScoreMetaSort) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setProjection(fromjson("{a: {$meta: \"textScore\"}}"));
     findCommand.setSort(fromjson("{b: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, RequestResumeTokenWithHint) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setHint(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, RequestResumeTokenWithSort) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL << "$extra" << 1);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setHint(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithSort) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{a: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
-    FindCommand findCommand(NamespaceString::kRsOplogNamespace);
+    FindCommandRequest findCommand(NamespaceString::kRsOplogNamespace);
     BSONObj resumeAfter = fromjson("{}");
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     findCommand.setResumeAfter(resumeAfter);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
-    ASSERT_OK(query_request_helper::validateFindCommand(findCommand));
+    ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
 }
 
 //
@@ -387,7 +387,8 @@ TEST(QueryRequestTest, ParseFromCommandWithOptions) {
         "projection: {_id: 0, a: 1},"
         "showRecordId: true, '$db': 'test'}");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     // Make sure the values from the command BSON are reflected in the QR.
     ASSERT(findCommand->getShowRecordId());
@@ -399,7 +400,8 @@ TEST(QueryRequestTest, ParseFromCommandHintAsString) {
         "filter:  {a: 1},"
         "hint: 'foo_1', '$db': 'test'}");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     BSONObj hintObj = findCommand->getHint();
     ASSERT_BSONOBJ_EQ(BSON("$hint"
@@ -435,7 +437,8 @@ TEST(QueryRequestTest, ParseFromCommandAllFlagsTrue) {
         "readOnce: true,"
         "allowSpeculativeMajorityRead: true, '$db': 'test'}");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     // Test that all the flags got set to true.
     ASSERT(findCommand->getTailable());
@@ -465,7 +468,8 @@ TEST(QueryRequestTest, OplogReplayFlagIsAllowedButIgnored) {
 TEST(QueryRequestTest, ParseFromCommandReadOnceDefaultsToFalse) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(!findCommand->getReadOnce());
 }
 
@@ -476,7 +480,8 @@ TEST(QueryRequestTest, ParseFromCommandValidMinMax) {
         "min: {a: 1},"
         "max: {a: 2}, '$db': 'test'}");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     BSONObj expectedMin = BSON("a" << 1);
     ASSERT_EQUALS(0, expectedMin.woCompare(findCommand->getMin()));
     BSONObj expectedMax = BSON("a" << 2);
@@ -501,7 +506,8 @@ TEST(QueryRequestTest, ParseFromCommandAllNonOptionFields) {
                          "singleBatch: false, '$db': 'test'}")
                          .addField(rtcObj["runtimeConstants"]);
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     // Check the values inside the QR.
     BSONObj expectedQuery = BSON("a" << 1);
     ASSERT_EQUALS(0, expectedQuery.woCompare(findCommand->getFilter()));
@@ -534,7 +540,8 @@ TEST(QueryRequestTest, ParseFromCommandLargeLimit) {
         "filter: {a: 1},"
         "limit: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *findCommand->getLimit());
 }
@@ -545,7 +552,8 @@ TEST(QueryRequestTest, ParseFromCommandLargeBatchSize) {
         "filter: {a: 1},"
         "batchSize: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *findCommand->getBatchSize());
 }
@@ -556,7 +564,8 @@ TEST(QueryRequestTest, ParseFromCommandLargeSkip) {
         "filter: {a: 1},"
         "skip: 8000000000, '$db': 'test'}");  // 8 * 1000 * 1000 * 1000
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT_EQUALS(8LL * 1000 * 1000 * 1000, *findCommand->getSkip());
 }
@@ -863,7 +872,8 @@ TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
         "{find: 'testns',"
         "skip: 0,"
         "filter: {a: 3}, '$db': 'test'}");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_BSONOBJ_EQ(BSON("a" << 3), findCommand->getFilter());
     ASSERT_FALSE(findCommand->getSkip());
 }
@@ -882,7 +892,8 @@ TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
         "{find: 'testns',"
         "limit: 0,"
         "filter: {a: 3}, '$db': 'test'}");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_BSONOBJ_EQ(BSON("a" << 3), findCommand->getFilter());
     ASSERT_FALSE(findCommand->getLimit());
 }
@@ -898,7 +909,8 @@ TEST(QueryRequestTest, ParseFromCommandNegativeBatchSizeError) {
 
 TEST(QueryRequestTest, ParseFromCommandBatchSizeZero) {
     BSONObj cmdObj = fromjson("{find: 'testns', batchSize: 0, '$db': 'test'}");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT(findCommand->getBatchSize());
     ASSERT_EQ(0, *findCommand->getBatchSize());
@@ -907,7 +919,8 @@ TEST(QueryRequestTest, ParseFromCommandBatchSizeZero) {
 
 TEST(QueryRequestTest, ParseFromCommandDefaultBatchSize) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT(!findCommand->getBatchSize());
     ASSERT(!findCommand->getLimit());
@@ -920,7 +933,8 @@ TEST(QueryRequestTest, ParseFromCommandRequestResumeToken) {
                           << "$_requestResumeToken" << true << "$db"
                           << "test");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(findCommand->getRequestResumeToken());
 }
 
@@ -932,7 +946,8 @@ TEST(QueryRequestTest, ParseFromCommandResumeToken) {
                           << BSON("$recordId" << 1LL) << "$db"
                           << "test");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(!findCommand->getResumeAfter().isEmpty());
     ASSERT(findCommand->getRequestResumeToken());
 }
@@ -946,16 +961,17 @@ TEST(QueryRequestTest, ParseFromCommandEmptyResumeToken) {
              << "$_requestResumeToken" << true << "$_resumeAfter" << resumeAfter << "$db"
              << "test");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(findCommand->getRequestResumeToken());
     ASSERT(findCommand->getResumeAfter().isEmpty());
 }
 
 //
-// Test FindCommand object ns and uuid variants.
+// Test FindCommandRequest object ns and uuid variants.
 //
 
-TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
+TEST(QueryRequestTest, AsFindCommandRequestAllNonOptionFields) {
     BSONObj storage = BSON("runtimeConstants"
                            << (LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
     BSONObj cmdObj = fromjson(
@@ -972,11 +988,12 @@ TEST(QueryRequestTest, AsFindCommandAllNonOptionFields) {
                          "readConcern: {e: 1}, '$db': 'test'}")
                          .addField(storage["runtimeConstants"]);
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), findCommand->toBSON(BSONObj()));
 }
 
-TEST(QueryRequestTest, AsFindCommandWithUuidAllNonOptionFields) {
+TEST(QueryRequestTest, AsFindCommandRequestWithUuidAllNonOptionFields) {
     BSONObj storage = BSON("runtimeConstants"
                            << (LegacyRuntimeConstants{Date_t::now(), Timestamp(1, 1)}.toBSON()));
     BSONObj cmdObj =
@@ -995,19 +1012,20 @@ TEST(QueryRequestTest, AsFindCommandWithUuidAllNonOptionFields) {
             "readConcern: {e: 1}, '$db': 'test'}")
             .addField(storage["runtimeConstants"]);
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), findCommand->toBSON(BSONObj()));
 }
 
-TEST(QueryRequestTest, AsFindCommandWithUuidNoAvailableNamespace) {
+TEST(QueryRequestTest, AsFindCommandRequestWithUuidNoAvailableNamespace) {
     BSONObj cmdObj =
         fromjson("{find: { \"$binary\" : \"ASNFZ4mrze/ty6mHZUMhAQ==\", \"$type\" : \"04\" }}");
-    FindCommand findCommand(NamespaceStringOrUUID(
+    FindCommandRequest findCommand(NamespaceStringOrUUID(
         "test", UUID::parse("01234567-89ab-cdef-edcb-a98765432101").getValue()));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), findCommand.toBSON(BSONObj()));
 }
 
-TEST(QueryRequestTest, AsFindCommandWithResumeToken) {
+TEST(QueryRequestTest, AsFindCommandRequestWithResumeToken) {
     BSONObj cmdObj = BSON("find"
                           << "testns"
                           << "sort" << BSON("$natural" << 1) << "hint" << BSON("$natural" << 1)
@@ -1015,11 +1033,12 @@ TEST(QueryRequestTest, AsFindCommandWithResumeToken) {
                           << BSON("$recordId" << 1LL) << "$db"
                           << "test");
 
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT_BSONOBJ_EQ(cmdObj.removeField("$db"), findCommand->toBSON(BSONObj()));
 }
 
-TEST(QueryRequestTest, AsFindCommandWithEmptyResumeToken) {
+TEST(QueryRequestTest, AsFindCommandRequestWithEmptyResumeToken) {
     BSONObj resumeAfter = fromjson("{}");
     BSONObj cmdObj =
         BSON("find"
@@ -1027,13 +1046,14 @@ TEST(QueryRequestTest, AsFindCommandWithEmptyResumeToken) {
              << "hint" << BSON("$natural" << 1) << "sort" << BSON("$natural" << 1)
              << "$_requestResumeToken" << true << "$_resumeAfter" << resumeAfter << "$db"
              << "test");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
     ASSERT(findCommand->toBSON(BSONObj()).getField("$_resumeAftr").eoo());
 }
 
 //
 //
-// Errors checked in query_request_helper::validateFindCommand().
+// Errors checked in query_request_helper::validateFindCommandRequest().
 //
 
 TEST(QueryRequestTest, ParseFromCommandMinMaxDifferentFieldsError) {
@@ -1087,7 +1107,8 @@ TEST(QueryRequestTest, ParseCommandForbidExhaust) {
 
 TEST(QueryRequestTest, ParseCommandIsFromFindCommand) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
-    unique_ptr<FindCommand> findCommand(query_request_helper::makeFromFindCommandForTests(cmdObj));
+    unique_ptr<FindCommandRequest> findCommand(
+        query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT_FALSE(findCommand->getNtoreturn());
 }
@@ -1114,7 +1135,7 @@ TEST(QueryRequestTest, ParseCommandIgnoreShardVersionField) {
 TEST(QueryRequestTest, DefaultQueryParametersCorrect) {
     BSONObj cmdObj = fromjson("{find: 'testns', '$db': 'test'}");
 
-    std::unique_ptr<FindCommand> findCommand(
+    std::unique_ptr<FindCommandRequest> findCommand(
         query_request_helper::makeFromFindCommandForTests(cmdObj));
 
     ASSERT_FALSE(findCommand->getSkip());
@@ -1206,7 +1227,7 @@ TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
@@ -1223,7 +1244,7 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
 
@@ -1237,7 +1258,7 @@ TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setHint(fromjson("{a_1: -1}"));
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
@@ -1249,94 +1270,94 @@ TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMinFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMin(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMaxFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMax(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldAndLimitFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
     findCommand.setLimit(7);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithSingleBatchFieldLimitOneSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setSingleBatch(true);
     findCommand.setLimit(1);
     ASSERT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setReturnKey(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setShowRecordId(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     query_request_helper::setTailableMode(TailableModeEnum::kTailable, &findCommand);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setNoCursorTimeout(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     query_request_helper::setTailableMode(TailableModeEnum::kTailableAndAwaitData, &findCommand);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowPartialResults(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithNToReturnFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setNtoreturn(7);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     BSONObj resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setFilter(BSON("x" << 1));
     findCommand.setSort(BSON("y" << -1));
     findCommand.setLimit(3);
@@ -1368,7 +1389,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setBatchSize(4);
 
     auto agg = query_request_helper::asAggregationCommand(findCommand);
@@ -1386,7 +1407,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setMaxTimeMS(9);
 
     auto agg = query_request_helper::asAggregationCommand(findCommand);
@@ -1407,7 +1428,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setCollation(BSON("f" << 1));
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
@@ -1425,14 +1446,14 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setReadOnce(true);
     const auto aggCmd = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowSpeculativeMajorityRead(true);
     const auto aggCmd = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_EQ(ErrorCodes::InvalidPipelineOperator, aggCmd.getStatus().code());
@@ -1440,7 +1461,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowSpeculativeMajorityReadFails
 
 TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
     LegacyRuntimeConstants rtc{Date_t::now(), Timestamp(1, 1)};
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setLegacyRuntimeConstants(rtc);
     auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg);
@@ -1454,7 +1475,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(true);
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg.getStatus());
@@ -1466,7 +1487,7 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(false);
     const auto agg = query_request_helper::asAggregationCommand(findCommand);
     ASSERT_OK(agg.getStatus());
@@ -1478,21 +1499,21 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(true);
     const auto findCmd = findCommand.toBSON(BSONObj());
 
-    BSONElement elem = findCmd[FindCommand::kAllowDiskUseFieldName];
+    BSONElement elem = findCmd[FindCommandRequest::kAllowDiskUseFieldName];
     ASSERT_EQ(true, elem.isBoolean());
     ASSERT_EQ(true, elem.Bool());
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseFalseSucceeds) {
-    FindCommand findCommand(testns);
+    FindCommandRequest findCommand(testns);
     findCommand.setAllowDiskUse(false);
     const auto findCmd = findCommand.toBSON(BSONObj());
 
-    ASSERT_FALSE(findCmd[FindCommand::kAllowDiskUseFieldName].booleanSafe());
+    ASSERT_FALSE(findCmd[FindCommandRequest::kAllowDiskUseFieldName].booleanSafe());
 }
 
 TEST(QueryRequestTest, ParseFromLegacyQuery) {
@@ -1509,7 +1530,7 @@ TEST(QueryRequestTest, ParseFromLegacyQuery) {
          })");
 
     bool explain = false;
-    unique_ptr<FindCommand> findCommand(assertGet(query_request_helper::fromLegacyQuery(
+    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
         nss, queryObj, BSON("proj" << 1), kSkip, kNToReturn, QueryOption_Exhaust, &explain)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
@@ -1539,7 +1560,7 @@ TEST(QueryRequestTest, ParseFromLegacyQueryOplogReplayFlagAllowed) {
     // flag may be set by old clients.
     auto options = QueryOption_OplogReplay_DEPRECATED;
     bool explain = false;
-    unique_ptr<FindCommand> findCommand(assertGet(query_request_helper::fromLegacyQuery(
+    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
         nss, queryObj, projectionObj, nToSkip, nToReturn, options, &explain)));
 
     // Verify that if we reserialize the find command, the 'oplogReplay' field
@@ -1561,7 +1582,7 @@ TEST(QueryRequestTest, ParseFromLegacyQueryUnwrapped) {
          })");
     const NamespaceString nss("test.testns");
     bool explain = false;
-    unique_ptr<FindCommand> findCommand(assertGet(query_request_helper::fromLegacyQuery(
+    unique_ptr<FindCommandRequest> findCommand(assertGet(query_request_helper::fromLegacyQuery(
         nss, queryObj, BSONObj(), 0, 0, QueryOption_Exhaust, &explain)));
 
     ASSERT_EQ(*findCommand->getNamespaceOrUUID().nss(), nss);
@@ -1606,7 +1627,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
 
 
     NamespaceStringOrUUID nssOrUUID("test", uuid);
-    FindCommand findCommand(nssOrUUID);
+    FindCommandRequest findCommand(nssOrUUID);
     const NamespaceString nss("test.testns");
     // Ensure a call to refreshNSS succeeds.
     query_request_helper::refreshNSS(nss, &findCommand);

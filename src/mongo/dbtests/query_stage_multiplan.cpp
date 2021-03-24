@@ -128,7 +128,7 @@ protected:
 std::unique_ptr<CanonicalQuery> makeCanonicalQuery(OperationContext* opCtx,
                                                    NamespaceString nss,
                                                    BSONObj filter) {
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filter);
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx, std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
@@ -378,7 +378,7 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     AutoGetCollectionForReadCommand collection(_opCtx.get(), nss);
 
     // Query for both 'a' and 'b' and sort on 'b'.
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("a" << 1 << "b" << 1));
     findCommand->setSort(BSON("b" << 1));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx(), std::move(findCommand));
@@ -490,7 +490,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("x" << 1));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     unique_ptr<MultiPlanStage> mps =
@@ -562,7 +562,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     const CollectionPtr& coll = ctx.getCollection();
 
     // Create the executor (Matching all documents).
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     auto exec = uassertStatusOK(
@@ -615,7 +615,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
         getCollScanPlan(_expCtx.get(), coll.getCollection(), sharedWs.get(), filter.get());
 
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(filterObj);
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -655,7 +655,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     unique_ptr<PlanStage> collScanRoot =
         getCollScanPlan(_expCtx.get(), coll.getCollection(), sharedWs.get(), filter.get());
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
@@ -698,7 +698,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     insert(BSON("foo" << 10));
     AutoGetCollectionForReadCommand ctx(_opCtx.get(), nss);
 
-    auto findCommand = std::make_unique<FindCommand>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(BSON("fake"
                                 << "query"));
     auto canonicalQuery =

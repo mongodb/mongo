@@ -176,9 +176,9 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * A $group stage on a single field behaves similarly to a distinct command. If it has no
  * accumulators or only $first accumulators, the $group command only needs to visit one document for
  * each distinct value of the grouped-by (_id) field to compute its result. When there is a sort
- * order specified in parsedDistinct->getQuery()->getFindCommand().getSort(), the DISTINCT_SCAN will
- * follow that sort order, ensuring that it chooses the correct document from each group to compute
- * any $first accumulators.
+ * order specified in parsedDistinct->getQuery()->getFindCommandRequest().getSort(), DISTINCT_SCAN
+ * will follow that sort order, ensuring that it chooses the correct document from each group to
+ * compute any $first accumulators.
  *
  * Specify the QueryPlannerParams::STRICT_DISTINCT_ONLY flag in the 'params' argument to ensure that
  * any resulting plan _guarantees_ it will return exactly one document per value of the distinct
@@ -216,7 +216,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr* collection,
-    const CountCommand& request,
+    const CountCommandRequest& request,
     bool explain,
     const NamespaceString& nss);
 

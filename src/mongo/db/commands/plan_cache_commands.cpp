@@ -85,7 +85,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     }
 
     // Create canonical query
-    auto findCommand = std::make_unique<FindCommand>(NamespaceString{ns});
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString{ns});
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setSort(sortObj.getOwned());
     findCommand->setProjection(projObj.getOwned());

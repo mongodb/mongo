@@ -94,7 +94,7 @@ public:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutor(const CollectionPtr& collection,
                             const NamespaceString& nss,
-                            const AggregateCommand* aggRequest,
+                            const AggregateCommandRequest* aggRequest,
                             Pipeline* pipeline);
 
     /**
@@ -116,10 +116,11 @@ public:
      * used when the executor attachment phase doesn't need to be deferred and the $cursor stage
      * can be created right after buiding the executor.
      */
-    static void buildAndAttachInnerQueryExecutorToPipeline(const CollectionPtr& collection,
-                                                           const NamespaceString& nss,
-                                                           const AggregateCommand* aggRequest,
-                                                           Pipeline* pipeline);
+    static void buildAndAttachInnerQueryExecutorToPipeline(
+        const CollectionPtr& collection,
+        const NamespaceString& nss,
+        const AggregateCommandRequest* aggRequest,
+        Pipeline* pipeline);
 
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
@@ -156,7 +157,7 @@ private:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregateCommand* aggRequest,
+                                   const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);
 
     /**
@@ -167,7 +168,7 @@ private:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregateCommand* aggRequest,
+                                   const AggregateCommandRequest* aggRequest,
                                    Pipeline* pipeline);
 
     /**
@@ -205,7 +206,7 @@ private:
         QueryMetadataBitSet metadataAvailable,
         const BSONObj& queryObj,
         SkipThenLimit skipThenLimit,
-        const AggregateCommand* aggRequest,
+        const AggregateCommandRequest* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         bool* hasNoRequirements);
 };

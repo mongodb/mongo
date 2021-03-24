@@ -90,7 +90,7 @@ Status ParsedDelete::parseQueryToCQ() {
 
     // The projection needs to be applied after the delete operation, so we do not specify a
     // projection during canonicalization.
-    auto findCommand = std::make_unique<FindCommand>(_request->getNsString());
+    auto findCommand = std::make_unique<FindCommandRequest>(_request->getNsString());
     findCommand->setFilter(_request->getQuery().getOwned());
     findCommand->setSort(_request->getSort().getOwned());
     findCommand->setCollation(_request->getCollation().getOwned());
@@ -107,7 +107,7 @@ Status ParsedDelete::parseQueryToCQ() {
     }
 
     // If the delete request has runtime constants or let parameters attached to it, pass them to
-    // the FindCommand.
+    // the FindCommandRequest.
     if (auto& runtimeConstants = _request->getLegacyRuntimeConstants())
         findCommand->setLegacyRuntimeConstants(*runtimeConstants);
     if (auto& letParams = _request->getLet())

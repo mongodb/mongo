@@ -226,16 +226,16 @@ public:
                                   StmtId stmtId) {
         // Do write on a separate thread in order not to pollute this thread's opCtx.
         stdx::thread insertThread([sessionInfo, ns, doc, stmtId] {
-            write_ops::WriteCommandBase cmdBase;
+            write_ops::WriteCommandRequestBase cmdBase;
             std::vector<StmtId> stmtIds;
             stmtIds.push_back(stmtId);
             cmdBase.setStmtIds(stmtIds);
 
-            write_ops::Insert insertRequest(ns);
+            write_ops::InsertCommandRequest insertRequest(ns);
             std::vector<BSONObj> documents;
             documents.push_back(doc);
             insertRequest.setDocuments(documents);
-            insertRequest.setWriteCommandBase(cmdBase);
+            insertRequest.setWriteCommandRequestBase(cmdBase);
 
             BSONObjBuilder insertBuilder;
             insertRequest.serialize({}, &insertBuilder);

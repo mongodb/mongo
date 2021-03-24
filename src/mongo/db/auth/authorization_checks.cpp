@@ -272,7 +272,7 @@ Status checkAuthForCollMod(AuthorizationSession* authSession,
 
 StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* authSession,
                                                       const NamespaceString& nss,
-                                                      const AggregateCommand& request,
+                                                      const AggregateCommandRequest& request,
                                                       bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,

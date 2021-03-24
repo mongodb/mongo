@@ -138,9 +138,9 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
     return electionId;
 }
 
-write_ops::FindAndModifyCommand makeFindAndModifyRequest(
+write_ops::FindAndModifyCommandRequest makeFindAndModifyRequest(
     NamespaceString fullNs, BSONObj query, boost::optional<write_ops::UpdateModification> update) {
-    auto request = write_ops::FindAndModifyCommand(fullNs);
+    auto request = write_ops::FindAndModifyCommandRequest(fullNs);
     request.setQuery(query);
     if (update) {
         request.setUpdate(std::move(update));
@@ -201,7 +201,7 @@ StatusWith<LockpingsType> DistLockCatalogImpl::getPing(OperationContext* opCtx,
 }
 
 Status DistLockCatalogImpl::ping(OperationContext* opCtx, StringData processID, Date_t ping) {
-    auto request = write_ops::FindAndModifyCommand(_lockPingNS);
+    auto request = write_ops::FindAndModifyCommandRequest(_lockPingNS);
     request.setQuery(BSON(LockpingsType::process() << processID));
     request.setUpdate(write_ops::UpdateModification::parseFromClassicUpdate(
         BSON("$set" << BSON(LockpingsType::ping(ping)))));
@@ -355,7 +355,7 @@ Status DistLockCatalogImpl::unlock(OperationContext* opCtx,
 
 Status DistLockCatalogImpl::unlockAll(OperationContext* opCtx, const std::string& processID) {
     BatchedCommandRequest request([&] {
-        write_ops::Update updateOp(_locksNS);
+        write_ops::UpdateCommandRequest updateOp(_locksNS);
         updateOp.setUpdates({[&] {
             write_ops::UpdateOpEntry entry;
             entry.setQ(BSON(LocksType::process(processID)));

@@ -243,7 +243,7 @@ Status insertAuthzDocument(OperationContext* opCtx,
         BSONObj res;
         client.runCommand(collectionName.db().toString(),
                           [&] {
-                              write_ops::Insert insertOp(collectionName);
+                              write_ops::InsertCommandRequest insertOp(collectionName);
                               insertOp.setDocuments({document});
                               return insertOp.toBSON({});
                           }(),
@@ -279,7 +279,7 @@ Status updateAuthzDocuments(OperationContext* opCtx,
         BSONObj res;
         client.runCommand(collectionName.db().toString(),
                           [&] {
-                              write_ops::Update updateOp(collectionName);
+                              write_ops::UpdateCommandRequest updateOp(collectionName);
                               updateOp.setUpdates({[&] {
                                   write_ops::UpdateOpEntry entry;
                                   entry.setQ(query);
@@ -353,7 +353,7 @@ Status removeAuthzDocuments(OperationContext* opCtx,
         BSONObj res;
         client.runCommand(collectionName.db().toString(),
                           [&] {
-                              write_ops::Delete deleteOp(collectionName);
+                              write_ops::DeleteCommandRequest deleteOp(collectionName);
                               deleteOp.setDeletes({[&] {
                                   write_ops::DeleteOpEntry entry;
                                   entry.setQ(query);
@@ -790,7 +790,7 @@ public:
 
     StatusWith<std::uint32_t> insert(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
         dassert(nss.db() == kAdminDB);
-        write_ops::Insert op(nss);
+        write_ops::InsertCommandRequest op(nss);
         op.setDocuments(docs);
         return doCrudOp(op.toBSON({}));
     }
@@ -801,7 +801,7 @@ public:
         entry.setQ(query);
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
         entry.setMulti(true);
-        write_ops::Update op(nss);
+        write_ops::UpdateCommandRequest op(nss);
         op.setUpdates({entry});
         return doCrudOp(op.toBSON({}));
     }
@@ -811,7 +811,7 @@ public:
         write_ops::DeleteOpEntry entry;
         entry.setQ(query);
         entry.setMulti(true);
-        write_ops::Delete op(nss);
+        write_ops::DeleteCommandRequest op(nss);
         op.setDeletes({entry});
         return doCrudOp(op.toBSON({}));
     }
@@ -1420,8 +1420,8 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UsersInfoReply, UMCInfoParams>::Inv
         DBDirectClient client(opCtx);
 
         rpc::OpMsgReplyBuilder replyBuilder;
-        AggregateCommand aggRequest(AuthorizationManager::usersCollectionNamespace,
-                                    std::move(pipeline));
+        AggregateCommandRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
+                                           std::move(pipeline));
         // Impose no cursor privilege requirements, as cursor is drained internally
         uassertStatusOK(runAggregate(opCtx,
                                      AuthorizationManager::usersCollectionNamespace,

@@ -65,8 +65,8 @@ public:
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none);
 
-    write_ops::FindAndModifyReply findAndModify(
-        const write_ops::FindAndModifyCommand& findAndModify);
+    write_ops::FindAndModifyCommandReply findAndModify(
+        const write_ops::FindAndModifyCommandRequest& findAndModify);
 
     virtual bool isFailed() const;
 

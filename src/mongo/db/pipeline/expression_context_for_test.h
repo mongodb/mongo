@@ -141,7 +141,7 @@ public:
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
      * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
      */
-    ExpressionContextForTest(OperationContext* opCtx, const AggregateCommand& request)
+    ExpressionContextForTest(OperationContext* opCtx, const AggregateCommandRequest& request)
         : ExpressionContext(
               opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}),
           _serviceContext(opCtx->getServiceContext()) {
