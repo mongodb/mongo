@@ -768,6 +768,54 @@ err:
 }
 
 /*
+ * __create_tiered --
+ *     Create a tiered tree structure for the given name.
+ */
+static int
+__create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
+{
+    WT_CONFIG cparser;
+    WT_CONFIG_ITEM ckey, cval, tierconf;
+    WT_DECL_RET;
+    int ntiers;
+    char *meta_value;
+    const char *cfg[] = {WT_CONFIG_BASE(session, tiered_meta), config, NULL};
+    const char *metadata;
+
+    metadata = NULL;
+    ntiers = 0;
+
+    /* If it can be opened, it already exists. */
+    if ((ret = __wt_metadata_search(session, uri, &meta_value)) != WT_NOTFOUND) {
+        if (exclusive)
+            WT_TRET(EEXIST);
+        goto err;
+    }
+    WT_RET_NOTFOUND_OK(ret);
+
+    /* A tiered cursor must specify at least one underlying table */
+    WT_RET(__wt_config_gets(session, cfg, "tiered.tiers", &tierconf));
+    __wt_config_subinit(session, &cparser, &tierconf);
+
+    while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+        ++ntiers;
+    WT_RET_NOTFOUND_OK(ret);
+
+    if (ntiers == 0)
+        WT_RET_MSG(session, EINVAL, "tiered table must specify at least one tier");
+
+    if (!F_ISSET(S2C(session), WT_CONN_READONLY)) {
+        WT_ERR(__wt_config_merge(session, cfg, NULL, &metadata));
+        WT_ERR(__wt_metadata_insert(session, uri, metadata));
+    }
+
+err:
+    __wt_free(session, meta_value);
+    __wt_free(session, metadata);
+    return (ret);
+}
+
+/*
  * __create_data_source --
  *     Create a custom data source.
  */
@@ -835,7 +883,7 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __create_table(session, uri, exclusive, import, config);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __wt_tiered_create(session, uri, exclusive, config);
+        ret = __create_tiered(session, uri, exclusive, config);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->create == NULL ? __wt_object_unsupported(session, uri) :
                                      __create_data_source(session, uri, config, dsrc);

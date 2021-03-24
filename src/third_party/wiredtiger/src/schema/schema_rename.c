@@ -278,6 +278,32 @@ err:
 }
 
 /*
+ * __rename_tiered --
+ *     Rename a tiered data source.
+ */
+static int
+__rename_tiered(WT_SESSION_IMPL *session, const char *olduri, const char *newuri, const char *cfg[])
+{
+    WT_DECL_RET;
+    WT_TIERED *tiered;
+
+    /* Get the tiered data handle. */
+    WT_RET(__wt_session_get_dhandle(session, olduri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+    tiered = (WT_TIERED *)session->dhandle;
+
+    /* TODO */
+    WT_UNUSED(olduri);
+    WT_UNUSED(newuri);
+    WT_UNUSED(cfg);
+    WT_UNUSED(tiered);
+
+    F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+    WT_TRET(__wt_session_release_dhandle(session));
+
+    return (ret);
+}
+
+/*
  * __schema_rename --
  *     WT_SESSION::rename.
  */
@@ -306,7 +332,7 @@ __schema_rename(WT_SESSION_IMPL *session, const char *uri, const char *newuri, c
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __rename_table(session, uri, newuri, cfg);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __wt_tiered_rename(session, uri, newuri, cfg);
+        ret = __rename_tiered(session, uri, newuri, cfg);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->rename == NULL ?
           __wt_object_unsupported(session, uri) :
