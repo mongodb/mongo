@@ -331,11 +331,11 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     BSONObjBuilder bob;
     bob.append("desc", "tenant donor migration");
     bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
-    bob.append("receivedCancellation", _abortMigrationSource.token().isCanceled());
-    bob.append("instanceID", _migrationUuid.toBSON());
+    _migrationUuid.appendToBuilder(&bob, "instanceID"_sd);
     bob.append("tenantId", _tenantId);
     bob.append("recipientConnectionString", _recipientConnectionString);
     bob.append("readPreference", _readPreference.toInnerBSON());
+    bob.append("receivedCancellation", _abortMigrationSource.token().isCanceled());
     bob.append("lastDurableState", _durableState.state);
     if (_stateDoc.getMigrationStart()) {
         bob.appendDate("migrationStart", *_stateDoc.getMigrationStart());
@@ -344,17 +344,16 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
         bob.appendDate("expireAt", *_stateDoc.getExpireAt());
     }
     if (_stateDoc.getStartMigrationDonorTimestamp()) {
-        bob.append("startMigrationDonorTimestamp",
-                   _stateDoc.getStartMigrationDonorTimestamp()->toBSON());
+        bob.append("startMigrationDonorTimestamp", *_stateDoc.getStartMigrationDonorTimestamp());
     }
     if (_stateDoc.getBlockTimestamp()) {
-        bob.append("blockTimestamp", _stateDoc.getBlockTimestamp()->toBSON());
+        bob.append("blockTimestamp", *_stateDoc.getBlockTimestamp());
     }
     if (_stateDoc.getCommitOrAbortOpTime()) {
-        bob.append("commitOrAbortOpTime", _stateDoc.getCommitOrAbortOpTime()->toBSON());
+        _stateDoc.getCommitOrAbortOpTime()->append(&bob, "commitOrAbortOpTime");
     }
     if (_stateDoc.getAbortReason()) {
-        bob.append("abortReason", _stateDoc.getAbortReason()->toString());
+        bob.append("abortReason", *_stateDoc.getAbortReason());
     }
     return bob.obj();
 }

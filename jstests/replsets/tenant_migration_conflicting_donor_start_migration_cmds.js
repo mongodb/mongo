@@ -125,12 +125,12 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
     assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
     assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                     "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                     "instanceID": UUID(migrationOpts0.migrationIdString)
                  }).length);
     if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
         assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
         assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                         "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                         "instanceID": UUID(migrationOpts1.migrationIdString)
                      }).length);
     } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
         assert.eq(0, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
@@ -161,12 +161,12 @@ function testConcurrentConflictingMigrations(
         assertNoCertificateOrPrivateKey(res1.errmsg);
         assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
         assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                         "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                         "instanceID": UUID(migrationOpts0.migrationIdString)
                      }).length);
         if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
             assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
             assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                             "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                             "instanceID": UUID(migrationOpts1.migrationIdString)
                          }).length);
         } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
@@ -182,12 +182,12 @@ function testConcurrentConflictingMigrations(
         assertNoCertificateOrPrivateKey(res0.errmsg);
         assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
         assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                         "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                         "instanceID": UUID(migrationOpts1.migrationIdString)
                      }).length);
         if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
             assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
             assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
-                             "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                             "instanceID": UUID(migrationOpts0.migrationIdString)
                          }).length);
         } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
