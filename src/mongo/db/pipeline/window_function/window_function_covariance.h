@@ -29,34 +29,58 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/window_function/window_function.h"
+#include "mongo/db/pipeline/window_function/window_function_avg.h"
+#include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo {
 
-/**
- * A WindowFunctionState is a mutable, removable accumulator.
- *
- * Implementations must ensure that 'remove()' undoes 'add()' when called in FIFO order.
- * For example:
- *     'add(x); add(y); remove(x)' == 'add(y)'
- *     'add(a); add(b); add(z); remove(a); remove(b)' == 'add(z)'
- */
-class WindowFunctionState {
+class WindowFunctionCovariance : public WindowFunctionState {
 public:
-    WindowFunctionState(ExpressionContext* const expCtx) : _expCtx(expCtx) {}
-    virtual ~WindowFunctionState() = default;
-    virtual void add(Value) = 0;
-    virtual void remove(Value) = 0;
-    virtual Value getValue() const = 0;
-    virtual void reset() = 0;
-    size_t getApproximateSize() {
-        tassert(5414200, "_memUsageBytes not set for function", _memUsageBytes != 0);
-        return _memUsageBytes;
+    static inline const Value kDefault = Value(BSONNULL);
+
+    WindowFunctionCovariance(ExpressionContext* const expCtx, bool isSamp);
+
+    void add(Value value) override;
+
+    void remove(Value value) override;
+
+    void reset() override;
+
+    Value getValue() const override;
+
+    bool isSample() const {
+        return _isSamp;
     }
 
-protected:
-    ExpressionContext* _expCtx;
-    size_t _memUsageBytes = 0;
+private:
+    bool _isSamp;
+    long long _count = 0;
+
+    WindowFunctionAvg _meanX;
+    WindowFunctionAvg _meanY;
+    WindowFunctionSum _cXY;
 };
+
+class WindowFunctionCovarianceSamp final : public WindowFunctionCovariance {
+public:
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionCovarianceSamp>(expCtx);
+    }
+
+    explicit WindowFunctionCovarianceSamp(ExpressionContext* const expCtx)
+        : WindowFunctionCovariance(expCtx, true) {}
+};
+
+class WindowFunctionCovariancePop final : public WindowFunctionCovariance {
+public:
+    static std::unique_ptr<WindowFunctionState> create(ExpressionContext* const expCtx) {
+        return std::make_unique<WindowFunctionCovariancePop>(expCtx);
+    }
+
+    explicit WindowFunctionCovariancePop(ExpressionContext* const expCtx)
+        : WindowFunctionCovariance(expCtx, false) {}
+};
+
 }  // namespace mongo

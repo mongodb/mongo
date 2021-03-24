@@ -31,7 +31,7 @@
 
 #include <cmath>
 
-#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -40,56 +40,23 @@
 
 namespace mongo {
 
-REGISTER_WINDOW_FUNCTION(
-    covarianceSamp, window_function::ExpressionFromAccumulator<AccumulatorCovarianceSamp>::parse);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(covarianceSamp,
+                                   AccumulatorCovarianceSamp,
+                                   WindowFunctionCovarianceSamp);
 
-REGISTER_WINDOW_FUNCTION(
-    covariancePop, window_function::ExpressionFromAccumulator<AccumulatorCovariancePop>::parse);
+REGISTER_REMOVABLE_WINDOW_FUNCTION(covariancePop,
+                                   AccumulatorCovariancePop,
+                                   WindowFunctionCovariancePop);
 
 void AccumulatorCovariance::processInternal(const Value& input, bool merging) {
     tassert(5424000, "$covariance can't be merged", !merging);
 
-    // Currently we only support array with 2 numeric values as input value. Other types of input or
-    // non-numeric arrays have no impact on covariance.
-    if (!input.isArray())
-        return;
-    const auto& arr = input.getArray();
-    if (arr.size() != 2)
-        return;
-    if (!arr[0].numeric() || !arr[1].numeric())
-        return;
-
-    // This is an implementation of the following algorithm:
-    // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online
-    double x = arr[0].coerceToDouble();
-    double y = arr[1].coerceToDouble();
-    double dx = x - _meanX;
-
-    _count++;
-    _meanX += (dx / _count);
-    _meanY += (y - _meanY) / _count;
-    _cXY += dx * (y - _meanY);
+    _covarianceWF.add(input);
 }
 
 AccumulatorCovariance::AccumulatorCovariance(ExpressionContext* const expCtx, bool isSamp)
-    : AccumulatorState(expCtx), _isSamp(isSamp) {
+    : AccumulatorForWindowFunctions(expCtx), _covarianceWF(expCtx, isSamp) {
     _memUsageBytes = sizeof(*this);
-}
-
-void AccumulatorCovariance::reset() {
-    _count = 0;
-    _meanX = 0;
-    _meanY = 0;
-    _cXY = 0;  // 0 only makes sense if "_count" > 0.
-}
-
-Value AccumulatorCovariance::getValue(bool toBeMerged) {
-    const double adjustedCount = (_isSamp ? _count - 1 : _count);
-
-    if (adjustedCount <= 0)
-        return Value(BSONNULL);  // Covariance not well defined in this case.
-
-    return Value(_cXY / adjustedCount);
 }
 
 boost::intrusive_ptr<AccumulatorState> AccumulatorCovarianceSamp::create(
@@ -100,6 +67,14 @@ boost::intrusive_ptr<AccumulatorState> AccumulatorCovarianceSamp::create(
 boost::intrusive_ptr<AccumulatorState> AccumulatorCovariancePop::create(
     ExpressionContext* const expCtx) {
     return new AccumulatorCovariancePop(expCtx);
+}
+
+void AccumulatorCovariance::reset() {
+    _covarianceWF.reset();
+}
+
+Value AccumulatorCovariance::getValue(bool toBeMerged) {
+    return _covarianceWF.getValue();
 }
 
 }  // namespace mongo

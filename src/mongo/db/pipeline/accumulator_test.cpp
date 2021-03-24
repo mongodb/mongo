@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
@@ -490,11 +491,21 @@ TEST(Accumulators, CovarianceEdgeCases) {
         Value(std::vector<Value>({Value(0), Value(1)})),
     };
 
-    const std::vector<Value> nanPoints = {
+    // This is actually an "undefined" case because NaN/Inf is not counted.
+    const std::vector<Value> nonFiniteOnly = {
         Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
                                   Value(numeric_limits<double>::quiet_NaN())})),
+        Value(std::vector<Value>({Value(numeric_limits<double>::infinity()),
+                                  Value(numeric_limits<double>::infinity())})),
+    };
+
+    const std::vector<Value> mixedPoints = {
         Value(std::vector<Value>({Value(numeric_limits<double>::quiet_NaN()),
                                   Value(numeric_limits<double>::quiet_NaN())})),
+        Value(std::vector<Value>({Value(numeric_limits<double>::infinity()),
+                                  Value(numeric_limits<double>::infinity())})),
+        Value(std::vector<Value>({Value(0), Value(1)})),
+        Value(std::vector<Value>({Value(1), Value(2)})),
     };
 
     assertExpectedResults<AccumulatorCovariancePop>(
@@ -502,7 +513,8 @@ TEST(Accumulators, CovarianceEdgeCases) {
         {
             {{}, Value(BSONNULL)},
             {singlePoint, Value(0.0)},
-            {nanPoints, Value(numeric_limits<double>::quiet_NaN())},
+            {nonFiniteOnly, Value(BSONNULL)},
+            {mixedPoints, Value(numeric_limits<double>::quiet_NaN())},
         },
         true /* Covariance accumulator can't be merged */);
 
@@ -511,7 +523,8 @@ TEST(Accumulators, CovarianceEdgeCases) {
         {
             {{}, Value(BSONNULL)},
             {singlePoint, Value(BSONNULL)},
-            {nanPoints, Value(numeric_limits<double>::quiet_NaN())},
+            {nonFiniteOnly, Value(BSONNULL)},
+            {mixedPoints, Value(numeric_limits<double>::quiet_NaN())},
         },
         true /* Covariance accumulator can't be merged */);
 }

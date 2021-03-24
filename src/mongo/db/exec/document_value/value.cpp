@@ -1060,6 +1060,36 @@ bool Value::integral() const {
     }
 }
 
+bool Value::isNaN() const {
+    switch (getType()) {
+        case NumberInt:
+        case NumberLong:
+        case NumberDouble: {
+            const double dbl = getDouble();
+            return std::isnan(dbl);
+        }
+        case NumberDecimal: {
+            return _storage.getDecimal().isNaN();
+        }
+
+        default:
+            return false;
+    }
+}
+
+bool Value::isInfinite() const {
+    switch (getType()) {
+        case NumberDouble:
+            return (_storage.doubleValue == std::numeric_limits<double>::infinity() ||
+                    _storage.doubleValue == -std::numeric_limits<double>::infinity());
+        case NumberDecimal:
+            return _storage.getDecimal().isInfinite();
+
+        default:
+            return false;
+    }
+}
+
 bool Value::integral64Bit() const {
     switch (getType()) {
         case NumberInt:

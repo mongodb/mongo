@@ -224,58 +224,6 @@ private:
     Value _last;
 };
 
-class AccumulatorRankBase : public AccumulatorState {
-public:
-    explicit AccumulatorRankBase(ExpressionContext* const expCtx);
-    void reset();
-
-    bool isAssociative() const final {
-        tasserted(5417004,
-                  str::stream() << "Invalid call to isAssociative in accumulator " << getOpName());
-    }
-    bool isCommutative() const final {
-        tasserted(5417000,
-                  str::stream() << "Invalid call to isCommutative in accumulator " << getOpName());
-    }
-
-    Value getValue(bool toBeMerged) final {
-        return Value::createIntOrLong(_lastRank);
-    }
-
-protected:
-    long long _lastRank = 0;
-    boost::optional<Value> _lastInput = boost::none;
-};
-
-class AccumulatorRank : public AccumulatorRankBase {
-public:
-    explicit AccumulatorRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
-    void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
-    void reset() final;
-
-private:
-    size_t _numSameRank = 1;
-};
-
-class AccumulatorDocumentNumber : public AccumulatorRankBase {
-public:
-    explicit AccumulatorDocumentNumber(ExpressionContext* const expCtx)
-        : AccumulatorRankBase(expCtx) {}
-    void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
-};
-
-class AccumulatorDenseRank : public AccumulatorRankBase {
-public:
-    explicit AccumulatorDenseRank(ExpressionContext* const expCtx) : AccumulatorRankBase(expCtx) {}
-    void processInternal(const Value& input, bool merging) final;
-    const char* getOpName() const final;
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
-};
-
 class AccumulatorSum final : public AccumulatorState {
 public:
     explicit AccumulatorSum(ExpressionContext* const expCtx);
@@ -414,47 +362,6 @@ class AccumulatorStdDevSamp final : public AccumulatorStdDev {
 public:
     explicit AccumulatorStdDevSamp(ExpressionContext* const expCtx)
         : AccumulatorStdDev(expCtx, true) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
-};
-
-class AccumulatorCovariance : public AccumulatorState {
-public:
-    AccumulatorCovariance(ExpressionContext* const expCtx, bool isSamp);
-
-    void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) final;
-    void reset() final;
-    const char* getOpName() const final {
-        return (_isSamp ? "$covarianceSamp" : "$covariancePop");
-    }
-
-    bool isAssociative() const final {
-        tasserted(5424002,
-                  str::stream() << "Invalid call to isAssociative in accumulator " << getOpName());
-    }
-    bool isCommutative() const final {
-        tasserted(5424003,
-                  str::stream() << "Invalid call to isCommutative in accumulator " << getOpName());
-    }
-
-private:
-    bool _isSamp;
-    long long _count = 0;
-    double _meanX = 0, _meanY = 0;
-    double _cXY = 0;
-};
-
-class AccumulatorCovarianceSamp final : public AccumulatorCovariance {
-public:
-    explicit AccumulatorCovarianceSamp(ExpressionContext* const expCtx)
-        : AccumulatorCovariance(expCtx, true) {}
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
-};
-
-class AccumulatorCovariancePop final : public AccumulatorCovariance {
-public:
-    explicit AccumulatorCovariancePop(ExpressionContext* const expCtx)
-        : AccumulatorCovariance(expCtx, false) {}
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
 };
 

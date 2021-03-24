@@ -1,9 +1,10 @@
 /**
  * Test that $covariance(Pop/Samp) works as a window function.
- * Currently only tests accumulator-type window function.
  */
 (function() {
 "use strict";
+
+load("jstests/aggregation/extras/window_function_helpers.js");
 
 const featureEnabled =
     assert.commandWorked(db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1}))
@@ -49,39 +50,53 @@ for (let i = 1; i <= nDocs; i++) {
     }));
 }
 
-// Caculate the running average of vector X and vector Y using $avg window function. The running
-// average of each document is the current average of 'X' and 'Y' in window [unbounded, current].
-// 'runningAvg(X/Y)' will be used to calculate covariance based on the offline algorithm -
+// Calculate the running average of vector X and vector Y using $avg window function over the given
+// 'bounds'. 'runningAvg(X/Y)' will be used to calculate covariance based on the offline algorithm -
 // Cov(x, y) = ( Σ( (xi - avg(x)) * (yi - avg(y)) ) / n )
-function calculateCovarianceOffline() {
-    let resultOffline =
-        coll.aggregate([
-                {
-                    $setWindowFields: {
-                        sortBy: {_id: 1},
-                        output: {
-                            runningAvgX:
-                                {$avg: "$x", window: {documents: ["unbounded", "current"]}},
-                            runningAvgY:
-                                {$avg: "$y", window: {documents: ["unbounded", "current"]}},
-                        }
-                    },
-                },
-            ])
-            .toArray();
+function calculateCovarianceOffline(bounds) {
+    let resultOffline = coll.aggregate([
+                                {
+                                    $setWindowFields: {
+                                        sortBy: {_id: 1},
+                                        output: {
+                                            runningAvgX: {$avg: "$x", window: {documents: bounds}},
+                                            runningAvgY: {$avg: "$y", window: {documents: bounds}},
+                                        }
+                                    },
+                                },
+                            ])
+                            .toArray();
 
     assert.eq(resultOffline.length, nDocs);
-    resultOffline[0].popCovariance = 0.0;
-    resultOffline[0].sampCovariance = null;
 
-    for (let i = 1; i < resultOffline.length; i++) {
+    // Calculate covariance based on the offline algorithm.
+    for (let i = 0; i < resultOffline.length; i++) {
+        // Transform the bounds to numeric indices.
+        let lowerBound;
+        let upperBound;
+        if (bounds[0] == "unbounded")
+            lowerBound = 0;
+        else if (bounds[0] == "current")
+            lowerBound = i;
+        else
+            lowerBound = Math.max(i + bounds[0], 0);
+
+        if (bounds[1] == "unbounded")
+            upperBound = resultOffline.length;
+        else if (bounds[1] == "current")
+            upperBound = i + 1;
+        else
+            upperBound = Math.min(i + bounds[1] + 1, resultOffline.length);
+
         let c_i = 0.0;
-        for (let j = 0; j <= i; j++) {
+        let count = 0;
+        for (let j = lowerBound; j < upperBound; j++, count++) {
             c_i += ((resultOffline[j].x - resultOffline[i].runningAvgX) *
                     (resultOffline[j].y - resultOffline[i].runningAvgY));
         }
-        resultOffline[i].popCovariance = c_i / (i + 1);
-        resultOffline[i].sampCovariance = c_i / i;
+        // The current window bounds are [lowerBound, upperBound);
+        resultOffline[i].popCovariance = count < 1 ? null : c_i / count;
+        resultOffline[i].sampCovariance = count < 2 ? null : c_i / (count - 1.0);
     }
 
     return resultOffline;
@@ -91,17 +106,44 @@ function calculateCovarianceOffline() {
 // test the results are consistent.
 // Note that the server calculates covariance based on an online algorithm -
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online
-(function compareCovarianceOfflineAndOnline() {
-    const offlineRes = calculateCovarianceOffline();
-    const onlineRes = coll.aggregate([nonRemovableCovStage]).toArray();
+function compareCovarianceOfflineAndOnline(bounds) {
+    let offlineRes = calculateCovarianceOffline(bounds);
 
+    const onlineRes =
+        coll.aggregate([{
+                $setWindowFields: {
+                    sortBy: {_id: 1},
+                    output: {
+                        popCovariance: {$covariancePop: ["$x", "$y"], window: {documents: bounds}},
+                        sampCovariance:
+                            {$covarianceSamp: ["$x", "$y"], window: {documents: bounds}},
+                    }
+                }
+            }])
+            .toArray();
     assert.eq(offlineRes.length, onlineRes.length);
-    assert.eq(onlineRes.length, nDocs);
-    assert.eq(onlineRes[0].popCovariance, 0.0);
-    assert.eq(onlineRes[0].sampCovariance, null);
-    for (let i = 1; i < offlineRes.length; i++) {
-        assert.eq(offlineRes[i].popCovariance.toFixed(5), onlineRes[i].popCovariance.toFixed(5));
-        assert.eq(offlineRes[i].sampCovariance.toFixed(5), onlineRes[i].sampCovariance.toFixed(5));
+
+    for (let i = 0; i < offlineRes.length; i++) {
+        offlineRes[i].popCovariance =
+            offlineRes[i].popCovariance != null ? offlineRes[i].popCovariance.toFixed(5) : null;
+        offlineRes[i].sampCovariance =
+            offlineRes[i].sampCovariance != null ? offlineRes[i].sampCovariance.toFixed(5) : null;
+        onlineRes[i].popCovariance =
+            onlineRes[i].popCovariance != null ? onlineRes[i].popCovariance.toFixed(5) : null;
+        onlineRes[i].sampCovariance =
+            onlineRes[i].sampCovariance != null ? onlineRes[i].sampCovariance.toFixed(5) : null;
+
+        assert.eq(offlineRes[i].popCovariance,
+                  onlineRes[i].popCovariance,
+                  "Offline popCovariance: " + offlineRes[i].popCovariance +
+                      " Online popCovariance: " + onlineRes[i].popCovariance);
+        assert.eq(offlineRes[i].sampCovariance,
+                  onlineRes[i].sampCovariance,
+                  "Offline sampCovariance: " + offlineRes[i].sampCovariance +
+                      " Online sampCovariance: " + onlineRes[i].sampCovariance);
     }
-})();
+}
+
+// Test various type of window.
+documentBounds.forEach(compareCovarianceOfflineAndOnline);
 })();

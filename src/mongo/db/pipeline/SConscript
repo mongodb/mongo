@@ -130,6 +130,7 @@ env.Library(
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
         'window_function/window_bounds.cpp',
+        'window_function/window_function_covariance.cpp',
         'window_function/window_function_expression.cpp',
         'window_function/window_function_sum.cpp'
         ],
@@ -444,6 +445,7 @@ env.CppUnitTest(
         'tee_buffer_test.cpp',
         'window_function/partition_iterator_test.cpp',
         'window_function/window_function_add_to_set_test.cpp',
+        'window_function/window_function_covariance_test.cpp',
         'window_function/window_function_exec_derivative_test.cpp',
         'window_function/window_function_exec_non_removable_test.cpp',
         'window_function/window_function_exec_removable_test.cpp',

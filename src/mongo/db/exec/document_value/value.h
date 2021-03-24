@@ -181,6 +181,16 @@ public:
     bool integral() const;
 
     /**
+     * Returns true if this value is numeric and a NaN value.
+     */
+    bool isNaN() const;
+
+    /**
+     * Returns true if this value is numeric and infinite.
+     */
+    bool isInfinite() const;
+
+    /**
      * Returns true if this value is a numeric type that can be represented as a 64-bit integer,
      * and false otherwise.
      */

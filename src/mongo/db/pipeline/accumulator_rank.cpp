@@ -32,7 +32,7 @@
 #include <cmath>
 #include <limits>
 
-#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/accumulator_for_window_functions.h"
 
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
@@ -107,7 +107,7 @@ intrusive_ptr<AccumulatorState> AccumulatorDocumentNumber::create(ExpressionCont
 }
 
 AccumulatorRankBase::AccumulatorRankBase(ExpressionContext* const expCtx)
-    : AccumulatorState(expCtx) {
+    : AccumulatorForWindowFunctions(expCtx) {
     _memUsageBytes = sizeof(*this);
 }
 
