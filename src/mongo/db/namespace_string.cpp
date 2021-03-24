@@ -129,7 +129,8 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
     return coll() == collectionlessAggregateCursorCol;
 }
 
-bool NamespaceString::isLegalClientSystemNS() const {
+bool NamespaceString::isLegalClientSystemNS(
+    const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
     if (db() == kAdminDb) {
         if (coll() == "system.roles")
             return true;
@@ -161,7 +162,11 @@ bool NamespaceString::isLegalClientSystemNS() const {
         return true;
     if (coll() == kSystemDotViewsCollectionName)
         return true;
-    if (isTemporaryReshardingCollection()) {
+    if (currentFCV.isGreaterThanOrEqualTo(
+            ServerGlobalParams::FeatureCompatibility::Version::kVersion47) &&
+        // While this FCV check is being added in 4.9, the namespace was allowed in 4.7 binaries
+        // without an FCV check.
+        isTemporaryReshardingCollection()) {
         return true;
     }
     if (isTimeseriesBucketsCollection()) {

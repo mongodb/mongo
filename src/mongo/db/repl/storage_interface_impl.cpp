@@ -220,6 +220,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
     Client::setCurrent(
         getGlobalServiceContext()->makeClient(str::stream() << nss.ns() << " loader"));
     auto opCtx = cc().makeOperationContext();
+    opCtx->setEnforceConstraints(false);
 
     // DocumentValidationSettings::kDisableInternalValidation is currently inert.
     // But, it's logically ok to disable internal validation as this function gets called

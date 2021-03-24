@@ -226,7 +226,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx,
                 ns)) {  // someone else may have beat us to it.
-            uassertStatusOK(userAllowedCreateNS(ns));
+            uassertStatusOK(userAllowedCreateNS(opCtx, ns));
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
@@ -575,7 +575,7 @@ WriteResult performInserts(OperationContext* opCtx,
     // If we are performing inserts from tenant migrations, skip checking if the user is allowed to
     // write to the namespace.
     if (!repl::tenantMigrationRecipientInfo(opCtx)) {
-        uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
+        uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
@@ -840,7 +840,7 @@ WriteResult performUpdates(OperationContext* opCtx,
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
-    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
+    uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
@@ -1009,7 +1009,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
     auto txnParticipant = TransactionParticipant::get(opCtx);
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() ||
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
-    uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
+    uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());

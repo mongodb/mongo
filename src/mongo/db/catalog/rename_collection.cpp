@@ -770,11 +770,11 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
             "If either the source or target of a rename is an oplog name, both must be",
             source.isOplog() == target.isOplog());
 
-    Status sourceStatus = userAllowedWriteNS(source);
+    Status sourceStatus = userAllowedWriteNS(opCtx, source);
     uassert(ErrorCodes::IllegalOperation,
             "error with source namespace: " + sourceStatus.reason(),
             sourceStatus.isOK());
-    Status targetStatus = userAllowedWriteNS(target);
+    Status targetStatus = userAllowedWriteNS(opCtx, target);
     uassert(ErrorCodes::IllegalOperation,
             "error with target namespace: " + targetStatus.reason(),
             targetStatus.isOK());
@@ -864,7 +864,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     }
 
     // Check that the target namespace is in the correct form, "database.collection".
-    auto targetStatus = userAllowedCreateNS(targetNss);
+    auto targetStatus = userAllowedCreateNS(opCtx, targetNss);
     if (!targetStatus.isOK()) {
         return Status(targetStatus.code(),
                       str::stream() << "error with target namespace: " << targetStatus.reason());

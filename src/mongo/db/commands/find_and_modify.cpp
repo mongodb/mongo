@@ -441,7 +441,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::writeConflictRetryUp
 
         // If someone else beat us to creating the collection, do nothing
         if (!createdCollection) {
-            uassertStatusOK(userAllowedCreateNS(nsString));
+            uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
@@ -541,7 +541,7 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     validate(this->request());
 
     const NamespaceString& nsString = this->request().getNamespace();
-    uassertStatusOK(userAllowedWriteNS(nsString));
+    uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
     const std::string dbName = this->request().getDbName().toString();
@@ -603,7 +603,7 @@ write_ops::FindAndModifyReply CmdFindAndModify::Invocation::typedRun(OperationCo
     validate(req);
 
     const NamespaceString& nsString = req.getNamespace();
-    uassertStatusOK(userAllowedWriteNS(nsString));
+    uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
     auto const curOp = CurOp::get(opCtx);
     OpDebug* const opDebug = &curOp->debug();
 
