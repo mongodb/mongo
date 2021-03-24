@@ -42,22 +42,41 @@ function sendAndCheckReads({rst, cmd, minRate, maxRate}) {
     assert.soon(() => {
         let currentMirroredReads = getMirroredReadsStats(rst);
 
+        let readsSent = currentMirroredReads.sent - startMirroredReads.sent;
+        let readsResolved = currentMirroredReads.resolved - startMirroredReads.resolved;
+        // The number of reads the primary has decided to mirror to secondaries, but hasn't yet
+        // sent.
+        let readsPending = currentMirroredReads.pending;
         let readsSeen = currentMirroredReads.seen - startMirroredReads.seen;
-        let readsMirrored = currentMirroredReads.resolved - startMirroredReads.resolved;
 
-        let numNodes = rst.getSecondaries().length;
-        jsTestLog(`Seen ${readsSeen} requests; ` +
-                  `verified ${readsMirrored / numNodes} requests ` +
-                  `x ${numNodes} nodes`);
+        jsTestLog(
+            "Verifying that all mirrored reads sent from primary have been recieved by secondaries: " +
+            tojson({
+                sent: readsSent,
+                resolved: readsResolved,
+                pending: readsPending,
+                seen: readsSeen
+            }));
 
-        let rate = readsMirrored / readsSeen / numNodes;
-        return (rate >= minRate) && (readsSeen >= kBurstCount);
-    }, "Did not verify all requests within time limit", 10000);
+        return ((readsPending == 0) && (readsSent == readsResolved));
+    }, "Did not resolve all requests within time limit", 10000);
+
     let currentMirroredReads = getMirroredReadsStats(rst);
-    const resolvedRate = (currentMirroredReads.resolved - startMirroredReads.resolved) /
-        (currentMirroredReads.seen - startMirroredReads.seen) / rst.getSecondaries().length;
-    jsTestLog(`Comparing resolvedRate: ${resolvedRate} versus maxRate: ${maxRate}`);
-    assert(resolvedRate <= maxRate);
+
+    jsTestLog("Verifying statistics: " +
+              tojson({current: currentMirroredReads, start: startMirroredReads}));
+
+    let readsSeen = currentMirroredReads.seen - startMirroredReads.seen;
+    let readsSent = currentMirroredReads.sent - startMirroredReads.sent;
+    let readsMirrored = currentMirroredReads.resolved - startMirroredReads.resolved;
+    let numNodes = rst.getSecondaries().length;
+    let rate = readsMirrored / readsSeen / numNodes;
+
+    // Check that the primary has seen all the mirrored-read supporting operations we've sent it
+    assert.gte(readsSeen, kBurstCount);
+    // Check that the rate of mirroring meets the provided criteria
+    assert.gte(rate, minRate);
+    assert.lte(rate, maxRate);
 
     jsTestLog(`Verified ${tojson(cmd)} was mirrored`);
 }
@@ -94,8 +113,12 @@ function verifyMirrorReads(rst, cmd) {
 {
     const rst = new ReplSetTest({
         nodes: 3,
-        nodeOptions:
-            {setParameter: {"failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"})}}
+        nodeOptions: {
+            setParameter: {
+                "failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"}),
+                "failpoint.mirrorMaestroTracksPending": tojson({mode: "alwaysOn"})
+            }
+        }
     });
     rst.startSet();
     rst.initiateWithHighElectionTimeout();
@@ -198,7 +221,10 @@ function verifyMirroringDistribution(rst) {
         const rst = new ReplSetTest({
             nodes: secondaries + 1,
             nodeOptions: {
-                setParameter: {"failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"})}
+                setParameter: {
+                    "failpoint.mirrorMaestroExpectsResponse": tojson({mode: "alwaysOn"}),
+                    "failpoint.mirrorMaestroTracksPending": tojson({mode: "alwaysOn"})
+                }
             }
         });
         rst.startSet();
