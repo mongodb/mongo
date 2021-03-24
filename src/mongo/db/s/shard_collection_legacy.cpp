@@ -532,11 +532,10 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
     bool shouldUseUUIDForChunkIndexing;
     {
-        invariant(!opCtx->lockState()->isLocked());
-        Lock::SharedLock fcvLock(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+        FixedFCVRegion fcvRegion(opCtx);
+
         shouldUseUUIDForChunkIndexing =
-            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(*fcvRegion);
     }
 
     CreateCollectionResponse shardCollectionResponse;

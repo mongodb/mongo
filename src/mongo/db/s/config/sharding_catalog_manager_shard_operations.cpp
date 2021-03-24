@@ -58,7 +58,6 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -87,7 +86,7 @@ using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
-using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
 
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
 
@@ -342,25 +341,6 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
         return status.withContext(str::stream() << "isMaster returned invalid 'maxWireVersion' "
                                                 << "field when attempting to add "
                                                 << connectionString.toString() << " as a shard");
-    }
-    const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
-    // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-    if (currentFcv == FeatureCompatibilityParams::kLatest ||
-        currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous ||
-        currentFcv == FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS ||
-        currentFcv == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest ||
-        currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest) {
-        // If the cluster's FCV is kLatest, or upgrading to / downgrading from kLatest, the node
-        // being added must be a version kLatest binary.
-        invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
-    } else if (currentFcv == FeatureCompatibilityParams::kLastContinuous ||
-               currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous) {
-        // If we are using the kLastContinuous  or upgrading to kLastContinuous FCV, the node being
-        // added must be of the last-continuous or latest binary version.
-        invariant(maxWireVersion >= WireVersion::LAST_CONT_WIRE_VERSION);
-    } else {
-        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-        invariant(currentFcv == FeatureCompatibilityParams::kLastLTS);
     }
 
     // Check whether there is a master. If there isn't, the replica set may not have been
@@ -652,46 +632,37 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     }
 
     {
-        // Hold the fcvLock across checking the FCV, sending setFCV to the new shard, and
-        // writing the entry for the new shard to config.shards. This ensures the FCV doesn't change
-        // after we send setFCV to the new shard, but before we write its entry to config.shards.
-        // (Note, we don't use a Global IX lock here, because we don't want to hold the global lock
+        // Keep the FCV stable across checking the FCV, sending setFCV to the new shard and writing
+        // the entry for the new shard to config.shards. This ensures the FCV doesn't change after
+        // we send setFCV to the new shard, but before we write its entry to config.shards.
+        //
+        // NOTE: We don't use a Global IX lock here, because we don't want to hold the global lock
         // while blocking on the network).
-        invariant(!opCtx->lockState()->isLocked());
-        Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+        FixedFCVRegion fcvRegion(opCtx);
 
-        // Get the target version that the newly added shard should be set to.
-        const FeatureCompatibilityParams::Version setVersion = [] {
-            const auto currentFcv = serverGlobalParams.featureCompatibility.getVersion();
+        SetFeatureCompatibilityVersion setFcvCmd([&] {
             // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-            if (currentFcv == FeatureCompatibilityParams::kLatest ||
-                currentFcv == FeatureCompatibilityParams::kUpgradingFromLastContinuousToLatest ||
-                currentFcv == FeatureCompatibilityParams::kUpgradingFromLastLTSToLatest) {
-                return FeatureCompatibilityParams::kLatest;
-            } else if (currentFcv == FeatureCompatibilityParams::kLastContinuous ||
-                       currentFcv ==
-                           FeatureCompatibilityParams::kDowngradingFromLatestToLastContinuous ||
-                       currentFcv ==
-                           FeatureCompatibilityParams::kUpgradingFromLastLTSToLastContinuous) {
+            if (fcvRegion == FeatureCompatibility::kLatest ||
+                fcvRegion == FeatureCompatibility::kUpgradingFromLastContinuousToLatest ||
+                fcvRegion == FeatureCompatibility::kUpgradingFromLastLTSToLatest) {
+                return FeatureCompatibility::kLatest;
+            } else if (fcvRegion == FeatureCompatibility::kLastContinuous ||
+                       fcvRegion == FeatureCompatibility::kDowngradingFromLatestToLastContinuous ||
+                       fcvRegion == FeatureCompatibility::kUpgradingFromLastLTSToLastContinuous) {
                 // (Generic FCV reference): These FCV checks should exist across LTS binary
                 // versions.
-                return FeatureCompatibilityParams::kLastContinuous;
+                return FeatureCompatibility::kLastContinuous;
             } else {
                 // (Generic FCV reference): This FCV reference should exist across LTS binary
                 // versions.
-                invariant(currentFcv ==
-                              FeatureCompatibilityParams::kDowngradingFromLatestToLastLTS ||
-                          currentFcv == FeatureCompatibilityParams::kLastLTS);
-                return FeatureCompatibilityParams::kLastLTS;
+                invariant(fcvRegion == FeatureCompatibility::kDowngradingFromLatestToLastLTS ||
+                          fcvRegion == FeatureCompatibility::kLastLTS);
+                return FeatureCompatibility::kLastLTS;
             }
-        }();
-
-        SetFeatureCompatibilityVersion setFcvCmd(setVersion);
+        }());
         setFcvCmd.setDbName(NamespaceString::kAdminDb);
-        // TODO (SERVER-50954): Remove this FCV check once 4.4 is no longer the last LTS
-        // version.
-        if (serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                FeatureCompatibilityParams::Version::kVersion47)) {
+        // TODO (SERVER-50954): Remove this FCV check once 4.4 is no longer the last LTS version.
+        if (fcvRegion->isGreaterThanOrEqualTo(FeatureCompatibility::Version::kVersion47)) {
             // fromConfigServer is a new parameter added to 4.8 with intention to be backported
             // to 4.7.
             setFcvCmd.setFromConfigServer(true);
