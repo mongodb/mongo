@@ -84,7 +84,7 @@ public:
     };
     virtual ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                                     const ShardKeyPattern& shardKeyPattern,
-                                                    SplitPolicyParams params) = 0;
+                                                    const SplitPolicyParams& params) = 0;
 
     /**
      * Returns whether the chunk generation strategy being used is optimized or not. Since there is
@@ -125,7 +125,7 @@ public:
      * assignments as configSvrShardCollection.
      */
     static ShardCollectionConfig generateShardCollectionInitialChunks(
-        SplitPolicyParams params,
+        const SplitPolicyParams& params,
         const ShardKeyPattern& shardKeyPattern,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
@@ -140,7 +140,7 @@ class SingleChunkOnPrimarySplitPolicy : public InitialSplitPolicy {
 public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params);
+                                            const SplitPolicyParams& params) override;
 };
 
 /**
@@ -151,8 +151,9 @@ class UnoptimizedSplitPolicy : public InitialSplitPolicy {
 public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params);
-    bool isOptimized() {
+                                            const SplitPolicyParams& params) override;
+
+    bool isOptimized() override {
         return false;
     }
 };
@@ -186,7 +187,7 @@ public:
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params);
+                                            const SplitPolicyParams& params) override;
 
     // Helpers for unit testing.
     const std::vector<BSONObj>& getSplitPoints() const {
@@ -219,7 +220,7 @@ public:
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params);
+                                            const SplitPolicyParams& params) final;
 
     /**
      * Returns the split points to be used for generating chunks within a given tag.
@@ -248,7 +249,7 @@ public:
     SingleChunkPerTagSplitPolicy(OperationContext* opCtx, std::vector<TagsType> tags)
         : AbstractTagsBasedSplitPolicy(opCtx, tags) {}
 
-    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern);
+    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
 private:
     StringMap<size_t> _nextShardIndexForZone;
@@ -268,7 +269,7 @@ public:
                                    size_t numInitialChunks,
                                    bool isCollectionEmpty);
 
-    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern);
+    SplitInfo buildSplitInfoForTag(TagsType tag, const ShardKeyPattern& shardKeyPattern) override;
 
 private:
     /**
@@ -323,7 +324,7 @@ public:
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
-                                            SplitPolicyParams params) override;
+                                            const SplitPolicyParams& params) override;
 
     /**
      * Creates the aggregation pipeline BSON to get documents for sampling from shards.
