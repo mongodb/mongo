@@ -61,6 +61,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_QUEUED_DATA, "QUEUED_DATA"_sd},
         {STAGE_RECORD_STORE_FAST_COUNT, "RECORD_STORE_FAST_COUNT"_sd},
         {STAGE_RETURN_KEY, "RETURN_KEY"_sd},
+        {STAGE_SAMPLE_FROM_TIMESERIES_BUCKET, "SAMPLE_FROM_TIMESERIES_BUCKET"_sd},
         {STAGE_SHARDING_FILTER, "SHARDING_FILTER"_sd},
         {STAGE_SKIP, "SKIP"_sd},
         {STAGE_SORT_DEFAULT, "SORT"_sd},
@@ -72,6 +73,7 @@ StringData stageTypeToString(StageType stageType) {
         {STAGE_TEXT_MATCH, "TEXT_MATCH"_sd},
         {STAGE_TRIAL, "TRIAL"_sd},
         {STAGE_UNKNOWN, "UNKNOWN"_sd},
+        {STAGE_UNPACK_TIMESERIES_BUCKET, "UNPACK_TIMESERIES_BUCKET"_sd},
         {STAGE_UPDATE, "UPDATE"_sd},
     };
     if (auto it = kStageTypesMap.find(stageType); it != kStageTypesMap.end()) {

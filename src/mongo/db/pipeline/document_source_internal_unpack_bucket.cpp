@@ -33,7 +33,6 @@
 
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -58,59 +57,6 @@ REGISTER_DOCUMENT_SOURCE(_internalUnpackBucket,
                          LiteParsedDocumentSource::AllowedWithApiStrict::kInternal);
 
 namespace {
-/**
- * Removes metaField from the field set and returns a boolean indicating whether metaField should be
- * included in the materialized measurements. Always returns false if metaField does not exist.
- */
-auto eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior unpackerBehavior,
-                                                  BucketSpec* bucketSpec) {
-    if (!bucketSpec->metaField) {
-        return false;
-    } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField);
-               itr != bucketSpec->fieldSet.end()) {
-        bucketSpec->fieldSet.erase(itr);
-        return unpackerBehavior == BucketUnpacker::Behavior::kInclude;
-    } else {
-        return unpackerBehavior == BucketUnpacker::Behavior::kExclude;
-    }
-}
-
-/**
- * Determine if timestamp values should be included in the materialized measurements.
- */
-auto determineIncludeTimeField(BucketUnpacker::Behavior unpackerBehavior, BucketSpec* bucketSpec) {
-    return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec->fieldSet.find(bucketSpec->timeField) != bucketSpec->fieldSet.end());
-}
-
-/**
- * Determine if an arbitrary field should be included in the materialized measurements.
- */
-auto determineIncludeField(StringData fieldName,
-                           BucketUnpacker::Behavior unpackerBehavior,
-                           const BucketSpec& bucketSpec) {
-    return (unpackerBehavior == BucketUnpacker::Behavior::kInclude) ==
-        (bucketSpec.fieldSet.find(fieldName.toString()) != bucketSpec.fieldSet.end());
-}
-
-/**
- * Erase computed meta projection fields if they are present in the exclusion field set.
- */
-void eraseExcludedComputedMetaProjFields(BucketUnpacker::Behavior unpackerBehavior,
-                                         BucketSpec* bucketSpec) {
-    if (unpackerBehavior == BucketUnpacker::Behavior::kExclude &&
-        bucketSpec->computedMetaProjFields.size() > 0) {
-        for (auto it = bucketSpec->computedMetaProjFields.begin();
-             it != bucketSpec->computedMetaProjFields.end();) {
-            if (bucketSpec->fieldSet.find(*it) != bucketSpec->fieldSet.end()) {
-                it = bucketSpec->computedMetaProjFields.erase(it);
-            } else {
-                it++;
-            }
-        }
-    }
-}
-
 /**
  * A projection can be internalized if every field corresponds to a boolean value. Note that this
  * correctly rejects dotted fieldnames, which are mapped to objects internally.
@@ -234,190 +180,6 @@ void optimizePrefix(Pipeline::SourceContainer::iterator itr, Pipeline::SourceCon
 }
 }  // namespace
 
-// Calculates the number of measurements in a bucket given the 'targetTimestampObjSize' using the
-// 'BucketUnpacker::kTimestampObjSizeTable' table. If the 'targetTimestampObjSize' hits a record in
-// the table, this helper returns the measurement count corresponding to the table record.
-// Otherwise, the 'targetTimestampObjSize' is used to probe the table for the smallest {b_i, S_i}
-// pair such that 'targetTimestampObjSize' < S_i. Once the interval is found, the upper bound of the
-// pair for the interval is computed and then linear interpolation is used to compute the
-// measurement count corresponding to the 'targetTimestampObjSize' provided.
-int BucketUnpacker::computeMeasurementCount(int targetTimestampObjSize) {
-    auto currentInterval =
-        std::find_if(std::begin(BucketUnpacker::kTimestampObjSizeTable),
-                     std::end(BucketUnpacker::kTimestampObjSizeTable),
-                     [&](const auto& entry) { return targetTimestampObjSize <= entry.second; });
-
-    if (currentInterval->second == targetTimestampObjSize) {
-        return currentInterval->first;
-    }
-    // This points to the first interval larger than the target 'targetTimestampObjSize', the actual
-    // interval that will cover the object size is the interval before the current one.
-    tassert(5422104,
-            "currentInterval should not point to the first table entry",
-            currentInterval > BucketUnpacker::kTimestampObjSizeTable.begin());
-    --currentInterval;
-
-    auto nDigitsInRowKey = 1 + (currentInterval - BucketUnpacker::kTimestampObjSizeTable.begin());
-
-    return currentInterval->first +
-        ((targetTimestampObjSize - currentInterval->second) / (10 + nDigitsInRowKey));
-}
-
-void BucketUnpacker::reset(BSONObj&& bucket) {
-    _fieldIters.clear();
-    _timeFieldIter = boost::none;
-
-    _bucket = std::move(bucket);
-    uassert(5346510, "An empty bucket cannot be unpacked", !_bucket.isEmpty());
-    tassert(5346701,
-            "The $_internalUnpackBucket stage requires the bucket to be owned",
-            _bucket.isOwned());
-
-    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
-    if (dataRegion.isEmpty()) {
-        // If the data field of a bucket is present but it holds an empty object, there's nothing to
-        // unpack.
-        return;
-    }
-
-    auto&& timeFieldElem = dataRegion.getField(_spec.timeField);
-    uassert(5346700,
-            "The $_internalUnpackBucket stage requires the data region to have a timeField object",
-            timeFieldElem);
-
-    _timeFieldIter = BSONObjIterator{timeFieldElem.Obj()};
-
-    _metaValue = _bucket[timeseries::kBucketMetaFieldName];
-    if (_spec.metaField) {
-        // The spec indicates that there might be a metadata region. Missing metadata in
-        // measurements is expressed with missing metadata in a bucket. But we disallow undefined
-        // since the undefined BSON type is deprecated.
-        uassert(5369600,
-                "The $_internalUnpackBucket stage allows metadata to be absent or otherwise, it "
-                "must not be the deprecated undefined bson type",
-                !_metaValue || _metaValue.type() != BSONType::Undefined);
-    } else {
-        // If the spec indicates that the time series collection has no metadata field, then we
-        // should not find a metadata region in the underlying bucket documents.
-        uassert(5369601,
-                "The $_internalUnpackBucket stage expects buckets to have missing metadata regions "
-                "if the metaField parameter is not provided",
-                !_metaValue);
-    }
-
-    // Walk the data region of the bucket, and decide if an iterator should be set up based on the
-    // include or exclude case.
-    for (auto&& elem : dataRegion) {
-        auto& colName = elem.fieldNameStringData();
-        if (colName == _spec.timeField) {
-            // Skip adding a FieldIterator for the timeField since the timestamp value from
-            // _timeFieldIter can be placed accordingly in the materialized measurement.
-            continue;
-        }
-
-        // Includes a field when '_unpackerBehavior' is 'kInclude' and it's found in 'fieldSet' or
-        // _unpackerBehavior is 'kExclude' and it's not found in 'fieldSet'.
-        if (determineIncludeField(colName, _unpackerBehavior, _spec)) {
-            _fieldIters.emplace_back(colName.toString(), BSONObjIterator{elem.Obj()});
-        }
-    }
-
-    // Update computed meta projections with values from this bucket.
-    if (!_spec.computedMetaProjFields.empty()) {
-        for (auto&& name : _spec.computedMetaProjFields) {
-            _computedMetaProjections[name] = _bucket[name];
-        }
-    }
-
-    // Save the measurement count for the owned bucket.
-    _numberOfMeasurements = computeMeasurementCount(timeFieldElem.objsize());
-}
-
-void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior) {
-    _includeMetaField = eraseMetaFromFieldSetAndDetermineIncludeMeta(behavior, &bucketSpec);
-    _includeTimeField = determineIncludeTimeField(behavior, &bucketSpec);
-    _unpackerBehavior = behavior;
-    eraseExcludedComputedMetaProjFields(behavior, &bucketSpec);
-    _spec = std::move(bucketSpec);
-}
-
-Document BucketUnpacker::getNext() {
-    tassert(5422100, "'getNext()' was called after the bucket has been exhausted", hasNext());
-
-    auto measurement = MutableDocument{};
-    auto&& timeElem = _timeFieldIter->next();
-    if (_includeTimeField) {
-        measurement.addField(_spec.timeField, Value{timeElem});
-    }
-
-    // Includes metaField when we're instructed to do so and metaField value exists.
-    if (_includeMetaField && _metaValue) {
-        measurement.addField(*_spec.metaField, Value{_metaValue});
-    }
-
-    auto& currentIdx = timeElem.fieldNameStringData();
-    for (auto&& [colName, colIter] : _fieldIters) {
-        if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
-            measurement.addField(colName, Value{elem});
-            colIter.advance(elem);
-        }
-    }
-
-    // Add computed meta projections.
-    for (auto&& name : _spec.computedMetaProjFields) {
-        measurement.addField(name, Value{_computedMetaProjections[name]});
-    }
-
-    return measurement.freeze();
-}
-
-Document BucketUnpacker::extractSingleMeasurement(int j) {
-    tassert(5422101,
-            "'extractSingleMeasurment' expects j to be greater than or equal to zero and less than "
-            "or equal to the number of measurements in a bucket",
-            j >= 0 && j < _numberOfMeasurements);
-
-    auto measurement = MutableDocument{};
-
-    auto rowKey = std::to_string(j);
-    auto targetIdx = StringData{rowKey};
-    auto&& dataRegion = _bucket.getField(timeseries::kBucketDataFieldName).Obj();
-
-    if (_includeMetaField && !_metaValue.isNull()) {
-        measurement.addField(*_spec.metaField, Value{_metaValue});
-    }
-
-    for (auto&& dataElem : dataRegion) {
-        auto colName = dataElem.fieldNameStringData();
-        if (!determineIncludeField(colName, _unpackerBehavior, _spec)) {
-            continue;
-        }
-        auto value = dataElem[targetIdx];
-        if (value) {
-            measurement.addField(dataElem.fieldNameStringData(), Value{value});
-        }
-    }
-
-    // Add computed meta projections.
-    for (auto&& name : _spec.computedMetaProjFields) {
-        measurement.addField(name, Value{_computedMetaProjections[name]});
-    }
-
-    return measurement.freeze();
-}
-
-const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
-    timeseries::kBucketIdFieldName,
-    timeseries::kBucketDataFieldName,
-    timeseries::kBucketMetaFieldName,
-    timeseries::kBucketControlFieldName};
-
-void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
-    for (auto&& field : computedFieldNames) {
-        _spec.computedMetaProjFields.emplace_back(field.toString());
-    }
-}
-
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, BucketUnpacker bucketUnpacker)
     : DocumentSource(kStageName, expCtx), _bucketUnpacker(std::move(bucketUnpacker)) {}
@@ -482,15 +244,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             "The $_internalUnpackBucket stage requires a timeField parameter",
             specElem[timeseries::kTimeFieldName].ok());
 
-    auto includeTimeField = determineIncludeTimeField(unpackerBehavior, &bucketSpec);
-
-    auto includeMetaField =
-        eraseMetaFromFieldSetAndDetermineIncludeMeta(unpackerBehavior, &bucketSpec);
-
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
-        expCtx,
-        BucketUnpacker{
-            std::move(bucketSpec), unpackerBehavior, includeTimeField, includeMetaField});
+        expCtx, BucketUnpacker{std::move(bucketSpec), unpackerBehavior});
 }
 
 void DocumentSourceInternalUnpackBucket::serializeToArray(
@@ -524,65 +279,8 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     }
 }
 
-DocumentSource::GetNextResult
-DocumentSourceInternalUnpackBucket::sampleUniqueMeasurementFromBuckets() {
-    const auto kMaxAttempts = 100;
-    for (auto attempt = 0; attempt < kMaxAttempts; ++attempt) {
-        auto randResult = pSource->getNext();
-        switch (randResult.getStatus()) {
-            case GetNextResult::ReturnStatus::kAdvanced: {
-                auto bucket = randResult.getDocument().toBson();
-                _bucketUnpacker.reset(std::move(bucket));
-
-                auto& prng = pExpCtx->opCtx->getClient()->getPrng();
-                auto j = prng.nextInt64(_bucketMaxCount);
-
-                if (j < _bucketUnpacker.numberOfMeasurements()) {
-                    auto sampledDocument = _bucketUnpacker.extractSingleMeasurement(j);
-
-                    auto bucketId = _bucketUnpacker.bucket()[timeseries::kBucketIdFieldName];
-                    auto bucketIdMeasurementIdxKey = SampledMeasurementKey{bucketId.OID(), j};
-
-                    if (_seenSet.insert(std::move(bucketIdMeasurementIdxKey)).second) {
-                        _nSampledSoFar++;
-                        return sampledDocument;
-                    } else {
-                        LOGV2_DEBUG(
-                            5422102,
-                            1,
-                            "$_internalUnpackBucket optimized for sample saw duplicate measurement",
-                            "measurementIndex"_attr = j,
-                            "bucketId"_attr = bucketId);
-                    }
-                }
-                break;
-            }
-            case GetNextResult::ReturnStatus::kPauseExecution: {
-                // This state should never be reached since the input stage is a random cursor.
-                MONGO_UNREACHABLE;
-            }
-            case GetNextResult::ReturnStatus::kEOF: {
-                return randResult;
-            }
-        }
-    }
-    uasserted(5422103,
-              str::stream()
-                  << "$_internalUnpackBucket stage could not find a non-duplicate document after "
-                  << kMaxAttempts
-                  << " attempts while using a random cursor. This is likely a "
-                     "sporadic failure, please try again");
-}
-
 DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
-    // If the '_sampleSize' member is present, then the stage will produce randomly sampled
-    // documents from buckets.
-    if (_sampleSize) {
-        if (_nSampledSoFar >= _sampleSize) {
-            return GetNextResult::makeEOF();
-        }
-        return sampleUniqueMeasurementFromBuckets();
-    }
+    tassert(5521502, "calling doGetNext() when '_sampleSize' is set is disallowed", !_sampleSize);
 
     // Otherwise, fallback to unpacking every measurement in all buckets until the child stage is
     // exhausted.
@@ -653,8 +351,7 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
                                                             bool isInclusion) {
     // 'fields' are the top-level fields to be included/excluded by the unpacker. We handle the
-    // special case of _id, which may be excluded in an inclusion $project (or vice versa),
-    // here.
+    // special case of _id, which may be excluded in an inclusion $project (or vice versa), here.
     auto fields = project.getFieldNames<std::set<std::string>>();
     if (auto elt = project.getField("_id"); (elt.isBoolean() && elt.Bool() != isInclusion) ||
         (elt.isNumber() && (elt.Int() == 1) != isInclusion)) {
@@ -672,8 +369,7 @@ void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& proje
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProjectToInternalize(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
     if (std::next(itr) == container->end() || !_bucketUnpacker.bucketSpec().fieldSet.empty()) {
-        // There is no project to internalize or there are already fields being
-        // included/excluded.
+        // There is no project to internalize or there are already fields being included/excluded.
         return {BSONObj{}, false};
     }
 
@@ -684,9 +380,9 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
         return {existingProj, isInclusion};
     }
 
-    // Attempt to get an inclusion $project representing the root-level dependencies of the
-    // pipeline after the $_internalUnpackBucket. If this $project is not empty, then the
-    // dependency set was finite.
+    // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
+    // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
+    // finite.
     Pipeline::SourceContainer restOfPipeline(std::next(itr), container->end());
     auto deps = Pipeline::getDependenciesForContainer(pExpCtx, restOfPipeline, boost::none);
     if (auto dependencyProj =
@@ -709,18 +405,17 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     auto path = matchExpr->path();
     auto rhs = matchExpr->getData();
 
-    // The control field's min and max are chosen using a field-order insensitive comparator,
-    // while MatchExpressions use a comparator that treats field-order as significant. Because
-    // of this we will not perform this optimization on queries with operands of compound types.
+    // The control field's min and max are chosen using a field-order insensitive comparator, while
+    // MatchExpressions use a comparator that treats field-order as significant. Because of this we
+    // will not perform this optimization on queries with operands of compound types.
     if (rhs.type() == BSONType::Object || rhs.type() == BSONType::Array) {
         return nullptr;
     }
 
-    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null}
-    // will match all documents where the field is either null or missing. Because this is
-    // different from both the comparison semantics that InternalExprComparison expressions and
-    // the control's min and max fields use, we will not perform this optimization on queries
-    // with null operands.
+    // MatchExpressions have special comparison semantics regarding null, in that {$eq: null} will
+    // match all documents where the field is either null or missing. Because this is different from
+    // both the comparison semantics that InternalExprComparison expressions and the control's min
+    // and max fields use, we will not perform this optimization on queries with null operands.
     if (rhs.type() == BSONType::jstNULL) {
         return nullptr;
     }
