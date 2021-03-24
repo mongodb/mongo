@@ -711,7 +711,7 @@ local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sess
     LOCAL_STORAGE *local;
     size_t alloc_sz, cluster_len, marker_len, prefix_len;
     uint32_t allocated, count;
-    int ret;
+    int ret, t_ret;
     char **entries, **new_entries;
     const char *basename;
 
@@ -780,7 +780,12 @@ local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sess
     *countp = count;
 
 err:
-    free(dirp);
+    if (closedir(dirp) != 0) {
+        t_ret =
+          local_err(local, session, errno, "%s: ss_location_list: closedir", location->bucket);
+        if (ret == 0)
+            ret = t_ret;
+    }
     if (ret == 0)
         return (0);
 
