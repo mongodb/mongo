@@ -1539,6 +1539,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto shardKeyBinding =
             generateShardKeyBinding(fieldRef, _frameIdGenerator, std::move(currentFieldSlot), 0);
 
+        // If this is a hashed shard key then compute the hash value.
+        if (ShardKeyPattern::isHashedPatternEl(keyPatternElem)) {
+            shardKeyBinding = makeFunction("shardHash"_sd, std::move(shardKeyBinding));
+        }
+
         projections.emplace(fieldSlots.back(), std::move(shardKeyBinding));
     }
 

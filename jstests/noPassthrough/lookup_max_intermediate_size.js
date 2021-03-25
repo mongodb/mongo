@@ -2,7 +2,6 @@
 // but no larger than internalLookupStageIntermediateDocumentMaxSizeBytes.
 // @tags: [
 //   requires_sharding,
-//   sbe_incompatible,
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
@@ -30,6 +29,7 @@ function testPipeline(pipeline, expectedResult, collection) {
 function runTest(coll, from) {
     const db = null;  // Using the db variable is banned in this function.
 
+    from.drop();
     //
     // Confirm aggregation will not fail if intermediate $lookup stage exceeds 16 MB.
     //
@@ -90,6 +90,7 @@ const db = standalone.getDB("test");
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalLookupStageIntermediateDocumentMaxSizeBytes: 30 * 1024 * 1024}));
 
+db.lookUp.drop();
 runTest(db.lookUp, db.from);
 
 MongoRunner.stopMongod(standalone);
@@ -106,6 +107,7 @@ const sharded = new ShardingTest({
 
 assert(sharded.adminCommand({enableSharding: "test"}));
 
+sharded.getDB('test').lookUp.drop();
 assert(sharded.adminCommand({shardCollection: "test.lookUp", key: {_id: 'hashed'}}));
 runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from);
 
