@@ -36,8 +36,10 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -448,6 +450,39 @@ void releaseRecoverableCriticalSection(OperationContext* opCtx,
               str::stream() << "Delete did not remove any doc from collection "
                             << NamespaceString::kCollectionCriticalSectionsNamespace
                             << " for namespace " << nss << " and reason " << reason);
+}
+
+void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
+
+    LOGV2_DEBUG(5549400, 2, "Starting re-acquisition of recoverable critical sections");
+
+    PersistentTaskStore<CollectionCriticalSectionDocument> store(
+        NamespaceString::kCollectionCriticalSectionsNamespace);
+    store.forEach(opCtx, Query{}, [&opCtx](const CollectionCriticalSectionDocument& doc) {
+        const auto& nss = doc.getNss();
+        {
+            // Entering into the catch-up phase: blocking writes
+            Lock::GlobalLock lk(opCtx, MODE_IX);
+            AutoGetCollection cCollLock(opCtx, nss, MODE_S);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
+            csr->enterCriticalSectionCatchUpPhase(csrLock);
+        }
+
+        if (doc.getBlockReads()) {
+            // Entering into the commit phase: blocking reads
+            AutoGetCollection cCollLock(opCtx, nss, MODE_X);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+            auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
+            csr->enterCriticalSectionCommitPhase(csrLock);
+
+            CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+        }
+
+        return true;
+    });
+
+    LOGV2_DEBUG(5549401, 2, "Finished re-acquisition of recoverable critical sections");
 }
 
 void stopMigrations(OperationContext* opCtx, const NamespaceString& nss) {
