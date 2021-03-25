@@ -1912,8 +1912,8 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
     // We're correcting the size as of now, future writes should be tracked.
     sizeRecoveryState(getGlobalServiceContext()).markCollectionAsAlwaysNeedsSizeAdjustment(_ident);
 
-    _sizeInfo->numRecords.store(numRecords);
-    _sizeInfo->dataSize.store(dataSize);
+    _sizeInfo->numRecords.store(std::max(numRecords, 0ll));
+    _sizeInfo->dataSize.store(std::max(dataSize, 0ll));
 
     // If we have a WiredTigerSizeStorer, but our size info is not currently cached, add it.
     if (_sizeStorer)
@@ -1976,7 +1976,9 @@ public:
                     3,
                     "WiredTigerRecordStore: rolling back NumRecordsChange {diff}",
                     "diff"_attr = -_diff);
-        _rs->_sizeInfo->numRecords.fetchAndAdd(-_diff);
+        if (_rs->_sizeInfo->numRecords.addAndFetch(-_diff) < 0) {
+            _rs->_sizeInfo->numRecords.store(0);
+        }
     }
 
 private:
@@ -1994,8 +1996,8 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
     }
 
     opCtx->recoveryUnit()->registerChange(std::make_unique<NumRecordsChange>(this, diff));
-    if (_sizeInfo->numRecords.fetchAndAdd(diff) < 0)
-        _sizeInfo->numRecords.store(std::max(diff, int64_t(0)));
+    if (_sizeInfo->numRecords.addAndFetch(diff) < 0)
+        _sizeInfo->numRecords.store(0);
 }
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
