@@ -2956,7 +2956,8 @@ bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState_UNSAFE() const {
 
 bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* opCtx,
                                                              const NamespaceString& ns) {
-    if (ReplSettings::shouldRecoverFromOplogAsStandalone() || tenantMigrationRecipientInfo(opCtx)) {
+    if (ReplSettings::shouldRecoverFromOplogAsStandalone() || !recoverToOplogTimestamp.empty() ||
+        tenantMigrationRecipientInfo(opCtx)) {
         return true;
     }
     return !canAcceptWritesFor(opCtx, ns);
