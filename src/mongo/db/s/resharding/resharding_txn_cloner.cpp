@@ -242,9 +242,10 @@ auto ReshardingTxnCloner::_withTemporaryOperationContext(Callable&& callable) {
     }
 }
 
-ExecutorFuture<void> ReshardingTxnCloner::run(
+SemiFuture<void> ReshardingTxnCloner::run(
     ServiceContext* serviceContext,
     std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest) {
     struct ChainContext {
@@ -369,6 +370,7 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
             return true;
         })
         .on(executor, cancelToken)
+        .thenRunOn(cleanupExecutor)
         .onCompletion([this, chainCtx](Status status) {
             if (chainCtx->pipeline) {
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
@@ -380,7 +382,8 @@ ExecutorFuture<void> ReshardingTxnCloner::run(
 
             // Propagate the result of the AsyncTry.
             return status;
-        });
+        })
+        .semi();
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(

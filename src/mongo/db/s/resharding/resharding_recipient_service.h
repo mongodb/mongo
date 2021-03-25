@@ -105,7 +105,8 @@ public:
 class ReshardingRecipientService::RecipientStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
-    explicit RecipientStateMachine(const BSONObj& recipientDoc);
+    explicit RecipientStateMachine(const ReshardingRecipientService* recipientService,
+                                   const BSONObj& recipientDoc);
 
     ~RecipientStateMachine();
 
@@ -133,7 +134,8 @@ public:
                                     const ReshardingRecipientDocument& recipientDoc);
 
 private:
-    RecipientStateMachine(const ReshardingRecipientDocument& recipientDoc);
+    RecipientStateMachine(const ReshardingRecipientService* recipientService,
+                          const ReshardingRecipientDocument& recipientDoc);
 
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
@@ -200,6 +202,8 @@ private:
     //
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
+
+    const ReshardingRecipientService* const _recipientService;
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.recipient.

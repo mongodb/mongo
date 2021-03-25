@@ -71,9 +71,10 @@ public:
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
         const boost::optional<LogicalSessionId>& startAfter);
 
-    ExecutorFuture<void> run(
+    SemiFuture<void> run(
         ServiceContext* serviceContext,
         std::shared_ptr<executor::TaskExecutor> executor,
+        std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface_forTest = nullptr);
 

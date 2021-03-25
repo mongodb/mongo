@@ -113,6 +113,7 @@ public:
 
             cloner
                 .run(executor,
+                     executor,
                      opCtx->getCancellationToken(),
                      CancelableOperationContextFactory(opCtx->getCancellationToken(),
                                                        cancelableOperationContextPool))

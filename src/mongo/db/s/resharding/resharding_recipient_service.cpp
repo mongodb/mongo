@@ -217,17 +217,20 @@ ReshardingDonorOplogId getApplierIdToResumeFrom(OperationContext* opCtx,
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
     BSONObj initialState) const {
-    return std::make_shared<RecipientStateMachine>(std::move(initialState));
+    return std::make_shared<RecipientStateMachine>(this, std::move(initialState));
 }
 
 ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
-    const BSONObj& recipientDoc)
+    const ReshardingRecipientService* recipientService, const BSONObj& recipientDoc)
     : RecipientStateMachine(
+          recipientService,
           ReshardingRecipientDocument::parse({"RecipientStateMachine"}, recipientDoc)) {}
 
 ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
+    const ReshardingRecipientService* recipientService,
     const ReshardingRecipientDocument& recipientDoc)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
+      _recipientService{recipientService},
       _metadata{recipientDoc.getCommonReshardingMetadata()},
       _donorShardIds{recipientDoc.getDonorShards()},
       _minimumOperationDuration{Milliseconds{recipientDoc.getMinimumOperationDurationMillis()}},
@@ -537,6 +540,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     auto cloneFinishFuture =
         whenAllSucceed(_collectionCloner
                            ->run(**executor,
+                                 _recipientService->getInstanceCleanupExecutor(),
                                  abortToken,
                                  CancelableOperationContextFactory(abortToken, _markKilledExecutor))
                            .thenRunOn(**executor),
@@ -552,7 +556,12 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                                std::vector<ExecutorFuture<void>> txnClonerFutures;
                                for (auto&& txnCloner : _txnCloners) {
                                    txnClonerFutures.push_back(
-                                       txnCloner->run(serviceContext, **executor, abortToken));
+                                       txnCloner
+                                           ->run(serviceContext,
+                                                 **executor,
+                                                 _recipientService->getInstanceCleanupExecutor(),
+                                                 abortToken)
+                                           .thenRunOn(**executor));
                                }
 
                                return whenAllSucceed(std::move(txnClonerFutures));
