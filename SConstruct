@@ -415,14 +415,9 @@ add_option('build-fast-and-loose',
     type='choice',
 )
 
-add_option("disable-warnings-as-errors",
-    action="append",
-    choices=["configure", "source"],
-    const="source",
-    default=[],
-    help="Don't add a warnings-as-errors flag to compiler command lines in selected contexts; defaults to 'source' if no argument is provided",
-    nargs="?",
-    type="choice",
+add_option('disable-warnings-as-errors',
+    help="Don't add -Werror to compiler command line",
+    nargs=0,
 )
 
 add_option('detect-odr-violations',
@@ -1190,38 +1185,12 @@ if get_option('build-tools') == 'next':
     SCons.Tool.DefaultToolpath.insert(0, os.path.abspath('site_scons/site_tools/next'))
 
 env = Environment(variables=env_vars, **envDict)
-del envDict
 
 # Only print the spinner if stdout is a tty
 if sys.stdout.isatty():
     Progress(['-\r', '\\\r', '|\r', '/\r'], interval=50)
 
-# We are going to start running conf tests soon, so setup
-# --disable-warnings-as-errors as soon as possible.
-def create_werror_generator(flagname):
-    werror_conftests = 'configure' not in get_option('disable-warnings-as-errors')
-    werror_source = 'source' not in get_option('disable-warnings-as-errors')
-
-    def generator(target, source, env, for_signature):
-        if werror_conftests and "conftest" in str(target[0]):
-            return flagname
-
-        if werror_source:
-            return flagname
-
-        return str()
-
-    return generator
-
-env.Append(
-    CCFLAGS=['$CCFLAGS_GENERATE_WERROR'],
-    CCFLAGS_GENERATE_WERROR=create_werror_generator('$CCFLAGS_WERROR'),
-    CXXFLAGS=['$CXXFLAGS_GENERATE_WERROR'],
-    CXXFLAGS_GENERATE_WERROR=create_werror_generator('$CXXFLAGS_WERROR'),
-    LINKFLAGS=['$LINKFLAGS_GENERATE_WERROR'],
-    LINKFLAGS_GENERATE_WERROR=create_werror_generator('$LINKFLAGS_WERROR'),
-)
-
+del envDict
 
 for var in ['CC', 'CXX']:
     if var not in env:
@@ -1460,8 +1429,6 @@ detectSystem = Configure(detectEnv, help=False, custom_tests = {
 toolchain_search_sequence = [ "GCC", "clang" ]
 if mongo_platform.is_running_os('windows'):
     toolchain_search_sequence = [ 'MSVC', 'clang', 'GCC' ]
-
-detected_toolchain = None
 for candidate_toolchain in toolchain_search_sequence:
     if detectSystem.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
         detected_toolchain = candidate_toolchain
@@ -1504,17 +1471,8 @@ elif not detectSystem.CheckForOS(env['TARGET_OS']):
 
 detectSystem.Finish()
 
-if env.TargetOSIs('posix'):
-    if env.ToolchainIs('gcc', 'clang'):
-        env.Append(
-            CCFLAGS_WERROR=["-Werror"],
-            CXXFLAGS_WERROR=['-Werror=unused-result'] if env.ToolchainIs('clang') else [],
-            LINKFLAGS_WERROR=['-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings"],
-        )
-elif env.TargetOSIs('windows'):
-        env.Append(
-            CCFLAGS_WERROR=["/WX"]
-        )
+
+
 
 env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
 env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
@@ -2306,6 +2264,10 @@ elif env.TargetOSIs('windows'):
     #     object called lock on the stack.
     env.Append( CCFLAGS=["/we4013", "/we4099", "/we4930"] )
 
+    # Warnings as errors
+    if not has_option("disable-warnings-as-errors"):
+        env.Append( CCFLAGS=["/WX"] )
+
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS", "_SCL_SECURE_NO_WARNINGS"] )
 
     # this would be for pre-compiled headers, could play with it later
@@ -2483,7 +2445,13 @@ if env.TargetOSIs('posix'):
         env.Append(CCFLAGS=["-fno-strict-aliasing"])
 
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
+    if env.TargetOSIs('linux', 'darwin', 'solaris'):
+        if not has_option("disable-warnings-as-errors"):
+            env.Append( CCFLAGS=["-Werror"] )
+
     env.Append( CXXFLAGS=["-Woverloaded-virtual"] )
+    if env.ToolchainIs('clang') and not has_option('disable-warnings-as-errors'):
+        env.Append( CXXFLAGS=['-Werror=unused-result'] )
 
     # On OS X, clang doesn't want the pthread flag at link time, or it
     # issues warnings which make it impossible for us to declare link
@@ -2532,6 +2500,15 @@ if env.TargetOSIs('posix'):
 
     if optBuild and "treevec" in selected_experimental_optimizations:
         env.Append(CCFLAGS=["-ftree-vectorize"])
+
+    # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
+    # noall_load obsolete and warns about it.
+    if not has_option("disable-warnings-as-errors"):
+        env.Append(
+            LINKFLAGS=[
+                '-Wl,-fatal_warnings' if env.TargetOSIs('darwin') else "-Wl,--fatal-warnings",
+            ]
+        )
 
 wiredtiger = False
 if get_option('wiredtiger') == 'on':
@@ -2813,27 +2790,13 @@ def doConfigure(myenv):
                     if test_flag.startswith("-Wno-") and not test_flag.startswith("-Wno-error="):
                         test_flags.append(re.sub("^-Wno-", "-W", test_flag))
 
-        # If the user has selected ``configure` in
-        # `disable-warnings-as-errors`, the usual mechanisms that
-        # would inject Werror or similar are disabled for
-        # conftests. But AddFlagIfSupported requires that those flags
-        # be used. Disable the generators so we have explicit control.
-        cloned = env.Clone(
-            CCFLAGS_GENERATE_WERROR=[],
-            CXXFLAGS_GENERATE_WERROR=[],
-            LINKFLAGS_GENERATE_WERROR=[],
-        )
-
+        cloned = env.Clone()
         cloned.Append(**test_mutation)
 
-        # Add these *after* the test mutation, so that the mutation
-        # can't step on the warnings-as-errors state.
-        cloned.Append(
-            CCFLAGS=["$CCFLAGS_WERROR"],
-            CXXFLAGS=["$CXXFLAGS_WERROR"],
-            LINKFLAGS=["$LINKFLAGS_WERROR"],
-        )
-
+        # For GCC, we don't need anything since bad flags are already errors, but
+        # adding -Werror won't hurt. For clang, bad flags are only warnings, so we need -Werror
+        # to make them real errors.
+        cloned.Append(CCFLAGS=['-Werror'])
         conf = Configure(cloned, help=False, custom_tests = {
                 'CheckFlag' : lambda ctx : CheckFlagTest(ctx, tool, extension, flag)
         })
@@ -3027,18 +2990,14 @@ def doConfigure(myenv):
             };
             """
 
-            context.Message('Checking if -Wnon-virtual-dtor works reasonably... ')
+            context.Message('Checking -Wnon-virtual-dtor for false positives... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
             context.Result(ret)
             return ret
 
         myenvClone = myenv.Clone()
-        myenvClone.Append(
-            CCFLAGS=[
-                '$CCFLAGS_WERROR',
-                '-Wnon-virtual-dtor',
-            ]
-        )
+        myenvClone.Append( CCFLAGS=['-Werror'] )
+        myenvClone.Append( CXXFLAGS=["-Wnon-virtual-dtor"] )
         conf = Configure(myenvClone, help=False, custom_tests = {
             'CheckNonVirtualDtor' : CheckNonVirtualDtor,
         })

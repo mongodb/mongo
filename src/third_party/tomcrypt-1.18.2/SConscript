@@ -6,15 +6,13 @@ Import([
 
 env = env.Clone()
 
-env['WERROR_CCFLAGS'] = []
-
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
 
-for to_remove in ['-Wall', '-W']:
+for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 env.Prepend(CPPPATH=[
