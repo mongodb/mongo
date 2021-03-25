@@ -50,6 +50,7 @@ constexpr auto kTopologyVersionFieldName = "topologyVersion"_sd;
 class CreateIndexesCmd : public BasicCommandWithRequestParser<CreateIndexesCmd> {
 public:
     using Request = CreateIndexesCommand;
+    using Reply = CreateIndexesReply;
 
     const std::set<std::string>& apiVersions() const final {
         return kApiVersions1;
@@ -118,62 +119,35 @@ public:
      * 'code' & 'codeName' are permitted in either scenario, but non-zero 'code' indicates "not ok".
      */
     void validateResult(const BSONObj& result) final {
-        BSONElement rawElem;
-        bool ok = true, hasErrMsg = false;
-
-        for (auto elem : result) {
-            const auto fieldName = elem.fieldNameStringData();
-            if (fieldName == kRawFieldName) {
-                rawElem = elem;
-                uassert(ErrorCodes::BadValue,
-                        str::stream()
-                            << "'raw' field must be an object, got: " << typeName(elem.type()),
-                        elem.type() == Object);
-            } else if (fieldName == ErrorReply::kCodeFieldName) {
-                uassert(ErrorCodes::BadValue,
-                        str::stream() << "Reply contained non-numeric status code: " << elem,
-                        elem.isNumber());
-                ok = ok & (elem.numberInt() != 0);
-            } else if (fieldName == ErrorReply::kOkFieldName) {
-                ok = ok & elem.trueValue();
-            } else if (fieldName == ErrorReply::kErrmsgFieldName) {
-                hasErrMsg = true;
-            } else if ((fieldName == ErrorReply::kCodeNameFieldName) ||
-                       (fieldName == kWriteConcernErrorFieldName)) {
-                // Ignorable field.
-            } else {
-                uasserted(ErrorCodes::BadValue,
-                          str::stream() << "Invalid field in reply: " << fieldName);
-            }
+        auto ctx = IDLParserErrorContext("createIndexesReply");
+        if (checkIsErrorStatus(result, ctx)) {
+            return;
         }
 
-        if (ok) {
-            uassert(
-                ErrorCodes::BadValue, "Error message field present for 'ok' result", !hasErrMsg);
-            uassert(ErrorCodes::BadValue, "Missing field in reply: raw", !rawElem.eoo());
+        StringDataSet ignorableFields({kWriteConcernErrorFieldName,
+                                       ErrorReply::kOkFieldName,
+                                       kTopologyVersionFieldName,
+                                       kRawFieldName});
+        Reply::parse(ctx, result.removeFields(ignorableFields));
+        if (!result.hasField(kRawFieldName)) {
+            return;
+        }
 
-            invariant(rawElem.type() == Object);  // Validated in field loop above.
-            IDLParserErrorContext ctx("createIndexesReply");
-            StringDataSet ignorableFields(
-                {kWriteConcernErrorFieldName, ErrorReply::kOkFieldName, kTopologyVersionFieldName});
-            for (auto elem : rawElem.Obj()) {
-                uassert(ErrorCodes::FailedToParse,
-                        str::stream() << "Response from shard must be an object, found: "
-                                      << typeName(elem.type()),
-                        elem.type() == Object);
-                try {
-                    // 'ok' is a permissable part of an reply even though it's not
-                    // a formal part of the command reply.
-                    CreateIndexesReply::parse(ctx, elem.Obj().removeFields(ignorableFields));
-                } catch (const DBException& ex) {
-                    uasserted(ex.code(),
-                              str::stream()
-                                  << "Failed parsing response from shard: " << ex.reason());
-                }
+        const auto& rawData = result[kRawFieldName];
+        if (!ctx.checkAndAssertType(rawData, Object)) {
+            return;
+        }
+
+        auto rawCtx = IDLParserErrorContext(kRawFieldName, &ctx);
+        for (const auto& element : rawData.Obj()) {
+            if (!rawCtx.checkAndAssertType(element, Object)) {
+                return;
             }
-        } else {
-            uassert(
-                ErrorCodes::BadValue, "Error message field missing for 'not ok' result", hasErrMsg);
+
+            const auto& shardReply = element.Obj();
+            if (!checkIsErrorStatus(shardReply, ctx)) {
+                Reply::parse(ctx, shardReply.removeFields(ignorableFields));
+            }
         }
     }
 

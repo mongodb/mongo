@@ -117,26 +117,36 @@ public:
 
     void validateResult(const BSONObj& resultObj) final {
         auto ctx = IDLParserErrorContext("CollModReply");
+        if (checkIsErrorStatus(resultObj, ctx)) {
+            return;
+        }
+
         StringDataSet ignorableFields({kWriteConcernErrorFieldName,
                                        ErrorReply::kOkFieldName,
                                        kTopologyVersionFieldName,
                                        kRawFieldName});
-        if (!checkIsErrorStatus(resultObj, ctx)) {
-            auto reply = Reply::parse(ctx, resultObj.removeFields(ignorableFields));
-            coll_mod_reply_validation::validateReply(reply);
+        auto reply = Reply::parse(ctx, resultObj.removeFields(ignorableFields));
+        coll_mod_reply_validation::validateReply(reply);
 
-            if (resultObj.hasField(kRawFieldName)) {
-                const auto& rawData = resultObj[kRawFieldName];
-                if (ctx.checkAndAssertType(rawData, Object)) {
-                    for (const auto& element : rawData.Obj()) {
-                        const auto& shardReply = element.Obj();
-                        if (!checkIsErrorStatus(shardReply, ctx)) {
-                            auto reply =
-                                Reply::parse(ctx, shardReply.removeFields(ignorableFields));
-                            coll_mod_reply_validation::validateReply(reply);
-                        }
-                    }
-                }
+        if (!resultObj.hasField(kRawFieldName)) {
+            return;
+        }
+
+        const auto& rawData = resultObj[kRawFieldName];
+        if (!ctx.checkAndAssertType(rawData, Object)) {
+            return;
+        }
+
+        auto rawCtx = IDLParserErrorContext(kRawFieldName, &ctx);
+        for (const auto& element : rawData.Obj()) {
+            if (!rawCtx.checkAndAssertType(element, Object)) {
+                return;
+            }
+
+            const auto& shardReply = element.Obj();
+            if (!checkIsErrorStatus(shardReply, ctx)) {
+                auto reply = Reply::parse(ctx, shardReply.removeFields(ignorableFields));
+                coll_mod_reply_validation::validateReply(reply);
             }
         }
     }
