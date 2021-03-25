@@ -29,37 +29,66 @@
 
 #pragma once
 
+#include "mongo/db/s/rename_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 
-class RenameCollectionCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<RenameCollectionCoordinator> {
+class RenameCollectionCoordinator final : public ShardingDDLCoordinator {
 public:
-    RenameCollectionCoordinator(OperationContext* opCtx,
-                                const NamespaceString& fromNss,
-                                const NamespaceString& toNss,
-                                bool dropTarget,
-                                bool stayTemp);
+    using StateDoc = RenameCollectionCoordinatorDocument;
+    using Phase = RenameCollectionCoordinatorPhaseEnum;
 
-    SharedSemiFuture<RenameCollectionResponse> getResponseFuture() {
-        return _response.getFuture();
+    RenameCollectionCoordinator(const BSONObj& initialState);
+
+    void checkIfOptionsConflict(const BSONObj& doc) const override;
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
+
+    /**
+     * Waits for the rename to complete and returns the collection version.
+     */
+    RenameCollectionResponse getResponse(OperationContext* opCtx) {
+        getCompletionFuture().get(opCtx);
+        invariant(_response);
+        return *_response;
     }
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
 
-    void _renameUnshardedCollection(OperationContext* opCtx);
-    void _renameShardedCollection(OperationContext* opCtx);
+    std::vector<DistLockManager::ScopedDistLock> _acquireAdditionalLocks(
+        OperationContext* opCtx) override;
 
-    ServiceContext* _serviceContext;
-    NamespaceString _toNss;
-    bool _dropTarget;
-    bool _stayTemp;
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
 
-    SharedPromise<RenameCollectionResponse> _response;
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    }
+
+    void _insertStateDocument(StateDoc&& doc);
+    void _updateStateDocument(StateDoc&& newStateDoc);
+    void _removeStateDocument();
+    void _enterPhase(Phase newPhase);
+
+    RenameCollectionCoordinatorDocument _doc;
+
+    boost::optional<RenameCollectionResponse> _response;
 };
 
 }  // namespace mongo

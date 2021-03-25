@@ -41,6 +41,7 @@
 
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
+#include "mongo/db/s/rename_collection_coordinator.h"
 
 namespace mongo {
 
@@ -63,6 +64,9 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
             break;
         case DDLCoordinatorTypeEnum::kDropCollection:
             return std::make_shared<DropCollectionCoordinator>(std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kRenameCollection:
+            return std::make_shared<RenameCollectionCoordinator>(std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,

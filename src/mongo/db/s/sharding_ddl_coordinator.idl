@@ -44,6 +44,7 @@ enums:
         values:
             kDropDatabase: "dropDatabase"
             kDropCollection: "dropCollection"
+            kRenameCollection: "renameCollection"
 
 types:
     ForwardableOperationMetadata:
