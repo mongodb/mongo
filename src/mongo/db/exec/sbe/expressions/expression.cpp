@@ -338,6 +338,11 @@ namespace {
 using ArityFn = bool (*)(size_t);
 
 /**
+ * The arity test function that trivially accepts any number of arguments.
+ */
+static constexpr ArityFn kAnyNumberOfArgs = [](size_t) { return true; };
+
+/**
  * The builtin function description.
  */
 struct BuiltinFn {
@@ -366,7 +371,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"regexMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexMatch, false}},
     {"replaceOne", BuiltinFn{[](size_t n) { return n == 3; }, vm::Builtin::replaceOne, false}},
     {"dropFields", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::dropFields, false}},
-    {"newArray", BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::newArray, false}},
+    {"newArray", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::newArray, false}},
     {"newObj", BuiltinFn{[](size_t n) { return n % 2 == 0; }, vm::Builtin::newObj, false}},
     {"ksToString", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::ksToString, false}},
     {"ks", BuiltinFn{[](size_t n) { return n > 2; }, vm::Builtin::newKs, false}},
@@ -419,9 +424,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"isDayOfWeek", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isDayOfWeek, false}},
     {"isTimeUnit", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isTimeUnit, false}},
     {"isTimezone", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isTimezone, false}},
-    {"setUnion", BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::setUnion, false}},
-    {"setIntersection",
-     BuiltinFn{[](size_t n) { return n >= 0; }, vm::Builtin::setIntersection, false}},
+    {"setUnion", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::setUnion, false}},
+    {"setIntersection", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::setIntersection, false}},
     {"setDifference",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setDifference, false}},
     {"collSetUnion", BuiltinFn{[](size_t n) { return n >= 1; }, vm::Builtin::collSetUnion, false}},
