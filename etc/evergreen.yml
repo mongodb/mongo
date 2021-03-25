@@ -60,12 +60,6 @@ variables:
       resmoke_args: --help
       resmoke_jobs_max: 0  # No cap on number of jobs.
 
-# Used for tests that invoke resmoke.py and require no additional setup.
-- &task_depending_on_all_template
-  <<: *task_template
-  depends_on:
-  - name: compile_all
-
 - &benchmark_template
   name: benchmark_template
   depends_on:
@@ -123,13 +117,6 @@ variables:
   commands:
   - func: "generate fuzzer tasks"
 
-- &multiversion_template
-  name: multiversion_template
-  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
-  depends_on: []
-  commands:
-  - func: "generate implicit multiversion tasks"
-
 # Templates used by powercycle
 - &powercycle_remote_credentials
   private_key_file: $(${posix_workdir})/src/powercycle.pem
@@ -183,10 +170,10 @@ variables:
         ${archive_file|src/archive.json}
   setup_group_can_fail_task: true
   setup_group:
-  - func: "kill processes"
-  - func: "cleanup environment"
   - command: manifest.load
   - func: "git get project"
+  - func: "kill processes"
+  - func: "cleanup environment"
   - func: "get all modified patch files"
   - func: "set task expansion macros"
   # The python virtual environment is installed in ${workdir}, which is created in
@@ -260,10 +247,10 @@ variables:
   - func: "attach scons logs"
   setup_group_can_fail_task: true
   setup_group:
-    - func: "kill processes"
-    - func: "cleanup environment"
     - command: manifest.load
     - func: "git get project"
+    - func: "kill processes"
+    - func: "cleanup environment"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -595,34 +582,13 @@ functions:
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
-    command: shell.exec
+    command: subprocess.exec
     params:
       background: true
       system_log: true
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # On Windows we can use typeperf.exe to dump performance counters.
-        if [ "Windows_NT" = "$OS" ]; then
-            typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
-            typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
-        # Linux: iostat -t option for timestamp.
-        elif iostat -tdmx > /dev/null 2>&1; then
-            iostat -tdmx 5 > mongo-diskstats
-        # OSX: Simulate the iostat timestamp.
-        elif iostat -d > /dev/null 2>&1; then
-            iostat -d -w 5 | while IFS= read -r line; do printf '%s %s\n' "$(date +'%m/%d/%Y %H:%M:%S')" "$line" >> mongo-diskstats; done
-        # Check if vmstat -t is available.
-        elif vmstat -td  > /dev/null 2>&1; then
-            vmstat -td 5 > mongo-diskstats
-        # Check if vmstat -T d is available.
-        elif vmstat -T d > /dev/null 2>&1; then
-            vmstat -T d 5 > mongo-diskstats
-        else
-            printf "Cannot collect mongo-diskstats on this platform\n"
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/run_diskstats.sh"
 
   "collect system resource info": &collect_system_resource_info
     command: shell.exec
@@ -1197,8 +1163,6 @@ functions:
   - *collect_system_resource_info
 
   "do non-compile setup":
-  - command: manifest.load
-  - *git_get_project
   - *set_task_expansion_macros
   - *set_up_venv
   - *upload_pip_requirements
@@ -1206,8 +1170,6 @@ functions:
   - *set_up_credentials
 
   "do benchmark setup":
-  - command: manifest.load
-  - *git_get_project
   - *set_task_expansion_macros
   - *set_up_venv
   - *upload_pip_requirements
@@ -1307,16 +1269,11 @@ functions:
         fi
 
   "move multiversion binaries": &move_multiversion_binaries
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-
-        # powercycle expects the binaries to be in dist-test/bin
-        mkdir -p dist-test/bin
-        mv /data/multiversion/* dist-test/bin/
+      binary: bash
+      args:
+        - "./src/evergreen/move_multiversion_binaries.sh"
 
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
@@ -1496,20 +1453,12 @@ functions:
       local_file: "generate_tasks_config.tgz"
 
   "extract generated test configuration": &extract_generated_test_configuration
-    command: shell.exec
+    command: subprocess.exec
     type: test
     params:
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        target_dir="src/generated_resmoke_config"
-        mkdir -p $target_dir
-        mv generate_tasks_config.tgz $target_dir
-
-        cd $target_dir
-        tar xzf generate_tasks_config.tgz
+      binary: bash
+      args:
+        - "./src/evergreen/extract_generated_test_configuration.sh"
 
   "generate selected tests":
     - command: expansions.write
@@ -1595,8 +1544,6 @@ functions:
           - src/generated_burn_in_tags_config/burn_in_tags_gen.json
 
   "generate randomized multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
     - *set_task_expansion_macros
     - *set_up_venv
     - *upload_pip_requirements
@@ -1658,8 +1605,6 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate resmoke tasks":
-    - command: manifest.load
-    - *git_get_project
     - *set_task_expansion_macros
     - *set_up_venv
     - *upload_pip_requirements
@@ -1709,6 +1654,7 @@ functions:
         files:
           - src/generated_resmoke_config/*.json
 
+  # Used by generator
   "run generated tests":
   - *retrieve_generated_test_configuration
   - *extract_generated_test_configuration
@@ -1728,16 +1674,12 @@ functions:
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
     # because we don't intend for any human to look at this failure.
-  - command: shell.exec
+  - command: subprocess.exec
     type: setup
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        if [ -f run_tests_infrastructure_failure ]; then
-          exit $(cat run_tests_infrastructure_failure)
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/check_run_tests_infrastructure_failure.sh"
 
   "run tests":
     - *determine_task_timeout
@@ -1762,16 +1704,12 @@ functions:
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
       # because we don't intend for any human to look at this failure.
-    - command: shell.exec
+    - command: subprocess.exec
       type: setup
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o verbose
-          if [ -f run_tests_infrastructure_failure ]; then
-            exit $(cat run_tests_infrastructure_failure)
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/check_run_tests_infrastructure_failure.sh"
 
   "scons lint":
     - command: shell.exec
@@ -1952,37 +1890,16 @@ functions:
       file: src/compile_expansions.yml
 
   "do jepsen setup":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-
-          # Build libfaketime. A version of libfaketime at least as new as v0.9.6-9-g75896bd is
-          # required to use the FAKETIME_NO_CACHE and FAKETIME_TIMESTAMP_FILE environment variables.
-          # Additionally, a version of libfaketime containing the changes mentioned in SERVER-29336
-          # is required to avoid needing to use libfaketimeMT.so.1 and serializing all calls to
-          # fake_clock_gettime() with a mutex.
-          git clone --branch=for-jepsen --depth=1 git@github.com:10gen/libfaketime.git
-          cd libfaketime
-          branch=$(git symbolic-ref --short HEAD)
-          commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-          echo "Git branch: $branch, commit: $commit"
-          make PREFIX=$(pwd)/build/ LIBDIRNAME='.' install
-    - command: shell.exec
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/build_libfaketime.sh"
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          git clone --branch=jepsen-mongodb-master --depth=1 git@github.com:10gen/jepsen.git jepsen-mongodb
-          cd jepsen-mongodb
-          branch=$(git symbolic-ref --short HEAD)
-          commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
-          echo "Git branch: $branch, commit: $commit"
-
-          lein install
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/install_jepsen.sh"
     - command: shell.exec
       params:
         working_dir: src
@@ -1991,15 +1908,11 @@ functions:
           set -o errexit
           ${activate_virtualenv}
           $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-
-          # Move binaries to CWD as Jepsen expects that.
-          mv dist-test/bin/* .
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/move_binaries.sh"
 
   "run jepsen test":
     - command: shell.exec
@@ -2097,8 +2010,6 @@ functions:
 
 
   "generate explicit multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
     - *set_task_expansion_macros
     - *set_up_venv
     - *upload_pip_requirements
@@ -2151,8 +2062,6 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate implicit multiversion tasks":
-    - command: manifest.load
-    - *git_get_project
     - *set_task_expansion_macros
     - *set_up_venv
     - *configure_evergreen_api_credentials
@@ -2205,8 +2114,6 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate fuzzer tasks":
-    - command: manifest.load
-    - *git_get_project
     - *set_task_expansion_macros
     - *set_up_venv
     - *upload_pip_requirements
@@ -2303,18 +2210,13 @@ functions:
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
           find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
 
+  # Used by generator
   "run jstestfuzz":
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
-          git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
-
+        binary: bash
+        args:
+          - "./src/evergreen/run_jstestfuzz/clone_repos.sh"
     - command: shell.exec
       type: test
       params:
@@ -2327,7 +2229,6 @@ functions:
           ${add_nodejs_to_path}
 
           npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
-
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -2439,91 +2340,33 @@ functions:
         fi
 
   "do snmp setup":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        mkdir -p snmpconf
-        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
+      binary: bash
+      args:
+        - "./src/evergreen/do_snmp_setup.sh"
 
   "do watchdog setup":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        bash jstests/watchdog/charybdefs_setup.sh
+      binary: bash
+      args:
+        - "./src/evergreen/do_watchdog_setup.sh"
 
   "cleanup environment":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      shell: bash
-      script: |
-        set -o verbose
-
-        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
-        exit 0
+      binary: bash
+      args:
+        - "./src/evergreen/cleanup_environment.sh"
 
   "kill processes":
-    command: shell.exec
+    command: subprocess.exec
     params:
       silent: true
-      shell: bash
-      script: |
-        process_kill_list="(^cl\.exe$|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
-        # Exclude Evergreen agent processes and other system daemons
-        process_exclude_list="(main|tuned|evergreen)"
-
-        if [ "Windows_NT" = "$OS" ]; then
-          # Get the list of Windows tasks (tasklist list format):
-          # - Transpose the Image Name and PID
-          # - The first column has the process ID
-          # - The second column (and beyond) has task name
-          # - Grep for the task names of interest while ignoring any names that are in the exclude list
-
-          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -iE "$process_kill_list" | grep -ivE "$process_exclude_list")
-
-          # Kill the Windows process by process ID with force (/f)
-          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; taskkill /pid "$pid" /f; }
-        else
-          # Get the list of Unix tasks (pgrep full & long):
-          # - Grep for the task names of interest while ignoring any names that are in the exclude list
-          # - The first column has the process ID
-          # - The second column (and beyond) has task name
-
-          # There are 2 "styles" of pgrep, figure out which one works.
-          # Due to https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1501916
-          # we cannot rely on the return status ($?) to detect if the option is supported.
-          pgrep -f --list-full ".*" 2>&1 | grep -qE "(illegal|invalid|unrecognized) option"
-          if [ $? -ne 0 ]; then
-            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
-          else
-            pgrep_list=$(pgrep -f -l "$process_kill_list")
-          fi
-
-          # Since a process name might have a CR or LF in it, we need to delete any lines from
-          # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
-          processes=$(echo "$pgrep_list" | grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
-
-          # Kill the Unix process ID with signal KILL (9)
-          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
-        fi
-        # Since a full process name can have spaces, the IFS (internal field separator)
-        # should not include a space, just a LF & CR
-        IFS=$(printf "\n\r")
-        for process in $processes
-        do
-          kill_process "$process"
-        done
-
-        exit 0
+      binary: bash
+      args:
+        - "./src/evergreen/kill_processes.sh"
 
   "run kitchen":
     command: shell.exec
@@ -2718,54 +2561,19 @@ functions:
 
   ### Cleanup after the watchdog FUSE testing ###
   "cleanup FUSE watchdog":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        if [ -d /data/thrift ]; then
-          rm -rf /data/thrift
-        fi
-
-        if [ -d /data/charybdefs ]; then
-          rm -rf /data/charybdefs
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/cleanup_fuse_watchdog.sh"
 
   ### Process & archive Code Coverage artifacts ###
   "process code coverage data": &process_code_coverage_data
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set +o errexit
-        if [ -d "./build" ]; then
-          file_list=$(find ./build -type f -name "*.gcda")
-          if [ -n "$file_list" ]; then
-            for gcda_file in $file_list; do
-              echo "Processing file $gcda_file"
-              /opt/mongodbtoolchain/v3/bin/gcov -i $gcda_file
-              base_name=$(echo $gcda_file | rev | cut -f1 -d '/' | cut -f2 -d '.' | rev)
-              gcov_file=$base_name.gcda.gcov
-              if [ -f "$gcov_file" ]; then
-                # Add a prefix to the intermediate file, since it does not have a unique name.
-                # Convert the '/' to '#' in the file path.
-                file_prefix=$(echo $gcda_file | sed -e 's,^\./,,' | rev | cut -f2- -d '/' | rev | tr -s '/' '#')
-                new_gcov_file=$file_prefix#$base_name.gcda.gcov
-                if [ ! -f $new_gcov_file ]; then
-                  echo "Renaming gcov intermediate file $gcov_file to $new_gcov_file"
-                  mv $gcov_file $new_gcov_file
-                else
-                  # We treat this as a fatal condition and remove all of the coverage files.
-                  echo "Not renaming $gcov_file as $new_gcov_file already exists!"
-                  rm -f *.gcda.gcov
-                  exit 1
-                fi
-              fi
-              rm $gcda_file
-            done
-          fi
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/process_code_coverage_data.sh"
 
   "tar code coverage data": &tar_code_coverage_data
     command: archive.targz_pack
@@ -2843,21 +2651,11 @@ functions:
 
   ### Process & archive mongo coredumps ###
   "gather mongo coredumps": &gather_mongo_coredumps
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: "src"
-      shell: bash
-      script: |
-        # Find all core files and move to src
-        core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
-        for core_file in $core_files
-        do
-          base_name=$(echo $core_file | sed "s/.*\///")
-          # Move file if it does not already exist
-          if [ ! -f $base_name ]; then
-            mv $core_file .
-          fi
-        done
+      binary: bash
+      args:
+        - "./src/evergreen/gather_mongo_coredumps.sh"
 
   "tar mongo coredumps": &tar_mongo_coredumps
     command: archive.targz_pack
@@ -3044,36 +2842,11 @@ functions:
         fi
 
   "wait for resmoke to shutdown":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        proc="resmoke.py"
-        if [ "Windows_NT" = "$OS" ]; then
-          check_resmoke() {
-            resmoke_info=$(wmic process | grep resmoke.py)
-          }
-          while [ 1 ]
-          do
-            check_resmoke
-            if ! [[ "$resmoke_info" =~ .*"$proc".* ]]; then
-              break
-            fi
-            sleep 5
-          done
-        else
-          get_pids() { proc_pids=$(pgrep -f $1); }
-          while [ 1 ]
-          do
-            get_pids $proc
-            if [ -z "$proc_pids" ]; then
-              break
-            fi
-            sleep 5
-          done
-        fi
-
+      binary: bash
+      args:
+        - "./src/evergreen/wait_for_resmoke_to_shutdown.sh"
 
   "tar hang analyzer debugger files": &tar_hang_analyzer_debugger_files
     command: archive.targz_pack
@@ -3245,6 +3018,8 @@ functions:
 
 # Pre task steps
 pre:
+  - command: manifest.load
+  - func: "git get project"
   - func: "kill processes"
   - func: "cleanup environment"
   - func: "set task expansion macros"
@@ -3531,25 +3306,13 @@ tasks:
       vars:
         targets: generated-sources compiledb
         compiling_for_test: true
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       timeout_secs: 3600 # 1 hour timeout for no output
       params:
-        working_dir: "src"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-          # TODO SERVER-49884 Remove this when we no longer check in generated Bison.
-          BISON_GENERATED_PATTERN=parser_gen\.cpp
-          jq -r '.[] | .file' compile_commands.json | \
-            grep src/mongo | \
-            grep -v $BISON_GENERATED_PATTERN | \
-            xargs -n 32 -P $(grep -c ^processor /proc/cpuinfo) -t \
-            /opt/mongodbtoolchain/v3/bin/clang-tidy \
-            -p ./compile_commands.json \
-            --checks="-*,bugprone-unused-raii,bugprone-use-after-move,readability-const-return-type,readability-avoid-const-params-in-decls" \
-            -warnings-as-errors="*"
+        binary: bash
+        args:
+          - "./src/evergreen/run_clang_tidy.sh"
 
 ## compile_unittests ##
 - name: compile_unittests
@@ -3947,8 +3710,6 @@ tasks:
 - name: compile_benchmarks
   depends_on: []
   commands:
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -3992,8 +3753,6 @@ tasks:
       params:
         # 40 minutes
         exec_timeout_secs: 2400
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4007,8 +3766,6 @@ tasks:
       params:
         # 40 minutes
         exec_timeout_secs: 2400
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4022,8 +3779,6 @@ tasks:
       params:
         # 40 minutes
         exec_timeout_secs: 2400
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4037,8 +3792,6 @@ tasks:
       params:
         # 40 minutes
         exec_timeout_secs: 2400
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4049,8 +3802,6 @@ tasks:
 - name: lint_yaml
   depends_on: []
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
@@ -4068,8 +3819,6 @@ tasks:
 
 - name: lint_errorcodes
   commands:
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4081,8 +3830,6 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -4107,8 +3854,6 @@ tasks:
 
 - name: burn_in_tests_gen
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
@@ -4161,8 +3906,6 @@ tasks:
 
 - name: burn_in_tests_multiversion_gen
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
@@ -5059,8 +4802,6 @@ tasks:
 - name: lint_fuzzer_sanity_patch
   patch_only: true
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "get added and modified patch files"
   - func: "setup jstestfuzz"
@@ -5069,8 +4810,6 @@ tasks:
 # Check that the mutational fuzzer can parse all JS filess.
 - name: lint_fuzzer_sanity_all
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
@@ -5239,8 +4978,6 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
     vars:
@@ -5257,8 +4994,6 @@ tasks:
 
 - name: selected_tests_gen
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
     vars:
@@ -5557,8 +5292,6 @@ tasks:
   name: integration_tests_standalone
   tags: ["integration", "standalone"]
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5576,8 +5309,6 @@ tasks:
   name: integration_tests_standalone_audit
   tags: ["integration", "audit"]
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5595,8 +5326,6 @@ tasks:
   name: integration_tests_replset
   tags: ["integration"]
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5614,8 +5343,6 @@ tasks:
   name: integration_tests_replset_ssl_auth
   tags: ["integration"]
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5633,8 +5360,6 @@ tasks:
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -7310,8 +7035,6 @@ tasks:
 - name: powercycle_smoke_skip_compile
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   commands:
-    - command: manifest.load
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
@@ -7454,8 +7177,6 @@ tasks:
   depends_on:
   - name: archive_dist_test_debug
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
@@ -7499,15 +7220,12 @@ tasks:
 - name: tla_plus
   commands:
   - func: "do non-compile setup"
-  - command: shell.exec
+  - command: subprocess.exec
     type: setup
     params:
-      working_dir: src/src/mongo/db/repl/tla_plus
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ./download-tlc.sh
+      binary: bash
+      args:
+        - "./src/evergreen/download_tlc.sh"
   - func: "run tests"
     vars:
       resmoke_args: --suites=tla_plus
@@ -7537,7 +7255,6 @@ tasks:
   depends_on:
   - name: package
   commands:
-    - func: "git get project"
     - func: "fetch packages"
     - func: "set up remote credentials"
       vars:
@@ -8333,24 +8050,18 @@ tasks:
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "shared scons cache pruning"
 
 - name: win_shared_scons_cache_pruning
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on: []
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set up win mount script"
   - func: "shared scons cache pruning"
 
 - name: validate_commit_message
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
-  - command: manifest.load
-  - func: "git get project"
   - func: "set task expansion macros"
   - func: "set up venv"
   - command: shell.exec
@@ -8507,9 +8218,9 @@ task_groups:
   setup_group_can_fail_task: true
   setup_group:
     - command: manifest.load
+    - func: "git get project"
     - func: "kill processes"
     - func: "cleanup environment"
-    - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up venv"
     - func: "configure evergreen api credentials"
