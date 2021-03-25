@@ -612,16 +612,19 @@ public:
                 ? _performTimeseriesInsert(opCtx, batch, metadata, stmtIds)
                 : _performTimeseriesUpdate(opCtx, batch, metadata, stmtIds);
 
-            if (batch->numPreviouslyCommittedMeasurements() != 0 && result.isOK() &&
-                result.getValue().getNModified() == 0) {
-                // No bucket was found to update, meaning that it was manually removed.
+            if (auto error = generateError(opCtx, result, start + index, errors->size())) {
+                errors->push_back(*error);
                 bucketCatalog.abort(batch);
-                updatesToRetry->push_back(index);
                 return;
             }
 
-            if (auto error = generateError(opCtx, result, start + index, errors->size())) {
-                errors->push_back(*error);
+            if (batch->numPreviouslyCommittedMeasurements() != 0 &&
+                result.getValue().getNModified() == 0) {
+                // No document in the buckets collection was found to update, meaning that it was
+                // removed.
+                bucketCatalog.abort(batch);
+                updatesToRetry->push_back(index);
+                return;
             }
 
             auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
