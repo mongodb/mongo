@@ -158,12 +158,10 @@ public:
     private:
         const NamespaceString _stateDocumentsNS = NamespaceString::kTenantMigrationDonorsNamespace;
 
-        /**
-         * Makes a task executor for executing commands against the recipient. If the server
-         * parameter 'tenantMigrationDisableX509Auth' is false, configures the executor to use the
-         * migration certificate to establish an SSL connection to the recipient.
-         */
-        std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeRecipientCmdExecutor();
+        ExecutorFuture<void> _enterAbortingIndexBuildsState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& serviceToken,
+            const CancellationToken& instanceToken);
 
         /**
          * Fetches all key documents from the recipient's admin.system.keys collection, stores
@@ -174,6 +172,40 @@ public:
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
             const CancellationToken& serviceToken,
             const CancellationToken& instanceToken);
+
+        ExecutorFuture<void> _abortIndexBuildsAndEnterDataSyncState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& serviceToken,
+            const CancellationToken& instanceToken);
+
+        ExecutorFuture<void> _waitForRecipientToBecomeConsistentAndEnterBlockingState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancellationToken& serviceToken,
+            const CancellationToken& instanceToken);
+
+        ExecutorFuture<void> _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancellationToken& serviceToken,
+            const CancellationToken& instanceToken);
+
+        ExecutorFuture<void> _handleErrorOrEnterAbortedState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& serviceToken,
+            Status status);
+
+        ExecutorFuture<void> _waitForForgetMigrationThenMarkMigrationGarbageCollectable(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancellationToken& serviceToken);
+
+        /**
+         * Makes a task executor for executing commands against the recipient. If the server
+         * parameter 'tenantMigrationDisableX509Auth' is false, configures the executor to use the
+         * migration certificate to establish an SSL connection to the recipient.
+         */
+        std::shared_ptr<executor::ThreadPoolTaskExecutor> _makeRecipientCmdExecutor();
 
         /**
          * Inserts the state document to _stateDocumentsNS and returns the opTime for the insert
