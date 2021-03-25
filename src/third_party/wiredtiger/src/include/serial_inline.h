@@ -258,6 +258,15 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     /* Mark the page dirty after updating the footprint. */
     __wt_page_modify_set(session, page);
 
+    /*
+     * Don't remove obsolete updates in the history store, due to having different visibility rules
+     * compared to normal tables. This visibility rule allows different readers to concurrently read
+     * globally visible updates, and insert new globally visible updates, due to the reuse of
+     * original transaction informations.
+     */
+    if (WT_IS_HS(session->dhandle))
+        return (0);
+
     /* If there are no subsequent WT_UPDATE structures we are done here. */
     if (upd->next == NULL || exclusive)
         return (0);
