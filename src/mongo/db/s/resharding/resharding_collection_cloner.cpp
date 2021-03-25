@@ -309,9 +309,11 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     return true;
 }
 
-SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskExecutor> executor,
-                                                 CancellationToken cancelToken,
-                                                 CancelableOperationContextFactory factory) {
+SemiFuture<void> ReshardingCollectionCloner::run(
+    std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) {
     struct ChainContext {
         std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
         bool moreToCome = true;
@@ -377,8 +379,13 @@ SemiFuture<void> ReshardingCollectionCloner::run(std::shared_ptr<executor::TaskE
             return true;
         })
         .on(executor, cancelToken)
+        .thenRunOn(cleanupExecutor)
         .onCompletion([this, chainCtx](Status status) {
             if (chainCtx->pipeline) {
+                auto client =
+                    cc().getServiceContext()->makeClient("ReshardingCollectionClonerCleanupClient");
+
+                AlternativeClientRegion acr(client);
                 auto opCtx = cc().makeOperationContext();
 
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
