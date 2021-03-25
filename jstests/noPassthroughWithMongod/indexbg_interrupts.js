@@ -4,7 +4,7 @@
  * active. The problem is that this is timing dependent and the current test setup
  * tries to achieve this by inserting insane amount of documents.
  *
- * @tags: [requires_replication, incompatible_with_eft]
+ * @tags: [requires_replication]
  */
 
 /**
