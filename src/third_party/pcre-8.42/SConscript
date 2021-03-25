@@ -6,15 +6,13 @@ env = env.Clone()
 
 env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
 
-env['WERROR_CCFLAGS'] = []
-
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
 
-for to_remove in ['-Wall', '-W']:
+for to_remove in ['-Werror', '-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 # Directories that include generated config.h for various platforms

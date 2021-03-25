@@ -103,9 +103,7 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-env['WERROR_CCFLAGS'] = []
-env['WERROR_CXXFLAGS'] = []
-for to_remove in ["-Wsign-compare", "-Wall"]:
+for to_remove in ['-Werror', "-Wsign-compare","-Wall","-Werror=unused-result"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 if not env.TargetOSIs('windows'):
