@@ -50,6 +50,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -286,16 +287,35 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto expectedChunksIndexes = std::vector<BSONObj>{
-        BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
-                 << "_id_"),
-        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
-                 << "ns_1_min_1"),
-        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "shard" << 1 << "min" << 1)
-                 << "name"
-                 << "ns_1_shard_1_min_1"),
-        BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1) << "name"
-                 << "ns_1_lastmod_1")};
+    std::vector<BSONObj> expectedChunksIndexes;
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        expectedChunksIndexes = std::vector<BSONObj>{
+            BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                     << "_id_"),
+            BSON("v" << 2 << "key" << BSON("uuid" << 1 << "min" << 1) << "name"
+                     << "uuid_1_min_1"
+                     << "unique" << true),
+            BSON("v" << 2 << "key" << BSON("uuid" << 1 << "shard" << 1 << "min" << 1) << "name"
+                     << "uuid_1_shard_1_min_1"
+                     << "unique" << true),
+            BSON("v" << 2 << "key" << BSON("uuid" << 1 << "lastmod" << 1) << "name"
+                     << "uuid_1_lastmod_1"
+                     << "unique" << true)};
+    } else {
+        expectedChunksIndexes = std::vector<BSONObj>{
+            BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                     << "_id_"),
+            BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "min" << 1) << "name"
+                     << "ns_1_min_1"),
+            BSON("v" << 2 << "unique" << true << "key"
+                     << BSON("ns" << 1 << "shard" << 1 << "min" << 1) << "name"
+                     << "ns_1_shard_1_min_1"),
+            BSON("v" << 2 << "unique" << true << "key" << BSON("ns" << 1 << "lastmod" << 1)
+                     << "name"
+                     << "ns_1_lastmod_1")};
+    }
+
     auto expectedLockpingsIndexes =
         std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
                                       << "_id_"),
