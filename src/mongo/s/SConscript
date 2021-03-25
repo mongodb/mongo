@@ -146,6 +146,7 @@ env.Library(
         'database_version.cpp',
         'database_version.idl',
         'mongod_and_mongos_server_parameters.idl',
+        'request_types/abort_reshard_collection.idl',
         'request_types/add_shard_request_type.cpp',
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',

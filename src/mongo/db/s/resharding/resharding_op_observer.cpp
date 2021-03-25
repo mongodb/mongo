@@ -47,7 +47,7 @@ namespace {
 std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     OperationContext* opCtx, const BSONObj& reshardingId) {
     auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-    auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
+    auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
     auto instance =
         ReshardingCoordinatorService::ReshardingCoordinator::lookup(opCtx, service, reshardingId);
 

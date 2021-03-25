@@ -74,6 +74,7 @@ let validateTestCase = function(test) {
 let testCases = {
     _addShard: {skip: "internal command"},
     _cloneCollectionOptionsFromPrimaryShard: {skip: "internal command"},
+    _configsvrAbortReshardCollection: {skip: "internal command"},
     _configsvrAddShard: {skip: "internal command"},
     _configsvrAddShardToZone: {skip: "internal command"},
     _configsvrBalancerCollectionStatus: {skip: "internal command"},
@@ -132,6 +133,7 @@ let testCases = {
     _shardsvrShardCollection: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},
+    abortReshardCollection: {skip: "does not accept read or write concern"},
     abortTransaction: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));

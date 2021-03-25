@@ -25,6 +25,7 @@ const isPrimaryOnly = "primary only";
 const allCommands = {
     _addShard: {skip: isPrimaryOnly},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isPrimaryOnly},
+    _configsvrAbortReshardCollection: {skip: isPrimaryOnly},
     _configsvrAddShard: {skip: isPrimaryOnly},
     _configsvrAddShardToZone: {skip: isPrimaryOnly},
     _configsvrBalancerCollectionStatus: {skip: isPrimaryOnly},
@@ -82,6 +83,7 @@ const allCommands = {
     _shardsvrRefineCollectionShardKey: {skip: isPrimaryOnly},
     _transferMods: {skip: isPrimaryOnly},
     _vectorClockPersist: {skip: isPrimaryOnly},
+    abortReshardCollection: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},
     aggregate: {
         command: {aggregate: collName, pipeline: [{$match: {}}], cursor: {}},

@@ -96,10 +96,72 @@ std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntri
 class ServiceContext;
 class OperationContext;
 
-constexpr StringData kReshardingCoordinatorServiceName = "ReshardingCoordinatorService"_sd;
+/**
+ * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.
+ */
+class CoordinatorCancellationTokenHolder {
+public:
+    CoordinatorCancellationTokenHolder(CancellationToken stepdownToken)
+        : _stepdownToken(stepdownToken),
+          _abortSource(CancellationSource(stepdownToken)),
+          _abortToken(_abortSource.token()) {}
+
+    /**
+     * Returns whether the any token has been canceled.
+     */
+    bool isCanceled() {
+        return _stepdownToken.isCanceled() || _abortToken.isCanceled();
+    }
+
+    /**
+     * Returns whether the abort token has been canceled, indicating that the resharding operation
+     * was explicitly aborted by an external user.
+     */
+    bool isAborted() {
+        return !_stepdownToken.isCanceled() && _abortToken.isCanceled();
+    }
+
+    /**
+     * Returns whether the stepdownToken has been canceled, indicating that the shard's underlying
+     * replica set node is stepping down or shutting down.
+     */
+    bool isSteppingOrShuttingDown() {
+        return _stepdownToken.isCanceled();
+    }
+
+    /**
+     * Cancels the source created by this class, in order to indicate to holders of the abortToken
+     * that the resharding operation has been aborted.
+     */
+    void abort() {
+        _abortSource.cancel();
+    }
+
+    const CancellationToken& getStepdownToken() {
+        return _stepdownToken;
+    }
+
+    const CancellationToken& getAbortToken() {
+        return _abortToken;
+    }
+
+private:
+    // The token passed in by the PrimaryOnlyService runner that is canceled when this shard's
+    // underlying replica set node is stepping down or shutting down.
+    CancellationToken _stepdownToken;
+
+    // The source created by inheriting from the stepdown token.
+    CancellationSource _abortSource;
+
+    // The token to wait on in cases where a user wants to wait on either a resharding operation
+    // being aborted or the replica set node stepping/shutting down.
+    CancellationToken _abortToken;
+};
 
 class ReshardingCoordinatorService final : public repl::PrimaryOnlyService {
 public:
+    static constexpr StringData kServiceName = "ReshardingCoordinatorService"_sd;
+
     explicit ReshardingCoordinatorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
     ~ReshardingCoordinatorService() = default;
@@ -107,7 +169,7 @@ public:
     class ReshardingCoordinator;
 
     StringData getServiceName() const override {
-        return kReshardingCoordinatorServiceName;
+        return kServiceName;
     }
 
     NamespaceString getStateDocumentsNS() const override {
@@ -130,13 +192,19 @@ private:
 class ReshardingCoordinatorService::ReshardingCoordinator final
     : public PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
 public:
-    explicit ReshardingCoordinator(const BSONObj& state);
+    explicit ReshardingCoordinator(const ReshardingCoordinatorService* coordinatorService,
+                                   const BSONObj& state);
     ~ReshardingCoordinator();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;
 
-    void interrupt(Status status) override;
+    void interrupt(Status status) override {}
+
+    /**
+     * Attempts to cancel the underlying resharding operation using the abort token.
+     */
+    void abort();
 
     /**
      * Replace in-memory representation of the CoordinatorDoc
@@ -162,6 +230,25 @@ private:
         std::vector<ChunkType> initialChunks;
         std::vector<TagsType> newZones;
     };
+
+    /**
+     * Runs resharding up through preparing to persist the decision.
+     */
+    ExecutorFuture<ReshardingCoordinatorDocument> _runUntilReadyToPersistDecision(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) noexcept;
+
+    /**
+     * Runs resharding through persisting the decision until cleanup.
+     */
+    ExecutorFuture<void> _persistDecisionAndFinishReshardOperation(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept;
+
+    /**
+     * Runs cleanup logic that only applies to abort.
+     */
+    void _onAbort(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                  const Status& status);
 
     /**
      * Does the following writes:
@@ -210,7 +297,7 @@ private:
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have entered
      * strict-consistency.
      */
-    SharedSemiFuture<ReshardingCoordinatorDocument> _awaitAllRecipientsInStrictConsistency(
+    ExecutorFuture<ReshardingCoordinatorDocument> _awaitAllRecipientsInStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
@@ -271,6 +358,9 @@ private:
     // collection. The object looks like: {_id: 'reshardingUUID'}
     const InstanceID _id;
 
+    // The primary-only service instance corresponding to the coordinator instance. Not owned.
+    const ReshardingCoordinatorService* const _coordinatorService;
+
     // Observes writes that indicate state changes for this resharding operation and notifies
     // 'this' when all donors/recipients have entered some state so that 'this' can transition
     // states.
@@ -278,6 +368,9 @@ private:
 
     // The updated coordinator state document.
     ReshardingCoordinatorDocument _coordinatorDoc;
+
+    // Holds the cancellation tokens relevant to the ReshardingCoordinator.
+    std::unique_ptr<CoordinatorCancellationTokenHolder> _ctHolder;
 
     // Protects promises below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorService::_mutex");
