@@ -34,9 +34,10 @@ let shardIdToShardMap = {};
 shardIdToShardMap[st.shard0.shardName] = st.shard0;
 shardIdToShardMap[st.shard1.shardName] = st.shard1;
 
-const DDLFeatureFlagParam = assert.commandWorked(
-    st.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagShardingFullDDLSupport: 1}));
-const isDDLFeatureFlagEnabled = DDLFeatureFlagParam.featureFlagShardingFullDDLSupport.value;
+const DDLFeatureFlagParam = assert.commandWorked(st.configRS.getPrimary().adminCommand(
+    {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}));
+const isDDLFeatureFlagEnabled =
+    DDLFeatureFlagParam.featureFlagShardingFullDDLSupportTimestampedVersion.value;
 
 let getUUIDFromCollectionInfo = (dbName, collName, collInfo) => {
     if (collInfo) {

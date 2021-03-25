@@ -53,8 +53,10 @@ void MigrationTestFixture::setUpDatabase(const std::string& dbName, const ShardI
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }
 
-void MigrationTestFixture::setUpCollection(const NamespaceString& collName, ChunkVersion version) {
-    CollectionType coll(collName, version.epoch(), Date_t::now(), UUID::gen());
+void MigrationTestFixture::setUpCollection(const NamespaceString& collName,
+                                           const UUID& collUUID,
+                                           ChunkVersion version) {
+    CollectionType coll(collName, version.epoch(), Date_t::now(), collUUID);
     coll.setKeyPattern(kKeyPattern);
     coll.setUnique(false);
     ASSERT_OK(catalogClient()->insertConfigDocument(
@@ -62,12 +64,18 @@ void MigrationTestFixture::setUpCollection(const NamespaceString& collName, Chun
 }
 
 ChunkType MigrationTestFixture::setUpChunk(const NamespaceString& collName,
+                                           const UUID& collUUID,
                                            const BSONObj& chunkMin,
                                            const BSONObj& chunkMax,
                                            const ShardId& shardId,
                                            const ChunkVersion& version) {
     ChunkType chunk;
+    // The ns is not present in 5.0 chunks but some testing utils rely on it
     chunk.setNS(collName);
+
+    if (version.getTimestamp())
+        chunk.setCollectionUUID(collUUID);
+
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
     chunk.setShard(shardId);

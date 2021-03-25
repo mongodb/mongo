@@ -126,13 +126,14 @@ TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
         operationContext(), ShardType::ConfigNS, kShard1, kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
-    ChunkVersion version(2, 0, OID::gen(), boost::none /* timestamp */);
+    const auto collUUID = UUID::gen();
+    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
     setUpDatabase(kDbName, kShardId0);
-    setUpCollection(kNamespace, version);
+    setUpCollection(kNamespace, collUUID, version);
 
     // Set up one chunk for the collection in the metadata.
     ChunkType chunk = setUpChunk(
-        kNamespace, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+        kNamespace, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto assertRangeOverlapConflictWhenMoveChunk =
         [this, &chunk](const StringMap<ChunkRange>& tagChunkRanges) {
@@ -182,17 +183,20 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                                                     kMajorityWriteConcern));
 
     // Set up a database and a sharded collection in the metadata.
-    ChunkVersion version(2, 0, OID::gen(), boost::none /* timestamp */);
+    const auto collUUID = UUID::gen();
+    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
     setUpDatabase(kDbName, kShardId0);
-    setUpCollection(kNamespace, version);
+    setUpCollection(kNamespace, collUUID, version);
 
     // Set up the zone.
     setUpTags(kNamespace, {{"A", {kKeyPattern.globalMin(), BSON(kPattern << -10)}}});
 
-    auto assertErrorWhenMoveChunk = [this, &version](const std::vector<ChunkRange>& chunkRanges) {
+    auto assertErrorWhenMoveChunk = [this, &version, &collUUID](
+                                        const std::vector<ChunkRange>& chunkRanges) {
         // Give shard0 all the chunks so the cluster is imbalanced.
         for (const auto& chunkRange : chunkRanges) {
-            setUpChunk(kNamespace, chunkRange.getMin(), chunkRange.getMax(), kShardId0, version);
+            setUpChunk(
+                kNamespace, collUUID, chunkRange.getMin(), chunkRange.getMax(), kShardId0, version);
             version.incMinor();
         }
 
