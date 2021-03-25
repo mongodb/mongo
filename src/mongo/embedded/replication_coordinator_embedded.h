@@ -207,6 +207,8 @@ public:
                              GetNewConfigFn getNewConfig,
                              bool force) override;
 
+    Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn getNewConfig) override;
+
     Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) override;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) override;

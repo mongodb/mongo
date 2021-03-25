@@ -226,6 +226,8 @@ public:
                                      GetNewConfigFn getNewConfig,
                                      bool force);
 
+    virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn getNewConfig);
+
     Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment);
 
     virtual Status processReplSetInitiate(OperationContext* opCtx,
