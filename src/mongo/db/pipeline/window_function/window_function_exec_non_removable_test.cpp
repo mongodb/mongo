@@ -164,11 +164,11 @@ TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariabl
     auto exec = WindowFunctionExecNonRemovable<AccumulatorState>(
         iter.get(), std::move(input), AccumulatorFirst::create(getExpCtx().get()), 1);
     // The input is a constant [2, 3] for each document.
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), exec.getNext());
     iter->advance();
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), exec.getNext());
     iter->advance();
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), exec.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), exec.getNext());
 }
 
 }  // namespace

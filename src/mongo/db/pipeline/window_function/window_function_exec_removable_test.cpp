@@ -320,11 +320,11 @@ TEST_F(WindowFunctionExecRemovableDocumentTest, InputExpressionAllowedToCreateVa
     auto mgr = WindowFunctionExecRemovableDocument(
         iter.get(), std::move(input), std::move(maxFunc), WindowBounds::DocumentBased{-1, 0});
     // The input is a constant [2, 3] for each document.
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), mgr.getNext());
     iter->advance();
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), mgr.getNext());
     iter->advance();
-    ASSERT_VALUE_EQ(Value({Value(2), Value(3)}), mgr.getNext());
+    ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), mgr.getNext());
 }
 
 }  // namespace
