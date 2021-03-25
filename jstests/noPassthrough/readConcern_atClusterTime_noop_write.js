@@ -3,7 +3,6 @@
 // as an actual opTime on another shard.
 // @tags: [
 //   requires_sharding,
-//   sbe_incompatible,
 //   uses_atclustertime,
 //   uses_transactions,
 // ]

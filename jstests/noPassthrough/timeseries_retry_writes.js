@@ -1,8 +1,7 @@
 /**
  * Tests retrying of time-series insert operations.
  * @tags: [
- *     requires_replication,
- *     sbe_incompatible,
+ *   requires_replication,
  * ]
  */
 (function() {

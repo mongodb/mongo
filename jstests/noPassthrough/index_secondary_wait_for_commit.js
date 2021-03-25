@@ -4,7 +4,6 @@
  * Requires two phase index builds to be enabled via the twoPhaseIndexBuild server parameter.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

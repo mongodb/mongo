@@ -8,9 +8,6 @@
  *    server.
  * 3. db.loadServerScripts performs as expected even with the flag is set in
  *    the shell.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 (function() {

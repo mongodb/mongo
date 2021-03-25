@@ -3,7 +3,6 @@
  * document when run via mongoS, and that the former is absent when run on a non-shard mongoD.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

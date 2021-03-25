@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_wiredtiger,
- *   sbe_incompatible,
  * ]
  */
 (function() {

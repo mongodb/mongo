@@ -1,7 +1,6 @@
 // SERVER-35132 Test that we still honor maxTimeMs during replica set targeting.
 // @tags: [
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 (function() {
 'use strict';

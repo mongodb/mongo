@@ -1,7 +1,6 @@
 // Tests that the $changeStream requires read concern majority.
 // @tags: [
 //   requires_majority_read_concern,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

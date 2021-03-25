@@ -4,7 +4,6 @@
  * should not affect the progress of index builds on empty collections.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

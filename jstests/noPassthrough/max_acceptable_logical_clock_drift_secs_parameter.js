@@ -4,7 +4,6 @@
  * maxAcceptableLogicalClockDriftSecs ahead of their wall clocks.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

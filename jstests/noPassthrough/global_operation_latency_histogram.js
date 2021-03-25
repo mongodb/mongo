@@ -1,7 +1,6 @@
 // Checks that global histogram counters for collections are updated as we expect.
 // @tags: [
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 
 (function() {

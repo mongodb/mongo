@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_replication,
  *   requites_wiredtiger,
- *   sbe_incompatible,
  * ]
  */
 

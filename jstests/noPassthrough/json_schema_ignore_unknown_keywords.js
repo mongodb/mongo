@@ -1,9 +1,6 @@
 /**
  * Test that setting the query knob 'internalQueryIgnoreUnknownJSONSchemaKeywords' correctly
  * ignores unknown keywords within $jsonSchema.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

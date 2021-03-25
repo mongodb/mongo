@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_snapshot_read,
- *   sbe_incompatible,
  * ]
  */
 

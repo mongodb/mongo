@@ -2,7 +2,6 @@
 //   does_not_support_stepdowns,
 //   requires_profiling,
 //   requires_sharding,
-//   sbe_incompatible,
 // ]
 
 // Confirms that profiled aggregation execution contains expected values for usedDisk.

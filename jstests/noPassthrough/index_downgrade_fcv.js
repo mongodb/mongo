@@ -3,7 +3,6 @@
  * downgrade should succeed without blocking.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

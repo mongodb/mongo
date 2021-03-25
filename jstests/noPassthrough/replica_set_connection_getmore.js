@@ -3,7 +3,6 @@
  * set connection and cursors are established on a secondary.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

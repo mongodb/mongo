@@ -2,7 +2,6 @@
  * Tests for the aggregate command's support for readConcern level "snapshot".
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_transactions,
  * ]
  */

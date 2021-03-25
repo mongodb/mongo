@@ -6,7 +6,6 @@
  *   live_record_incompatible,
  *   requires_replication,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 

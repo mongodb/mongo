@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 load("jstests/libs/logv2_helpers.js");

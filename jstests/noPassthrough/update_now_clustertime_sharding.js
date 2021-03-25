@@ -8,7 +8,6 @@
  * @tags: [
  *   requires_find_command,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -2,7 +2,10 @@
  * Test that the memory usage of validate is properly limited according to the
  * maxValidateMemoryUsageMB parameter.
  *
- * @tags: [requires_wiredtiger, requires_persistence]
+ * @tags: [
+ *   requires_persistence,
+ *   requires_wiredtiger,
+ * ]
  */
 (function() {
 "use strict";

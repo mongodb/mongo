@@ -3,7 +3,6 @@
 //   requires_journaling,
 //   requires_persistence,
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

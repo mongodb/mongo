@@ -4,7 +4,6 @@
  * SERVER-37499.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  *   uses_transactions,
  * ]
  */

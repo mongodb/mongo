@@ -3,7 +3,6 @@
  * version errors.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 load('jstests/libs/ftdc.js');

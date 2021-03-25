@@ -2,7 +2,6 @@
 // members in the set, followed by waiting for writeConcern with "w" values equal to size of set.
 // @tags: [
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";
