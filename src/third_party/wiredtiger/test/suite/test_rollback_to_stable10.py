@@ -302,6 +302,13 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
             done.set()
             ckpt.join()
 
+        # Check that the history store file has been used and has non-zero size before the simulated
+        # crash.
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        cache_hs_ondisk = stat_cursor[stat.conn.cache_hs_ondisk][2]
+        stat_cursor.close()
+        self.assertGreater(cache_hs_ondisk, 0)
+
         # Simulate a crash by copying to a new directory(RESTART).
         copy_wiredtiger_home(self, ".", "RESTART")
 
@@ -316,6 +323,12 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.conn = self.setUpConnectionOpen("RESTART")
         self.session = self.setUpSessionOpen(self.conn)
         self.pr("restart complete")
+
+        # The history store file size should be greater than zero after the restart.
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        cache_hs_ondisk = stat_cursor[stat.conn.cache_hs_ondisk][2]
+        stat_cursor.close()
+        self.assertGreater(cache_hs_ondisk, 0)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri_1, nrows, 50)

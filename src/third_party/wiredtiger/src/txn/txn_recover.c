@@ -770,6 +770,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     WT_DECL_RET;
     WT_RECOVERY r;
     WT_RECOVERY_FILE *metafile;
+    wt_off_t hs_size;
     char *config;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     bool do_checkpoint, eviction_started, hs_exists, needs_rec, was_backup;
@@ -960,6 +961,14 @@ done:
     WT_ERR(__recovery_set_oldest_timestamp(&r));
     WT_ERR(__recovery_set_checkpoint_snapshot(session));
     WT_ERR(__recovery_set_ckpt_base_write_gen(&r));
+
+    /*
+     * Set the history store file size as it may already exist after a restart.
+     */
+    if (hs_exists) {
+        WT_ERR(__wt_block_manager_named_size(session, WT_HS_FILE, &hs_size));
+        WT_STAT_CONN_SET(session, cache_hs_ondisk, hs_size);
+    }
 
     /*
      * Perform rollback to stable only when the following conditions met.
