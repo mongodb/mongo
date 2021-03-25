@@ -993,6 +993,7 @@ multithreaded
 munmap
 mutex
 mutexes
+mux
 mytable
 mytxn
 namespace
@@ -1169,6 +1170,7 @@ rwlock
 sH
 sHQ
 sT
+sanitizer
 sanitizers
 scalability
 sched

@@ -51,7 +51,7 @@ retry:
         }
         if (!F_ISSET(session, WT_SESSION_SERVER_ASYNC))
             return (0);
-        if (!F_ISSET(conn, WT_CONN_SERVER_ASYNC))
+        if (!FLD_ISSET(conn->server_flags, WT_CONN_SERVER_ASYNC))
             return (0);
         WT_ORDERED_READ(last_consume, async->alloc_tail);
     }
@@ -278,7 +278,8 @@ __wt_async_worker(void *arg)
 
     worker.num_cursors = 0;
     TAILQ_INIT(&worker.cursorqh);
-    while (F_ISSET(conn, WT_CONN_SERVER_ASYNC) && F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
+    while (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_ASYNC) &&
+      F_ISSET(session, WT_SESSION_SERVER_ASYNC)) {
         WT_ERR(__async_op_dequeue(conn, session, &op));
         if (op != NULL && op != &async->flush_op) {
             /*

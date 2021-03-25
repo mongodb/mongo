@@ -303,7 +303,7 @@ class test_txn19(wttest.WiredTigerTestCase, suite_subprocess):
         if expect_fail:
             self.check_file_contains_one_of(errfile,
                 ['/log file.*corrupted/',
-                'WT_TRY_SALVAGE: database corruption detected'])
+                'WT_TRY_SALVAGE: database corruption detected'], True)
         else:
             self.check_empty_file(errfile)
             if self.expect_warning_corruption():

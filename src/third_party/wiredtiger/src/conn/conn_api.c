@@ -1987,6 +1987,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
      * point where race conditions aren't encountered.
      */
     static const WT_NAME_FLAG stress_types[] = {
+      {"aggressive_sweep", WT_TIMING_STRESS_AGGRESSIVE_SWEEP},
       {"checkpoint_slow", WT_TIMING_STRESS_CHECKPOINT_SLOW},
       {"lookaside_sweep_race", WT_TIMING_STRESS_LOOKASIDE_SWEEP},
       {"split_1", WT_TIMING_STRESS_SPLIT_1}, {"split_2", WT_TIMING_STRESS_SPLIT_2},

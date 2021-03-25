@@ -252,7 +252,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 static bool
 __sweep_server_run_chk(WT_SESSION_IMPL *session)
 {
-    return (F_ISSET(S2C(session), WT_CONN_SERVER_SWEEP));
+    return (FLD_ISSET(S2C(session)->server_flags, WT_CONN_SERVER_SWEEP));
 }
 
 /*
@@ -266,13 +266,18 @@ __sweep_server(void *arg)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     time_t last, now;
-    uint64_t last_las_sweep_id, min_sleep, oldest_id;
+    uint64_t last_las_sweep_id, min_sleep, oldest_id, sweep_interval;
     u_int dead_handles;
+    bool cv_signalled;
 
     session = arg;
     conn = S2C(session);
     last_las_sweep_id = WT_TXN_NONE;
     min_sleep = WT_MIN(WT_LAS_SWEEP_SEC, conn->sweep_interval);
+    if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_AGGRESSIVE_SWEEP))
+        sweep_interval = conn->sweep_interval / 10;
+    else
+        sweep_interval = conn->sweep_interval;
 
     /*
      * Sweep for dead and excess handles.
@@ -280,7 +285,12 @@ __sweep_server(void *arg)
     __wt_seconds(session, &last);
     for (;;) {
         /* Wait until the next event. */
-        __wt_cond_wait(session, conn->sweep_cond, min_sleep * WT_MILLION, __sweep_server_run_chk);
+        if (FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_AGGRESSIVE_SWEEP))
+            __wt_cond_wait_signal(session, conn->sweep_cond, min_sleep * 100 * WT_THOUSAND,
+              __sweep_server_run_chk, &cv_signalled);
+        else
+            __wt_cond_wait_signal(session, conn->sweep_cond, min_sleep * WT_MILLION,
+              __sweep_server_run_chk, &cv_signalled);
 
         /* Check if we're quitting or being reconfigured. */
         if (!__sweep_server_run_chk(session))
@@ -299,8 +309,9 @@ __sweep_server(void *arg)
          * bringing in and evicting pages from the lookaside table,
          * which will stop the cache from moving into the stuck state.
          */
-        if (now - last >= WT_LAS_SWEEP_SEC && !__wt_las_empty(session) &&
-          !__wt_cache_stuck(session)) {
+        if ((FLD_ISSET(conn->timing_stress_flags, WT_TIMING_STRESS_AGGRESSIVE_SWEEP) ||
+              now - last >= WT_LAS_SWEEP_SEC) &&
+          !__wt_las_empty(session) && !__wt_cache_stuck(session)) {
             oldest_id = __wt_txn_oldest_id(session);
             if (WT_TXNID_LT(last_las_sweep_id, oldest_id)) {
                 WT_ERR(__wt_las_sweep(session));
@@ -310,10 +321,18 @@ __sweep_server(void *arg)
 
         /*
          * See if it is time to sweep the data handles. Those are swept less frequently than the
-         * lookaside table by default and the frequency is controlled by a user setting.
+         * history store table by default and the frequency is controlled by a user setting. We want
+         * to avoid sweeping while checkpoint is gathering handles. Both need to lock the dhandle
+         * list and sweep acquiring that lock can interfere with checkpoint and cause it to take
+         * longer. Sweep is an operation that typically has long intervals so skipping some for
+         * checkpoint should have little impact.
          */
-        if ((uint64_t)(now - last) < conn->sweep_interval)
+        if (!cv_signalled && ((uint64_t)(now - last) < sweep_interval))
             continue;
+        if (F_ISSET(conn, WT_CONN_CKPT_GATHER)) {
+            WT_STAT_CONN_INCR(session, dh_sweep_skip_ckpt);
+            continue;
+        }
         WT_STAT_CONN_INCR(session, dh_sweeps);
         /*
          * Mark handles with a time of death, and report whether any handles are marked dead. If
@@ -333,6 +352,9 @@ __sweep_server(void *arg)
 
         if (dead_handles > 0)
             WT_ERR(__sweep_remove_handles(session));
+
+        /* Remember the last sweep time. */
+        last = now;
     }
 
     if (0) {
@@ -387,7 +409,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
     conn = S2C(session);
 
     /* Set first, the thread might run before we finish up. */
-    F_SET(conn, WT_CONN_SERVER_SWEEP);
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_SWEEP);
 
     /*
      * Handle sweep does enough I/O it may be called upon to perform slow operations for the block
@@ -426,7 +448,7 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    F_CLR(conn, WT_CONN_SERVER_SWEEP);
+    FLD_CLR(conn->server_flags, WT_CONN_SERVER_SWEEP);
     if (conn->sweep_tid_set) {
         __wt_cond_signal(session, conn->sweep_cond);
         WT_TRET(__wt_thread_join(session, &conn->sweep_tid));
