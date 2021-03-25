@@ -176,7 +176,8 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
     // Advance the clock by some arbitrary amount of time so we are not starting at 0 seconds.
     _clkSource->advance(Milliseconds(10000));
 
-    auto taskFp = globalFailPointRegistry().find("pauseTenantMigrationBeforeEnteringFutureChain");
+    auto taskFp =
+        globalFailPointRegistry().find("pauseTenantMigrationAfterPersistingInitialDonorStateDoc");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
