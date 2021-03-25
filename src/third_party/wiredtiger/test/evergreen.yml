@@ -2616,7 +2616,7 @@ buildvariants:
 
 - name: doc-update
   display_name: "~ Documentation update"
-  batchtime: 10080 # 1 day
+  batchtime: 1440 # 1 day
   run_on:
   - ubuntu1804-test
   tasks:
@@ -2626,7 +2626,7 @@ buildvariants:
 
 - name: linux-no-ftruncate
   display_name: Linux no ftruncate
-  batchtime: 10080 # 1 day
+  batchtime: 1440 # 1 day
   run_on:
   - ubuntu1804-test
   expansions:
