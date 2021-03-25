@@ -1687,8 +1687,8 @@ void WiredTigerRecordStore::updateStatsAfterRepair(OperationContext* opCtx,
     sizeRecoveryState(getGlobalServiceContext())
         .markCollectionAsAlwaysNeedsSizeAdjustment(getIdent());
 
-    _sizeInfo->numRecords.store(numRecords);
-    _sizeInfo->dataSize.store(dataSize);
+    _sizeInfo->numRecords.store(std::max(numRecords, 0ll));
+    _sizeInfo->dataSize.store(std::max(dataSize, 0ll));
 
     // If we have a WiredTigerSizeStorer, but our size info is not currently cached, add it.
     if (_sizeStorer)
@@ -1750,11 +1750,11 @@ public:
     NumRecordsChange(WiredTigerRecordStore* rs, int64_t diff) : _rs(rs), _diff(diff) {}
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
-        LOGV2_DEBUG(22404,
-                    3,
-                    "WiredTigerRecordStore: rolling back NumRecordsChange {diff}",
-                    "diff"_attr = -_diff);
-        _rs->_sizeInfo->numRecords.fetchAndAdd(-_diff);
+        LOGV2_DEBUG(
+            22404, 3, "WiredTigerRecordStore: rolling back NumRecordsChange", "diff"_attr = -_diff);
+        if (_rs->_sizeInfo->numRecords.addAndFetch(-_diff) < 0) {
+            _rs->_sizeInfo->numRecords.store(0);
+        }
     }
 
 private:
@@ -1772,8 +1772,8 @@ void WiredTigerRecordStore::_changeNumRecords(OperationContext* opCtx, int64_t d
     }
 
     opCtx->recoveryUnit()->registerChange(std::make_unique<NumRecordsChange>(this, diff));
-    if (_sizeInfo->numRecords.fetchAndAdd(diff) < 0)
-        _sizeInfo->numRecords.store(std::max(diff, int64_t(0)));
+    if (_sizeInfo->numRecords.addAndFetch(diff) < 0)
+        _sizeInfo->numRecords.store(0);
 }
 
 class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
@@ -1809,7 +1809,7 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
 }
 
 void WiredTigerRecordStore::setNumRecords(long long numRecords) {
-    _sizeInfo->numRecords.store(numRecords);
+    _sizeInfo->numRecords.store(std::max(numRecords, 0ll));
 
     if (!_sizeStorer) {
         return;
@@ -1822,7 +1822,7 @@ void WiredTigerRecordStore::setNumRecords(long long numRecords) {
 }
 
 void WiredTigerRecordStore::setDataSize(long long dataSize) {
-    _sizeInfo->dataSize.store(dataSize);
+    _sizeInfo->dataSize.store(std::max(dataSize, 0ll));
 
     if (!_sizeStorer) {
         return;
