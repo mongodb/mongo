@@ -3,13 +3,16 @@ Import("env")
 
 env = env.Clone()
 
+env['CCFLAGS_WERROR'] = []
+env['CXXFLAGS_WERROR'] = []
+
 def removeIfPresent(lst, item):
     try:
         lst.remove(item)
     except ValueError:
         pass
 
-for to_remove in ['-Werror', "-Wsign-compare", "-Wall", "-Werror=unused-result"]:
+for to_remove in ["-Wsign-compare", "-Wall"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
     removeIfPresent(env['CFLAGS'], to_remove)
 
