@@ -9,6 +9,7 @@ from shrub.v2 import BuildVariant, ShrubProject
 
 # pylint: disable=wrong-import-position
 import buildscripts.ciconfig.evergreen as _evergreen
+from buildscripts.burn_in_tests import TaskInfo
 from buildscripts.evergreen_generate_resmoke_tasks import Suite
 from buildscripts.tests.test_burn_in_tests import get_evergreen_config, mock_changed_git_files
 from buildscripts import selected_tests as under_test
@@ -421,13 +422,25 @@ class TestGetTaskConfigsForTestMappings(unittest.TestCase):
         ]
         exclude_task_mock.return_value = False
         tests_by_task = {
-            "jsCore_auth": {
-                "tests": [
-                    "jstests/core/currentop_waiting_for_latch.js",
-                    "jstests/core/latch_analyzer.js",
-                ],
-            },
-            "auth_gen": {"tests": ["jstests/auth/auth3.js"], },
+            "jsCore_auth":
+                TaskInfo(
+                    display_task_name="task 1",
+                    tests=[
+                        "jstests/core/currentop_waiting_for_latch.js",
+                        "jstests/core/latch_analyzer.js",
+                    ],
+                    resmoke_args="",
+                    use_multiversion=None,
+                    distro="",
+                ),
+            "auth_gen":
+                TaskInfo(
+                    display_task_name="task 2",
+                    tests=["jstests/auth/auth3.js"],
+                    resmoke_args="",
+                    use_multiversion=None,
+                    distro="",
+                ),
         }
         get_evg_task_config_mock.side_effect = [{"task_config_key": "task_config_value_1"},
                                                 {"task_config_key": "task_config_value_2"}]

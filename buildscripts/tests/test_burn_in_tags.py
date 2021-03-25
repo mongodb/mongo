@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from shrub.v2 import ShrubProject
 
 import buildscripts.ciconfig.evergreen as _evergreen
+from buildscripts.burn_in_tests import TaskInfo
 from buildscripts.tests.test_burn_in_tests import ns as burn_in_tests_ns
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 
@@ -121,13 +122,13 @@ class TestGenerateEvgTasks(unittest.TestCase):
     def test_generate_evg_tasks_one_test_changed(self, create_tests_by_task_mock):
         evg_conf_mock = get_evergreen_config()
         create_tests_by_task_mock.return_value = {
-            "aggregation_mongos_passthrough": {
-                "display_task_name": "aggregation_mongos_passthrough",
-                "resmoke_args":
-                    "--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
-                "tests": ["jstests/aggregation/ifnull.js"],
-                "use_multiversion": None
-            }
+            "aggregation_mongos_passthrough": TaskInfo(
+                display_task_name="aggregation_mongos_passthrough",
+                resmoke_args="--suites=aggregation_mongos_passthrough --storageEngine=wiredTiger",
+                tests=["jstests/aggregation/ifnull.js"],
+                use_multiversion=None,
+                distro="",
+            )
         }  # yapf: disable
         expansions_file_data = get_expansions_data()
         buildvariant_map = {
@@ -204,7 +205,7 @@ CREATE_TEST_MEMBERSHIP_MAP = {
 class TestAcceptance(unittest.TestCase):
     @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
-    @patch(ns("find_changed_tests"))
+    @patch(ns("EvergreenFileChangeDetector"))
     def test_no_tests_run_if_none_changed(self, find_changed_tests_mock,
                                           create_evg_build_variant_map_mock, write_to_file_mock):
         """
@@ -214,11 +215,11 @@ class TestAcceptance(unittest.TestCase):
         """
         repos = [MagicMock(working_dir=os.getcwd())]
         evg_conf_mock = MagicMock()
-        find_changed_tests_mock.return_value = {}
+        find_changed_tests_mock.return_value.find_changed_tests.return_value = {}
 
         create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
 
-        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, None, repos)
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf_mock, MagicMock(), repos)
 
         write_to_file_mock.assert_called_once()
         shrub_config = write_to_file_mock.call_args[0][2]
@@ -227,7 +228,7 @@ class TestAcceptance(unittest.TestCase):
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(ns("write_file_to_dir"))
     @patch(ns("_create_evg_build_variant_map"))
-    @patch(ns("find_changed_tests"))
+    @patch(ns("EvergreenFileChangeDetector"))
     @patch(burn_in_tests_ns("create_test_membership_map"))
     def test_tests_generated_if_a_file_changed(
             self, create_test_membership_map_mock, find_changed_tests_mock,
@@ -242,12 +243,12 @@ class TestAcceptance(unittest.TestCase):
         repos = [MagicMock(working_dir=os.getcwd())]
         evg_conf = get_evergreen_config()
         create_evg_build_variant_map_mock.return_value = CREATE_EVG_BUILD_VARIANT_MAP
-        find_changed_tests_mock.return_value = {
+        find_changed_tests_mock.return_value.find_changed_tests.return_value = {
             'jstests/slow1/large_role_chain.js',
             'jstests/aggregation/accumulators/accumulator_js.js'
         }
 
-        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, None, repos)
+        under_test.burn_in(EXPANSIONS_FILE_DATA, evg_conf, MagicMock(), repos)
 
         write_to_file_mock.assert_called_once()
         written_config = write_to_file_mock.call_args[0][2]

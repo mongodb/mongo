@@ -13,16 +13,18 @@ from git import Repo
 from shrub.v2 import ShrubProject, BuildVariant, ExistingTask
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
+
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # pylint: disable=wrong-import-position
+from buildscripts.evergreen_burn_in_tests import GenerateBurnInExecutor, GenerateConfig, \
+    EvergreenFileChangeDetector
 from buildscripts.util.fileops import write_file_to_dir
 import buildscripts.util.read_config as read_config
 from buildscripts.ciconfig import evergreen
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig, Variant
-from buildscripts.burn_in_tests import create_generate_tasks_config, create_tests_by_task, \
-    find_changed_tests, GenerateConfig, RepeatConfig, DEFAULT_REPO_LOCATIONS
+from buildscripts.burn_in_tests import create_tests_by_task, RepeatConfig, DEFAULT_REPO_LOCATIONS
 # pylint: enable=wrong-import-position
 
 EXTERNAL_LOGGERS = {
@@ -126,7 +128,7 @@ def _generate_evg_build_variant(
     return build_variant
 
 
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments,too-many-locals
 def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject,
                         task_expansions: Dict[str, Any], build_variant_map: Dict[str, str],
                         repos: List[Repo], evg_conf: EvergreenProjectConfig) -> None:
@@ -142,20 +144,22 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
     for build_variant, run_build_variant in build_variant_map.items():
         config_options = _get_config_options(task_expansions, build_variant, run_build_variant)
         task_id = task_expansions[TASK_ID_EXPANSION]
-        changed_tests = find_changed_tests(repos, evg_api=evergreen_api, task_id=task_id)
+        change_detector = EvergreenFileChangeDetector(task_id, evergreen_api)
+        changed_tests = change_detector.find_changed_tests(repos)
         tests_by_task = create_tests_by_task(build_variant, evg_conf, changed_tests)
         if tests_by_task:
             shrub_build_variant = _generate_evg_build_variant(
                 evg_conf.get_variant(build_variant), run_build_variant,
                 task_expansions["build_variant"])
             gen_config = GenerateConfig(build_variant, config_options.project, run_build_variant,
-                                        config_options.distro).validate(evg_conf)
+                                        config_options.distro,
+                                        include_gen_task=False).validate(evg_conf)
             repeat_config = RepeatConfig(repeat_tests_min=config_options.repeat_tests_min,
                                          repeat_tests_max=config_options.repeat_tests_max,
                                          repeat_tests_secs=config_options.repeat_tests_secs)
 
-            create_generate_tasks_config(shrub_build_variant, tests_by_task, gen_config,
-                                         repeat_config, evergreen_api, include_gen_task=False)
+            burn_in_generator = GenerateBurnInExecutor(gen_config, repeat_config, evergreen_api)
+            burn_in_generator.add_config_for_build_variant(shrub_build_variant, tests_by_task)
             shrub_project.add_build_variant(shrub_build_variant)
 
 

@@ -25,7 +25,7 @@ if __name__ == "__main__" and __package__ is None:
 import buildscripts.resmokelib.parser
 import buildscripts.util.read_config as read_config
 from buildscripts.burn_in_tests import DEFAULT_REPO_LOCATIONS, create_task_list_for_tests, \
-    is_file_a_test_file
+    is_file_a_test_file, TaskInfo
 from buildscripts.ciconfig.evergreen import (
     EvergreenProjectConfig,
     ResmokeArgs,
@@ -296,7 +296,7 @@ def _update_config_with_task(evg_api: EvergreenApi, build_variant: BuildVariant,
 
 
 def _get_task_configs_for_test_mappings(selected_tests_variant_expansions: Dict[str, str],
-                                        tests_by_task: Dict[str, Any],
+                                        tests_by_task: Dict[str, TaskInfo],
                                         build_variant_config: Variant) -> Dict[str, dict]:
     """
     For test mappings, generate a dict containing task names and their config settings.
@@ -312,7 +312,7 @@ def _get_task_configs_for_test_mappings(selected_tests_variant_expansions: Dict[
         if task and not _exclude_task(task):
             evg_task_config = _get_evg_task_config(selected_tests_variant_expansions, task,
                                                    build_variant_config)
-            evg_task_config.update({"selected_tests_to_run": set(test_list_info["tests"])})
+            evg_task_config.update({"selected_tests_to_run": set(test_list_info.tests)})
             evg_task_configs[task.name] = evg_task_config
 
     return evg_task_configs

@@ -4,24 +4,16 @@ from __future__ import absolute_import
 
 import collections
 import datetime
-import json
 import os
 import sys
 import subprocess
 import unittest
 
-from math import ceil
 from mock import Mock, patch, MagicMock
-
-import requests
-
-from shrub.v2 import ShrubProject, BuildVariant
 
 import buildscripts.burn_in_tests as under_test
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
-import buildscripts.util.teststats as teststats_utils
 import buildscripts.resmokelib.parser as _parser
-import buildscripts.resmokelib.config as _config
 _parser.set_run_options()
 
 # pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
@@ -29,10 +21,10 @@ _parser.set_run_options()
 
 def create_tests_by_task_mock(n_tasks, n_tests):
     return {
-        f"task_{i}_gen": {
-            "display_task_name": f"task_{i}", "resmoke_args": f"--suites=suite_{i}",
-            "tests": [f"jstests/tests_{j}" for j in range(n_tests)]
-        }
+        f"task_{i}_gen":
+        under_test.TaskInfo(display_task_name=f"task_{i}", resmoke_args=f"--suites=suite_{i}",
+                            tests=[f"jstests/tests_{j}" for j in range(n_tests)],
+                            use_multiversion=None, distro=f"distro_{i}")
         for i in range(n_tasks)
     }
 
@@ -73,77 +65,6 @@ def get_evergreen_config(config_file_path):
     if os.path.exists(evergreen_home):
         return parse_evergreen_file(config_file_path, evergreen_home)
     return parse_evergreen_file(config_file_path)
-
-
-class TestAcceptance(unittest.TestCase):
-    def tearDown(self):
-        _parser.set_run_options()
-
-    @patch(ns("write_file"))
-    def test_no_tests_run_if_none_changed(self, write_json_mock):
-        """
-        Given a git repository with no changes,
-        When burn_in_tests is run,
-        Then no tests are discovered to run.
-        """
-        variant = "build_variant"
-        repos = [mock_changed_git_files([])]
-        repeat_config = under_test.RepeatConfig()
-        gen_config = under_test.GenerateConfig(
-            variant,
-            "project",
-        )  # yapf: disable
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.get_task_names_by_tag.return_value = set()
-
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_conf_mock,
-                           repos, None, None)
-
-        write_json_mock.assert_called_once()
-        written_config = json.loads(write_json_mock.call_args[0][1])
-        display_task = written_config["buildvariants"][0]["display_tasks"][0]
-        self.assertEqual(1, len(display_task["execution_tasks"]))
-        self.assertEqual(under_test.BURN_IN_TESTS_GEN_TASK, display_task["execution_tasks"][0])
-
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch(ns("write_file"))
-    def test_tests_generated_if_a_file_changed(self, write_json_mock):
-        """
-        Given a git repository with changes,
-        When burn_in_tests is run,
-        Then tests are discovered to run.
-        """
-        # Note: this test is using actual tests and suites. So changes to those suites could
-        # introduce failures and require this test to be updated.
-        # You can see the test file it is using below. This test is used in the 'auth' and
-        # 'auth_audit' test suites. It needs to be in at least one of those for the test to pass.
-        _config.NAMED_SUITES = None
-        variant = "enterprise-rhel-80-64-bit"
-        repos = [mock_changed_git_files(["jstests/auth/auth1.js"])]
-        repeat_config = under_test.RepeatConfig()
-        gen_config = under_test.GenerateConfig(
-            variant,
-            "project",
-        )  # yapf: disable
-        evg_config = get_evergreen_config("etc/evergreen.yml")
-
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repos,
-                           None, None)
-
-        write_json_mock.assert_called_once()
-        written_config = json.loads(write_json_mock.call_args[0][1])
-        n_tasks = len(written_config["tasks"])
-        # Ensure we are generating at least one task for the test.
-        self.assertGreaterEqual(n_tasks, 1)
-
-        written_build_variant = written_config["buildvariants"][0]
-        self.assertEqual(variant, written_build_variant["name"])
-        self.assertEqual(n_tasks, len(written_build_variant["tasks"]))
-
-        display_task = written_build_variant["display_tasks"][0]
-        # The display task should contain all the generated tasks as well as 1 extra task for
-        # the burn_in_test_gen task.
-        self.assertEqual(n_tasks + 1, len(display_task["execution_tasks"]))
 
 
 class TestRepeatConfig(unittest.TestCase):
@@ -230,157 +151,6 @@ class TestRepeatConfig(unittest.TestCase):
         self.assertEqual(repeat_options.strip(), "--repeatSuites=2")
 
 
-class TestGenerateConfig(unittest.TestCase):
-    def test_run_build_variant_with_no_run_build_variant(self):
-        gen_config = under_test.GenerateConfig("build_variant", "project")
-
-        self.assertEqual(gen_config.build_variant, gen_config.run_build_variant)
-
-    def test_run_build_variant_with_run_build_variant(self):
-        gen_config = under_test.GenerateConfig("build_variant", "project", "run_build_variant")
-
-        self.assertNotEqual(gen_config.build_variant, gen_config.run_build_variant)
-        self.assertEqual(gen_config.run_build_variant, "run_build_variant")
-
-    def test_validate_non_existing_build_variant(self):
-        evg_conf_mock = MagicMock()
-        evg_conf_mock.get_variant.return_value = None
-
-        gen_config = under_test.GenerateConfig("build_variant", "project", "run_build_variant")
-
-        with self.assertRaises(ValueError):
-            gen_config.validate(evg_conf_mock)
-
-    def test_validate_existing_build_variant(self):
-        evg_conf_mock = MagicMock()
-
-        gen_config = under_test.GenerateConfig("build_variant", "project", "run_build_variant")
-        gen_config.validate(evg_conf_mock)
-
-    def test_validate_non_existing_run_build_variant(self):
-        evg_conf_mock = MagicMock()
-
-        gen_config = under_test.GenerateConfig("build_variant", "project")
-        gen_config.validate(evg_conf_mock)
-
-
-class TestParseAvgTestRuntime(unittest.TestCase):
-    def test__parse_avg_test_runtime(self):
-        task_avg_test_runtime_stats = [
-            teststats_utils.TestRuntime(test_name="dir/test1.js", runtime=30.2),
-            teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)
-        ]
-        result = under_test._parse_avg_test_runtime("dir/test2.js", task_avg_test_runtime_stats)
-        self.assertEqual(result, 455.1)
-
-
-class TestCalculateTimeout(unittest.TestCase):
-    def test__calculate_timeout(self):
-        avg_test_runtime = 455.1
-        expected_result = ceil(avg_test_runtime * under_test.AVG_TEST_TIME_MULTIPLIER)
-        self.assertEqual(expected_result, under_test._calculate_timeout(avg_test_runtime))
-
-    def test__calculate_timeout_avg_is_less_than_min(self):
-        avg_test_runtime = 10
-        self.assertEqual(under_test.MIN_AVG_TEST_TIME_SEC,
-                         under_test._calculate_timeout(avg_test_runtime))
-
-
-class TestCalculateExecTimeout(unittest.TestCase):
-    def test__calculate_exec_timeout(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
-        avg_test_runtime = 455.1
-
-        exec_timeout = under_test._calculate_exec_timeout(repeat_config, avg_test_runtime)
-
-        self.assertEqual(1771, exec_timeout)
-
-    def test_average_timeout_greater_than_execution_time(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600, repeat_tests_min=2)
-        avg_test_runtime = 750
-
-        exec_timeout = under_test._calculate_exec_timeout(repeat_config, avg_test_runtime)
-
-        # The timeout needs to be greater than the number of the test * the minimum number of runs.
-        minimum_expected_timeout = avg_test_runtime * repeat_config.repeat_tests_min
-
-        self.assertGreater(exec_timeout, minimum_expected_timeout)
-
-
-class TestGenerateTimeouts(unittest.TestCase):
-    def test__generate_timeouts(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
-        runtime_stats = [teststats_utils.TestRuntime(test_name="dir/test2.js", runtime=455.1)]
-        test_name = "dir/test2.js"
-
-        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
-
-        self.assertEqual(timeout_info.exec_timeout, 1771)
-        self.assertEqual(timeout_info.timeout, 1366)
-
-    def test__generate_timeouts_no_results(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
-        runtime_stats = []
-        test_name = "dir/new_test.js"
-
-        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
-
-        self.assertIsNone(timeout_info.cmd)
-
-    def test__generate_timeouts_avg_runtime_is_zero(self):
-        repeat_config = under_test.RepeatConfig(repeat_tests_secs=600)
-        runtime_stats = [
-            teststats_utils.TestRuntime(test_name="dir/test_with_zero_runtime.js", runtime=0)
-        ]
-        test_name = "dir/test_with_zero_runtime.js"
-
-        timeout_info = under_test._generate_timeouts(repeat_config, test_name, runtime_stats)
-
-        self.assertIsNone(timeout_info.cmd)
-
-
-class TestGetTaskRuntimeHistory(unittest.TestCase):
-    def test_get_task_runtime_history_with_no_api(self):
-        self.assertListEqual([],
-                             under_test._get_task_runtime_history(None, "project", "task",
-                                                                  "variant"))
-
-    def test__get_task_runtime_history(self):
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.return_value = [
-            Mock(
-                test_file="dir/test2.js",
-                task_name="task1",
-                variant="variant1",
-                distro="distro1",
-                date=_DATE,
-                num_pass=1,
-                num_fail=0,
-                avg_duration_pass=10.1,
-            )
-        ]
-        analysis_duration = under_test.AVG_TEST_RUNTIME_ANALYSIS_DAYS
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=analysis_duration)
-
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
-        self.assertEqual(result, [("dir/test2.js", 10.1)])
-        evergreen_api.test_stats_by_project.assert_called_with(
-            "project1", after_date=start_date, before_date=end_date, group_by="test",
-            group_num_days=14, tasks=["task1"], variants=["variant1"])
-
-    def test__get_task_runtime_history_evg_degraded_mode_error(self):  # pylint: disable=invalid-name
-        response = Mock()
-        response.status_code = requests.codes.SERVICE_UNAVAILABLE
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.side_effect = requests.HTTPError(response=response)
-
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
-        self.assertEqual(result, [])
-
-
 class TestGetTaskName(unittest.TestCase):
     def test__get_task_name(self):
         name = "mytask"
@@ -448,92 +218,6 @@ class TestSetResmokeCmd(unittest.TestCase):
         resmoke_cmd = under_test._set_resmoke_cmd(repeat_config, resmoke_args)
 
         self.assertListEqual(resmoke_args + ['--repeatSuites=3'], resmoke_cmd)
-
-
-TESTS_BY_TASK = {
-    "task1": {
-        "resmoke_args": "--suites=suite1",
-        "tests": ["jstests/test1.js", "jstests/test2.js"]},
-    "task2": {
-        "resmoke_args": "--suites=suite1",
-        "tests": ["jstests/test1.js", "jstests/test3.js"]},
-    "task3": {
-        "resmoke_args": "--suites=suite3",
-        "tests": ["jstests/test4.js", "jstests/test5.js"]},
-    "task4": {
-        "resmoke_args": "--suites=suite4", "tests": []},
-}  # yapf: disable
-
-
-class TestCreateGenerateTasksConfig(unittest.TestCase):
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_no_tasks_given(self):
-        build_variant = BuildVariant("build variant")
-        gen_config = MagicMock(run_build_variant="variant")
-        repeat_config = MagicMock()
-
-        under_test.create_generate_tasks_config(build_variant, {}, gen_config, repeat_config, None)
-
-        evg_config_dict = build_variant.as_dict()
-        self.assertEqual(0, len(evg_config_dict["tasks"]))
-
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_one_task_one_test(self):
-        n_tasks = 1
-        n_tests = 1
-        resmoke_options = "options for resmoke"
-        build_variant = BuildVariant("build variant")
-        gen_config = MagicMock(run_build_variant="variant", distro=None)
-        repeat_config = MagicMock()
-        repeat_config.generate_resmoke_options.return_value = resmoke_options
-        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-
-        under_test.create_generate_tasks_config(build_variant, tests_by_task, gen_config,
-                                                repeat_config, None)
-
-        shrub_config = ShrubProject.empty().add_build_variant(build_variant)
-        evg_config_dict = shrub_config.as_dict()
-        tasks = evg_config_dict["tasks"]
-        self.assertEqual(n_tasks * n_tests, len(tasks))
-        cmd = tasks[0]["commands"]
-        self.assertIn(resmoke_options, cmd[1]["vars"]["resmoke_args"])
-        self.assertIn("--suites=suite_0", cmd[1]["vars"]["resmoke_args"])
-        self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
-
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_n_task_m_test(self):
-        n_tasks = 3
-        n_tests = 5
-        build_variant = BuildVariant("build variant")
-        gen_config = MagicMock(run_build_variant="variant", distro=None)
-        repeat_config = MagicMock()
-        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-
-        under_test.create_generate_tasks_config(build_variant, tests_by_task, gen_config,
-                                                repeat_config, None)
-
-        evg_config_dict = build_variant.as_dict()
-        self.assertEqual(n_tasks * n_tests, len(evg_config_dict["tasks"]))
-
-
-class TestCreateGenerateTasksFile(unittest.TestCase):
-    @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    @patch(ns("sys.exit"))
-    @patch(ns("create_generate_tasks_config"))
-    @patch(ns("validate_task_generation_limit"))
-    def test_cap_on_task_generate(self, validate_mock, _, exit_mock):
-        evg_api = MagicMock()
-        gen_config = MagicMock(use_multiversion=False)
-        repeat_config = MagicMock()
-        tests_by_task = MagicMock()
-
-        validate_mock.return_value = False
-
-        exit_mock.side_effect = ValueError("exiting")
-        with self.assertRaises(ValueError):
-            under_test.create_generate_tasks_file(tests_by_task, gen_config, repeat_config, evg_api)
-
-        exit_mock.assert_called_once()
 
 
 class RunTests(unittest.TestCase):
@@ -642,7 +326,7 @@ def create_variant_task_mock(task_name, suite_name, distro="distro"):
     return variant_task
 
 
-class TestGatherTaskInfo(unittest.TestCase):
+class TestTaskInfo(unittest.TestCase):
     def test_non_generated_task(self):
         suite_name = "suite_1"
         distro_name = "distro_1"
@@ -657,13 +341,13 @@ class TestGatherTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = under_test._gather_task_info(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
 
-        self.assertIn(suite_name, task_info["resmoke_args"])
+        self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
-            self.assertIn(test, task_info["tests"])
-        self.assertIsNone(task_info["use_multiversion"])
-        self.assertEqual(distro_name, task_info["distro"])
+            self.assertIn(test, task_info.tests)
+        self.assertIsNone(task_info.use_multiversion)
+        self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_no_large_on_task(self):
         suite_name = "suite_1"
@@ -681,13 +365,13 @@ class TestGatherTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = under_test._gather_task_info(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
 
-        self.assertIn(suite_name, task_info["resmoke_args"])
+        self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
-            self.assertIn(test, task_info["tests"])
-        self.assertIsNone(task_info["use_multiversion"])
-        self.assertEqual(distro_name, task_info["distro"])
+            self.assertIn(test, task_info.tests)
+        self.assertIsNone(task_info.use_multiversion)
+        self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_no_large_on_build_variant(self):
         suite_name = "suite_1"
@@ -705,13 +389,13 @@ class TestGatherTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = under_test._gather_task_info(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
 
-        self.assertIn(suite_name, task_info["resmoke_args"])
+        self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
-            self.assertIn(test, task_info["tests"])
-        self.assertIsNone(task_info["use_multiversion"])
-        self.assertEqual(distro_name, task_info["distro"])
+            self.assertIn(test, task_info.tests)
+        self.assertIsNone(task_info.use_multiversion)
+        self.assertEqual(distro_name, task_info.distro)
 
     def test_generated_task_large_distro(self):
         suite_name = "suite_1"
@@ -735,13 +419,13 @@ class TestGatherTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = under_test._gather_task_info(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = under_test.TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
 
-        self.assertIn(suite_name, task_info["resmoke_args"])
+        self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
-            self.assertIn(test, task_info["tests"])
-        self.assertIsNone(task_info["use_multiversion"])
-        self.assertEqual(large_distro_name, task_info["distro"])
+            self.assertIn(test, task_info.tests)
+        self.assertIsNone(task_info.use_multiversion)
+        self.assertEqual(large_distro_name, task_info.distro)
 
 
 class TestCreateTaskList(unittest.TestCase):
@@ -785,11 +469,11 @@ class TestCreateTaskList(unittest.TestCase):
 
         self.assertIn("task 1", task_list)
         task_info = task_list["task 1"]
-        self.assertIn("suite_1", task_info["resmoke_args"])
+        self.assertIn("suite_1", task_info.resmoke_args)
         for i in range(3):
-            self.assertIn(f"test{i}.js", task_info["tests"])
-        self.assertIsNone(task_info["use_multiversion"])
-        self.assertEqual("distro 1", task_info["distro"])
+            self.assertIn(f"test{i}.js", task_info.tests)
+        self.assertIsNone(task_info.use_multiversion)
+        self.assertEqual("distro 1", task_info.distro)
 
     def test_create_task_list_with_excludes(self):
         variant = "variant name"
@@ -833,7 +517,7 @@ class TestCreateTaskList(unittest.TestCase):
             under_test.create_task_list(evg_conf_mock, variant, suite_dict, [])
 
 
-class TestFindChangedTests(unittest.TestCase):
+class TestLocalFileChangeDetector(unittest.TestCase):
     @patch(ns("find_changed_files_in_repos"))
     @patch(ns("os.path.isfile"))
     def test_non_js_files_filtered(self, is_file_mock, changed_files_mock):
@@ -846,7 +530,8 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = True
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        file_change_detector = under_test.LocalFileChangeDetector(None)
+        found_tests = file_change_detector.find_changed_tests([repo_mock])
 
         self.assertIn(file_list[0], found_tests)
         self.assertIn(file_list[2], found_tests)
@@ -864,7 +549,8 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = False
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        file_change_detector = under_test.LocalFileChangeDetector(None)
+        found_tests = file_change_detector.find_changed_tests([repo_mock])
 
         self.assertEqual(0, len(found_tests))
 
@@ -880,7 +566,8 @@ class TestFindChangedTests(unittest.TestCase):
         changed_files_mock.return_value = set(file_list)
         is_file_mock.return_value = True
 
-        found_tests = under_test.find_changed_tests([repo_mock])
+        file_change_detector = under_test.LocalFileChangeDetector(None)
+        found_tests = file_change_detector.find_changed_tests([repo_mock])
 
         self.assertIn(file_list[0], found_tests)
         self.assertIn(file_list[2], found_tests)
