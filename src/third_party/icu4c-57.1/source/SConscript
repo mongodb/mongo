@@ -40,7 +40,8 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-for to_remove in ['-Werror', '-Wall', '-W']:
+env['CCFLAGS_WERROR'] = []
+for to_remove in ['-Wall', '-W']:
     removeIfPresent(env['CCFLAGS'], to_remove)
 
 # Suppress sign-compare warnings.
