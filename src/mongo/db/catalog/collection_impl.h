@@ -480,9 +480,10 @@ private:
         const long long _cappedMaxDocs;
         long long _cappedMaxSize;
 
-        // Only one operation can do capped deletes at a time.
+        // Only one operation can do capped deletes at a time and protects the state below.
         mutable Mutex _cappedDeleterMutex =
             MONGO_MAKE_LATCH("CollectionImpl::SharedState::_cappedDeleterMutex");
+        RecordId _cappedFirstRecord;
     };
 
     NamespaceString _ns;
