@@ -11,6 +11,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/discover_topology.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
 const reshardingTest = new ReshardingTest({numDonors: 2});
@@ -49,6 +50,13 @@ reshardingTest.withReshardingInBackground(
             },
             () => `timed out waiting for resharding fields to be added to original nss: ${
                 tojson(res)}`);
+
+        const topology = DiscoverTopology.findConnectedNodes(mongos);
+        const donor = new Mongo(topology.shards[donorShardNames[0]].primary);
+        assert.soon(() => {
+            res = donor.getCollection("config.localReshardingOperations.donor").find().toArray();
+            return res.length == 1;
+        }, "timed out waiting for resharding initialization on donor shard");
 
         assert.commandFailedWithCode(
             mongos.adminCommand({moveChunk: ns, find: {oldKey: -10}, to: donorShardNames[1]}),
