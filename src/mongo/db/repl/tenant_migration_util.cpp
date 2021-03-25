@@ -76,8 +76,7 @@ ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, B
     return externalKeyDoc;
 }
 
-repl::OpTime storeExternalClusterTimeKeyDocs(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                             std::vector<ExternalKeysCollectionDocument> keyDocs) {
+repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionDocument> keyDocs) {
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
     auto nss = NamespaceString::kExternalKeysCollectionNamespace;

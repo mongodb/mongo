@@ -518,7 +518,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                        checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
 
                        return tenant_migration_util::storeExternalClusterTimeKeyDocs(
-                           executor, std::move(keyDocs));
+                           std::move(keyDocs));
                    })
                    .then([this, self = shared_from_this(), serviceToken, instanceToken](
                              repl::OpTime lastKeyOpTime) {

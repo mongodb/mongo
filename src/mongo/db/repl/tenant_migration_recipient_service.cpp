@@ -1747,7 +1747,7 @@ void TenantMigrationRecipientService::Instance::_fetchAndStoreDonorClusterTimeKe
             tenant_migration_util::makeExternalClusterTimeKeyDoc(_migrationUuid, doc));
     }
 
-    tenant_migration_util::storeExternalClusterTimeKeyDocs(_scopedExecutor, std::move(keyDocs));
+    tenant_migration_util::storeExternalClusterTimeKeyDocs(std::move(keyDocs));
 }
 
 void TenantMigrationRecipientService::Instance::_compareRecipientAndDonorFCV() const {
