@@ -12,10 +12,12 @@ from mock import MagicMock, patch
 from shrub.v2 import BuildVariant, ShrubProject
 
 import buildscripts.burn_in_tests_multiversion as under_test
-from buildscripts.burn_in_tests import _gather_task_info, create_generate_tasks_config
+from buildscripts.burn_in_tests import TaskInfo, RepeatConfig
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
 import buildscripts.resmokelib.parser as _parser
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
+from buildscripts.evergreen_burn_in_tests import GenerateBurnInExecutor
+
 _parser.set_run_options()
 
 MONGO_4_2_HASH = "d94888c0d0a8065ca57d354ece33b3c2a1a5a6d6"
@@ -23,12 +25,17 @@ MONGO_4_2_HASH = "d94888c0d0a8065ca57d354ece33b3c2a1a5a6d6"
 # pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
 
 
-def create_tests_by_task_mock(n_tasks, n_tests):
+def create_tests_by_task_mock(n_tasks, n_tests, multiversion_values=None):
+    if multiversion_values is None:
+        multiversion_values = [None for _ in range(n_tasks)]
     return {
-        f"task_{i}_gen": {
-            "display_task_name": f"task_{i}", "resmoke_args": f"--suites=suite_{i}",
-            "tests": [f"jstests/tests_{j}" for j in range(n_tests)]
-        }
+        f"task_{i}_gen": TaskInfo(
+            display_task_name=f"task_{i}",
+            resmoke_args=f"--suites=suite_{i}",
+            tests=[f"jstests/tests_{j}" for j in range(n_tests)],
+            use_multiversion=multiversion_values[i],
+            distro="",
+        )
         for i in range(n_tasks)
     }
 
@@ -39,10 +46,13 @@ MV_MOCK_SUITES = ["replica_sets_jscore_passthrough", "sharding_jscore_passthroug
 def create_multiversion_tests_by_task_mock(n_tasks, n_tests):
     assert n_tasks <= len(MV_MOCK_SUITES)
     return {
-        f"{MV_MOCK_SUITES[i % len(MV_MOCK_SUITES)]}": {
-            "resmoke_args": f"--suites=suite_{i}",
-            "tests": [f"jstests/tests_{j}" for j in range(n_tests)]
-        }
+        f"{MV_MOCK_SUITES[i % len(MV_MOCK_SUITES)]}": TaskInfo(
+            display_task_name=f"task_{i}",
+            resmoke_args=f"--suites=suite_{i}",
+            tests=[f"jstests/tests_{j}" for j in range(n_tests)],
+            use_multiversion=None,
+            distro="",
+        )
         for i in range(n_tasks)
     }
 
@@ -201,13 +211,6 @@ class TestCreateMultiversionGenerateTasksConfig(unittest.TestCase):
             (NUM_REPL_MIXED_VERSION_CONFIGS + NUM_SHARDED_MIXED_VERSION_CONFIGS) * n_tests)
 
 
-class TestRepeatConfig(unittest.TestCase):
-    def test_get_resmoke_repeat_options_use_multiversion(self):
-        repeat_config = under_test.RepeatConfig()
-
-        self.assertEqual(repeat_config, repeat_config.validate())
-
-
 class TestGenerateConfig(unittest.TestCase):
     def test_validate_use_multiversion(self):
         evg_conf_mock = MagicMock()
@@ -225,12 +228,12 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         build_variant = BuildVariant("variant")
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
-        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
-        first_task = "task_0_gen"
         multiversion_path = "multiversion_path"
-        tests_by_task[first_task]["use_multiversion"] = multiversion_path
+        tests_by_task = create_tests_by_task_mock(n_tasks, n_tests, [multiversion_path])
+        mock_evg_api = MagicMock()
 
-        create_generate_tasks_config(build_variant, tests_by_task, gen_config, repeat_config, None)
+        executor = GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
+        executor.add_config_for_build_variant(build_variant, tests_by_task)
 
         shrub_project = ShrubProject.empty().add_build_variant(build_variant)
         evg_config_dict = shrub_project.as_dict()
@@ -255,10 +258,10 @@ class TestGatherTaskInfo(unittest.TestCase):
             "suite 3": [f"test{i}.js" for i in range(2)],
         }
 
-        task_info = _gather_task_info(task_mock, tests_by_suite, evg_conf_mock, variant)
+        task_info = TaskInfo.from_task(task_mock, tests_by_suite, evg_conf_mock, variant)
 
-        self.assertIn(suite_name, task_info["resmoke_args"])
+        self.assertIn(suite_name, task_info.resmoke_args)
         for test in test_list:
-            self.assertIn(test, task_info["tests"])
-        self.assertEqual(task_mock.multiversion_path, task_info["use_multiversion"])
-        self.assertEqual(distro_name, task_info["distro"])
+            self.assertIn(test, task_info.tests)
+        self.assertEqual(task_mock.multiversion_path, task_info.use_multiversion)
+        self.assertEqual(distro_name, task_info.distro)

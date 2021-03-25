@@ -6,7 +6,7 @@ import sys
 from typing import Dict
 
 import click
-from evergreen.api import EvergreenApi
+from evergreen.api import EvergreenApi, RetryingEvergreenApi
 from git import Repo
 from shrub.v2 import BuildVariant, ExistingTask, ShrubProject
 import structlog
@@ -14,10 +14,11 @@ from structlog.stdlib import LoggerFactory
 
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
 import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke
-from buildscripts.burn_in_tests import GenerateConfig, DEFAULT_PROJECT, CONFIG_FILE, _configure_logging, RepeatConfig, \
-    _get_evg_api, EVERGREEN_FILE, DEFAULT_REPO_LOCATIONS, _set_resmoke_cmd, create_tests_by_task, \
-    find_changed_tests, run_tests
+from buildscripts.burn_in_tests import _configure_logging, EVERGREEN_FILE, \
+    DEFAULT_REPO_LOCATIONS, create_tests_by_task, TaskInfo
 from buildscripts.ciconfig.evergreen import parse_evergreen_file
+from buildscripts.evergreen_burn_in_tests import GenerateConfig, DEFAULT_PROJECT, CONFIG_FILE, \
+    EvergreenFileChangeDetector
 from buildscripts.patch_builds.task_generation import validate_task_generation_limit
 from buildscripts.resmokelib.suitesconfig import get_named_suites_with_root_level_key
 from buildscripts.util.fileops import write_file
@@ -32,7 +33,8 @@ BURN_IN_MULTIVERSION_TASK = gen_multiversion.BURN_IN_TASK
 TASK_PATH_SUFFIX = "/data/multiversion"
 
 
-def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: EvergreenApi,
+def create_multiversion_generate_tasks_config(tests_by_task: Dict[str, TaskInfo],
+                                              evg_api: EvergreenApi,
                                               generate_config: GenerateConfig) -> BuildVariant:
     """
     Create the multiversion config for the Evergreen generate.tasks file.
@@ -72,7 +74,7 @@ def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: Ever
 
             config_generator = gen_multiversion.EvergreenMultiversionConfigGenerator(
                 evg_api, gen_resmoke.ConfigOptions(config_options))
-            test_list = tests_by_task[suite["origin"]]["tests"]
+            test_list = tests_by_task[suite["origin"]].tests
             for test in test_list:
                 # Generate the multiversion tasks for each test.
                 sub_tasks = config_generator.get_burn_in_tasks(test, idx)
@@ -86,9 +88,7 @@ def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: Ever
 
 
 @click.command()
-@click.option("--no-exec", "no_exec", default=False, is_flag=True,
-              help="Do not execute the found tests.")
-@click.option("--generate-tasks-file", "generate_tasks_file", default=None, metavar='FILE',
+@click.option("--generate-tasks-file", "generate_tasks_file", required=True, metavar='FILE',
               help="Run in 'generate.tasks' mode. Store task config to given file.")
 @click.option("--build-variant", "build_variant", default=None, metavar='BUILD_VARIANT',
               help="Tasks to run will be selected from this build variant.")
@@ -103,10 +103,9 @@ def create_multiversion_generate_tasks_config(tests_by_task: Dict, evg_api: Ever
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.option("--task_id", "task_id", default=None, metavar='TASK_ID',
               help="The evergreen task id.")
-@click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
-def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
-         resmoke_args, evg_api_config, verbose, task_id):
+def main(build_variant, run_build_variant, distro, project, generate_tasks_file, evg_api_config,
+         verbose, task_id):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -137,56 +136,45 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     :param distro: Distro to run tests on.
     :param project: Project to run tests on.
     :param generate_tasks_file: Create a generate tasks configuration in this file.
-    :param no_exec: Just perform test discover, do not execute the tests.
-    :param resmoke_args: Arguments to pass through to resmoke.
     :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
     """
     _configure_logging(verbose)
 
     evg_conf = parse_evergreen_file(EVERGREEN_FILE)
-    repeat_config = RepeatConfig()  # yapf: disable
     generate_config = GenerateConfig(build_variant=build_variant,
                                      run_build_variant=run_build_variant,
                                      distro=distro,
                                      project=project,
                                      task_id=task_id)  # yapf: disable
-    if generate_tasks_file:
-        generate_config.validate(evg_conf)
-
-    evg_api = _get_evg_api(evg_api_config, False)
+    generate_config.validate(evg_conf)
 
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
+    evg_api = RetryingEvergreenApi.get_api(config_file=evg_api_config)
 
-    resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
-
-    changed_tests = find_changed_tests(repos, evg_api=evg_api, task_id=task_id)
+    change_detector = EvergreenFileChangeDetector(task_id, evg_api)
+    changed_tests = change_detector.find_changed_tests(repos)
     tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
-    if generate_tasks_file:
-        multiversion_tasks = evg_conf.get_task_names_by_tag(MULTIVERSION_PASSTHROUGH_TAG)
-        LOGGER.debug("Multiversion tasks by tag", tasks=multiversion_tasks,
-                     tag=MULTIVERSION_PASSTHROUGH_TAG)
-        # We expect the number of suites with MULTIVERSION_PASSTHROUGH_TAG to be the same as in
-        # multiversion_suites. Multiversion passthrough suites must include
-        # MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
-        multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
-        assert len(multiversion_tasks) == len(multiversion_suites)
+    multiversion_tasks = evg_conf.get_task_names_by_tag(MULTIVERSION_PASSTHROUGH_TAG)
+    LOGGER.debug("Multiversion tasks by tag", tasks=multiversion_tasks,
+                 tag=MULTIVERSION_PASSTHROUGH_TAG)
+    # We expect the number of suites with MULTIVERSION_PASSTHROUGH_TAG to be the same as in
+    # multiversion_suites. Multiversion passthrough suites must include
+    # MULTIVERSION_CONFIG_KEY as a root level key and must be set to true.
+    multiversion_suites = get_named_suites_with_root_level_key(MULTIVERSION_CONFIG_KEY)
+    assert len(multiversion_tasks) == len(multiversion_suites)
 
-        build_variant = create_multiversion_generate_tasks_config(tests_by_task, evg_api,
-                                                                  generate_config)
-        shrub_project = ShrubProject.empty()
-        shrub_project.add_build_variant(build_variant)
+    build_variant = create_multiversion_generate_tasks_config(tests_by_task, evg_api,
+                                                              generate_config)
+    shrub_project = ShrubProject.empty()
+    shrub_project.add_build_variant(build_variant)
 
-        if not validate_task_generation_limit(shrub_project):
-            sys.exit(1)
+    if not validate_task_generation_limit(shrub_project):
+        sys.exit(1)
 
-        write_file(generate_tasks_file, shrub_project.json())
-    elif not no_exec:
-        run_tests(tests_by_task, resmoke_cmd)
-    else:
-        LOGGER.info("Not running tests due to 'no_exec' option.")
+    write_file(generate_tasks_file, shrub_project.json())
 
 
 if __name__ == "__main__":

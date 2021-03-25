@@ -1,25 +1,20 @@
 #!/usr/bin/env python3
 """Command line utility for determining what jstests have been added or modified."""
 import copy
-import datetime
 import logging
 import os.path
 import shlex
 import subprocess
 import sys
+from abc import ABC, abstractmethod
 from collections import defaultdict
-from math import ceil
-from typing import Optional, Set, Tuple, List, Dict
+from typing import Optional, Set, Tuple, List, Dict, NamedTuple
 
 import click
-import requests
 import yaml
-from evergreen.api import RetryingEvergreenApi, EvergreenApi
 from git import Repo
 import structlog
 from structlog.stdlib import LoggerFactory
-
-from shrub.v2 import Task, TaskDependency, BuildVariant, ShrubProject, ExistingTask
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -27,18 +22,12 @@ if __name__ == "__main__" and __package__ is None:
 
 # pylint: disable=wrong-import-position
 from buildscripts.patch_builds.change_data import generate_revision_map, \
-    generate_revision_map_from_manifest, RevisionMap, find_changed_files_in_repos
+    RevisionMap, find_changed_files_in_repos
 import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
     EvergreenProjectConfig, VariantTask
-from buildscripts.util.fileops import write_file
-from buildscripts.util.teststats import HistoricTaskData, TestRuntime
-from buildscripts.util.taskname import name_generated_task
-from buildscripts.patch_builds.task_generation import (resmoke_commands, TimeoutInfo,
-                                                       validate_task_generation_limit)
-
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -49,18 +38,11 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 
-AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
-AVG_TEST_SETUP_SEC = 4 * 60
-AVG_TEST_TIME_MULTIPLIER = 3
-CONFIG_FILE = ".evergreen.yml"
-DEFAULT_PROJECT = "mongodb-mongo-master"
 DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
 DEFAULT_REPO_LOCATIONS = [".", f"./{ENTERPRISE_MODULE_PATH}"]
 REPEAT_SUITES = 2
 EVERGREEN_FILE = "etc/evergreen.yml"
-MIN_AVG_TEST_OVERFLOW_SEC = float(60)
-MIN_AVG_TEST_TIME_SEC = 5 * 60
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"
@@ -68,9 +50,6 @@ SUITE_FILES = ["with_server"]
 
 SUPPORTED_TEST_KINDS = ("fsm_workload_test", "js_test", "json_schema_test",
                         "multi_stmt_txn_passthrough", "parallel_fsm_workload_test")
-
-BURN_IN_TESTS_GEN_TASK = "burn_in_tests_gen"
-BURN_IN_TESTS_TASK = "burn_in_tests"
 
 
 class RepeatConfig(object):
@@ -137,56 +116,6 @@ class RepeatConfig(object):
         ])
 
 
-class GenerateConfig(object):
-    """Configuration for how to generate tasks."""
-
-    def __init__(self, build_variant: str, project: str, run_build_variant: Optional[str] = None,
-                 distro: Optional[str] = None, task_id: Optional[str] = None):
-        # pylint: disable=too-many-arguments,too-many-locals
-        """
-        Create a GenerateConfig.
-
-        :param build_variant: Build variant to get tasks from.
-        :param project: Project to run tasks on.
-        :param run_build_variant: Build variant to run new tasks on.
-        :param distro: Distro to run tasks on.
-        :param task_id: Evergreen task being run under.
-        """
-        self.build_variant = build_variant
-        self._run_build_variant = run_build_variant
-        self.distro = distro
-        self.project = project
-        self.task_id = task_id
-
-    @property
-    def run_build_variant(self):
-        """Build variant tasks should run against."""
-        if self._run_build_variant:
-            return self._run_build_variant
-        return self.build_variant
-
-    def validate(self, evg_conf: EvergreenProjectConfig):
-        """
-        Raise an exception if this configuration is invalid.
-
-        :param evg_conf: Evergreen configuration.
-        :return: self.
-        """
-        self._check_variant(self.build_variant, evg_conf)
-        return self
-
-    @staticmethod
-    def _check_variant(build_variant: str, evg_conf: EvergreenProjectConfig):
-        """
-        Check if the build_variant is found in the evergreen file.
-
-        :param build_variant: Build variant to check.
-        :param evg_conf: Evergreen configuration to check against.
-        """
-        if not evg_conf.get_variant(build_variant):
-            raise ValueError(f"Build variant '{build_variant}' not found in Evergreen file")
-
-
 def is_file_a_test_file(file_path: str) -> bool:
     """
     Check if the given path points to a test file.
@@ -202,47 +131,6 @@ def is_file_a_test_file(file_path: str) -> bool:
         return False
 
     return True
-
-
-def _create_revision_map(repos: List[Repo], origin_rev: Optional[str], evg_api: EvergreenApi,
-                         task_id: Optional[str]) -> RevisionMap:
-    """
-    Create a map of the repos and the given revisions to diff against.
-
-    :param repos: Repositories to include in the map.
-    :param origin_rev: User specified revision to compare against.
-    :param evg_api: Evergreen API client.
-    :param task_id: Evergreen task ID.
-    :return: Map of repositories to revisions.
-    """
-    if origin_rev:
-        return generate_revision_map(repos, {"mongo": origin_rev})
-
-    if evg_api and task_id:
-        return generate_revision_map_from_manifest(repos, task_id, evg_api)
-
-    return {}
-
-
-def find_changed_tests(repos: List[Repo], origin_rev: Optional[str] = None,
-                       evg_api: Optional[EvergreenApi] = None,
-                       task_id: Optional[str] = None) -> Set[str]:
-    """
-    Find the changed tests.
-
-    Use git to find which test files have changed in this patch.
-    The returned file paths are in normalized form (see os.path.normpath(path)).
-
-    :param repos: List of repos containing changed files.
-    :param origin_rev: The revision that local changes will be compared against.
-    :param evg_api: Evergreen API client.
-    :param task_id: Evergreen task ID.
-    :return: Set of changed tests.
-    """
-    revision_map = _create_revision_map(repos, origin_rev, evg_api, task_id)
-    LOGGER.info("Calculated revision map", revision_map=revision_map)
-    changed_files = find_changed_files_in_repos(repos, revision_map)
-    return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
 
 
 def find_excludes(selector_file: str) -> Tuple[List, List, List]:
@@ -362,37 +250,46 @@ def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectC
     return task.run_on[0]
 
 
-def _gather_task_info(task: VariantTask, tests_by_suite: Dict,
-                      evg_proj_config: EvergreenProjectConfig, build_variant: str) -> Dict:
+class TaskInfo(NamedTuple):
     """
-    Gather the information needed to run the given task.
+    Information about tests to run under a specific Task.
 
-    :param task: Task to be run.
-    :param tests_by_suite: Dict of suites.
-    :param evg_proj_config: Evergreen project configuration.
-    :param build_variant: Build variant task will be run on.
-    :return: Dictionary of information needed to run task.
+    display_task_name: Display name of task.
+    resmoke_args: Arguments to provide to resmoke on task invocation.
+    tests: List of tests to run as part of task.
+    use_multiversion: If running under multiversion, path to multiversion binaries.
+    distro: Evergreen distro task runs on.
     """
-    return {
-        "display_task_name": _get_task_name(task),
-        "resmoke_args": _set_resmoke_args(task),
-        "tests": tests_by_suite[task.resmoke_suite],
-        "use_multiversion": task.multiversion_path,
-        "distro": _distro_to_run_task_on(task, evg_proj_config, build_variant)
-    }  # yapf: disable
+
+    display_task_name: str
+    resmoke_args: str
+    tests: List[str]
+    use_multiversion: Optional[str]
+    distro: str
+
+    @classmethod
+    def from_task(cls, task: VariantTask, tests_by_suite: Dict[str, List[str]],
+                  evg_proj_config: EvergreenProjectConfig, build_variant: str) -> "TaskInfo":
+        """
+        Gather the information needed to run the given task.
+
+        :param task: Task to be run.
+        :param tests_by_suite: Dict of suites.
+        :param evg_proj_config: Evergreen project configuration.
+        :param build_variant: Build variant task will be run on.
+        :return: Dictionary of information needed to run task.
+        """
+        return cls(
+            display_task_name=_get_task_name(task), resmoke_args=_set_resmoke_args(task),
+            tests=tests_by_suite[task.resmoke_suite], use_multiversion=task.multiversion_path,
+            distro=_distro_to_run_task_on(task, evg_proj_config, build_variant))
 
 
 def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
-                     tests_by_suite: Dict[str, List[str]], exclude_tasks: [str]):
+                     tests_by_suite: Dict[str, List[str]],
+                     exclude_tasks: [str]) -> Dict[str, TaskInfo]:
     """
     Find associated tasks for the specified build_variant and suites.
-
-    Returns a dict keyed by task_name, with executor, resmoke_args & tests, i.e.,
-    {'jsCore_small_oplog':
-        {'resmoke_args': '--suites=core_small_oplog --storageEngine=inMemory',
-         'tests': ['jstests/core/all2.js', 'jstests/core/all3.js'],
-         'use_multiversion': '/data/multiversion'}
-    }
 
     :param evergreen_conf: Evergreen configuration for project.
     :param build_variant: Build variant to select tasks from.
@@ -418,7 +315,7 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
 
     # Return the list of tasks to run for the specified suite.
     task_list = {
-        task_name: _gather_task_info(task, tests_by_suite, evergreen_conf, build_variant)
+        task_name: TaskInfo.from_task(task, tests_by_suite, evergreen_conf, build_variant)
         for task_name, task in all_variant_tasks.items() if task.resmoke_suite in tests_by_suite
     }
 
@@ -437,202 +334,10 @@ def _set_resmoke_cmd(repeat_config: RepeatConfig, resmoke_args: [str]) -> [str]:
     return new_args
 
 
-def _parse_avg_test_runtime(test: str,
-                            task_avg_test_runtime_stats: List[TestRuntime]) -> Optional[float]:
-    """
-    Parse list of test runtimes to find runtime for particular test.
-
-    :param task_avg_test_runtime_stats: List of average historic runtimes of tests.
-    :param test: Test name.
-    :return: Historical average runtime of the test.
-    """
-    for test_stat in task_avg_test_runtime_stats:
-        if test_stat.test_name == test:
-            return test_stat.runtime
-    return None
-
-
-def _calculate_timeout(avg_test_runtime: float) -> int:
-    """
-    Calculate timeout_secs for the Evergreen task.
-
-    :param avg_test_runtime: How long a test has historically taken to run.
-    :return: The test runtime times AVG_TEST_TIME_MULTIPLIER, or MIN_AVG_TEST_TIME_SEC (whichever
-        is higher).
-    """
-    return max(MIN_AVG_TEST_TIME_SEC, ceil(avg_test_runtime * AVG_TEST_TIME_MULTIPLIER))
-
-
-def _calculate_exec_timeout(repeat_config: RepeatConfig, avg_test_runtime: float) -> int:
-    """
-    Calculate exec_timeout_secs for the Evergreen task.
-
-    :param repeat_config: Information about how the test will repeat.
-    :param avg_test_runtime: How long a test has historically taken to run.
-    :return: repeat_tests_secs + an amount of padding time so that the test has time to finish on
-        its final run.
-    """
-    LOGGER.debug("Calculating exec timeout", repeat_config=repeat_config,
-                 avg_test_runtime=avg_test_runtime)
-    repeat_tests_secs = repeat_config.repeat_tests_secs
-    if avg_test_runtime > repeat_tests_secs and repeat_config.repeat_tests_min:
-        # If a single execution of the test takes longer than the repeat time, then we don't
-        # have to worry about the repeat time at all and can just use the average test runtime
-        # and minimum number of executions to calculate the exec timeout value.
-        return ceil(avg_test_runtime * AVG_TEST_TIME_MULTIPLIER * repeat_config.repeat_tests_min)
-
-    test_execution_time_over_limit = avg_test_runtime - (repeat_tests_secs % avg_test_runtime)
-    test_execution_time_over_limit = max(MIN_AVG_TEST_OVERFLOW_SEC, test_execution_time_over_limit)
-    return ceil(repeat_tests_secs + (test_execution_time_over_limit * AVG_TEST_TIME_MULTIPLIER) +
-                AVG_TEST_SETUP_SEC)
-
-
-def _generate_timeouts(repeat_config: RepeatConfig, test: str,
-                       task_avg_test_runtime_stats: [TestRuntime]) -> TimeoutInfo:
-    """
-    Add timeout.update command to list of commands for a burn in execution task.
-
-    :param repeat_config: Information on how the test will repeat.
-    :param test: Test name.
-    :param task_avg_test_runtime_stats: Average historic runtimes of tests.
-    :return: TimeoutInfo to use.
-    """
-    if task_avg_test_runtime_stats:
-        avg_test_runtime = _parse_avg_test_runtime(test, task_avg_test_runtime_stats)
-        if avg_test_runtime:
-            LOGGER.debug("Avg test runtime", test=test, runtime=avg_test_runtime)
-
-            timeout = _calculate_timeout(avg_test_runtime)
-            exec_timeout = _calculate_exec_timeout(repeat_config, avg_test_runtime)
-            LOGGER.debug("Using timeout overrides", exec_timeout=exec_timeout, timeout=timeout)
-            timeout_info = TimeoutInfo.overridden(exec_timeout, timeout)
-
-            LOGGER.debug("Override runtime for test", test=test, timeout=timeout_info)
-            return timeout_info
-
-    return TimeoutInfo.default_timeout()
-
-
-def _get_task_runtime_history(evg_api: Optional[EvergreenApi], project: str, task: str,
-                              variant: str) -> List[TestRuntime]:
-    """
-    Fetch historical average runtime for all tests in a task from Evergreen API.
-
-    :param evg_api: Evergreen API.
-    :param project: Project name.
-    :param task: Task name.
-    :param variant: Variant name.
-    :return: Test historical runtimes, parsed into teststat objects.
-    """
-    if not evg_api:
-        return []
-
-    try:
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        test_stats = HistoricTaskData.from_evg(evg_api, project, start_date=start_date,
-                                               end_date=end_date, task=task, variant=variant)
-        return test_stats.get_tests_runtimes()
-    except requests.HTTPError as err:
-        if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-            # Evergreen may return a 503 when the service is degraded.
-            # We fall back to returning no test history
-            return []
-        else:
-            raise
-
-
-def _create_task(index: int, test_count: int, test: str, task_data: Dict,
-                 task_runtime_stats: List[TestRuntime], generate_config: GenerateConfig,
-                 repeat_config: RepeatConfig, task_prefix: str) -> Task:
-    # pylint: disable=too-many-arguments,too-many-locals
-    """
-    Create the described shrub sub task.
-
-    :param index: Index of task being created.
-    :param test_count: Total number of testing being created.
-    :param test: Test task is being generated for.
-    :param task_data: Data about task to create.
-    :param task_runtime_stats: Historical runtime of test.
-    :param generate_config: Configuration of how to generate the task.
-    :param repeat_config: Configuration of how the task should be repeated.
-    :param task_prefix: String to prefix generated task with.
-    :return: Shrub task for given configuration.
-    """
-    multiversion_path = task_data.get("use_multiversion")
-    display_task_name = task_data["display_task_name"]
-    resmoke_args = task_data["resmoke_args"]
-    sub_task_name = name_generated_task(f"{task_prefix}:{display_task_name}", index, test_count,
-                                        generate_config.run_build_variant)
-    LOGGER.debug("Generating sub-task", sub_task=sub_task_name)
-
-    test_unix_style = test.replace('\\', '/')
-    run_tests_vars = {
-        "resmoke_args":
-            f"{resmoke_args} {repeat_config.generate_resmoke_options()} {test_unix_style}"
-    }
-    if multiversion_path:
-        run_tests_vars["task_path_suffix"] = multiversion_path
-    timeout = _generate_timeouts(repeat_config, test, task_runtime_stats)
-    commands = resmoke_commands("run tests", run_tests_vars, timeout, multiversion_path)
-    dependencies = {TaskDependency("archive_dist_test_debug")}
-
-    return Task(sub_task_name, commands, dependencies)
-
-
-def create_generated_tasks(tests_by_task: Dict, task_prefix: str, generate_config: GenerateConfig,
-                           repeat_config: RepeatConfig, evg_api: EvergreenApi) -> Set[Task]:
-    """
-    Create the set of tasks to run the given tests_by_task.
-
-    :param tests_by_task: Dictionary of tests to generate tasks for.
-    :param task_prefix: Prefix all task names with this.
-    :param generate_config: Configuration of what to generate.
-    :param repeat_config: Configuration of how to repeat tests.
-    :param evg_api: Evergreen API.
-    :return: Set of shrub tasks to run tests_by_task.
-    """
-    tasks: Set[Task] = set()
-    for task in sorted(tests_by_task):
-        task_info = tests_by_task[task]
-        test_list = task_info["tests"]
-        task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project,
-                                                       task_info["display_task_name"],
-                                                       generate_config.build_variant)
-        test_count = len(test_list)
-        for index, test in enumerate(test_list):
-            tasks.add(
-                _create_task(index, test_count, test, task_info, task_runtime_stats,
-                             generate_config, repeat_config, task_prefix))
-
-    return tasks
-
-
-def create_generate_tasks_config(build_variant: BuildVariant, tests_by_task: Dict,
-                                 generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                                 evg_api: Optional[EvergreenApi], include_gen_task: bool = True,
-                                 task_prefix: str = "burn_in") -> None:
-    # pylint: disable=too-many-arguments,too-many-locals
-    """
-    Create the config for the Evergreen generate.tasks file.
-
-    :param build_variant: Shrub configuration to add to.
-    :param tests_by_task: Dictionary of tests to generate tasks for.
-    :param generate_config: Configuration of what to generate.
-    :param repeat_config: Configuration of how to repeat tests.
-    :param evg_api: Evergreen API.
-    :param include_gen_task: Should generating task be include in display task.
-    :param task_prefix: Prefix all task names with this.
-    """
-    tasks = create_generated_tasks(tests_by_task, task_prefix, generate_config, repeat_config,
-                                   evg_api)
-    existing_tasks = {ExistingTask(BURN_IN_TESTS_GEN_TASK)} if include_gen_task else None
-    build_variant.display_task(BURN_IN_TESTS_TASK, tasks, execution_existing_tasks=existing_tasks)
-
-
-def create_task_list_for_tests(
-        changed_tests: Set[str], build_variant: str, evg_conf: EvergreenProjectConfig,
-        exclude_suites: Optional[List] = None, exclude_tasks: Optional[List] = None) -> Dict:
+def create_task_list_for_tests(changed_tests: Set[str], build_variant: str,
+                               evg_conf: EvergreenProjectConfig,
+                               exclude_suites: Optional[List] = None,
+                               exclude_tasks: Optional[List] = None) -> Dict[str, TaskInfo]:
     """
     Create a list of tests by task for the given tests.
 
@@ -658,7 +363,7 @@ def create_task_list_for_tests(
 
 
 def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
-                         changed_tests: Set[str]) -> Dict:
+                         changed_tests: Set[str]) -> Dict[str, TaskInfo]:
     """
     Create a list of tests by task.
 
@@ -681,36 +386,7 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
     return {}
 
 
-# pylint: disable=too-many-arguments
-def create_generate_tasks_file(tests_by_task: Dict, generate_config: GenerateConfig,
-                               repeat_config: RepeatConfig, evg_api: Optional[EvergreenApi],
-                               task_prefix: str = 'burn_in', include_gen_task: bool = True) -> str:
-    """
-    Create an Evergreen generate.tasks file to run the given tasks and tests.
-
-    :param tests_by_task: Dictionary of tests and tasks to run.
-    :param generate_config: Information about how burn_in should generate tasks.
-    :param repeat_config: Information about how burn_in should repeat tests.
-    :param evg_api: Evergreen api.
-    :param task_prefix: Prefix to start generated task's name with.
-    :param include_gen_task: Should the generating task be included in the display task.
-    :returns: Configuration to pass to 'generate.tasks'.
-    """
-    build_variant = BuildVariant(generate_config.run_build_variant)
-    create_generate_tasks_config(build_variant, tests_by_task, generate_config, repeat_config,
-                                 evg_api, include_gen_task=include_gen_task,
-                                 task_prefix=task_prefix)
-
-    shrub_project = ShrubProject.empty()
-    shrub_project.add_build_variant(build_variant)
-
-    if not validate_task_generation_limit(shrub_project):
-        sys.exit(1)
-
-    return shrub_project.json()
-
-
-def run_tests(tests_by_task: Dict, resmoke_cmd: [str]):
+def run_tests(tests_by_task: Dict[str, TaskInfo], resmoke_cmd: [str]) -> None:
     """
     Run the given tests locally.
 
@@ -722,8 +398,8 @@ def run_tests(tests_by_task: Dict, resmoke_cmd: [str]):
     for task in sorted(tests_by_task):
         log = LOGGER.bind(task=task)
         new_resmoke_cmd = copy.deepcopy(resmoke_cmd)
-        new_resmoke_cmd.extend(shlex.split(tests_by_task[task]["resmoke_args"]))
-        new_resmoke_cmd.extend(tests_by_task[task]["tests"])
+        new_resmoke_cmd.extend(shlex.split(tests_by_task[task].resmoke_args))
+        new_resmoke_cmd.extend(tests_by_task[task].tests)
         log.debug("starting execution of task")
         try:
             subprocess.check_call(new_resmoke_cmd, shell=False)
@@ -748,68 +424,150 @@ def _configure_logging(verbose: bool):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
 
-def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi]:
-    """
-    Get an instance of the Evergreen Api.
+class FileChangeDetector(ABC):
+    """Interface to detect changes to files."""
 
-    :param evg_api_config: Config file with evg auth information.
-    :param local_mode: If true, do not connect to Evergreen API.
-    :return: Evergreen Api instance.
-    """
-    if not local_mode:
-        return RetryingEvergreenApi.get_api(config_file=evg_api_config)
-    return None
+    @abstractmethod
+    def create_revision_map(self, repos: List[Repo]) -> RevisionMap:
+        """
+        Create a map of the repos and the given revisions to diff against.
+
+        :param repos: List of repos being tracked.
+        :return: Map of repositories and revisions to diff against.
+        """
+        raise NotImplementedError()
+
+    def find_changed_tests(self, repos: List[Repo]) -> Set[str]:
+        """
+        Find the changed tests.
+
+        Use git to find which test files have changed in this patch.
+        The returned file paths are in normalized form (see os.path.normpath(path)).
+
+        :param repos: List of repos containing changed files.
+        :return: Set of changed tests.
+        """
+        revision_map = self.create_revision_map(repos)
+        LOGGER.info("Calculated revision map", revision_map=revision_map)
+
+        changed_files = find_changed_files_in_repos(repos, revision_map)
+        return {os.path.normpath(path) for path in changed_files if is_file_a_test_file(path)}
 
 
-def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
-            generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig,
-            repos: List[Repo], evg_api: EvergreenApi, origin_rev: Optional[str]) -> None:
-    """
-    Run burn_in_tests with the given configuration.
+class LocalFileChangeDetector(FileChangeDetector):
+    """A change detector for detecting changes in a local repository."""
 
-    :param repeat_config: Config on how much to repeat tests.
-    :param generate_config: Config on how to generate tests.
-    :param resmoke_args: Arguments to pass to resmoke.
-    :param generate_tasks_file: File to write generated config to.
-    :param no_exec: Do not execute tests, just discover tests to run.
-    :param evg_conf: Evergreen configuration.
-    :param repos: Git repositories to check.
-    :param evg_api: Evergreen API client.
-    :param project: Evergreen project to query.
-    :param origin_rev: The revision that local changes will be compared against.
-    """
-    changed_tests = find_changed_tests(repos, origin_rev, evg_api, generate_config.task_id)
-    LOGGER.info("Found changed tests", files=changed_tests)
+    def __init__(self, origin_rev: Optional[str]) -> None:
+        """
+        Create a local file change detector.
 
-    # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
-    resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
+        :param origin_rev: Git revision to diff against.
+        """
+        self.origin_rev = origin_rev
 
-    tests_by_task = create_tests_by_task(generate_config.build_variant, evg_conf, changed_tests)
-    LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
+    def create_revision_map(self, repos: List[Repo]) -> RevisionMap:
+        """
+        Create a map of the repos and the given revisions to diff against.
 
-    if generate_tasks_file:
-        json_text = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
-                                               evg_api)
-        write_file(generate_tasks_file, json_text)
-    elif not no_exec:
-        run_tests(tests_by_task, resmoke_cmd)
-    else:
+        :param repos: List of repos being tracked.
+        :return: Map of repositories and revisions to diff against.
+        """
+        if self.origin_rev:
+            return generate_revision_map(repos, {"mongo": self.origin_rev})
+
+        return {}
+
+
+class BurnInExecutor(ABC):
+    """An interface to execute discovered tests."""
+
+    @abstractmethod
+    def execute(self, tests_by_task: Dict[str, TaskInfo]) -> None:
+        """
+        Execute the given tests in the given tasks.
+
+        :param tests_by_task: Dictionary of tasks to run with tests to run in each.
+        """
+        raise NotImplementedError()
+
+
+class NopBurnInExecutor(BurnInExecutor):
+    """A burn-in executor that displays results, but doesn't execute."""
+
+    def execute(self, tests_by_task: Dict[str, TaskInfo]) -> None:
+        """
+        Execute the given tests in the given tasks.
+
+        :param tests_by_task: Dictionary of tasks to run with tests to run in each.
+        """
         LOGGER.info("Not running tests due to 'no_exec' option.")
+        for task_name, task_info in tests_by_task.items():
+            print(task_name)
+            for test_name in task_info.tests:
+                print(f"- {test_name}")
+
+
+class LocalBurnInExecutor(BurnInExecutor):
+    """A burn-in executor that runs tests on the local machine."""
+
+    def __init__(self, resmoke_args: str, repeat_config: RepeatConfig) -> None:
+        """
+        Create a new local burn-in executor.
+
+        :param resmoke_args: Resmoke arguments to use for execution.
+        :param repeat_config: How tests should be repeated.
+        """
+        self.resmoke_args = resmoke_args
+        self.repeat_config = repeat_config
+
+    def execute(self, tests_by_task: Dict[str, TaskInfo]) -> None:
+        """
+        Execute the given tests in the given tasks.
+
+        :param tests_by_task: Dictionary of tasks to run with tests to run in each.
+        """
+        # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
+        resmoke_cmd = _set_resmoke_cmd(self.repeat_config, list(self.resmoke_args))
+        run_tests(tests_by_task, resmoke_cmd)
+
+
+class BurnInOrchestrator:
+    """Orchestrate the execution of burn_in_tests."""
+
+    def __init__(self, change_detector: FileChangeDetector, burn_in_executor: BurnInExecutor,
+                 evg_conf: EvergreenProjectConfig) -> None:
+        """
+        Create a new orchestrator.
+
+        :param change_detector: Component to use to detect test changes.
+        :param burn_in_executor: Components to execute tests.
+        :param evg_conf: Evergreen project configuration.
+        """
+        self.change_detector = change_detector
+        self.burn_in_executor = burn_in_executor
+        self.evg_conf = evg_conf
+
+    def burn_in(self, repos: List[Repo], build_variant: str) -> None:
+        """
+        Execute burn in tests for the given git repositories.
+
+        :param repos: Repositories to check for changes.
+        :param build_variant: Build variant to use for task definitions.
+        """
+        changed_tests = self.change_detector.find_changed_tests(repos)
+        LOGGER.info("Found changed tests", files=changed_tests)
+
+        tests_by_task = create_tests_by_task(build_variant, self.evg_conf, changed_tests)
+        LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
+
+        self.burn_in_executor.execute(tests_by_task)
 
 
 @click.command()
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
-@click.option("--generate-tasks-file", "generate_tasks_file", default=None, metavar='FILE',
-              help="Run in 'generate.tasks' mode. Store task config to given file.")
 @click.option("--build-variant", "build_variant", default=DEFAULT_VARIANT, metavar='BUILD_VARIANT',
               help="Tasks to run will be selected from this build variant.")
-@click.option("--run-build-variant", "run_build_variant", default=None, metavar='BUILD_VARIANT',
-              help="Burn in tasks will be generated on this build variant.")
-@click.option("--distro", "distro", default=None, metavar='DISTRO',
-              help="The distro the tasks will execute on.")
-@click.option("--project", "project", default=DEFAULT_PROJECT, metavar='PROJECT',
-              help="The evergreen project the tasks will execute on.")
 @click.option("--repeat-tests", "repeat_tests_num", default=None, type=int,
               help="Number of times to repeat tests.")
 @click.option("--repeat-tests-min", "repeat_tests_min", default=None, type=int,
@@ -818,21 +576,16 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
               help="The maximum number of times to repeat tests if time option is specified.")
 @click.option("--repeat-tests-secs", "repeat_tests_secs", default=None, type=int, metavar="SECONDS",
               help="Repeat tests for the given time (in secs).")
-@click.option("--evg-api-config", "evg_api_config", default=CONFIG_FILE, metavar="FILE",
-              help="Configuration file with connection info for Evergreen API.")
-@click.option("--local", "local_mode", default=False, is_flag=True,
-              help="Local mode. Do not call out to evergreen api.")
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
-@click.option("--task_id", "task_id", default=None, metavar='TASK_ID',
-              help="The evergreen task id.")
 @click.option(
     "--origin-rev", "origin_rev", default=None,
     help="The revision in the mongo repo that changes will be compared against if specified.")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
-def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
-         repeat_tests_num, repeat_tests_min, repeat_tests_max, repeat_tests_secs, resmoke_args,
-         local_mode, evg_api_config, verbose, task_id, origin_rev):
+def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
+         repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
+         repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
+         origin_rev: Optional[str]) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -848,61 +601,35 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     The `--repeat-*` arguments allow configuration of how burn_in_tests repeats tests. Tests can
     either be repeated a specified number of times with the `--repeat-tests` option, or they can
     be repeated for a certain time period with the `--repeat-tests-secs` option.
-
-    There are two modes that burn_in_tests can run in:
-
-    (1) Normal mode: by default burn_in_tests will attempt to run all detected tests the
-    configured number of times. This is useful if you have a test or tests you would like to
-    check before submitting a patch to evergreen.
-
-    (2) By specifying the `--generate-tasks-file`, burn_in_tests will run generate a configuration
-    file that can then be sent to the Evergreen 'generate.tasks' command to create evergreen tasks
-    to do all the test executions. This is the mode used to run tests in patch builds.
-
-    NOTE: There is currently a limit of the number of tasks burn_in_tests will attempt to generate
-    in evergreen. The limit is 1000. If you change enough tests that more than 1000 tasks would
-    be generated, burn_in_test will fail. This is to avoid generating more tasks than evergreen
-    can handle.
     \f
 
     :param build_variant: Build variant to query tasks from.
-    :param run_build_variant:Build variant to actually run against.
-    :param distro: Distro to run tests on.
-    :param project: Project to run tests on.
-    :param generate_tasks_file: Create a generate tasks configuration in this file.
     :param no_exec: Just perform test discover, do not execute the tests.
     :param repeat_tests_num: Repeat each test this number of times.
     :param repeat_tests_min: Repeat each test at least this number of times.
     :param repeat_tests_max: Once this number of repetitions has been reached, stop repeating.
     :param repeat_tests_secs: Continue repeating tests for this number of seconds.
     :param resmoke_args: Arguments to pass through to resmoke.
-    :param local_mode: Don't call out to the evergreen API (used for testing).
-    :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
-    :param task_id: Id of evergreen task being run in.
     :param origin_rev: The revision that local changes will be compared against.
     """
     _configure_logging(verbose)
 
-    evg_conf = parse_evergreen_file(EVERGREEN_FILE)
     repeat_config = RepeatConfig(repeat_tests_secs=repeat_tests_secs,
                                  repeat_tests_min=repeat_tests_min,
                                  repeat_tests_max=repeat_tests_max,
                                  repeat_tests_num=repeat_tests_num)  # yapf: disable
-    generate_config = GenerateConfig(build_variant=build_variant,
-                                     run_build_variant=run_build_variant,
-                                     distro=distro,
-                                     project=project,
-                                     task_id=task_id)  # yapf: disable
-    if generate_tasks_file:
-        generate_config.validate(evg_conf)
-
-    evg_api = _get_evg_api(evg_api_config, local_mode)
 
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
+    evg_conf = parse_evergreen_file(EVERGREEN_FILE)
 
-    burn_in(repeat_config, generate_config, resmoke_args, generate_tasks_file, no_exec, evg_conf,
-            repos, evg_api, origin_rev)
+    change_detector = LocalFileChangeDetector(origin_rev)
+    executor = LocalBurnInExecutor(resmoke_args, repeat_config)
+    if no_exec:
+        executor = NopBurnInExecutor()
+
+    burn_in_orchestrator = BurnInOrchestrator(change_detector, executor, evg_conf)
+    burn_in_orchestrator.burn_in(repos, build_variant)
 
 
 if __name__ == "__main__":
