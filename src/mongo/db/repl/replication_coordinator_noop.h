@@ -199,6 +199,8 @@ public:
                              GetNewConfigFn getNewConfig,
                              bool force) final;
 
+    Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) final;
+
     Status awaitConfigCommitment(OperationContext* opCtx, bool waitForOplogCommitment) final;
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;

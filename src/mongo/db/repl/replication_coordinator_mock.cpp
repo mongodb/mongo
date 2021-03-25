@@ -437,6 +437,11 @@ Status ReplicationCoordinatorMock::doReplSetReconfig(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::doOptimizedReconfig(OperationContext* opCtx,
+                                                       GetNewConfigFn getNewConfig) {
+    return Status::OK();
+}
+
 Status ReplicationCoordinatorMock::awaitConfigCommitment(OperationContext* opCtx,
                                                          bool waitForOplogCommitment) {
     return Status::OK();

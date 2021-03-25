@@ -726,6 +726,18 @@ public:
                                      bool force) = 0;
 
     /**
+     * Performs a reconfig that skips certain safety checks, including the following:
+     * 1) Wait for the current config to be majority committed
+     * 2) Wait for oplog commitment
+     * 3) Quorum check
+     * This function is only intended to be called for internal reconfigs that do not change the
+     * consensus group (eg. only bumping the config version or term). These scenarios are expected
+     * to be able to bypass certain safety checks because the caller guarantees the reconfig to be
+     * safe.
+     */
+    virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) = 0;
+
+    /**
      * Waits until the following two conditions are satisfied:
      *  (1) The current config has propagated to a majority of nodes.
      *  (2) Any operations committed in the previous config are committed in the current config.

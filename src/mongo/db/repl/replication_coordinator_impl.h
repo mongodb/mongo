@@ -259,6 +259,8 @@ public:
                                      GetNewConfigFn getNewConfig,
                                      bool force) override;
 
+    virtual Status doOptimizedReconfig(OperationContext* opCtx, GetNewConfigFn) override;
+
     virtual Status awaitConfigCommitment(OperationContext* opCtx,
                                          bool waitForOplogCommitment) override;
 
@@ -1477,6 +1479,15 @@ private:
      * Calculates and returns the read preference for the node.
      */
     const ReadPreference _getSyncSourceReadPreference(WithLock);
+
+    /*
+     * Performs the replica set reconfig procedure. Certain consensus safety checks are omitted when
+     * either 'force' or 'skipSafetyChecks' are true.
+     */
+    Status _doReplSetReconfig(OperationContext* opCtx,
+                              GetNewConfigFn getNewConfig,
+                              bool force,
+                              bool skipSafetyChecks);
 
     //
     // All member variables are labeled with one of the following codes indicating the
