@@ -1313,14 +1313,15 @@ const operations = [
         profileFilter: {op: 'insert', 'command.insert': 'capped'},
         profileAssert: (db, profileDoc) => {
             if (!isDebugBuild(db)) {
-                // Should read exactly as many bytes as are in the document that is being deleted.
+                // Capped deletes will read two documents. The first is the document to be deleted
+                // and the next is to cache the RecordId of the next document.
                 // Debug builds may perform extra reads of the _mdb_catalog.
-                assert.eq(profileDoc.docBytesRead, 29);
-                assert.eq(profileDoc.docUnitsRead, 1);
+                assert.eq(profileDoc.docBytesRead, 58);
+                assert.eq(profileDoc.docUnitsRead, 2);
                 assert.eq(profileDoc.cursorSeeks, 1);
             } else {
-                assert.gte(profileDoc.docBytesRead, 29);
-                assert.gte(profileDoc.docUnitsRead, 1);
+                assert.gte(profileDoc.docBytesRead, 58);
+                assert.gte(profileDoc.docUnitsRead, 2);
                 assert.gte(profileDoc.cursorSeeks, 1);
             }
             assert.eq(profileDoc.idxEntryBytesRead, 0);
@@ -1347,15 +1348,16 @@ const operations = [
         profileFilter: {op: 'insert', 'command.insert': 'capped'},
         profileAssert: (db, profileDoc) => {
             if (!isDebugBuild(db)) {
-                // Should read exactly as many bytes as are in the documents that are being deleted.
+                // Capped deletes will read two documents. The first is the document to be deleted
+                // and the next is to cache the RecordId of the next document.
                 // Debug builds may perform extra reads of the _mdb_catalog.
-                assert.eq(profileDoc.docBytesRead, 261);
-                assert.eq(profileDoc.docUnitsRead, 9);
-                assert.eq(profileDoc.cursorSeeks, 9);
+                assert.eq(profileDoc.docBytesRead, 522);
+                assert.eq(profileDoc.docUnitsRead, 18);
+                assert.eq(profileDoc.cursorSeeks, 18);
             } else {
-                assert.gte(profileDoc.docBytesRead, 261);
-                assert.gte(profileDoc.docUnitsRead, 9);
-                assert.gte(profileDoc.cursorSeeks, 9);
+                assert.gte(profileDoc.docBytesRead, 522);
+                assert.gte(profileDoc.docUnitsRead, 18);
+                assert.gte(profileDoc.cursorSeeks, 18);
             }
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);

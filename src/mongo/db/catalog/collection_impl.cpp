@@ -891,10 +891,20 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx) const {
 
     WriteUnitOfWork wuow(opCtx);
 
+    boost::optional<Record> record;
     auto cursor = getCursor(opCtx, /*forward=*/true);
-    while (sizeSaved < sizeOverCap || docsRemoved < docsOverCap) {
-        boost::optional<Record> record = cursor->next();
 
+    // If the next RecordId to be deleted is known, navigate to it using seekExact(). Using a cursor
+    // and advancing it to the first element by calling next() will be slow for capped collections
+    // on particular storage engines, such as WiredTiger. In WiredTiger, there may be many
+    // tombstones (invisible deleted records) to traverse at the beginning of the table.
+    if (!_shared->_cappedFirstRecord.isNull()) {
+        record = cursor->seekExact(_shared->_cappedFirstRecord);
+    } else {
+        record = cursor->next();
+    }
+
+    while (sizeSaved < sizeOverCap || docsRemoved < docsOverCap) {
         // Because we're in a side transaction, we're using another storage snapshot and therefore
         // can't see the newly inserted documents in the capped collection. If there are no records
         // found. there's nothing to delete.
@@ -909,11 +919,23 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx) const {
             int64_t unusedKeysDeleted = 0;
             _indexCatalog->unindexRecord(
                 opCtx, record->data.toBson(), record->id, /*logIfError=*/false, &unusedKeysDeleted);
-            _shared->_recordStore->deleteRecord(opCtx, record->id);
+
+            // We're about to delete the record our cursor is positioned on, so advance the cursor.
+            RecordId toDelete = record->id;
+            record = cursor->next();
+
+            _shared->_recordStore->deleteRecord(opCtx, toDelete);
         } catch (const WriteConflictException&) {
             LOGV2(22398, "Got write conflict removing capped records, ignoring");
             return;
         }
+    }
+
+    // Save the RecordId of the next record to be deleted, if it exists.
+    if (!record) {
+        _shared->_cappedFirstRecord = RecordId();
+    } else {
+        _shared->_cappedFirstRecord = record->id;
     }
 
     wuow.commit();
