@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 #include "mongo/platform/basic.h"
 
@@ -304,6 +304,14 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
                                           Milliseconds delayBetweenBatches) {
     return AsyncTry([=] {
                return withTemporaryOperationContext([=](OperationContext* opCtx) {
+                   LOGV2_DEBUG(5346200,
+                               1,
+                               "Starting batch deletion",
+                               "namespace"_attr = nss,
+                               "range"_attr = redact(range.toString()),
+                               "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
+                               "delayBetweenBatches"_attr = delayBetweenBatches);
+
                    if (migrationId) {
                        ensureRangeDeletionTaskStillExists(opCtx, *migrationId);
                    }
@@ -323,7 +331,7 @@ ExecutorFuture<void> deleteRangeInBatches(const std::shared_ptr<executor::TaskEx
 
                    LOGV2_DEBUG(
                        23769,
-                       2,
+                       1,
                        "Deleted {numDeleted} documents in pass in namespace {namespace} with "
                        "UUID  {collectionUUID} for range {range}",
                        "Deleted documents in pass",
@@ -388,14 +396,13 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
-        LOGV2_DEBUG(23771,
-                    2,
-                    "Waiting for majority replication of local deletions in namespace {namespace} "
-                    "with UUID  {collectionUUID} for range {range}",
+        LOGV2_DEBUG(5346202,
+                    1,
                     "Waiting for majority replication of local deletions",
                     "namespace"_attr = nss.ns(),
                     "collectionUUID"_attr = collectionUuid,
-                    "range"_attr = redact(range.toString()));
+                    "range"_attr = redact(range.toString()),
+                    "clientOpTime"_attr = clientOpTime);
 
         // Asynchronously wait for majority write concern.
         return WaitForMajorityService::get(opCtx->getServiceContext())
@@ -432,7 +439,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
         })
         .then([=]() mutable {
             LOGV2_DEBUG(23772,
-                        2,
+                        1,
                         "Beginning deletion of any documents in {namespace} range {range} with  "
                         "numDocsToRemovePerBatch {numDocsToRemovePerBatch}",
                         "Beginning deletion of documents",
@@ -463,6 +470,11 @@ SharedSemiFuture<void> removeDocumentsInRange(
                     // visible to the caller at non-local read concerns.
                     return waitForDeletionsToMajorityReplicate(executor, nss, collectionUuid, range)
                         .then([=] {
+                            LOGV2_DEBUG(5346201,
+                                        1,
+                                        "Finished waiting for majority for deleted batch",
+                                        "namespace"_attr = nss,
+                                        "range"_attr = redact(range.toString()));
                             // Propagate any errors to the onCompletion() handler below.
                             return s;
                         });
@@ -471,7 +483,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
         .onCompletion([=](Status s) {
             if (s.isOK()) {
                 LOGV2_DEBUG(23773,
-                            2,
+                            1,
                             "Completed deletion of documents in {namespace} range {range}",
                             "Completed deletion of documents",
                             "namespace"_attr = nss.ns(),
@@ -500,13 +512,13 @@ SharedSemiFuture<void> removeDocumentsInRange(
             try {
                 removePersistentRangeDeletionTask(nss, std::move(*migrationId));
             } catch (const DBException& e) {
-                LOGV2(23770,
-                      "Failed to delete range deletion task for range {range} in collection "
-                      "{namespace} due to {error}",
-                      "Failed to delete range deletion task",
-                      "range"_attr = range,
-                      "namespace"_attr = nss,
-                      "error"_attr = e.what());
+                LOGV2_ERROR(23770,
+                            "Failed to delete range deletion task for range {range} in collection "
+                            "{namespace} due to {error}",
+                            "Failed to delete range deletion task",
+                            "range"_attr = range,
+                            "namespace"_attr = nss,
+                            "error"_attr = e.what());
 
                 return e.toStatus();
             }
