@@ -1,7 +1,4 @@
 // this tests all points using $near
-// @tags: [
-//   sbe_incompatible,
-// ]
 var db;
 (function() {
 "use strict";

@@ -4,7 +4,6 @@
 //   requires_persistence,
 //   requires_replication,
 //   requires_sharding,
-//   sbe_incompatible,
 //   uses_atclustertime,
 //   uses_transactions,
 // ]

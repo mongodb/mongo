@@ -2,7 +2,6 @@
  * Tests that the transaction items in the 'twoPhaseCommitCoordinator' object in currentOp() are
  * being tracked correctly.
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

@@ -4,7 +4,6 @@
  * the primary's abortIndexBuild oplog entry.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

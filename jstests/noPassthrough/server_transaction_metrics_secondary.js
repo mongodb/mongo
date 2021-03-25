@@ -1,6 +1,5 @@
 // Test that transactions run on secondaries do not change the serverStatus transaction metrics.
 // @tags: [
-//   sbe_incompatible,
 //   uses_transactions,
 // ]
 (function() {

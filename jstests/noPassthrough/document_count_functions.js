@@ -1,7 +1,6 @@
 /**
  * @tags: [
  *   requires_fastcount,
- *   sbe_incompatible,
  * ]
  * Tests the countDocuments and estimatedDocumentCount commands.
  */

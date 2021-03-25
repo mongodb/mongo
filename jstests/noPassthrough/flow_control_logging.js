@@ -5,7 +5,6 @@
  *   requires_flow_control,
  *   requires_majority_read_concern,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

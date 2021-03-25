@@ -3,7 +3,6 @@
 // are run in parallel on shards).
 // @tags: [
 //   requires_journaling,
-//   sbe_incompatible,
 // ]
 (function() {
 'use strict';

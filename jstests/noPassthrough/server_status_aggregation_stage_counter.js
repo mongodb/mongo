@@ -2,7 +2,6 @@
  * Tests for serverStatus metrics.stage stats.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

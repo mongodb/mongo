@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 load('jstests/libs/ftdc.js');

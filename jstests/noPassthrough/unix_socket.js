@@ -11,7 +11,6 @@
 // @tags: [
 //   live_record_incompatible,
 //   requires_sharding,
-//   sbe_incompatible,
 // ]
 (function() {
 'use strict';

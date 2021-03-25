@@ -7,7 +7,6 @@
  * This test is labeled resource intensive because its total io_write is 900MB.
  * @tags: [
  *   resource_intensive,
- *   sbe_incompatible,
  * ]
  */
 (function() {

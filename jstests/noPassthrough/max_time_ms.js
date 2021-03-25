@@ -4,7 +4,6 @@
  * Creates a sharded cluster.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {

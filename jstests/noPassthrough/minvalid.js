@@ -3,7 +3,6 @@
 // their stored minvalid
 // @tags: [
 //   requires_replication,
-//   sbe_incompatible,
 // ]
 
 var name = "minvalid";

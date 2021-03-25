@@ -17,9 +17,6 @@
 // Tests can be easily reproduced by getting the test number from the output directly before a
 // test fails, and hard-wiring that as the test number.
 //
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 (function() {
 "use strict";

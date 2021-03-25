@@ -3,11 +3,11 @@
  * it is guaranteed to be past the maximum time range of a bucket.
  *
  * @tags: [
- *     assumes_no_implicit_collection_creation_after_drop,
- *     does_not_support_stepdowns,
- *     requires_fcv_49,
- *     requires_find_command,
- *     requires_getmore,
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   does_not_support_stepdowns,
+ *   requires_fcv_49,
+ *   requires_find_command,
+ *   requires_getmore,
  * ]
  */
 (function() {

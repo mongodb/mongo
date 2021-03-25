@@ -4,7 +4,6 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -2,7 +2,6 @@
 // @tags: [
 //   requires_majority_read_concern,
 //   requires_persistence,
-//   sbe_incompatible,
 //   uses_transactions,
 // ]
 (function() {

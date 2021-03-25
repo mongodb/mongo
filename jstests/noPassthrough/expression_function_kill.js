@@ -1,8 +1,5 @@
 /**
  * Tests where/function can be interrupted through maxTimeMS and query knob.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

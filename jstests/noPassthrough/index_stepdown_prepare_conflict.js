@@ -1,4 +1,4 @@
-/*
+/**
  * Tests that we don't hit 3 way deadlock between an index builder, prepared transaction, and step
  * down.
  *

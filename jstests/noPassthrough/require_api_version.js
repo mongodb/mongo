@@ -8,7 +8,6 @@
  *   requires_journaling,
  *   requires_replication,
  *   requires_transactions,
- *   sbe_incompatible,
  * ]
  */
 

@@ -3,7 +3,6 @@
  * through replication, the primary drops all the indexes.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

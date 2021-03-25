@@ -3,7 +3,6 @@
  * option while there is an index build in progress, we should reject the shutdown request.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

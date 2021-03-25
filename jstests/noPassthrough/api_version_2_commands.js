@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_fcv_47,
  *   requires_journaling,
- *   sbe_incompatible,
  * ]
  */
 

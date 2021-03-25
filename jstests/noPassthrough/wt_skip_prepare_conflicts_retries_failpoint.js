@@ -4,7 +4,6 @@
  * transaction with the "WTSkipPrepareConflictRetries" failpoint is enabled.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

@@ -1,7 +1,6 @@
 // @tags: [
 //   requires_replication,
 //   requires_sharding,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

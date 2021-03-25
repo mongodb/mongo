@@ -5,7 +5,6 @@
  * @tags: [
  *   live_record_incompatible,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

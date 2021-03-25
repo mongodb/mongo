@@ -13,7 +13,6 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 

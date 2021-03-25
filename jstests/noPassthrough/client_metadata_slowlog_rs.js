@@ -3,7 +3,6 @@
  * set.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 load("jstests/libs/logv2_helpers.js");
