@@ -350,6 +350,7 @@ env.Library(
         'move_chunk_command.cpp',
         'move_primary_coordinator.cpp',
         'rename_collection_coordinator.cpp',
+        'rename_collection_coordinator_document.idl',
         'refine_collection_shard_key_coordinator.cpp',
         'reshard_collection_coordinator.cpp',
         'resharding_test_commands.cpp',

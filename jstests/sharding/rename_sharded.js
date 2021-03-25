@@ -1,7 +1,7 @@
 /**
  * Test all the possible succeed/fail cases around sharded collections renaming.
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [requires_fcv_49]
  */
 load("jstests/libs/uuid_util.js");
 
@@ -227,4 +227,5 @@ if (isDDLFeatureFlagEnabled) {
         assert.commandFailed(fromColl.renameCollection(toNs.split('.')[1], false /* dropTarget*/));
     }
 }
+
 st.stop();

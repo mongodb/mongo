@@ -68,6 +68,27 @@ void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) 
                 "collectionExisted"_attr = knownNss);
 }
 
+/*
+ * Rename the collection if exists locally, otherwise simply drop the source collection.
+ * Returns true if the source collection is known, false otherwise.
+ */
+void renameOrDropTarget(OperationContext* opCtx,
+                        const NamespaceString& fromNss,
+                        const NamespaceString& toNss,
+                        const RenameCollectionOptions& options) {
+    try {
+        validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // It's ok for a participant shard to have no knowledge about a collection
+        LOGV2_DEBUG(5448801,
+                    1,
+                    "Source namespace not found while trying to rename collection on participant",
+                    "namespace"_attr = fromNss);
+        dropCollectionLocally(opCtx, toNss);
+        deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
+    }
+}
+
 class ShardsvrRenameCollectionParticipantCommand final
     : public TypedCommand<ShardsvrRenameCollectionParticipantCommand> {
 public:
@@ -120,26 +141,12 @@ public:
             uassertStatusOK(waitForWriteConcern(
                 opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
-            dropCollectionLocally(opCtx, toNss);
+            snapshotRangeDeletionsForRename(opCtx, fromNss, toNss);
 
-            try {
-                snapshotRangeDeletionsForRename(opCtx, fromNss, toNss);
+            renameOrDropTarget(opCtx, fromNss, toNss, options);
 
-                // Rename the collection locally and clear the cache
-                validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
-                uassertStatusOK(
-                    shardmetadatautil::dropChunksAndDeleteCollectionsEntry(opCtx, fromNss));
-
-                restoreRangeDeletionTasksForRename(opCtx, toNss);
-                deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
-            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // It's ok for a participant shard to have no knowledge about a collection
-                LOGV2_DEBUG(
-                    5448801,
-                    1,
-                    "Source namespace not found while trying to rename collection on participant",
-                    "namespace"_attr = fromNss);
-            }
+            restoreRangeDeletionTasksForRename(opCtx, toNss);
+            deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
         }
 
     private:

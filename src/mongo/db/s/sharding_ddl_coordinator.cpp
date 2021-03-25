@@ -101,6 +101,10 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 _scopedLocks.emplace(collDistLock.moveToAnotherThread());
             }
 
+            for (auto& lock : _acquireAdditionalLocks(opCtx)) {
+                _scopedLocks.emplace(lock.moveToAnotherThread());
+            }
+
             stdx::lock_guard<Latch> lg(_mutex);
             if (!_constructionCompletionPromise.getFuture().isReady()) {
                 _constructionCompletionPromise.emplaceValue();

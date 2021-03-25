@@ -54,7 +54,7 @@ public:
      *
      * This is used to decide if we can join a previously created coordinator.
      * In the case the given coordinator document has incompatible options with this,
-     * this function must throw a ConflictingOprationInProgress exception with an adequate message.
+     * this function must throw a ConflictingOperationInProgress exception with an adequate message.
      */
     virtual void checkIfOptionsConflict(const BSONObj& coorDoc) const = 0;
 
@@ -90,6 +90,11 @@ public:
     }
 
 protected:
+    virtual std::vector<DistLockManager::ScopedDistLock> _acquireAdditionalLocks(
+        OperationContext* opCtx) {
+        return {};
+    };
+
     ShardingDDLCoordinatorMetadata _coorMetadata;
 
 private:

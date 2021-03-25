@@ -37,6 +37,8 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
+#include "mongo/db/s/rename_collection_coordinator_document_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -51,6 +53,14 @@ bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead lock(opCtx, nss);
     return opCtx->writesAreReplicated() &&
         CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx).isSharded();
+}
+
+bool renameIsAllowedOnNS(const NamespaceString& nss) {
+    if (nss.isSystem()) {
+        return nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility);
+    }
+
+    return !nss.isOnInternalDb();
 }
 
 RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
@@ -106,6 +116,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto& req = request();
             const auto& fromNss = ns();
+            const auto& toNss = req.getTo();
 
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
@@ -127,10 +138,26 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            auto renameCollectionCoordinator = std::make_shared<RenameCollectionCoordinator>(
-                opCtx, ns(), req.getTo(), req.getDropTarget(), req.getStayTemp());
-            renameCollectionCoordinator->run(opCtx).get();
-            return renameCollectionCoordinator->getResponseFuture().get();
+            uassert(ErrorCodes::CommandFailed,
+                    "Source and destination collections must be on the same database.",
+                    fromNss.db() == toNss.db());
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Can't rename from internal namespace: " << fromNss,
+                    renameIsAllowedOnNS(fromNss));
+
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Can't rename to internal namespace: " << toNss,
+                    renameIsAllowedOnNS(toNss));
+
+            auto coordinatorDoc =
+                RenameCollectionCoordinatorDocument(toNss, req.getDropTarget(), req.getStayTemp());
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            auto renameCollectionCoordinator = checked_pointer_cast<RenameCollectionCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+            return renameCollectionCoordinator->getResponse(opCtx);
         }
 
     private:

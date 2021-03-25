@@ -97,26 +97,36 @@ var $config = (function() {
                           ' collection:' + srcCollName);
                 assertAlways.commandWorked(srcColl.renameCollection(destCollName));
             } catch (e) {
-                if (e.code && e.code === ErrorCodes.NamespaceNotFound) {
-                    // It is fine for a rename operation to throw NamespaceNotFound BEFORE starting
-                    // (e.g. if the collection was previously dropped). Checking the changelog to
-                    // assert that no such exception was thrown AFTER a rename started.
-                    const dbName = db.getName();
-                    let config = db.getSiblingDB('config');
-                    let countRenames = config.changelog
-                                           .find({
-                                               what: 'renameCollection.start',
-                                               details: {
-                                                   source: dbName + srcCollName,
-                                                   destination: dbName + destCollName
-                                               }
-                                           })
-                                           .itcount();
-                    assert.eq(0,
-                              countRenames,
-                              'NamespaceNotFound exception thrown during rename from ' +
-                                  srcCollName + ' to ' + destCollName);
-                    return;
+                const exceptionCode = e.code;
+                if (exceptionCode) {
+                    if (exceptionCode === ErrorCodes.NamespaceNotFound) {
+                        // It is fine for a rename operation to throw NamespaceNotFound BEFORE
+                        // starting (e.g. if the collection was previously dropped). Checking the
+                        // changelog to assert that no such exception was thrown AFTER a rename
+                        // started.
+                        const dbName = db.getName();
+                        let config = db.getSiblingDB('config');
+                        let countRenames = config.changelog
+                                               .find({
+                                                   what: 'renameCollection.start',
+                                                   details: {
+                                                       source: dbName + srcCollName,
+                                                       destination: dbName + destCollName
+                                                   }
+                                               })
+                                               .itcount();
+                        assert.eq(0,
+                                  countRenames,
+                                  'NamespaceNotFound exception thrown during rename from ' +
+                                      srcCollName + ' to ' + destCollName);
+                        return;
+                    }
+                    if (exceptionCode === ErrorCodes.ConflictingOperationInProgress) {
+                        // It is fine for a rename operation to throw ConflictingOperationInProgress
+                        // if a concurrent rename with the same source collection but different
+                        // options is ongoing.
+                        return;
+                    }
                 }
                 throw e;
             } finally {

@@ -53,10 +53,18 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 
 
 /**
- * Erase collection metadata from config server and invalidate the locally cached once.
+ * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove chunks, tags and the description associated with the given namespace.
  */
 void removeCollMetadataFromConfig(OperationContext* opCtx, const CollectionType& coll);
+
+/**
+ * Erase collection metadata from config server and invalidate the locally cached one.
+ * In particular remove chunks, tags and the description associated with the given namespace.
+ *
+ * Returns true if the collection existed before being removed.
+ */
+bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString& nss);
 
 /**
  * Rename sharded collection metadata as part of a renameCollection operation.

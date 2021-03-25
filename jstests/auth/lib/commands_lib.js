@@ -5053,6 +5053,7 @@ var authCommandsLib = {
         {
           testname: "renameCollection_twoDbs",
           command: {renameCollection: firstDbName + ".x", to: secondDbName + ".y"},
+          skipSharded: true,
           setup: function(db) {
             assert.writeOK(db.getSiblingDB(firstDbName).x.save({}));
             assert.writeOK(db.getSiblingDB(secondDbName).y.save({}));
