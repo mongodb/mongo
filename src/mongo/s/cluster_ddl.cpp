@@ -33,11 +33,53 @@
 
 #include "mongo/s/cluster_ddl.h"
 
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace cluster {
+namespace {
+
+std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
+    OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
+    auto cmdToSend = cmdObj;
+    appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED());
+
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (auto&& shardId : shardIds)
+        requests.emplace_back(std::move(shardId), cmdToSend);
+
+    return requests;
+}
+
+AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
+    OperationContext* opCtx,
+    StringData dbName,
+    const CachedDatabaseInfo& dbInfo,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy) {
+    ShardId shardId;
+    if (dbName == NamespaceString::kConfigDb) {
+        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
+        std::sort(shardIds.begin(), shardIds.end());
+        shardId = shardIds[0];
+    } else {
+        shardId = dbInfo.primaryId();
+    }
+
+    auto responses =
+        gatherResponses(opCtx,
+                        dbName,
+                        readPref,
+                        retryPolicy,
+                        buildUnshardedRequestsForAllShards(
+                            opCtx, {shardId}, appendDbVersionIfPresent(cmdObj, dbInfo)));
+    return std::move(responses.front());
+}
+
+}  // namespace
 
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   StringData dbName,
@@ -73,6 +115,29 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
     }
 
     return uassertStatusOK(std::move(dbStatus));
+}
+
+void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request) {
+    const auto& nss = request.getNamespace();
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+
+    auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
+        opCtx,
+        nss.db(),
+        dbInfo,
+        CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
+
+    const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+    uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+    auto createCollResp = CreateCollectionResponse::parse(IDLParserErrorContext("createCollection"),
+                                                          remoteResponse.data);
+
+    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
 }
 
 }  // namespace cluster

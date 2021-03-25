@@ -54,6 +54,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+// TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {
 namespace {
 
@@ -100,9 +101,6 @@ void validateAndDeduceFullRequestOptions(OperationContext* opCtx,
             numChunks >= 0 && numChunks <= maxNumInitialChunksForShards &&
                 numChunks <= maxNumInitialChunksTotal);
 
-    // TODO (SERVER-48639): As of 4.7, this check is also performed on the shard itself, under the
-    // critical section, so the code below should be removed when 5.0 becomes last-lts.
-    //
     // Ensure the collation is valid. Currently we only allow the simple collation.
     bool simpleCollationSpecified = false;
     if (request->getCollation()) {

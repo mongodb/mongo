@@ -40,6 +40,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/util/scopeguard.h"
 
+// TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {
 namespace {
 

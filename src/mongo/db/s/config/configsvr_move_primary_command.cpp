@@ -53,6 +53,7 @@
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/scopeguard.h"
 
+// TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {
 namespace {
 

@@ -280,7 +280,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-	'$BUILD_DIR/mongo/s/query/cluster_aggregate',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         'type_shard_identity',
     ],
     LIBDEPS_PRIVATE=[
@@ -411,10 +411,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
-        '$BUILD_DIR/mongo/db/sessions_collection',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/sessions_collection_sharded',
+        '$BUILD_DIR/mongo/s/sharding_api',
     ]
 )
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace cluster {
@@ -41,6 +42,11 @@ namespace cluster {
 CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                   StringData dbName,
                                   boost::optional<ShardId> suggestedPrimaryId = boost::none);
+
+/**
+ * Creates the specified sharded collection.
+ */
+void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& request);
 
 }  // namespace cluster
 }  // namespace mongo
