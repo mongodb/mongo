@@ -443,6 +443,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"getRegexFlags",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::getRegexFlags, false}},
     {"shardFilter", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::shardFilter, false}},
+    {"shardHash", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::shardHash, false}},
     {"extractSubArray",
      BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::extractSubArray, false}},
     {"isArrayEmpty", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isArrayEmpty, false}},

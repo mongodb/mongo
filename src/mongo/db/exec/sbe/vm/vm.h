@@ -309,6 +309,7 @@ enum class Builtin : uint8_t {
     regexFind,
     regexFindAll,
     shardFilter,
+    shardHash,
     extractSubArray,
     isArrayEmpty,
     reverseArray,
@@ -724,6 +725,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinShardFilter(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinShardHash(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinExtractSubArray(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsArrayEmpty(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinReverseArray(ArityType arity);
