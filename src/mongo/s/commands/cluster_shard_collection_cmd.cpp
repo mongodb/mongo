@@ -38,59 +38,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/cluster_ddl.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
-#include "mongo/s/config_server_client.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
-
-std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
-    OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
-    auto cmdToSend = cmdObj;
-    appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED());
-
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (auto&& shardId : shardIds)
-        requests.emplace_back(std::move(shardId), cmdToSend);
-
-    return requests;
-}
-
-AsyncRequestsSender::Response executeCommandAgainstDatabasePrimaryOrFirstShard(
-    OperationContext* opCtx,
-    StringData dbName,
-    const CachedDatabaseInfo& dbInfo,
-    const BSONObj& cmdObj,
-    const ReadPreferenceSetting& readPref,
-    Shard::RetryPolicy retryPolicy) {
-    ShardId shardId;
-    if (dbName == NamespaceString::kConfigDb) {
-        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        uassert(ErrorCodes::IllegalOperation, "there are no shards to target", !shardIds.empty());
-        std::sort(shardIds.begin(), shardIds.end());
-        shardId = shardIds[0];
-    } else {
-        shardId = dbInfo.primaryId();
-    }
-
-    auto responses =
-        gatherResponses(opCtx,
-                        dbName,
-                        readPref,
-                        retryPolicy,
-                        buildUnshardedRequestsForAllShards(
-                            opCtx, {shardId}, appendDbVersionIfPresent(cmdObj, dbInfo)));
-    return std::move(responses.front());
-}
 
 class ShardCollectionCmd : public BasicCommand {
 public:
@@ -146,34 +98,11 @@ public:
         shardsvrCollRequest.setCollation(shardCollRequest.getCollation());
         shardsvrCollRequest.setDbName(nss.db());
 
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
-        const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
-
-        auto cmdResponse = executeCommandAgainstDatabasePrimaryOrFirstShard(
-            opCtx,
-            nss.db(),
-            dbInfo,
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj, shardsvrCollRequest.toBSON({})),
-                opCtx->getWriteConcern()),
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            Shard::RetryPolicy::kIdempotent);
-
-        const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
-        uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
-
-        auto createCollResp = CreateCollectionResponse::parse(
-            IDLParserErrorContext("createCollection"), remoteResponse.data);
-
-        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-            nss, createCollResp.getCollectionVersion(), dbInfo.primaryId());
+        cluster::createCollection(opCtx, shardsvrCollRequest);
 
         // Add only collectionsharded as a response parameter and remove the version to maintain the
         // same format as before.
         result.append("collectionsharded", nss.toString());
-        auto resultObj =
-            remoteResponse.data.removeField(CreateCollectionResponse::kCollectionVersionFieldName);
-        CommandHelpers::filterCommandReplyForPassthrough(resultObj, &result);
         return true;
     }
 

@@ -63,7 +63,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
                           << ": cannot create the collection until there are shards",
             Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() != 0);
 
-    // First, shard the sessions collection to create it.
+    // TODO (SERVER-54879): Switch this to call cluster::createCollection after 5.0 branches
     ConfigsvrShardCollectionRequest shardCollection;
     shardCollection.set_configsvrShardCollection(NamespaceString::kLogicalSessionsNamespace);
     shardCollection.setKey(BSON("_id" << 1));

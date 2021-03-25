@@ -90,6 +90,7 @@ void inferCollationFromLocalCollection(
     shardsvrShardCollectionRequest->setCollation(defaultCollation.getOwned());
 }
 
+// TODO (SERVER-54879): Remove this path after 5.0 branches
 CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const ShardsvrCreateCollection& request) {
