@@ -5,8 +5,6 @@
  * oplog entries. The primary then fills up its oplog until it rolls over. At that point
  * initial sync is resumed and we assert that it succeeds and that all of the inserted documents
  * are there.
- *
- * @tags: [incompatible_with_eft]
  */
 
 (function() {
