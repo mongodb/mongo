@@ -159,11 +159,9 @@ public:
 
         ExecutorFuture<void> _enterAbortingIndexBuildsState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& serviceToken,
-            const CancellationToken& instanceToken);
+            const CancellationToken& token);
 
-        void _abortIndexBuilds(const CancellationToken& serviceToken,
-                               const CancellationToken& instanceToken);
+        void _abortIndexBuilds(const CancellationToken& token);
 
         /**
          * Fetches all key documents from the recipient's admin.system.keys collection, stores
@@ -172,35 +170,31 @@ public:
         ExecutorFuture<void> _fetchAndStoreRecipientClusterTimeKeyDocs(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& serviceToken,
-            const CancellationToken& instanceToken);
+            const CancellationToken& token);
 
         ExecutorFuture<void> _enterDataSyncState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& serviceToken,
-            const CancellationToken& instanceToken);
+            const CancellationToken& token);
 
         ExecutorFuture<void> _waitForRecipientToBecomeConsistentAndEnterBlockingState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& serviceToken,
-            const CancellationToken& instanceToken);
+            const CancellationToken& token);
 
         ExecutorFuture<void> _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& serviceToken,
-            const CancellationToken& instanceToken);
+            const CancellationToken& token);
 
         ExecutorFuture<void> _handleErrorOrEnterAbortedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& serviceToken,
+            const CancellationToken& token,
             Status status);
 
         ExecutorFuture<void> _waitForForgetMigrationThenMarkMigrationGarbageCollectable(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const CancellationToken& serviceToken);
+            const CancellationToken& token);
 
         /**
          * Makes a task executor for executing commands against the recipient. If the server
@@ -238,7 +232,9 @@ public:
          * Waits for given opTime to be majority committed.
          */
         ExecutorFuture<void> _waitForMajorityWriteConcern(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor, repl::OpTime opTime);
+            std::shared_ptr<executor::ScopedTaskExecutor> executor,
+            repl::OpTime opTime,
+            const CancellationToken& token);
 
         /**
          * Sends the given command to the recipient replica set.
@@ -323,8 +319,8 @@ public:
         // abort.
         SharedPromise<void> _decisionPromise;
 
-        // This CancellationSource is instantiated from CancellationToken that is passed into run().
-        // It allows for manual cancellation of work from the instance.
+        // Used for logical interrupts that require aborting the migration but not unconditionally
+        // interrupting the instance, e.g. receiving donorAbortMigration.
         CancellationSource _abortMigrationSource;
     };
 
