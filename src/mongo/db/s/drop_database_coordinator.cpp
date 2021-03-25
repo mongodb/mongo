@@ -159,7 +159,7 @@ void DropDatabaseCoordinator::_removeStateDocument() {
     auto opCtx = cc().makeOperationContext();
     PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
     LOGV2_DEBUG(
-        5549402, 2, "Removing state document for drop database coordinator", "db"_attr = _dbName);
+        5494502, 2, "Removing state document for drop database coordinator", "db"_attr = _dbName);
     store.remove(opCtx.get(),
                  BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
                  WriteConcerns::kMajorityWriteConcern);

@@ -142,6 +142,13 @@ void releaseRecoverableCriticalSection(OperationContext* opCtx,
                                        const BSONObj& reason);
 
 /**
+ * Retakes the in-memory collection critical section for each recoverable critical section
+ * persisted on config.collectionCriticalSections. Apart from that, it also clears the filtering
+ * metadata and spawn an async task to refresh it for each collection.
+ */
+void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx);
+
+/**
  * Stops ongoing migrations and prevents future ones to start for the given nss.
  */
 void stopMigrations(OperationContext* opCtx, const NamespaceString& nss);

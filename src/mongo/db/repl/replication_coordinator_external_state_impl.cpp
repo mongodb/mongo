@@ -82,6 +82,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -896,6 +897,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // refreshes which should use the recovered configOpTime.
         migrationutil::resubmitRangeDeletionsOnStepUp(_service);
         migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+
+        sharding_ddl_util::retakeInMemoryRecoverableCriticalSections(opCtx);
 
     } else {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
