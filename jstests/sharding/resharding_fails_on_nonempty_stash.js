@@ -60,7 +60,7 @@ reshardingTest.withReshardingInBackground(
     },
     {
         expectedErrorCode: 5356800,
-        postAbortDecisionPersistedFn: () => {
+        postDecisionPersistedFn: () => {
             ReshardingTestUtil.assertRecipientAbortsLocally(
                 recipient1Conn, recipient1Conn.shardName, "reshardingDb.coll", 5356800);
         }

@@ -61,7 +61,7 @@ reshardingTest.withReshardingInBackground(
     },
     {
         expectedErrorCode: ErrorCodes.InternalError,
-        postAbortDecisionPersistedFn: () => {
+        postDecisionPersistedFn: () => {
             ReshardingTestUtil.assertAllParticipantsReportAbortToCoordinator(
                 configsvr, inputCollection.getFullName(), ErrorCodes.InternalError);
         }

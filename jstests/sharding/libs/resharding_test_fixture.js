@@ -257,13 +257,17 @@ var ReshardingTest = class {
      * assertions. This function is called in the critical section after a successful
      * `reshardCollection` command has shuffled data, but before the response is returned to the
      * client.
+     *
+     * @param postDecisionPersistedFn - a function for evaluating addition assertions after
+     * the decision has been persisted, but before the resharding operation finishes and returns
+     * to the client.
      */
     withReshardingInBackground({newShardKeyPattern, newChunks},
                                duringReshardingFn = (tempNs) => {},
                                {
                                    expectedErrorCode = ErrorCodes.OK,
                                    postCheckConsistencyFn = (tempNs) => {},
-                                   postAbortDecisionPersistedFn = () => {}
+                                   postDecisionPersistedFn = () => {}
                                } = {}) {
         this._startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
                                                                 expectedErrorCode);
@@ -276,7 +280,7 @@ var ReshardingTest = class {
         this._callFunctionSafely(() => duringReshardingFn(this._tempNs));
         this._checkConsistencyAndPostState(expectedErrorCode,
                                            () => postCheckConsistencyFn(this._tempNs),
-                                           () => postAbortDecisionPersistedFn());
+                                           () => postDecisionPersistedFn());
     }
 
     /** @private */
@@ -380,7 +384,7 @@ var ReshardingTest = class {
     /** @private */
     _checkConsistencyAndPostState(expectedErrorCode,
                                   postCheckConsistencyFn = () => {},
-                                  postAbortDecisionPersistedFn = () => {}) {
+                                  postDecisionPersistedFn = () => {}) {
         let performCorrectnessChecks = true;
         if (expectedErrorCode === ErrorCodes.OK) {
             this._callFunctionSafely(() => {
@@ -414,13 +418,14 @@ var ReshardingTest = class {
                 }
 
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
+                postDecisionPersistedFn();
                 this._pauseCoordinatorBeforeCompletionFailpoint.off();
             });
         } else {
             this._callFunctionSafely(() => {
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
-                postAbortDecisionPersistedFn();
+                postDecisionPersistedFn();
                 this._pauseCoordinatorBeforeCompletionFailpoint.off();
             });
         }

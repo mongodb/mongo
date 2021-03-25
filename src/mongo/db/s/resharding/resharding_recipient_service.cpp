@@ -65,6 +65,9 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(removeRecipientDocFailpoint);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientBeforeCloning);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringCloning);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseRecipientDuringOplogApplication);
 
 namespace {
 
@@ -471,6 +474,11 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     auto* serviceContext = Client::getCurrent()->getServiceContext();
     auto fetchTimestamp = *_fetchTimestamp;
 
+    {
+        auto opCtx = cc().makeOperationContext();
+        reshardingPauseRecipientBeforeCloning.pauseWhileSet(opCtx.get());
+    }
+
     _collectionCloner = std::make_unique<ReshardingCollectionCloner>(
         std::make_unique<ReshardingCollectionCloner::Env>(_metrics()),
         ShardKeyPattern{_metadata.getReshardingKey()},
@@ -526,35 +534,42 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
                 }));
     }
 
-    return whenAllSucceed(
-               _collectionCloner
-                   ->run(**executor,
-                         abortToken,
-                         CancelableOperationContextFactory(abortToken, _markKilledExecutor))
-                   .thenRunOn(**executor),
-               (*executor)
-                   ->sleepFor(_minimumOperationDuration, abortToken)
-                   .then([this, executor, abortToken] {
-                       if (_txnCloners.empty()) {
-                           return SemiFuture<void>::makeReady();
-                       }
+    auto cloneFinishFuture =
+        whenAllSucceed(_collectionCloner
+                           ->run(**executor,
+                                 abortToken,
+                                 CancelableOperationContextFactory(abortToken, _markKilledExecutor))
+                           .thenRunOn(**executor),
+                       (*executor)
+                           ->sleepFor(_minimumOperationDuration, abortToken)
+                           .then([this, executor, abortToken] {
+                               if (_txnCloners.empty()) {
+                                   return SemiFuture<void>::makeReady();
+                               }
 
-                       auto serviceContext = Client::getCurrent()->getServiceContext();
+                               auto serviceContext = Client::getCurrent()->getServiceContext();
 
-                       std::vector<ExecutorFuture<void>> txnClonerFutures;
-                       for (auto&& txnCloner : _txnCloners) {
-                           txnClonerFutures.push_back(
-                               txnCloner->run(serviceContext, **executor, abortToken));
-                       }
+                               std::vector<ExecutorFuture<void>> txnClonerFutures;
+                               for (auto&& txnCloner : _txnCloners) {
+                                   txnClonerFutures.push_back(
+                                       txnCloner->run(serviceContext, **executor, abortToken));
+                               }
 
-                       return whenAllSucceed(std::move(txnClonerFutures));
-                   }))
-        .thenRunOn(**executor)
-        .then([this] {
-            // ReshardingTxnCloners must complete before the recipient transitions to kApplying to
-            // avoid errors caused by donor shards unpinning the fetchTimestamp.
-            _transitionState(RecipientStateEnum::kApplying);
-        });
+                               return whenAllSucceed(std::move(txnClonerFutures));
+                           }))
+            .thenRunOn(**executor)
+            .then([this] {
+                // ReshardingTxnCloners must complete before the recipient transitions to kApplying
+                // to avoid errors caused by donor shards unpinning the fetchTimestamp.
+                _transitionState(RecipientStateEnum::kApplying);
+            });
+
+    {
+        auto opCtx = cc().makeOperationContext();
+        reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
+    }
+
+    return cloneFinishFuture;
 }
 
 ExecutorFuture<void>
@@ -658,6 +673,11 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                 applier->applyUntilCloneFinishedTs(abortToken).then([applier, abortToken] {
                     return applier->applyUntilDone(abortToken);
                 }));
+        }
+
+        {
+            auto opCtx = cc().makeOperationContext();
+            reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
         }
 
         return whenAllSucceed(std::move(futuresToWaitOn))

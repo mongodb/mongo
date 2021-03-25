@@ -40,6 +40,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 /**
  * Mock interface to allow specifiying mock results for the lookup pipeline.
  */
@@ -279,7 +281,8 @@ protected:
     }
 
     const NamespaceString _remoteOplogNss{"local.oplog.rs"};
-    const NamespaceString _localOplogBufferNss{"config.localReshardingOplogBuffer.xxx.yyy"};
+    const NamespaceString _localOplogBufferNss{"{}.{}xxx.yyy"_format(
+        NamespaceString::kConfigDb, NamespaceString::kReshardingLocalOplogBufferPrefix)};
     const NamespaceString _crudNss{"test.foo"};
     // Use a constant value so unittests can store oplog entries as extended json strings in code.
     const UUID _reshardingCollUUID =

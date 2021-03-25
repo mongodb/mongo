@@ -143,7 +143,8 @@ public:
             coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-            auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
+            auto service =
+                registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
             auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
                 opCtx, service, coordinatorDoc.toBSON());
 

@@ -310,6 +310,7 @@ env.Library(
         'cleanup_orphaned_cmd.cpp',
         'clone_catalog_data_command.cpp',
         'clone_collection_options_from_primary_shard_cmd.cpp',
+        'config/configsvr_abort_reshard_collection_command.cpp',
         'config/configsvr_add_shard_command.cpp',
         'config/configsvr_add_shard_to_zone_command.cpp',
         'config/configsvr_balancer_collection_status_command.cpp',
