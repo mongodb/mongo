@@ -76,11 +76,11 @@ public:
         Reply typedRun(OperationContext* opCtx) final {
             auto nss = request().getNamespace();
             uassert(ErrorCodes::IllegalOperation,
-                    "Cannot drop collection in config database",
+                    "Cannot drop collection in 'config' database in sharded cluster",
                     nss.db() != NamespaceString::kConfigDb);
 
             uassert(ErrorCodes::IllegalOperation,
-                    "Cannot drop collection in admin database",
+                    "Cannot drop collection in 'admin' database in sharded cluster",
                     nss.db() != NamespaceString::kAdminDb);
 
             try {
