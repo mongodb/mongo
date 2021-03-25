@@ -23,6 +23,58 @@ const kDelayMS =
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 (() => {
+    jsTestLog("Test sending donorAbortMigration before an instance's future chain begins.");
+
+    const tmt = new TenantMigrationTest({name: jsTestName()});
+    if (!tmt.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
+
+    const donorPrimary = tmt.getDonorPrimary();
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeEnteringFutureChain");
+
+    const tenantId = kTenantId;
+    const migrationId = extractUUIDFromObject(UUID());
+    const migrationOpts = {
+        migrationIdString: migrationId,
+        tenantId: tenantId,
+        recipientConnString: tmt.getRecipientConnString(),
+    };
+
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(tmt.getDonorRst());
+
+    const startMigrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    startMigrationThread.start();
+
+    fp.wait();
+
+    const tryAbortThread =
+        new Thread(TenantMigrationUtil.tryAbortMigrationAsync, migrationOpts, donorRstArgs);
+    tryAbortThread.start();
+
+    // Wait for donorAbortMigration command to start.
+    assert.soon(() => {
+        const res = assert.commandWorked(donorPrimary.adminCommand(
+            {currentOp: true, desc: "tenant donor migration", tenantId: tenantId}));
+        return res.inprog[0].receivedCancellation;
+    });
+
+    fp.off();
+
+    startMigrationThread.join();
+    tryAbortThread.join();
+    let r = assert.commandWorked(tryAbortThread.returnData());
+
+    const stateRes = assert.commandWorked(tmt.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
+
+    tmt.stop();
+})();
+
+(() => {
     jsTestLog(
         "Test sending donorAbortMigration during a tenant migration while recipientSyncData " +
         "command repeatedly fails with retryable errors.");
@@ -58,6 +110,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     fp.off();
     tenantMigrationTest.stop();
@@ -99,6 +152,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     fp.off();
     tenantMigrationTest.stop();
@@ -160,6 +214,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     tenantMigrationTest.stop();
 })();
@@ -199,6 +254,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
     tenantMigrationTest.stop();
 })();
 
@@ -251,6 +307,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes = assert.commandWorked(tmt.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     tmt.stop();
 })();
@@ -362,6 +419,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     tenantMigrationTest.stop();
 })();
@@ -410,6 +468,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const stateRes =
         assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.TenantMigrationAborted, tojson(stateRes));
 
     tenantMigrationTest.stop();
 })();
@@ -436,6 +495,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
+    assert.eq(stateRes.abortReason.code, ErrorCodes.InternalError, tojson(stateRes));
 
     fp.off();
 
@@ -464,6 +524,7 @@ const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
     const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
+    assert.isnull(stateRes.abortReason, tojson(stateRes));
 
     assert.commandFailedWithCode(
         tenantMigrationTest.tryAbortMigration({migrationIdString: migrationOpts.migrationIdString}),

@@ -121,22 +121,6 @@ public:
         }
 
         /**
-         * Returns a Future that will be resolved when a migration has called the run() method and
-         * instantiated the CancellationSource.
-         */
-        SharedSemiFuture<void> getMigrationCancelableFuture() const {
-            return _migrationCancelablePromise.getFuture();
-        }
-
-        /**
-         * Returns a Future that will be resolved when the donor has majority-committed the write to
-         * insert the donor state doc for the migration.
-         */
-        SharedSemiFuture<void> getInitialDonorStateDurableFuture() const {
-            return _initialDonorStateDurablePromise.getFuture();
-        }
-
-        /**
          * Kicks off work for the donorAbortMigration command.
          */
         void onReceiveDonorAbortMigration();
@@ -189,6 +173,7 @@ public:
         ExecutorFuture<void> _handleErrorOrEnterAbortedState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             const CancellationToken& token,
+            const CancellationToken& abortToken,
             Status status);
 
         ExecutorFuture<void> _waitForForgetMigrationThenMarkMigrationGarbageCollectable(
@@ -267,6 +252,12 @@ public:
             return recipientCmdThreadPoolLimits;
         }
 
+        /*
+         * Initializes _abortMigrationSource and returns a token from it. The source will be
+         * immediately canceled if an abort has already been requested.
+         */
+        CancellationToken _initAbortMigrationSource(const CancellationToken& token);
+
         ServiceContext* const _serviceContext;
         const TenantMigrationDonorService* const _donorService;
 
@@ -295,15 +286,12 @@ public:
 
         boost::optional<Status> _abortReason;
 
-        // Protects the durable state, state document, and the promises below.
+        // Protects the durable state, state document, abort requested boolean, and the promises
+        // below.
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
 
         // The latest majority-committed migration state.
         DurableState _durableState;
-
-        // Promise that is resolved when run() has been called and the CancellationSource has been
-        // instantiated.
-        SharedPromise<void> _migrationCancelablePromise;
 
         // Promise that is resolved when the donor has majority-committed the write to insert the
         // donor state doc for the migration.
@@ -319,9 +307,14 @@ public:
         // abort.
         SharedPromise<void> _decisionPromise;
 
+        // Set to true when a request to cancel the migration has been processed, e.g. after
+        // executing the donorAbortMigration command.
+        bool _abortRequested{false};
+
         // Used for logical interrupts that require aborting the migration but not unconditionally
-        // interrupting the instance, e.g. receiving donorAbortMigration.
-        CancellationSource _abortMigrationSource;
+        // interrupting the instance, e.g. receiving donorAbortMigration. Initialized in
+        // _initAbortMigrationSource().
+        boost::optional<CancellationSource> _abortMigrationSource;
     };
 
 private:

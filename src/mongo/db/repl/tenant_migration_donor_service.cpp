@@ -333,7 +333,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("tenantId", _tenantId);
     bob.append("recipientConnectionString", _recipientConnectionString);
     bob.append("readPreference", _readPreference.toInnerBSON());
-    bob.append("receivedCancellation", _abortMigrationSource.token().isCanceled());
+    bob.append("receivedCancellation", _abortRequested);
     bob.append("lastDurableState", _durableState.state);
     if (_stateDoc.getMigrationStart()) {
         bob.appendDate("migrationStart", *_stateDoc.getMigrationStart());
@@ -385,9 +385,11 @@ TenantMigrationDonorService::Instance::getDurableState(OperationContext* opCtx) 
 }
 
 void TenantMigrationDonorService::Instance::onReceiveDonorAbortMigration() {
-    _abortMigrationSource.cancel();
-
     stdx::lock_guard<Latch> lg(_mutex);
+    _abortRequested = true;
+    if (_abortMigrationSource) {
+        _abortMigrationSource->cancel();
+    }
     if (auto fetcher = _recipientKeysFetcher.lock()) {
         fetcher->shutdown();
     }
@@ -405,7 +407,6 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     setPromiseErrorIfNotReady(lg, _receiveDonorForgetMigrationPromise, status);
     setPromiseErrorIfNotReady(lg, _completionPromise, status);
     setPromiseErrorIfNotReady(lg, _decisionPromise, status);
-    setPromiseErrorIfNotReady(lg, _migrationCancelablePromise, status);
 
     if (auto fetcher = _recipientKeysFetcher.lock()) {
         fetcher->shutdown();
@@ -713,9 +714,25 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);
 }
 
+CancellationToken TenantMigrationDonorService::Instance::_initAbortMigrationSource(
+    const CancellationToken& token) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(!_abortMigrationSource);
+    _abortMigrationSource = CancellationSource(token);
+
+    if (_abortRequested) {
+        // An abort was requested before the abort source was set up so immediately cancel it.
+        _abortMigrationSource->cancel();
+    }
+
+    return _abortMigrationSource->token();
+}
+
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
+    pauseTenantMigrationBeforeEnteringFutureChain.pauseWhileSet();
+
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (!_stateDoc.getMigrationStart()) {
@@ -723,45 +740,42 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         }
     }
 
-    pauseTenantMigrationBeforeEnteringFutureChain.pauseWhileSet();
+    auto abortToken = _initAbortMigrationSource(token);
 
-    _abortMigrationSource = CancellationSource(token);
-
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        setPromiseOkIfNotReady(lg, _migrationCancelablePromise);
-    }
     auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(
         _recipientUri.getSetName(), _recipientUri.getServers());
     auto scopedOutstandingMigrationCounter =
         TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingDonatingCount();
 
     return ExecutorFuture(**executor)
-        .then([this, self = shared_from_this(), executor] {
-            return _enterAbortingIndexBuildsState(executor, _abortMigrationSource.token());
+        .then([this, self = shared_from_this(), executor, token] {
+            // Note we do not use the abort migration token here because the donorAbortMigration
+            // command waits for a decision to be persisted which will not happen if inserting the
+            // initial state document fails.
+            return _enterAbortingIndexBuildsState(executor, token);
         })
-        .then([this, self = shared_from_this(), executor] {
-            _abortIndexBuilds(_abortMigrationSource.token());
+        .then([this, self = shared_from_this(), executor, abortToken] {
+            _abortIndexBuilds(abortToken);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
             return _fetchAndStoreRecipientClusterTimeKeyDocs(
-                executor, recipientTargeterRS, _abortMigrationSource.token());
+                executor, recipientTargeterRS, abortToken);
         })
-        .then([this, self = shared_from_this(), executor] {
-            return _enterDataSyncState(executor, _abortMigrationSource.token());
+        .then([this, self = shared_from_this(), executor, abortToken] {
+            return _enterDataSyncState(executor, abortToken);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
             return _waitForRecipientToBecomeConsistentAndEnterBlockingState(
-                executor, recipientTargeterRS, _abortMigrationSource.token());
+                executor, recipientTargeterRS, abortToken);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, abortToken] {
             return _waitForRecipientToReachBlockTimestampAndEnterCommittedState(
-                executor, recipientTargeterRS, _abortMigrationSource.token());
+                executor, recipientTargeterRS, abortToken);
         })
         // Note from here on the migration cannot be aborted, so only the token from the primary
         // only service should be used.
-        .onError([this, self = shared_from_this(), executor, token](Status status) {
-            return _handleErrorOrEnterAbortedState(executor, token, status);
+        .onError([this, self = shared_from_this(), executor, token, abortToken](Status status) {
+            return _handleErrorOrEnterAbortedState(executor, token, abortToken, status);
         })
         .onCompletion([this, self = shared_from_this()](Status status) {
             LOGV2(5006601,
@@ -1105,6 +1119,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterAbortedState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& token,
+    const CancellationToken& abortToken,
     Status status) {
     {
         stdx::lock_guard<Latch> lg(_mutex);
@@ -1114,7 +1129,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         }
     }
 
-    if (_abortMigrationSource.token().isCanceled()) {
+    if (abortToken.isCanceled()) {
         status = Status(ErrorCodes::TenantMigrationAborted, "Aborted due to donorAbortMigration.");
     }
 
