@@ -26,11 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
 #include <algorithm>
 #include <memory>
 
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
@@ -160,6 +162,34 @@ void ReshardingMetrics::setCoordinatorState(CoordinatorStateEnum state) noexcept
     _currentOp->coordinatorState = state;
 }
 
+static StringData serializeState(RecipientStateEnum e) {
+    return RecipientState_serializer(e);
+}
+
+static StringData serializeState(DonorStateEnum e) {
+    return DonorState_serializer(e);
+}
+
+template <typename T>
+static bool checkState(T state, std::initializer_list<T> validStates) {
+    invariant(validStates.size());
+    if (std::find(validStates.begin(), validStates.end(), state) != validStates.end())
+        return true;
+
+    std::stringstream ss;
+    StringData sep = "";
+    for (auto state : validStates) {
+        ss << sep << serializeState(state);
+        sep = ", "_sd;
+    }
+
+    LOGV2_FATAL_CONTINUE(5553300,
+                         "Invalid resharding state",
+                         "state"_attr = serializeState(state),
+                         "valid"_attr = ss.str());
+    return false;
+}
+
 void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_currentOp.has_value(), kNoOperationInProgress);
@@ -170,8 +200,10 @@ void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noe
 
 void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
-    invariant(_currentOp.has_value(), kNoOperationInProgress);
-    invariant(_currentOp->recipientState == RecipientStateEnum::kCloning);
+
+    invariant(_currentOp &&
+              checkState(_currentOp->recipientState,
+                         {RecipientStateEnum::kCloning, RecipientStateEnum::kError}));
 
     _currentOp->documentsCopied += documents;
     _currentOp->bytesCopied += bytes;
@@ -181,28 +213,43 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
-    invariant(_currentOp.has_value(), kNoOperationInProgress);
-    invariant(_currentOp->recipientState == RecipientStateEnum::kCloning ||
-              _currentOp->recipientState == RecipientStateEnum::kApplying ||
-              _currentOp->recipientState == RecipientStateEnum::kSteadyState);
+
+    invariant(_currentOp &&
+              checkState(_currentOp->recipientState,
+                         {RecipientStateEnum::kCloning,
+                          RecipientStateEnum::kApplying,
+                          RecipientStateEnum::kSteadyState,
+                          RecipientStateEnum::kError}));
+
     _currentOp->oplogEntriesFetched += entries;
     _cumulativeOp.oplogEntriesFetched += entries;
 }
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
-    invariant(_currentOp.has_value(), kNoOperationInProgress);
-    invariant(_currentOp->recipientState == RecipientStateEnum::kApplying ||
-              _currentOp->recipientState == RecipientStateEnum::kSteadyState);
+
+    invariant(_currentOp &&
+              checkState(_currentOp->recipientState,
+                         {RecipientStateEnum::kApplying,
+                          RecipientStateEnum::kSteadyState,
+                          RecipientStateEnum::kError}));
+
     _currentOp->oplogEntriesApplied += entries;
     _cumulativeOp.oplogEntriesApplied += entries;
 }
 
 void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+
     invariant(_currentOp.has_value(), kNoOperationInProgress);
-    invariant(_currentOp->donorState == DonorStateEnum::kPreparingToBlockWrites ||
-              _currentOp->donorState == DonorStateEnum::kBlockingWrites);
+
+    invariant(_currentOp &&
+              checkState(_currentOp->donorState,
+                         {DonorStateEnum::kDonatingOplogEntries,
+                          DonorStateEnum::kPreparingToBlockWrites,
+                          DonorStateEnum::kBlockingWrites,
+                          DonorStateEnum::kError}));
+
     _currentOp->writesDuringCriticalSection += writes;
     _cumulativeOp.writesDuringCriticalSection += writes;
 }
