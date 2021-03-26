@@ -436,7 +436,7 @@ public:
         // Batches, per logical session, that haven't been committed or aborted yet.
         stdx::unordered_map<UUID, std::shared_ptr<WriteBatch>, UUID::Hash> _batches;
 
-        // If the bucket is in the _idleList, then its position is recorded here.
+        // If the bucket is in _idleBuckets, then its position is recorded here.
         boost::optional<IdleList::iterator> _idleListEntry = boost::none;
 
         // Approximate memory usage of this bucket.
@@ -517,7 +517,7 @@ private:
         ExecutionStats* _stats = nullptr;
         const Date_t* _time = nullptr;
 
-        Bucket* _bucket;
+        Bucket* _bucket = nullptr;
         stdx::unique_lock<Mutex> _guard;
     };
 
@@ -531,7 +531,7 @@ private:
     /**
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
-    bool _removeBucket(Bucket* bucket, bool bucketIsUnused);
+    bool _removeBucket(Bucket* bucket, bool expiringBuckets);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date
@@ -539,9 +539,10 @@ private:
     void _markBucketIdle(Bucket* bucket);
 
     /**
-     * Remove the bucket from the list of idle buckets
+     * Remove the bucket from the list of idle buckets. The second parameter encodes whether the
+     * caller holds a lock on _idleMutex.
      */
-    void _markBucketNotIdle(Bucket* bucket);
+    void _markBucketNotIdle(Bucket* bucket, bool locked);
 
     /**
      * Verify the bucket is currently unused by taking a lock on it. Must hold exclusive lock from

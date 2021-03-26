@@ -211,6 +211,7 @@ void BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     _waitToCommitBatch(batch);
 
     BucketAccess bucket(this, batch->bucket());
+    invariant(bucket);
 
     auto prevMemoryUsage = bucket->_memoryUsage;
     batch->_prepareCommit();
@@ -256,7 +257,7 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
             // Only remove from _allBuckets and _idleBuckets. If it was marked full, we know that
             // happened in BucketAccess::rollover, and that there is already a new open bucket for
             // this metadata.
-            _markBucketNotIdle(ptr);
+            _markBucketNotIdle(ptr, false /* locked */);
             _allBuckets.erase(ptr);
         } else {
             _markBucketIdle(bucket);
@@ -286,7 +287,7 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
             if (bucket->allCommitted()) {
                 // No uncommitted batches left to abort, go ahead and remove the bucket.
                 blk.unlock();
-                _removeBucket(bucket, true /* bucketIsUnused */);
+                _removeBucket(bucket, false /* expiringBuckets */);
                 break;
             }
 
@@ -333,7 +334,7 @@ void BucketCatalog::clear(const NamespaceString& ns) {
         _verifyBucketIsUnused(bucket.get());
         if (shouldClear(bucket->_ns)) {
             _executionStats.erase(bucket->_ns);
-            _removeBucket(bucket.get(), true /* bucketIsUnused */);
+            _removeBucket(bucket.get(), false /* expiringBuckets */);
         }
 
         it = nextIt;
@@ -396,6 +397,8 @@ BucketCatalog::StripedMutex::ExclusiveLock BucketCatalog::_lockExclusive() const
 void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch) {
     while (true) {
         BucketAccess bucket{this, batch->bucket()};
+        invariant(bucket);
+
         auto current = bucket->_preparedBatch;
         if (!current) {
             // No other batches for this bucket are currently committing, so we can proceed.
@@ -409,23 +412,16 @@ void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch)
     }
 }
 
-bool BucketCatalog::_removeBucket(Bucket* bucket, bool bucketIsUnused) {
+bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
     auto it = _allBuckets.find(bucket);
     if (it == _allBuckets.end()) {
         return false;
     }
 
-    if (!bucketIsUnused) {
-        _verifyBucketIsUnused(bucket);
-    }
-
     invariant(bucket->_batches.empty());
 
     _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
-    if (bucket->_idleListEntry) {
-        _idleBuckets.erase(*bucket->_idleListEntry);
-        bucket->_idleListEntry = boost::none;
-    }
+    _markBucketNotIdle(bucket, expiringBuckets /* locked */);
     _openBuckets.erase({std::move(bucket->_ns), std::move(bucket->_metadata)});
     _allBuckets.erase(it);
 
@@ -435,14 +431,17 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool bucketIsUnused) {
 void BucketCatalog::_markBucketIdle(Bucket* bucket) {
     invariant(bucket);
     stdx::lock_guard lk{_idleMutex};
-    _idleBuckets.emplace_front(bucket);
+    _idleBuckets.push_front(bucket);
     bucket->_idleListEntry = _idleBuckets.begin();
 }
 
-void BucketCatalog::_markBucketNotIdle(Bucket* bucket) {
+void BucketCatalog::_markBucketNotIdle(Bucket* bucket, bool locked) {
     invariant(bucket);
     if (bucket->_idleListEntry) {
-        stdx::lock_guard lk{_idleMutex};
+        stdx::unique_lock<Mutex> guard;
+        if (!locked) {
+            guard = stdx::unique_lock{_idleMutex};
+        }
         _idleBuckets.erase(*bucket->_idleListEntry);
         bucket->_idleListEntry = boost::none;
     }
@@ -465,7 +464,7 @@ void BucketCatalog::_expireIdleBuckets(ExecutionStats* stats) {
                static_cast<std::uint64_t>(gTimeseriesIdleBucketExpiryMemoryUsageThreshold)) {
         Bucket* bucket = _idleBuckets.back();
         _verifyBucketIsUnused(bucket);
-        if (_removeBucket(bucket, true /* bucketIsUnused */)) {
+        if (_removeBucket(bucket, true /* expiringBuckets */)) {
             stats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(1);
         }
     }
@@ -647,7 +646,7 @@ bool BucketCatalog::BucketAccess::_findOpenBucketAndLock(std::size_t hash) {
 
     _bucket = it->second;
     _acquire();
-    _catalog->_markBucketNotIdle(_bucket);
+    _catalog->_markBucketNotIdle(_bucket, false /* locked */);
 
     return true;
 }
@@ -662,7 +661,7 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t has
 
     _bucket = it->second;
     _acquire();
-    _catalog->_markBucketNotIdle(_bucket);
+    _catalog->_markBucketNotIdle(_bucket, false /* locked */);
 }
 
 void BucketCatalog::BucketAccess::_acquire() {
@@ -723,7 +722,7 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
             // remove it now. Otherwise, we must keep the bucket around until it is committed.
             oldBucket = _bucket;
             release();
-            bool removed = _catalog->_removeBucket(oldBucket, true /* bucketIsUnused */);
+            bool removed = _catalog->_removeBucket(oldBucket, false /* expiringBuckets */);
             invariant(removed);
         } else {
             _bucket->_full = true;
