@@ -33,6 +33,16 @@ env.Library(
     source=[
         'timeseries_index_schema_conversion_functions.cpp',
     ],
+    LIBDEPS_PRIVATE=[
+        'timeseries_idl',
+    ],
+)
+
+env.Library(
+    target='timeseries_lookup',
+    source=[
+        'timeseries_lookup.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'timeseries_idl',
