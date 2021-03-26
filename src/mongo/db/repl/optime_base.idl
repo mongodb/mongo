@@ -25,7 +25,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 
-# This IDL file specifies the fields for OpTimeAndWallTimeBase.
+# This IDL file specifies the fields for OpTimeBase.
 
 global:
     cpp_namespace: "mongo::repl"
@@ -34,10 +34,10 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    OpTimeAndWallTimeBase:
-        description: "A document that stores the time-related fields in an oplog entry. Should 
-                     never be used directly in server code. Instead, create an instance of 
-                     OpTimeAndWallTime."
+    OpTimeBase:
+        description: "A document that stores the logical time-related fields in an oplog entry.
+                     Should never be used directly in server code. Instead, create an instance
+                     of OpTime."
         strict: false
         fields:
             ts:
@@ -49,7 +49,3 @@ structs:
                 type: long
                 optional: true # The term will no longer be optional, see SERVER-42258.
                 description: "The term of the primary that created the oplog entry"
-            wall:
-                cpp_name: wallClockTime
-                type: date
-                description: "A wallclock time with MS resolution"

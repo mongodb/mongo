@@ -60,7 +60,8 @@ protected:
 
         // These are unused by ReshardingOplogBatchPreparer but required by IDL parsing.
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
 
         return {op.toBSON()};
     }
@@ -94,7 +95,8 @@ protected:
 
         // These are unused by ReshardingOplogBatchPreparer but required by IDL parsing.
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
 
         return {op.toBSON()};
     }
@@ -114,7 +116,8 @@ protected:
 
         // These are unused by ReshardingOplogBatchPreparer but required by IDL parsing.
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
 
         return {op.toBSON()};
     }
@@ -371,7 +374,8 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsNoops) {
         op.setOpType(repl::OpTypeEnum::kNoop);
         op.setObject({});
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
         batch.emplace_back(op.toBSON());
     }
 

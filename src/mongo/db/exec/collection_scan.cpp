@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/assert_util.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/exec/collection_scan.h"
@@ -238,7 +239,7 @@ void CollectionScan::assertTsHasNotFallenOffOplog(const Record& record) {
     // events earlier can have fallen off this oplog. Otherwise, verify that the timestamp of the
     // first observed oplog entry is earlier than or equal to timestamp that should not have fallen
     // off the oplog.
-    auto oplogEntry = invariantStatusOK(repl::OplogEntry::parse(record.data.toBson()));
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(record.data.toBson()));
     invariant(_specificStats.docsTested == 0);
     const bool isNewRS =
         oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&

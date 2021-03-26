@@ -144,7 +144,8 @@ public:
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
 
         return {op.toBSON()};
     }
@@ -161,7 +162,8 @@ public:
 
         // These are unused by ReshardingOplogSessionApplication but required by IDL parsing.
         op.setNss({});
-        op.setOpTimeAndWallTimeBase({{}, {}});
+        op.setOpTime({{}, {}});
+        op.setWallClockTime({});
 
         return {op.toBSON()};
     }

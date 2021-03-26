@@ -602,7 +602,7 @@ TEST_F(SyncSourceResolverTest,
     ASSERT_TRUE(_resolver->isActive());
 
     _scheduleFirstOplogEntryFetcherResponse(
-        getNet(), _selector.get(), candidate1, candidate2, {BSON("t" << 1)});
+        getNet(), _selector.get(), candidate1, candidate2, {BSON("t" << 1LL)});
 
     ASSERT_TRUE(_resolver->isActive());
     ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
@@ -654,7 +654,7 @@ TEST_F(SyncSourceResolverTest, SyncSourceResolverWillSucceedWithExtraFields) {
                                             _selector.get(),
                                             candidate1,
                                             HostAndPort(),
-                                            {BSON("ts" << Timestamp(1, 1) << "t" << 1 << "note"
+                                            {BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "note"
                                                        << "a")});
 
     _resolver->join();

@@ -31,6 +31,7 @@
 
 #include "mongo/db/ops/write_ops_retryability.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"

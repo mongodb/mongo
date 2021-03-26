@@ -96,7 +96,7 @@ makeOplogTimestampSlotsIfNeeded(const CollectionPtr& collection,
         invariant(collection->ns().isOplog());
 
         auto tsSlot = slotIdGenerator->generate();
-        return {{repl::OpTime::kTimestampFieldName}, sbe::makeSV(tsSlot), tsSlot};
+        return {{repl::OpTime::kTimestampFieldName.toString()}, sbe::makeSV(tsSlot), tsSlot};
     }
     return {};
 };
