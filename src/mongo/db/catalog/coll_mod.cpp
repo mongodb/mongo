@@ -307,10 +307,10 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
             cmr.recordPreImages = e.trueValue();
         } else if (fieldName == "clusteredIndex") {
-            if (!nss.isTimeseriesBucketsCollection()) {
+            if (coll->getRecordStore()->keyFormat() != KeyFormat::String) {
                 return Status(
                     ErrorCodes::InvalidOptions,
-                    "'clusteredIndex' option is only supported on time-series bucket collections");
+                    "'clusteredIndex' option is only supported on collections clustered by _id");
             }
 
             BSONElement elem = e.Obj()["expireAfterSeconds"];
