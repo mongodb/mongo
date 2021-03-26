@@ -163,6 +163,9 @@ public:
             const CancellationToken& serviceToken,
             const CancellationToken& instanceToken);
 
+        void _abortIndexBuilds(const CancellationToken& serviceToken,
+                               const CancellationToken& instanceToken);
+
         /**
          * Fetches all key documents from the recipient's admin.system.keys collection, stores
          * them in config.external_validation_keys, and refreshes the keys cache.
@@ -173,7 +176,7 @@ public:
             const CancellationToken& serviceToken,
             const CancellationToken& instanceToken);
 
-        ExecutorFuture<void> _abortIndexBuildsAndEnterDataSyncState(
+        ExecutorFuture<void> _enterDataSyncState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
             const CancellationToken& serviceToken,
             const CancellationToken& instanceToken);
