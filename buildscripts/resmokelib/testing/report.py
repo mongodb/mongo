@@ -298,6 +298,9 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                     "elapsed": test_info.end_time - test_info.start_time,
                 }
 
+                if test_info.display_test_name is not None:
+                    result["display_test_name"] = test_info.display_test_name
+
                 if test_info.group_id is not None:
                     result["group_id"] = test_info.group_id
 
@@ -322,11 +325,12 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         report = cls(logging.loggers.EXECUTOR_LOGGER, _config.SuiteOptions.ALL_INHERITED.resolve())
         for result in report_dict["results"]:
             # By convention, dynamic tests are named "<basename>:<hook name>".
-            is_dynamic = ":" in result["test_file"]
+            is_dynamic = ":" in result["test_file"] or ":" in result.get("display_test_name", "")
             test_file = result["test_file"]
             # Using test_file as the test id is ok here since the test id only needs to be unique
             # during suite execution.
             test_info = _TestInfo(test_file, test_file, is_dynamic)
+            test_info.display_test_name = result.get("display_test_name")
             test_info.group_id = result.get("group_id")
             test_info.url_endpoint = result.get("url")
             test_info.status = result["status"]
@@ -380,7 +384,14 @@ class _TestInfo(object):  # pylint: disable=too-many-instance-attributes
         """Initialize the _TestInfo instance."""
 
         self.test_id = test_id
-        self.test_file = test_file
+        # If spawned using jasper, we need to set the display_test_name and the
+        # test_file since these are distinct in cedar buildlogger.
+        if _config.SPAWN_USING == "jasper":
+            self.test_file = str(test_id)
+            self.display_test_name = test_file
+        else:
+            self.test_file = test_file
+            self.display_test_name = None
         self.dynamic = dynamic
 
         self.group_id = None
