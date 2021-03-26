@@ -65,24 +65,24 @@ if (recipientDoc) {
         case TenantMigrationTest.RecipientState.kStarted:
             if (recipientDoc.dataConsistentStopDonorOpTime) {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
+                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
                                       .state == TenantMigrationTest.RecipientAccessState.kReject);
             }
             break;
         case TenantMigrationTest.RecipientState.kConsistent:
             if (recipientDoc.rejectReadsBeforeTimestamp) {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
+                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
                                       .state ==
                                 TenantMigrationTest.RecipientAccessState.kRejectBefore);
                 assert.soon(() => bsonWoCompare(tenantMigrationTest
                                                     .getTenantMigrationAccessBlocker(
-                                                        recipientPrimary, kTenantId)
+                                                        initialSyncNode, kTenantId)
                                                     .rejectBeforeTimestamp,
                                                 recipientDoc.rejectReadsBeforeTimestamp) == 0);
             } else {
                 assert.soon(() => tenantMigrationTest
-                                      .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
+                                      .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
                                       .state == TenantMigrationTest.RecipientAccessState.kReject);
             }
             break;
