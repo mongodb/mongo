@@ -34,6 +34,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
@@ -67,6 +68,8 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
             break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(std::move(initialState));
+        case DDLCoordinatorTypeEnum::kCreateCollection:
+            return std::make_shared<CreateCollectionCoordinator>(std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,

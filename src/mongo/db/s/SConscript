@@ -334,6 +334,7 @@ env.Library(
         'config/configsvr_split_chunk_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
         'create_collection_coordinator.cpp',
+        'create_collection_coordinator_document.idl',
         'drop_collection_coordinator.cpp',
         'drop_collection_coordinator_document.idl',
         'drop_database_coordinator.cpp',

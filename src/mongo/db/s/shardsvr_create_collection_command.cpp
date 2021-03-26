@@ -38,6 +38,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/shard_collection_legacy.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -167,15 +168,25 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
     uassert(
         ErrorCodes::NotImplemented, "create collection not implemented yet", request.getShardKey());
 
-    DistLockManager::ScopedDistLock dbDistLock(uassertStatusOK(DistLockManager::get(opCtx)->lock(
-        opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
-    DistLockManager::ScopedDistLock collDistLock(uassertStatusOK(DistLockManager::get(opCtx)->lock(
-        opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
+    auto coordinatorDoc = CreateCollectionCoordinatorDocument();
+    coordinatorDoc.setShardingDDLCoordinatorMetadata(
+        {{nss, DDLCoordinatorTypeEnum::kCreateCollection}});
+    coordinatorDoc.setShardKey(request.getShardKey());
+    if (request.getCollation())
+        coordinatorDoc.setCollation(request.getCollation());
+    if (request.getInitialSplitPoints())
+        coordinatorDoc.setInitialSplitPoints(request.getInitialSplitPoints());
+    if (request.getNumInitialChunks())
+        coordinatorDoc.setNumInitialChunks(request.getNumInitialChunks());
+    if (request.getPresplitHashedZones())
+        coordinatorDoc.setPresplitHashedZones(request.getPresplitHashedZones());
+    if (request.getUnique())
+        coordinatorDoc.setUnique(request.getUnique());
 
-    auto createCollectionCoordinator =
-        std::make_shared<CreateCollectionCoordinator>(opCtx, request);
-    createCollectionCoordinator->run(opCtx).get(opCtx);
-    return createCollectionCoordinator->getResultOnSuccess();
+    auto service = ShardingDDLCoordinatorService::getService(opCtx);
+    auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(
+        service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+    return createCollectionCoordinator->getResult(opCtx);
 }
 
 class ShardsvrCreateCollectionCommand final : public TypedCommand<ShardsvrCreateCollectionCommand> {

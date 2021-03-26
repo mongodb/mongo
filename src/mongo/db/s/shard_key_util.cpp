@@ -100,12 +100,12 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
 
 }  // namespace
 
-void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   const ShardKeyPattern& shardKeyPattern,
-                                                   const boost::optional<BSONObj>& defaultCollation,
-                                                   bool unique,
-                                                   const ShardKeyValidationBehaviors& behaviors) {
+bool validShardKeyIndexExists(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const ShardKeyPattern& shardKeyPattern,
+                              const boost::optional<BSONObj>& defaultCollation,
+                              bool unique,
+                              const ShardKeyValidationBehaviors& behaviors) {
     auto indexes = behaviors.loadIndexes(nss);
 
     // 1.  Verify consistency with existing unique indexes
@@ -174,8 +174,22 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     if (hasUsefulIndexForKey) {
         // Check 2.iii Make sure that there is a useful, non-multikey index available.
         behaviors.verifyUsefulNonMultiKeyIndex(nss, shardKeyPattern.toBSON());
+    }
+
+    return hasUsefulIndexForKey;
+}
+
+void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const ShardKeyPattern& shardKeyPattern,
+                                                   const boost::optional<BSONObj>& defaultCollation,
+                                                   bool unique,
+                                                   const ShardKeyValidationBehaviors& behaviors) {
+    if (validShardKeyIndexExists(
+            opCtx, nss, shardKeyPattern, defaultCollation, unique, behaviors)) {
         return;
     }
+
 
     // 4. If no useful index, verify we can create one.
     behaviors.verifyCanCreateShardKeyIndex(nss);
