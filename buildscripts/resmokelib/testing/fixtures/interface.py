@@ -9,14 +9,16 @@ from typing import List
 import pymongo
 import pymongo.errors
 
-from buildscripts.resmokelib import config
-from buildscripts.resmokelib import errors
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib import multiversionconstants as multiversion
-from buildscripts.resmokelib import utils
-from buildscripts.resmokelib.utils import registry
+import buildscripts.resmokelib.multiversionconstants as multiversion
+import buildscripts.resmokelib.utils.registry as registry
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 _FIXTURES = {}  # type: ignore
+
+# Represents the version of the API presented by interface.py,
+# registry.py, and fixturelib.py. Increment this when making
+# possibly-breaking changes to them.
+FIXTURE_API_VERSION = 0.1
 
 
 class TeardownMode(Enum):
@@ -32,12 +34,14 @@ class TeardownMode(Enum):
     ABORT = 6
 
 
-def make_fixture(class_name, *args, **kwargs):
+def make_fixture(class_name, logger, job_num, *args, **kwargs):
     """Provide factory function for creating Fixture instances."""
+
+    fixturelib = FixtureLib()
 
     if class_name not in _FIXTURES:
         raise ValueError("Unknown fixture class '%s'" % class_name)
-    return _FIXTURES[class_name](*args, **kwargs)
+    return _FIXTURES[class_name](logger, job_num, fixturelib, *args, **kwargs)
 
 
 class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  # pylint: disable=invalid-metaclass
@@ -51,11 +55,15 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
     _LATEST_FCV = multiversion.LATEST_FCV
     _LAST_LTS_BIN_VERSION = multiversion.LAST_LTS_BIN_VERSION
 
-    def __init__(self, logger, job_num, dbpath_prefix=None):
+    AWAIT_READY_TIMEOUT_SECS = 300
+
+    def __init__(self, logger, job_num, fixturelib, dbpath_prefix=None):
         """Initialize the fixture with a logger instance."""
 
-        if not isinstance(logger, logging.Logger):
-            raise TypeError("logger must be a Logger instance")
+        self.fixturelib = fixturelib
+        self.config = self.fixturelib.get_config()
+
+        self.fixturelib.assert_logger(logger)
 
         if not isinstance(job_num, int):
             raise TypeError("job_num must be an integer")
@@ -65,8 +73,9 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         self.logger = logger
         self.job_num = job_num
 
-        dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
-        dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
+        dbpath_prefix = self.fixturelib.default_if_none(self.config.DBPATH_PREFIX, dbpath_prefix)
+        dbpath_prefix = self.fixturelib.default_if_none(dbpath_prefix,
+                                                        self.config.DEFAULT_DBPATH_PREFIX)
         self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num))
 
     def pids(self):
@@ -98,7 +107,7 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
                 for handler in self.logger.handlers:
                     # We ignore the cancellation token returned by close_later() since we always
                     # want the logs to eventually get flushed.
-                    logging.flush.close_later(handler)
+                    self.fixturelib.close_loggers(handler)
 
     def _do_teardown(self, mode=None):  # noqa
         """Destroy the fixture.
@@ -202,15 +211,15 @@ class ReplFixture(Fixture):
                     message = "Failed to connect to {} within {} minutes".format(
                         self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
                     self.logger.error(message)
-                    raise errors.ServerFailure(message)
+                    raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.WTimeoutError:
                 message = "Replication of write operation timed out."
                 self.logger.error(message)
-                raise errors.ServerFailure(message)
+                raise self.fixturelib.ServerFailure(message)
             except pymongo.errors.PyMongoError as err:
                 message = "Write operation on {} failed: {}".format(
                     self.get_driver_connection_url(), err)
-                raise errors.ServerFailure(message)
+                raise self.fixturelib.ServerFailure(message)
 
 
 class NoOpFixture(Fixture):
@@ -277,7 +286,7 @@ class FixtureTeardownHandler(object):
             fixture.teardown(mode=mode)
             self._logger.info("Successfully stopped %s.", name)
             return True
-        except errors.ServerFailure as err:
+        except fixture.fixturelib.ServerFailure as err:
             msg = "Error while stopping {}: {}".format(name, err)
             self._logger.warning(msg)
             self._add_error_message(msg)

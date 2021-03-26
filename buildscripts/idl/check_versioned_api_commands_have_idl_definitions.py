@@ -46,6 +46,7 @@ sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import ShardedClusterFixture
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
 from idl import parser, syntax
@@ -109,17 +110,18 @@ def list_commands_for_api(api_version: str, mongod_or_mongos: str, install_dir: 
     assert mongod_or_mongos in ("mongod", "mongos")
     logging.info("Calling listCommands on %s", mongod_or_mongos)
     dbpath = TemporaryDirectory()
+    fixturelib = FixtureLib()
     mongod_executable = os.path.join(install_dir, "mongod")
     mongos_executable = os.path.join(install_dir, "mongos")
     if mongod_or_mongos == "mongod":
         logger = loggers.new_fixture_logger("MongoDFixture", 0)
         logger.parent = LOGGER
-        fixture: interface.Fixture = MongoDFixture(logger, 0, dbpath_prefix=dbpath.name,
+        fixture: interface.Fixture = MongoDFixture(logger, 0, fixturelib, dbpath_prefix=dbpath.name,
                                                    mongod_executable=mongod_executable)
     else:
         logger = loggers.new_fixture_logger("ShardedClusterFixture", 0)
         logger.parent = LOGGER
-        fixture = ShardedClusterFixture(logger, 0, dbpath_prefix=dbpath.name,
+        fixture = ShardedClusterFixture(logger, 0, fixturelib, dbpath_prefix=dbpath.name,
                                         mongos_executable=mongos_executable,
                                         mongod_executable=mongod_executable, mongod_options={})
 

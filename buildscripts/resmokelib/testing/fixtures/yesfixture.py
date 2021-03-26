@@ -2,17 +2,16 @@
 
 import signal
 
-from buildscripts.resmokelib import logging
-from buildscripts.resmokelib.core import programs
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 
 class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
     """Fixture which spawns several 'yes' executables to generate lots of log messages."""
 
-    def __init__(self, logger, job_num, num_instances=1, message_length=100):
+    def __init__(self, logger, job_num, fixturelib, num_instances=1, message_length=100):  # pylint: disable=too-many-arguments
         """Initialize YesFixture."""
-        interface.Fixture.__init__(self, logger, job_num)
+        interface.Fixture.__init__(self, logger, job_num, fixturelib)
 
         self.__processes = [None] * num_instances
         self.__message = "y" * message_length
@@ -33,9 +32,9 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
             self.__processes[i] = process
 
     def _make_process(self, index):
-        logger = logging.loggers.new_fixture_node_logger(self.__class__.__name__, self.job_num,
+        logger = self.fixturelib.new_fixture_node_logger(self.__class__.__name__, self.job_num,
                                                          "yes{:d}".format(index))
-        return programs.generic_program(logger, self.job_num, ["yes", self.__message])
+        return self.fixturelib.generic_program(logger, self.job_num, ["yes", self.__message])
 
     def _do_teardown(self, mode=None):
         running_at_start = self.is_running()

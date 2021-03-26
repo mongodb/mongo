@@ -9,6 +9,7 @@ import random
 import shlex
 import sys
 import time
+import shutil
 
 import curatorbin
 import pkg_resources
@@ -374,7 +375,7 @@ def _get_jasper_reqs():
     # meant to because tracked by git or linted.
     proto_out = os.path.join(root_dir, "build", "jasper")
 
-    utils.rmtree(proto_out, ignore_errors=True)
+    shutil.rmtree(proto_out, ignore_errors=True)
     os.makedirs(proto_out)
 
     # We make 'proto_out' into a Python package so we can add it to 'sys.path' and import the

@@ -1,6 +1,6 @@
 """External fixture for executing JSTests against."""
 
-from buildscripts.resmokelib.testing.fixtures import interface
+import buildscripts.resmokelib.testing.fixtures.interface as interface
 
 
 class ExternalFixture(interface.Fixture):
@@ -10,9 +10,9 @@ class ExternalFixture(interface.Fixture):
         """:return: no pids are owned by this fixture."""
         return []
 
-    def __init__(self, logger, job_num, shell_conn_string=None):
+    def __init__(self, logger, job_num, fixturelib, shell_conn_string=None):
         """Initialize ExternalFixture."""
-        interface.Fixture.__init__(self, logger, job_num)
+        interface.Fixture.__init__(self, logger, job_num, fixturelib)
 
         if shell_conn_string is None:
             raise ValueError("The ExternalFixture must be specified with the resmoke option"
