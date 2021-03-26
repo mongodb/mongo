@@ -66,7 +66,8 @@ repl::MutableOplogEntry makeOplog(const NamespaceString& nss,
         oplogEntry.setObject2(o2Field);
     }
 
-    oplogEntry.setOpTimeAndWallTimeBase(repl::OpTimeAndWallTimeBase({}, {}));
+    oplogEntry.setOpTime({{}, {}});
+    oplogEntry.setWallClockTime({});
     oplogEntry.set_id(Value(oplogId.toBSON()));
 
     return oplogEntry;

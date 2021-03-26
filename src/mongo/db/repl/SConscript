@@ -518,17 +518,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/idl/idl_parser',
         'optime',
-        'optime_and_wall_time_base',
+        'optime_base',
     ],
-   LIBDEPS_PRIVATE=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )
 
 env.Library(
-    target='optime_and_wall_time_base',
+    target='optime_base',
     source=[
-        'optime_and_wall_time_base.idl',
+        'optime_base.idl'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1048,7 +1048,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        'optime_and_wall_time_base',
+        'optime_base',
     ],
 )
 

@@ -40,7 +40,7 @@ using namespace mongo;
 
 TEST(ExtractBSON, ExtractOpTimeField) {
     // Outer object cases.
-    BSONObj obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "b"
+    BSONObj obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "t" << 2LL) << "b"
                            << "notAnObj");
     repl::OpTime opTime;
     ASSERT_OK(bsonExtractOpTimeField(obj, "a", &opTime));
@@ -51,10 +51,10 @@ TEST(ExtractBSON, ExtractOpTimeField) {
     // Missing timestamp field.
     obj = BSON("a" << BSON("ts"
                            << "notATimestamp"
-                           << "t" << 2));
+                           << "t" << 2LL));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, bsonExtractOpTimeField(obj, "a", &opTime));
     // Wrong typed timestamp field.
-    obj = BSON("a" << BSON("t" << 2));
+    obj = BSON("a" << BSON("t" << 2LL));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, bsonExtractOpTimeField(obj, "a", &opTime));
     // Missing term field.
     obj = BSON("a" << BSON("ts" << Timestamp(10, 0) << "t"

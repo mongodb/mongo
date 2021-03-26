@@ -104,16 +104,16 @@ TEST(OplogEntryTest, Create) {
     ASSERT_EQ(entry.getOpTime(), entryOpTime);
 }
 
-TEST(OplogEntryTest, OpTimeAndWallTimeBaseNonStrictParsing) {
+TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     const BSONObj oplogEntryExtraField = BSON("ts" << Timestamp(0, 0) << "t" << 0LL << "op"
                                                    << "c"
                                                    << "ns" << nss.ns() << "wall" << Date_t() << "o"
                                                    << BSON("_id" << 1) << "extraField" << 3);
 
-    // OpTimeAndWallTimeBase should be successfully created from an OplogEntry, even though it has
+    // OpTimeBase should be successfully created from an OplogEntry, even though it has
     // extraneous fields.
-    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(OpTimeAndWallTimeBase::parse(
-        IDLParserErrorContext("OpTimeAndWallTimeBase"), oplogEntryExtraField));
+    UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
+        OpTimeBase::parse(IDLParserErrorContext("OpTimeBase"), oplogEntryExtraField));
 
     // OplogEntryBase should still use strict parsing and throw an error when it has extraneous
     // fields.

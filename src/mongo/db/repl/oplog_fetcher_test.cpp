@@ -1115,7 +1115,7 @@ TEST_F(OplogFetcherTest, RemoteFirstOplogEntryWithExtraFieldsReturnsOplogStartMi
     auto entry = makeNoopOplogEntry(Seconds(456));
 
     // Set the remote node's first oplog entry to include extra fields.
-    auto remoteFirstOplogEntry = BSON("ts" << Timestamp(1, 0) << "t" << 1 << "extra"
+    auto remoteFirstOplogEntry = BSON("ts" << Timestamp(1, 0) << "t" << 1LL << "extra"
                                            << "field");
     _mockServer->insert(nss.ns(), remoteFirstOplogEntry);
 
@@ -1728,8 +1728,10 @@ TEST_F(OplogFetcherTest,
     CursorId cursorId = 22LL;
     auto firstEntry = makeNoopOplogEntry(lastFetched);
     auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+
+    auto missingFieldErrorCode = ErrorCodes::duplicateCodeForTest(40414);
     ASSERT_EQUALS(
-        ErrorCodes::NoSuchKey,
+        missingFieldErrorCode,
         processSingleBatch(makeFirstBatch(cursorId,
                                           {firstEntry,
                                            BSON("o" << BSON("msg"
@@ -1992,7 +1994,8 @@ TEST_F(OplogFetcherTest, ValidateDocumentsReturnsNoSuchKeyIfTimestampIsNotFoundI
     auto secondEntry = BSON("o" << BSON("msg"
                                         << "oplog entry without optime"));
 
-    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+    auto missingFieldErrorCode = ErrorCodes::duplicateCodeForTest(40414);
+    ASSERT_EQUALS(missingFieldErrorCode,
                   OplogFetcher::validateDocuments(
                       {firstEntry, secondEntry},
                       true,

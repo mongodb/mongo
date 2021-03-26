@@ -5980,9 +5980,9 @@ TEST_F(ReplCoordTest, DoNotIgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNo
     auto lowerConfigVersion = 1;
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
+            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2LL) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion"
+                              << BSON("ts" << Timestamp(10, 0) << "t" << 2LL) << "configVersion"
                               << lowerConfigVersion << "configTerm" << 2 << "term" << 2
                               << "syncSourceIndex" << 1 << "isPrimary" << true)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
@@ -5993,9 +5993,9 @@ TEST_F(ReplCoordTest, DoNotIgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNo
     auto higherConfigVersion = 100;
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "lastCommittedWall"
+            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 2LL) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "t" << 2) << "configVersion"
+                              << BSON("ts" << Timestamp(10, 0) << "t" << 2LL) << "configVersion"
                               << higherConfigVersion << "configTerm" << 2 << "term" << 2
                               << "syncSourceIndex" << 1 << "isPrimary" << true)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
@@ -6069,9 +6069,9 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     // Higher term, should change.
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3)
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3LL)
                                   << "lastCommittedWall" << Date_t() + Seconds(100)
-                                  << "lastOpVisible" << BSON("ts" << Timestamp(10, 0) << "t" << 3)
+                                  << "lastOpVisible" << BSON("ts" << Timestamp(10, 0) << "t" << 3LL)
                                   << "configVersion" << 2 << "configTerm" << 2 << "term" << 3
                                   << "syncSourceIndex" << 1 << "isPrimary" << true)));
     getReplCoord()->processReplSetMetadata(metadata.getValue());
@@ -6082,9 +6082,9 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     // Lower term, should not change.
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3)
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3LL)
                                   << "lastCommittedWall" << Date_t() + Seconds(100)
-                                  << "lastOpVisible" << BSON("ts" << Timestamp(11, 0) << "t" << 3)
+                                  << "lastOpVisible" << BSON("ts" << Timestamp(11, 0) << "t" << 3LL)
                                   << "configVersion" << 2 << "configTerm" << 2 << "term" << 2
                                   << "syncSourceIndex" << 1 << "isPrimary" << true)));
     getReplCoord()->processReplSetMetadata(metadata2.getValue());
@@ -6095,9 +6095,9 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
     // Same term, should not change.
     StatusWith<rpc::ReplSetMetadata> metadata3 = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3)
+        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(11, 0) << "t" << 3LL)
                                   << "lastCommittedWall" << Date_t() + Seconds(100)
-                                  << "lastOpVisible" << BSON("ts" << Timestamp(11, 0) << "t" << 3)
+                                  << "lastOpVisible" << BSON("ts" << Timestamp(11, 0) << "t" << 3LL)
                                   << "configVersion" << 2 << "configTerm" << 2 << "term" << 3
                                   << "syncSourceIndex" << 1 << "isPrimary" << true)));
     getReplCoord()->processReplSetMetadata(metadata3.getValue());
@@ -6133,9 +6133,9 @@ TEST_F(ReplCoordTest,
     // Higher term - should update term but not last committed optime.
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "lastCommittedWall"
+            "lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 3LL) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 0) << "t" << 3) << "configVersion"
+                              << BSON("ts" << Timestamp(10, 0) << "t" << 3LL) << "configVersion"
                               << config.getConfigVersion() << "configTerm" << config.getConfigTerm()
                               << "term" << 3 << "syncSourceIndex" << 1 << "isPrimary" << true)));
     BSONObjBuilder responseBuilder;
@@ -6272,9 +6272,9 @@ TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter)
     // commit point via heartbeats.
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
         rpc::kReplSetMetadataFieldName << BSON(
-            "lastOpCommitted" << BSON("ts" << Timestamp(10, 1) << "t" << 3) << "lastCommittedWall"
+            "lastOpCommitted" << BSON("ts" << Timestamp(10, 1) << "t" << 3LL) << "lastCommittedWall"
                               << Date_t() + Seconds(100) << "lastOpVisible"
-                              << BSON("ts" << Timestamp(10, 1) << "t" << 3) << "configVersion"
+                              << BSON("ts" << Timestamp(10, 1) << "t" << 3LL) << "configVersion"
                               << config.getConfigVersion() << "configTerm" << config.getConfigTerm()
                               << "term" << 3 << "syncSourceIndex" << 1 << "isPrimary" << true)));
     BSONObjBuilder responseBuilder;

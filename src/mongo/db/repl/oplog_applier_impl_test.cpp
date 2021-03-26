@@ -2346,7 +2346,7 @@ TEST_F(OplogApplierImplTest, LogSlowOpApplicationWhenSuccessful) {
     ASSERT_EQUALS(
         1,
         countBSONFormatLogLinesIsSubset(BSON(
-            "attr" << BSON("CRUD" << BSON("ts" << Timestamp(1, 1) << "t" << 1 << "v" << 2 << "op"
+            "attr" << BSON("CRUD" << BSON("ts" << Timestamp(1, 1) << "t" << 1LL << "v" << 2 << "op"
                                                << "i"
                                                << "ns"
                                                << "test.t"

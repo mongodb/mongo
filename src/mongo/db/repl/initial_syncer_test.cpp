@@ -2858,7 +2858,7 @@ TEST_F(
         // Oplog entry associated with the stopTimestamp.
         processSuccessfulLastOplogEntryFetcherResponse({BSON("ts"
                                                              << "not a timestamp"
-                                                             << "t" << 1)});
+                                                             << "t" << 1LL)});
 
         // _lastOplogEntryFetcherCallbackAfterCloningData() will shut down the OplogFetcher after
         // setting the completion status.

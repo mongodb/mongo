@@ -1063,11 +1063,11 @@ Status RollbackImpl::_checkAgainstTimeLimit(
         return Status(ErrorCodes::OplogStartMissing, "no oplog during rollback");
     }
     const auto topOfOplogBSON = topOfOplogSW.getValue().first;
-    const auto topOfOplog = uassertStatusOK(OplogEntry::parse(topOfOplogBSON));
+    const auto topOfOplogOpAndWallTime = OpTimeAndWallTime::parse(topOfOplogBSON);
 
-    _rollbackStats.lastLocalOptime = topOfOplog.getOpTime();
+    _rollbackStats.lastLocalOptime = topOfOplogOpAndWallTime.opTime;
 
-    auto topOfOplogWallTime = topOfOplog.getWallClockTime();
+    auto topOfOplogWallTime = topOfOplogOpAndWallTime.wallTime;
     // We check the difference between the top of the oplog and the first oplog entry after the
     // common point when computing the rollback time limit.
     auto firstOpWallClockTimeAfterCommonPoint =
