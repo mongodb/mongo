@@ -555,11 +555,14 @@ TEST_F(ReshardingTxnClonerTest, ClonerOneBatchThenCanceled) {
     auto cancelSource = CancelationSource(opCtxToken);
     auto future = runCloner(cloner, executor, cancelSource.token());
 
-    onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
-                            CursorId{123},
-                            true /* isFirstBatch */);
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        cancelSource.cancel();
 
-    cancelSource.cancel();
+        return CursorResponse(NamespaceString::kSessionTransactionsTableNamespace,
+                              CursorId{123},
+                              std::vector<BSONObj>(txns.begin(), txns.begin() + 2))
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
 
     auto status = future.getNoThrow();
     ASSERT_EQ(status.code(), ErrorCodes::CallbackCanceled);
