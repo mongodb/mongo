@@ -208,6 +208,10 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                  ReshardingDonorDocument>(opCtx, donorDoc);
 }
 
+bool isCurrentShardPrimary(OperationContext* opCtx, const CollectionMetadata& metadata) {
+    return metadata.getChunkManager()->dbPrimary() == ShardingState::get(opCtx)->shardId();
+}
+
 /*
  * Either constructs a new ReshardingRecipientStateMachine with 'reshardingFields' or passes
  * 'reshardingFields' to an already-existing ReshardingRecipientStateMachine.
@@ -243,7 +247,7 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
 
     // This could be a shard not indicated as a recipient that's trying to refresh the temporary
     // collection. In this case, we don't want to create a recipient machine.
-    if (!metadata.currentShardHasAnyChunks()) {
+    if (!isCurrentShardPrimary(opCtx, metadata) && !metadata.currentShardHasAnyChunks()) {
         return;
     }
 
