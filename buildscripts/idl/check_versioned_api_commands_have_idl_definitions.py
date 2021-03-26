@@ -43,37 +43,17 @@ from pymongo import MongoClient
 sys.path.append(os.path.normpath(os.path.join(os.path.abspath(__file__), '../../..')))
 
 # pylint: disable=wrong-import-position,wrong-import-order
+from buildscripts.idl.lib import list_idls, parse_idl
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.testing.fixtures import interface
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.testing.fixtures.shardedcluster import ShardedClusterFixture
 from buildscripts.resmokelib.testing.fixtures.standalone import MongoDFixture
-from idl import parser, syntax
-from idl.compiler import CompilerImportResolver
+from idl import syntax
 
 LOGGER_NAME = 'check-idl-definitions'
 LOGGER = logging.getLogger(LOGGER_NAME)
-
-
-def list_idls(directory: str) -> Set[str]:
-    """Find all IDL files in the current directory."""
-    return {
-        os.path.join(dirpath, filename)
-        for dirpath, dirnames, filenames in os.walk(directory) for filename in filenames
-        if filename.endswith('.idl')
-    }
-
-
-def parse_idl(idl_path: str, import_directories: List[str]) -> syntax.IDLParsedSpec:
-    """Parse an IDL file or throw an error."""
-    parsed_doc = parser.parse(open(idl_path), idl_path, CompilerImportResolver(import_directories))
-
-    if parsed_doc.errors:
-        parsed_doc.errors.dump_errors()
-        raise ValueError(f"Cannot parse {idl_path}")
-
-    return parsed_doc
 
 
 def is_test_idl(idl_path: str) -> bool:

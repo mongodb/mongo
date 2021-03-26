@@ -3315,6 +3315,17 @@ tasks:
         content_type: application/gzip
         display_name: Binaries
 
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          ${activate_virtualenv}
+          $python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+
     - command: archive.targz_pack
       params:
         target: "artifacts.tgz"
@@ -3328,6 +3339,7 @@ tasks:
           - "artifacts.json"
           - "buildscripts/**"
           - "compile_expansions.yml"
+          - "all_feature_flags.txt"  # Must correspond to the definition in buildscripts/idl/lib.py.
           - "jstests/**"
           - "library_dependency_graph.json"
           - "patch_files.txt"
@@ -9624,27 +9636,29 @@ buildvariants:
     target_resmoke_time: 20
     max_sub_suites: 5
     large_distro_name: windows-vsCurrent-large
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
+  tasks:
+    - name: compile_and_archive_dist_test_then_package_TG
+      distros:
+        - windows-vsCurrent-xlarge
+    - name: compile_build_tools_next_TG
+      distros:
+        - windows-vsCurrent-xlarge
+    - name: burn_in_tests_gen
+    - name: noPassthrough_gen
+    - name: powercycle_kill_mongod_smoke
+# Disabling as the following tests are not aware of feature flags.
+#    - name: buildscripts_test
+#    - name: server_discovery_and_monitoring_json_test_TG
+#    - name: server_selection_json_test_TG
+#    - name: compile_run_and_archive_dbtest_TG
+#      distros:
+#        - windows-vsCurrent-xlarge
+#    - name: unittest_shell_hang_analyzer_gen
 
 - &enterprise-windows-suggested-template
   name: enterprise-windows-suggested
@@ -9730,27 +9744,48 @@ buildvariants:
     target_resmoke_time: 20
     max_sub_suites: 3
     large_distro_name: windows-vsCurrent-large
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
         --excludeWithAnyTags=incompatible_with_windows_tls
+  tasks:
+    - name: compile_test_and_package_serial_TG
+      distros:
+        - windows-vsCurrent-xlarge
+    - name: audit
+    - name: auth_audit_gen
+    - name: causally_consistent_jscore_txns_passthrough
+      distros:
+        - windows-vsCurrent-large
+    - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+    - name: external_auth
+    - name: external_auth_aws
+    - name: external_auth_windows
+      distros:
+        - windows-64-2016
+    - name: .jscore .common !.compat !.sharding
+    - name: jsCore_auth
+    - name: jsCore_ese
+    - name: jsCore_txns_large_txns_format
+    - name: .jstestfuzz .common
+    - name: mqlrun
+    - name: noPassthrough_gen
+    - name: noPassthroughWithMongod_gen
+    - name: .replica_sets .common
+    - name: .replica_sets .multi_oplog
+    - name: replica_sets_ese_gen
+    - name: sasl
+    - name: .sharding .txns
+    - name: sharding_auth_gen
+    - name: sharding_auth_audit_gen
+    - name: sharding_ese_gen
+    - name: snmp
+# Disabling as the following tests are not aware of feature flags.
+#    - name: buildscripts_test
+#    - name: unittest_shell_hang_analyzer_gen
+#    - name: server_selection_json_test_TG
+#    - name: server_discovery_and_monitoring_json_test_TG
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
@@ -10368,37 +10403,20 @@ buildvariants:
     max_sub_suites: 5
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
-    test_flags: >-
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagTenantMigrations: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+    test_flags: --runAllFeatureFlagTests
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - rhel80-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-medium
+# Disabling as the following tests are not aware of feature flags.
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#      - rhel80-large
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
+#    distros:
+#    - rhel80-medium
   - name: libdeps_graph_linting_TG
     distros:
       - rhel80-large
@@ -10472,12 +10490,13 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
-  - name: server_discovery_and_monitoring_json_test_TG
-    distros:
-      - rhel80-large
-  - name: server_selection_json_test_TG
-    distros:
-      - rhel80-large
+# Disabling as the following tests are not aware of feature flags.
+#  - name: server_discovery_and_monitoring_json_test_TG
+#    distros:
+#      - rhel80-large
+#  - name: server_selection_json_test_TG
+#    distros:
+#      - rhel80-large
 
 - name: enterprise-rhel-80-64-bit-dynamic-sbe
   display_name: "Shared Library Enterprise RHEL 8.0 (SBE)"
@@ -10511,12 +10530,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - rhel80-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-medium
+# Disable the following tests as they are not aware of feature flags.
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#      - rhel80-large
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
+#    distros:
+#    - rhel80-medium
   - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.sharded !.repl
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
@@ -11449,27 +11469,10 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagTenantMigrations: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -12136,6 +12139,7 @@ buildvariants:
   - name: .retry
   - name: .read_only
   - name: .rollbackfuzzer
+  - name: .updatefuzzer
   - name: sasl
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
@@ -12170,28 +12174,10 @@ buildvariants:
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
     exec_timeout_secs: 14400 # 3 hour timeout
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
-        --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagTenantMigrations: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_benchmarks
@@ -12234,10 +12220,10 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
-  - name: .updatefuzzer
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+# Disabling the following tests as they are not aware of feature flags.
+#  - name: unittest_shell_hang_analyzer_gen
+#  - name: server_discovery_and_monitoring_json_test_TG
+#  - name: server_selection_json_test_TG
 
 - name: ubuntu1804-asan
   display_name: ~ ASAN Ubuntu 18.04
@@ -12342,28 +12328,11 @@ buildvariants:
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagTenantMigrations: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under UBSAN build.
@@ -12408,8 +12377,9 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
-  - name: server_discovery_and_monitoring_json_test_TG
-  - name: server_selection_json_test_TG
+# Disabling the following tests as they are not aware of feature flags.
+#  - name: server_discovery_and_monitoring_json_test_TG
+#  - name: server_selection_json_test_TG
 
 - &ubuntu1804-debug-aubsan-lite-required-template
   name: ubuntu1804-debug-aubsan-lite-required
@@ -12459,28 +12429,11 @@ buildvariants:
     # also made to SConstruct.
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer" LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
     test_flags: >-
         --excludeWithAnyTags=requires_ocsp_stapling
-        --mongodSetParameters="{
-            featureFlagToaster: true,
-            featureFlagSpoon: true,
-            featureFlagAuthorizationContract: true,
-            featureFlagTenantMigrations: true,
-            featureFlagImprovedAuditing: true,
-            featureFlagRuntimeAuditConfig: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagShardingFullDDLSupport: true,
-            featureFlagShardingFullDDLSupportTimestampedVersion: true,
-            featureFlagWindowFunctions: true,
-            featureFlagUseSecondaryDelaySecs: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
-        --mongosSetParameters="{
-            featureFlagImprovedAuditing: true,
-            featureFlagTimeseriesCollection: true,
-            featureFlagWindowFunctions: true,
-            featureFlagChangeStreamsOptimization: true,
-        }"
+        --runAllFeatureFlagTests
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
     scons_cache_scope: shared
@@ -12491,15 +12444,16 @@ buildvariants:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - ubuntu1804-xlarge
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - ubuntu1804-xlarge
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-      - ubuntu1804-xlarge
   - name: jsCore
   - name: jsCore_txns
-  - name: unittest_shell_hang_analyzer_gen
+# Disabling these tests as they are not aware of feature flags.
+#  - name: compile_test_and_package_parallel_unittest_stream_TG
+#    distros:
+#      - ubuntu1804-xlarge
+#  - name: compile_test_and_package_parallel_dbtest_stream_TG
+#    distros:
+#      - ubuntu1804-xlarge
+#  - name: unittest_shell_hang_analyzer_gen
 
 - name: ubuntu1804-debug-aubsan-lite_fuzzer
   display_name: "{A,UB}SAN Enterprise Ubuntu 18.04 FUZZER"
