@@ -39,6 +39,7 @@ function createUsers(rst) {
         assert.commandWorked(testDB.runCommand(
             {createUser: kTestUser.name, pwd: kTestUser.pwd, roles: ["readWrite"]}));
     });
+    rst.awaitReplication();
 }
 
 const kTenantId = "testTenantId";
