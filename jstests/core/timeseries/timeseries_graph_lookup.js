@@ -1,5 +1,5 @@
 /**
- * Verifies that time-series bucket collections work as expected with $graphLookup.
+ * Verifies that time-series collections work as expected with $graphLookup.
  *
  *
  * @tags: [
