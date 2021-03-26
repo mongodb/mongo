@@ -67,11 +67,21 @@ assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}, 'bucketindex'),
 
 // Check that $indexStats aggregation stage returns key patterns that are consistent with the ones
 // provided to the createIndexes commands.
-let res = assert.throws(() => {
-    coll.aggregate([{$indexStats: {}}]);
-});
-// 40602 - $indexStats is only valid as the first stage in a pipeline.
-assert.commandFailedWithCode(res, 40602);
+const indexStatsDocs = coll.aggregate([{$indexStats: {}}]).toArray();
+assert.eq(Object.keys(indexKeys).length, indexStatsDocs.length, tojson(indexStatsDocs));
+for (let i = 0; i < indexStatsDocs.length; ++i) {
+    const stat = indexStatsDocs[i];
+    assert(indexKeys.hasOwnProperty(stat.name),
+           '$indexStats returned unknown index: ' + stat.name + ': ' + tojson(indexStatsDocs));
+    assert.docEq(indexKeys[stat.name],
+                 stat.key,
+                 '$indexStats returned unexpected top-level key for index: ' + stat.name + ': ' +
+                     tojson(indexStatsDocs));
+    assert.docEq(indexKeys[stat.name],
+                 stat.spec.key,
+                 '$indexStats returned unexpected nested key in spec for index: ' + stat.name +
+                     ': ' + tojson(indexStatsDocs));
+}
 
 // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
 // $indexStats on the buckets collection.
@@ -81,9 +91,9 @@ assert.eq(
 
 // Check that $indexStats is not limited to being the only stage in an aggregation pipeline on a
 // time-series collection.
-res = assert.throws(() => {
-    coll.aggregate([{$indexStats: {}}, {$group: {_id: 0, index_names: {$addToSet: '$name'}}}]);
-});
-// 40602 - $indexStats is only valid as the first stage in a pipeline.
-assert.commandFailedWithCode(res, 40602);
+const multiStageDocs =
+    coll.aggregate([{$indexStats: {}}, {$group: {_id: 0, index_names: {$addToSet: '$name'}}}])
+        .toArray();
+assert.eq(1, multiStageDocs.length, tojson(multiStageDocs));
+assert.sameMembers(Object.keys(indexKeys), multiStageDocs[0].index_names, tojson(multiStageDocs));
 })();

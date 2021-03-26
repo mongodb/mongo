@@ -33,6 +33,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/pipeline/document_source_index_stats.h"
+#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
+#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/timeseries/timeseries_field_names.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -94,6 +98,32 @@ AggregateCommand ResolvedView::asExpandedViewAggregation(const AggregateCommand&
     resolvedPipeline.insert(resolvedPipeline.end(), _pipeline.begin(), _pipeline.end());
     resolvedPipeline.insert(
         resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
+
+    // $indexStats needs special handling for time-series-collections. Normally for a regular read,
+    // $_internalUnpackBucket unpacks the buckets entries into time-series document format and then
+    // passes the time-series documents on through the pipeline. Instead we need to read the buckets
+    // collection's index stats unmodified and then pass the results through an additional stage to
+    // specially convert them to the time-series collection's schema, and then onward. There is no
+    // need for the $_internalUnpackBucket stage with $indexStats, so we remove it.
+    if (resolvedPipeline.size() >= 2 &&
+        resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageName] &&
+        resolvedPipeline[1][DocumentSourceIndexStats::kStageName]) {
+        // Clear the $_internalUnpackBucket stage.
+        auto unpackStage = resolvedPipeline[0];
+        resolvedPipeline[0] = resolvedPipeline[1];
+
+        // Grab the $_internalUnpackBucket stage's time-series collection schema options and pass
+        // them into the $_internalConvertBucketIndexStats stage to use for schema conversion.
+        BSONObjBuilder builder;
+        for (const auto& elem : unpackStage[DocumentSourceInternalUnpackBucket::kStageName].Obj()) {
+            if (elem.fieldNameStringData() == timeseries::kTimeFieldName ||
+                elem.fieldNameStringData() == timeseries::kMetaFieldName) {
+                builder.append(elem);
+            }
+        }
+        resolvedPipeline[1] =
+            BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
+    }
 
     AggregateCommand expandedRequest{_namespace, resolvedPipeline};
 
