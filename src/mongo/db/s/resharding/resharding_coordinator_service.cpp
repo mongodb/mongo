@@ -629,6 +629,10 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
     std::set<ShardId> recipientShardIds;
     std::vector<ChunkType> initialChunks;
 
+    // The database primary must always be a recipient to ensure it ends up with consistent
+    // collection metadata.
+    recipientShardIds.emplace(cm.dbPrimary());
+
     if (const auto& chunks = coordinatorDoc.getPresetReshardedChunks()) {
         auto version = calculateChunkVersionForInitialChunks(opCtx);
 

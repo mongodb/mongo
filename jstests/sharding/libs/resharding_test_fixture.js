@@ -58,6 +58,8 @@ var ReshardingTest = class {
         this._sourceCollectionUUID = undefined;
         /** @private */
         this._tempNs = undefined;
+        /** @private */
+        this._primaryShardName = undefined;
 
         // Properties set by startReshardingInBackground() and withReshardingInBackground().
         /** @private */
@@ -149,7 +151,8 @@ var ReshardingTest = class {
      * {min: <shardKeyValue0>, max: <shardKeyValue1>, shard: <shardName>} objects. The chunks must
      * form a partition of the {shardKey: MinKey} --> {shardKey: MaxKey} space.
      */
-    createShardedCollection({ns, shardKeyPattern, chunks}) {
+    createShardedCollection(
+        {ns, shardKeyPattern, chunks, primaryShardName = this.donorShardNames[0]}) {
         this._ns = ns;
         this._currentShardKey = Object.assign({}, shardKeyPattern);
 
@@ -169,7 +172,8 @@ var ReshardingTest = class {
         // collection is unsharded. We configure one of the recipient shards to be the primary shard
         // for the database so mongos still ends up routing operations to a shard which owns the
         // temporary resharding collection.
-        this._st.ensurePrimaryShard(sourceDB.getName(), this.recipientShardNames[0]);
+        this._st.ensurePrimaryShard(sourceDB.getName(), primaryShardName);
+        this._primaryShardName = primaryShardName;
 
         return sourceCollection;
     }
@@ -627,7 +631,8 @@ var ReshardingTest = class {
     /** @private */
     _checkDonorPostState(donor, expectedErrorCode) {
         const collInfo = donor.getCollection(this._ns).exists();
-        const isAlsoRecipient = this._recipientShards().includes(donor);
+        const isAlsoRecipient =
+            this._recipientShards().includes(donor) || donor.shardName === this._primaryShardName;
         if (expectedErrorCode === ErrorCodes.OK && !isAlsoRecipient) {
             assert.eq(
                 null,
