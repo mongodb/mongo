@@ -31,31 +31,13 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/timeseries/timeseries_field_names.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/logv2/redaction.h"
 
 namespace mongo {
 
 namespace timeseries {
-
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
-    if (!viewCatalog) {
-        return {};
-    }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss.ns());
-    if (!view) {
-        return {};
-    }
-
-    // Return a copy of the time-series options so that we do not refer to the internal state of
-    // 'viewCatalog' after it goes out of scope.
-    return view->timeseries();
-}
 
 StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
     const TimeseriesOptions& timeseriesOptions, const BSONObj& timeseriesIndexSpecBSON) {

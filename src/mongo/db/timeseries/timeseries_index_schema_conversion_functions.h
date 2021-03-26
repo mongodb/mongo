@@ -29,25 +29,19 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
 
 class OperationContext;
+class TimeseriesOptions;
 
 /**
  * Namespace for helper functions converting index spec schema between time-series collection and
  * underlying buckets collection.
  */
 namespace timeseries {
-
-/**
- * Returns a copy of the time-series options for namespace 'nss', if 'nss' refers to a time-series
- * collection. Otherwise returns boost::none.
- */
-boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
-                                                        const NamespaceString& nss);
 
 /**
  * Maps the time-series collection index spec 'timeseriesIndexSpecBSON' to the index schema of the
