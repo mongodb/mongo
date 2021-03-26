@@ -96,6 +96,7 @@ protected:
     };
 
     ShardingDDLCoordinatorMetadata _coorMetadata;
+    bool _recoveredFromDisk;
 
 private:
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,

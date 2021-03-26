@@ -47,7 +47,8 @@ ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONO
 }
 
 ShardingDDLCoordinator::ShardingDDLCoordinator(const BSONObj& coorDoc)
-    : _coorMetadata(extractShardingDDLCoordinatorMetadata(coorDoc)) {}
+    : _coorMetadata(extractShardingDDLCoordinatorMetadata(coorDoc)),
+      _recoveredFromDisk(_coorMetadata.getRecoveredFromDisk()) {}
 
 ShardingDDLCoordinator::~ShardingDDLCoordinator() {
     invariant(_constructionCompletionPromise.getFuture().isReady());

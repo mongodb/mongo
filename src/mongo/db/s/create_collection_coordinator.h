@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/db/s/create_collection_coordinator_document_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -38,22 +39,56 @@
 
 namespace mongo {
 
-class CreateCollectionCoordinator final
-    : public ShardingDDLCoordinator_NORESILIENT,
-      public std::enable_shared_from_this<CreateCollectionCoordinator> {
+class CreateCollectionCoordinator final : public ShardingDDLCoordinator {
 public:
-    CreateCollectionCoordinator(OperationContext* opCtx, const ShardsvrCreateCollection& request);
+    using CoordDoc = CreateCollectionCoordinatorDocument;
+    using Phase = CreateCollectionCoordinatorPhaseEnum;
+
+    CreateCollectionCoordinator(const BSONObj& initialState);
+    ~CreateCollectionCoordinator() = default;
+
+
+    void checkIfOptionsConflict(const BSONObj& coorDoc) const override;
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override;
 
     /**
-     * Returns the information of the newly created collection, or the already existing one. It must
-     * be called after a successfull execution of run.
+     * Waits for the termination of the parent DDLCoordinator (so all the resources are liberated)
+     * and then return the
      */
-    const CreateCollectionResponse& getResultOnSuccess() {
+    CreateCollectionResponse getResult(OperationContext* opCtx) {
+        getCompletionFuture().get(opCtx);
+        invariant(_result.is_initialized());
         return *_result;
     }
 
 private:
-    SemiFuture<void> runImpl(std::shared_ptr<executor::TaskExecutor> executor) override;
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept override;
+
+    template <typename Func>
+    auto _executePhase(const Phase& newPhase, Func&& func) {
+        return [=] {
+            const auto& currPhase = _doc.getPhase();
+
+            if (currPhase > newPhase) {
+                // Do not execute this phase if we already reached a subsequent one.
+                return;
+            }
+            if (currPhase < newPhase) {
+                // Persist the new phase if this is the first time we are executing it.
+                _enterPhase(newPhase);
+            }
+            return func();
+        };
+    };
+
+    void _insertCoordinatorDocument(CoordDoc&& doc);
+    void _updateCoordinatorDocument(CoordDoc&& newStateDoc);
+    void _removeCoordinatorDocument();
+    void _enterPhase(Phase newState);
 
     /**
      * Performs all required checks before holding the critical sections.
@@ -68,7 +103,7 @@ private:
     /**
      * Given the appropiate split policy, create the initial chunks.
      */
-    void _createChunks(OperationContext* opCtx);
+    void _createPolicyAndChunks(OperationContext* opCtx);
 
     /**
      * If the optimized path can be taken, ensure the collection is already created in all the
@@ -86,12 +121,11 @@ private:
     /**
      * Refresh all participant shards and log creation.
      */
-    void _cleanup(OperationContext* opCtx);
+    void _finalize(OperationContext* opCtx) noexcept;
 
-    ServiceContext* _serviceContext;
-    const ShardsvrCreateCollection _request;
-    const NamespaceString& _nss;
+    CreateCollectionCoordinatorDocument _doc;
 
+    // Objects generated on each execution.
     boost::optional<ShardKeyPattern> _shardKeyPattern;
     boost::optional<BSONObj> _collation;
     boost::optional<UUID> _collectionUUID;
