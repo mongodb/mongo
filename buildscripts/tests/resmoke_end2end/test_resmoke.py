@@ -7,10 +7,11 @@ import os.path
 import sys
 import time
 import unittest
+from shutil import rmtree
+
 import yaml
 
 from buildscripts.resmokelib import core
-from buildscripts.resmokelib.utils import rmtree
 
 # pylint: disable=missing-docstring,protected-access
 

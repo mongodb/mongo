@@ -12,7 +12,9 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.core import process
+from buildscripts.resmokelib.core import network
 from buildscripts.resmokelib.testing.fixtures import standalone, shardedcluster
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils.history import make_historic, HistoryDict
 
 
@@ -56,7 +58,10 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     """
 
     args = [executable]
+    mongod_options = mongod_options.copy()
 
+    if "port" not in mongod_options:
+        mongod_options["port"] = network.PortAllocator.next_fixture_port(job_num)
     suite_set_parameters = mongod_options.get("set_parameters", make_historic({}))
     _apply_set_parameters(args, suite_set_parameters)
     mongod_options.pop("set_parameters")
@@ -72,26 +77,31 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
         mongod_options.dump_history(f"{logger.name}_config.yml")
     elif config.EXPORT_MONGOD_CONFIG == "detailed":
         mongod_options.dump_history(f"{logger.name}_config.yml", include_location=True)
-    return make_process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs), mongod_options["port"]
 
 
-def mongos_program(logger, job_num, test_id=None, executable=None, process_kwargs=None, **kwargs):
+def mongos_program(  # pylint: disable=too-many-arguments
+        logger, job_num, test_id=None, executable=None, process_kwargs=None, mongos_options=None):
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
     args = [executable]
 
-    suite_set_parameters = kwargs.get("set_parameters", {})
+    mongos_options = mongos_options.copy()
+
+    if "port" not in mongos_options:
+        mongos_options["port"] = network.PortAllocator.next_fixture_port(job_num)
+    suite_set_parameters = mongos_options.get("set_parameters", {})
     _apply_set_parameters(args, suite_set_parameters)
-    kwargs.pop("set_parameters")
+    mongos_options.pop("set_parameters")
 
     # Apply the rest of the command line arguments.
-    _apply_kwargs(args, kwargs)
+    _apply_kwargs(args, mongos_options)
 
-    _set_keyfile_permissions(kwargs)
+    _set_keyfile_permissions(mongos_options)
 
     process_kwargs = make_historic(utils.default_if_none(process_kwargs, {}))
     process_kwargs["job_num"] = job_num
     process_kwargs["test_id"] = test_id
-    return make_process(logger, args, **process_kwargs)
+    return make_process(logger, args, **process_kwargs), mongos_options["port"]
 
 
 def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
@@ -163,10 +173,13 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     if config.MONGOCRYPTD_SET_PARAMETERS is not None:
         mongocryptd_set_parameters.update(utils.load_yaml(config.MONGOCRYPTD_SET_PARAMETERS))
 
+    fixturelib = FixtureLib()
+    mongod_launcher = standalone.MongodLauncher(fixturelib)
+
     # If the 'logComponentVerbosity' setParameter for mongod was not already specified, we set its
     # value to a default.
     mongod_set_parameters.setdefault("logComponentVerbosity",
-                                     standalone.default_mongod_log_component_verbosity())
+                                     mongod_launcher.default_mongod_log_component_verbosity())
 
     # If the 'enableFlowControl' setParameter for mongod was not already specified, we set its value
     # to a default.
@@ -176,10 +189,11 @@ def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches
     # Set the default value for minimum resharding operation duration to 5 seconds.
     mongod_set_parameters.setdefault("reshardingMinimumOperationDurationMillis", 5000)
 
+    mongos_launcher = shardedcluster.MongosLauncher(fixturelib)
     # If the 'logComponentVerbosity' setParameter for mongos was not already specified, we set its
     # value to a default.
     mongos_set_parameters.setdefault("logComponentVerbosity",
-                                     shardedcluster.default_mongos_log_component_verbosity())
+                                     mongos_launcher.default_mongos_log_component_verbosity())
 
     test_data["setParameters"] = mongod_set_parameters
     test_data["setParametersMongos"] = mongos_set_parameters

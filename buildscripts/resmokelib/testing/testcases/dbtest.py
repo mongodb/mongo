@@ -2,6 +2,7 @@
 
 import os
 import os.path
+import shutil
 
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import core
@@ -47,7 +48,7 @@ class DBTestCase(interface.ProcessTestCase):
         self._clear_dbpath()
 
     def _clear_dbpath(self):
-        utils.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
+        shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
         return core.programs.dbtest_program(self.logger, self.fixture.job_num, test_id=self._id,

@@ -10,6 +10,7 @@ from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing import job
 from buildscripts.resmokelib.testing import queue_element
 from buildscripts.resmokelib.testing.fixtures import interface as _fixtures
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import queue as _queue
 
 # pylint: disable=missing-docstring,protected-access
@@ -271,7 +272,9 @@ class TestNoOpFixtureSetupAndTeardown(unittest.TestCase):
 
     def setUp(self):
         self.logger = logging.getLogger("job_unittest")
-        self.__noop_fixture = _fixtures.NoOpFixture(logger=self.logger, job_num=0)
+        fixturelib = FixtureLib()
+        self.__noop_fixture = _fixtures.NoOpFixture(logger=self.logger, job_num=0,
+                                                    fixturelib=fixturelib)
         self.__noop_fixture.setup = mock.Mock()
         self.__noop_fixture.teardown = mock.Mock()
 

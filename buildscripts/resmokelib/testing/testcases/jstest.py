@@ -4,6 +4,7 @@ import copy
 import os
 import os.path
 import sys
+import shutil
 import threading
 
 from buildscripts.resmokelib import config
@@ -65,7 +66,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
 
-        utils.rmtree(data_dir, ignore_errors=True)
+        shutil.rmtree(data_dir, ignore_errors=True)
 
         try:
             os.makedirs(data_dir)

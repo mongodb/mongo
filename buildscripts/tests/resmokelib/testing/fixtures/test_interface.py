@@ -4,6 +4,7 @@ import unittest
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface
+from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 # pylint: disable=missing-docstring,protected-access
 
@@ -48,7 +49,8 @@ class UnitTestFixture(interface.Fixture):  # pylint: disable=abstract-method
 
     def __init__(self, should_raise=False):
         logger = logging.getLogger("fixture_unittests")
-        interface.Fixture.__init__(self, logger, 99)
+        fixturelib = FixtureLib()
+        interface.Fixture.__init__(self, logger, 99, fixturelib)
         self._should_raise = should_raise
 
     def _do_teardown(self, mode=None):

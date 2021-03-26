@@ -42,11 +42,6 @@ def default_if_none(*values):
     return None
 
 
-def rmtree(path, **kwargs):
-    """Wrap shutil.rmtree."""
-    shutil.rmtree(path, **kwargs)
-
-
 def is_windows():
     """Return True if Windows."""
     return sys.platform.startswith("win32") or sys.platform.startswith("cygwin")
