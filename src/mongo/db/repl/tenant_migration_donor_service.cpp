@@ -741,18 +741,20 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     auto scopedOutstandingMigrationCounter =
         TenantMigrationStatistics::get(_serviceContext)->getScopedOutstandingDonatingCount();
 
-    return ExecutorFuture<void>(**executor)
+    return ExecutorFuture(**executor)
         .then([this, self = shared_from_this(), executor, serviceToken] {
             return _enterAbortingIndexBuildsState(
                 executor, serviceToken, _abortMigrationSource.token());
+        })
+        .then([this, self = shared_from_this(), serviceToken] {
+            _abortIndexBuilds(serviceToken, _abortMigrationSource.token());
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, serviceToken] {
             return _fetchAndStoreRecipientClusterTimeKeyDocs(
                 executor, recipientTargeterRS, serviceToken, _abortMigrationSource.token());
         })
         .then([this, self = shared_from_this(), executor, serviceToken] {
-            return _abortIndexBuildsAndEnterDataSyncState(
-                executor, serviceToken, _abortMigrationSource.token());
+            return _enterDataSyncState(executor, serviceToken, _abortMigrationSource.token());
         })
         .then([this, self = shared_from_this(), executor, recipientTargeterRS, serviceToken] {
             return _waitForRecipientToBecomeConsistentAndEnterBlockingState(
@@ -812,7 +814,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterAbortingIndexB
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
@@ -831,6 +833,27 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterAbortingIndexB
         });
 }
 
+void TenantMigrationDonorService::Instance::_abortIndexBuilds(
+    const CancellationToken& serviceToken, const CancellationToken& instanceToken) {
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
+            return;
+        }
+    }
+
+    checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
+
+    // Before starting data sync, abort any in-progress index builds.  No new index
+    // builds can start while we are doing this because the mtab prevents it.
+    {
+        auto opCtxHolder = cc().makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
+        indexBuildsCoordinator->abortTenantIndexBuilds(opCtx, _tenantId, "tenant migration");
+    }
+}
+
 ExecutorFuture<void>
 TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -840,7 +863,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
@@ -969,7 +992,7 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
         .on(**executor, CancellationToken::uncancelable());
 }
 
-ExecutorFuture<void> TenantMigrationDonorService::Instance::_abortIndexBuildsAndEnterDataSyncState(
+ExecutorFuture<void> TenantMigrationDonorService::Instance::_enterDataSyncState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
     const CancellationToken& serviceToken,
     const CancellationToken& instanceToken) {
@@ -977,21 +1000,13 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_abortIndexBuildsAnd
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kAbortingIndexBuilds) {
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
     checkIfReceivedDonorAbortMigration(serviceToken, instanceToken);
 
-    // Before starting data sync, abort any in-progress index builds.  No new index
-    // builds can start while we are doing this because the mtab prevents it.
-    {
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-        indexBuildsCoordinator->abortTenantIndexBuilds(opCtx, _tenantId, "tenant migration");
-        pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState.pauseWhileSet(opCtx);
-    }
+    pauseTenantMigrationBeforeLeavingAbortingIndexBuildsState.pauseWhileSet();
 
     // Enter "dataSync" state.
     return _updateStateDoc(executor, TenantMigrationDonorStateEnum::kDataSync, instanceToken)
@@ -1012,7 +1027,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToBecomeConsistentAndEnt
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
@@ -1051,7 +1066,7 @@ TenantMigrationDonorService::Instance::_waitForRecipientToReachBlockTimestampAnd
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
@@ -1148,7 +1163,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
             // The migration was resumed on stepup and it was already aborted.
-            return ExecutorFuture<void>(**executor, Status::OK());
+            return ExecutorFuture(**executor);
         }
     }
 
@@ -1159,7 +1174,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         // Fulfill the promise since the state doc failed to insert.
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
-        return ExecutorFuture<void>(**executor, status);
+        return ExecutorFuture(**executor);
     } else if (status == ErrorCodes::PrimarySteppedDown) {
         // The node started stepping down while the instance was waiting for key docs to
         // to replicate. Do not abort the migration since the migration can safely resume
@@ -1167,7 +1182,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         stdx::lock_guard<Latch> lg(_mutex);
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
-        return ExecutorFuture<void>(**executor, status);
+        return ExecutorFuture(**executor);
     } else {
         // Enter "abort" state.
         _abortReason.emplace(status);
@@ -1199,7 +1214,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         // donorForgetMigration promise here since the Instance's destructor has an
         // invariant that _receiveDonorForgetMigrationPromise is ready.
         onReceiveDonorForgetMigration();
-        return ExecutorFuture<void>(**executor, Status::OK());
+        return ExecutorFuture(**executor);
     }
 
     // Wait for the donorForgetMigration command.
