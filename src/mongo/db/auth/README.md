@@ -192,7 +192,7 @@ The specific properties that each SASL mechanism provides is outlined in this ta
 | PLAIN         |             |               |
 | GSS-API       | X           | X             |
 
-### X509 Authentication
+### <a name="x509atn"></a>X509 Authentication
 
 `MONGODB-X509` is an authentication method that uses the x509 certificates from the SSL/TLS
 certificate key exchange. When the peer certificate validation happens during the SSL handshake, an
@@ -224,7 +224,40 @@ a server parameter that configures how servers authenticate to each other. There
 to allow a transition from keyfile, which provides minimal security, to x509 authentication, which
 provides the most security.
 
-### Localhost Auth Bypass
+#### Special Case: Arbiter
+
+The only purpose of an arbiter is to participate in elections for replica set primary. An arbiter
+does not have a copy of data set, including system tables which contain user and role definitions,
+and therefore can not authenticate local users. It is possible to authenticate to arbiter using
+external authentication methods such as cluster authentication or
+[x.509 authentication](#x509atn) and acquire a role using [x.509 authorization](#x509azn).
+
+It is also possible to connect to an arbiter with limited access using the
+[localhost auth bypass](#lhabp). If the localhost auth bypass is disabled using the
+[`enableLocalhostAuthBypass`](https://docs.mongodb.com/manual/reference/parameters/#param.enableLocalhostAuthBypass)
+option, then all non cluster-auth connections will be denied access.
+
+### Sharding Authentication
+
+Sharded databases use the same authentication mechanism as previously described in "Cluster
+Authentication".
+
+Sharding query router (mongos) is an interface between client applications and the data bearing nodes
+of a sharded cluster. It does not store any data, however it does maintain some in-memory caches. In
+order to authenticate users, mongos contacts config servers to obtain a user's entire definition,
+which it then deserializes to obtain roles, privileges, and credentials. It does this by invoking the
+[`{usersInfo:...}` command](https://docs.mongodb.com/manual/reference/command/usersInfo/)
+against a config server, see
+[`getUserDescription`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_s.cpp#L120)
+function for details.
+
+Data bearing members of a sharded cluster have no special provisions and do not normally have access
+to any user or role definitions, making non-cluster authentication impossible under normal circumstances.
+While it is possible to create local users and roles on a data bearing shard (making non-cluster
+authentication possible), this should be avoided. All connecting clients should access members 
+via mongos only.
+
+### <a name="lhabp">Localhost Auth Bypass
 
 When first setting up database authentication (using the `--auth` command to start a server), there
 is a feature called `localhostAuthBypass`. The `localhostAuthBypass` allows a client to connect over
@@ -586,7 +619,7 @@ so all the calls to libLDAP are wrapped with mutexes to ensure thread safety whe
 servers on certain distros. The logic to see whether libLDAP is thread-safe lives
 [here](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/connections/openldap_connection.cpp#L348-L378).
 
-#### X.509 Authorization
+#### <a name="x509azn"></a>X.509 Authorization
 
 In user acquisition in the
 [`AuthorizationManager`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager_impl.cpp#L454-L465),
