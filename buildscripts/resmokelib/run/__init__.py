@@ -35,6 +35,7 @@ from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
+_MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
 _BENCHMARK_ARGUMENT_TITLE = "Benchmark/Benchrun test options"
 _EVERGREEN_ARGUMENT_TITLE = "Evergreen options"
 _CEDAR_ARGUMENT_TITLE = "Cedar options"
@@ -610,11 +611,6 @@ class RunPlugin(PluginInterface):
         parser.add_argument("--continueOnFailure", action="store_true", dest="continue_on_failure",
                             help="Executes all tests in all suites, even if some of them fail.")
 
-        parser.add_argument(
-            "--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
-            help=("The directory which will contain the dbpaths of any mongod's started"
-                  " by resmoke.py or the tests themselves."))
-
         parser.add_argument("--dbtest", dest="dbtest_executable", metavar="PATH",
                             help="The path to the dbtest executable for resmoke to use.")
 
@@ -660,35 +656,6 @@ class RunPlugin(PluginInterface):
                   " own MongoDB deployment to dispatch tests to."))
 
         parser.set_defaults(logger_file="console")
-
-        parser.add_argument("--mongo", dest="mongo_executable", metavar="PATH",
-                            help="The path to the mongo shell executable for resmoke.py to use.")
-
-        parser.add_argument("--mongod", dest="mongod_executable", metavar="PATH",
-                            help="The path to the mongod executable for resmoke.py to use.")
-
-        parser.add_argument("--fuzzMongodConfigs", dest="fuzz_mongod_configs", action="store_true",
-                            help="Will randomly choose storage configs that were not specified.")
-
-        parser.add_argument("--configFuzzSeed", dest="config_fuzz_seed", metavar="PATH",
-                            help="Sets the seed used by storage config fuzzer")
-
-        parser.add_argument(
-            "--mongodSetParameters", dest="mongod_set_parameters", action="append",
-            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=("Passes one or more --setParameter options to all mongod processes"
-                  " started by resmoke.py. The argument is specified as bracketed YAML -"
-                  " i.e. JSON with support for single quoted and unquoted keys."))
-
-        parser.add_argument("--mongos", dest="mongos_executable", metavar="PATH",
-                            help="The path to the mongos executable for resmoke.py to use.")
-
-        parser.add_argument(
-            "--mongosSetParameters", dest="mongos_set_parameters", action="append",
-            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-            help=("Passes one or more --setParameter options to all mongos processes"
-                  " started by resmoke.py. The argument is specified as bracketed YAML -"
-                  " i.e. JSON with support for single quoted and unquoted keys."))
 
         parser.add_argument(
             "--mongocryptdSetParameters", dest="mongocryptd_set_parameters", action="append",
@@ -750,8 +717,8 @@ class RunPlugin(PluginInterface):
             help=("Seed for the random number generator. Useful in combination with the"
                   " --shuffle option for producing a consistent test execution order."))
 
-        parser.add_argument("--transportLayer", dest="transport_layer", metavar="TRANSPORT",
-                            help="The transport layer used by jstests")
+        parser.add_argument("--mongo", dest="mongo_executable", metavar="PATH",
+                            help="The path to the mongo shell executable for resmoke.py to use.")
 
         parser.add_argument("--shellReadMode", action="store", dest="shell_read_mode",
                             choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
@@ -772,49 +739,6 @@ class RunPlugin(PluginInterface):
             help=("Controls whether to randomize the order in which tests are executed."
                   " Defaults to auto when not supplied. auto enables randomization in"
                   " all cases except when the number of jobs requested is 1."))
-
-        parser.add_argument(
-            "--majorityReadConcern", action="store", dest="majority_read_concern", choices=("on",
-                                                                                            "off"),
-            metavar="ON|OFF", help=("Enable or disable majority read concern support."
-                                    " Defaults to %%default."))
-
-        parser.add_argument("--flowControl", action="store", dest="flow_control", choices=("on",
-                                                                                           "off"),
-                            metavar="ON|OFF", help=("Enable or disable flow control."))
-
-        parser.add_argument("--flowControlTicketOverride", type=int, action="store",
-                            dest="flow_control_tickets", metavar="TICKET_OVERRIDE",
-                            help=("Number of tickets available for flow control."))
-
-        parser.add_argument("--storageEngine", dest="storage_engine", metavar="ENGINE",
-                            help="The storage engine used by dbtests and jstests.")
-
-        parser.add_argument(
-            "--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb", metavar="CONFIG",
-            help="Sets the storage engine cache size configuration"
-            " setting for all mongod's.")
-
-        parser.add_argument(
-            "--numReplSetNodes", type=int, dest="num_replset_nodes", metavar="N",
-            help="The number of nodes to initialize per ReplicaSetFixture. This is also "
-            "used to indicate the number of replica set members per shard in a "
-            "ShardedClusterFixture.")
-
-        parser.add_argument("--numShards", type=int, dest="num_shards", metavar="N",
-                            help="The number of shards to use in a ShardedClusterFixture.")
-
-        parser.add_argument(
-            "--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
-            help="Sets the WiredTiger collection configuration setting for all mongod's.")
-
-        parser.add_argument(
-            "--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
-            help="Sets the WiredTiger engine configuration setting for all mongod's.")
-
-        parser.add_argument(
-            "--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
-            help="Sets the WiredTiger index configuration setting for all mongod's.")
 
         parser.add_argument(
             "--executor", dest="executor_file",
@@ -855,6 +779,101 @@ class RunPlugin(PluginInterface):
             metavar="FILE", help=
             "Have resmoke redirect all output to FILE. Additionally, stdout will contain lines that typically indicate that the test is making progress, or an error has happened. If `mrlog` is in the path it will be used. `tee` and `egrep` must be in the path."
         )
+
+        parser.add_argument(
+            "--runAllFeatureFlagTests", dest="run_all_feature_flag_tests", action="store_true",
+            help=
+            "Run MongoDB servers with all feature flags enabled and only run tests tags with these feature flags"
+        )
+
+        mongodb_server_options = parser.add_argument_group(
+            title=_MONGODB_SERVER_OPTIONS_TITLE,
+            description=("Options related to starting a MongoDB cluster that are forwarded from"
+                         " resmoke.py to the fixture."))
+
+        mongodb_server_options.add_argument(
+            "--mongod", dest="mongod_executable", metavar="PATH",
+            help="The path to the mongod executable for resmoke.py to use.")
+
+        mongodb_server_options.add_argument(
+            "--mongos", dest="mongos_executable", metavar="PATH",
+            help="The path to the mongos executable for resmoke.py to use.")
+
+        mongodb_server_options.add_argument(
+            "--mongodSetParameters", dest="mongod_set_parameters", action="append",
+            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
+            help=("Passes one or more --setParameter options to all mongod processes"
+                  " started by resmoke.py. The argument is specified as bracketed YAML -"
+                  " i.e. JSON with support for single quoted and unquoted keys."))
+
+        mongodb_server_options.add_argument(
+            "--mongosSetParameters", dest="mongos_set_parameters", action="append",
+            metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
+            help=("Passes one or more --setParameter options to all mongos processes"
+                  " started by resmoke.py. The argument is specified as bracketed YAML -"
+                  " i.e. JSON with support for single quoted and unquoted keys."))
+
+        mongodb_server_options.add_argument(
+            "--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
+            help=("The directory which will contain the dbpaths of any mongod's started"
+                  " by resmoke.py or the tests themselves."))
+
+        mongodb_server_options.add_argument(
+            "--majorityReadConcern", action="store", dest="majority_read_concern", choices=("on",
+                                                                                            "off"),
+            metavar="ON|OFF", help=("Enable or disable majority read concern support."
+                                    " Defaults to %%default."))
+
+        mongodb_server_options.add_argument("--flowControl", action="store", dest="flow_control",
+                                            choices=("on", "off"), metavar="ON|OFF",
+                                            help=("Enable or disable flow control."))
+
+        mongodb_server_options.add_argument("--flowControlTicketOverride", type=int, action="store",
+                                            dest="flow_control_tickets", metavar="TICKET_OVERRIDE",
+                                            help=("Number of tickets available for flow control."))
+
+        mongodb_server_options.add_argument("--storageEngine", dest="storage_engine",
+                                            metavar="ENGINE",
+                                            help="The storage engine used by dbtests and jstests.")
+
+        mongodb_server_options.add_argument(
+            "--storageEngineCacheSizeGB", dest="storage_engine_cache_size_gb", metavar="CONFIG",
+            help="Sets the storage engine cache size configuration"
+            " setting for all mongod's.")
+
+        mongodb_server_options.add_argument(
+            "--numReplSetNodes", type=int, dest="num_replset_nodes", metavar="N",
+            help="The number of nodes to initialize per ReplicaSetFixture. This is also "
+            "used to indicate the number of replica set members per shard in a "
+            "ShardedClusterFixture.")
+
+        mongodb_server_options.add_argument(
+            "--numShards", type=int, dest="num_shards", metavar="N",
+            help="The number of shards to use in a ShardedClusterFixture.")
+
+        mongodb_server_options.add_argument(
+            "--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
+            help="Sets the WiredTiger collection configuration setting for all mongod's.")
+
+        mongodb_server_options.add_argument(
+            "--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
+            help="Sets the WiredTiger engine configuration setting for all mongod's.")
+
+        mongodb_server_options.add_argument(
+            "--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
+            help="Sets the WiredTiger index configuration setting for all mongod's.")
+
+        mongodb_server_options.add_argument("--transportLayer", dest="transport_layer",
+                                            metavar="TRANSPORT",
+                                            help="The transport layer used by jstests")
+
+        mongodb_server_options.add_argument(
+            "--fuzzMongodConfigs", dest="fuzz_mongod_configs", action="store_true",
+            help="Will randomly choose storage configs that were not specified.")
+
+        mongodb_server_options.add_argument("--configFuzzSeed", dest="config_fuzz_seed",
+                                            metavar="PATH",
+                                            help="Sets the seed used by storage config fuzzer")
 
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,
@@ -1130,10 +1149,14 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
             if not hasattr(parsed_args, arg_dest):
                 continue
             # Skip any evergreen centric args.
-            elif group.title in [_INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE]:
+            elif group.title in [
+                    _INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE, _CEDAR_ARGUMENT_TITLE
+            ]:
                 continue
-            # Keep these args.
-            elif group.title == 'optional arguments':
+            elif group.title == 'positional arguments':
+                positional_args.extend(arg_value)
+            # Keep all remaining args.
+            else:
                 arg_name = action.option_strings[-1]
 
                 # If an option has the same value as the default, we don't need to specify it.
@@ -1156,8 +1179,6 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
                         storage_engine_arg = arg
                     else:
                         other_local_args.append(arg)
-            elif group.title == 'positional arguments':
-                positional_args.extend(arg_value)
 
     return ["run"] + [arg for arg in (suites_arg, storage_engine_arg) if arg is not None
                       ] + other_local_args + positional_args

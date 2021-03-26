@@ -83,6 +83,7 @@ DEFAULTS = {
     "replay_file": None,
     "report_failure_status": "fail",
     "report_file": None,
+    "run_all_feature_flag_tests": False,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,

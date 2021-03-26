@@ -12,6 +12,8 @@ import random
 
 import pymongo.uri_parser
 
+from buildscripts.idl.lib import ALL_FEATURE_FLAG_FILE
+
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import mongod_fuzzer_configs
@@ -44,6 +46,11 @@ def _validate_options(parser, args):
         parser.error(
             "Cannot use --replayFile with additional test files listed on the command line invocation."
         )
+
+    if args.run_all_feature_flag_tests:
+        if not os.path.isfile(ALL_FEATURE_FLAG_FILE):
+            parser.error("To run tests with disabled feature flags, the %s file must exist" %
+                         ALL_FEATURE_FLAG_FILE)
 
     def get_set_param_errors(process_params):
         agg_set_params = collections.defaultdict(list)
@@ -142,20 +149,30 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             user_config = dict(config_parser["resmoke"])
             config.update(user_config)
 
+    # If the run_all_feature_flag_tests option is specified, run only tests with
+    # disabled feature tags and a Server that enables all disabled features.
+    all_feature_flags = None
+    if config.pop("run_all_feature_flag_tests"):
+        all_feature_flags = open(ALL_FEATURE_FLAG_FILE).read().split()
+
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BACKUP_ON_RESTART_DIR = config.pop("backup_on_restart_dir")
     _config.BUILDLOGGER_URL = config.pop("buildlogger_url")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpath_prefix"))
     _config.DRY_RUN = config.pop("dry_run")
+
     # EXCLUDE_WITH_ANY_TAGS will always contain the implicitly defined EXCLUDED_TAG.
     _config.EXCLUDE_WITH_ANY_TAGS = [_config.EXCLUDED_TAG]
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
+
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.FLOW_CONTROL = config.pop("flow_control")
     _config.FLOW_CONTROL_TICKETS = config.pop("flow_control_tickets")
+
     _config.INCLUDE_WITH_ANY_TAGS = _tags_from_list(config.pop("include_with_any_tags"))
+
     _config.GENNY_EXECUTABLE = _expand_user(config.pop("genny_executable"))
     _config.JOBS = config.pop("jobs")
     _config.LINEAR_CHAIN = config.pop("linear_chain") == "on"
@@ -186,7 +203,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         return utils.dump_yaml(ret)
 
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
-    _config.MONGOD_SET_PARAMETERS = _merge_set_params(config.pop("mongod_set_parameters"))
+
+    mongod_set_parameters = config.pop("mongod_set_parameters")
+    if all_feature_flags is not None:
+        feature_flag_dict = {ff: "true" for ff in all_feature_flags}
+        mongod_set_parameters.append(str(feature_flag_dict))
+    _config.MONGOD_SET_PARAMETERS = _merge_set_params(mongod_set_parameters)
     _config.FUZZ_MONGOD_CONFIGS = config.pop("fuzz_mongod_configs")
     _config.CONFIG_FUZZ_SEED = config.pop("config_fuzz_seed")
 
@@ -199,7 +221,12 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             .fuzz_set_parameters(_config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
-    _config.MONGOS_SET_PARAMETERS = _merge_set_params(config.pop("mongos_set_parameters"))
+
+    mongos_set_parameters = config.pop("mongos_set_parameters")
+    if all_feature_flags is not None:
+        feature_flag_dict = {ff: "true" for ff in all_feature_flags}
+        mongos_set_parameters.append(str(feature_flag_dict))
+    _config.MONGOS_SET_PARAMETERS = _merge_set_params(mongos_set_parameters)
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
 
