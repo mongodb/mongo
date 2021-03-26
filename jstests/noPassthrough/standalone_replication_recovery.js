@@ -8,7 +8,6 @@
  *   requires_persistence,
  *   requires_replication,
  *   requires_wiredtiger,
- *   sbe_incompatible,
  * ]
  */
 

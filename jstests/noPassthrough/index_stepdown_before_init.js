@@ -3,7 +3,6 @@
  * scheduling on the thread pool and initialization.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -14,7 +14,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_wiredtiger,
- *   sbe_incompatible,
  * ]
  */
 

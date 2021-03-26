@@ -12,8 +12,8 @@
  *    block stepDown.
  *
  * @tags: [
- *     uses_prepare_transaction,
- *     uses_transactions,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
  * ]
  */
 load('jstests/noPassthrough/libs/index_build.js');

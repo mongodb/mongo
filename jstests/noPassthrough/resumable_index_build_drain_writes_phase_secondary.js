@@ -10,7 +10,6 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -3,7 +3,6 @@
  * the initialization and collection scan phases.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {
