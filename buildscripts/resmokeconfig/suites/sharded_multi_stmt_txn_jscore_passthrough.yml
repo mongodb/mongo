@@ -131,6 +131,7 @@ selector:
 
   # $indexStats
   - jstests/core/index_stats.js
+  - jstests/core/timeseries/timeseries_index_stats.js
 
   # $collStats
   - jstests/core/operation_latency_histogram.js
