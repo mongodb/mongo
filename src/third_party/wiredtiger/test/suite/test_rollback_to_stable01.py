@@ -39,16 +39,16 @@ def timestamp_str(t):
 # test_rollback_to_stable01.py
 # Shared base class used by rollback to stable tests.
 class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
-    def large_updates(self, uri, value, ds, nrows, commit_ts):
+    def large_updates(self, uri, value, ds, nrows, prepare, commit_ts):
         # Update a large number of records.
         session = self.session
         cursor = session.open_cursor(uri)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor[ds.key(i)] = value
             if commit_ts == 0:
                 session.commit_transaction()
-            elif self.prepare:
+            elif prepare:
                 session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
                 session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
                 session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
@@ -57,19 +57,19 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
                 session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
         cursor.close()
 
-    def large_modifies(self, uri, value, ds, location, nbytes, nrows, commit_ts):
+    def large_modifies(self, uri, value, ds, location, nbytes, nrows, prepare, commit_ts):
         # Load a slight modification.
         session = self.session
         cursor = session.open_cursor(uri)
         session.begin_transaction()
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             cursor.set_key(i)
             mods = [wiredtiger.Modify(value, location, nbytes)]
             self.assertEqual(cursor.modify(mods), 0)
 
         if commit_ts == 0:
             session.commit_transaction()
-        elif self.prepare:
+        elif prepare:
             session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
             session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
             session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
@@ -78,17 +78,17 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
             session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
         cursor.close()
 
-    def large_removes(self, uri, ds, nrows, commit_ts):
+    def large_removes(self, uri, ds, nrows, prepare, commit_ts):
         # Remove a large number of records.
         session = self.session
         cursor = session.open_cursor(uri)
-        for i in range(0, nrows):
+        for i in range(1, nrows + 1):
             session.begin_transaction()
             cursor.set_key(i)
             cursor.remove()
             if commit_ts == 0:
                 session.commit_transaction()
-            elif self.prepare:
+            elif prepare:
                 session.prepare_transaction('prepare_timestamp=' + timestamp_str(commit_ts-1))
                 session.timestamp_transaction('commit_timestamp=' + timestamp_str(commit_ts))
                 session.timestamp_transaction('durable_timestamp=' + timestamp_str(commit_ts+1))
@@ -115,6 +115,11 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
 class test_rollback_to_stable01(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
         ('inmem', dict(in_memory=True))
@@ -125,7 +130,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(in_memory_values, prepare_values)
+    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -138,10 +143,14 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 10000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         uri = "table:rollback_to_stable01"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 1.
@@ -149,12 +158,12 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
             ',stable_timestamp=' + timestamp_str(1))
 
         valuea = "aaaaa" * 100
-        self.large_updates(uri, valuea, ds, nrows, 10)
+        self.large_updates(uri, valuea, ds, nrows, self.prepare, 10)
         # Check that all updates are seen.
         self.check(valuea, uri, nrows, 10)
 
         # Remove all keys with newer timestamp.
-        self.large_removes(uri, ds, nrows, 20)
+        self.large_removes(uri, ds, nrows, self.prepare, 20)
         # Check that the no keys should be visible.
         self.check(valuea, uri, 0, 20)
 

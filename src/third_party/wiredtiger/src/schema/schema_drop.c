@@ -170,6 +170,35 @@ err:
 }
 
 /*
+ * __drop_tiered --
+ *     Drop a tiered store.
+ */
+static int
+__drop_tiered(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
+{
+    WT_DATA_HANDLE *tier;
+    WT_DECL_RET;
+    WT_TIERED *tiered;
+    u_int i;
+
+    /* Get the tiered data handle. */
+    WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+    tiered = (WT_TIERED *)session->dhandle;
+
+    /* Drop the tiers. */
+    for (i = 0; i < tiered->ntiers; i++) {
+        tier = tiered->tiers[i];
+        WT_ERR(__wt_schema_drop(session, tier->name, cfg));
+    }
+
+    ret = __wt_metadata_remove(session, uri);
+
+err:
+    F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+    WT_TRET(__wt_session_release_dhandle(session));
+    return (ret);
+}
+/*
  * __schema_drop --
  *     Process a WT_SESSION::drop operation for all supported types.
  */
@@ -200,7 +229,7 @@ __schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __drop_table(session, uri, cfg);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
-        ret = __wt_tiered_drop(session, uri, cfg);
+        ret = __drop_tiered(session, uri, cfg);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->drop == NULL ? __wt_object_unsupported(session, uri) :
                                    dsrc->drop(dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);

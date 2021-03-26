@@ -899,6 +899,16 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
         time_start_hs = __wt_clock(session);
         WT_WITH_DHANDLE(session, hs_dhandle, ret = __wt_checkpoint(session, cfg));
         WT_ERR(ret);
+
+        /*
+         * Once the history store checkpoint is complete, we increment the checkpoint generation of
+         * the associated b-tree. The checkpoint generation controls whether we include the
+         * checkpoint transaction in our calculations of the pinned and oldest_ids for a given
+         * btree. We increment it here to ensure that the visibility checks performed on updates in
+         * the history store do not include the checkpoint transaction.
+         */
+        __checkpoint_update_generation(session);
+
         time_stop_hs = __wt_clock(session);
         hs_ckpt_duration_usecs = WT_CLOCKDIFF_US(time_stop_hs, time_start_hs);
         WT_STAT_CONN_SET(session, txn_hs_ckpt_duration, hs_ckpt_duration_usecs);

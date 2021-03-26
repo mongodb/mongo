@@ -1,0 +1,40 @@
+# Sets up a basic database with 2 collections and 5 keys and run thread for 10 seconds.
+# All components are enabled.
+# Used as a basic test for the framework.
+duration_seconds=10
+cache_size_mb=1000
+enable_logging=true
+runtime_monitor=
+{
+    rate_per_second=3
+    stat_cache_size=
+    {
+        enabled=true
+        limit=100
+    }
+}
+timestamp_manager=
+{
+    enabled=true
+    oldest_lag=1
+    stable_lag=1
+}
+workload_generator=
+{
+    collection_count=2
+    key_count=5
+    key_format=i
+    key_size=1
+    ops_per_transaction=
+    {
+        min=5
+        max=50
+    }
+    read_threads=1
+    value_size=10
+    value_format=S
+}
+workload_tracking=
+{
+    enabled=true
+}

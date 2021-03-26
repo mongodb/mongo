@@ -33,23 +33,33 @@ check_timing(WTPERF *wtperf, const char *name, uint64_t start, uint64_t *stop)
 {
     CONFIG_OPTS *opts;
     uint64_t last_interval;
+    int msg_err;
+    const char *str;
 
     opts = wtperf->opts;
+    msg_err = 0;
 
     *stop = __wt_clock(NULL);
 
     last_interval = WT_CLOCKDIFF_SEC(*stop, start);
 
-    if (last_interval > opts->idle_table_cycle) {
-        lprintf(wtperf, ETIMEDOUT, 0,
-          "Cycling idle table failed because %s took %" PRIu64
+    if (last_interval > opts->max_idle_table_cycle) {
+        if (opts->max_idle_table_cycle_fatal) {
+            msg_err = ETIMEDOUT;
+            str = "ERROR";
+            wtperf->error = true;
+        } else {
+            str = "WARNING";
+        }
+        lprintf(wtperf, msg_err, 0,
+          "%s: Cycling idle table failed because %s took %" PRIu64
           " seconds which is longer than configured acceptable maximum of %" PRIu32 ".",
-          name, last_interval, opts->idle_table_cycle);
-        wtperf->error = true;
-        return (ETIMEDOUT);
+          str, name, last_interval, opts->max_idle_table_cycle);
     }
-    return (0);
+
+    return (msg_err);
 }
+
 /*
  * Regularly create, open a cursor and drop a table. Measure how long each step takes, and flag an
  * error if it exceeds the configured maximum.
@@ -145,7 +155,7 @@ start_idle_table_cycle(WTPERF *wtperf, wt_thread_t *idle_table_cycle_thread)
 
     opts = wtperf->opts;
 
-    if (opts->idle_table_cycle == 0)
+    if (opts->max_idle_table_cycle == 0)
         return;
 
     wtperf->idle_cycle_run = true;
@@ -160,7 +170,7 @@ stop_idle_table_cycle(WTPERF *wtperf, wt_thread_t idle_table_cycle_thread)
 
     opts = wtperf->opts;
 
-    if (opts->idle_table_cycle == 0 || !wtperf->idle_cycle_run)
+    if (opts->max_idle_table_cycle == 0 || !wtperf->idle_cycle_run)
         return;
 
     wtperf->idle_cycle_run = false;

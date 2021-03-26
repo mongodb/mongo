@@ -140,6 +140,10 @@ compression; see @ref compression for more information.
 Configure WiredTiger for <a href="https://github.com/facebook/zstd">Zstd</a>
 compression; see @ref compression for more information.
 
+@par \c --disable-standalone-build
+Configure WiredTiger to disable standalone build. Standalone build is enabled
+by default.
+
 @par <code>--with-builtins</code>
 Configure WiredTiger to include support for extensions in the main library.
 This avoids requiring additional libraries for supported extensions. Currently

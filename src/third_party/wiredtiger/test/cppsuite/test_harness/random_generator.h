@@ -33,12 +33,12 @@
 
 namespace test_harness {
 
-/* Helper class to generate random values. */
+/* Helper class to generate random values using uniform distributions. */
 class random_generator {
     public:
     /* No copies of the singleton allowed. */
     random_generator(random_generator const &) = delete;
-    void operator=(random_generator const &) = delete;
+    random_generator &operator=(random_generator const &) = delete;
 
     static random_generator &
     instance()
@@ -47,6 +47,7 @@ class random_generator {
         return _instance;
     }
 
+    /* Generate a random string of a given length. */
     std::string
     generate_string(std::size_t length)
     {
@@ -56,6 +57,14 @@ class random_generator {
             random_string += _characters[_distribution(_generator)];
 
         return (random_string);
+    }
+
+    /* Generate a random integer between min and max. */
+    int64_t
+    generate_integer(int64_t min, int64_t max)
+    {
+        std::uniform_int_distribution<> dis(min, max);
+        return dis(_generator);
     }
 
     private:

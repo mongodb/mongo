@@ -31,6 +31,7 @@ from helper import simulate_crash_restart
 import wiredtiger, wttest
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
+from wtscenario import make_scenarios
 
 def timestamp_str(t):
     return '%x' % t
@@ -39,8 +40,27 @@ def timestamp_str(t):
 # Test that rollback to stable handles updates present on history store and data store for variable
 # length column store.
 class test_rollback_to_stable17(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=200MB,statistics=(all)'
     session_config = 'isolation=snapshot'
+
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
+    in_memory_values = [
+        ('no_inmem', dict(in_memory=False)),
+        ('inmem', dict(in_memory=True))
+    ]
+
+    scenarios = make_scenarios(key_format_values, in_memory_values)
+
+    def conn_config(self):
+        config = 'cache_size=200MB,statistics=(all)'
+        if self.in_memory:
+            config += ',in_memory=true'
+        else:
+            config += ',in_memory=false'
+        return config
 
     def insert_update_data(self, uri, value, start_row, end_row, timestamp):
         cursor =  self.session.open_cursor(uri)
@@ -72,7 +92,7 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         ts = [2,5,7,9]
         values = ["aaaa", "bbbb", "cccc", "dddd"]
 
-        create_params = 'key_format=r,value_format=S'
+        create_params = 'log=(enabled=false),key_format=r,value_format=S'
         self.session.create(uri, create_params)
 
         # Pin oldest and stable to timestamp 1.
@@ -86,11 +106,14 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         # Set the stable timestamp to 5.
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(5))
 
-        # Checkpoint to ensure that all the updates are flushed to disk.
-        self.session.checkpoint()
-
-        # Rollback to stable done as part of recovery.
-        simulate_crash_restart(self, ".", "RESTART")
+        if not self.in_memory:
+            # Checkpoint to ensure that all the updates are flushed to disk.
+            self.session.checkpoint()
+            # Rollback to stable done as part of recovery.
+            simulate_crash_restart(self,".", "RESTART")
+        else:
+            # Manually call rollback_to_stable for in memory keys/values.
+            self.conn.rollback_to_stable()
 
         # Check that keys at timestamps 2 and 5 have the correct values they were updated with.
         self.check(values[0], uri, nrows - 1, 2)
@@ -99,6 +122,13 @@ class test_rollback_to_stable17(wttest.WiredTigerTestCase):
         # stable timestamp 5.
         self.check(values[1], uri, nrows - 1, 7)
         self.check(values[1], uri, nrows - 1, 9)
+
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        stat_cursor.close()
+
+        self.assertGreaterEqual(upd_aborted + hs_removed, (nrows*2) - 2)
 
         self.session.close()
 

@@ -12,7 +12,13 @@
 #define WT_BTREE_MAJOR_VERSION_MIN 1 /* Oldest version supported */
 #define WT_BTREE_MINOR_VERSION_MIN 1
 
+/* Increase the version number for standalone build. */
+#ifdef WT_STANDALONE_BUILD
+#define WT_BTREE_MAJOR_VERSION_MAX 2 /* Newest version supported */
+#else
 #define WT_BTREE_MAJOR_VERSION_MAX 1 /* Newest version supported */
+#endif
+
 #define WT_BTREE_MINOR_VERSION_MAX 1
 
 #define WT_BTREE_MIN_ALLOC_SIZE 512
@@ -150,6 +156,7 @@ struct __wt_btree {
     bool intlpage_compadjust;     /* Run-time compression adjustment */
     uint64_t maxintlpage_precomp; /* Internal page pre-compression size */
 
+    WT_BUCKET_STORAGE *bstorage;    /* Tiered storage source */
     WT_KEYED_ENCRYPTOR *kencryptor; /* Page encryptor */
 
     WT_RWLOCK ovfl_lock; /* Overflow lock */

@@ -413,6 +413,27 @@ file_config = format_meta + file_runtime_config + [
         split into smaller pages, where each page is the specified
         percentage of the maximum Btree page size''',
         min='50', max='100'),
+    Config('tiered_storage', '', r'''
+        configure a storage source for this table''',
+        type='category', subconfig=[
+        Config('name', 'none', r'''
+            Permitted values are \c "none"
+            or custom storage source name created with
+            WT_CONNECTION::add_storage_source.
+            See @ref custom_storage_sources for more information'''),
+        Config('auth_token', '', r'''
+            authentication string identifier'''),
+        Config('bucket', '', r'''
+            The bucket indicating the location for this table'''),
+        Config('local_retention', '300', r'''
+            time in seconds to retain data on tiered storage on the local tier
+            for faster read access''',
+        min='0', max='10000'),
+        Config('object_target_size', '10M', r'''
+            the approximate size of objects before creating them on the
+            tiered storage tier''',
+            min='100K', max='10TB'),
+        ]),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)
@@ -954,13 +975,22 @@ wiredtiger_open_tiered_storage_configuration = [
         configured session_max''',
         type='category', undoc=True, subconfig=
         tiered_storage_configuration_common + [
-        Config('enabled', 'false', r'''
-            enable tiered storage subsystem''',
-            type='boolean'),
+        Config('auth_token', '', r'''
+            authentication string identifier'''),
+        Config('bucket', '', r'''
+            bucket string identifier where the objects should reside'''),
+        Config('cluster', '', r'''
+            unique string identifier identifying the cluster owning these objects.
+            This identifier is used in naming since objects multiple instances can share
+            the object storage bucket'''),
+        Config('member', '', r'''
+            unique string identifier identifying the member within a cluster.
+            This identifier is used in naming objects since multiple nodes in a
+            cluster could write to the same table in the object storage bucket'''),
         Config('name', 'none', r'''
             Permitted values are \c "none"
             or custom storage name created with
-            WT_CONNECTION::add_tiered_storage'''),
+            WT_CONNECTION::add_storage_source'''),
     ]),
 ]
 
@@ -1505,6 +1535,10 @@ methods = {
 ]),
 
 'WT_SESSION.flush_tier' : Method([
+    Config('flush_timestamp', '', r'''
+        flush objects to all storage sources using the specified timestamp.
+        The supplied value must not be older than the current oldest timestamp and it must
+        not be newer than the stable timestamp'''),
     Config('force', 'false', r'''
         force sharing of all data''',
         type='boolean'),

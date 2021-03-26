@@ -1,0 +1,74 @@
+/*! @page custom_storage_sources Custom Tiered Storage sources
+
+@section storage_overview Overview of Tiered Storage in WiredTiger
+
+Applications can implement their own custom storage sources.
+WiredTiger does not currently offer builtin support for any particular
+storage source. The expected usage of a storage source is to implement and
+allow for cloud-based object storage.
+
+@ref storage_examples "Example storage code" is provided
+to demonstrate how storage source extensions are created.
+
+The storage source extension must be loaded in the ::wiredtiger_open call.
+See @subpage_single extensions for details on how extensions are loaded.
+Also, a storage source is specified using \c tiered_storage= in the configuration
+for the ::wiredtiger_open call. This configuration establishes
+the name and bucket to be used for database log files and a subset
+of the WiredTiger metadata files. By default, this same tiered storage source
+is also used for all data files. We call this the <em>system</em> storage source.
+
+It is also possible to use different tiered storage options when individual
+data files are first created, using the \c tiered_storage= configuration in
+the WT_SESSION::create call.  Such options override the default
+(<em>system</em>) storage that was indicated in the ::wiredtiger_open
+call for the individual data file. It is possible to turn off tiered
+storage for individual files using the reserved \c none name. It is also
+possible to use a different storage source, or to specify a different \c bucket.
+
+Overriding the system storage source for a table does not override
+the system storage source for indices on that table, nor does it override
+the system storage source for column groups specified on that table.
+The storage source for column groups and indices must be specified when they
+are created, if they are to be different than the system storage source.
+
+It is an error to specify a storage source in a WT_SESSION::create call when it
+was not specified in the ::wiredtiger_open call.
+
+@section storage_parameters Storage source parameters
+
+Several parameters, \c name, \c bucket, \c cluster and \c member, may be specified
+when configuring a storage source for ::wiredtiger_open to allow the possibility
+of varying the location according to different names and buckets.
+
+The configuration parameter
+<code>tiered_storage=(bucket=<em>identifier</em>)</code>
+may be used in ::wiredtiger_open or WT_SESSION::create calls. This is intended
+to reference a location in the storage source for where to find or place objects.
+
+The configuration parameter <code>cluster=<em>identifier</em></code> is used
+only in the ::wiredtiger_open call. The value of the cluster is unchanging
+for this database. Its intent is to identify the objects belonging to this
+database so that they are unique in case multiple databases share an
+object-storage bucket. It must always be provided
+when WiredTiger is reopened (again, with the ::wiredtiger_open call).
+
+Similarly, the configuration parameter <code>member=<em>identifier</em></code> is used
+only in the ::wiredtiger_open call. There may be multiple nodes accessing the
+same cluster's database objects in the storage source. The member id will make
+the names of objects it creates unique from objects potentially created by other
+members of the same cluster. Its intent is to identify the objects belonging to this
+database so that they are unique in case multiple nodes writing to the bucket.
+It must always be provided when WiredTiger is reopened (again, with the ::wiredtiger_open call).
+
+@section storage_examples Storage source examples
+
+There are two kinds of example code with overlapping functionality.
+A simple, self contained storage source example is in @ex_ref{ex_storage_source.c}.
+This example includes a small demo storage source that is a no-op and
+simply returns.  This example also shows how a storage source is configured
+within an application.  The second set of examples are in \c ext/storage. These are
+storage source only (no application level code), showing how a storage source
+might be packaged in a loadable shared library.
+
+ */

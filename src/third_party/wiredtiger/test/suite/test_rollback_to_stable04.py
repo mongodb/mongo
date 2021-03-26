@@ -43,6 +43,11 @@ def mod_val(value, char, location, nbytes=1):
 class test_rollback_to_stable04(test_rollback_to_stable_base):
     session_config = 'isolation=snapshot'
 
+    key_format_values = [
+        ('column', dict(key_format='r')),
+        ('integer_row', dict(key_format='i')),
+    ]
+
     in_memory_values = [
         ('no_inmem', dict(in_memory=False)),
         ('inmem', dict(in_memory=True))
@@ -53,7 +58,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(in_memory_values, prepare_values)
+    scenarios = make_scenarios(key_format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all)'
@@ -66,10 +71,14 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
     def test_rollback_to_stable(self):
         nrows = 1000
 
+        # Prepare transactions for column store table is not yet supported.
+        if self.prepare and self.key_format == 'r':
+            self.skipTest('Prepare transactions for column store table is not yet supported')
+
         # Create a table without logging.
         uri = "table:rollback_to_stable04"
         ds = SimpleDataSet(
-            self, uri, 0, key_format="i", value_format="S", config='log=(enabled=false)')
+            self, uri, 0, key_format=self.key_format, value_format="S", config='log=(enabled=false)')
         ds.populate()
 
         # Pin oldest and stable to timestamp 10.
@@ -91,19 +100,19 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         value_modZ = mod_val(value_modY, 'Z', 7)
 
         # Perform a combination of modifies and updates.
-        self.large_updates(uri, value_a, ds, nrows, 20)
-        self.large_modifies(uri, 'Q', ds, 0, 1, nrows, 30)
-        self.large_modifies(uri, 'R', ds, 1, 1, nrows, 40)
-        self.large_modifies(uri, 'S', ds, 2, 1, nrows, 50)
-        self.large_updates(uri, value_b, ds, nrows, 60)
-        self.large_updates(uri, value_c, ds, nrows, 70)
-        self.large_modifies(uri, 'T', ds, 3, 1, nrows, 80)
-        self.large_updates(uri, value_d, ds, nrows, 90)
-        self.large_modifies(uri, 'W', ds, 4, 1, nrows, 100)
-        self.large_updates(uri, value_a, ds, nrows, 110)
-        self.large_modifies(uri, 'X', ds, 5, 1, nrows, 120)
-        self.large_modifies(uri, 'Y', ds, 6, 1, nrows, 130)
-        self.large_modifies(uri, 'Z', ds, 7, 1, nrows, 140)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_modifies(uri, 'Q', ds, 0, 1, nrows, self.prepare, 30)
+        self.large_modifies(uri, 'R', ds, 1, 1, nrows, self.prepare, 40)
+        self.large_modifies(uri, 'S', ds, 2, 1, nrows, self.prepare, 50)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 60)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 70)
+        self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 80)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 90)
+        self.large_modifies(uri, 'W', ds, 4, 1, nrows, self.prepare, 100)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 110)
+        self.large_modifies(uri, 'X', ds, 5, 1, nrows, self.prepare, 120)
+        self.large_modifies(uri, 'Y', ds, 6, 1, nrows, self.prepare, 130)
+        self.large_modifies(uri, 'Z', ds, 7, 1, nrows, self.prepare, 140)
 
         # Verify data is visible and correct.
         self.check(value_a, uri, nrows, 20)
@@ -139,6 +148,7 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
@@ -150,11 +160,10 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
         if self.in_memory:
-            self.assertGreaterEqual(upd_aborted, nrows * 11)
-            self.assertGreaterEqual(hs_removed, 0)
+            self.assertEqual(upd_aborted, nrows * 11)
+            self.assertEqual(hs_removed + hs_sweep, 0)
         else:
-            self.assertGreaterEqual(upd_aborted, 0)
-            self.assertGreaterEqual(hs_removed, nrows * 11)
+            self.assertGreaterEqual(upd_aborted + hs_removed + hs_sweep, nrows * 11)
 
 if __name__ == '__main__':
     wttest.run()

@@ -380,6 +380,13 @@ __curhs_prev_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
         }
 
         /*
+         * Don't check the visibility of the record if we want to read any history store record,
+         * even with a globally visible tombstone.
+         */
+        if (F_ISSET(std_cursor, WT_CURSTD_HS_READ_ALL))
+            break;
+
+        /*
          * If the stop time pair on the tombstone in the history store is already globally visible
          * we can skip it.
          */
@@ -467,6 +474,13 @@ __curhs_next_visible(WT_SESSION_IMPL *session, WT_CURSOR_HS *hs_cursor)
                 goto err;
             }
         }
+
+        /*
+         * Don't check the visibility of the record if we want to read any history store record,
+         * even with a globally visible tombstone.
+         */
+        if (F_ISSET(std_cursor, WT_CURSTD_HS_READ_ALL))
+            break;
 
         /*
          * If the stop time pair on the tombstone in the history store is already globally visible
@@ -613,8 +627,8 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
 
     if (exact >= 0) {
         /*
-         * We placed the file cursor before the search key. Try first to walk forwards to see if we
-         * can find a visible record. If nothing is visible, try to walk backwards.
+         * We placed the file cursor after or exactly at the search key. Try first to walk forwards
+         * to see if we can find a visible record. If nothing is visible, try to walk backwards.
          */
         WT_ERR_NOTFOUND_OK(__curhs_next_visible(session, hs_cursor), true);
         if (ret == WT_NOTFOUND) {
@@ -657,7 +671,7 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
             }
             WT_ERR(ret);
             /*
-             * Keeping looking for the first visible update in the specified range when walking
+             * Keep looking for the first visible update in the specified range when walking
              * backwards.
              */
             WT_ERR(__curhs_prev_visible(session, hs_cursor));
@@ -669,15 +683,19 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
         } else {
             WT_ERR(ret);
             /*
-             * We find an update when walking forwards. If initially we land on the same key as the
-             * specified key, exact will be 0 and we should return that. If it is not visible, we
+             * We find an update when walking forwards. If initially we landed on the same key as
+             * the specified key, we need to compare the keys to see where we are now. Otherwise, we
              * must have found a key that is larger than the specified key.
              */
-            *exactp = exact;
+            if (exact == 0) {
+                WT_ERR(__wt_compare(session, NULL, &file_cursor->key, srch_key, &cmp));
+                *exactp = cmp;
+            } else
+                *exactp = exact;
         }
     } else {
         /*
-         * We placed the file cursor after the search key. Try first to walk backwards to see if we
+         * We placed the file cursor before the search key. Try first to walk backwards to see if we
          * can find a visible record. If nothing is visible, try to walk forwards.
          */
         WT_ERR_NOTFOUND_OK(__curhs_prev_visible(session, hs_cursor), true);
@@ -721,7 +739,7 @@ __curhs_search_near(WT_CURSOR *cursor, int *exactp)
             }
             WT_ERR(ret);
             /*
-             * Keeping looking for the first visible update in the specified range when walking
+             * Keep looking for the first visible update in the specified range when walking
              * forwards.
              */
             WT_ERR(__curhs_next_visible(session, hs_cursor));

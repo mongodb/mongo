@@ -32,21 +32,35 @@
 /* Define all constants related to WiredTiger APIs and testing. */
 namespace test_harness {
 
+/* Component names. */
+static const char *RUNTIME_MONITOR = "runtime_monitor";
+static const char *TIMESTAMP_MANAGER = "timestamp_manager";
+static const char *WORKLOAD_GENERATOR = "workload_generator";
+static const char *WORKLOAD_TRACKING = "workload_tracking";
+
 /* Configuration API consts. */
 static const char *CACHE_SIZE_MB = "cache_size_mb";
 static const char *COLLECTION_COUNT = "collection_count";
 static const char *DURATION_SECONDS = "duration_seconds";
-static const char *ENABLE_TRACKING = "enable_tracking";
 static const char *ENABLED = "enabled";
+static const char *ENABLE_LOGGING = "enable_logging";
 static const char *KEY_COUNT = "key_count";
 static const char *LIMIT = "limit";
+static const char *MAX = "max";
+static const char *MIN = "min";
+static const char *OLDEST_LAG = "oldest_lag";
+static const char *OPS_PER_TRANSACTION = "ops_per_transaction";
 static const char *RATE_PER_SECOND = "rate_per_second";
 static const char *READ_THREADS = "read_threads";
+static const char *STABLE_LAG = "stable_lag";
 static const char *STAT_CACHE_SIZE = "stat_cache_size";
 static const char *VALUE_SIZE = "value_size";
 
 /* WiredTiger API consts. */
+static const char *COMMIT_TS = "commit_timestamp";
 static const char *CONNECTION_CREATE = "create";
+static const char *OLDEST_TS = "oldest_timestamp";
+static const char *STABLE_TS = "stable_timestamp";
 
 /* Test harness consts. */
 static const char *TABLE_OPERATION_TRACKING = "table:operation_tracking";

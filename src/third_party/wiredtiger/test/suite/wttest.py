@@ -352,7 +352,6 @@ class WiredTigerTestCase(unittest.TestCase):
             print("Failed wiredtiger_open: dir '%s', config '%s'" % \
                 (home, conn_param))
             raise e
-        self.pr(repr(conn))
         return conn
 
     # Replacement for wiredtiger.wiredtiger_open that returns
