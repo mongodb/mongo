@@ -3,7 +3,6 @@
  * scan phase. This applies to both two phase and single phase index builds.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

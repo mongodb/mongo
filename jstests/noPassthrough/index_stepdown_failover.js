@@ -3,7 +3,6 @@
  * wait for a commitIndexBuild from the new primary before committing.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

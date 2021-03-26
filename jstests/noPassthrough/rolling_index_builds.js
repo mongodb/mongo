@@ -6,7 +6,6 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 

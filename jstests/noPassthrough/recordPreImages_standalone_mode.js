@@ -8,7 +8,6 @@
  *   # This test uses a replica set and must avoid replica set incompatible test suites, like the
  *   # test suite that turns journaling off.
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 
