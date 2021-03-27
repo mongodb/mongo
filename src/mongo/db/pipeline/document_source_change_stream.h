@@ -142,6 +142,7 @@ public:
 
     static constexpr StringData kTxnNumberField = "txnNumber"_sd;
     static constexpr StringData kLsidField = "lsid"_sd;
+    static constexpr StringData kTxnOpIndexField = "txnOpIndex"_sd;
 
     // The target namespace of a rename operation.
     static constexpr StringData kRenameTargetNssField = "to"_sd;

@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_close_cursor.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
 #include "mongo/db/pipeline/document_source_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -437,8 +438,9 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
             ResumeToken::makeHighWaterMarkToken(*startFrom).toDocument().toBson();
     }
 
-    // Obtain the current FCV and use it to create the DocumentSourceChangeStreamTransform stage.
+    // Obtain the current FCV and use it to create the unwind-transaction and transform stages.
     const auto fcv = serverGlobalParams.featureCompatibility.getVersion();
+    stages.push_back(DocumentSourceChangeStreamUnwindTransaction::create(expCtx));
     stages.push_back(
         DocumentSourceChangeStreamTransform::create(expCtx, fcv, elem.embeddedObject()));
 

@@ -251,7 +251,7 @@ public:
         stages[0] = executableMatch;
 
         // Check the oplog entry is transformed correctly.
-        auto transform = stages[1].get();
+        auto transform = stages[2].get();
         ASSERT(transform);
         ASSERT_EQ(string(transform->getSourceName()), DSChangeStream::kStageName);
 
@@ -326,7 +326,7 @@ public:
 
         // Create the stages and check that the documents produced matched those in the applyOps.
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(oplogEntry, kDefaultSpec);
-        auto transform = stages[2].get();
+        auto transform = stages[3].get();
         invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
         std::vector<Document> res;
@@ -1304,7 +1304,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithMultipleOplogEntries) {
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     auto stages = makeStages(transactionEntry2);
-    auto transform = stages[2].get();
+    auto transform = stages[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -1470,7 +1470,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithEmptyOplogEntries) {
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     auto stages = makeStages(transactionEntry5);
-    auto transform = stages[2].get();
+    auto transform = stages[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -1562,7 +1562,7 @@ TEST_F(ChangeStreamStageTest, TransactionWithOnlyEmptyOplogEntries) {
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     auto stages = makeStages(transactionEntry2);
-    auto transform = stages[2].get();
+    auto transform = stages[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -1645,7 +1645,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     auto stages = makeStages(commitEntry);
-    auto transform = stages[2].get();
+    auto transform = stages[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -1780,7 +1780,7 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.
     auto stages = makeStages(commitEntry);
-    auto transform = stages[2].get();
+    auto transform = stages[3].get();
     invariant(dynamic_cast<DocumentSourceChangeStreamTransform*>(transform) != nullptr);
 
     // Populate the MockTransactionHistoryEditor in reverse chronological order.
@@ -1964,8 +1964,8 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
     vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
-    ASSERT_EQ(allStages.size(), 4UL);
-    auto stage = allStages[1];
+    ASSERT_EQ(allStages.size(), 5UL);
+    auto stage = allStages[2];
     ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(stage.get()));
 
     //

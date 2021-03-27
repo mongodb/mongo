@@ -2054,7 +2054,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 5UL);
+    ASSERT_EQ(stages.size(), 6UL);
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 
@@ -2080,7 +2080,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 5UL);
+    ASSERT_EQ(stages.size(), 6UL);
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 
@@ -2105,7 +2105,7 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                              << "required"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 5UL);
+    ASSERT_EQ(stages.size(), 6UL);
     // Make sure the pre-image lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePreImage*>(stages.back().get()));
 
@@ -2131,7 +2131,7 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                              << "required"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 5UL);
+    ASSERT_EQ(stages.size(), 6UL);
     // Make sure the pre-image lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePreImage*>(stages.back().get()));
 
