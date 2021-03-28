@@ -646,6 +646,7 @@ BSONObj getUnshardedCollInfo(const Shard* primaryShard, const NamespaceString& n
     ScopedDbConnection conn(primaryShard->getConnString());
     std::list<BSONObj> all =
         conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+    conn.done();
     if (all.empty()) {
         // Collection does not exist, return an empty object.
         return BSONObj();
