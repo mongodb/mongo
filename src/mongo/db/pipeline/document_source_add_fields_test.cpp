@@ -259,5 +259,20 @@ TEST_F(AddFieldsTest, CannotAddNestedDocumentExceedingDepthLimit) {
         AssertionException,
         ErrorCodes::Overflow);
 }
+
+TEST_F(AddFieldsTest, TestModifiedPaths) {
+    auto addFields =
+        DocumentSourceAddFields::create(BSON("a" << BSON("$concat" << BSON_ARRAY("$b"
+                                                                                 << "$c"))
+                                                 << "x"
+                                                 << "$y"),
+                                        getExpCtx());
+
+    auto modifiedPaths = addFields->getModifiedPaths();
+
+    ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(1U, modifiedPaths.paths.size());
+    ASSERT_EQUALS(1U, modifiedPaths.renames.size());
+}
 }  // namespace
 }  // namespace mongo

@@ -131,6 +131,12 @@ public:
         return boost::none;
     }
 
+    void substituteFieldPathElement(const StringData& oldName, const StringData& newName) final {
+        StringMap<std::string> renames;
+        renames[oldName] = newName.toString();
+        _root->substituteFieldPathElement(renames);
+    }
+
 private:
     /**
      * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to

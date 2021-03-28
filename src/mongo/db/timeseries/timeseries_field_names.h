@@ -34,6 +34,7 @@ namespace timeseries {
 static constexpr StringData kBucketIdFieldName = "_id"_sd;
 static constexpr StringData kBucketDataFieldName = "data"_sd;
 static constexpr StringData kBucketMetaFieldName = "meta"_sd;
+static constexpr StringData kBucketControlFieldName = "control"_sd;
 static constexpr StringData kControlMaxFieldNamePrefix = "control.max."_sd;
 static constexpr StringData kControlMinFieldNamePrefix = "control.min."_sd;
 

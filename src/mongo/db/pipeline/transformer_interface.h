@@ -67,5 +67,13 @@ public:
      */
     virtual Document serializeTransformation(
         boost::optional<ExplainOptions::Verbosity> explain) const = 0;
+
+    virtual void substituteFieldPathElement(const StringData& oldName, const StringData& newName) {}
+
+    virtual BSONObj extractComputedProjections(const std::string& oldName,
+                                               const std::string& newName,
+                                               const std::set<StringData>& reservedNames) {
+        return BSONObj{};
+    }
 };
 }  // namespace mongo

@@ -1045,6 +1045,72 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
                                      Document{{"b", "COMPUTED"_sd}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedProjections) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON(
+        "computedMeta1" << BSON("$toUpper"
+                                << "$myMeta.x")
+                        << "computed2" << BSON("$add" << BSON_ARRAY(1 << "$c")) << "computedMeta3"
+                        << "$myMeta"));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{};
+    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(addFields.nFields(), 2);
+    auto expectedAddFields =
+        BSON("computedMeta1" << BSON("$toUpper" << BSON_ARRAY("$meta.x")) << "computedMeta3"
+                             << "$meta");
+    ASSERT_BSONOBJ_EQ(expectedAddFields, addFields);
+
+    auto expectedProjection =
+        Document(fromjson("{_id: true, computedMeta1: true, computed2: {$add: [\"$c\", {$const: "
+                          "1}]}, computedMeta3: \"$computedMeta3\"}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAfterSplit) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("a" << true << "computedMeta1"
+                 << BSON("$toUpper"
+                         << "$myMeta.x")
+                 << "computed2" << BSON("$add" << BSON_ARRAY(1 << "$c")) << "c" << true
+                 << "computedMeta3"
+                 << "$myMeta"));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{};
+    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+
+    // Assuming the document was produced by the $_internalUnpackBucket.
+    auto result = inclusion->applyTransformation(
+        Document{{"a", 1}, {"c", 5}, {"computedMeta1", "XXX"_sd}, {"computedMeta3", 2}});
+    // Computed projections preserve the order in $project, field 'c' moves in front of them.
+    auto expectedResult = Document{
+        {"a", 1}, {"c", 5}, {"computedMeta1", "XXX"_sd}, {"computed2", 6}, {"computedMeta3", 2}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, DoNotExtractReservedNames) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a" << true << "data"
+                                                                         << BSON("$toUpper"
+                                                                                 << "$myMeta.x")
+                                                                         << "newMeta"
+                                                                         << "$myMeta"));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{"meta", "data", "_id"};
+    auto addFields = r->extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(addFields.nFields(), 1);
+    auto expectedAddFields = BSON("newMeta"
+                                  << "$meta");
+    ASSERT_BSONOBJ_EQ(expectedAddFields, addFields);
+
+    auto expectedProjection = Document(fromjson(
+        "{_id: true, a: true, data: {\"$toUpper\" : [\"$myMeta.x\"]}, newMeta: \"$newMeta\"}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
+}
 }  // namespace
 
 // The tests in this block are for the fast-path projection only, as the default projection mode
@@ -1110,5 +1176,6 @@ TEST_F(InclusionProjectionExecutionTestWithoutFallBackToDefault,
                        AssertionException,
                        51752);
 }
+
 }  // namespace fast_path_projection_only_tests
 }  // namespace mongo::projection_executor

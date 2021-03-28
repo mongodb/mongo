@@ -94,6 +94,30 @@ public:
         return *_parsedTransform;
     }
 
+    /**
+     * Substitute the occurence of 'oldName' as first field path element for a 'newName' in all
+     * expressions in the transformation object.
+     */
+    void substituteFieldPathElement(const std::string& oldName, const std::string& newName) {
+        _parsedTransform->substituteFieldPathElement(oldName, newName);
+    }
+
+    /**
+     * If this transformation is an inclusion projection, the function extracts the computed
+     * projection(s) depending on the oldName argument. Extraction is not allowed if the name of the
+     * projection is in the 'reservedNames' set. The computed projection is returned as a BSONObj,
+     * where the oldName is substituted for the newName. In the original inclusion projection it is
+     * replaced with a projected field or an identity projection depending on its position in the
+     * order of additional fields. The function has no effect for exclusion projections, or if there
+     * are no computed projections, or the computed expression depends on other fields than the
+     * oldName.
+     */
+    BSONObj extractComputedProjections(const std::string& oldName,
+                                       const std::string& newName,
+                                       const std::set<StringData>& reservedNames) {
+        return _parsedTransform->extractComputedProjections(oldName, newName, reservedNames);
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

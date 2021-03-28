@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
@@ -303,6 +304,14 @@ void BucketUnpacker::reset(BSONObj&& bucket) {
         }
     }
 
+
+    // Update computed meta projections with values from this bucket.
+    if (!_spec.computedMetaProjFields.empty()) {
+        for (auto&& name : _spec.computedMetaProjFields) {
+            _computedMetaProjections[name] = _bucket[name];
+        }
+    }
+
     // Save the measurement count for the owned bucket.
     _numberOfMeasurements = computeMeasurementCount(timeFieldElem.objsize());
 }
@@ -336,6 +345,11 @@ Document BucketUnpacker::getNext() {
         }
     }
 
+    // Add computed meta projections.
+    for (auto&& name : _spec.computedMetaProjFields) {
+        measurement.addField(name, Value{_computedMetaProjections[name]});
+    }
+
     return measurement.freeze();
 }
 
@@ -366,7 +380,24 @@ Document BucketUnpacker::extractSingleMeasurement(int j) {
         }
     }
 
+    // Add computed meta projections.
+    for (auto&& name : _spec.computedMetaProjFields) {
+        measurement.addField(name, Value{_computedMetaProjections[name]});
+    }
+
     return measurement.freeze();
+}
+
+const std::set<StringData> BucketUnpacker::reservedBucketFieldNames = {
+    timeseries::kBucketIdFieldName,
+    timeseries::kBucketDataFieldName,
+    timeseries::kBucketMetaFieldName,
+    timeseries::kBucketControlFieldName};
+
+void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
+    for (auto&& field : computedFieldNames) {
+        _spec.computedMetaProjFields.emplace_back(field.toString());
+    }
 }
 
 DocumentSourceInternalUnpackBucket::DocumentSourceInternalUnpackBucket(
@@ -556,6 +587,38 @@ DocumentSource::GetNextResult DocumentSourceInternalUnpackBucket::doGetNext() {
     return nextResult;
 }
 
+void DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    if (std::next(itr) == container->end()) {
+        return;
+    }
+    if (!_bucketUnpacker.bucketSpec().metaField || !_bucketUnpacker.includeMetaField()) {
+        return;
+    }
+    auto nextProject =
+        dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
+    if (!nextProject ||
+        nextProject->getType() != TransformerInterface::TransformerType::kInclusionProjection) {
+        return;
+    }
+    auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
+    auto addFieldsSpec =
+        nextProject->extractComputedProjections(metaName,
+                                                timeseries::kBucketMetaFieldName.toString(),
+                                                BucketUnpacker::reservedBucketFieldNames);
+
+    if (!addFieldsSpec.isEmpty()) {
+        std::vector<StringData> computedMetaProjFields;
+        for (auto&& elem : addFieldsSpec) {
+            computedMetaProjFields.emplace_back(elem.fieldName());
+        }
+        _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
+        container->insert(itr,
+                          DocumentSourceAddFields::createFromBson(
+                              BSON("$addFields" << addFieldsSpec).firstElement(), getContext()));
+    }
+}
+
 void DocumentSourceInternalUnpackBucket::internalizeProject(const BSONObj& project,
                                                             bool isInclusion) {
     // 'fields' are the top-level fields to be included/excluded by the unpacker. We handle the
@@ -726,6 +789,58 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
     return {nullptr, match};
 }
 
+// Push down computed projections over meta fields ($addFields or $set).
+void DocumentSourceInternalUnpackBucket::pushDownAddFieldsMetaProjection(
+    Pipeline::SourceContainer::iterator itr) {
+    if (!_bucketUnpacker.bucketSpec().metaField) {
+        return;
+    }
+    auto& metaName = _bucketUnpacker.bucketSpec().metaField.get();
+    if (auto nextTransform =
+            dynamic_cast<DocumentSourceSingleDocumentTransformation*>((*std::next(itr)).get());
+        nextTransform &&
+        nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection) {
+        // Check if the transformation works exclusively over metafields.
+        DepsTracker deps;
+        nextTransform->getDependencies(&deps);
+        auto topLevelFields =
+            deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
+        auto topLevelFieldNames = topLevelFields.getFieldNames<std::set<std::string>>();
+        topLevelFieldNames.erase("_id");
+
+        // Do not pushdown if a computed field name is (or starts with) a reserved bucket field
+        // name.
+        auto newNames = nextTransform->getModifiedPaths().getNewNames();
+        for (auto&& name : newNames) {
+            auto pos = name.find('.');
+            auto prefix = (pos == std::string::npos) ? name : name.substr(0, pos);
+            if (BucketUnpacker::isReservedBucketFieldName(prefix)) {
+                return;
+            }
+        }
+
+        if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(metaName) == 1) {
+            // a) Rename the user metaField name into bucket's "meta" name in all expressions in
+            // the transformation phase.
+            nextTransform->substituteFieldPathElement(metaName,
+                                                      timeseries::kBucketMetaFieldName.toString());
+
+            // b) Modify this stage to include the computed meta projections from the next
+            // stage.
+            auto computedMetaProj =
+                nextTransform->getTransformer().serializeTransformation(boost::none).toBson();
+            std::vector<StringData> computedMetaProjFields;
+            for (auto&& elem : computedMetaProj) {
+                computedMetaProjFields.emplace_back(elem.fieldName());
+            }
+            _bucketUnpacker.addComputedMetaProjFields(computedMetaProjFields);
+
+            // c) Swap the $_internalUnpackBucket stage with the $addFields stage.
+            std::swap(*itr, *std::next(itr));
+        }
+    }
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -797,6 +912,15 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
             }
         }
+    }
+
+    // Attempt to extract computed meta projections from subsequent $project and push them before
+    // the $_internalunpackBucket.
+    pushDownComputedMetaProjection(itr, container);
+    // If there is $addFields or $set that operate only on metadata, push it before the
+    // $_internalUnpackBucket.
+    if (std::next(itr) != container->end()) {
+        pushDownAddFieldsMetaProjection(itr);
     }
 
     // Attempt to build a $project based on dependency analysis or extract one from the pipeline. We
