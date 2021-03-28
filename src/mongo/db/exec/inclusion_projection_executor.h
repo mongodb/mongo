@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_node.h"
+#include "mongo/db/pipeline/expression_walker.h"
 
 namespace mongo::projection_executor {
 /**
@@ -74,6 +75,29 @@ public:
     boost::optional<size_t> maxFieldsToProject() const override {
         return _children.size() + _projectedFields.size();
     }
+
+    /**
+     * All field paths with the first path element in the 'renames' map are substituted for field
+     * paths with respective mapped name as a first element. The change is applied to all
+     * expressions of the InclusionNode, including the expressions in its children.
+     *
+     */
+    void substituteFieldPathElement(const StringMap<std::string>& renames) {
+        SubstituteFieldPathWalker substituteWalker(renames);
+        for (auto&& expressionPair : _expressions) {
+            auto substExpr =
+                expression_walker::walk(&substituteWalker, expressionPair.second.get());
+            if (substExpr.get() != nullptr) {
+                expressionPair.second = substExpr.release();
+            }
+        }
+
+        for (auto&& childPair : _children) {
+            static_cast<InclusionNode*>(childPair.second.get())
+                ->substituteFieldPathElement(renames);
+        }
+    }
+
 
 protected:
     // For inclusions, we can apply an optimization here by simply appending to the output document
@@ -241,6 +265,12 @@ public:
         }
 
         return exhaustivePaths;
+    }
+
+    BSONObj extractComputedProjections(const std::string& oldName,
+                                       const std::string& newName,
+                                       const std::set<StringData>& reservedNames) final {
+        return _root->extractComputedProjections(oldName, newName, reservedNames);
     }
 
 private:

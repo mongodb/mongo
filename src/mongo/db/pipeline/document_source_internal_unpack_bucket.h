@@ -50,6 +50,10 @@ struct BucketSpec {
 
     // The set of field names in the data region that should be included or excluded.
     std::set<std::string> fieldSet;
+
+    // Vector of computed meta field projection names. Added at the end of materialized
+    // measurements.
+    std::vector<std::string> computedMetaProjFields;
 };
 
 
@@ -81,6 +85,12 @@ public:
      */
     static int computeMeasurementCount(int targetTimestampObjSize);
 
+    // Set of field names reserved for time-series buckets.
+    static const std::set<StringData> reservedBucketFieldNames;
+
+    static bool isReservedBucketFieldName(const StringData& name) {
+        return (reservedBucketFieldNames.count(name) > 0);
+    }
     // When BucketUnpacker is created with kInclude it must produce measurements that contain the
     // set of fields. Otherwise, if the kExclude option is used, the measurements will include the
     // set difference between all fields in the bucket and the provided fields.
@@ -142,6 +152,9 @@ public:
 
     void setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior);
 
+    // Add computed meta projection names to the bucket specification.
+    void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
+
 private:
     BucketSpec _spec;
     Behavior _unpackerBehavior;
@@ -166,6 +179,10 @@ private:
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
     // phase according to the provided 'Behavior' and 'BucketSpec'.
     std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
+
+    // Map <name, BSONElement> for the computed meta field projections. Updated for
+    // every bucket upon reset().
+    stdx::unordered_map<std::string, BSONElement> _computedMetaProjections;
 
     // The number of measurements in the bucket.
     int32_t _numberOfMeasurements = 0;
@@ -299,6 +316,11 @@ public:
     boost::optional<long long> sampleSize() const {
         return _sampleSize;
     }
+
+    void pushDownAddFieldsMetaProjection(Pipeline::SourceContainer::iterator itr);
+
+    void pushDownComputedMetaProjection(Pipeline::SourceContainer::iterator itr,
+                                        Pipeline::SourceContainer* container);
 
 private:
     /**

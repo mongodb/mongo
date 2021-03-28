@@ -133,6 +133,17 @@ public:
     void serialize(boost::optional<ExplainOptions::Verbosity> explain,
                    MutableDocument* output) const;
 
+    /**
+     * Extract computed projections that depend only on the 'oldName' field. Extraction is not
+     * allowed if the name of the projection is in the 'reservedNames' set.
+     * The function returns a BSONObj with computed projections, if such exist, or an empty BSONObj.
+     * Each extracted computed projection is replaced with a projected field or with an identity
+     * projection.
+     */
+    BSONObj extractComputedProjections(const StringData& oldName,
+                                       const StringData& newName,
+                                       const std::set<StringData>& reservedNames);
+
 protected:
     /**
      * Creates the child if it doesn't already exist. 'field' is not allowed to be dotted. Returns
