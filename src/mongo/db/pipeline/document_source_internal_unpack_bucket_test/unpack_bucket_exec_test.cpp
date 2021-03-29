@@ -774,6 +774,17 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsNonStringMetaField) {
         5346505);
 }
 
+
+TEST_F(InternalUnpackBucketExecTest, ParserRejectsDottedMetaField) {
+    ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
+                           fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', "
+                                    "metaField: 'address.city'}}")
+                               .firstElement(),
+                           getExpCtx()),
+                       AssertionException,
+                       5545700);
+}
+
 TEST_F(InternalUnpackBucketExecTest, ParserRejectsAdditionalFields) {
     ASSERT_THROWS_CODE(DocumentSourceInternalUnpackBucket::createFromBson(
                            fromjson("{$_internalUnpackBucket: {include: [], timeField: 'foo', "
