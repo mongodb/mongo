@@ -137,7 +137,7 @@ private:
     StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
     bool _init = false;
     bool _eof = false;
-    size_t _maxMemory;
+    size_t _maxMemory = 0;
 };
 
 }  // namespace mongo
