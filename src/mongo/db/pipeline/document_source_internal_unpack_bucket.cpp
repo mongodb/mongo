@@ -417,7 +417,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             uassert(5346505,
                     str::stream() << "metaField field must be a string, got: " << elem.type(),
                     elem.type() == BSONType::String);
-            bucketSpec.metaField = elem.str();
+            auto metaField = elem.str();
+            uassert(5545700,
+                    str::stream() << "metaField field must be a single-element field path",
+                    metaField.find('.') == std::string::npos);
+            bucketSpec.metaField = std::move(metaField);
         } else {
             uasserted(5346506,
                       str::stream()
