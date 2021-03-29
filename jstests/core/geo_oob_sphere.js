@@ -27,7 +27,7 @@ assert.throws(function() {
 
 // In a spherical geometry, this point is out-of-bounds.
 assert.commandFailedWithCode(coll.runCommand("find", {filter: {loc: {$nearSphere: [179, -91]}}}),
-                             17444);
+                             2);
 assert.commandFailedWithCode(coll.runCommand("aggregate", {
     cursor: {},
     pipeline: [{
@@ -38,5 +38,5 @@ assert.commandFailedWithCode(coll.runCommand("aggregate", {
         }
     }]
 }),
-                             17444);
+                             2);
 }());

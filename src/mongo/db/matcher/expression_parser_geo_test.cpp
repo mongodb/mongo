@@ -262,6 +262,15 @@ TEST(MatchExpressionParserGeoNear, ParseInvalidGeoNear) {
                                                    MatchExpressionParser::kAllowAllSpecialFeatures)
                           .getStatus());
     }
+    {
+        BSONObj query = fromjson("{loc: {$geoNear: [0,0], $invalidArgument: 0}}");
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        ASSERT_NOT_OK(MatchExpressionParser::parse(query,
+                                                   expCtx,
+                                                   ExtensionsCallbackNoop(),
+                                                   MatchExpressionParser::kAllowAllSpecialFeatures)
+                          .getStatus());
+    }
 }
 
 TEST(MatchExpressionParserGeoNear, ParseValidNearSphere) {
