@@ -165,9 +165,14 @@ public:
                 uassert(
                     ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("size"), !cmd.getSize());
                 uassert(ErrorCodes::InvalidOptions, timeseriesNotAllowedWith("max"), !cmd.getMax());
-                uassert(ErrorCodes::InvalidOptions,
-                        timeseriesNotAllowedWith("validator"),
-                        !cmd.getValidator());
+
+                // The 'timeseries' option may be passed with a 'validator' if a buckets collection
+                // is being restored. We assume the caller knows what they are doing.
+                if (!cmd.getNamespace().isTimeseriesBucketsCollection()) {
+                    uassert(ErrorCodes::InvalidOptions,
+                            timeseriesNotAllowedWith("validator"),
+                            !cmd.getValidator());
+                }
                 uassert(ErrorCodes::InvalidOptions,
                         timeseriesNotAllowedWith("validationLevel"),
                         !cmd.getValidationLevel());

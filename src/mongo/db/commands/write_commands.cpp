@@ -62,6 +62,7 @@
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/views/view_catalog.h"
@@ -102,20 +103,20 @@ bool shouldSkipOutput(OperationContext* opCtx) {
 }
 
 /**
- * Returns true if 'ns' refers to a time-series collection.
+ * Returns true if 'ns' is a time-series collection. That is, this namespace is backed by a
+ * time-series buckets collection.
  */
 bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
-    if (!viewCatalog) {
-        return false;
-    }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
-    if (!view) {
-        return false;
-    }
-
-    return view->timeseries().has_value();
+    // If the buckets collection exists now, the time-series insert path will check for the
+    // existence of the buckets collection later on with a lock.
+    // If this check is concurrent with the creation of a time-series collection and the buckets
+    // collection does not yet exist, this check may return false unnecessarily. As a result, an
+    // insert attempt into the time-series namespace will either succeed or fail, depending on who
+    // wins the race.
+    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+    return CollectionCatalog::get(opCtx)
+        ->lookupCollectionByNamespaceForRead(opCtx, bucketsNs)
+        .get();
 }
 
 // Default for control.version in time-series bucket collection.
@@ -660,6 +661,18 @@ public:
 
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
+            auto bucketsNs = ns().makeTimeseriesBucketsNamespace();
+            // Holding this shared pointer to the collection guarantees that the collator is not
+            // invalidated.
+            auto bucketsColl =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "Could not find time-series buckets collection for write",
+                    bucketsColl);
+            uassert(ErrorCodes::InvalidOptions,
+                    "Time-series buckets collection is missing time-series options",
+                    bucketsColl->getTimeseriesOptions());
+
             std::vector<std::pair<std::shared_ptr<BucketCatalog::WriteBatch>, size_t>> batches;
             stdx::unordered_map<BucketCatalog::Bucket*, std::vector<StmtId>> bucketStmtIds;
 
@@ -677,6 +690,8 @@ public:
 
                 auto result = bucketCatalog.insert(opCtx,
                                                    ns(),
+                                                   bucketsColl->getDefaultCollator(),
+                                                   *bucketsColl->getTimeseriesOptions(),
                                                    request().getDocuments()[start + index],
                                                    canCombineWithInsertsFromOtherClients(opCtx));
                 if (auto error = generateError(opCtx, result, index, errors->size())) {

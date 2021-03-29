@@ -622,8 +622,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
         status = {ErrorCodes::InvalidNamespace,
                   str::stream() << "invalid namespace name for a view: " + viewName.toString()};
     } else {
-        status = ViewCatalog::createView(
-            opCtx, this, viewName, viewOnNss, pipeline, options.collation, options.timeseries);
+        status =
+            ViewCatalog::createView(opCtx, this, viewName, viewOnNss, pipeline, options.collation);
     }
 
     audit::logCreateView(&cc(), viewName, viewOnNss.toString(), pipeline, status.code());

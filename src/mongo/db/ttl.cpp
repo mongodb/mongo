@@ -298,17 +298,8 @@ private:
     Date_t safeExpirationDate(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               std::int64_t expireAfterSeconds) const {
-        if (coll->ns().isTimeseriesBucketsCollection()) {
-            auto timeseriesNs = coll->ns().bucketsNamespaceToTimeseries();
-            auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, timeseriesNs.db());
-            invariant(viewCatalog);
-            auto viewDef = viewCatalog->lookup(opCtx, timeseriesNs.ns());
-            uassert(ErrorCodes::NamespaceNotFound,
-                    fmt::format("Could not find view definition for namespace: {}",
-                                timeseriesNs.toString()),
-                    viewDef);
-
-            const auto bucketMaxSpan = Seconds(viewDef->timeseries()->getBucketMaxSpanSeconds());
+        if (auto timeseries = coll->getTimeseriesOptions()) {
+            const auto bucketMaxSpan = Seconds(timeseries->getBucketMaxSpanSeconds());
 
             // Don't delete data unless it is safely out of range of the bucket maximum time
             // range. On time-series collections, the _id (and thus RecordId) is the minimum

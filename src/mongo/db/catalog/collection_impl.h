@@ -365,6 +365,8 @@ public:
      */
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
+    boost::optional<TimeseriesOptions> getTimeseriesOptions() const final;
+
     /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
      * Collection is destroyed.
@@ -502,6 +504,9 @@ private:
 
     // Whether or not this collection is clustered on _id values.
     bool _clustered = false;
+
+    // If this is a time-series buckets collection, the metadata for this collection.
+    boost::optional<TimeseriesOptions> _timeseriesOptions;
 
     bool _recordPreImages = false;
 

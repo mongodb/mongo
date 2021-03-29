@@ -333,6 +333,8 @@ void CollectionImpl::init(OperationContext* opCtx) {
                               "validatorStatus"_attr = _validator.getStatus());
     }
 
+    _timeseriesOptions = collectionOptions.timeseries;
+
     if (collectionOptions.clusteredIndex) {
         _clustered = true;
         if (collectionOptions.clusteredIndex->getExpireAfterSeconds()) {
@@ -1430,6 +1432,10 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
     _validationLevel = newLevel;
     _validationAction = newAction;
     return Status::OK();
+}
+
+boost::optional<TimeseriesOptions> CollectionImpl::getTimeseriesOptions() const {
+    return _timeseriesOptions;
 }
 
 const CollatorInterface* CollectionImpl::getDefaultCollator() const {
