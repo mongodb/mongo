@@ -55,13 +55,13 @@ namespace mongo {
 
 namespace {
 
-bool isSharded(OperationContext* opCtx, const NamespaceString& nss) {
+boost::optional<CollectionType> getShardedCollection(OperationContext* opCtx,
+                                                     const NamespaceString& nss) {
     try {
-        Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-        return true;
+        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The collection is unsharded or doesn't exist
-        return false;
+        return boost::none;
     }
 }
 
@@ -72,6 +72,7 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(const BSONObj& initialS
           IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)) {}
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
+    // TODO SERVER-55597 simply compare the `request` nested objects
     const auto otherDoc = RenameCollectionCoordinatorDocument::parse(
         IDLParserErrorContext("RenameCollectionCoordinatorDocument"), doc);
 
@@ -189,7 +190,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(
-            Phase::kCheckPreconditions,
+            Phase::kCheckPreconditionsAndFreezeMigrations,
             [this, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
@@ -199,7 +200,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& toNss = _doc.getTo();
 
                 // Make sure the source collection exists
-                const auto sourceIsSharded = isSharded(opCtx, nss());
+                const auto optSourceCollType = getShardedCollection(opCtx, nss());
+                const bool sourceIsSharded = (bool)optSourceCollType;
                 if (!sourceIsSharded) {
                     Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
                     Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
@@ -211,6 +213,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             sourceCollPtr);
                 }
 
+                _doc.setOptShardedCollInfo(optSourceCollType);
+
                 // Make sure the target namespace is not a view
                 {
                     Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
@@ -221,13 +225,20 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
                 }
 
-                _doc.setSourceIsSharded(sourceIsSharded);
-
-                const auto targetIsSharded = isSharded(opCtx, toNss);
+                const auto targetIsSharded = (bool)getShardedCollection(opCtx, toNss);
                 _doc.setTargetIsSharded(targetIsSharded);
 
                 sharding_ddl_util::checkShardedRenamePreconditions(
                     opCtx, toNss, _doc.getDropTarget());
+
+                // Block migrations on involved sharded collections
+                if (sourceIsSharded) {
+                    sharding_ddl_util::stopMigrations(opCtx, nss());
+                }
+
+                if (targetIsSharded) {
+                    sharding_ddl_util::stopMigrations(opCtx, _doc.getTo());
+                }
 
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
@@ -236,21 +247,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
                     ShardingCatalogClient::kMajorityWriteConcern);
             }))
-        .then(_executePhase(Phase::kFreezeCollections,
-                            [this, anchor = shared_from_this()] {
-                                auto opCtxHolder = cc().makeOperationContext();
-                                auto* opCtx = opCtxHolder.get();
-                                getForwardableOpMetadata().setOn(opCtx);
-
-                                // Block migrations on involved sharded collections
-                                if (_doc.getSourceIsSharded()) {
-                                    sharding_ddl_util::stopMigrations(opCtx, nss());
-                                }
-
-                                if (_doc.getTargetIsSharded()) {
-                                    sharding_ddl_util::stopMigrations(opCtx, _doc.getTo());
-                                }
-                            }))
         .then(_executePhase(
             Phase::kBlockCRUDAndRename,
             [this, executor = executor, anchor = shared_from_this()] {
@@ -289,9 +285,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
 
-                if (_doc.getSourceIsSharded()) {
+                const auto& optFromCollType = _doc.getOptShardedCollInfo();
+                if (optFromCollType) {
                     // Rename CSRS metadata
-                    sharding_ddl_util::shardedRenameMetadata(opCtx, nss(), _doc.getTo());
+                    auto collType = *optFromCollType;
+                    sharding_ddl_util::shardedRenameMetadata(opCtx, collType, _doc.getTo());
                 } else if (_doc.getTargetIsSharded()) {
                     // Remove stale target CSRS metadata
                     sharding_ddl_util::removeCollMetadataFromConfig(opCtx, _doc.getTo());
