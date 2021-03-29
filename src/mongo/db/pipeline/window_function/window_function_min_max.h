@@ -49,8 +49,8 @@ public:
     }
 
     void add(Value value) final {
-        _values.insert(std::move(value));
         _memUsageBytes += value.getApproximateSize();
+        _values.insert(std::move(value));
     }
 
     void remove(Value value) final {
