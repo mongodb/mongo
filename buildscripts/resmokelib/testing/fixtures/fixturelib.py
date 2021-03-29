@@ -7,7 +7,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib import logging
 from buildscripts.resmokelib.utils.history import make_historic as _make_historic
 from buildscripts.resmokelib.testing.fixtures import interface
-from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
+from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY, LAST_LTS_MONGOS_BINARY
 
 
 class FixtureLib(object):
@@ -99,6 +99,7 @@ class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
         self.FIXTURE_SUBDIR = config.FIXTURE_SUBDIR
         self.ALWAYS_USE_LOG_FILES = config.ALWAYS_USE_LOG_FILES
         self.LAST_LTS_MONGOD_BINARY = LAST_LTS_MONGOD_BINARY
+        self.LAST_LTS_MONGOS_BINARY = LAST_LTS_MONGOS_BINARY
         self.EVERGREEN_TASK_ID = config.EVERGREEN_TASK_ID
         self.FLOW_CONTROL = config.FLOW_CONTROL
         self.FLOW_CONTROL_TICKETS = config.FLOW_CONTROL_TICKETS

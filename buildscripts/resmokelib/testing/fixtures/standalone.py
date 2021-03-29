@@ -326,8 +326,9 @@ class MongodLauncher(object):
 
         if ("failpoint.flowControlTicketOverride" not in suite_set_parameters
                 and self.config.FLOW_CONTROL_TICKETS is not None):
-            suite_set_parameters["failpoint.flowControlTicketOverride"] = self.config.make_historic(
-                {"mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}})
+            suite_set_parameters[
+                "failpoint.flowControlTicketOverride"] = self.fixturelib.make_historic(
+                    {"mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}})
 
         _add_testing_set_parameters(suite_set_parameters)
 
