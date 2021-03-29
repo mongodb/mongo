@@ -406,6 +406,8 @@ std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams
 
 namespace {
 
+StatusWith<std::vector<std::string>> getSubjectAlternativeNames(PCCERT_CONTEXT cert);
+
 SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
     : _weakValidation(params.sslWeakCertificateValidation),
       _allowInvalidCertificates(params.sslAllowInvalidCertificates),
@@ -441,6 +443,16 @@ SSLManagerWindows::SSLManagerWindows(const SSLParams& params, bool isServer)
                                      &subjectName,
                                      &_sslConfiguration.serverCertificateExpirationDate));
             uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(subjectName)));
+
+            auto swSans = getSubjectAlternativeNames(_serverCertificates[0]);
+            const bool hasSan = swSans.isOK() && (0 != swSans.getValue().size());
+            if (!hasSan) {
+                LOGV2_WARNING_OPTIONS(
+                    551192,
+                    {logv2::LogTag::kStartupWarnings},
+                    "Server certificate has no compatible Subject Alternative Name. "
+                    "This may prevent TLS clients from connecting");
+            }
         }
 
         // Monitor the server certificate's expiration

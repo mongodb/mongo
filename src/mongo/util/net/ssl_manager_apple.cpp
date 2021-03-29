@@ -546,6 +546,29 @@ StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFDictionary
     return ret;
 }
 
+StatusWith<::SecCertificateRef> getCertificate(::CFArrayRef certs);
+
+StatusWith<std::vector<std::string>> extractSubjectAlternateNames(::CFArrayRef certs) {
+    auto swCert = getCertificate(certs);
+    if (!swCert.isOK()) {
+        return swCert.getStatus();
+    }
+    CFUniquePtr<::SecCertificateRef> cert(swCert.getValue());
+
+    CFUniquePtr<::CFMutableArrayRef> oids(
+        ::CFArrayCreateMutable(nullptr, 1, &::kCFTypeArrayCallBacks));
+    ::CFArrayAppendValue(oids.get(), ::kSecOIDSubjectAltName);
+
+    ::CFErrorRef err = nullptr;
+    CFUniquePtr<::CFDictionaryRef> cfdict(::SecCertificateCopyValues(cert.get(), oids.get(), &err));
+    CFUniquePtr<::CFErrorRef> cferror(err);
+    if (cferror) {
+        return Status(ErrorCodes::NoSuchKey, "Could not find Subject Alternative Name");
+    }
+
+    return extractSubjectAlternateNames(cfdict.get());
+}
+
 bool isCFDataEqual(::CFDataRef a, ::CFDataRef b) {
     const auto len = ::CFDataGetLength(a);
     if (::CFDataGetLength(b) != len) {
@@ -1323,6 +1346,16 @@ SSLManagerApple::SSLManagerApple(const SSLParams& params, bool isServer)
                     _serverCtx.certs.get(), &_sslConfiguration.serverCertificateExpirationDate))));
             CertificateExpirationMonitor::get()->updateExpirationDeadline(
                 _sslConfiguration.serverCertificateExpirationDate);
+
+            auto swSans = extractSubjectAlternateNames(_serverCtx.certs.get());
+            const bool hasSan = swSans.isOK() && (0 != swSans.getValue().size());
+            if (!hasSan) {
+                LOGV2_WARNING_OPTIONS(
+                    551191,
+                    {logv2::LogTag::kStartupWarnings},
+                    "Server certificate has no compatible Subject Alternative Name. "
+                    "This may prevent TLS clients from connecting");
+            }
         }
     }
 

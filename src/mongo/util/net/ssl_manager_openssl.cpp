@@ -1301,6 +1301,7 @@ private:
      * and extract server certificate notAfter date.
      * @param keyFile referencing the PEM file to be read.
      * @param subjectName as a pointer to the subject name variable being set.
+     * @param verifyHasSubjectAlternativeName to generate warning if SAN is absent.
      * @param serverNotAfter a Date_t object pointer that is valued if the
      * date is to be checked (as for a server certificate) and null otherwise.
      * @return Status::Ok showing if the function was successful.
@@ -1308,17 +1309,20 @@ private:
     Status _parseAndValidateCertificate(const std::string& keyFile,
                                         PasswordFetcher* keyPassword,
                                         SSLX509Name* subjectName,
+                                        bool verifyHasSubjectAlternativeName,
                                         Date_t* serverNotAfter);
 
     Status _parseAndValidateCertificateFromBIO(UniqueBIO inBio,
                                                PasswordFetcher* keyPassword,
                                                StringData fileNameForLogging,
                                                SSLX509Name* subjectName,
+                                               bool verifyHasSubjectAlternativeName,
                                                Date_t* serverNotAfter);
 
     Status _parseAndValidateCertificateFromMemory(StringData buffer,
                                                   PasswordFetcher* keyPassword,
                                                   SSLX509Name* subjectName,
+                                                  bool verifyHasSubjectAlternativeName,
                                                   Date_t* serverNotAfter);
     /*
      * Parse and return x509 object from the provided keyfile.
@@ -1594,7 +1598,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
 
     if (!clientPEM.empty()) {
         auto status = _parseAndValidateCertificate(
-            clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, nullptr);
+            clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, false, nullptr);
         uassertStatusOKWithContext(
             status,
             str::stream() << "ssl client initialization problem for certificate: " << clientPEM);
@@ -1611,6 +1615,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
             _parseAndValidateCertificate(params.sslPEMKeyFile,
                                          &_serverPEMPassword,
                                          &serverSubjectName,
+                                         true,
                                          &_sslConfiguration.serverCertificateExpirationDate);
         uassertStatusOKWithContext(status,
                                    str::stream()
@@ -2282,6 +2287,7 @@ Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
             _parseAndValidateCertificateFromMemory((*_transientSSLParams).sslClusterPEMPayload,
                                                    &_clusterPEMPassword,
                                                    &_sslConfiguration.clientSubjectName,
+                                                   false,
                                                    nullptr);
         if (!status.isOK()) {
             return status.withContext("Could not validate transient certificate");
@@ -2397,6 +2403,7 @@ bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
 Status SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
                                                        PasswordFetcher* keyPassword,
                                                        SSLX509Name* subjectName,
+                                                       bool verifyHasSubjectAlternativeName,
                                                        Date_t* serverCertificateExpirationDate) {
     UniqueBIO inBio(BIO_new(BIO_s_file()));
     if (!inBio) {
@@ -2411,14 +2418,19 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFil
                           keyFile, getSSLErrorMessage(ERR_get_error())));
     }
 
-    return _parseAndValidateCertificateFromBIO(
-        std::move(inBio), keyPassword, keyFile, subjectName, serverCertificateExpirationDate);
+    return _parseAndValidateCertificateFromBIO(std::move(inBio),
+                                               keyPassword,
+                                               keyFile,
+                                               subjectName,
+                                               verifyHasSubjectAlternativeName,
+                                               serverCertificateExpirationDate);
 }
 
 Status SSLManagerOpenSSL::_parseAndValidateCertificateFromMemory(
     StringData buffer,
     PasswordFetcher* keyPassword,
     SSLX509Name* subjectName,
+    bool verifyHasSubjectAlternativeName,
     Date_t* serverCertificateExpirationDate) {
     logv2::DynamicAttributes errorAttrs;
 
@@ -2439,6 +2451,7 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromMemory(
                                                keyPassword,
                                                "transient"_sd,
                                                subjectName,
+                                               verifyHasSubjectAlternativeName,
                                                serverCertificateExpirationDate);
 }
 
@@ -2447,6 +2460,7 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
     PasswordFetcher* keyPassword,
     StringData fileNameForLogging,
     SSLX509Name* subjectName,
+    bool verifyHasSubjectAlternativeName,
     Date_t* serverCertificateExpirationDate) {
     X509* x509 = PEM_read_bio_X509(
         inBio.get(), nullptr, &SSLManagerOpenSSL::password_cb, static_cast<void*>(&keyPassword));
@@ -2459,6 +2473,24 @@ Status SSLManagerOpenSSL::_parseAndValidateCertificateFromBIO(
     ON_BLOCK_EXIT([&] { X509_free(x509); });
 
     *subjectName = getCertificateSubjectX509Name(x509);
+
+    if (verifyHasSubjectAlternativeName) {
+        bool hasSan = false;
+        STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>(
+            X509_get_ext_d2i(x509, NID_subject_alt_name, nullptr, nullptr));
+        if (nullptr != sanNames) {
+            int sanNamesCount = sk_GENERAL_NAME_num(sanNames);
+            hasSan = (0 != sanNamesCount);
+            sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
+        }
+
+        if (!hasSan) {
+            LOGV2_WARNING_OPTIONS(551190,
+                                  {logv2::LogTag::kStartupWarnings},
+                                  "Server certificate has no compatible Subject Alternative Name. "
+                                  "This may prevent TLS clients from connecting");
+        }
+    }
 
     auto notBeforeMillis = convertASN1ToMillis(X509_get_notBefore(x509));
     if (notBeforeMillis == Date_t()) {
