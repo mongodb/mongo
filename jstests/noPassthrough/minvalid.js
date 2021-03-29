@@ -24,8 +24,10 @@ var lastOp = local.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 printjson(lastOp);
 
 print("3: change minvalid");
+// Set the 'minvalid' to a high enough opTime that it won't conflict with any oplogs written on
+// stepUp by any PrimaryOnlyServices.
 assert.commandWorked(local.replset.minvalid.update(
-    {}, {$set: {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1)}}, {upsert: true}));
+    {}, {$set: {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1000)}}, {upsert: true}));
 printjson(local.replset.minvalid.findOne());
 
 print("4: restart");
