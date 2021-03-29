@@ -299,6 +299,10 @@ certs:
     subjectAltName:
       DNS: ['localhost', '127.0.0.1', '::1']
 
+- name: 'server_no_SAN.pem'
+  description: General purpose server certificate with missing SAN.
+  Subject: {CN: localhost, title: 'Server no SAN attribute'}
+
 # For tenant migration testing.
 - name: 'rs0.pem'
   description: General purpose server certificate file.
