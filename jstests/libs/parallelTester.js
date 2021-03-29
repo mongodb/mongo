@@ -195,9 +195,6 @@ if (typeof _threadInject != "undefined") {
             // Assumes that other tests are not creating cursors.
             "kill_cursors.js",
 
-            // Assumes that other tests are not starting operations.
-            "currentop_shell.js",
-
             // These tests check global command counters.
             "find_and_modify_metrics.js",
             "update_metrics.js",

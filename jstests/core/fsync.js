@@ -49,8 +49,7 @@ assert(!resFail.ok, "fsyncLock command succeeded against DB other than admin.");
 // Uses admin automatically and locks the server for writes.
 var fsyncLockRes = db.fsyncLock();
 assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");
-assert(db.getSiblingDB('admin').runCommand({currentOp: 1}).fsyncLock,
-       "Value in currentOp result incorrect for fsyncLocked server");
+assert(db.currentOp().fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
 // Make sure writes are blocked. Spawn a write operation in a separate shell and make sure it
 // is blocked. There is really no way to do that currently, so just check that the write didn't
@@ -65,8 +64,7 @@ assert.eq(1, fsyncLockDB.coll.find({}).itcount());
 // Unlock and make sure the insert succeeded.
 var fsyncUnlockRes = db.fsyncUnlock();
 assert(fsyncUnlockRes.ok, "fsyncUnlock command failed");
-assert(db.getSiblingDB('admin').runCommand({currentOp: 1}).fsyncLock == null,
-       "fsyncUnlock is not null in currentOp result");
+assert(db.currentOp().fsyncLock == null, "fsyncUnlock is not null in db.currentOp");
 
 // Make sure the db is unlocked and the initial write made it through.
 writeOpHandle();
@@ -87,9 +85,9 @@ assert(fsyncUnlockRes.ok, "Second execution of fsyncUnlock command failed");
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
 assert(fsyncLockRes.lockCount == 1, tojson(fsyncLockRes));
-let currentOp = db.getSiblingDB('admin').runCommand({currentOp: 1});
+let currentOp = db.currentOp();
 assert.commandWorked(currentOp);
-assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
+assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
 let shellHandle1 =
     startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
@@ -97,9 +95,9 @@ let shellHandle1 =
 fsyncLockRes = db.fsyncLock();
 assert.commandWorked(fsyncLockRes);
 assert(fsyncLockRes.lockCount == 2, tojson(fsyncLockRes));
-currentOp = db.getSiblingDB('admin').runCommand({currentOp: 1});
+currentOp = db.currentOp();
 assert.commandWorked(currentOp);
-assert(currentOp.fsyncLock, "Value in currentOp result incorrect for fsyncLocked server");
+assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
 
 let shellHandle2 =
     startParallelShell("db.getSiblingDB('fsyncLockTestDB').multipleLock.insert({x:1});");
