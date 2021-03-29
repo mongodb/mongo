@@ -69,12 +69,13 @@ bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 /**
  * Rename sharded collection metadata as part of a renameCollection operation.
  *
- * Transaction:
- * - Update config.collections entry: update nss and epoch.
- * - Update config.chunks entries: change epoch/timestamp.
+ * - Update namespace associated with tags (FROM -> TO)
+ * - Update FROM collection entry to TO
+ *
+ * This function is idempotent.
  */
 void shardedRenameMetadata(OperationContext* opCtx,
-                           const NamespaceString& fromNss,
+                           CollectionType& fromCollType,
                            const NamespaceString& toNss);
 
 /**

@@ -55,9 +55,10 @@ namespace sharding_ddl_util {
 
 namespace {
 
-void cloneTags(OperationContext* opCtx,
-               const NamespaceString& fromNss,
-               const NamespaceString& toNss) {
+void updateTags(OperationContext* opCtx,
+                const NamespaceString& fromNss,
+                const NamespaceString& toNss) {
+    // TODO very inefficient function, refactor using a cluster write with bulk update
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, fromNss));
 
@@ -69,13 +70,21 @@ void cloneTags(OperationContext* opCtx,
     auto lastTag = tags.back();
     tags.pop_back();
     for (auto& tag : tags) {
-        tag.setNS(toNss);
-        uassertStatusOK(catalogClient->insertConfigDocument(
-            opCtx, TagsType::ConfigNS, tag.toBSON(), ShardingCatalogClient::kLocalWriteConcern));
+        uassertStatusOK(catalogClient->updateConfigDocument(
+            opCtx,
+            TagsType::ConfigNS,
+            BSON(TagsType::ns(fromNss.ns()) << TagsType::min(tag.getMinKey())),
+            BSON("$set" << BSON(TagsType::ns << toNss.ns())),
+            false /* upsert */,
+            ShardingCatalogClient::kLocalWriteConcern));
     }
-    lastTag.setNS(toNss);
-    uassertStatusOK(catalogClient->insertConfigDocument(
-        opCtx, TagsType::ConfigNS, lastTag.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
+    uassertStatusOK(catalogClient->updateConfigDocument(
+        opCtx,
+        TagsType::ConfigNS,
+        BSON(TagsType::ns(fromNss.ns()) << TagsType::min(lastTag.getMinKey())),
+        BSON("$set" << BSON(TagsType::ns << toNss.ns())),
+        false /* upsert */,
+        ShardingCatalogClient::kMajorityWriteConcern));
 }
 
 void deleteChunks(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
@@ -171,27 +180,25 @@ bool removeCollMetadataFromConfig(OperationContext* opCtx, const NamespaceString
 }
 
 void shardedRenameMetadata(OperationContext* opCtx,
-                           const NamespaceString& fromNss,
+                           CollectionType& fromCollType,
                            const NamespaceString& toNss) {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto fromNss = fromCollType.getNss();
 
     // Delete eventual TO chunk/collection entries referring a dropped collection
     removeCollMetadataFromConfig(opCtx, toNss);
 
     // Clone FROM tags to TO
-    cloneTags(opCtx, fromNss, toNss);
+    updateTags(opCtx, fromNss, toNss);
 
-    auto collType = catalogClient->getCollection(opCtx, fromNss);
-    collType.setNss(toNss);
     // Insert the TO collection entry
+    fromCollType.setNss(toNss);
     uassertStatusOK(
         catalogClient->insertConfigDocument(opCtx,
                                             CollectionType::ConfigNS,
-                                            collType.toBSON(),
+                                            fromCollType.toBSON(),
                                             ShardingCatalogClient::kMajorityWriteConcern));
 
-    // Delete FROM tag/collection entries
-    removeTagsMetadataFromConfig(opCtx, fromNss);
     deleteCollection(opCtx, fromNss);
 }
 

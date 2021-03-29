@@ -31,6 +31,8 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/catalog/type_collection.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
@@ -42,12 +44,19 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kCheckPreconditions: "checkPreconditions"
-            kFreezeCollections: "freezeCollection"
+            kCheckPreconditionsAndFreezeMigrations: "checkPreconditionsAndFreezeMigrations"
             kBlockCRUDAndRename: "blockCRUDAndRename"
             kRenameMetadata: "renameMetadata"
             kUnblockCRUD: "unblockCRUD"
             kSetResponse: "setResponse"
+
+types:
+    CollectionInfo:
+        description: "Information of the sharded collection to rename."
+        bson_serialization_type: object
+        cpp_type: CollectionType
+        serializer: "mongo::CollectionType::toBSON"
+        deserializer: "mongo::CollectionType"
 
 structs:
     RenameCollectionCoordinatorDocument:
@@ -69,11 +78,11 @@ structs:
             stayTemp:
                 description: "If true, the original collection will remain temp if it was temp before the rename."
                 type: bool
-            sourceIsSharded:
-                description: "Indicates whether the source collection is sharded or not."
-                type: bool
-                default: false
             targetIsSharded:
                 description: "Indicates whether the target collection (to override) is sharded or not."
                 type: bool
                 default: false
+            optShardedCollInfo:
+                description: "CollectionType of the collection currently being renamed (if sharded)."
+                type: CollectionInfo
+                optional: true
