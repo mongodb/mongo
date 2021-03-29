@@ -149,11 +149,33 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
             user_config = dict(config_parser["resmoke"])
             config.update(user_config)
 
-    # If the run_all_feature_flag_tests option is specified, run only tests with
-    # disabled feature tags and a Server that enables all disabled features.
-    all_feature_flags = None
-    if config.pop("run_all_feature_flag_tests"):
-        all_feature_flags = open(ALL_FEATURE_FLAG_FILE).read().split()
+    def setup_feature_flags():
+        _config.RUN_ALL_FEATURE_FLAG_TESTS = config.pop("run_all_feature_flag_tests")
+        feature_flags = []
+        try:
+            feature_flags = open(ALL_FEATURE_FLAG_FILE).read().split()
+        except FileNotFoundError:
+            # If we ask resmoke to run with all feature flags, the feature flags file
+            # needs to exist.
+            if _config.RUN_ALL_FEATURE_FLAG_TESTS:
+                raise
+
+        # Specify additional feature flags from the command line.
+        # Set running all feature flag tests to True if this options is specified.
+        additional_feature_flags = config.pop("additional_feature_flags")
+        if additional_feature_flags is not None:
+            if _config.RUN_ALL_FEATURE_FLAG_TESTS:
+                feature_flags.extend(additional_feature_flags)
+            else:
+                feature_flags = additional_feature_flags
+
+            # `additional_feature_flags` only determines the universal set of feature flags,
+            # resmoke.py is set to run with "all" feature flags regardless.
+            _config.RUN_ALL_FEATURE_FLAG_TESTS = True
+
+        return feature_flags
+
+    all_feature_flags = setup_feature_flags()
 
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.BASE_PORT = int(config.pop("base_port"))
@@ -166,6 +188,10 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.EXCLUDE_WITH_ANY_TAGS = [_config.EXCLUDED_TAG]
     _config.EXCLUDE_WITH_ANY_TAGS.extend(
         utils.default_if_none(_tags_from_list(config.pop("exclude_with_any_tags")), []))
+
+    # Don't run tests with feature flags if the `run_all_feature_flag_tests` is not specified.
+    if not _config.RUN_ALL_FEATURE_FLAG_TESTS and all_feature_flags:
+        _config.EXCLUDE_WITH_ANY_TAGS.extend(all_feature_flags)
 
     _config.FAIL_FAST = not config.pop("continue_on_failure")
     _config.FLOW_CONTROL = config.pop("flow_control")
@@ -205,9 +231,10 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod_executable"))
 
     mongod_set_parameters = config.pop("mongod_set_parameters")
-    if all_feature_flags is not None:
+    if _config.RUN_ALL_FEATURE_FLAG_TESTS:
         feature_flag_dict = {ff: "true" for ff in all_feature_flags}
         mongod_set_parameters.append(str(feature_flag_dict))
+
     _config.MONGOD_SET_PARAMETERS = _merge_set_params(mongod_set_parameters)
     _config.FUZZ_MONGOD_CONFIGS = config.pop("fuzz_mongod_configs")
     _config.CONFIG_FUZZ_SEED = config.pop("config_fuzz_seed")
@@ -223,9 +250,10 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
 
     mongos_set_parameters = config.pop("mongos_set_parameters")
-    if all_feature_flags is not None:
+    if _config.RUN_ALL_FEATURE_FLAG_TESTS:
         feature_flag_dict = {ff: "true" for ff in all_feature_flags}
         mongos_set_parameters.append(str(feature_flag_dict))
+
     _config.MONGOS_SET_PARAMETERS = _merge_set_params(mongos_set_parameters)
 
     _config.MONGOCRYPTD_SET_PARAMETERS = _merge_set_params(config.pop("mongocryptd_set_parameters"))
