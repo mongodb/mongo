@@ -14,6 +14,7 @@
  *   operations_longer_than_stepdown_interval_in_txns,
  *   # Uses index building in background
  *   requires_background_index,
+ *   requires_fcv_49,
  * ]
  */
 
@@ -204,19 +205,22 @@ coll.dropIndexes();
 assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}, {weights: {}}));
 assert.commandFailed(coll.createIndex({a: 1, _fts: "text", _ftsx: 1, c: 1}));
 
-// These are permitted for now, make sure they don't interfere with listIndexes.
-// TODO (SERVER-54712): Remove
+// The 'weights' parameter should only be allowed when the index is a text index.
 coll.drop();
-assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {d: 1}}),
+                             ErrorCodes.CannotCreateIndex);
 coll.getIndexes();
 coll.drop();
-assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: "$**"}));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$**"}),
+                             ErrorCodes.CannotCreateIndex);
 coll.getIndexes();
 coll.drop();
-assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: {}}));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: {}}),
+                             ErrorCodes.CannotCreateIndex);
 coll.getIndexes();
 coll.drop();
-assert.commandWorked(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}));
+assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}),
+                             ErrorCodes.CannotCreateIndex);
 coll.getIndexes();
 
 coll.drop();
