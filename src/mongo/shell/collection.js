@@ -235,8 +235,10 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
             cursor.readPref(readPreference.mode, readPreference.tags);
         }
 
-        const readConcern = session._getSessionAwareClient().getReadConcern(session);
-        if (readConcern !== null) {
+        const client = session._getSessionAwareClient();
+        const readConcern = client.getReadConcern(session);
+        if (readConcern !== null &&
+            client.canUseReadConcern(session, cursor._convertToCommand(true))) {
             cursor.readConcern(readConcern.level);
         }
     }
