@@ -248,19 +248,29 @@ Status GeoNearExpression::parseNewQuery(const BSONObj& obj) {
                                       << "invalid point in geo near query $geometry argument: "
                                       << embeddedObj << "  " << status.reason());
                 }
-                uassert(16681,
-                        "$near requires geojson point, given " + embeddedObj.toString(),
-                        (SPHERE == centroid->crs));
+                if (SPHERE != centroid->crs) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << "$near requires geojson point, given "
+                                                << embeddedObj.toString());
+                }
                 hasGeometry = true;
             }
         } else if (fieldName == "$minDistance") {
-            uassert(16897, "$minDistance must be a number", e.isNumber());
+            if (!e.isNumber()) {
+                return Status(ErrorCodes::BadValue, "$minDistance must be a number");
+            }
             minDistance = e.Number();
-            uassert(16898, "$minDistance must be non-negative", minDistance >= 0.0);
+            if (minDistance < 0.0) {
+                return Status(ErrorCodes::BadValue, "$minDistance must be non-negative");
+            }
         } else if (fieldName == "$maxDistance") {
-            uassert(16899, "$maxDistance must be a number", e.isNumber());
+            if (!e.isNumber()) {
+                return Status(ErrorCodes::BadValue, "$maxDistance must be a number");
+            }
             maxDistance = e.Number();
-            uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
+            if (maxDistance < 0.0) {
+                return Status(ErrorCodes::BadValue, "$maxDistance must be non-negative");
+            }
         } else {
             // Return an error if a bad argument was passed inside the query document.
             return Status(ErrorCodes::BadValue,
@@ -295,9 +305,10 @@ Status GeoNearExpression::parseFrom(const BSONObj& obj) {
     // Fixup the near query for anonoyances caused by $nearSphere
     if (isNearSphere) {
         // The user-provided point can be flat for a spherical query - needs to be projectable
-        uassert(17444,
-                "Legacy point is out of bounds for spherical query",
-                ShapeProjection::supportsProject(*centroid, SPHERE));
+        if (!ShapeProjection::supportsProject(*centroid, SPHERE)) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Legacy point is out of bounds for spherical query");
+        }
 
         unitsAreRadians = SPHERE != centroid->crs;
         // GeoJSON points imply wrapping queries
