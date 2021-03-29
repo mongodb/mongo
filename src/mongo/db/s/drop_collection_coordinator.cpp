@@ -33,6 +33,7 @@
 
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
@@ -125,22 +126,24 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(Phase::kFreezeCollection,
-                            [this, anchor = shared_from_this()] {
-                                auto opCtxHolder = cc().makeOperationContext();
-                                auto* opCtx = opCtxHolder.get();
-                                getForwardableOpMetadata().setOn(opCtx);
+        .then(_executePhase(
+            Phase::kFreezeCollection,
+            [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
 
-                                try {
-                                    sharding_ddl_util::stopMigrations(opCtx, nss());
-                                    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
-                                        opCtx, nss());
-                                    _doc.setCollInfo(std::move(coll));
-                                } catch (ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
-                                    // The collection is not sharded or doesn't exist.
-                                    _doc.setCollInfo(boost::none);
-                                }
-                            }))
+                ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection.start", nss().ns());
+
+                try {
+                    sharding_ddl_util::stopMigrations(opCtx, nss());
+                    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss());
+                    _doc.setCollInfo(std::move(coll));
+                } catch (ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
+                    // The collection is not sharded or doesn't exist.
+                    _doc.setCollInfo(boost::none);
+                }
+            }))
         .then(_executePhase(
             Phase::kDropCollection,
             [this, executor = executor, anchor = shared_from_this()] {
@@ -191,6 +194,8 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                         dropCollectionParticipant.toBSON({})),
                     participants,
                     **executor);
+
+                ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isOK() &&
