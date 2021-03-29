@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -136,8 +137,6 @@ const OplogApplier::Options& OplogApplier::getOptions() const {
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool() {
-    // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
-    // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
     if (replWriterThreadCount < replWriterMinThreadCount) {
         LOGV2_FATAL_NOTRACE(
             5605400,
@@ -145,7 +144,12 @@ std::unique_ptr<ThreadPool> makeReplWriterPool() {
             "replWriterMinThreadCount"_attr = replWriterMinThreadCount,
             "replWriterThreadCount"_attr = replWriterThreadCount);
     }
-    return makeReplWriterPool(replWriterThreadCount);
+
+    // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
+    // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
+    auto numberOfThreads =
+        std::min(replWriterThreadCount, 2 * static_cast<int>(ProcessInfo::getNumAvailableCores()));
+    return makeReplWriterPool(numberOfThreads);
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
