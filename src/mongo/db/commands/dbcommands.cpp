@@ -577,8 +577,6 @@ public:
         // - It avoids any accidental changes to critical view-specific properties of the
         //   time-series collection, which are important for maintaining the view-bucket
         //   relationship.
-        // - It disallows hiding/unhiding indexes on the time-series collection due to a
-        //   restriction on system collections. TODO(SERVER-54646): Update this comment.
         //
         // 'timeseriesCmd' is null if the request namespace does not refer to a time-series
         // collection. Otherwise, transforms the user time-series index request to one on the
