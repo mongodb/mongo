@@ -73,6 +73,11 @@ function runTests({withSession}) {
                        " to not have a logical session id: " + func.toString());
         }
 
+        // Explain read concerns are on the inner command.
+        if (cmdName === "explain") {
+            cmdObjSeen = cmdObjSeen[cmdName];
+        }
+
         if (expectedAfterClusterTime) {
             assert(cmdObjSeen.hasOwnProperty("readConcern"),
                    "Expected operation " + tojson(cmdObjSeen) +
