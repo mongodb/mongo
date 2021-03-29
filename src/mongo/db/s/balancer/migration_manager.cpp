@@ -348,11 +348,19 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
-            const auto chunk = cm.findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
+            try {
+                const auto chunk =
+                    cm.findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
 
-            if (chunk.getShardId() != migrationInfo.from) {
-                // Chunk is no longer on the source shard specified by this migration. Erase the
-                // migration recovery document associated with it.
+                if (chunk.getShardId() != migrationInfo.from) {
+                    // Chunk is no longer on the source shard specified by this migration. Erase the
+                    // migration recovery document associated with it.
+                    ScopedMigrationRequest::createForRecovery(opCtx, nss, migrationInfo.minKey);
+                    continue;
+                }
+            } catch (const ExceptionFor<ErrorCodes::ShardKeyNotFound>&) {
+                // The shard key for the collection has changed.
+                // Abandon this migration and remove the document associated with it.
                 ScopedMigrationRequest::createForRecovery(opCtx, nss, migrationInfo.minKey);
                 continue;
             }
