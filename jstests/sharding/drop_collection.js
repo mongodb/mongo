@@ -276,5 +276,57 @@ jsTest.log("Move primary with drop and recreate - new primary own chunks.");
     coll.drop();
 }
 
+jsTest.log(
+    "Test that dropping a non-sharded collection, relevant events are properly logged on CSRS");
+{
+    // Create a non-sharded collection
+    const db = getNewDb();
+    const coll = db['unshardedColl'];
+    assert.commandWorked(coll.insert({x: 1}));
+
+    // Drop the collection
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
+
+    // Verify that the drop collection start event has been logged
+    const startLogCount =
+        configDB.changelog.countDocuments({what: 'dropCollection.start', ns: coll.getFullName()});
+    assert.gte(1, startLogCount, "dropCollection start event not found in changelog");
+
+    // Verify that the drop collection end event has been logged
+    const endLogCount =
+        configDB.changelog.countDocuments({what: 'dropCollection', ms: coll.getFullName()});
+    assert.gte(1, endLogCount, "dropCollection end event not found in changelog");
+}
+
+jsTest.log("Test that dropping a sharded collection, relevant events are properly logged on CSRS");
+{
+    // Create a sharded collection
+    const db = getNewDb();
+    const coll = db['shardedColl'];
+    assert.commandWorked(
+        st.s.adminCommand({enableSharding: db.getName(), primaryShard: st.shard0.shardName}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
+
+    // Distribute the chunks among the shards
+    assert.commandWorked(st.s.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
+    assert.commandWorked(st.s.adminCommand(
+        {moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
+    assert.commandWorked(coll.insert({_id: 10}));
+    assert.commandWorked(coll.insert({_id: -10}));
+
+    // Drop the collection
+    assert.commandWorked(db.runCommand({drop: coll.getName()}));
+
+    // Verify that the drop collection start event has been logged
+    const startLogCount =
+        configDB.changelog.countDocuments({what: 'dropCollection.start', ns: coll.getFullName()});
+    assert.gte(1, startLogCount, "dropCollection start event not found in changelog");
+
+    // Verify that the drop collection end event has been logged
+    const endLogCount =
+        configDB.changelog.countDocuments({what: 'dropCollection', ms: coll.getFullName()});
+    assert.gte(1, endLogCount, "dropCollection end event not found in changelog");
+}
+
 st.stop();
 })();
