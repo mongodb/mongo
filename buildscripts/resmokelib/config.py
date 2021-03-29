@@ -84,6 +84,7 @@ DEFAULTS = {
     "report_failure_status": "fail",
     "report_file": None,
     "run_all_feature_flag_tests": False,
+    "additional_feature_flags": None,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
     "shell_conn_string": None,
@@ -348,6 +349,9 @@ LOGGER_FILE = None
 
 # Where to find the MONGO*_EXECUTABLE binaries
 INSTALL_DIR = None
+
+# Whether to run tests for feature flags.
+RUN_ALL_FEATURE_FLAG_TESTS = None
 
 # The path to the mongo executable used by resmoke.py.
 MONGO_EXECUTABLE = None

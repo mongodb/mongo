@@ -786,6 +786,10 @@ class RunPlugin(PluginInterface):
             "Run MongoDB servers with all feature flags enabled and only run tests tags with these feature flags"
         )
 
+        parser.add_argument("--additionalFeatureFlags", dest="additional_feature_flags",
+                            action="append", metavar="featureFlag1, featureFlag2, ...",
+                            help="Additional feature flags")
+
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,
             description=("Options related to starting a MongoDB cluster that are forwarded from"
