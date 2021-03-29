@@ -331,41 +331,56 @@ Status dropCollection(OperationContext* opCtx,
                     reply);
             }
 
+            auto dropTimeseries = [opCtx, &autoDb, &collectionName, &reply](
+                                      const NamespaceString& bucketNs, bool dropView) {
+                return _abortIndexBuildsAndDrop(
+                    opCtx,
+                    std::move(autoDb),
+                    bucketNs,
+                    [opCtx, dropView, &collectionName, &reply](Database* db,
+                                                               const NamespaceString& bucketsNs) {
+                        if (dropView) {
+                            auto status = _dropView(
+                                opCtx, db, collectionName, reply, true /* clearBucketCatalog */);
+                            if (!status.isOK()) {
+                                return status;
+                            }
+                        }
+
+                        // Drop the buckets collection in its own writeConflictRetry so that if
+                        // it throws a WCE, only the buckets collection drop is retried.
+                        writeConflictRetry(opCtx, "drop", bucketsNs.ns(), [opCtx, db, &bucketsNs] {
+                            WriteUnitOfWork wuow(opCtx);
+                            db->dropCollectionEvenIfSystem(opCtx, bucketsNs).ignore();
+                            wuow.commit();
+                        });
+
+                        return Status::OK();
+                    },
+                    reply,
+                    false /* appendNs */);
+            };
+
             auto view = ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(
                 opCtx, collectionName.ns());
             if (!view) {
+                // Timeseries bucket collection may exist even without the view. If that is the case
+                // delete it.
+                auto bucketsNs = collectionName.makeTimeseriesBucketsNamespace();
+                if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, bucketsNs)) {
+                    return dropTimeseries(bucketsNs, false);
+                }
+
                 Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
                 audit::logDropView(&cc(), collectionName, "", {}, status.code());
                 return status;
             }
 
-            if (!view->timeseries()) {
-                return _dropView(opCtx, db, collectionName, reply);
+            if (view->timeseries()) {
+                return dropTimeseries(view->viewOn(), true);
             }
 
-            return _abortIndexBuildsAndDrop(
-                opCtx,
-                std::move(autoDb),
-                view->viewOn(),
-                [opCtx, &collectionName, &reply](Database* db, const NamespaceString& bucketsNs) {
-                    auto status =
-                        _dropView(opCtx, db, collectionName, reply, true /* clearBucketCatalog */);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-
-                    // Drop the buckets collection in its own writeConflictRetry so that if it
-                    // throws a WCE, only the buckets collection drop is retried.
-                    writeConflictRetry(opCtx, "drop", bucketsNs.ns(), [opCtx, db, &bucketsNs] {
-                        WriteUnitOfWork wuow(opCtx);
-                        db->dropCollectionEvenIfSystem(opCtx, bucketsNs).ignore();
-                        wuow.commit();
-                    });
-
-                    return Status::OK();
-                },
-                reply,
-                false /* appendNs */);
+            return _dropView(opCtx, db, collectionName, reply);
         });
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The shell requires that NamespaceNotFound error codes return the "ns not found"
