@@ -57,6 +57,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
@@ -382,6 +383,48 @@ private:
     BSONObjBuilder* _result;
 };
 
+void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
+                                     const CollectionOptions& oldCollOptions,
+                                     const CollectionPtr& coll,
+                                     const BSONElement& clusteredIndexExpireAfterSeconds) {
+    invariant(oldCollOptions.clusteredIndex.has_value());
+
+    boost::optional<int64_t> oldExpireAfterSeconds =
+        oldCollOptions.clusteredIndex->getExpireAfterSeconds();
+
+    if (clusteredIndexExpireAfterSeconds.type() == mongo::String) {
+        const std::string newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.String();
+        invariant(newExpireAfterSeconds == "off");
+        if (!oldExpireAfterSeconds) {
+            // expireAfterSeconds is already disabled on the clustered index.
+            return;
+        }
+
+        DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
+            opCtx, coll->getCatalogId(), boost::none);
+        return;
+    }
+
+    invariant(clusteredIndexExpireAfterSeconds.type() == mongo::NumberLong);
+    int64_t newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.safeNumberLong();
+    if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
+        // expireAfterSeconds is already the requested value on the clustered index.
+        return;
+    }
+
+    // If this collection was not previously TTL, inform the TTL monitor when we commit.
+    if (!oldExpireAfterSeconds) {
+        auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+        opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
+            ttlCache->registerTTLInfo(uuid, TTLCollectionCache::ClusteredId());
+        });
+    }
+
+    invariant(newExpireAfterSeconds >= 0);
+    DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
+        opCtx, coll->getCatalogId(), newExpireAfterSeconds);
+}
+
 Status _collModInternal(OperationContext* opCtx,
                         const NamespaceString& nss,
                         const BSONObj& cmdObj,
@@ -490,37 +533,8 @@ Status _collModInternal(OperationContext* opCtx,
 
         // Handle collMod operation type appropriately.
         if (clusteredIndexExpireAfterSeconds) {
-            invariant(oldCollOptions.clusteredIndex.has_value());
-
-            [&]() -> void {
-                boost::optional<int64_t> oldExpireAfterSeconds =
-                    oldCollOptions.clusteredIndex->getExpireAfterSeconds();
-
-                if (clusteredIndexExpireAfterSeconds.type() == mongo::String) {
-                    const std::string newExpireAfterSeconds =
-                        clusteredIndexExpireAfterSeconds.String();
-                    invariant(newExpireAfterSeconds == "off");
-                    if (!oldExpireAfterSeconds) {
-                        // expireAfterSeconds is already disabled on the clustered index.
-                        return;
-                    }
-
-                    DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
-                        opCtx, coll->getCatalogId(), boost::none);
-                    return;
-                }
-
-                invariant(clusteredIndexExpireAfterSeconds.type() == mongo::NumberLong);
-                int64_t newExpireAfterSeconds = clusteredIndexExpireAfterSeconds.safeNumberLong();
-                if (oldExpireAfterSeconds && *oldExpireAfterSeconds == newExpireAfterSeconds) {
-                    // expireAfterSeconds is already the requested value on the clustered index.
-                    return;
-                }
-
-                invariant(newExpireAfterSeconds >= 0);
-                DurableCatalog::get(opCtx)->updateClusteredIndexTTLSetting(
-                    opCtx, coll->getCatalogId(), newExpireAfterSeconds);
-            }();
+            _setClusteredExpireAfterSeconds(
+                opCtx, oldCollOptions, coll.getCollection(), clusteredIndexExpireAfterSeconds);
         }
 
         if (indexExpireAfterSeconds || indexHidden) {

@@ -140,5 +140,36 @@ testCase((coll, bucketsColl) => {
     assert.eq(0, bucketsColl.find().itcount());
 });
 
+// Make a collection TTL using collMod. Ensure data expires correctly.
+(function newlyTTLWithCollMod() {
+    const coll = testDB.getCollection('ts');
+    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    assert.commandWorked(testDB.createCollection(coll.getName(), {
+        timeseries: {
+            timeField: timeFieldName,
+            metaField: metaFieldName,
+        }
+    }));
+
+    // Insert two measurements 5 minutes apart that end up in the same bucket and both are older
+    // than the TTL expiry and the maximum bucket range.
+    const maxTime = new Date((new Date()).getTime() - (1000 * defaultBucketMaxRange));
+    const minTime = new Date(maxTime.getTime() - (1000 * 5 * 60));
+    assert.commandWorked(coll.insert({[timeFieldName]: minTime, [metaFieldName]: "localhost"}));
+    assert.commandWorked(coll.insert({[timeFieldName]: maxTime, [metaFieldName]: "localhost"}));
+
+    assert.eq(2, coll.find().itcount());
+    assert.eq(1, bucketsColl.find().itcount());
+
+    // Make the collection TTL and expect the data to be deleted because the bucket minimum is past
+    // the expiry plus the maximum bucket range.
+    assert.commandWorked(testDB.runCommand(
+        {collMod: 'system.buckets.ts', clusteredIndex: {expireAfterSeconds: expireAfterSeconds}}));
+
+    waitForTTL();
+    assert.eq(0, coll.find().itcount());
+    assert.eq(0, bucketsColl.find().itcount());
+})();
+
 MongoRunner.stopMongod(conn);
 })();
