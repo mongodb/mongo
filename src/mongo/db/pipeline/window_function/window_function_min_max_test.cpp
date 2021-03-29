@@ -133,5 +133,23 @@ TEST_F(WindowFunctionMinMaxTest, Ties) {
     ASSERT_VALUE_EQ(max.getValue(), y);
 }
 
+TEST_F(WindowFunctionMinMaxTest, TracksMemoryUsageOnAddAndRemove) {
+    size_t trackingSize = sizeof(WindowFunctionMin);
+    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+
+    auto largeStr = Value{"this is quite a long string"_sd};
+    min.add(largeStr);
+    trackingSize += largeStr.getApproximateSize();
+    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+
+    min.add(largeStr);
+    trackingSize += largeStr.getApproximateSize();
+    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+
+    min.remove(largeStr);
+    trackingSize -= largeStr.getApproximateSize();
+    ASSERT_EQ(min.getApproximateSize(), trackingSize);
+}
+
 }  // namespace
 }  // namespace mongo
