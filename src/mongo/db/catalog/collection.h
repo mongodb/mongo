@@ -565,6 +565,12 @@ public:
     virtual void setMinimumVisibleSnapshot(const Timestamp name) = 0;
 
     /**
+     * Returns the time-series options for this buckets collection, or boost::none if not a
+     * time-series buckets collection.
+     */
+    virtual boost::optional<TimeseriesOptions> getTimeseriesOptions() const = 0;
+
+    /**
      * Get a pointer to the collection's default collator. The pointer must not be used after this
      * Collection is destroyed.
      */

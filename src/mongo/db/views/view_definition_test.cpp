@@ -46,12 +46,12 @@ namespace {
 
 const NamespaceString viewNss("testdb.testview");
 const NamespaceString backingNss("testdb.testcoll");
+const NamespaceString bucketsColl("testdb.system.buckets.testcoll");
 const BSONObj samplePipeline = BSON_ARRAY(BSON("limit" << 9));
-const TimeseriesOptions timeseries("time");
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStrings) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr, boost::none);
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     ASSERT_EQ(viewDef.name(), viewNss);
     ASSERT_EQ(viewDef.viewOn(), backingNss);
 }
@@ -59,12 +59,8 @@ TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStrings) 
 TEST(ViewDefinitionTest, CopyConstructorProperlyClonesAllFields) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    ViewDefinition originalView(viewNss.db(),
-                                viewNss.coll(),
-                                backingNss.coll(),
-                                samplePipeline,
-                                std::move(collator),
-                                timeseries);
+    ViewDefinition originalView(
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView(originalView);
 
     ASSERT_EQ(originalView.name(), copiedView.name());
@@ -75,18 +71,14 @@ TEST(ViewDefinitionTest, CopyConstructorProperlyClonesAllFields) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
     ASSERT(CollatorInterface::collatorsMatch(originalView.defaultCollator(),
                                              copiedView.defaultCollator()));
-    ASSERT(originalView.timeseries()->toBSON().binaryEqual(copiedView.timeseries()->toBSON()));
+    ASSERT_EQ(originalView.timeseries(), copiedView.timeseries());
 }
 
 TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
-    ViewDefinition originalView(viewNss.db(),
-                                viewNss.coll(),
-                                backingNss.coll(),
-                                samplePipeline,
-                                std::move(collator),
-                                timeseries);
+    ViewDefinition originalView(
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView = originalView;
 
     ASSERT_EQ(originalView.name(), copiedView.name());
@@ -97,21 +89,20 @@ TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
     ASSERT(CollatorInterface::collatorsMatch(originalView.defaultCollator(),
                                              copiedView.defaultCollator()));
-    ASSERT(originalView.timeseries()->toBSON().binaryEqual(copiedView.timeseries()->toBSON()));
 }
 
 DEATH_TEST_REGEX(ViewDefinitionTest,
                  SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
                  R"#(Invariant failure.*_viewNss.db\(\) == viewOnNss.db\(\))#") {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr, boost::none);
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     NamespaceString badViewOn("someOtherDb.someOtherCollection");
     viewDef.setViewOn(badViewOn);
 }
 
 TEST(ViewDefinitionTest, SetViewOnSucceedsIfNewViewOnIsInSameDatabaseAsView) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr, boost::none);
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     ASSERT_EQ(viewDef.viewOn(), backingNss);
 
     NamespaceString newViewOn("testdb.othercollection");
@@ -123,7 +114,7 @@ DEATH_TEST_REGEX(ViewDefinitionTest,
                  SetPiplineFailsIfPipelineTypeIsNotArray,
                  R"#(Invariant failure.*pipeline.type\(\) == Array)#") {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr, boost::none);
+        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
 
     // We'll pass in a BSONElement that could be a valid array, but is BSONType::Object rather than
     // BSONType::Array.
@@ -138,8 +129,7 @@ DEATH_TEST_REGEX(ViewDefinitionTest,
 }
 
 TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
-    ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), BSONObj(), nullptr, boost::none);
+    ViewDefinition viewDef(viewNss.db(), viewNss.coll(), backingNss.coll(), BSONObj(), nullptr);
     ASSERT(viewDef.pipeline().empty());
 
     BSONObj matchStage = BSON("match" << BSON("x" << 9));
@@ -157,9 +147,8 @@ TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlySetsTimeseries) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr, timeseries);
+        viewNss.db(), viewNss.coll(), bucketsColl.coll(), samplePipeline, nullptr);
     ASSERT(viewDef.timeseries());
-    ASSERT_EQ(viewDef.timeseries()->getTimeField(), "time");
 }
 }  // namespace
 }  // namespace mongo

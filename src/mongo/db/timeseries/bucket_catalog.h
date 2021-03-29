@@ -180,10 +180,13 @@ public:
      * batch may commit or abort the batch after claiming commit rights. See WriteBatch for more
      * details.
      */
-    StatusWith<std::shared_ptr<WriteBatch>> insert(OperationContext* opCtx,
-                                                   const NamespaceString& ns,
-                                                   const BSONObj& doc,
-                                                   CombineWithInsertsFromOtherClients combine);
+    StatusWith<std::shared_ptr<WriteBatch>> insert(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        const StringData::ComparatorInterface* comparator,
+        const TimeseriesOptions& options,
+        const BSONObj& doc,
+        CombineWithInsertsFromOtherClients combine);
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
@@ -258,7 +261,7 @@ private:
     struct BucketMetadata {
     public:
         BucketMetadata() = default;
-        BucketMetadata(BSONObj&& obj, std::shared_ptr<const ViewDefinition>& view);
+        BucketMetadata(BSONObj&& obj, const StringData::ComparatorInterface* comparator);
 
         bool operator==(const BucketMetadata& other) const;
 
@@ -266,7 +269,7 @@ private:
 
         StringData getMetaField() const;
 
-        const CollatorInterface* getCollator() const;
+        const StringData::ComparatorInterface* getComparator() const;
 
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
@@ -277,7 +280,7 @@ private:
 
     private:
         BSONObj _metadata;
-        std::shared_ptr<const ViewDefinition> _view;
+        const StringData::ComparatorInterface* _comparator;
 
         // This stores the _metadata object with all fields sorted to allow for binary comparisons.
         BSONObj _sorted;

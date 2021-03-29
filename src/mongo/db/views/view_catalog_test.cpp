@@ -121,8 +121,7 @@ public:
             MODE_X);
 
         WriteUnitOfWork wuow(opCtx);
-        Status s =
-            ViewCatalog::createView(opCtx, _db, viewName, viewOn, pipeline, collation, boost::none);
+        Status s = ViewCatalog::createView(opCtx, _db, viewName, viewOn, pipeline, collation);
         wuow.commit();
 
         return s;
@@ -531,13 +530,8 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
             MODE_X);
 
         WriteUnitOfWork wunit(operationContext());
-        ASSERT_OK(ViewCatalog::createView(operationContext(),
-                                          db(),
-                                          viewName,
-                                          viewOn,
-                                          emptyPipeline,
-                                          emptyCollation,
-                                          boost::none));
+        ASSERT_OK(ViewCatalog::createView(
+            operationContext(), db(), viewName, viewOn, emptyPipeline, emptyCollation));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
     auto collectionCatalog = CollectionCatalog::get(operationContext());

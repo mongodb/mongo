@@ -303,6 +303,10 @@ public:
         std::abort();
     }
 
+    boost::optional<TimeseriesOptions> getTimeseriesOptions() const {
+        std::abort();
+    }
+
     const CollatorInterface* getDefaultCollator() const {
         std::abort();
     }

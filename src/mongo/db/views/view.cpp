@@ -41,12 +41,8 @@ ViewDefinition::ViewDefinition(StringData dbName,
                                StringData viewName,
                                StringData viewOnName,
                                const BSONObj& pipeline,
-                               std::unique_ptr<CollatorInterface> collator,
-                               const boost::optional<TimeseriesOptions>& timeseries)
-    : _viewNss(dbName, viewName),
-      _viewOnNss(dbName, viewOnName),
-      _collator(std::move(collator)),
-      _timeseries(timeseries) {
+                               std::unique_ptr<CollatorInterface> collator)
+    : _viewNss(dbName, viewName), _viewOnNss(dbName, viewOnName), _collator(std::move(collator)) {
     for (BSONElement e : pipeline) {
         _pipeline.push_back(e.Obj().getOwned());
     }
@@ -56,15 +52,13 @@ ViewDefinition::ViewDefinition(const ViewDefinition& other)
     : _viewNss(other._viewNss),
       _viewOnNss(other._viewOnNss),
       _collator(CollatorInterface::cloneCollator(other._collator.get())),
-      _pipeline(other._pipeline),
-      _timeseries(other._timeseries) {}
+      _pipeline(other._pipeline) {}
 
 ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
     _viewNss = other._viewNss;
     _viewOnNss = other._viewOnNss;
     _collator = CollatorInterface::cloneCollator(other._collator.get());
     _pipeline = other._pipeline;
-    _timeseries = other._timeseries;
 
     return *this;
 }

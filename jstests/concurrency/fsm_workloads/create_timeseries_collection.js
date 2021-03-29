@@ -63,7 +63,7 @@ var $config = (function() {
             }
 
             collName = getCollectionName(this.prefix, collName, this.tid);
-            db.getCollection(collName).drop();
+            assertAlways(db.getCollection(collName).drop(), "failed to drop " + collName);
         }
 
         return {init: init, create: create, insert: insert, drop: drop};

@@ -31,8 +31,7 @@
 
 #include "mongo/db/timeseries/timeseries_lookup.h"
 
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/views/view_catalog.h"
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo {
 
@@ -40,19 +39,13 @@ namespace timeseries {
 
 boost::optional<TimeseriesOptions> getTimeseriesOptions(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, nss.db());
-    if (!viewCatalog) {
-        return {};
+    auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
+    auto bucketsColl =
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
+    if (!bucketsColl) {
+        return boost::none;
     }
-
-    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, nss.ns());
-    if (!view) {
-        return {};
-    }
-
-    // Return a copy of the time-series options so that we do not refer to the internal state of
-    // 'viewCatalog' after it goes out of scope.
-    return view->timeseries();
+    return bucketsColl->getTimeseriesOptions();
 }
 
 }  // namespace timeseries

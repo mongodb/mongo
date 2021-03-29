@@ -100,13 +100,10 @@ BSONObj BucketCatalog::getMetadata(Bucket* ptr) const {
 StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     OperationContext* opCtx,
     const NamespaceString& ns,
+    const StringData::ComparatorInterface* comparator,
+    const TimeseriesOptions& options,
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
-    invariant(viewCatalog);
-    auto viewDef = viewCatalog->lookup(opCtx, ns.ns());
-    invariant(viewDef);
-    const auto& options = *viewDef->timeseries();
 
     BSONObjBuilder metadata;
     if (auto metaField = options.getMetaField()) {
@@ -116,7 +113,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
             metadata.appendNull(*metaField);
         }
     }
-    auto key = std::make_tuple(ns, BucketMetadata{metadata.obj(), viewDef});
+    auto key = std::make_tuple(ns, BucketMetadata{metadata.obj(), comparator});
 
     auto stats = _getExecutionStats(ns);
     invariant(stats);
@@ -525,8 +522,8 @@ void BucketCatalog::_setIdTimestamp(Bucket* bucket, const Date_t& time) {
 }
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
-                                              std::shared_ptr<const ViewDefinition>& v)
-    : _metadata(obj), _view(v) {
+                                              const StringData::ComparatorInterface* comparator)
+    : _metadata(obj), _comparator(comparator) {
     BSONObjBuilder objBuilder;
     normalizeObject(&objBuilder, _metadata);
     _sorted = objBuilder.obj();
@@ -544,8 +541,8 @@ StringData BucketCatalog::BucketMetadata::getMetaField() const {
     return _metadata.firstElementFieldNameStringData();
 }
 
-const CollatorInterface* BucketCatalog::BucketMetadata::getCollator() const {
-    return _view->defaultCollator();
+const StringData::ComparatorInterface* BucketCatalog::BucketMetadata::getComparator() const {
+    return _comparator;
 }
 
 const OID& BucketCatalog::Bucket::id() const {
@@ -1064,11 +1061,11 @@ void BucketCatalog::WriteBatch::_prepareCommit() {
     for (const auto& doc : _measurements) {
         _bucket->_min.update(doc,
                              _bucket->_metadata.getMetaField(),
-                             _bucket->_metadata.getCollator(),
+                             _bucket->_metadata.getComparator(),
                              std::less<>{});
         _bucket->_max.update(doc,
                              _bucket->_metadata.getMetaField(),
-                             _bucket->_metadata.getCollator(),
+                             _bucket->_metadata.getComparator(),
                              std::greater<>{});
     }
     _bucket->_memoryUsage += _bucket->_min.getMemoryUsage() + _bucket->_max.getMemoryUsage();
