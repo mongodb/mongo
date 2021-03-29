@@ -2,16 +2,16 @@
 
 'use strict';
 
-const conn = MongoRunner.runMongod({auth: ""});
+var conn = MongoRunner.runMongod({auth: ""});
 
-const admin = conn.getDB("admin");
-const errorCodeUnauthorized = 13;
+var admin = conn.getDB("admin");
+var errorCodeUnauthorized = 13;
 
 admin.createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
 
 print("make sure curop, killop, and unlock fail");
 
-let x = admin.currentOp();
+var x = admin.currentOp();
 assert(!("inprog" in x), tojson(x));
 assert.eq(x.code, errorCodeUnauthorized, tojson(x));
 
