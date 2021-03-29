@@ -12184,7 +12184,6 @@ buildvariants:
   - name: .aggregation
 #  - name: .auth
   - name: audit
-  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
@@ -12221,6 +12220,7 @@ buildvariants:
   - name: .watchdog
   - name: .stitch
 # Disabling the following tests as they are not aware of feature flags.
+#  - name: .benchmarks
 #  - name: unittest_shell_hang_analyzer_gen
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
@@ -12343,7 +12343,6 @@ buildvariants:
   - name: .aggregation
   - name: .auth
   - name: audit
-  - name: .benchmarks
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
@@ -12378,6 +12377,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
 # Disabling the following tests as they are not aware of feature flags.
+#  - name: .benchmarks
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
