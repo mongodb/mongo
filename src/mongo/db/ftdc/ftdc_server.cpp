@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mirror_maestro.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -198,7 +199,7 @@ private:
     constexpr static StringData kCommand = "serverStatus"_sd;
 
 public:
-    FTDCServerStatusCommandCollector() {}
+    FTDCServerStatusCommandCollector() : _serverShuttingDown(false) {}
 
     void collect(OperationContext* opCtx, BSONObjBuilder& builder) final {
         // CmdServerStatus
@@ -221,6 +222,11 @@ public:
         commandBuilder.append(MirrorMaestro::kServerStatusSectionName, true);
         commandBuilder.append("tenantMigrationAccessBlocker", false);
 
+        if (_serverShuttingDown) {
+            // Avoid requesting metrics that aren't available during a shutdown.
+            commandBuilder.append("repl", false);
+        }
+
         // Exclude 'serverStatus.transactions.lastCommittedTransactions' because it triggers
         // frequent schema changes.
         commandBuilder.append("transactions", BSON("includeLastCommitted" << false));
@@ -239,12 +245,27 @@ public:
 
         auto request = OpMsgRequest::fromDBAndBody("", commandBuilder.obj());
         auto result = CommandHelpers::runCommandDirectly(opCtx, request);
+
+        Status status = getStatusFromCommandResult(result);
+        if (!status.isOK()) {
+            if (status.isA<ErrorCategory::ShutdownError>()) {
+                _serverShuttingDown = true;
+            } else {
+                // There have been cases in the past where operations like rollback-to-stable would
+                // flip the shutting down flag for internal threads.
+                _serverShuttingDown = false;
+            }
+        }
+
         builder.appendElements(result);
     }
 
     std::string name() const final {
         return kName.toString();
     }
+
+private:
+    bool _serverShuttingDown;
 };
 
 // Register the FTDC system
