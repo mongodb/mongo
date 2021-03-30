@@ -197,10 +197,23 @@ public:
             results.warnings.push_back(
                 "Some checks omitted for speed. use {full:true} option to do more thorough scan.");
         }
-
         result.appendBool("valid", results.valid);
-        result.append("warnings", results.warnings);
-        result.append("errors", results.errors);
+
+        static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
+        auto appendRangeSizeLimited = [&result](StringData fieldName, const auto& values) {
+            std::size_t usedSize = 0;
+            BSONArrayBuilder arr(result.subarrayStart(fieldName));
+            for (auto it = values.begin(), end = values.end();
+                 it != end && usedSize < kMaxErrorWarningSizeBytes;
+                 ++it) {
+                arr.append(*it);
+                usedSize += it->size();
+            }
+        };
+
+        appendRangeSizeLimited("warnings"_sd, results.warnings);
+        appendRangeSizeLimited("errors"_sd, results.errors);
+
         result.append("extraIndexEntries", results.extraIndexEntries);
         result.append("missingIndexEntries", results.missingIndexEntries);
 
