@@ -240,6 +240,9 @@ public:
         auto request = ConfigsvrShardCollectionRequest::parse(
             IDLParserErrorContext("ConfigsvrShardCollectionRequest"), cmdObj);
 
+        audit::logShardCollection(
+            opCtx->getClient(), nss.ns(), request.getKey(), request.getUnique());
+
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const catalogClient = Grid::get(opCtx)->catalogClient();

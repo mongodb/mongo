@@ -93,6 +93,8 @@ public:
         void _internalRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
 
+            audit::logRefineCollectionShardKey(opCtx->getClient(), nss.ns(), request().getKey());
+
             // Set the operation context read concern level to local for reads into the config
             // database.
             repl::ReadConcernArgs::get(opCtx) =
@@ -161,9 +163,6 @@ public:
                   "CMD: refineCollectionShardKey: {request}",
                   "CMD: refineCollectionShardKey",
                   "request"_attr = request().toBSON({}));
-
-            audit::logRefineCollectionShardKey(
-                opCtx->getClient(), nss.ns(), newShardKeyPattern.toBSON());
 
             ShardingCatalogManager::get(opCtx)->refineCollectionShardKey(
                 opCtx, nss, newShardKeyPattern);
