@@ -55,6 +55,7 @@ env.Library(
     ] + platform_libs,
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/rpc/command_status',
     ],
     LIBDEPS_TAGS=[
         'lint-allow-non-alphabetic',
