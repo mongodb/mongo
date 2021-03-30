@@ -28,7 +28,7 @@ The backend interacts with the graph_analyzer to perform queries on various libd
 """
 
 from pathlib import Path
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import flask
 import networkx
@@ -57,7 +57,6 @@ class BackendServer:
         self.socketio.on_event('git_hash_selected', self.git_hash_selected)
         self.socketio.on_event('row_selected', self.row_selected)
 
-        self.current_graph = networkx.DiGraph()
         self.loaded_graphs = {}
         self.current_selected_rows = {}
         self.graphml_dir = Path(graphml_dir)
@@ -65,6 +64,28 @@ class BackendServer:
 
         self.graph_file_tuple = namedtuple('GraphFile', ['version', 'git_hash', 'graph_file'])
         self.graph_files = self.get_graphml_files()
+
+        try:
+            default_selected_graph = list(self.graph_files.items())[0][1].graph_file
+            self.load_graph_from_file(default_selected_graph)
+            self._dependents_graph = networkx.reverse_view(self._dependency_graph)
+        except (IndexError, AttributeError) as ex:
+            print(ex)
+            print(
+                f"Failed to load read a graph file from {list(self.graph_files.items())} for graphml_dir '{self.graphml_dir}'"
+            )
+            exit(1)
+
+    def load_graph_from_file(self, file_path):
+        """Load a graph file from disk and handle version."""
+
+        graph = libdeps.graph.LibdepsGraph(networkx.read_graphml(file_path))
+        if graph.graph['graph_schema_version'] == 1:
+            self._dependents_graph = graph
+            self._dependency_graph = networkx.reverse_view(self._dependents_graph)
+        else:
+            self._dependency_graph = graph
+            self._dependents_graph = networkx.reverse_view(self._dependency_graph)
 
     def get_app(self):
         """Return the app and socketio instances."""
@@ -91,7 +112,7 @@ class BackendServer:
     def get_graphml_files(self):
         """Find all graphml files in the target graphml dir."""
 
-        graph_files = {}
+        graph_files = OrderedDict()
         for graph_file in self.graphml_dir.glob("**/*.graphml"):
             graph_file_tuple = self.get_graph_build_data(graph_file)
             graph_files[graph_file_tuple.git_hash[:7]] = graph_file_tuple
@@ -124,21 +145,21 @@ class BackendServer:
                         str(node),
                     'name':
                         node.name,
-                    'attribs':
-                        [{'name': key, 'value': value}
-                         for key, value in self.current_graph.nodes(data=True)[str(node)].items()],
+                    'attribs': [{
+                        'name': key, 'value': value
+                    } for key, value in self._dependents_graph.nodes(data=True)[str(node)].items()],
                     'dependers': [{
                         'node':
                             depender, 'symbols':
-                                self.current_graph[str(node)][depender].get('symbols',
-                                                                            '').split(' ')
-                    } for depender in self.current_graph[str(node)]],
+                                self._dependents_graph[str(node)][depender].get('symbols',
+                                                                                '').split(' ')
+                    } for depender in self._dependents_graph[str(node)]],
                     'dependencies': [{
                         'node':
                             dependency, 'symbols':
-                                self.current_graph[dependency][str(node)].get('symbols',
-                                                                              '').split(' ')
-                    } for dependency in self.current_graph.rgraph[str(node)]],
+                                self._dependents_graph[dependency][str(node)].get('symbols',
+                                                                                  '').split(' ')
+                    } for dependency in self._dependency_graph[str(node)]],
                 })
 
             self.socketio.emit("node_infos", nodeinfo_data)
@@ -154,18 +175,21 @@ class BackendServer:
             for node, _ in self.current_selected_rows.items():
                 nodes.add(
                     tuple({
-                        'id': str(node), 'name': node.name, 'type': self.current_graph.nodes()
+                        'id': str(node), 'name': node.name, 'type': self._dependents_graph.nodes()
                                                                     [str(node)]['bin_type']
                     }.items()))
 
-                for depender in self.current_graph.rgraph[str(node)]:
+                for depender in self._dependency_graph[str(node)]:
 
                     depender_path = Path(depender)
-                    if self.current_graph[depender][str(node)].get('direct'):
+                    if self._dependents_graph[depender][str(node)].get('direct'):
                         nodes.add(
                             tuple({
-                                'id': str(depender_path), 'name': depender_path.name,
-                                'type': self.current_graph.nodes()[str(depender_path)]['bin_type']
+                                'id':
+                                    str(depender_path), 'name':
+                                        depender_path.name, 'type':
+                                            self._dependents_graph.nodes()[str(depender_path)]
+                                            ['bin_type']
                             }.items()))
                         links.add(
                             tuple({'source': str(node), 'target': str(depender_path)}.items()))
@@ -203,9 +227,9 @@ class BackendServer:
         with self.app.test_request_context():
 
             analysis = libdeps.analyzer.counter_factory(
-                self.current_graph,
+                self._dependents_graph,
                 [name[0] for name in libdeps.analyzer.CountTypes.__members__.items()])
-            ga = libdeps.analyzer.LibdepsGraphAnalysis(libdeps_graph=self.current_graph,
+            ga = libdeps.analyzer.LibdepsGraphAnalysis(libdeps_graph=self._dependents_graph,
                                                        analysis=analysis)
             results = ga.get_results()
 
@@ -223,7 +247,7 @@ class BackendServer:
                 "selectedNodes": [str(node) for node in list(self.current_selected_rows.keys())]
             }
 
-            for node in self.current_graph.nodes():
+            for node in self._dependents_graph.nodes():
                 node_path = Path(node)
                 node_data['graphData']['nodes'].append(
                     {'id': str(node_path), 'name': node_path.name})
@@ -234,20 +258,19 @@ class BackendServer:
 
         with self.app.test_request_context():
 
-            current_hash = self.current_graph.graph.get('git_hash', 'NO_HASH')[:7]
+            current_hash = self._dependents_graph.graph.get('git_hash', 'NO_HASH')[:7]
             if current_hash != message['hash']:
                 self.current_selected_rows = {}
                 if message['hash'] in self.loaded_graphs:
-                    self.current_graph = self.loaded_graphs[message['hash']]
+                    self._dependents_graph = self.loaded_graphs[message['hash']]
+                    self._dependents_graph = networkx.reverse_view(self._dependency_graph)
                 else:
                     print(
                         f'loading new graph {current_hash} because different than {message["hash"]}'
                     )
 
-                    graph = networkx.read_graphml(self.graph_files[message['hash']].graph_file)
-
-                    self.current_graph = libdeps.graph.LibdepsGraph(graph)
-                    self.loaded_graphs[message['hash']] = self.current_graph
+                    self.load_graph_from_file(self.graph_files[message['hash']].graph_file)
+                    self.loaded_graphs[message['hash']] = self._dependents_graph
 
             self.socketio.start_background_task(self.analyze_counts)
             self.socketio.start_background_task(self.send_node_list)
