@@ -16,8 +16,8 @@ import requests
 import click
 import structlog
 
-from evergreen.api import RetryingEvergreenApi, EvergreenApi
 from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
+from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 from buildscripts.resmokelib.multiversionconstants import (LAST_LTS_MONGO_BINARY, REQUIRES_FCV_TAG)
 import buildscripts.util.taskname as taskname

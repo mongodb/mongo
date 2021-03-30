@@ -4,8 +4,8 @@ from itertools import chain
 from typing import Any, Dict, Iterable, Set, Optional, List
 
 import structlog
-from evergreen import EvergreenApi
 from git import DiffIndex, Repo
+from evergreen import EvergreenApi
 
 LOGGER = structlog.get_logger(__name__)
 

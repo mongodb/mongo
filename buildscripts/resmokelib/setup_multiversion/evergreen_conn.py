@@ -2,8 +2,8 @@
 import os
 
 import structlog
-from evergreen import RetryingEvergreenApi
 from requests import HTTPError
+from evergreen import RetryingEvergreenApi
 
 EVERGREEN_HOST = "https://evergreen.mongodb.com"
 EVERGREEN_CONFIG_LOCATIONS = (

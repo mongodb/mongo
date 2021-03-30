@@ -8,9 +8,9 @@ from typing import Any, Dict, List
 
 import click
 
-from evergreen.api import RetryingEvergreenApi, EvergreenApi
 from git import Repo
 from shrub.v2 import ShrubProject, BuildVariant, ExistingTask
+from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 
