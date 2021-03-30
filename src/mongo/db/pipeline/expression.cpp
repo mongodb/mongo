@@ -7187,6 +7187,86 @@ void ExpressionDateTrunc::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
+/* -------------------------- ExpressionGetField ------------------------------ */
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(getField,
+                                         ExpressionGetField::parse,
+                                         feature_flags::gFeatureFlagDotsAndDollars);
+
+intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const expCtx,
+                                                    BSONElement expr,
+                                                    const VariablesParseState& vps) {
+    boost::intrusive_ptr<Expression> fieldExpr;
+    boost::intrusive_ptr<Expression> fromExpr;
+
+    if (expr.type() == BSONType::Object) {
+        for (auto&& elem : expr.embeddedObject()) {
+            const auto fieldName = elem.fieldNameStringData();
+            if (!fieldExpr && !fromExpr && fieldName[0] == '$') {
+                // This may be an expression, so we should treat it as such.
+                fieldExpr = Expression::parseOperand(expCtx, expr, vps);
+                fromExpr = ExpressionFieldPath::parse(expCtx, "$$ROOT", vps);
+                break;
+            } else if (fieldName == "field"_sd) {
+                fieldExpr = Expression::parseOperand(expCtx, elem, vps);
+            } else if (fieldName == "from"_sd) {
+                fromExpr = Expression::parseOperand(expCtx, elem, vps);
+            } else {
+                uasserted(3041701,
+                          str::stream()
+                              << kExpressionName << " found an unknown argument: " << fieldName);
+            }
+        }
+    } else {
+        fieldExpr = Expression::parseOperand(expCtx, expr, vps);
+        fromExpr = ExpressionFieldPath::parse(expCtx, "$$ROOT", vps);
+    }
+
+    uassert(3041702,
+            str::stream() << kExpressionName << " requires 'field' to be specified",
+            fieldExpr);
+    uassert(
+        3041703, str::stream() << kExpressionName << " requires 'from' to be specified", fromExpr);
+
+    return make_intrusive<ExpressionGetField>(expCtx, fieldExpr, fromExpr);
+}
+
+Value ExpressionGetField::evaluate(const Document& root, Variables* variables) const {
+    auto fieldValue = _field->evaluate(root, variables);
+    if (fieldValue.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    auto fromValue = _from->evaluate(root, variables);
+    if (fromValue.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(3041704,
+            str::stream() << kExpressionName << " requires 'field' to evaluate to type String",
+            fieldValue.getType() == BSONType::String);
+
+    uassert(3041705,
+            str::stream() << kExpressionName << " requires 'from' to evaluate to type Object",
+            fromValue.getType() == BSONType::Object);
+
+    return fromValue.getDocument().getField(fieldValue.getString());
+}
+
+intrusive_ptr<Expression> ExpressionGetField::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+void ExpressionGetField::_doAddDependencies(DepsTracker* deps) const {
+    _from->addDependencies(deps);
+    _field->addDependencies(deps);
+}
+
+Value ExpressionGetField::serialize(const bool explain) const {
+    return Value(Document{{"$getField"_sd,
+                           Document{{"field"_sd, _field->serialize(explain)},
+                                    {"from"_sd, _from->serialize(explain)}}}});
+}
+
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
     // defined by REGISTER_EXPRESSION / REGISTER_EXPRESSION_WITH_MIN_VERSION.

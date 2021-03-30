@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/intrusive_counter.h"
@@ -75,6 +76,25 @@ class DocumentSource;
         addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
     (InitializerContext*) {                                                   \
         Expression::registerExpression("$" #key, (parser), boost::none);      \
+    }
+
+/**
+ * Registers a Parser so it can be called from parseExpression and friends (but only if
+ * 'featureFlag' is enabled).
+ *
+ * As an example, if your expression looks like {"$foo": [1,2,3]} and should be flag-guarded by
+ * feature_flags::gFoo, you would add this line:
+ * REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(foo, ExpressionFoo::parse, feature_flags::gFoo);
+ *
+ * An expression registered this way can be used in any featureCompatibilityVersion.
+ */
+#define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(key, parser, featureFlag)    \
+    MONGO_INITIALIZER_GENERAL(                                                \
+        addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
+    (InitializerContext*) {                                                   \
+        if (featureFlag.isEnabledAndIgnoreFCV()) {                            \
+            Expression::registerExpression("$" #key, (parser), boost::none);  \
+        }                                                                     \
     }
 
 /**
@@ -3471,5 +3491,47 @@ private:
     // First/start day of the week to use for date truncation when the time unit is the week.
     // Accepted BSON type: String. If not specified, "sunday" is used.
     boost::intrusive_ptr<Expression>& _startOfWeek;
+};
+
+class ExpressionGetField final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    /**
+     * Constructs a $getField expression where 'field' is an expression resolving to a string Value
+     * (or null) and 'from' is an expression resolving to an object Value (or null).
+     *
+     * If either 'field' or 'from' is nullish, $getField evaluates to null. Furthermore, if 'from'
+     * does not contain 'field', then $getField returns missing.
+     */
+    ExpressionGetField(ExpressionContext* const expCtx,
+                       boost::intrusive_ptr<Expression> field,
+                       boost::intrusive_ptr<Expression> from)
+        : Expression(expCtx, {std::move(field), std::move(from)}),
+          _field(_children[0]),
+          _from(_children[1]) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value serialize(const bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    boost::intrusive_ptr<Expression> optimize() final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    static constexpr auto kExpressionName = "$getField"_sd;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final override;
+
+private:
+    boost::intrusive_ptr<Expression>& _field;
+    boost::intrusive_ptr<Expression>& _from;
 };
 }  // namespace mongo

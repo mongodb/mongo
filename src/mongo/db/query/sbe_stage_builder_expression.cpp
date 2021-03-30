@@ -485,6 +485,7 @@ public:
     void visit(ExpressionToHashedIndexKey* expr) final {}
     void visit(ExpressionDateAdd* expr) final {}
     void visit(ExpressionDateSubtract* expr) final {}
+    void visit(ExpressionGetField* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -684,6 +685,7 @@ public:
     void visit(ExpressionToHashedIndexKey* expr) final {}
     void visit(ExpressionDateAdd* expr) final {}
     void visit(ExpressionDateSubtract* expr) final {}
+    void visit(ExpressionGetField* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -2645,6 +2647,10 @@ public:
 
     void visit(ExpressionDateSubtract* expr) final {
         generateDateArithmeticsExpression(expr, "dateSubtract");
+    }
+
+    void visit(ExpressionGetField* expr) final {
+        unsupportedExpression("$getField");
     }
 
 private:

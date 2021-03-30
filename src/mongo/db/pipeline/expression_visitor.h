@@ -157,6 +157,7 @@ class ExpressionDateDiff;
 class ExpressionDateAdd;
 class ExpressionDateSubtract;
 class ExpressionDateTrunc;
+class ExpressionGetField;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -311,6 +312,7 @@ public:
     virtual void visit(ExpressionToHashedIndexKey*) = 0;
     virtual void visit(ExpressionDateAdd*) = 0;
     virtual void visit(ExpressionDateSubtract*) = 0;
+    virtual void visit(ExpressionGetField*) = 0;
 };
 
 }  // namespace mongo
