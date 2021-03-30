@@ -198,21 +198,15 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (!status.isOK() &&
-                (status.isA<ErrorCategory::NotPrimaryError>() ||
-                 status.isA<ErrorCategory::ShutdownError>())) {
-                LOGV2_DEBUG(5390506,
-                            1,
-                            "Drop collection coordinator has been interrupted and "
-                            " will continue on the next elected replicaset primary",
-                            "namespace"_attr = nss(),
-                            "error"_attr = status);
-                return;
-            }
-
             if (status.isOK()) {
-                LOGV2_DEBUG(5390503, 1, "Collection dropped", "namespace"_attr = nss());
+                LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
             } else {
+                // Do not remove the coordinator document if we have a stepdown related error.
+                if (status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::ShutdownError>()) {
+                    uassertStatusOK(status);
+                }
+
                 LOGV2_ERROR(5280901,
                             "Error running drop collection",
                             "namespace"_attr = nss(),
@@ -222,10 +216,12 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
             try {
                 _removeStateDocument();
             } catch (DBException& ex) {
+                LOGV2_WARNING(5390506, "Failed to remove coordinator", "error"_attr = redact(ex));
                 ex.addContext("Failed to remove drop collection coordinator state document"_sd);
                 throw;
             }
 
+            // TODO SERVER-55396: retry operation until it succeeds.
             uassertStatusOK(status);
         });
 }

@@ -340,39 +340,30 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     ShardingCatalogClient::kMajorityWriteConcern);
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (!status.isOK() &&
-                (status.isA<ErrorCategory::NotPrimaryError>() ||
-                 status.isA<ErrorCategory::ShutdownError>())) {
-                LOGV2_DEBUG(5460503,
-                            1,
-                            "Rename collection coordinator has been interrupted and "
-                            " will continue on the next elected replicaset primary",
-                            "fromNs"_attr = nss(),
-                            "toNs"_attr = _doc.getTo(),
-                            "error"_attr = status);
-                return;
-            }
-
             if (status.isOK()) {
-                LOGV2_DEBUG(5460504,
-                            1,
-                            "Collection renamed",
-                            "fromNs"_attr = nss(),
-                            "toNs"_attr = _doc.getTo());
+                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
             } else {
+                // Do not remove the coordinator document if we have a stepdown related error.
+                if (status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::ShutdownError>()) {
+                    uassertStatusOK(status);
+                }
+
                 LOGV2_ERROR(5460505,
                             "Error running rename collection",
-                            "fromNs"_attr = nss(),
-                            "toNs"_attr = _doc.getTo(),
+                            "namespace"_attr = nss(),
                             "error"_attr = redact(status));
             }
+
             try {
                 _removeStateDocument();
             } catch (DBException& ex) {
-                ex.addContext("Failed to remove rename collection coordinator state document");
+                LOGV2_WARNING(5460503, "Failed to remove coordinator", "error"_attr = redact(ex));
+                ex.addContext("Failed to remove rename collection coordinator state document"_sd);
                 throw;
             }
 
+            // TODO SERVER-55396: retry operation until it succeeds.
             uassertStatusOK(status);
         });
 }
