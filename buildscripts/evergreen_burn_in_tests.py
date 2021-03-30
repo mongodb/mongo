@@ -10,9 +10,9 @@ from typing import Optional, List, Dict, Set
 import click
 import requests
 import structlog
-from evergreen import RetryingEvergreenApi, EvergreenApi
 from git import Repo
 from shrub.v2 import ShrubProject, BuildVariant, Task, TaskDependency, ExistingTask
+from evergreen import RetryingEvergreenApi, EvergreenApi
 
 from buildscripts.burn_in_tests import RepeatConfig, BurnInExecutor, TaskInfo, FileChangeDetector, \
     DEFAULT_REPO_LOCATIONS, BurnInOrchestrator

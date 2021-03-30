@@ -2,9 +2,9 @@
 # pylint: disable=missing-docstring,too-many-arguments
 import unittest
 
-from evergreen import RetryingEvergreenApi
 from mock import patch
 from requests import HTTPError
+from evergreen import RetryingEvergreenApi
 
 from buildscripts.resmokelib.setup_multiversion import evergreen_conn
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig

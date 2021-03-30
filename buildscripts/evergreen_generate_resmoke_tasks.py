@@ -23,10 +23,10 @@ import requests
 import structlog
 import yaml
 
-from evergreen.api import EvergreenApi, RetryingEvergreenApi
 from pydantic.main import BaseModel
 
 from shrub.v2 import Task, TaskDependency, BuildVariant, ExistingTask, ShrubProject
+from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
