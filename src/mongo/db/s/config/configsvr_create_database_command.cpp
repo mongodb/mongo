@@ -78,6 +78,8 @@ public:
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Enable sharding can only be set to `true`",
                         *request().getEnableSharding());
+
+                audit::logEnableSharding(opCtx->getClient(), dbname);
             }
 
             auto dbt = ShardingCatalogManager::get(opCtx)->createDatabase(

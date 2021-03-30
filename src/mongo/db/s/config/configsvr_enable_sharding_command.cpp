@@ -115,7 +115,7 @@ public:
                            : boost::optional<ShardId>(),
             true);
 
-        audit::logEnableSharding(Client::getCurrent(), dbname);
+        audit::logEnableSharding(opCtx->getClient(), dbname);
 
         return true;
     }

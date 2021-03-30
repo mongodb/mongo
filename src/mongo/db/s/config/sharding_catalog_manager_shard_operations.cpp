@@ -802,6 +802,7 @@ BSONObj makeCommitRemoveShardCommand(const std::string& removedShardName,
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
                                                         const ShardId& shardId) {
     const auto name = shardId.toString();
+    audit::logRemoveShard(opCtx->getClient(), name);
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
@@ -907,7 +908,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Draining is done, now finish removing the shard.
     LOGV2(
         21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
-    audit::logRemoveShard(opCtx->getClient(), name);
 
     // Find a controlShard to be updated.
     auto controlShardQueryStatus =
