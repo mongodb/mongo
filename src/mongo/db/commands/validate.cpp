@@ -186,8 +186,22 @@ public:
         if (validateResults.readTimestamp) {
             result.append("readTimestamp", validateResults.readTimestamp.get());
         }
-        result.append("warnings", validateResults.warnings);
-        result.append("errors", validateResults.errors);
+
+        static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
+        auto appendRangeSizeLimited = [&result](StringData fieldName, const auto& values) {
+            std::size_t usedSize = 0;
+            BSONArrayBuilder arr(result.subarrayStart(fieldName));
+            for (auto it = values.begin(), end = values.end();
+                 it != end && usedSize < kMaxErrorWarningSizeBytes;
+                 ++it) {
+                arr.append(*it);
+                usedSize += it->size();
+            }
+        };
+
+        appendRangeSizeLimited("warnings"_sd, validateResults.warnings);
+        appendRangeSizeLimited("errors"_sd, validateResults.errors);
+
         result.append("extraIndexEntries", validateResults.extraIndexEntries);
         result.append("missingIndexEntries", validateResults.missingIndexEntries);
 
