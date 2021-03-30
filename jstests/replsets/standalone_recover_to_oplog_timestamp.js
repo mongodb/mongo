@@ -14,7 +14,7 @@
 "use strict";
 
 const dbName = "test";
-const collName = "foo";
+const collName = jsTestName();
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -32,7 +32,9 @@ assert.commandWorked(primaryDB.adminCommand({
     "data": {"timestamp": recoveryTimestamp}
 }));
 
-const docs = [{_id: 1}];
+assert.commandWorked(primaryDB.getCollection(collName).createIndex({a: 1}));
+
+const docs = [{_id: 1, a: 1}];
 const operationTime =
     assert.commandWorked(primaryDB.runCommand({insert: collName, documents: docs})).operationTime;
 
