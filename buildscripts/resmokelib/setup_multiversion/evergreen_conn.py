@@ -3,6 +3,7 @@ import os
 
 import structlog
 from requests import HTTPError
+
 from evergreen import RetryingEvergreenApi
 
 EVERGREEN_HOST = "https://evergreen.mongodb.com"
@@ -121,8 +122,6 @@ def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name):
             # Only set the compile task if there isn't one already, otherwise
             # newer tasks like "archive_dist_test_debug" take precedence.
             if evg_task.display_name in ("compile", "archive_dist_test") and compile_task is None:
-                compile_task = evg_task
-            elif evg_task.display_name == "archive_dist_test_debug":
                 compile_task = evg_task
             elif evg_task.display_name == "push":
                 push_task = evg_task
