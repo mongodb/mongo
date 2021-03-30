@@ -1,8 +1,4 @@
 // test compound sorting
-// TODO SERVER-50370: remove sbe_incompatible tag
-// @tags: [
-//   sbe_incompatible,
-// ]
 var t = db.sort5;
 t.drop();
 

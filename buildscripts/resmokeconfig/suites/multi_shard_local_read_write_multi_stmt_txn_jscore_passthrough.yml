@@ -301,6 +301,7 @@ selector:
   # Cannot retry a getMore command if a transient transaction or network error occurs during
   # it, since we won't know whether the cursor was advanced or not.
   - requires_getmore
+  - does_not_support_transactions
   # Transaction-continuing commands cannot specify API parameters, so tests that use API parameters
   # cannot be run with transactions.
   - uses_api_parameters

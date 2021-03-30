@@ -202,14 +202,20 @@ inline auto makeConstant(StringData str) {
     return sbe::makeE<sbe::EConstant>(tag, value);
 }
 
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId,
-                                               boost::optional<sbe::FrameId> frameId = {});
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId);
+
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
 /**
- * Check if expression returns Nothing and return null if so. Otherwise, return the
- * expression.
+ * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
  */
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e);
+
+/**
+ * Check if expression returns Nothing and return bsonUndefined if so. Otherwise, return the
+ * expression.
+ */
+std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e);
 
 /**
  * Check if expression returns an array and return Nothing if so. Otherwise, return the expression.

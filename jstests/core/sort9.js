@@ -1,8 +1,4 @@
 // Unindexed array sorting SERVER-2884
-// TODO SERVER-50370: remove sbe_incompatible tag
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_sort9;
 t.drop();

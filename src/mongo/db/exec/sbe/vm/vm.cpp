@@ -41,9 +41,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
@@ -2845,6 +2847,34 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGetRegexFlags(A
     return {true, strType, strValue};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [ssOwned, ssTag, ssVal] = getFromStack(0);
+    auto [objOwned, objTag, objVal] = getFromStack(1);
+    if (ssTag != value::TypeTags::sortSpec || !value::isObject(objTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto ss = value::getSortSpecView(ssVal);
+
+    auto obj = [objTag = objTag, objVal = objVal]() {
+        if (objTag == value::TypeTags::bsonObject) {
+            return BSONObj{value::bitcastTo<const char*>(objVal)};
+        } else if (objTag == value::TypeTags::Object) {
+            BSONObjBuilder objBuilder;
+            bson::convertToBsonObj(objBuilder, value::getObjectView(objVal));
+            return objBuilder.obj();
+        } else {
+            MONGO_UNREACHABLE_TASSERT(5037004);
+        }
+    }();
+
+    return {true,
+            value::TypeTags::ksValue,
+            value::bitcastFrom<KeyString::Value*>(new KeyString::Value(ss->generateSortKey(obj)))};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {
     invariant(arity == 1);
     auto [inputOwned, inputType, inputVal] = getFromStack(0);
@@ -3130,6 +3160,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinGetRegexFlags(arity);
         case Builtin::ftsMatch:
             return builtinFtsMatch(arity);
+        case Builtin::generateSortKey:
+            return builtinGenerateSortKey(arity);
     }
 
     MONGO_UNREACHABLE;

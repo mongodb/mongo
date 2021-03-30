@@ -83,18 +83,6 @@ public:
                  boost::optional<RecordId> id = boost::none) const;
 
 private:
-    const KeyString::Version _keyStringVersion;
-    const Ordering _ordering;
-    // These are used by getKeys below.
-    const std::vector<const char*> _fieldNames;
-    const bool _isIdIndex;
-    const bool _isSparse;
-    const KeyString::Value _nullKeyString;  // A full key with all fields null.
-    // True if any of the indexed paths contains a positional path component. This prohibits the key
-    // generator from using the non-multikey fast path.
-    bool _pathsContainPositionalComponent{false};
-
-    std::vector<BSONElement> _fixed;
     /**
      * Stores info regarding traversal of a positional path. A path through a document is
      * considered positional if this path element names an array element. Generally this means
@@ -232,6 +220,22 @@ private:
                              boost::optional<RecordId> id) const;
 
     KeyString::Value _buildNullKeyString() const;
+
+    const KeyString::Version _keyStringVersion;
+
+    const bool _isIdIndex;
+    const bool _isSparse;
+    // True if any of the indexed paths contains a positional path component. This prohibits the key
+    // generator from using the non-multikey fast path.
+    bool _pathsContainPositionalComponent{false};
+
+    const Ordering _ordering;
+
+    // These are used by getKeys below.
+    const std::vector<const char*> _fieldNames;
+    const KeyString::Value _nullKeyString;  // A full key with all fields null.
+
+    std::vector<BSONElement> _fixed;
 
     const std::vector<PositionalPathInfo> _emptyPositionalInfo;
 
