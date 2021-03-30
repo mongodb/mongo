@@ -1274,7 +1274,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
 }
 
 /**
- * A helper for the bultinDate method. The formal parameters yearOrWeekYear and monthOrWeek carry
+ * A helper for the builtinDate method. The formal parameters yearOrWeekYear and monthOrWeek carry
  * values depending on wether the date is a year-month-day or ISOWeekYear.
  */
 using DateFn = std::function<Date_t(
@@ -1720,6 +1720,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(
     if (value::isString(operandTag)) {
         topStack(false, value::TypeTags::Nothing, 0);
         return {operandOwn, operandTag, operandVal};
+    }
+
+    if (operandTag == value::TypeTags::bsonSymbol) {
+        // Values of type StringBig and Values of type bsonSymbol have identical representations,
+        // so we can simply take ownership of the argument, change the type tag to StringBig, and
+        // return it.
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {operandOwn, value::TypeTags::StringBig, operandVal};
     }
 
     switch (operandTag) {
@@ -2476,11 +2484,11 @@ std::tuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
     value::TypeTags typeTagInputStr,
     value::Value valueInputStr,
     bool isMatch) {
-    if (!value::isString(typeTagInputStr) || !value::isPcreRegex(typeTagPcreRegex)) {
+    if (!value::isStringOrSymbol(typeTagInputStr) || !value::isPcreRegex(typeTagPcreRegex)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto inputString = value::getStringView(typeTagInputStr, valueInputStr);
+    auto inputString = value::getStringOrSymbolView(typeTagInputStr, valueInputStr);
     auto pcreRegex = value::getPcreRegexView(valuePcreRegex);
 
     return pcreFirstMatch(pcreRegex, inputString, isMatch);
@@ -2497,9 +2505,8 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
 
     // For strings, call CollatorInterface::getComparisonKey() to obtain the comparison key.
     if (value::isString(tag)) {
-        auto compKey = collator->getComparisonKey(value::getStringView(tag, val));
-        auto keyData = compKey.getKeyData();
-        return value::makeNewString(keyData);
+        return value::makeNewString(
+            collator->getComparisonKey(value::getStringView(tag, val)).getKeyData());
     }
 
     // For collatable types other than strings (such as arrays and objects), we take the slow

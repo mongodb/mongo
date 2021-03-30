@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-/**
- * This file contains tests for sbe::value::writeValueToStream.
- */
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
+/**
+ * This file contains tests for sbe::value::writeValueToStream.
+ */
 TEST(ValueSerializeForSorter, Serialize) {
     auto [testDataTag, testDataVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard testDataGuard{testDataTag, testDataVal};
@@ -58,13 +59,13 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back(value::TypeTags::MaxKey, 0);
     testData->push_back(value::TypeTags::bsonUndefined, 0);
 
-    StringData smallString = "perfect";
+    StringData smallString = "perfect"_sd;
     invariant(sbe::value::canUseSmallString(smallString));
-    StringData bigString = "too big string to fit into value";
+    StringData bigString = "too big string to fit into value"_sd;
     invariant(!sbe::value::canUseSmallString(bigString));
-    StringData smallStringWithNull = "a\0b";
+    StringData smallStringWithNull = "a\0b"_sd;
     invariant(smallStringWithNull.size() <= sbe::value::kSmallStringMaxLength);
-    StringData bigStringWithNull = "too big string \0 to fit into value";
+    StringData bigStringWithNull = "too big string \0 to fit into value"_sd;
     invariant(bigStringWithNull.size() > sbe::value::kSmallStringMaxLength);
 
     std::vector<StringData> stringCases = {
@@ -72,15 +73,21 @@ TEST(ValueSerializeForSorter, Serialize) {
         smallStringWithNull,
         bigString,
         bigStringWithNull,
-        "",
-        "a",
-        "a\0",
-        "\0",
-        "\0\0\0",
+        ""_sd,
+        "a"_sd,
+        "a\0"_sd,
+        "\0"_sd,
+        "\0\0\0"_sd,
     };
+
     for (const auto& stringCase : stringCases) {
         auto [stringTag, stringVal] = value::makeNewString(stringCase);
         testData->push_back(stringTag, stringVal);
+    }
+
+    for (const auto& stringCase : stringCases) {
+        auto [symbolTag, symbolVal] = value::makeNewBsonSymbol(stringCase);
+        testData->push_back(symbolTag, symbolVal);
     }
 
     auto [objectTag, objectVal] = value::makeNewObject();
@@ -118,7 +125,6 @@ TEST(ValueSerializeForSorter, Serialize) {
         value::TypeTags::bsonObject, value::bitcastFrom<const char*>(bson["obj"].value()));
     testData->push_back(bsonObjTag, bsonObjVal);
 
-
     auto [bsonArrayTag, bsonArrayVal] = value::copyValue(
         value::TypeTags::bsonArray, value::bitcastFrom<const char*>(bson["arr"].value()));
     testData->push_back(bsonArrayTag, bsonArrayVal);
@@ -141,11 +147,11 @@ TEST(ValueSerializeForSorter, Serialize) {
     testData->push_back(keyStringTag, keyStringVal);
 
     auto [plainCodeTag, plainCodeVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }");
+        value::makeCopyBsonJavascript("function test() { return 'Hello world!'; }"_sd);
     testData->push_back(value::TypeTags::bsonJavascript, plainCodeVal);
 
     auto [codeWithNullTag, codeWithNullVal] =
-        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }");
+        value::makeCopyBsonJavascript("function test() { return 'Danger\0us!'; }"_sd);
     testData->push_back(value::TypeTags::bsonJavascript, codeWithNullVal);
 
     auto regexBson =
@@ -158,6 +164,10 @@ TEST(ValueSerializeForSorter, Serialize) {
             value::TypeTags::bsonRegex, value::bitcastFrom<const char*>(element.value()));
         testData->push_back(copyTag, copyVal);
     }
+
+    auto [dbpointerTag, dbpointerVal] = value::makeNewBsonDBPointer(
+        "db.c", value::ObjectIdType{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}.data());
+    testData->push_back(dbpointerTag, dbpointerVal);
 
     value::MaterializedRow originalRow{testData->size()};
     for (size_t i = 0; i < testData->size(); i++) {

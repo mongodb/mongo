@@ -82,9 +82,11 @@ TEST_F(SBEKeyStringTest, Basic) {
     APPEND_TWICE(bob, "decimalNegativeInfinity", Decimal128::kNegativeInfinity);
     APPEND_TWICE(bob, "shortString", "str");
     APPEND_TWICE(bob, "longString", "I am the very model of a modern major general.");
+    APPEND_TWICE(bob, "symbol", BSONSymbol("I am the very model of a modern major general."));
     APPEND_TWICE(bob, "date", Date_t::fromMillisSinceEpoch(123));
     APPEND_TWICE(bob, "timestamp", Timestamp(123));
     APPEND_TWICE(bob, "binData", BSONBinData("\xde\xad\xbe\xef", 4, BinDataGeneral));
+    APPEND_TWICE(bob, "dbref", BSONDBRef("db.c", OID("010203040506070809101112")));
 
     bob.appendNull("null-ascending");
     bob.appendNull("null-descending");

@@ -75,10 +75,9 @@ std::pair<value::TypeTags, value::Value> genericCompare(
             default:
                 MONGO_UNREACHABLE;
         }
-    } else if (isString(lhsTag) && isString(rhsTag)) {
-        auto lhsStr = getStringView(lhsTag, lhsValue);
-        auto rhsStr = getStringView(rhsTag, rhsValue);
-
+    } else if (isStringOrSymbol(lhsTag) && isStringOrSymbol(rhsTag)) {
+        auto lhsStr = value::getStringOrSymbolView(lhsTag, lhsValue);
+        auto rhsStr = value::getStringOrSymbolView(rhsTag, rhsValue);
         auto result =
             op(comparator ? comparator->compare(lhsStr, rhsStr) : lhsStr.compare(rhsStr), 0);
 
@@ -123,13 +122,32 @@ std::pair<value::TypeTags, value::Value> genericCompare(
             ? value::getObjectIdView(rhsValue)->data()
             : value::bitcastTo<uint8_t*>(rhsValue);
         auto threeWayResult = memcmp(lhsObjId, rhsObjId, sizeof(value::ObjectIdType));
-        auto booleanResult = op(threeWayResult, 0);
-        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(booleanResult)};
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
     } else if (lhsTag == value::TypeTags::bsonRegex && rhsTag == value::TypeTags::bsonRegex) {
         auto lhsRegex = value::getBsonRegexView(lhsValue);
         auto rhsRegex = value::getBsonRegexView(rhsValue);
-        auto result = op(lhsRegex.dataView(), rhsRegex.dataView());
-        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+
+        if (auto threeWayResult = lhsRegex.pattern.compare(rhsRegex.pattern); threeWayResult != 0) {
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
+        }
+
+        auto threeWayResult = lhsRegex.flags.compare(rhsRegex.flags);
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
+    } else if (lhsTag == value::TypeTags::bsonDBPointer &&
+               rhsTag == value::TypeTags::bsonDBPointer) {
+        auto lhsDBPtr = value::getBsonDBPointerView(lhsValue);
+        auto rhsDBPtr = value::getBsonDBPointerView(rhsValue);
+        if (lhsDBPtr.ns.size() != rhsDBPtr.ns.size()) {
+            return {value::TypeTags::Boolean,
+                    value::bitcastFrom<bool>(op(lhsDBPtr.ns.size(), rhsDBPtr.ns.size()))};
+        }
+
+        if (auto threeWayResult = lhsDBPtr.ns.compare(rhsDBPtr.ns); threeWayResult != 0) {
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
+        }
+
+        auto threeWayResult = memcmp(lhsDBPtr.id, rhsDBPtr.id, sizeof(value::ObjectIdType));
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
     }
 
     return {value::TypeTags::Nothing, 0};
