@@ -526,9 +526,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             if (status.isOK()) {
                 LOGV2(5458701, "Collection created", "namespace"_attr = nss());
             } else {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+
                 // Do not remove the coordinator document if we have a stepdown related error.
-                if (status.isA<ErrorCategory::NotPrimaryError>() ||
-                    status.isA<ErrorCategory::ShutdownError>()) {
+                if (repl::ReplicationCoordinator::get(opCtx)->getMemberState() !=
+                        repl::MemberState::RS_PRIMARY &&
+                    (status.isA<ErrorCategory::NotPrimaryError>() ||
+                     status.isA<ErrorCategory::ShutdownError>())) {
                     uassertStatusOK(status);
                 }
 
