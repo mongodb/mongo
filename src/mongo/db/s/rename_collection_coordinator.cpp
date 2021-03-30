@@ -72,28 +72,16 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(const BSONObj& initialS
           IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)) {}
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
-    // TODO SERVER-55597 simply compare the `request` nested objects
     const auto otherDoc = RenameCollectionCoordinatorDocument::parse(
         IDLParserErrorContext("RenameCollectionCoordinatorDocument"), doc);
 
-    bool compatible = _doc.getTo() == otherDoc.getTo() &&
-        _doc.getDropTarget() == otherDoc.getDropTarget() &&
-        _doc.getStayTemp() == otherDoc.getStayTemp();
+    const auto& selfReq = _doc.getRenameCollectionRequest().toBSON();
+    const auto& otherReq = otherDoc.getRenameCollectionRequest().toBSON();
 
-    if (!compatible) {
-        auto getConflictingFields = [](const RenameCollectionCoordinatorDocument& d) {
-            BSONObjBuilder bob;
-            bob.append(d.kToFieldName, d.getTo().ns());
-            bob.append(d.kDropTargetFieldName, d.getDropTarget());
-            bob.append(d.kStayTempFieldName, d.getStayTemp());
-            return bob.obj();
-        };
-
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  str::stream() << "Detected conflict in RenameCollectionCoordinator: `"
-                                << getConflictingFields(_doc) << "` conflicts with `"
-                                << getConflictingFields(otherDoc) << "`.");
-    }
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Another rename collection for namespace " << nss()
+                          << "is being executed with different parameters: " << selfReq,
+            SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
 std::vector<DistLockManager::ScopedDistLock> RenameCollectionCoordinator::_acquireAdditionalLocks(
@@ -263,9 +251,8 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // - Locally rename source to target
                 ShardsvrRenameCollectionParticipant renameCollParticipantRequest(fromNss);
                 renameCollParticipantRequest.setDbName(fromNss.db());
-                renameCollParticipantRequest.setDropTarget(_doc.getDropTarget());
-                renameCollParticipantRequest.setStayTemp(_doc.getStayTemp());
-                renameCollParticipantRequest.setTo(_doc.getTo());
+                renameCollParticipantRequest.setRenameCollectionRequest(
+                    _doc.getRenameCollectionRequest());
 
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 // We need to send the command to all the shards because both movePrimary and

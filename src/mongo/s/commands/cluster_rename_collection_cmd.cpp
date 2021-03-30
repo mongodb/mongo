@@ -70,11 +70,13 @@ public:
                     str::stream() << "Invalid target namespace: " << toNss.ns(),
                     toNss.isValid());
 
+            RenameCollectionRequest renameCollReq(request().getTo());
+            renameCollReq.setDropTarget(request().getDropTarget());
+            renameCollReq.setStayTemp(request().getStayTemp());
+
             ShardsvrRenameCollection renameCollRequest(fromNss);
             renameCollRequest.setDbName(fromNss.db());
-            renameCollRequest.setDropTarget(request().getDropTarget());
-            renameCollRequest.setStayTemp(request().getStayTemp());
-            renameCollRequest.setTo(request().getTo());
+            renameCollRequest.setRenameCollectionRequest(renameCollReq);
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, fromNss.db()));
