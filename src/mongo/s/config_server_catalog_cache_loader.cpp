@@ -49,37 +49,6 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 namespace {
 
 /**
- * Structure repsenting the generated query and sort order for a chunk diffing operation.
- */
-struct QueryAndSort {
-    const BSONObj query;
-    const BSONObj sort;
-};
-
-/**
- * Returns the query needed to find incremental changes to a collection from the config server.
- *
- * The query has to find all the chunks $gte the current max version. Currently, any splits and
- * merges will increment the current max version.
- *
- * The sort needs to be by ascending version in order to pick up the chunks which changed most
- * recent and also in order to handle cursor yields between chunks being migrated/split/merged. This
- * ensures that changes to chunk version (which will always be higher) will always come *after* our
- * current position in the chunk cursor.
- */
-QueryAndSort createConfigDiffQueryNs(const NamespaceString& nss, ChunkVersion collectionVersion) {
-    return {BSON(ChunkType::ns() << nss.ns() << ChunkType::lastmod() << GTE
-                                 << Timestamp(collectionVersion.toLong())),
-            BSON(ChunkType::lastmod() << 1)};
-}
-
-QueryAndSort createConfigDiffQueryUuid(const UUID& uuid, ChunkVersion collectionVersion) {
-    return {BSON(ChunkType::collectionUUID()
-                 << uuid << ChunkType::lastmod() << GTE << Timestamp(collectionVersion.toLong())),
-            BSON(ChunkType::lastmod() << 1)};
-}
-
-/**
  * Blocking method, which returns the chunks which changed since the specified version.
  */
 CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
