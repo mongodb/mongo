@@ -106,7 +106,11 @@ def check_node(node_check, cwd):
     node_modules = cwd / 'node_modules'
 
     if not node_modules.exists():
-        print(f"{node_modules} not found, you need to run 'npm install' in {cwd}")
+        print(
+            textwrap.dedent(f"""\
+            {node_modules} not found, you need to run 'npm install' in {cwd}
+            Perhaps run 'source {cwd}/setup_node_env.sh install'"""))
+        exit(1)
 
 
 def start_backend(web_service_info, debug):
