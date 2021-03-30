@@ -35,11 +35,13 @@ This script accepts two directories as arguments, the "old" and the "new" IDL di
 Before running this script, run checkout_idl_files_from_past_releases.py to find and create
 directories containing the old IDL files from previous releases.
 """
+# pylint: disable=too-many-lines
 
 import argparse
 import os
 import sys
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Tuple, Union
 
 from idl import parser, syntax, errors, common
@@ -158,6 +160,14 @@ class FieldCompatibilityPair:
     new: FieldCompatibility
     cmd_name: str
     field_name: str
+
+
+class ArrayTypeCheckResult(Enum):
+    """Enumeration representing different return values of check_array_type."""
+
+    INVALID = 0
+    TRUE = 1
+    FALSE = 2
 
 
 def get_new_commands(
@@ -336,9 +346,13 @@ def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompa
     # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
-    if check_array_type(ctxt, "reply_field", old_field.field_type, new_field.field_type,
-                        field_pair.cmd_name, 'type', old_field.idl_file_path,
-                        new_field.idl_file_path, old_field.unstable):
+    array_check = check_array_type(ctxt, "reply_field", old_field.field_type, new_field.field_type,
+                                   field_pair.cmd_name, 'type', old_field.idl_file_path,
+                                   new_field.idl_file_path, old_field.unstable)
+    if array_check == ArrayTypeCheckResult.INVALID:
+        return
+
+    if array_check == ArrayTypeCheckResult.TRUE:
         old_field.field_type = old_field.field_type.element_type
         new_field.field_type = new_field.field_type.element_type
 
@@ -381,21 +395,27 @@ def check_array_type(ctxt: IDLCompatibilityContext, symbol: str,
                      old_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
                      new_type: Optional[Union[syntax.Enum, syntax.Struct, syntax.Type]],
                      cmd_name: str, symbol_name: str, old_idl_file_path: str,
-                     new_idl_file_path: str, old_field_unstable: bool) -> bool:
-    """Check compatibility between old and new ArrayTypes."""
+                     new_idl_file_path: str, old_field_unstable: bool) -> ArrayTypeCheckResult:
+    """
+    Check compatibility between old and new ArrayTypes.
+
+    :returns:
+        -  ArrayTypeCheckResult.TRUE : when the old type and new type are of array type.
+        -  ArrayTypeCheckResult.FALSE : when the old type and new type aren't of array type.
+        -  ArrayTypeCheckResult.INVALID : when one of the types is not of array type while the other one is.
+    """
     # pylint: disable=too-many-arguments,too-many-branches
     old_is_array = isinstance(old_type, syntax.ArrayType)
     new_is_array = isinstance(new_type, syntax.ArrayType)
     if not old_is_array and not new_is_array:
-        return False
+        return ArrayTypeCheckResult.FALSE
 
     if (not old_is_array or not new_is_array) and not old_field_unstable:
         ctxt.add_type_not_array_error(symbol, cmd_name, symbol_name, new_type.name, old_type.name,
                                       new_idl_file_path if old_is_array else old_idl_file_path)
-        ctxt.errors.dump_errors()
-        sys.exit(1)
+        return ArrayTypeCheckResult.INVALID
 
-    return True
+    return ArrayTypeCheckResult.TRUE
 
 
 def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
@@ -582,10 +602,15 @@ def check_param_or_command_type(ctxt: IDLCompatibilityContext, field_pair: Field
     # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
-    if check_array_type(ctxt, "command_parameter" if is_command_parameter else "command_namespace",
-                        old_field.field_type, new_field.field_type, field_pair.cmd_name,
-                        field_pair.field_name if is_command_parameter else "type",
-                        old_field.idl_file_path, new_field.idl_file_path, old_field.unstable):
+    array_check = check_array_type(
+        ctxt, "command_parameter" if is_command_parameter else "command_namespace",
+        old_field.field_type, new_field.field_type, field_pair.cmd_name,
+        field_pair.field_name if is_command_parameter else "type", old_field.idl_file_path,
+        new_field.idl_file_path, old_field.unstable)
+    if array_check == ArrayTypeCheckResult.INVALID:
+        return
+
+    if array_check == ArrayTypeCheckResult.TRUE:
         old_field.field_type = old_field.field_type.element_type
         new_field.field_type = new_field.field_type.element_type
 

@@ -2289,3 +2289,59 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+
+    ArrayCommandTypeErrorNoArrayOld:
+        description: "command will fail because the old command type is not of ArrayType while
+                      the new is of ArrayType."
+        command_name: arrayCommandTypeErrorNoArrayOld
+        namespace: type
+        type: ArrayTypeStruct
+        cpp_name: arrayCommandTypeErrorNoArrayOld
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<ArrayTypeStruct>
+        reply_type: ArrayTypeStruct
+
+    ArrayCommandTypeErrorNoArrayNew:
+        description: "command will fail because the new command type is not of ArrayType while
+                      the old is of ArrayType."
+        command_name: arrayCommandTypeErrorNoArrayNew
+        namespace: type
+        type: array<ArrayTypeStruct>
+        cpp_name: arrayCommandTypeErrorNoArrayNew
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<ArrayTypeStruct>
+        reply_type: ArrayTypeStruct
+
+    ArrayCommandParameterNoArrayOld:
+        description: "command will fail because the old command field type is not of ArrayType while
+                      the new is of ArrayType."
+        command_name: arrayCommandParameterNoArrayOld
+        namespace: type
+        type: array<ArrayTypeStruct>
+        cpp_name: arrayCommandParameterNoArrayOld
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: ArrayTypeStruct
+        reply_type: ArrayTypeStruct
+
+    ArrayCommandParameterNoArrayNew:
+        description: "command will fail because the new command field type is not of ArrayType while
+                      the old is of ArrayType."
+        command_name: arrayCommandParameterNoArrayNew
+        namespace: type
+        type: array<ArrayTypeStruct>
+        cpp_name: arrayCommandParameterNoArrayNew
+        strict: true
+        api_version: "1"
+        fields:
+            parameterStruct:
+                type: array<ArrayTypeStruct>
+        reply_type: ArrayTypeStruct

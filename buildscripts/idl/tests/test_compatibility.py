@@ -83,40 +83,6 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path, "compatibility_test_fail/abort/invalid_command_parameter_type"),
                 ["src"])
 
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_parameter_no_array"),
-                path.join(
-                    dir_path,
-                    "compatibility_test_fail/abort/missing_array/command_parameter_with_array"),
-                ["src"])
-
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(
-                    dir_path,
-                    "compatibility_test_fail/abort/missing_array/command_parameter_with_array"),
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_parameter_no_array"),
-                ["src"])
-
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_type_no_array"),
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_type_with_array"),
-                ["src"])
-
-        with self.assertRaises(SystemExit):
-            idl_check_compatibility.check_compatibility(
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_type_with_array"),
-                path.join(dir_path,
-                          "compatibility_test_fail/abort/missing_array/command_type_no_array"),
-                ["src"])
-
     # pylint: disable=too-many-locals,too-many-statements,invalid-name
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
@@ -126,7 +92,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 160)
+        self.assertTrue(error_collection.count() == 164)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -1216,6 +1182,30 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(added_access_check_field_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_ADDED_ACCESS_CHECK_FIELD)
         self.assertRegex(str(added_access_check_field_error), "addedAccessCheckField")
+
+        missing_array_command_type_old_error = error_collection.get_error_by_command_name(
+            "arrayCommandTypeErrorNoArrayOld")
+        self.assertTrue(missing_array_command_type_old_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_TYPE_NOT_ARRAY)
+        self.assertRegex(str(missing_array_command_type_old_error), "array<ArrayTypeStruct>")
+
+        missing_array_command_type_new_error = error_collection.get_error_by_command_name(
+            "arrayCommandTypeErrorNoArrayNew")
+        self.assertTrue(missing_array_command_type_new_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_TYPE_NOT_ARRAY)
+        self.assertRegex(str(missing_array_command_type_new_error), "array<ArrayTypeStruct>")
+
+        missing_array_command_parameter_old_error = error_collection.get_error_by_command_name(
+            "arrayCommandParameterNoArrayOld")
+        self.assertTrue(missing_array_command_parameter_old_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_TYPE_NOT_ARRAY)
+        self.assertRegex(str(missing_array_command_parameter_old_error), "array<ArrayTypeStruct>")
+
+        missing_array_command_parameter_new_error = error_collection.get_error_by_command_name(
+            "arrayCommandParameterNoArrayNew")
+        self.assertTrue(missing_array_command_parameter_new_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_TYPE_NOT_ARRAY)
+        self.assertRegex(str(missing_array_command_parameter_new_error), "array<ArrayTypeStruct>")
 
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""
