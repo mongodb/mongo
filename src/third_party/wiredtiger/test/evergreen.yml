@@ -205,13 +205,19 @@ functions:
     # Use separate shell.exec with "silent" directive to avoid exposing credentail in task log.
     - command: shell.exec
       params:
-        working_dir: "wiredtiger/wiredtiger.github.com"
+        working_dir: "wiredtiger"
         shell: bash
         silent: true
         script: |
           set -o errexit
           set -o verbose
 
+          if [[ "${branch_name}" != "develop" ]]; then
+            echo "We only run the documentation update task on the WiredTiger (develop) Evergreen project."
+            exit 0
+          fi
+
+          cd wiredtiger.github.com
           git push https://${doc-update-github-token}@github.com/wiredtiger/wiredtiger.github.com
   "make check directory":
     command: shell.exec
