@@ -37,8 +37,22 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj, bool debuggin
     if (readTimestamp) {
         resultObj->append("readTimestamp", readTimestamp.get());
     }
-    resultObj->append("warnings", warnings);
-    resultObj->append("errors", errors);
+
+    static constexpr std::size_t kMaxErrorWarningSizeBytes = 2 * 1024 * 1024;
+    auto appendRangeSizeLimited = [resultObj](StringData fieldName, const auto& values) {
+        std::size_t usedSize = 0;
+        BSONArrayBuilder arr(resultObj->subarrayStart(fieldName));
+        for (auto it = values.begin(), end = values.end();
+             it != end && usedSize < kMaxErrorWarningSizeBytes;
+             ++it) {
+            arr.append(*it);
+            usedSize += it->size();
+        }
+    };
+
+    appendRangeSizeLimited("warnings"_sd, warnings);
+    appendRangeSizeLimited("errors"_sd, errors);
+
     resultObj->append("extraIndexEntries", extraIndexEntries);
     resultObj->append("missingIndexEntries", missingIndexEntries);
 
