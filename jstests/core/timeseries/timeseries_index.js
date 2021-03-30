@@ -213,6 +213,10 @@ assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: tru
 assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {expireAfterSeconds: 3600}),
                              ErrorCodes.InvalidOptions);
 
+// Text indexes are not supported on a time-series buckets collection.
+assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 'text'}),
+                             ErrorCodes.InvalidOptions);
+
 // If listIndexes fails to convert a non-conforming index on the bucket collection, it should omit
 // that index from the results.
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());

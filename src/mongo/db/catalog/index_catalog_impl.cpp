@@ -754,6 +754,10 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
             "TTL indexes are not supported on collections clustered by _id",
             !_collection->isClustered() || !spec[IndexDescriptor::kExpireAfterSecondsFieldName]);
 
+    uassert(ErrorCodes::InvalidOptions,
+            "Text indexes are not supported on collections clustered by _id",
+            !_collection->isClustered() || pluginName != IndexNames::TEXT);
+
     if (IndexDescriptor::isIdIndexPattern(key)) {
         if (_collection->isClustered()) {
             return Status(ErrorCodes::CannotCreateIndex,

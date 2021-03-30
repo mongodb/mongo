@@ -131,14 +131,6 @@ runTest({
 });
 
 runTest({
-    indexSpec: {[metaField]: 'text'},
-    extraDocs: [
-        {[metaField]: 'test'},
-        {[metaField]: 'hello world'},
-    ],
-});
-
-runTest({
     indexSpec: {'control.min.time': 1},
     extraDocs: basicOps,
 });
