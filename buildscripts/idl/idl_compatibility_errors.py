@@ -25,6 +25,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
+# pylint: disable=too-many-lines
 """
 Common error handling code for IDL compatibility checker.
 
@@ -109,6 +110,8 @@ ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK = "ID0065"
 ERROR_ID_REMOVED_ACCESS_CHECK_FIELD = "ID0066"
 ERROR_ID_ADDED_ACCESS_CHECK_FIELD = "ID0067"
 ERROR_ID_COMMAND_STRICT_TRUE_ERROR = "ID0068"
+ERROR_ID_GENERIC_ARGUMENT_REMOVED = "ID0069"
+ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD = "ID0070"
 
 # TODO (SERVER-55203): Remove SKIPPED_COMMANDS logic.
 # Any breaking changes added to API V1 before releasing 5.0 should be added to SKIPPED_COMMANDS to
@@ -970,6 +973,20 @@ class IDLCompatibilityContext(object):
         self._add_error(ERROR_ID_ADDED_ACCESS_CHECK_FIELD, command_name, (
             "'%s' has added the access_check field in the new command when it did not exist in the "
             "old command and the api_version is '1'") % (command_name), file)
+
+    def add_generic_argument_removed(self, field_name: str, file: str) -> None:
+        """Add an error about a generic argument that was removed."""
+        self._add_error(
+            ERROR_ID_GENERIC_ARGUMENT_REMOVED, field_name,
+            ("The generic argument '%s' was removed from the new generic_argument.idl file") %
+            (field_name), file)
+
+    def add_generic_argument_removed_reply_field(self, field_name: str, file: str) -> None:
+        """Add an error about a generic reply field that was removed."""
+        self._add_error(
+            ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD, field_name,
+            ("The generic reply field '%s' was removed from the new generic_argument.idl file") %
+            (field_name), file)
 
 
 def _assert_unique_error_messages() -> None:
