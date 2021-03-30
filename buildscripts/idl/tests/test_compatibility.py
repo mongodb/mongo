@@ -1207,6 +1207,41 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_TYPE_NOT_ARRAY)
         self.assertRegex(str(missing_array_command_parameter_new_error), "array<ArrayTypeStruct>")
 
+    def test_generic_argument_compatibility_pass(self):
+        """Tests that compatible old and new generic_argument.idl files should pass."""
+        dir_path = path.dirname(path.realpath(__file__))
+        self.assertFalse(
+            idl_check_compatibility.check_generic_arguments_compatibility(
+                path.join(dir_path,
+                          "compatibility_test_pass/old_generic_argument/generic_argument.idl"),
+                path.join(dir_path,
+                          "compatibility_test_pass/new_generic_argument/generic_argument.idl")).
+            has_errors())
+
+    def test_generic_argument_compatibility_fail(self):
+        """Tests that incompatible old and new generic_argument.idl files should fail."""
+        dir_path = path.dirname(path.realpath(__file__))
+        error_collection = idl_check_compatibility.check_generic_arguments_compatibility(
+            path.join(dir_path,
+                      "compatibility_test_fail/old_generic_argument/generic_argument.idl"),
+            path.join(dir_path,
+                      "compatibility_test_fail/new_generic_argument/generic_argument.idl"))
+
+        self.assertTrue(error_collection.has_errors())
+        self.assertTrue(error_collection.count() == 2)
+
+        removed_generic_argument_error = error_collection.get_error_by_command_name(
+            "removedGenericArgument")
+        self.assertTrue(removed_generic_argument_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_GENERIC_ARGUMENT_REMOVED)
+        self.assertRegex(str(removed_generic_argument_error), "removedGenericArgument")
+
+        removed_generic_reply_field_error = error_collection.get_error_by_command_name(
+            "removedGenericReplyField")
+        self.assertTrue(removed_generic_reply_field_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD)
+        self.assertRegex(str(removed_generic_reply_field_error), "removedGenericReplyField")
+
     def test_error_reply(self):
         """Tests the compatibility checker with the ErrorReply struct."""
         dir_path = path.dirname(path.realpath(__file__))

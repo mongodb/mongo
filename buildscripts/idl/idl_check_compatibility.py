@@ -24,6 +24,8 @@
 # delete this exception statement from your version. If you delete this
 # exception statement from all source files in the program, then also delete
 # it in the license file.
+#
+# pylint: disable=too-many-lines
 """Checks compatibility of old and new IDL files.
 
 In order to support user-selectable API versions for the server, server commands are now
@@ -35,14 +37,13 @@ This script accepts two directories as arguments, the "old" and the "new" IDL di
 Before running this script, run checkout_idl_files_from_past_releases.py to find and create
 directories containing the old IDL files from previous releases.
 """
-# pylint: disable=too-many-lines
 
 import argparse
 import os
 import sys
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Set, Optional, Tuple, Union
 
 from idl import parser, syntax, errors, common
 from idl.compiler import CompilerImportResolver
@@ -995,6 +996,52 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str,
     return ctxt.errors
 
 
+def get_generic_arguments(gen_args_file_path: str) -> Tuple[Set[str], Set[str]]:
+    """Get arguments and reply fields from generic_argument.idl and check validity."""
+    arguments: Set[str] = set()
+    reply_fields: Set[str] = set()
+
+    with open(gen_args_file_path) as gen_args_file:
+        parsed_idl_file = parser.parse(gen_args_file, gen_args_file_path,
+                                       CompilerImportResolver([]))
+        if parsed_idl_file.errors:
+            parsed_idl_file.errors.dump_errors()
+            raise ValueError(f"Cannot parse {gen_args_file_path}")
+        for argument in parsed_idl_file.spec.symbols.get_generic_argument_list(
+                "generic_args_api_v1").fields:
+            arguments.add(argument.name)
+
+        for reply_field in parsed_idl_file.spec.symbols.get_generic_reply_field_list(
+                "generic_reply_fields_api_v1").fields:
+            reply_fields.add(reply_field.name)
+
+    return arguments, reply_fields
+
+
+def check_generic_arguments_compatibility(old_gen_args_file_path: str, new_gen_args_file_path: str
+                                          ) -> IDLCompatibilityErrorCollection:
+    """Check IDL compatibility between old and new generic_argument.idl files."""
+    # IDLCompatibilityContext takes in both 'old_idl_dir' and 'new_idl_dir',
+    # but for generic_argument.idl, the parent directories aren't helpful for logging purposes.
+    # Instead, we pass in "old generic_argument.idl" and "new generic_argument.idl"
+    # to make error messages clearer.
+    ctxt = IDLCompatibilityContext("old generic_argument.idl", "new generic_argument.idl",
+                                   IDLCompatibilityErrorCollection())
+
+    old_arguments, old_reply_fields = get_generic_arguments(old_gen_args_file_path)
+    new_arguments, new_reply_fields = get_generic_arguments(new_gen_args_file_path)
+
+    for old_argument in old_arguments:
+        if old_argument not in new_arguments:
+            ctxt.add_generic_argument_removed(old_argument, new_gen_args_file_path)
+
+    for old_reply_field in old_reply_fields:
+        if old_reply_field not in new_reply_fields:
+            ctxt.add_generic_argument_removed_reply_field(old_reply_field, new_gen_args_file_path)
+
+    return ctxt.errors
+
+
 def main():
     """Run the script."""
     arg_parser = argparse.ArgumentParser(description=__doc__)
@@ -1015,6 +1062,13 @@ def main():
     new_basic_types_path = os.path.join(args.new_idl_dir, "mongo/idl/basic_types.idl")
     error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path, args.include)
     if error_reply_coll.has_errors():
+        sys.exit(1)
+
+    old_generic_args_path = os.path.join(args.old_idl_dir, "mongo/idl/generic_argument.idl")
+    new_generic_args_path = os.path.join(args.new_idl_dir, "mongo/idl/generic_argument.idl")
+    error_gen_args_coll = check_generic_arguments_compatibility(old_generic_args_path,
+                                                                new_generic_args_path)
+    if error_gen_args_coll.has_errors():
         sys.exit(1)
 
 
