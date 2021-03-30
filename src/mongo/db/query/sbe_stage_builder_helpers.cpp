@@ -203,16 +203,25 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpre
                                                    sbe::value::bitcastFrom<bool>(false)));
 }
 
-std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId,
-                                               boost::optional<sbe::FrameId> frameId) {
-    return frameId ? sbe::makeE<sbe::EVariable>(*frameId, slotId)
-                   : sbe::makeE<sbe::EVariable>(slotId);
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(slotId);
+}
+
+std::unique_ptr<sbe::EExpression> makeVariable(sbe::FrameId frameId, sbe::value::SlotId slotId) {
+    return sbe::makeE<sbe::EVariable>(frameId, slotId);
 }
 
 std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e) {
     using namespace std::literals;
     return makeFunction(
         "fillEmpty"_sd, std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
+}
+
+std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e) {
+    using namespace std::literals;
+    return makeFunction("fillEmpty"_sd,
+                        std::move(e),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
 std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
