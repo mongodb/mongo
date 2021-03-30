@@ -1619,7 +1619,6 @@ public:
                 sbe::value::makeNewBsonRegex(expr->getString(), expr->getFlags());
             auto [compiledRegexTag, compiledRegexVal] =
                 sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
-            // TODO SERVER-54837: Support BSONType::Symbol once it is added to SBE.
             sbe::EVariable inputVar{inputSlot};
             auto resultExpr = makeBinaryOp(
                 sbe::EPrimBinary::logicOr,

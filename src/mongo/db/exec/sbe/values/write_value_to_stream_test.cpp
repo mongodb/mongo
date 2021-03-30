@@ -151,4 +151,25 @@ TEST(WriteValueToStream, LongBSONStringTest) {
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
+TEST(WriteValueToStream, ShortBSONSymbolTest) {
+    auto bsonSymbol = BSON("symbol" << BSONSymbol(kStringShort));
+    auto val = value::bitcastFrom<const char*>(bsonSymbol["symbol"].value());
+    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonSymbol, val);
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString = "Symbol(\"" + std::string(kStringShort) + "\")";
+    ASSERT_EQUALS(expectedString, oss.str());
+}
+
+TEST(WriteValueToStream, LongBSONSymbolTest) {
+    auto bsonSymbol = BSON("symbol" << BSONSymbol(kStringLong));
+    auto val = value::bitcastFrom<const char*>(bsonSymbol["symbol"].value());
+    const std::pair<value::TypeTags, value::Value> value(value::TypeTags::bsonSymbol, val);
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString = "Symbol(\"" +
+        std::string(kStringLong).substr(0, value::kStringMaxDisplayLength) + "\"" + "...)";
+    ASSERT_EQUALS(expectedString, oss.str());
+}
+
 }  // namespace mongo::sbe

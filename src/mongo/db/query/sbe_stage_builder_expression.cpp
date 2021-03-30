@@ -271,6 +271,7 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
     uint32_t typeMask = (getBSONTypeMask(sbe::value::TypeTags::StringSmall) |
                          getBSONTypeMask(sbe::value::TypeTags::StringBig) |
                          getBSONTypeMask(sbe::value::TypeTags::bsonString) |
+                         getBSONTypeMask(sbe::value::TypeTags::bsonSymbol) |
                          getBSONTypeMask(sbe::value::TypeTags::NumberInt32) |
                          getBSONTypeMask(sbe::value::TypeTags::NumberInt64) |
                          getBSONTypeMask(sbe::value::TypeTags::NumberDouble) |

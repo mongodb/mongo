@@ -110,6 +110,7 @@ enum class TypeTags : uint8_t {
     bsonObject,
     bsonArray,
     bsonString,
+    bsonSymbol,
     bsonObjectId,
     bsonBinData,
     // The bson prefix signifies the fact that this type can only come from BSON (either from disk
@@ -117,6 +118,7 @@ enum class TypeTags : uint8_t {
     bsonUndefined,
     bsonRegex,
     bsonJavascript,
+    bsonDBPointer,
 
     // KeyString::Value
     ksValue,
@@ -174,12 +176,16 @@ inline constexpr bool isPcreRegex(TypeTags tag) noexcept {
     return tag == TypeTags::pcreRegex;
 }
 
-inline constexpr bool isCollatableType(TypeTags tag) noexcept {
-    return isString(tag) || isArray(tag) || isObject(tag);
-}
-
 inline constexpr bool isBsonRegex(TypeTags tag) noexcept {
     return tag == TypeTags::bsonRegex;
+}
+
+inline constexpr bool isStringOrSymbol(TypeTags tag) noexcept {
+    return isString(tag) || tag == TypeTags::bsonSymbol;
+}
+
+inline constexpr bool isCollatableType(TypeTags tag) noexcept {
+    return isString(tag) || isArray(tag) || isObject(tag);
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
@@ -718,6 +724,11 @@ inline StringData getStringView(TypeTags tag, const Value& val) noexcept {
     return {getRawStringView(tag, val), getStringLength(tag, val)};
 }
 
+inline StringData getStringOrSymbolView(TypeTags tag, const Value& val) noexcept {
+    tag = (tag == TypeTags::bsonSymbol) ? TypeTags::StringBig : tag;
+    return {getRawStringView(tag, val), getStringLength(tag, val)};
+}
+
 inline size_t getBSONBinDataSize(TypeTags tag, Value val) {
     invariant(tag == TypeTags::bsonBinData);
     return static_cast<size_t>(
@@ -815,6 +826,11 @@ inline std::pair<TypeTags, Value> makeNewString(StringData input) {
     } else {
         return makeBigString(input);
     }
+}
+
+inline std::pair<TypeTags, Value> makeNewBsonSymbol(StringData input) {
+    auto [_, strVal] = makeBigString(input);
+    return {TypeTags::bsonSymbol, strVal};
 }
 
 inline std::pair<TypeTags, Value> makeNewArray() {
@@ -919,29 +935,15 @@ inline fts::FTSMatcher* getFtsMatcherView(Value val) noexcept {
  *   <pattern> <NULL> <flags> <NULL>
  */
 struct BsonRegex {
-    BsonRegex(const char* rawValue) {
+    explicit BsonRegex(const char* rawValue) {
         pattern = rawValue;
-        // We add 1 to account NULL byte after pattern.
-        flags = pattern.rawData() + pattern.size() + 1;
-    }
-
-    BsonRegex(StringData pattern, StringData flags) : pattern(pattern), flags(flags) {
-        // Ensure that flags follow right after pattern in memory. Otherwise 'dataView()' may return
-        // invalid 'StringData' object.
-        invariant(pattern.rawData() + pattern.size() + 1 == flags.rawData());
+        // We add sizeof(char) to account NULL byte after pattern.
+        flags = pattern.rawData() + pattern.size() + sizeof(char);
     }
 
     size_t byteSize() const {
-        // We add 2 to account NULL bytes after each string.
-        return pattern.size() + flags.size() + 2;
-    }
-
-    const char* data() const {
-        return pattern.rawData();
-    }
-
-    StringData dataView() const {
-        return {data(), byteSize()};
+        // We add 2 * sizeof(char) to account NULL bytes after each string.
+        return pattern.size() + sizeof(char) + flags.size() + sizeof(char);
     }
 
     StringData pattern;
@@ -952,15 +954,50 @@ inline BsonRegex getBsonRegexView(Value val) noexcept {
     return BsonRegex(getRawPointerView(val));
 }
 
-std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex);
-
 std::pair<TypeTags, Value> makeNewBsonRegex(StringData pattern, StringData flags);
+
+inline std::pair<TypeTags, Value> makeCopyBsonRegex(const BsonRegex& regex) {
+    return makeNewBsonRegex(regex.pattern, regex.flags);
+}
 
 inline StringData getBsonJavascriptView(Value val) noexcept {
     return getStringView(TypeTags::StringBig, val);
 }
 
 std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code);
+
+/**
+ * The BsonDBPointer class is used to represent the DBRef BSON type. DBRefs consist of a namespace
+ * string ('ns') and a document ID ('id'). The namespace string ('ns') can either just specify a
+ * collection name (ex. "c"), or it can specify both a database name and a collection name separated
+ * by a dot (ex. "db.c").
+ *
+ * In BSON, a DBRef is encoded as a bsonString ('ns') followed by an ObjectId ('id').
+ */
+struct BsonDBPointer {
+    explicit BsonDBPointer(const char* rawValue) {
+        uint32_t lenWithNull = ConstDataView(rawValue).read<LittleEndian<uint32_t>>();
+        ns = {rawValue + sizeof(uint32_t), lenWithNull - sizeof(char)};
+        id = reinterpret_cast<const uint8_t*>(rawValue) + 4 + lenWithNull;
+    }
+
+    size_t byteSize() const {
+        return sizeof(uint32_t) + ns.size() + sizeof(char) + sizeof(value::ObjectIdType);
+    }
+
+    StringData ns;
+    const uint8_t* id = nullptr;
+};
+
+inline BsonDBPointer getBsonDBPointerView(Value val) noexcept {
+    return BsonDBPointer(getRawPointerView(val));
+}
+
+std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id);
+
+inline std::pair<TypeTags, Value> makeCopyBsonDBPointer(const BsonDBPointer& dbptr) {
+    return makeNewBsonDBPointer(dbptr.ns, dbptr.id);
+}
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 
@@ -986,6 +1023,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeBigString(getStringView(tag, val));
         case TypeTags::bsonString:
             return makeBigString(getStringView(tag, val));
+        case TypeTags::bsonSymbol:
+            return makeNewBsonSymbol(getStringOrSymbolView(tag, val));
         case TypeTags::ObjectId: {
             return makeCopyObjectId(*getObjectIdView(val));
         }
@@ -1026,6 +1065,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyBsonRegex(getBsonRegexView(val));
         case TypeTags::bsonJavascript:
             return makeCopyBsonJavascript(getBsonJavascriptView(val));
+        case TypeTags::bsonDBPointer:
+            return makeCopyBsonDBPointer(getBsonDBPointerView(val));
         case TypeTags::ftsMatcher:
             return makeCopyFtsMatcher(*getFtsMatcherView(val));
         default:

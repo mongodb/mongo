@@ -56,7 +56,8 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::NumberDecimal: {
             auto [decTag, decVal] = makeCopyDecimal(Decimal128{buf.read<Decimal128::Value>()});
             val = decVal;
-        } break;
+            break;
+        }
         case TypeTags::Date:
             val = bitcastFrom<int64_t>(buf.read<int64_t>());
             break;
@@ -81,6 +82,12 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             auto stringLength = buf.read<LittleEndian<uint32_t>>();
             auto stringStart = reinterpret_cast<const char*>(buf.skip(stringLength));
             std::tie(tag, val) = makeNewString({stringStart, stringLength});
+            break;
+        }
+        case TypeTags::bsonSymbol: {
+            auto descriptionLength = buf.read<LittleEndian<uint32_t>>();
+            auto descriptionStart = reinterpret_cast<const char*>(buf.skip(descriptionLength));
+            std::tie(tag, val) = makeNewBsonSymbol({descriptionStart, descriptionLength});
             break;
         }
         case TypeTags::Array: {
@@ -158,13 +165,20 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::bsonRegex: {
             auto pattern = buf.readCStr();
             auto flags = buf.readCStr();
-            std::tie(tag, val) = value::makeCopyBsonRegex({pattern, flags});
+            std::tie(tag, val) = value::makeNewBsonRegex(pattern, flags);
             break;
         }
         case TypeTags::bsonJavascript: {
             auto codeLength = buf.read<LittleEndian<uint32_t>>();
             auto codeStart = reinterpret_cast<const char*>(buf.skip(codeLength));
             std::tie(tag, val) = makeCopyBsonJavascript({codeStart, codeLength});
+            break;
+        }
+        case TypeTags::bsonDBPointer: {
+            auto nsLen = buf.read<LittleEndian<uint32_t>>();
+            auto nsStart = reinterpret_cast<const char*>(buf.skip(nsLen));
+            auto id = reinterpret_cast<const uint8_t*>(buf.skip(sizeof(ObjectIdType)));
+            std::tie(tag, val) = makeNewBsonDBPointer({nsStart, nsLen}, id);
             break;
         }
         default:
@@ -230,8 +244,9 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         }
         case TypeTags::StringBig:
-        case TypeTags::bsonString: {
-            auto sv = getStringView(tag, val);
+        case TypeTags::bsonString:
+        case TypeTags::bsonSymbol: {
+            auto sv = getStringOrSymbolView(tag, val);
             buf.appendNum(static_cast<uint32_t>(sv.size()));
             buf.appendStr(sv, false /* includeEndingNull */);
             break;
@@ -310,6 +325,13 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendStr(javascriptCode, false /* includeEndingNull */);
             break;
         }
+        case TypeTags::bsonDBPointer: {
+            auto dbptr = getBsonDBPointerView(val);
+            buf.appendNum(static_cast<uint32_t>(dbptr.ns.size()));
+            buf.appendStr(dbptr.ns, false /* includeEndingNull */);
+            buf.appendBuf(dbptr.id, sizeof(ObjectIdType));
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -351,6 +373,9 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += sizeof(uint32_t) + getStringLength(tag, val) + sizeof(char);
             break;
         }
+        case TypeTags::bsonSymbol:
+            result += sizeof(uint32_t) + getStringOrSymbolView(tag, val).size() + sizeof(char);
+            break;
         case TypeTags::Array: {
             auto arr = getArrayView(val);
             result += sizeof(*arr);
@@ -408,6 +433,9 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += sizeof(uint32_t) + code.size() + sizeof(char);
             break;
         }
+        case TypeTags::bsonDBPointer:
+            result += getBsonDBPointerView(val).byteSize();
+            break;
         default:
             MONGO_UNREACHABLE;
     }
