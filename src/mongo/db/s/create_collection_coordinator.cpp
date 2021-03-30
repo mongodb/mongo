@@ -523,30 +523,31 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 _finalize(opCtx);
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            try {
-                _removeCoordinatorDocument();
-                uassertStatusOK(status);
-                LOGV2(5458702, "Collection created", "namespace"_attr = nss());
-            } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
-                LOGV2_ERROR(5458701,
-                            "Create collection interrupted with a NotPrimaryError exception "
-                            "category, it will continue on the next primary",
-                            "namespace"_attr = nss(),
-                            "error"_attr = redact(ex));
-            } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
-                LOGV2_ERROR(5458707,
-                            "Create collection interrupted with a ShutdownError exception "
-                            "category, it will continue on the next primary",
-                            "namespace"_attr = nss(),
-                            "error"_attr = redact(ex));
-            } catch (const DBException& ex) {
-                LOGV2_ERROR(5458703,
+            if (status.isOK()) {
+                LOGV2(5458701, "Collection created", "namespace"_attr = nss());
+            } else {
+                // Do not remove the coordinator document if we have a stepdown related error.
+                if (status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::ShutdownError>()) {
+                    uassertStatusOK(status);
+                }
+
+                LOGV2_ERROR(5458702,
                             "Error running create collection",
                             "namespace"_attr = nss(),
-                            "error"_attr = redact(ex));
-                // TODO SERVER-55396: retry operation until it succeeds.
+                            "error"_attr = redact(status));
+            }
+
+            try {
+                _removeCoordinatorDocument();
+            } catch (DBException& ex) {
+                LOGV2_WARNING(5458703, "Failed to remove coordinator", "error"_attr = redact(ex));
+                ex.addContext("Failed to remove create collection coordinator state document"_sd);
                 throw;
             }
+
+            // TODO SERVER-55396: retry operation until it succeeds.
+            uassertStatusOK(status);
         });
 }
 

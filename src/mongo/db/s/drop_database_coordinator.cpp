@@ -244,34 +244,30 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);
             }))
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (!status.isOK() &&
-                (status.isA<ErrorCategory::NotPrimaryError>() ||
-                 status.isA<ErrorCategory::ShutdownError>())) {
-                LOGV2_DEBUG(5494506,
-                            1,
-                            "Drop database coordinator has been interrupted and "
-                            " will continue on the next elected replicaset primary",
-                            "db"_attr = _dbName,
-                            "error"_attr = status);
-                return;
-            }
-
             if (status.isOK()) {
-                LOGV2_DEBUG(5494507, 1, "Database dropped", "db"_attr = _dbName);
+                LOGV2(5494506, "Database dropped", "namespace"_attr = nss());
             } else {
-                LOGV2_ERROR(5494508,
+                // Do not remove the coordinator document if we have a stepdown related error.
+                if (status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::ShutdownError>()) {
+                    uassertStatusOK(status);
+                }
+
+                LOGV2_ERROR(5494507,
                             "Error running drop database",
-                            "db"_attr = _dbName,
+                            "namespace"_attr = nss(),
                             "error"_attr = redact(status));
             }
 
             try {
                 _removeStateDocument();
             } catch (DBException& ex) {
-                ex.addContext("Failed to remove drop database coordinator state document");
+                LOGV2_WARNING(5494508, "Failed to remove coordinator", "error"_attr = redact(ex));
+                ex.addContext("Failed to remove drop database coordinator state document"_sd);
                 throw;
             }
 
+            // TODO SERVER-55396: retry operation until it succeeds.
             uassertStatusOK(status);
         });
 }
