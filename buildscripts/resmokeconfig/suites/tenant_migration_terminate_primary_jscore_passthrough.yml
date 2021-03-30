@@ -149,12 +149,6 @@ selector:
   # TODO (SERVER-55364): Investigate DuplicateKey error for createIndex command in
   # background_unique_indexes.js in tenant migration stepdown/kill/terminate suites.
   - jstests/core/background_unique_indexes.js
-  # TODO (SERVER-55366): Investigate missing docs in tenant migration stepdown/kill/terminate
-  # suites.
-  - jstests/core/geo_s2twofields.js
-  - jstests/core/geo3.js
-  - jstests/core/insert1.js
-  - jstests/core/sample_rate.js
   # TODO (SERVER-55359): Docs in tenant migration oplog buffer collection might not be ordered by
   # timestamp.
   - jstests/core/*find_and_modify*.js
