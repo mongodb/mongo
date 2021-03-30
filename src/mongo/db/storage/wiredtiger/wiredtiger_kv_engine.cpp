@@ -65,6 +65,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -1582,7 +1583,7 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident) {
-    invariant(!_readOnly);
+    invariant(!_readOnly || !recoverToOplogTimestamp.empty());
 
     _ensureIdentPath(ident);
     WiredTigerSession wtSession(_conn);
