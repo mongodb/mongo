@@ -150,8 +150,8 @@ public:
                     str::stream() << "Can't rename to internal namespace: " << toNss,
                     renameIsAllowedOnNS(toNss));
 
-            auto coordinatorDoc =
-                RenameCollectionCoordinatorDocument(toNss, req.getDropTarget(), req.getStayTemp());
+            auto coordinatorDoc = RenameCollectionCoordinatorDocument();
+            coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
             auto service = ShardingDDLCoordinatorService::getService(opCtx);

@@ -48,6 +48,24 @@ structs:
                 description: "The version of the newly-created or already existing database"
                 optional: false
 
+    RenameCollectionRequest:
+        description: "Request for the rename collection command"
+        strict: false
+        fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
+            dropTarget:
+                type: bool
+                description: "If true, mongod will drop the target of renameCollection prior to
+                renaming the collection."
+                default: false
+            stayTemp:
+                type: bool
+                description: "If true, the original collection will remain temp if it was temp
+                before the rename."
+                default: false
+
     RenameCollectionResponse:
         description: "Response for the rename collection command"
         strict: false
@@ -165,20 +183,8 @@ commands:
         strict: false
         namespace: concatenate_with_db
         api_version: ""
-        fields:
-            to:
-                type: namespacestring
-                description: "The new namespace for the collection being renamed."
-            dropTarget:
-                type: bool
-                description: "If true, mongod will drop the target of renameCollection prior to
-                renaming the collection."
-                default: false
-            stayTemp:
-                type: bool
-                description: "If true, the original collection will remain temp if it was temp
-                before the rename."
-                default: false
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
 
     _shardsvrRenameCollectionParticipant:
         command_name: _shardsvrRenameCollectionParticipant
@@ -187,20 +193,8 @@ commands:
         strict: false
         api_version: ""
         namespace: concatenate_with_db
-        fields:
-            to:
-                type: namespacestring
-                description: "The new namespace for the collection being renamed."
-            dropTarget:
-                type: bool
-                description: "If true, mongod will drop the target of renameCollection prior to
-                renaming the collection."
-                default: false
-            stayTemp:
-                type: bool
-                description: "If true, the original collection will remain temp if it was temp
-                before the rename."
-                default: false
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
 
     _shardsvrRenameCollectionUnblockParticipant:
         command_name: _shardsvrRenameCollectionUnblockParticipant

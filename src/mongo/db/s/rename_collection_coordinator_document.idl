@@ -37,6 +37,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
+    - "mongo/s/request_types/sharded_ddl_commands.idl"
 
 enums:
     RenameCollectionCoordinatorPhase:
@@ -65,19 +66,11 @@ structs:
         strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+            RenameCollectionRequest: RenameCollectionRequest
         fields:
             phase:
                 type: RenameCollectionCoordinatorPhase
                 default: kUnset
-            to:
-                description: "Namespace of the target collection."
-                type: namespacestring
-            dropTarget:
-                description: "If true, the target collection is expected to be dropped prior to renaming the collection."
-                type: bool
-            stayTemp:
-                description: "If true, the original collection will remain temp if it was temp before the rename."
-                type: bool
             targetIsSharded:
                 description: "Indicates whether the target collection (to override) is sharded or not."
                 type: bool
