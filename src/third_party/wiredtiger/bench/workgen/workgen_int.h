@@ -278,6 +278,8 @@ struct WorkloadRunner {
     ~WorkloadRunner();
     int run(WT_CONNECTION *conn);
     int increment_timestamp(WT_CONNECTION *conn);
+    int start_table_idle_cycle(WT_CONNECTION *conn);
+    int check_timing(const char *name, uint64_t last_interval);
 
 private:
     int close_all();
