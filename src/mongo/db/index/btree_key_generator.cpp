@@ -47,7 +47,6 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace dps = ::mongo::dotted_path_support;
 
 namespace {
-
 const BSONObj nullObj = BSON("" << BSONNULL);
 const BSONElement nullElt = nullObj.firstElement();
 const BSONObj undefinedObj = BSON("" << BSONUndefined);
@@ -94,16 +93,16 @@ BtreeKeyGenerator::BtreeKeyGenerator(std::vector<const char*> fieldNames,
                                      KeyString::Version keyStringVersion,
                                      Ordering ordering)
     : _keyStringVersion(keyStringVersion),
-      _ordering(ordering),
-      _fieldNames(fieldNames),
       _isIdIndex(fieldNames.size() == 1 && std::string("_id") == fieldNames[0]),
       _isSparse(isSparse),
+      _ordering(ordering),
+      _fieldNames(std::move(fieldNames)),
       _nullKeyString(_buildNullKeyString()),
-      _fixed(fixed),
-      _emptyPositionalInfo(fieldNames.size()),
+      _fixed(std::move(fixed)),
+      _emptyPositionalInfo(_fieldNames.size()),
       _collator(collator) {
 
-    for (const char* fieldName : fieldNames) {
+    for (const char* fieldName : _fieldNames) {
         FieldRef fieldRef{fieldName};
         auto pathLength = fieldRef.numParts();
         invariant(pathLength > 0);
