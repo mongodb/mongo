@@ -473,4 +473,23 @@ private:
     MutableDocument _output;
 };
 
+class AccumulatorExpMovingAvg : public AccumulatorState {
+public:
+    AccumulatorExpMovingAvg(ExpressionContext* const expCtx, Decimal128 alpha);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    const char* getOpName() const final;
+    void reset() final;
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx,
+                                                         Decimal128 alpha);
+
+private:
+    Decimal128 _alpha;
+    Decimal128 _currentResult;
+    bool _init = false;
+    bool _isDecimal = false;
+};
+
 }  // namespace mongo
