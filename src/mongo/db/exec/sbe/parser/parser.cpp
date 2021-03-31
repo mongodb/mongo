@@ -1142,8 +1142,8 @@ void Parser::walkTraverse(AstQuery& ast) {
         lookupSlotStrict(ast.nodes[0]->identifier),
         lookupSlotStrict(ast.nodes[1]->identifier),
         correlatedPos ? lookupSlots(ast.nodes[correlatedPos]->identifiers) : makeSV(),
-        foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
-        finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr,
+        std::move(ast.nodes[foldPos]->expr),
+        std::move(ast.nodes[finalPos]->expr),
         getCurrentPlanNodeId(),
         boost::none);
 }
