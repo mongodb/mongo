@@ -96,20 +96,25 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
  * If "allowSplitHorizonIP" is set to true, skips checking whether an IP address exists in
  * split horizon configuration.
  *
+ * If "skipFCVCompatibilityCheck" is set to true, skips checking whether the
+ * 'secondaryDelaySecs' field name is compatible with the current featureCompatibilityVersion.
+ *
  * Returns an indicative error on validation failure.
  */
 Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
-                                 bool allowSplitHorizonIP);
+                                 bool allowSplitHorizonIP,
+                                 bool skipFCVCompatibilityCheck);
 
 /**
- * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
- * reasponse.
+ * Validates that "newConfig" is an acceptable configuration when
+ * received in a heartbeat reasponse.
  *
- * If the new configuration omits the current node, but is otherwise valid, returns
- * ErrorCodes::NodeNotFound.  If the configuration is wholly valid, returns Status::OK().
- * Otherwise, returns some other error status.
+ * If the new configuration omits the current node, but is
+ * otherwise valid, returns ErrorCodes::NodeNotFound.  If the
+ * configuration is wholly valid, returns Status::OK(). Otherwise,
+ * returns some other error status.
  */
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,

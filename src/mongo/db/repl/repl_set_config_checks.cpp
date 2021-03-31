@@ -434,16 +434,19 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
 Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force,
-                                 bool allowSplitHorizonIP) {
+                                 bool allowSplitHorizonIP,
+                                 bool skipFCVCompatibilityCheck) {
     Status status =
         allowSplitHorizonIP ? newConfig.validateAllowingSplitHorizonIP() : newConfig.validate();
     if (!status.isOK()) {
         return status;
     }
 
-    status = isFCVCompatible(newConfig);
-    if (!status.isOK()) {
-        return status;
+    if (!skipFCVCompatibilityCheck) {
+        status = isFCVCompatible(newConfig);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 
     status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
