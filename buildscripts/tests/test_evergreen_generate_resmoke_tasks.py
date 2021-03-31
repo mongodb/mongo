@@ -18,7 +18,7 @@ from buildscripts.util.teststats import TestRuntime
 from buildscripts import evergreen_generate_resmoke_tasks as under_test
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
-# pylint: disable=too-many-locals,too-many-lines
+# pylint: disable=too-many-locals,too-many-lines,too-many-public-methods
 
 _DATE = datetime.datetime(2018, 7, 15)
 
@@ -1183,6 +1183,22 @@ class GenerateSubSuitesTest(unittest.TestCase):
         cadence = gen_sub_suites._get_clean_every_n_cadence()
 
         self.assertEqual(1, cadence)
+
+    @patch(ns("suitesconfig.get_suite"))
+    def test_list_tests_can_handle_strings_and_lists(self, mock_get_suite):
+        evg = MagicMock()
+        mock_suite = MagicMock(
+            tests=["test0", "test1", ["test2a", "tests2b", "test2c"], "test3", ["test4a"]])
+        config_options = MagicMock(
+            suite="suite",
+            san_options=None,
+        )
+        mock_get_suite.return_value = mock_suite
+
+        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
+        test_list = gen_sub_suites.list_tests()
+
+        self.assertEqual(len(test_list), 7)
 
 
 class TestShouldTasksBeGenerated(unittest.TestCase):

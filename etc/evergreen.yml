@@ -6233,15 +6233,14 @@ tasks:
       resmoke_jobs_max: 1
       fallback_num_sub_suites: 3
 
-- <<: *task_template
-  name: concurrency_replication_wiredtiger_eviction_debug
+- name: concurrency_replication_wiredtiger_eviction_debug_gen
   tags: ["concurrency", "repl", "debug_only"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: "--suites=concurrency_replication_wiredtiger_eviction_debug --storageEngine=wiredTiger"
+      resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
 - name: concurrency_sharded_replication_gen
   tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
@@ -6447,15 +6446,14 @@ tasks:
       resmoke_args: "--suites=concurrency_sharded_ddl_operations --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2, sharding: 2}}'"
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: concurrency_simultaneous
+- name: concurrency_simultaneous_gen
   tags: ["concurrency", "common"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
-      resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger
       resmoke_jobs_max: 1
+      fallback_num_sub_suites: 3
 
 - <<: *task_template
   name: concurrency_simultaneous_replication
@@ -8461,7 +8459,7 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: .misc_js !.sharded
   - name: concurrency
-  - name: concurrency_simultaneous
+  - name: concurrency_simultaneous_gen
   - name: disk_wiredtiger
   - name: failpoints_auth
   - name: .jscore .common !.sharding !.decimal !.txns
@@ -11737,7 +11735,7 @@ buildvariants:
   # - name: concurrency
   # - name: concurrency_replication_gen
   # - name: concurrency_replication_causal_consistency_gen
-  # - name: concurrency_simultaneous
+  # - name: concurrency_simultaneous_gen
   # - name: concurrency_simultaneous_replication
   - name: .integration !.audit
   - name: .jscore .common !.txns !.decimal
