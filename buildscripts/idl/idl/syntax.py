@@ -560,6 +560,7 @@ class AccessChecks(common.SourceLocation):
         # type: (str, int, int) -> None
         """Construct an AccessChecks."""
 
+        self.ignore = None  # type: bool
         self.none = None  # type: bool
         self.simple = None  # type: AccessCheck
         self.complex = None  # type: List[AccessCheck]
@@ -568,6 +569,8 @@ class AccessChecks(common.SourceLocation):
 
     def get_access_check_type(self) -> str:
         """Get type of AccessChecks."""
+        if self.ignore:
+            return "ignore"
         if self.none:
             return "none"
         if self.simple:

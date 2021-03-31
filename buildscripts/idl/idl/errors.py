@@ -25,6 +25,7 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
+# pylint: disable=too-many-lines
 """
 Common error handling code for IDL compiler.
 
@@ -128,6 +129,7 @@ ERROR_ID_DUPLICATE_ACTION_TYPE = "ID0086"
 ERROR_ID_DUPLICATE_ACCESS_CHECK = "ID0087"
 ERROR_ID_DUPLICATE_PRIVILEGE = "ID0088"
 ERROR_ID_EMPTY_ACCESS_CHECK = "ID0089"
+ERROR_ID_MISSING_ACCESS_CHECK = "ID0090"
 
 
 class IDLError(Exception):
@@ -962,11 +964,19 @@ class ParserContext(object):
 
     def add_empty_access_check(self, location):
         # type: (common.SourceLocation) -> None
-        """Add an error about specifying one of none, simple or complex in an access check."""
+        """Add an error about specifying one of ignore, none, simple or complex in an access check."""
         # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_EMPTY_ACCESS_CHECK,
-            "Must one and only one of either a 'none', 'simple', or 'complex' in an access_check.")
+            "Must one and only one of either a 'ignore', 'none', 'simple', or 'complex' in an access_check."
+        )
+
+    def add_missing_access_check(self, location, name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a missing access_check when api_version != ""."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_MISSING_ACCESS_CHECK,
+                        'Command "%s" has api_version != "" but is missing access_check.' % (name))
 
 
 def _assert_unique_error_messages():

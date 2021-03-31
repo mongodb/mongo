@@ -740,6 +740,7 @@ def _parse_access_checks(ctxt, node):
 
     _generic_parser(
         ctxt, node, "access_check", access_checks, {
+            "ignore": _RuleDesc('bool_scalar'),
             "none": _RuleDesc('bool_scalar'),
             "simple": _RuleDesc('mapping', mapping_parser_func=_parse_privilege_or_check),
             "complex": _RuleDesc('sequence_mapping', sequence_parser_func=_parse_complex_sequence),
@@ -748,7 +749,8 @@ def _parse_access_checks(ctxt, node):
     if ctxt.errors.has_errors():
         return None
 
-    if (bool(access_checks.none) + bool(access_checks.simple) + bool(access_checks.complex)) != 1:
+    if (bool(access_checks.ignore) + bool(access_checks.none) + bool(access_checks.simple) + bool(
+            access_checks.complex)) != 1:
         ctxt.add_empty_access_check(access_checks)
         return None
 

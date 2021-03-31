@@ -1096,6 +1096,8 @@ commands:
         namespace: ignored
         strict: true
         api_version: "1"
+        access_check:
+            none: true
         reply_type: OkReply
 
     APIVersion1CommandIDLName2:
@@ -1105,6 +1107,8 @@ commands:
         namespace: ignored
         strict: true
         api_version: "1"
+        access_check:
+            none: true
         reply_type: OkReply
 
     # Test whether the C++ code for a command with alias name is currently generated.
@@ -1115,6 +1119,8 @@ commands:
         namespace: ignored
         strict: true
         api_version: "1"
+        access_check:
+            none: true
         reply_type: OkReply
 
 ##################################################################################################
