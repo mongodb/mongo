@@ -72,6 +72,7 @@ using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
 
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangAfterStartingFCVTransition);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
@@ -257,6 +258,8 @@ public:
             requestedVersion,
             isFromConfigServer,
             true /* setTargetVersion */);
+
+        hangAfterStartingFCVTransition.pauseWhileSet(opCtx);
 
         if (requestedVersion > actualVersion) {
             _runUpgrade(opCtx, request);
