@@ -265,7 +265,8 @@ void _logOpsInner(OperationContext* opCtx,
                   const std::vector<Timestamp>& timestamps,
                   const CollectionPtr& oplogCollection,
                   OpTime finalOpTime,
-                  Date_t wallTime) {
+                  Date_t wallTime,
+                  bool isAbortIndexBuild) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
@@ -286,29 +287,12 @@ void _logOpsInner(OperationContext* opCtx,
     //
     // We ignore FCV here when checking the feature flag since the FCV may not have been initialized
     // yet. This is safe since tenant migrations does not have any upgrade/downgrade behavior.
-    if (repl::feature_flags::gTenantMigrations.isEnabledAndIgnoreFCV()) {
-        // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort
-        // an index build on the donor after the blockTimestamp, plus if an index build fails to
-        // commit due to TenantMigrationConflict, we need to be able to abort the index build and
-        // clean up.
-        auto isAbortIndexBuild = std::any_of(records->begin(), records->end(), [](Record record) {
-            auto oplogEntry = uassertStatusOK(OplogEntry::parse(record.data.toBson()));
-            return oplogEntry.getCommandType() == OplogEntry::CommandType::kAbortIndexBuild;
-        });
-
-        if (!isAbortIndexBuild) {
-            tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db());
-        } else if (records->size() > 1) {
-            str::stream ss;
-            ss << "abortIndexBuild cannot be logged with other oplog entries ";
-            ss << ": nss " << nss;
-            ss << ": entries: " << records->size() << ": [ ";
-            for (const auto& record : *records) {
-                ss << "(" << record.id << ", " << redact(record.data.toBson()) << ") ";
-            }
-            ss << "]";
-            uasserted(ErrorCodes::IllegalOperation, ss);
-        }
+    //
+    // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort an
+    // index build on the donor after the blockTimestamp, plus if an index build fails to commit due
+    // to TenantMigrationConflict, we need to be able to abort the index build and clean up.
+    if (repl::feature_flags::gTenantMigrations.isEnabledAndIgnoreFCV() && !isAbortIndexBuild) {
+        tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db());
     }
 
     Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
@@ -412,7 +396,16 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     std::vector<Record> records{
         {RecordId(), RecordData(bsonOplogEntry.objdata(), bsonOplogEntry.objsize())}};
     std::vector<Timestamp> timestamps{slot.getTimestamp()};
-    _logOpsInner(opCtx, oplogEntry->getNss(), &records, timestamps, oplog, slot, wallClockTime);
+    const auto isAbortIndexBuild = oplogEntry->getOpType() == OpTypeEnum::kCommand &&
+        parseCommandType(oplogEntry->getObject()) == OplogEntry::CommandType::kAbortIndexBuild;
+    _logOpsInner(opCtx,
+                 oplogEntry->getNss(),
+                 &records,
+                 timestamps,
+                 oplog,
+                 slot,
+                 wallClockTime,
+                 isAbortIndexBuild);
     wuow.commit();
     return slot;
 }
@@ -505,7 +498,9 @@ std::vector<OpTime> logInsertOps(
     invariant(!lastOpTime.isNull());
     const auto& oplog = oplogInfo->getCollection();
     auto wallClockTime = oplogEntryTemplate->getWallClockTime();
-    _logOpsInner(opCtx, nss, &records, timestamps, oplog, lastOpTime, wallClockTime);
+    const bool isAbortIndexBuild = false;
+    _logOpsInner(
+        opCtx, nss, &records, timestamps, oplog, lastOpTime, wallClockTime, isAbortIndexBuild);
     wuow.commit();
     return opTimes;
 }
