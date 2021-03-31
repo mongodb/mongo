@@ -29,10 +29,18 @@ assert.commandFailedWithCode(
     st.s.adminCommand({reshardCollection: sourceCollection.getFullName(), key: {y: 1}}),
     ErrorCodes.CommandNotFound);
 
+assert.commandFailedWithCode(
+    st.s.adminCommand({abortReshardCollection: sourceCollection.getFullName()}),
+    ErrorCodes.CommandNotFound);
+
 const configPrimary = st.configRS.getPrimary();
 assert.commandFailedWithCode(
     configPrimary.adminCommand(
         {_configsvrReshardCollection: sourceCollection.getFullName(), key: {y: 1}}),
+    ErrorCodes.CommandNotSupported);
+
+assert.commandFailedWithCode(
+    configPrimary.adminCommand({_configsvrAbortReshardCollection: sourceCollection.getFullName()}),
     ErrorCodes.CommandNotSupported);
 
 const serverStatusCmd = ({serverStatus: 1, shardingStatistics: 1});
