@@ -73,6 +73,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangAfterStartingFCVTransition);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
@@ -266,6 +267,8 @@ public:
                 isFromConfigServer,
                 true /* setTargetVersion */);
 
+            hangAfterStartingFCVTransition.pauseWhileSet(opCtx);
+
             // If the 'useSecondaryDelaySecs' feature flag is enabled in the upgraded FCV, issue a
             // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
             if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
@@ -370,6 +373,8 @@ public:
                 requestedVersion,
                 isFromConfigServer,
                 true /* setTargetVersion */);
+
+            hangAfterStartingFCVTransition.pauseWhileSet(opCtx);
 
             // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue
             // a reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
