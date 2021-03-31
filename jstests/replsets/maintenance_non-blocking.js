@@ -32,6 +32,7 @@ doTest = function() {
 
     print("******* writing to primary ************* ");
     assert.commandWorked(mColl.save({_id: -1}));
+    printjson(sDB.currentOp());
     assert.neq(null, mColl.findOne());
 
     var hello = assert.commandWorked(sColl.runCommand("hello"));

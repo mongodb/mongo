@@ -35,9 +35,6 @@ selector:
   - jstests/core/txns/create_indexes_parallel.js
   - jstests/core/txns/commands_in_txns_read_concern.js
 
-  # TODO SERVER-55174: Fails after changes to db.currentOp(), re-enable after investigation.
-  - jstests/core/txns/write_conflicts_with_non_txns.js
-
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.

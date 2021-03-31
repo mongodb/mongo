@@ -674,11 +674,6 @@ void appendAsObjOrString(StringData name,
             objToString[*maxSize - 3] = '.';
             objToString[*maxSize - 2] = '.';
             objToString[*maxSize - 1] = '.';
-            LOGV2_INFO(4760300,
-                       "Gathering currentOp information, operation of size {size} exceeds the size "
-                       "limit of {limit} and will be truncated.",
-                       "size"_attr = objToString.size(),
-                       "limit"_attr = *maxSize);
         }
 
         StringData truncation = StringData(objToString).substr(0, *maxSize);
