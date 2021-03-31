@@ -1008,7 +1008,16 @@ class GenerateSubSuites(object):
 
     def list_tests(self) -> List[str]:
         """List the test files that are part of the suite being split."""
-        return suitesconfig.get_suite(self.config_options.suite).tests
+        suite_config = suitesconfig.get_suite(self.config_options.suite)
+        test_list = []
+        for tests in suite_config.tests:
+            # `tests` could return individual tests or lists of tests, we need to handle both.
+            if isinstance(tests, list):
+                test_list.extend(tests)
+            else:
+                test_list.append(tests)
+
+        return test_list
 
     def add_suites_to_build_variant(self, suites: List[Suite], build_variant: BuildVariant) -> None:
         """
