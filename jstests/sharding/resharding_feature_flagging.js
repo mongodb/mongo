@@ -34,10 +34,12 @@ assert.commandFailedWithCode(
     ErrorCodes.CommandNotFound);
 
 const configPrimary = st.configRS.getPrimary();
-assert.commandFailedWithCode(
-    configPrimary.adminCommand(
-        {_configsvrReshardCollection: sourceCollection.getFullName(), key: {y: 1}}),
-    ErrorCodes.CommandNotSupported);
+assert.commandFailedWithCode(configPrimary.adminCommand({
+    _configsvrReshardCollection: sourceCollection.getFullName(),
+    key: {y: 1},
+    writeConcern: {w: 'majority'}
+}),
+                             ErrorCodes.CommandNotSupported);
 
 assert.commandFailedWithCode(
     configPrimary.adminCommand({_configsvrAbortReshardCollection: sourceCollection.getFullName()}),
