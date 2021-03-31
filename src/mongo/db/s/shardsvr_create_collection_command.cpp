@@ -35,6 +35,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -161,7 +162,13 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
         inferCollationFromLocalCollection(opCtx, nss, request, &shardsvrShardCollectionRequest);
     }
 
-    return shardCollectionLegacy(opCtx, nss, shardsvrShardCollectionRequest.toBSON(), false);
+    return shardCollectionLegacy(
+        opCtx,
+        nss,
+        shardsvrShardCollectionRequest.toBSON(),
+        false /* requestIsFromCSRS */,
+        feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility) /* use50MetadataFormat */);
 }
 
 CreateCollectionResponse createCollection(OperationContext* opCtx,

@@ -237,13 +237,8 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
         finalSplitPoints.push_back(splitPoint);
     }
 
-    boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        timestamp = validAfter;
-    }
-
-    ChunkVersion version(1, 0, OID::gen(), timestamp);
+    ChunkVersion version(
+        1, 0, OID::gen(), params.collectionUUID ? validAfter : boost::optional<Timestamp>());
     const auto& keyPattern(shardKeyPattern.getKeyPattern());
 
     std::vector<ChunkType> chunks;
@@ -263,7 +258,7 @@ InitialSplitPolicy::ShardCollectionConfig InitialSplitPolicy::generateShardColle
             params.nss, params.collectionUUID, min, max, &version, validAfter, shardId, &chunks);
     }
 
-    return {std::move(chunks), validAfter};
+    return {std::move(chunks)};
 }
 
 std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStrategy(
@@ -323,29 +318,23 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
     OperationContext* opCtx,
     const ShardKeyPattern& shardKeyPattern,
     const SplitPolicyParams& params) {
-    ShardCollectionConfig initialChunks;
-
     const auto currentTime = VectorClock::get(opCtx)->getTime();
-    const auto clusterTime = currentTime.clusterTime().asTimestamp();
+    const auto validAfter = currentTime.clusterTime().asTimestamp();
 
-    boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        timestamp = clusterTime;
-    }
-
-    ChunkVersion version(1, 0, OID::gen(), timestamp);
+    ChunkVersion version(
+        1, 0, OID::gen(), params.collectionUUID ? validAfter : boost::optional<Timestamp>());
     const auto& keyPattern = shardKeyPattern.getKeyPattern();
+    std::vector<ChunkType> chunks;
     appendChunk(params.nss,
                 params.collectionUUID,
                 keyPattern.globalMin(),
                 keyPattern.globalMax(),
                 &version,
-                currentTime.clusterTime().asTimestamp(),
+                validAfter,
                 params.primaryShardId,
-                &initialChunks.chunks);
-    initialChunks.creationTime = clusterTime;
-    return initialChunks;
+                &chunks);
+
+    return {std::move(chunks)};
 }
 
 InitialSplitPolicy::ShardCollectionConfig UnoptimizedSplitPolicy::createFirstChunks(
@@ -430,13 +419,8 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
         return shardIds[indx++ % shardIds.size()];
     };
 
-    boost::optional<Timestamp> timestamp;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        timestamp = validAfter;
-    }
-
-    ChunkVersion version(1, 0, OID::gen(), timestamp);
+    ChunkVersion version(
+        1, 0, OID::gen(), params.collectionUUID ? validAfter : boost::optional<Timestamp>());
     auto lastChunkMax = keyPattern.globalMin();
     std::vector<ChunkType> chunks;
     for (const auto& tag : _tags) {
@@ -512,7 +496,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
                     &chunks);
     }
 
-    return {std::move(chunks), validAfter};
+    return {std::move(chunks)};
 }
 
 AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSplitInfoForTag(
@@ -790,22 +774,15 @@ InitialSplitPolicy::ShardCollectionConfig ReshardingSplitPolicy::createFirstChun
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     const auto validAfter = currentTime.clusterTime().asTimestamp();
 
-    boost::optional<Timestamp> timestamp;
-    boost::optional<CollectionUUID> collectionUUID;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        timestamp = validAfter;
-        collectionUUID = params.collectionUUID;
-    }
-
-    ChunkVersion version(1, 0, OID::gen(), timestamp);
+    ChunkVersion version(
+        1, 0, OID::gen(), params.collectionUUID ? validAfter : boost::optional<Timestamp>());
 
     splitPoints.insert(keyPattern.globalMax());
     for (const auto& splitPoint : splitPoints) {
         auto bestShard = selectBestShard(
             chunkDistribution, zoneInfo, zoneToShardMap, {lastChunkMax, splitPoint});
         appendChunk(params.nss,
-                    collectionUUID,
+                    params.collectionUUID,
                     lastChunkMax,
                     splitPoint,
                     &version,
@@ -817,7 +794,7 @@ InitialSplitPolicy::ShardCollectionConfig ReshardingSplitPolicy::createFirstChun
         chunkDistribution[bestShard]++;
     }
 
-    return {std::move(chunks), validAfter};
+    return {std::move(chunks)};
 }
 
 BSONObjSet ReshardingSplitPolicy::_extractSplitPointsFromZones(const ShardKeyPattern& shardKey) {

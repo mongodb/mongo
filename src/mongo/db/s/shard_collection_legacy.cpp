@@ -38,7 +38,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -78,6 +77,9 @@
 namespace mongo {
 namespace {
 
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using FCVersion = FeatureCompatibility::Version;
+
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionBeforeCriticalSection);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionReadOnlyCriticalSection);
 MONGO_FAIL_POINT_DEFINE(pauseShardCollectionCommitPhase);
@@ -113,23 +115,17 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadyShardedWithSam
         opCtx, nss, request.getKey(), *request.getCollation(), request.getUnique());
 }
 
-// TODO SERVER-54587: Remove the code bellow after the new shard collection path is resilient.
 boost::optional<UUID> getUUID(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
     const auto& coll = autoColl.getCollection();
     return coll ? boost::make_optional(coll->uuid()) : boost::none;
 }
 
-void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
+void checkForExistingChunks(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const boost::optional<UUID>& optUUID) {
     BSONObjBuilder countBuilder;
-    boost::optional<UUID> optUUID;
-    // TODO SERVER-54587: Remove the code bellow the new shard collection path is resilient.
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        optUUID = getUUID(opCtx, nss);
-        if (!optUUID) {
-            return;
-        }
+    if (optUUID) {
         countBuilder.append("count", ChunkType::ConfigNS.coll());
         countBuilder.append("query", BSON(ChunkType::collectionUUID << *optUUID));
     } else {
@@ -254,44 +250,6 @@ std::vector<TagsType> getTagsAndValidate(OperationContext* opCtx,
     return tags;
 }
 
-boost::optional<UUID> getUUIDFromPrimaryShard(OperationContext* opCtx, const NamespaceString& nss) {
-    // Obtain the collection's UUID from the primary shard's listCollections response.
-    DBDirectClient localClient(opCtx);
-    BSONObj res;
-    {
-        std::list<BSONObj> all =
-            localClient.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
-        if (!all.empty()) {
-            res = all.front().getOwned();
-        }
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to have an entry for " << nss.toString()
-                          << " in listCollections response, but did not",
-            !res.isEmpty());
-
-    BSONObj collectionInfo;
-    if (res["info"].type() == BSONType::Object) {
-        collectionInfo = res["info"].Obj();
-    }
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to return 'info' field as part of "
-                             "listCollections for "
-                          << nss.ns()
-                          << " because the cluster is in featureCompatibilityVersion=3.6, but got "
-                          << res,
-            !collectionInfo.isEmpty());
-
-    uassert(ErrorCodes::InternalError,
-            str::stream() << "expected to return a UUID for collection " << nss.ns()
-                          << " as part of 'info' field but got " << res,
-            collectionInfo.hasField("uuid"));
-
-    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
-}
-
 bool checkIfCollectionIsEmpty(OperationContext* opCtx, const NamespaceString& nss) {
     // Use find with predicate instead of count in order to ensure that the count
     // command doesn't just consult the cached metadata, which may not always be
@@ -310,8 +268,7 @@ ShardCollectionTargetState calculateTargetState(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const ShardsvrShardCollectionRequest& request) {
     auto tags = getTagsAndValidate(opCtx, nss, request.getKey());
-    auto uuid =
-        request.getGetUUIDfromPrimaryShard() ? *getUUIDFromPrimaryShard(opCtx, nss) : UUID::gen();
+    auto uuid = request.getGetUUIDfromPrimaryShard() ? *getUUID(opCtx, nss) : UUID::gen();
 
     const bool isEmpty = checkIfCollectionIsEmpty(opCtx, nss);
     return {uuid, ShardKeyPattern(request.getKey()), tags, isEmpty};
@@ -433,14 +390,11 @@ void updateShardingCatalogEntryForCollection(
                                               ->makeFromBSON(defaultCollation));
     }
 
-    boost::optional<Timestamp> creationTime;
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        creationTime = initialChunks.creationTime;
-    }
-
-    CollectionType coll(
-        nss, initialChunks.collVersion().epoch(), creationTime, Date_t::now(), prerequisites.uuid);
+    CollectionType coll(nss,
+                        initialChunks.collVersion().epoch(),
+                        initialChunks.collVersion().getTimestamp(),
+                        Date_t::now(),
+                        prerequisites.uuid);
     coll.setKeyPattern(prerequisites.shardKeyPattern.toBSON());
     if (defaultCollator) {
         coll.setDefaultCollation(defaultCollator->getSpec().toBSON());
@@ -494,7 +448,8 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                          const BSONObj& cmdObj,
                                          const ShardsvrShardCollectionRequest& request,
                                          const ShardId& dbPrimaryShardId,
-                                         bool mustTakeDistLock) {
+                                         bool mustTakeDistLock,
+                                         bool use50MetadataFormat) {
     // Fast check for whether the collection is already sharded without taking any locks
     if (auto createCollectionResponseOpt =
             checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
@@ -530,14 +485,6 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
     boost::optional<ShardCollectionTargetState> targetState;
     std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
-
-    bool shouldUseUUIDForChunkIndexing;
-    {
-        FixedFCVRegion fcvRegion(opCtx);
-
-        shouldUseUUIDForChunkIndexing =
-            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(*fcvRegion);
-    }
 
     CreateCollectionResponse shardCollectionResponse;
 
@@ -608,7 +555,25 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
         }
 
         // Fail if there are partially written chunks from a previous failed shardCollection.
-        checkForExistingChunks(opCtx, nss);
+
+        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                FCVersion::kFullyDowngradedTo44) {
+                checkForExistingChunks(opCtx, nss, boost::none);
+            } else if (serverGlobalParams.featureCompatibility.getVersion() ==
+                       FCVersion::kVersion49) {
+                if (auto optUUID = getUUID(opCtx, nss))
+                    checkForExistingChunks(opCtx, nss, optUUID);
+            } else {
+                // In the intermediate state must check for leftovers from both formats
+                checkForExistingChunks(opCtx, nss, boost::none);
+                if (auto optUUID = getUUID(opCtx, nss))
+                    checkForExistingChunks(opCtx, nss, optUUID);
+            }
+        } else {
+            checkForExistingChunks(opCtx, nss, boost::none);
+        }
+
         checkCollation(opCtx, request);
 
         // Create the collection locally
@@ -639,7 +604,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                                               getNumShards(opCtx),
                                                               targetState->collectionIsEmpty);
         boost::optional<CollectionUUID> optCollectionUUID;
-        if (shouldUseUUIDForChunkIndexing) {
+        if (use50MetadataFormat) {
             optCollectionUUID = targetState->uuid;
         }
 
@@ -698,7 +663,8 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& cmdObj,
-                                               bool requestFromCSRS) {
+                                               bool requestFromCSRS,
+                                               bool use50MetadataFormat) {
     auto request = ShardsvrShardCollectionRequest::parse(
         IDLParserErrorContext("shardCollectionLegacy"), cmdObj);
     if (!request.getCollation())
@@ -726,7 +692,8 @@ CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                        cmdObj,
                                        request,
                                        ShardingState::get(opCtx)->shardId(),
-                                       !requestFromCSRS);
+                                       !requestFromCSRS,
+                                       use50MetadataFormat);
         } catch (const DBException& e) {
             scopedShardCollection.emplaceResponse(e.toStatus());
             throw;
