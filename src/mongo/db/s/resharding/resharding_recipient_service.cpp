@@ -244,6 +244,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
     _markKilledExecutor->startup();
+    _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return ExecutorFuture<void>(**executor)
         .then([this, executor] {
@@ -266,8 +267,12 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
         })
         .then([this] { _renameTemporaryReshardingCollection(); })
         .then([this, executor] {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             return _updateCoordinator(opCtx.get(), executor);
+        })
+        .onCompletion([this, stepdownToken](auto passthroughFuture) {
+            _cancelableOpCtxFactory.emplace(stepdownToken, _markKilledExecutor);
+            return passthroughFuture;
         })
         .onError([this, executor](Status status) {
             Status error = status;
@@ -284,7 +289,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                   "error"_attr = error);
 
             _transitionToError(error);
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             return _updateCoordinator(opCtx.get(), executor)
                 .then([this, executor] {
                     // Wait for all of the data replication components to halt. We ignore any errors
@@ -299,7 +304,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                     _transitionState(RecipientStateEnum::kDone);
                 })
                 .then([this, executor] {
-                    auto opCtx = cc().makeOperationContext();
+                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                     return _updateCoordinator(opCtx.get(), executor);
                 })
                 .then([this, error] { return error; });
@@ -321,7 +326,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 // extend the lifetime so the code can safely finish executing.
 
                 {
-                    auto opCtx = cc().makeOperationContext();
+                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                     removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
                 }
 
@@ -417,7 +422,7 @@ void ReshardingRecipientService::RecipientStateMachine::
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
         resharding::createTemporaryReshardingCollectionLocally(opCtx.get(),
                                                                _metadata.getSourceNss(),
@@ -480,12 +485,11 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
         auto dataReplication = _makeDataReplication(opCtx, cloningDone, executor);
         _dataReplicationQuiesced =
             dataReplication
-                ->runUntilStrictlyConsistent(
-                    **executor,
-                    _recipientService->getInstanceCleanupExecutor(),
-                    abortToken,
-                    CancelableOperationContextFactory(abortToken, _markKilledExecutor),
-                    _minimumOperationDuration)
+                ->runUntilStrictlyConsistent(**executor,
+                                             _recipientService->getInstanceCleanupExecutor(),
+                                             abortToken,
+                                             *_cancelableOpCtxFactory,
+                                             _minimumOperationDuration)
                 .share();
 
         stdx::lock_guard lk(_mutex);
@@ -506,17 +510,17 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         reshardingPauseRecipientBeforeCloning.pauseWhileSet(opCtx.get());
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         reshardingPauseRecipientDuringCloning.pauseWhileSet(opCtx.get());
     }
 
@@ -533,7 +537,7 @@ ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyS
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
 
     return _updateCoordinator(opCtx.get(), executor)
@@ -567,11 +571,11 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor)
         .then([this, abortToken] {
             {
@@ -583,7 +587,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                                  abortToken);
         })
         .then([this] {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             for (const auto& donor : _donorShardIds) {
                 auto stashNss = getLocalConflictStashNamespace(_metadata.getSourceUUID(), donor);
                 AutoGetCollection stashColl(opCtx.get(), stashNss, MODE_IS);
@@ -595,8 +599,8 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this] {
             _transitionState(RecipientStateEnum::kStrictConsistency);
 
-            bool isDonor = [& id = _metadata.getReshardingUUID()] {
-                auto opCtx = cc().makeOperationContext();
+            bool isDonor = [this, &id = _metadata.getReshardingUUID()] {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 auto instance = resharding::tryGetReshardingStateMachine<
                     ReshardingDonorService,
                     ReshardingDonorService::DonorStateMachine,
@@ -618,7 +622,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor)
         .then([this] { return _coordinatorHasDecisionPersisted.getFuture(); })
         .thenRunOn(**executor)
@@ -631,7 +635,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
         RenameCollectionOptions options;
         options.dropTarget = true;
@@ -769,7 +773,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
         .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this] {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
             auto shardId = ShardingState::get(opCtx.get())->shardId();
 
@@ -805,7 +809,7 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
 
 void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
     RecipientShardContext&& newRecipientCtx, boost::optional<Timestamp>&& fetchTimestamp) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
 
@@ -835,7 +839,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument() {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
     store.remove(opCtx.get(),
