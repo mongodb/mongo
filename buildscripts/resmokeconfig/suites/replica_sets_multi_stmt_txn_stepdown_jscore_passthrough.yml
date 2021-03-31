@@ -293,8 +293,7 @@ selector:
   - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
-  # $out is not supported in transactions
-  - uses_$out
+  - does_not_support_transactions
   # Operations in the main test shell aren't guaranteed to be causally consistent with operations
   # performed earlier in a parallel shell if multiple nodes are electable because the latest
   # operation and cluster times aren't shared between shells.

@@ -321,8 +321,7 @@ selector:
   - requires_profiling
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
-  # $out is not supported in transactions
-  - uses_$out
+  - does_not_support_transactions
   # Transaction-continuing commands cannot specify API parameters, so tests that use API parameters
   # cannot be run with transactions.
   - uses_api_parameters

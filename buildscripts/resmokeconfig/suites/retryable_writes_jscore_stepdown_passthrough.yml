@@ -55,6 +55,11 @@ selector:
   - jstests/core/startup_log.js # Checks pid, which is different on each server.
   - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.
 
+  # TODO: Remove when SERVER-55559 is fixed.
+  - jstests/core/timeseries/timeseries_union_with.js
+  - jstests/core/timeseries/timeseries_lookup.js
+  - jstests/core/timeseries/timeseries_graph_lookup.js
+
   exclude_with_any_tags:
   - assumes_standalone_mongod
   ##

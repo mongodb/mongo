@@ -371,9 +371,7 @@ selector:
   - requires_capped
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
-
-  # $out is not supported in transactions
-  - uses_$out
+  - does_not_support_transactions
 
 executor:
   archive:

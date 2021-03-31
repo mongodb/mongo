@@ -1,9 +1,9 @@
 // @tags: [
 //   does_not_support_stepdowns,
+//   does_not_support_transactions,
 //   requires_fastcount,
 //   requires_fcv_47,
 //   requires_non_retryable_commands,
-//   uses_$out,
 //   uses_map_reduce_with_temp_collections,
 // ]
 
