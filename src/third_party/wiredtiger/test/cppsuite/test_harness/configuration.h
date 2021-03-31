@@ -29,6 +29,8 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
+#include <string>
+
 extern "C" {
 #include "test_util.h"
 }
@@ -108,6 +110,14 @@ class configuration {
             return (-1);
         value = temp_value.val;
         return (0);
+    }
+
+    configuration *
+    get_subconfig(const std::string &key) const
+    {
+        WT_CONFIG_ITEM subconfig;
+        testutil_check(get(key, &subconfig));
+        return new configuration(subconfig);
     }
 
     /*

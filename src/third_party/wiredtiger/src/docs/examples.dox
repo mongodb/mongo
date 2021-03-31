@@ -2,21 +2,24 @@
 @example ex_access.c
 Create, insert and access a simple table.
 
+@example ex_backup.c
+Shows how to use log-based incremental backup.
+
+@example ex_backup_block.c
+Shows how to use block-based incremental backup.
+
 @example ex_call_center.c
 A more complex schema based on a call center example, showing how to map
 some SQL constructs onto the WiredTiger API.
+
+@example ex_col_store.c
+Shows how to use a column-store with column groups using example operations.
 
 @example ex_cursor.c
 Shows some common cursor types and operations.
 
 @example ex_encrypt.c
 Shows how to extend WiredTiger with a simple encryption algorithm.
-
-@example nop_encrypt.c
-Shows the basic framework for building an encryptor as a plug in library.
-
-@example rotn_encrypt.c
-Shows a simple encryptor as a plug in library.
 
 @example ex_extending.c
 Shows how to extend WiredTiger with application-specific collations,
@@ -25,8 +28,14 @@ extractors and cursor types.
 @example ex_extractor.c
 Shows how to extend WiredTiger with a more complex custom extractor.
 
+@example ex_file_system.c
+Shows how to extend WiredTiger with a custom file-system implementation.
+
 @example ex_hello.c
 This is an example of how to create and open a database.
+
+@example ex_log.c
+Shows how to access the database log files.
 
 @example ex_pack.c
 Shows basic packing and unpacking of fields.
@@ -43,16 +52,16 @@ Shows how to create column-oriented data and access individual columns.
 @example ex_stat.c
 Shows how to access database and table statistics.
 
-@example ex_log.c
-Shows how to access the database log files.
+@example ex_storage_source.c
+Shows how to extend WiredTiger with a custom storage source implementation.
 
 @example ex_thread.c
 Shows how to access a database with multiple threads.
 
-@example ex_file_system.c
-Shows how to extend WiredTiger with a custom file-system implementation.
+@example nop_encrypt.c
+Shows the basic framework for building an encryptor as a plug in library.
 
-@example ex_col_store.c
-Shows how to use a column-store with column groups using example operations.
+@example rotn_encrypt.c
+Shows a simple encryptor as a plug in library.
 
  */

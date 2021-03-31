@@ -94,8 +94,7 @@ class workload_generator : public component {
             testutil_check(_tracking->save(tracking_operation::CREATE, collection_name, 0, "", ts));
             _collection_names.push_back(collection_name);
         }
-        debug_info(
-          std::to_string(collection_count) + " collections created", _trace_level, DEBUG_INFO);
+        debug_print(std::to_string(collection_count) + " collections created", DEBUG_TRACE);
 
         /* Open a cursor on each collection and use the configuration to insert key/value pairs. */
         testutil_check(_config->get_int(KEY_COUNT, key_count));
@@ -123,30 +122,30 @@ class workload_generator : public component {
                 }
             }
         }
-        debug_info("Populate stage done", _trace_level, DEBUG_INFO);
+        debug_print("Populate stage done", DEBUG_TRACE);
     }
 
     /* Do the work of the main part of the workload. */
     void
     run()
     {
-        int64_t duration_seconds, read_threads, min_operation_per_transaction,
-          max_operation_per_transaction, value_size;
+        configuration *sub_config;
+        int64_t read_threads, min_operation_per_transaction, max_operation_per_transaction,
+          value_size;
 
         /* Populate the database. */
         populate();
 
         /* Retrieve useful parameters from the test configuration. */
-        testutil_check(_config->get_int(DURATION_SECONDS, duration_seconds));
-        testutil_assert(duration_seconds >= 0);
         testutil_check(_config->get_int(READ_THREADS, read_threads));
-        testutil_check(
-          _config->get_int(MIN_OPERATION_PER_TRANSACTION, min_operation_per_transaction));
-        testutil_check(
-          _config->get_int(MAX_OPERATION_PER_TRANSACTION, max_operation_per_transaction));
+        sub_config = _config->get_subconfig(OPS_PER_TRANSACTION);
+        testutil_check(sub_config->get_int(MIN, min_operation_per_transaction));
+        testutil_check(sub_config->get_int(MAX, max_operation_per_transaction));
         testutil_assert(max_operation_per_transaction >= min_operation_per_transaction);
         testutil_check(_config->get_int(VALUE_SIZE, value_size));
         testutil_assert(value_size >= 0);
+
+        delete sub_config;
 
         /* Generate threads to execute read operations on the collections. */
         for (int i = 0; i < read_threads; ++i) {
@@ -165,7 +164,7 @@ class workload_generator : public component {
             it->finish();
         }
         _thread_manager.join();
-        debug_info("Workload generator: run stage done", _trace_level, DEBUG_INFO);
+        debug_print("Workload generator: run stage done", DEBUG_TRACE);
     }
 
     /* Workload threaded operations. */
@@ -276,11 +275,11 @@ class workload_generator : public component {
         error_code = cursor->insert(cursor);
 
         if (error_code == 0) {
-            debug_info("key/value inserted", _trace_level, DEBUG_INFO);
+            debug_print("key/value inserted", DEBUG_TRACE);
             error_code =
               _tracking->save(tracking_operation::INSERT, collection_name, key, value, ts);
         } else
-            debug_info("key/value insertion failed", _trace_level, DEBUG_ERROR);
+            debug_print("key/value insertion failed", DEBUG_ERROR);
 
         return (error_code);
     }
@@ -313,11 +312,11 @@ class workload_generator : public component {
         error_code = cursor->update(cursor);
 
         if (error_code == 0) {
-            debug_info("key/value update", _trace_level, DEBUG_INFO);
+            debug_print("key/value update", DEBUG_TRACE);
             error_code =
               tracking->save(tracking_operation::UPDATE, collection_name, key, value, ts);
         } else
-            debug_info("key/value update failed", _trace_level, DEBUG_ERROR);
+            debug_print("key/value update failed", DEBUG_ERROR);
 
         return (error_code);
     }

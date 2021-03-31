@@ -436,11 +436,13 @@ struct WorkloadOptions {
     int run_time;
     int sample_interval_ms;
     int sample_rate;
+    int max_idle_table_cycle;
     std::string sample_file;
     int warmup;
     double oldest_timestamp_lag;
     double stable_timestamp_lag;
     double timestamp_advance;
+    bool max_idle_table_cycle_fatal;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);

@@ -54,15 +54,18 @@ namespace test_harness {
  */
 class test {
     public:
-    test(const std::string &config)
+    test(const std::string &config, const std::string &name)
     {
         _configuration = new configuration(name, config);
-        _runtime_monitor = new runtime_monitor(_configuration);
-        _timestamp_manager = new timestamp_manager(_configuration);
-        _workload_tracking = new workload_tracking(_configuration, OPERATION_TRACKING_TABLE_CONFIG,
-          TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG, TABLE_SCHEMA_TRACKING);
+        _runtime_monitor = new runtime_monitor(_configuration->get_subconfig(RUNTIME_MONITOR));
+        _timestamp_manager =
+          new timestamp_manager(_configuration->get_subconfig(TIMESTAMP_MANAGER));
+        _workload_tracking = new workload_tracking(_configuration->get_subconfig(WORKLOAD_TRACKING),
+          OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
+          TABLE_SCHEMA_TRACKING);
         _workload_generator =
-          new workload_generator(_configuration, _timestamp_manager, _workload_tracking);
+          new workload_generator(_configuration->get_subconfig(WORKLOAD_GENERATOR),
+            _timestamp_manager, _workload_tracking);
         _thread_manager = new thread_manager();
         /*
          * Ordering is not important here, any dependencies between components should be resolved
@@ -97,7 +100,7 @@ class test {
     /*
      * The primary run function that most tests will be able to utilize without much other code.
      */
-    void
+    virtual void
     run()
     {
         int64_t cache_size_mb = 100, duration_seconds = 0;
@@ -139,11 +142,7 @@ class test {
               _workload_tracking->get_schema_table_name());
         }
 
-        if (is_success)
-            std::cout << "SUCCESS" << std::endl;
-        else
-            std::cout << "FAILED" << std::endl;
-
+        debug_print(is_success ? "SUCCESS" : "FAILED", DEBUG_INFO);
         connection_manager::instance().close();
     }
 
@@ -175,10 +174,8 @@ class test {
         return _thread_manager;
     }
 
-    static const std::string name;
-    static const std::string default_config;
-
     private:
+    std::string _name;
     std::vector<component *> _components;
     configuration *_configuration;
     runtime_monitor *_runtime_monitor;

@@ -4,12 +4,16 @@ LDADD = $(top_builddir)/test/utility/libtest_util.la \
     $(top_builddir)/libwiredtiger.la
 AM_LDFLAGS = -static
 
+# Copy across the default configuration files with the artifacts.
+all:
+	rsync -rup $(top_srcdir)/test/cppsuite/configs $(top_builddir)/test/cppsuite
+
 all_TESTS=
 noinst_PROGRAMS=
 
-test_poc_SOURCES = tests/poc.cxx
-noinst_PROGRAMS += test_poc
-all_TESTS += test_poc
+run_SOURCES = tests/run.cxx
+noinst_PROGRAMS += run
+all_TESTS += run
 
 # Run this during a "make check" smoke test.
 TESTS = $(all_TESTS)

@@ -664,6 +664,116 @@ __wt_conn_remove_extractor(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __tiered_confchk --
+ *     Check for a valid tiered storage source.
+ */
+static int
+__tiered_confchk(
+  WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cname, WT_NAMED_STORAGE_SOURCE **nstoragep)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
+
+    *nstoragep = NULL;
+
+    if (cname->len == 0 || WT_STRING_MATCH("none", cname->str, cname->len))
+        return (0);
+
+    conn = S2C(session);
+    TAILQ_FOREACH (nstorage, &conn->storagesrcqh, q)
+        if (WT_STRING_MATCH(nstorage->name, cname->str, cname->len)) {
+            *nstoragep = nstorage;
+            return (0);
+        }
+    WT_RET_MSG(session, EINVAL, "unknown storage source '%.*s'", (int)cname->len, cname->str);
+}
+
+/*
+ * __wt_tiered_bucket_config --
+ *     Given a configuration, configure the bucket storage.
+ */
+int
+__wt_tiered_bucket_config(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_CONFIG_ITEM *bucket,
+  WT_BUCKET_STORAGE **bstoragep)
+{
+    WT_BUCKET_STORAGE *bstorage, *new;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
+#if 0
+    WT_STORAGE_SOURCE *custom, *storage;
+#else
+    WT_STORAGE_SOURCE *storage;
+#endif
+    uint64_t hash_bucket, hash;
+
+    *bstoragep = NULL;
+
+    bstorage = new = NULL;
+    conn = S2C(session);
+
+    __wt_spin_lock(session, &conn->storage_lock);
+
+    WT_ERR(__tiered_confchk(session, cval, &nstorage));
+    if (nstorage == NULL) {
+        if (bucket->len != 0)
+            WT_ERR_MSG(
+              session, EINVAL, "tiered_storage.bucket requires tiered_storage.name to be set");
+        goto out;
+    }
+
+    /*
+     * Check if tiered storage is set on the connection. If someone wants tiered storage on a table,
+     * it needs to be configured on the database as well.
+     */
+    if (conn->bstorage == NULL && bstoragep != &conn->bstorage)
+        WT_ERR_MSG(
+          session, EINVAL, "table tiered storage requires connection tiered storage to be set");
+    hash = __wt_hash_city64(bucket->str, bucket->len);
+    hash_bucket = hash & (conn->hash_size - 1);
+    TAILQ_FOREACH (bstorage, &nstorage->buckethashqh[hash_bucket], q)
+        if (WT_STRING_MATCH(bstorage->bucket, bucket->str, bucket->len))
+            goto out;
+
+    WT_ERR(__wt_calloc_one(session, &new));
+    WT_ERR(__wt_strndup(session, bucket->str, bucket->len, &new->bucket));
+    storage = nstorage->storage_source;
+#if 0
+    if (storage->customize != NULL) {
+        custom = NULL;
+        WT_ERR(storage->customize(storage, &session->iface, cfg_arg, &custom));
+        if (custom != NULL) {
+            bstorage->owned = 1;
+            storage = custom;
+        }
+    }
+#endif
+    new->storage_source = storage;
+    if (bstorage != NULL) {
+        new->object_size = bstorage->object_size;
+        new->retain_secs = bstorage->retain_secs;
+        WT_ERR(__wt_strdup(session, bstorage->auth_token, &new->auth_token));
+    }
+    TAILQ_INSERT_HEAD(&nstorage->bucketqh, new, q);
+    TAILQ_INSERT_HEAD(&nstorage->buckethashqh[hash_bucket], new, hashq);
+    F_SET(new, WT_BUCKET_FREE);
+
+out:
+    __wt_spin_unlock(session, &conn->storage_lock);
+    *bstoragep = new;
+    return (0);
+
+err:
+    if (bstorage != NULL) {
+        __wt_free(session, new->auth_token);
+        __wt_free(session, new->bucket);
+        __wt_free(session, new);
+    }
+    __wt_spin_unlock(session, &conn->storage_lock);
+    return (ret);
+}
+
+/*
  * __conn_add_storage_source --
  *     WT_CONNECTION->add_storage_source method.
  */
@@ -673,28 +783,33 @@ __conn_add_storage_source(
 {
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_NAMED_STORAGE_SOURCE *nstorage_source;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
     WT_SESSION_IMPL *session;
+    uint64_t i;
 
-    nstorage_source = NULL;
+    nstorage = NULL;
 
     conn = (WT_CONNECTION_IMPL *)wt_conn;
     CONNECTION_API_CALL(conn, session, add_storage_source, config, cfg);
     WT_UNUSED(cfg);
 
-    WT_ERR(__wt_calloc_one(session, &nstorage_source));
-    WT_ERR(__wt_strdup(session, name, &nstorage_source->name));
-    nstorage_source->storage_source = storage_source;
+    WT_ERR(__wt_calloc_one(session, &nstorage));
+    WT_ERR(__wt_strdup(session, name, &nstorage->name));
+    nstorage->storage_source = storage_source;
+    TAILQ_INIT(&nstorage->bucketqh);
+    WT_ERR(__wt_calloc_def(session, conn->hash_size, &nstorage->buckethashqh));
+    for (i = 0; i < conn->hash_size; i++)
+        TAILQ_INIT(&nstorage->buckethashqh[i]);
 
     __wt_spin_lock(session, &conn->api_lock);
-    TAILQ_INSERT_TAIL(&conn->storagesrcqh, nstorage_source, q);
-    nstorage_source = NULL;
+    TAILQ_INSERT_TAIL(&conn->storagesrcqh, nstorage, q);
+    nstorage = NULL;
     __wt_spin_unlock(session, &conn->api_lock);
 
 err:
-    if (nstorage_source != NULL) {
-        __wt_free(session, nstorage_source->name);
-        __wt_free(session, nstorage_source);
+    if (nstorage != NULL) {
+        __wt_free(session, nstorage->name);
+        __wt_free(session, nstorage);
     }
 
     API_END_RET_NOTFOUND_MAP(session, ret);
@@ -735,22 +850,38 @@ __conn_get_storage_source(
 int
 __wt_conn_remove_storage_source(WT_SESSION_IMPL *session)
 {
+    WT_BUCKET_STORAGE *bstorage;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
-    WT_NAMED_STORAGE_SOURCE *nstorage_source;
+    WT_NAMED_STORAGE_SOURCE *nstorage;
+    WT_STORAGE_SOURCE *storage;
 
     conn = S2C(session);
 
-    while ((nstorage_source = TAILQ_FIRST(&conn->storagesrcqh)) != NULL) {
+    while ((nstorage = TAILQ_FIRST(&conn->storagesrcqh)) != NULL) {
         /* Remove from the connection's list, free memory. */
-        TAILQ_REMOVE(&conn->storagesrcqh, nstorage_source, q);
-        /* Call any termination method. */
-        if (nstorage_source->storage_source->terminate != NULL)
-            WT_TRET(nstorage_source->storage_source->terminate(
-              nstorage_source->storage_source, (WT_SESSION *)session));
+        TAILQ_REMOVE(&conn->storagesrcqh, nstorage, q);
+        while ((bstorage = TAILQ_FIRST(&nstorage->bucketqh)) != NULL) {
+            /* Remove from the connection's list, free memory. */
+            TAILQ_REMOVE(&nstorage->bucketqh, bstorage, q);
+            storage = bstorage->storage_source;
+            WT_ASSERT(session, storage != NULL);
+            if (bstorage->owned && storage->terminate != NULL)
+                WT_TRET(storage->terminate(storage, (WT_SESSION *)session));
+            __wt_free(session, bstorage->auth_token);
+            __wt_free(session, bstorage->bucket);
+            __wt_free(session, bstorage);
+        }
 
-        __wt_free(session, nstorage_source->name);
-        __wt_free(session, nstorage_source);
+        /* Call any termination method. */
+        storage = nstorage->storage_source;
+        WT_ASSERT(session, storage != NULL);
+        if (storage->terminate != NULL)
+            WT_TRET(storage->terminate(storage, (WT_SESSION *)session));
+
+        __wt_free(session, nstorage->buckethashqh);
+        __wt_free(session, nstorage->name);
+        __wt_free(session, nstorage);
     }
 
     return (ret);
