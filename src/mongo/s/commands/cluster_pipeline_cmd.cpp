@@ -186,6 +186,10 @@ public:
     bool adminOnly() const override {
         return false;
     }
+
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::AggregateCommand::kAuthorizationContract;
+    }
 } clusterPipelineCmd;
 
 }  // namespace
