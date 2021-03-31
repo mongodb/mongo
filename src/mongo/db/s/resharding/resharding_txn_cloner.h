@@ -88,8 +88,6 @@ private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
                                                                          const Pipeline& pipeline);
 
-    void _updateSessionRecord(OperationContext* opCtx);
-
     void _updateProgressDocument(OperationContext* opCtx, const LogicalSessionId& progress);
 
     template <typename Callable>

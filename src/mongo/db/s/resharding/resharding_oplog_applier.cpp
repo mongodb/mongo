@@ -63,173 +63,6 @@ using namespace fmt::literals;
 
 namespace {
 
-const auto kReshardingOplogTag = BSON("$reshardingOplogApply" << 1);
-
-/**
- * Insert a no-op oplog entry that contains the pre/post image document from a retryable write.
- */
-repl::OpTime insertPrePostImageOplogEntry(OperationContext* opCtx,
-                                          const repl::DurableOplogEntry& prePostImageOp) {
-    uassert(4990408,
-            str::stream() << "expected a no-op oplog for pre/post image oplog: "
-                          << redact(prePostImageOp.toBSON()),
-            prePostImageOp.getOpType() == repl::OpTypeEnum::kNoop);
-
-    auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(prePostImageOp.toBSON()));
-    // Reset OpTime so logOp() can assign a new one.
-    noOpOplog.setOpTime(OplogSlot());
-    noOpOplog.setWallClockTime(Date_t::now());
-
-    return writeConflictRetry(
-        opCtx,
-        "InsertPrePostImageOplogEntryForResharding",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        [&] {
-            // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW. Take the
-            // transaction table db lock to ensure the same lock ordering with normal replicated
-            // updates to the table.
-            Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
-            WriteUnitOfWork wunit(opCtx);
-
-            const auto& oplogOpTime = repl::logOp(opCtx, &noOpOplog);
-
-            uassert(4990409,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << noOpOplog.getOpTime().toString() << ": "
-                                  << redact(noOpOplog.toBSON()),
-                    !oplogOpTime.isNull());
-
-            wunit.commit();
-
-            return oplogOpTime;
-        });
-}
-
-/**
- * Writes the oplog entries and updates to config.transactions for enabling retrying the write
- * described in the oplog entry.
- */
-Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
-                                              const repl::OplogEntry& oplog) {
-    auto txnNumber = *oplog.getTxnNumber();
-
-    opCtx->setLogicalSessionId(*oplog.getSessionId());
-    opCtx->setTxnNumber(txnNumber);
-
-    boost::optional<MongoDOperationContextSession> scopedSession;
-    scopedSession.emplace(opCtx);
-
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    uassert(4990400, "Failed to get transaction Participant", txnParticipant);
-
-    // If it's not a CRUD type, it's an oplog related to transaction, so convert it to
-    // incompleteHistory stmtId.
-    const auto stmtIds = oplog.isCrudOpType() ? oplog.getStatementIds()
-                                              : std::vector<StmtId>{kIncompleteHistoryStmtId};
-
-    try {
-        txnParticipant.beginOrContinue(opCtx, txnNumber, boost::none, boost::none);
-
-        if (txnParticipant.checkStatementExecuted(opCtx, stmtIds.front())) {
-            // Skip the incoming statement because it has already been logged locally.
-            return Status::OK();
-        }
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::TransactionTooOld) {
-            return Status::OK();
-        } else if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
-            // If the transaction chain is incomplete because oplog was truncated, just ignore the
-            // incoming oplog and don't attempt to 'patch up' the missing pieces.
-            // This can also occur when txnNum == activeTxnNum. This can only happen when (lsid,
-            // txnNum) pair is reused. We are not going to update config.transactions and let the
-            // retry error out on this shard for this case.
-            // This can also happen if we are trying to update config.transactions entry in which
-            // this node has already executed the transaction.
-            return Status::OK();
-        } else if (ex.code() == ErrorCodes::PreparedTransactionInProgress) {
-            // TODO SERVER-53139 Change to not block here.
-            auto txnFinishes = txnParticipant.onExitPrepare();
-            scopedSession.reset();
-            txnFinishes.wait();
-            return insertOplogAndUpdateConfigForRetryable(opCtx, oplog);
-        }
-
-        throw;
-    }
-
-    repl::OpTime prePostImageOpTime;
-    if (auto preImageOp = oplog.getPreImageOp()) {
-        prePostImageOpTime = insertPrePostImageOplogEntry(opCtx, *preImageOp);
-    } else if (auto postImageOp = oplog.getPostImageOp()) {
-        prePostImageOpTime = insertPrePostImageOplogEntry(opCtx, *postImageOp);
-    }
-
-    auto rawOplogBSON = oplog.getEntry().toBSON();
-    auto noOpOplog = uassertStatusOK(repl::MutableOplogEntry::parse(rawOplogBSON));
-
-    // We only need to store the original oplog details for retryable writes.
-    if (oplog.isCrudOpType()) {
-        noOpOplog.setObject2(rawOplogBSON);
-    } else {
-        // Make sure o2 is not empty so SessionUpdateTracker will not ignore this oplog.
-        noOpOplog.setObject2(kReshardingOplogTag);
-    }
-
-    noOpOplog.setNss({});
-    noOpOplog.setObject(kReshardingOplogTag);
-
-    if (oplog.getPreImageOp()) {
-        noOpOplog.setPreImageOpTime(prePostImageOpTime);
-    } else if (oplog.getPostImageOp()) {
-        noOpOplog.setPostImageOpTime(prePostImageOpTime);
-    }
-
-    noOpOplog.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
-    noOpOplog.setOpType(repl::OpTypeEnum::kNoop);
-    noOpOplog.setFromMigrate(true);
-    // Reset OpTime so logOp() can assign a new one.
-    noOpOplog.setOpTime(OplogSlot());
-    noOpOplog.setWallClockTime(Date_t::now());
-
-    writeConflictRetry(
-        opCtx,
-        "ReshardingUpdateConfigTransaction",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        [&] {
-            // Need to take global lock here so repl::logOp will not unlock it and trigger the
-            // invariant that disallows unlocking global lock while inside a WUOW. Take the
-            // transaction table db lock to ensure the same lock ordering with normal replicated
-            // updates to the table.
-            Lock::DBLock lk(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
-            WriteUnitOfWork wunit(opCtx);
-
-            const auto& oplogOpTime = repl::logOp(opCtx, &noOpOplog);
-
-            uassert(4990402,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << noOpOplog.getOpTime().toString() << ": "
-                                  << redact(noOpOplog.toBSON()),
-                    !oplogOpTime.isNull());
-
-            SessionTxnRecord sessionTxnRecord;
-            sessionTxnRecord.setSessionId(*oplog.getSessionId());
-            sessionTxnRecord.setTxnNum(txnNumber);
-            sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
-
-            // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog entry
-            // wallTime when replicating.
-            sessionTxnRecord.setLastWriteDate(noOpOplog.getWallClockTime());
-            txnParticipant.onRetryableWriteCloningCompleted(opCtx, stmtIds, sessionTxnRecord);
-
-            wunit.commit();
-        });
-
-    return Status::OK();
-}
-
 ServiceContext::UniqueClient makeKillableClient(ServiceContext* serviceContext, StringData name) {
     auto client = serviceContext->makeClient(name.toString());
     stdx::lock_guard<Client> lk(*client);
@@ -266,6 +99,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _outputNs(constructTemporaryReshardingNss(_nsBeingResharded.db(), _uuidBeingResharded)),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _batchPreparer{CollatorInterface::cloneCollator(sourceChunkMgr.getDefaultCollator())},
+      _sessionApplication{},
       _applicationRules(ReshardingOplogApplicationRules(
           _outputNs, std::move(allStashNss), myStashIdx, _sourceId.getShardId(), sourceChunkMgr)),
       _executor(std::move(executor)),
@@ -427,7 +261,17 @@ Status ReshardingOplogApplier::_applyOplogEntry(OperationContext* opCtx,
     invariant(opCtx->writesAreReplicated());
 
     if (op.isForReshardingSessionApplication()) {
-        return insertOplogAndUpdateConfigForRetryable(opCtx, op);
+        auto hitPreparedTxn = _sessionApplication.tryApplyOperation(opCtx, op);
+
+        if (hitPreparedTxn) {
+            hitPreparedTxn->get(opCtx);
+            uassert(5538400,
+                    str::stream() << "Hit prepared transaction twice while applying oplog entry: "
+                                  << redact(op.toBSONForLogging()),
+                    !_sessionApplication.tryApplyOperation(opCtx, op));
+        }
+
+        return Status::OK();
     }
 
     invariant(op.isCrudOpType());
