@@ -108,20 +108,6 @@ void DropCollectionCoordinator::_enterPhase(Phase newPhase) {
     _updateStateDocument(std::move(newDoc));
 }
 
-void DropCollectionCoordinator::_removeStateDocument() {
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    LOGV2_DEBUG(5390502,
-                2,
-                "Removing state document for drop collection coordinator",
-                "namespace"_attr = nss());
-    store.remove(opCtx.get(),
-                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = {};
-}
-
 ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -194,33 +180,18 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     **executor);
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
-            }))
-        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (status.isOK()) {
                 LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
-            } else {
-                // Do not remove the coordinator document if we have a stepdown related error.
-                if (status.isA<ErrorCategory::NotPrimaryError>() ||
-                    status.isA<ErrorCategory::ShutdownError>()) {
-                    uassertStatusOK(status);
-                }
-
+            }))
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
+                !status.isA<ErrorCategory::ShutdownError>()) {
+                // TODO SERVER-55396: retry operation until it succeeds.
                 LOGV2_ERROR(5280901,
                             "Error running drop collection",
                             "namespace"_attr = nss(),
                             "error"_attr = redact(status));
             }
-
-            try {
-                _removeStateDocument();
-            } catch (DBException& ex) {
-                LOGV2_WARNING(5390506, "Failed to remove coordinator", "error"_attr = redact(ex));
-                ex.addContext("Failed to remove drop collection coordinator state document"_sd);
-                throw;
-            }
-
-            // TODO SERVER-55396: retry operation until it succeeds.
-            uassertStatusOK(status);
+            return status;
         });
 }
 

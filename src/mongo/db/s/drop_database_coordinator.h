@@ -71,7 +71,6 @@ private:
 
     void _insertStateDocument(OperationContext* opCtx, StateDoc&& doc);
     void _updateStateDocument(OperationContext* opCtx, StateDoc&& newStateDoc);
-    void _removeStateDocument();
     void _enterPhase(Phase newPhase);
 
     DropDatabaseCoordinatorDocument _doc;

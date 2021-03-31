@@ -536,32 +536,15 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                 _finalize(opCtx);
             }))
-        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (status.isOK()) {
-                LOGV2(5458701, "Collection created", "namespace"_attr = nss());
-            } else {
-                // Do not remove the coordinator document if we have a stepdown related error.
-                if (status.isA<ErrorCategory::NotPrimaryError>() ||
-                    status.isA<ErrorCategory::ShutdownError>()) {
-                    uassertStatusOK(status);
-                }
-
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
+                !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5458702,
                             "Error running create collection",
                             "namespace"_attr = nss(),
                             "error"_attr = redact(status));
             }
-
-            try {
-                _removeCoordinatorDocument();
-            } catch (DBException& ex) {
-                LOGV2_WARNING(5458703, "Failed to remove coordinator", "error"_attr = redact(ex));
-                ex.addContext("Failed to remove create collection coordinator state document"_sd);
-                throw;
-            }
-
-            // TODO SERVER-55396: retry operation until it succeeds.
-            uassertStatusOK(status);
+            return status;
         });
 }
 
@@ -837,7 +820,13 @@ void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) noexcept {
     auto result = CreateCollectionResponse(
         _initialChunks.chunks[_initialChunks.chunks.size() - 1].getVersion());
     result.setCollectionUUID(_collectionUUID);
-    _result = result;
+    _result = std::move(result);
+
+    LOGV2(5458701,
+          "Collection created",
+          "namespace"_attr = nss(),
+          "UUID"_attr = _result->getCollectionUUID(),
+          "version"_attr = _result->getCollectionVersion());
 }
 
 // Phase change and document handling API.
@@ -864,23 +853,16 @@ void CreateCollectionCoordinator::_updateCoordinatorDocument(CoordDoc&& newDoc) 
     _doc = std::move(newDoc);
 }
 
-void CreateCollectionCoordinator::_removeCoordinatorDocument() {
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<CoordDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    LOGV2_DEBUG(5458705,
-                1,
-                "Removing state document for create collection coordinator",
-                "namespace"_attr = nss());
-    store.remove(opCtx.get(),
-                 BSON(CoordDoc::kIdFieldName << _doc.getId().toBSON()),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = {};
-}
-
 void CreateCollectionCoordinator::_enterPhase(Phase newPhase) {
     CoordDoc newDoc(_doc);
     newDoc.setPhase(newPhase);
+
+    LOGV2_DEBUG(5565600,
+                2,
+                "Create collection coordinator phase transition",
+                "namespace"_attr = nss(),
+                "newPhase"_attr = CreateCollectionCoordinatorPhase_serializer(newDoc.getPhase()),
+                "oldPhase"_attr = CreateCollectionCoordinatorPhase_serializer(_doc.getPhase()));
 
     if (_doc.getPhase() == Phase::kUnset) {
         _insertCoordinatorDocument(std::move(newDoc));

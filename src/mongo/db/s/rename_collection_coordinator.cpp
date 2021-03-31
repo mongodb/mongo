@@ -158,21 +158,6 @@ void RenameCollectionCoordinator::_enterPhase(Phase newPhase) {
     _updateStateDocument(std::move(newDoc));
 }
 
-void RenameCollectionCoordinator::_removeStateDocument() {
-    auto opCtx = cc().makeOperationContext();
-    PersistentTaskStore<StateDoc> store(NamespaceString::kShardingDDLCoordinatorsNamespace);
-    LOGV2_DEBUG(5460502,
-                2,
-                "Removing state document for rename collection coordinator",
-                "fromNs"_attr = nss(),
-                "toNs"_attr = _doc.getTo());
-    store.remove(opCtx.get(),
-                 BSON(StateDoc::kIdFieldName << _doc.getId().toBSON()),
-                 WriteConcerns::kMajorityWriteConcern);
-
-    _doc = {};
-}
-
 ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -319,39 +304,27 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     catalog->getCollectionRoutingInfoWithRefresh(opCtx, _doc.getTo()));
                 _response = RenameCollectionResponse(cm.isSharded() ? cm.getVersion()
                                                                     : ChunkVersion::UNSHARDED());
+
+
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
                     "renameCollection.end",
                     nss().ns(),
                     BSON("source" << nss().toString() << "destination" << _doc.getTo().toString()),
                     ShardingCatalogClient::kMajorityWriteConcern);
-            }))
-        .onCompletion([this, anchor = shared_from_this()](const Status& status) {
-            if (status.isOK()) {
-                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
-            } else {
-                // Do not remove the coordinator document if we have a stepdown related error.
-                if (status.isA<ErrorCategory::NotPrimaryError>() ||
-                    status.isA<ErrorCategory::ShutdownError>()) {
-                    uassertStatusOK(status);
-                }
 
+                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
+            }))
+        .onError([this, anchor = shared_from_this()](const Status& status) {
+            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
+                !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5460505,
                             "Error running rename collection",
                             "namespace"_attr = nss(),
                             "error"_attr = redact(status));
             }
 
-            try {
-                _removeStateDocument();
-            } catch (DBException& ex) {
-                LOGV2_WARNING(5460503, "Failed to remove coordinator", "error"_attr = redact(ex));
-                ex.addContext("Failed to remove rename collection coordinator state document"_sd);
-                throw;
-            }
-
-            // TODO SERVER-55396: retry operation until it succeeds.
-            uassertStatusOK(status);
+            return status;
         });
 }
 
