@@ -98,6 +98,13 @@ public:
     static void registerParser(std::string functionName, Parser parser);
 
     /**
+     * Is this a function that the parser knows about?
+     */
+    inline static bool isFunction(const mongo::StringData& name) {
+        return parserMap.find(name) != parserMap.end();
+    }
+
+    /**
      * Optimizes the input expression using its own optimize() method.
      */
     void optimize() {
@@ -145,7 +152,6 @@ public:
         return args.freezeToValue();
     }
 
-
 protected:
     ExpressionContext* _expCtx;
     std::string _accumulatorName;
@@ -176,7 +182,7 @@ public:
                         "'window' field must be an object",
                         arg.type() == BSONType::Object);
                 bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
-            } else if (parserMap.find(argName) != parserMap.end()) {
+            } else if (isFunction(argName)) {
                 uassert(ErrorCodes::FailedToParse,
                         "Cannot specify two functions in window function spec",
                         !accumulatorName);
@@ -229,7 +235,7 @@ public:
                         "'window' field must be an object",
                         obj[kWindowArg].type() == BSONType::Object);
                 bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
-            } else if (parserMap.find(argName) != parserMap.end()) {
+            } else if (isFunction(argName)) {
                 uassert(ErrorCodes::FailedToParse,
                         "Cannot specify two functions in window function spec",
                         !accumulatorName);
@@ -278,7 +284,7 @@ public:
             WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Current{}}};
         auto arg = obj.firstElement();
         auto argName = arg.fieldNameStringData();
-        if (parserMap.find(argName) != parserMap.end()) {
+        if (isFunction(argName)) {
             uassert(5371603,
                     str::stream() << accumulatorName << " must be specified with '{}' as the value",
                     arg.type() == BSONType::Object && arg.embeddedObject().nFields() == 0);

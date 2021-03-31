@@ -131,6 +131,7 @@ env.Library(
         'accumulator_sum.cpp',
         'window_function/window_bounds.cpp',
         'window_function/window_function_covariance.cpp',
+        'window_function/window_function_count.cpp',
         'window_function/window_function_expression.cpp',
         'window_function/window_function_integral.cpp',
         'window_function/window_function_sum.cpp',
