@@ -36,6 +36,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -99,7 +100,8 @@ public:
     }
 };
 
-MONGO_REGISTER_TEST_COMMAND(AbortReshardCollectionCommand);
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AbortReshardCollectionCommand,
+                                       resharding::gFeatureFlagResharding);
 
 }  // namespace
 }  // namespace mongo

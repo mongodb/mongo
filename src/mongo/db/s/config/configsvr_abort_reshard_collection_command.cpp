@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace {
@@ -96,6 +97,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "abortReshardCollection command not enabled",
+                    resharding::gFeatureFlagResharding.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
