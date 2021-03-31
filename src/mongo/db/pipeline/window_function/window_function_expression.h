@@ -256,7 +256,6 @@ public:
         // Rank based accumulators are always unbounded to current.
         WindowBounds bounds = WindowBounds{
             WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Current{}}};
-        boost::intrusive_ptr<::mongo::Expression> input;
         auto arg = obj.firstElement();
         auto argName = arg.fieldNameStringData();
         if (parserMap.find(argName) != parserMap.end()) {
@@ -309,6 +308,67 @@ public:
         args.addField(_accumulatorName, Value(Document()));
         return args.freezeToValue();
     }
+};
+
+class ExpressionExpMovingAvg : public Expression {
+public:
+    static constexpr StringData kAccName = "$expMovingAvg"_sd;
+    static constexpr StringData kInputArg = "input"_sd;
+    static constexpr StringData kNArg = "N"_sd;
+    static constexpr StringData kAlphaArg = "alpha"_sd;
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx);
+
+    ExpressionExpMovingAvg(ExpressionContext* expCtx,
+                           std::string accumulatorName,
+                           boost::intrusive_ptr<::mongo::Expression> input,
+                           WindowBounds bounds,
+                           long long nValue)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
+          _N(nValue) {}
+
+    ExpressionExpMovingAvg(ExpressionContext* expCtx,
+                           std::string accumulatorName,
+                           boost::intrusive_ptr<::mongo::Expression> input,
+                           WindowBounds bounds,
+                           Decimal128 alpha)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
+          _alpha(alpha) {}
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        if (_N) {
+            return AccumulatorExpMovingAvg::create(
+                _expCtx, Decimal128(2).divide(Decimal128(_N.get()).add(Decimal128(1))));
+        } else if (_alpha) {
+            return AccumulatorExpMovingAvg::create(_expCtx, _alpha.get());
+        }
+        tasserted(5433602, "ExpMovingAvg neither N nor alpha was set");
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        tasserted(5433603,
+                  str::stream() << "Window function " << _accumulatorName
+                                << " is not supported with a removable window");
+    }
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        MutableDocument subObj;
+        tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
+        if (_N) {
+            subObj[kNArg] = Value(_N.get());
+        } else {
+            subObj[kAlphaArg] = Value(_alpha.get());
+        }
+        subObj[kInputArg] = _input->serialize(static_cast<bool>(explain));
+        MutableDocument outerObj;
+        outerObj[kAccName] = subObj.freezeToValue();
+        return outerObj.freezeToValue();
+    }
+
+protected:
+    boost::optional<long long> _N;
+    boost::optional<Decimal128> _alpha;
 };
 
 }  // namespace mongo::window_function

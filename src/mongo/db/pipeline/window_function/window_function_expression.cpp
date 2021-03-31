@@ -66,6 +66,62 @@ void Expression::registerParser(std::string functionName, Parser parser) {
     parserMap.emplace(std::move(functionName), std::move(parser));
 }
 
+
+boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
+    BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
+    // 'obj' is something like '{$expMovingAvg: {input: <arg>, <N/alpha>: <int/float>}}'
+    boost::optional<StringData> accumulatorName;
+    boost::intrusive_ptr<::mongo::Expression> input;
+    uassert(ErrorCodes::FailedToParse,
+            "$expMovingAvg must have exactly one argument that is an object",
+            obj.nFields() == 1 && obj.hasField(kAccName) &&
+                obj[kAccName].type() == BSONType::Object);
+    auto subObj = obj[kAccName].embeddedObject();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "$expMovingAvg sub object must have exactly two fields: An '"
+                          << kInputArg << "' field, and either an '" << kNArg << "' field or an '"
+                          << kAlphaArg << "' field",
+            subObj.nFields() == 2 && subObj.hasField(kInputArg));
+    input =
+        ::mongo::Expression::parseOperand(expCtx, subObj[kInputArg], expCtx->variablesParseState);
+    // ExpMovingAvg is always unbounded to current.
+    WindowBounds bounds = WindowBounds{
+        WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Current{}}};
+    if (subObj.hasField(kNArg)) {
+        auto nVal = subObj[kNArg];
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << kNArg << "' field must be an integer, but found type "
+                              << nVal.type(),
+                nVal.isNumber());
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << kNArg << "' field must be an integer, but found  " << nVal
+                              << ". To use a non-integer, use the '" << kAlphaArg
+                              << "' argument instead",
+                nVal.safeNumberDouble() == floor(nVal.safeNumberDouble()));
+        auto nNum = nVal.safeNumberLong();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << kNArg << "' must be greater than zero. Got " << nNum,
+                nNum > 0);
+        return make_intrusive<ExpressionExpMovingAvg>(
+            expCtx, std::string(kAccName), std::move(input), std::move(bounds), nNum);
+    } else if (subObj.hasField(kAlphaArg)) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "'" << kAlphaArg << "' must be a number",
+                subObj[kAlphaArg].isNumber());
+        return make_intrusive<ExpressionExpMovingAvg>(expCtx,
+                                                      std::string(kAccName),
+                                                      std::move(input),
+                                                      std::move(bounds),
+                                                      subObj[kAlphaArg].numberDecimal());
+    } else {
+        uasserted(ErrorCodes::FailedToParse,
+                  str::stream() << "Got unrecognized field in $expMovingAvg"
+                                << "$expMovingAvg sub object must have exactly two fields: An '"
+                                << kInputArg << "' field, and either an '" << kNArg
+                                << "' field or an '" << kAlphaArg << "' field");
+    }
+}
+
 MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
     // defined by REGISTER_NON_REMOVABLE_WINDOW_FUNCTION and REGISTER_REMOVABLE_WINDOW_FUNCTION
