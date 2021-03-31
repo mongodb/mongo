@@ -38,9 +38,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction_participant.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo::resharding::data_copy {
@@ -200,6 +203,59 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
 
     callable();
     return boost::none;
+}
+
+void updateSessionRecord(OperationContext* opCtx,
+                         BSONObj o2Field,
+                         std::vector<StmtId> stmtIds,
+                         boost::optional<repl::OpTime> preImageOpTime,
+                         boost::optional<repl::OpTime> postImageOpTime) {
+    invariant(opCtx->getLogicalSessionId());
+    invariant(opCtx->getTxnNumber());
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant, "Must be called with session checked out");
+
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setObject(BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
+    oplogEntry.setObject2(std::move(o2Field));
+    oplogEntry.setNss({});
+    oplogEntry.setSessionId(opCtx->getLogicalSessionId());
+    oplogEntry.setTxnNumber(opCtx->getTxnNumber());
+    oplogEntry.setStatementIds(stmtIds);
+    oplogEntry.setPreImageOpTime(std::move(preImageOpTime));
+    oplogEntry.setPostImageOpTime(std::move(postImageOpTime));
+    oplogEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
+    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+    oplogEntry.setFromMigrate(true);
+
+    writeConflictRetry(opCtx,
+                       "resharding::data_copy::updateSessionRecord",
+                       NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       [&] {
+                           AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+
+                           WriteUnitOfWork wuow(opCtx);
+                           repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
+
+                           uassert(4989901,
+                                   str::stream() << "Failed to create new oplog entry: "
+                                                 << redact(oplogEntry.toBSON()),
+                                   !opTime.isNull());
+
+                           // Use the same wallTime as the oplog entry since SessionUpdateTracker
+                           // looks at the oplog entry wallTime when replicating.
+                           SessionTxnRecord sessionTxnRecord(*oplogEntry.getSessionId(),
+                                                             *oplogEntry.getTxnNumber(),
+                                                             std::move(opTime),
+                                                             oplogEntry.getWallClockTime());
+
+                           txnParticipant.onRetryableWriteCloningCompleted(
+                               opCtx, stmtIds, sessionTxnRecord);
+
+                           wuow.commit();
+                       });
 }
 
 }  // namespace mongo::resharding::data_copy

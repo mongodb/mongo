@@ -137,58 +137,6 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingTxnCloner::_targetAggregati
         pipeline.getContext(), std::move(request), _sourceId.getShardId());
 }
 
-void ReshardingTxnCloner::_updateSessionRecord(OperationContext* opCtx) {
-    invariant(opCtx->getLogicalSessionId());
-    invariant(opCtx->getTxnNumber());
-
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setObject(BSON(SessionCatalogMigrationDestination::kSessionMigrateOplogTag << 1));
-    oplogEntry.setObject2(TransactionParticipant::kDeadEndSentinel);
-    oplogEntry.setNss({});
-    oplogEntry.setSessionId(opCtx->getLogicalSessionId());
-    oplogEntry.setTxnNumber(opCtx->getTxnNumber());
-    oplogEntry.setStatementIds({kIncompleteHistoryStmtId});
-    oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
-    oplogEntry.setWallClockTime(Date_t::now());
-    oplogEntry.setFromMigrate(true);
-
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    writeConflictRetry(
-        opCtx,
-        "ReshardingTxnCloner::_updateSessionRecord",
-        NamespaceString::kSessionTransactionsTableNamespace.ns(),
-        [&] {
-            // We need to take the global lock here so repl::logOp() will not unlock it and trigger
-            // the invariant that disallows unlocking the global lock while inside a WUOW. We take
-            // the transaction table's database lock to ensure the same lock ordering with normal
-            // replicated updates to the collection.
-            Lock::DBLock dbLock(
-                opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IX);
-
-            WriteUnitOfWork wuow(opCtx);
-            repl::OpTime opTime = repl::logOp(opCtx, &oplogEntry);
-
-            uassert(4989901,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString() << ": "
-                                  << redact(oplogEntry.toBSON()),
-                    !opTime.isNull());
-
-            // Use the same wallTime as oplog since SessionUpdateTracker looks at the oplog entry
-            // wallTime when replicating.
-            SessionTxnRecord sessionTxnRecord(*opCtx->getLogicalSessionId(),
-                                              *opCtx->getTxnNumber(),
-                                              std::move(opTime),
-                                              oplogEntry.getWallClockTime());
-
-            txnParticipant.onRetryableWriteCloningCompleted(
-                opCtx, {kIncompleteHistoryStmtId}, sessionTxnRecord);
-
-            wuow.commit();
-        });
-}
-
 void ReshardingTxnCloner::_updateProgressDocument(OperationContext* opCtx,
                                                   const LogicalSessionId& progress) {
     PersistentTaskStore<ReshardingTxnClonerProgress> store(
@@ -303,7 +251,14 @@ SemiFuture<void> ReshardingTxnCloner::run(
                        chainCtx->donorRecord->getSessionId(),
                        chainCtx->donorRecord->getTxnNum(),
                        boost::none /* stmtId */,
-                       [&] { _updateSessionRecord(opCtx); });
+                       [&] {
+                           resharding::data_copy::updateSessionRecord(
+                               opCtx,
+                               TransactionParticipant::kDeadEndSentinel,
+                               {kIncompleteHistoryStmtId},
+                               boost::none /* preImageOpTime */,
+                               boost::none /* postImageOpTime */);
+                       });
                });
 
                if (hitPreparedTxn) {

@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_session_id.h"
@@ -112,6 +113,19 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
                                                               TxnNumber txnNumber,
                                                               boost::optional<StmtId> stmtId,
                                                               unique_function<void()> callable);
+
+/**
+ * Updates this shard's config.transactions table based on a retryable write or multi-statement
+ * transaction that already executed on some donor shard.
+ *
+ * This function assumes it is being called while the corresponding logical session is checked out
+ * by the supplied OperationContext.
+ */
+void updateSessionRecord(OperationContext* opCtx,
+                         BSONObj o2Field,
+                         std::vector<StmtId> stmtIds,
+                         boost::optional<repl::OpTime> preImageOpTime,
+                         boost::optional<repl::OpTime> postImageOpTime);
 
 }  // namespace resharding::data_copy
 }  // namespace mongo

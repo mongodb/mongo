@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
+#include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/util/future.h"
@@ -196,6 +197,8 @@ private:
     const Timestamp _reshardingCloneFinishedTs;
 
     const ReshardingOplogBatchPreparer _batchPreparer;
+
+    const ReshardingOplogSessionApplication _sessionApplication;
 
     // Actually applies the ops, using special rules that apply only to resharding. Only used when
     // the 'useReshardingOplogApplicationRules' server parameter is set to true.
