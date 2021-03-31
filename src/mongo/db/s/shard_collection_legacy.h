@@ -42,6 +42,7 @@ namespace mongo {
 CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& cmdObj,
-                                               bool requestFromCSRS);
+                                               bool requestFromCSRS,
+                                               bool use50MetadataFormat);
 
 }  // namespace mongo

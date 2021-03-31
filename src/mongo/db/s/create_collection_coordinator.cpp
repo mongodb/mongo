@@ -739,7 +739,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
 
     CollectionType coll(nss(),
                         _initialChunks.collVersion().epoch(),
-                        _initialChunks.creationTime,
+                        _initialChunks.collVersion().getTimestamp(),
                         Date_t::now(),
                         *_collectionUUID);
 

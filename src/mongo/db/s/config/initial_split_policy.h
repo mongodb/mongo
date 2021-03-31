@@ -76,7 +76,6 @@ public:
      */
     struct ShardCollectionConfig {
         std::vector<ChunkType> chunks;
-        Timestamp creationTime;
 
         const auto& collVersion() const {
             return chunks.back().getVersion();
