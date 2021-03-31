@@ -11,6 +11,7 @@
 (function() {
 "use strict";
 
+load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 const getParam = db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1});
 jsTestLog(getParam);
 const featureEnabled = assert.commandWorked(getParam).featureFlagWindowFunctions.value;
@@ -51,4 +52,47 @@ constantPartitionExprs.forEach(function(partitionExpr) {
     assert(result.stages[1].$_internalInhibitOptimization, result);
     assert.eq({$_internalSetWindowFields: {output: {}}}, result.stages[2]);
 });
+
+coll.drop();
+assert.commandWorked(coll.insertMany([
+    {int_field: 0},
+    {int_field: null, other_field: null},
+    {other_field: 0},
+    {int_field: null},
+    {other_field: null},
+    {int_field: null, other_field: null}
+]));
+
+// Test that missing and null field are in the same partition.
+let res = coll.aggregate([
+    {$setWindowFields: {partitionBy: "$int_field", output: {count: {$sum: 1}}}},
+    {$project: {_id: 0}}
+]);
+assert(resultsEq(res.toArray(), [
+    {int_field: null, other_field: null, count: 5},
+    {other_field: 0, count: 5},
+    {int_field: null, count: 5},
+    {other_field: null, count: 5},
+    {int_field: null, other_field: null, count: 5},
+    {int_field: 0, count: 1}
+]));
+
+// Test that the compound key with the mix of missing and null field works correctly.
+res = coll.aggregate([
+    {
+        $setWindowFields: {
+            partitionBy: {int_field: "$int_field", other_field: "$other_field"},
+            output: {count: {$sum: 1}}
+        }
+    },
+    {$project: {_id: 0}}
+]);
+assert(resultsEq(res.toArray(), [
+    {int_field: null, count: 1},
+    {int_field: null, other_field: null, count: 2},
+    {int_field: null, other_field: null, count: 2},
+    {other_field: null, count: 1},
+    {int_field: 0, count: 1},
+    {other_field: 0, count: 1}
+]));
 })();

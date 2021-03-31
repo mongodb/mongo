@@ -176,6 +176,54 @@ TEST_F(PartitionIteratorTest, CurrentReturnsCorrectDocumentAsIteratorAdvances) {
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[0]);
 }
 
+TEST_F(PartitionIteratorTest, PartitionWithNullsAndMissingFields) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"key", BSONNULL}}, Document{}, Document{{"key", BSONNULL}}, Document{}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto key = ExpressionFieldPath::createPathFromString(
+        getExpCtx().get(), "key", getExpCtx()->variablesParseState);
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
+
+    // All documents are in the same partition.
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[2]);
+    ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *partIter[3]);
+}
+
+TEST_F(PartitionIteratorTest, PartitionWithNullsAndMissingFieldsCompound) {
+    const auto docs = std::deque<DocumentSource::GetNextResult>{
+        Document{{"key", Document{{"a", BSONNULL}}}},
+        Document{{"key", Document{{"a", BSONNULL}}}},
+        Document{{"key", Document{{"a", BSONNULL}, {"b", BSONNULL}}}},
+        Document{{"key", Document{{"a", BSONNULL}, {"b", BSONNULL}}}},
+        Document{{"key", Document{{"b", BSONNULL}}}}};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+    auto key = ExpressionFieldPath::createPathFromString(
+        getExpCtx().get(), "key", getExpCtx()->variablesParseState);
+    auto partIter =
+        makeDefaultAccessor(mock, boost::optional<boost::intrusive_ptr<Expression>>(key));
+
+    // First partition of {a: null}.
+    ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *partIter[0]);
+    ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *partIter[1]);
+    ASSERT_FALSE(partIter[2]);
+    ASSERT_FALSE(partIter[-1]);
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, advance());
+    // Second partition of {a: null, b: null}.
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kNewPartition, advance());
+    ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *partIter[0]);
+    ASSERT_DOCUMENT_EQ(docs[3].getDocument(), *partIter[1]);
+    ASSERT_FALSE(partIter[2]);
+    ASSERT_FALSE(partIter[-1]);
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kAdvanced, advance());
+    // Last partition of {b: null}.
+    ASSERT_ADVANCE_RESULT(PartitionIterator::AdvanceResult::kNewPartition, advance());
+    ASSERT_DOCUMENT_EQ(docs[4].getDocument(), *partIter[0]);
+    ASSERT_FALSE(partIter[1]);
+}
+
 TEST_F(PartitionIteratorTest, EmptyCollectionReturnsEOF) {
     const auto docs = std::deque<DocumentSource::GetNextResult>{};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
@@ -273,7 +321,7 @@ DEATH_TEST_F(PartitionIteratorTest,
     partIter.advance();
 
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *laggingAccessor[-1]);
-    // The leading accessor has fallen off the right side of the partiiton.
+    // The leading accessor has fallen off the right side of the partition.
     ASSERT_FALSE(leadingAccessor[1]);
 
     // The first document should now be expired.
