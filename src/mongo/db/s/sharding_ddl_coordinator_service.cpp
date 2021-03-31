@@ -55,10 +55,8 @@ ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(Operati
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
     const auto op = extractShardingDDLCoordinatorMetadata(initialState);
-    LOGV2_DEBUG(5390510,
-                2,
-                "Constructing new sharding DDL coordinator",
-                "coordinatorDoc"_attr = op.toBSON());
+    LOGV2(
+        5390510, "Constructing new sharding DDL coordinator", "coordinatorDoc"_attr = op.toBSON());
     switch (op.getId().getOperationType()) {
         case DDLCoordinatorTypeEnum::kDropDatabase:
             return std::make_shared<DropDatabaseCoordinator>(std::move(initialState));

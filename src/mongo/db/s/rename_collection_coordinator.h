@@ -83,7 +83,6 @@ private:
 
     void _insertStateDocument(StateDoc&& doc);
     void _updateStateDocument(StateDoc&& newStateDoc);
-    void _removeStateDocument();
     void _enterPhase(Phase newPhase);
 
     RenameCollectionCoordinatorDocument _doc;

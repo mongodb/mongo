@@ -87,7 +87,6 @@ private:
 
     void _insertCoordinatorDocument(CoordDoc&& doc);
     void _updateCoordinatorDocument(CoordDoc&& newStateDoc);
-    void _removeCoordinatorDocument();
     void _enterPhase(Phase newState);
 
     /**

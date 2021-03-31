@@ -107,7 +107,7 @@ private:
 
     void interrupt(Status status) override final;
 
-    virtual void _interruptImpl(Status status) {}
+    void _removeDocument(OperationContext* opCtx);
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
