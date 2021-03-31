@@ -42,6 +42,8 @@ commands:
         cpp_name: ExplainCmd
         strict: true
         api_version: "1"
+        access_check:
+            ignore: true
         fields:
             verbosity:
                 description: "The verbosity for explain command."
@@ -62,6 +64,6 @@ commands:
             useNewUpsert:
                 type: IDLAnyType
                 ignore: true
-                unstable: true           
+                unstable: true
         # Dummy reply type as we won't use it to parse explain reply.
         reply_type: OkReply

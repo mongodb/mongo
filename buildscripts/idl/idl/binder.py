@@ -549,15 +549,15 @@ def _bind_command_reply_type(ctxt, parsed_spec, command):
     return ast_field
 
 
-def resolve_enum_value(ctxt, syntax_enum, name):
-    # type: (errors.ParserContext, syntax.Enum, str) -> syntax.EnumValue
+def resolve_enum_value(ctxt, location, syntax_enum, name):
+    # type: (errors.ParserContext, common.SourceLocation, syntax.Enum, str) -> syntax.EnumValue
     """Resolve a single enum value in an enum."""
 
     for value in syntax_enum.values:
         if value.value == name:
             return value
 
-    ctxt.add_unknown_enum_value(syntax_enum, syntax_enum.name, name)
+    ctxt.add_unknown_enum_value(location, syntax_enum.name, name)
 
     return None
 
@@ -577,7 +577,8 @@ def _bind_enum_value(ctxt, parsed_spec, location, enum_name, enum_value):
         ctxt.add_unknown_type_error(location, enum_name, "enum")
         return None
 
-    syntax_enum = resolve_enum_value(ctxt, cast(syntax.Enum, access_check_enum), enum_value)
+    syntax_enum = resolve_enum_value(ctxt, location, cast(syntax.Enum, access_check_enum),
+                                     enum_value)
     if not syntax_enum:
         return None
 
@@ -719,6 +720,8 @@ def _bind_command(ctxt, parsed_spec, command):
     _bind_struct_common(ctxt, parsed_spec, command, ast_command)
 
     ast_command.access_checks = _bind_access_check(ctxt, parsed_spec, command)
+    if command.api_version != "" and command.access_check is None:
+        ctxt.add_missing_access_check(ast_command, ast_command.name)
 
     ast_command.namespace = command.namespace
 

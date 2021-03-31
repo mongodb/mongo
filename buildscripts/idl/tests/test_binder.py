@@ -2647,6 +2647,20 @@ class TestBinder(testcase.IDLTestcase):
                 reply_type: reply
             """), idl.errors.ERROR_ID_DUPLICATE_ACCESS_CHECK)
 
+        # api_version != "" but not access_check
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+        commands:
+            test1:
+                description: foo
+                command_name: foo
+                api_version: 1
+                namespace: ignored
+                fields:
+                    foo: string
+                reply_type: reply
+            """), idl.errors.ERROR_ID_MISSING_ACCESS_CHECK)
+
 
 if __name__ == '__main__':
 
