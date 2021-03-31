@@ -110,6 +110,14 @@ Timestamp TenantOplogApplier::getResumeBatchingTs_forTest() const {
     return _resumeBatchingTs;
 }
 
+void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
+    stdx::lock_guard lk(_mutex);
+    invariant(!_isActive_inlock());
+    invariant(!cloneFinishedRecipientOpTime.isNull());
+    invariant(_cloneFinishedRecipientOpTime.isNull());
+    _cloneFinishedRecipientOpTime = cloneFinishedRecipientOpTime;
+}
+
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
     _oplogBatcher =
         std::make_shared<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor, _resumeBatchingTs);
@@ -605,19 +613,20 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             auto sessionId = *entry.getSessionId();
             auto txnNumber = *entry.getTxnNumber();
             auto entryStmtIds = entry.getStatementIds();
+            LOGV2_DEBUG(5351000,
+                        2,
+                        "Tenant Oplog Applier processing retryable write",
+                        "entry"_attr = redact(entry.toBSONForLogging()),
+                        "sessionId"_attr = sessionId,
+                        "txnNumber"_attr = txnNumber,
+                        "statementIds"_attr = entryStmtIds,
+                        "tenant"_attr = _tenantId,
+                        "migrationUuid"_attr = _migrationUuid);
             if (entry.getOpType() == repl::OpTypeEnum::kNoop) {
                 // There are two types of no-ops we expect here.  One is pre/post image, which
                 // will have an empty o2 field.  The other is previously transformed oplog
                 // entries from earlier migrations.
-                LOGV2_DEBUG(5351000,
-                            2,
-                            "Tenant Oplog Applier processing retryable write no-op",
-                            "entry"_attr = redact(entry.toBSONForLogging()),
-                            "sessionId"_attr = sessionId,
-                            "txnNumber"_attr = txnNumber,
-                            "statementIds"_attr = entryStmtIds,
-                            "tenant"_attr = _tenantId,
-                            "migrationUuid"_attr = _migrationUuid);
+
                 // We don't wrap the no-ops in another no-op.
                 // If object2 is missing, this is a preImage/postImage.
                 if (!entry.getObject2()) {
@@ -650,16 +659,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 }
             }
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
-
-            LOGV2_DEBUG(5350901,
-                        2,
-                        "Tenant Oplog Applier processing retryable write",
-                        "sessionId"_attr = sessionId,
-                        "txnNumber"_attr = txnNumber,
-                        "statementIds"_attr = entryStmtIds,
-                        "tenant"_attr = _tenantId,
-                        "noop_entry"_attr = redact(noopEntry.toBSON()),
-                        "migrationUuid"_attr = _migrationUuid);
 
             if (entry.getPreImageOpTime()) {
                 uassert(
@@ -732,7 +731,18 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                   << txnNumber << " statement " << entryStmtIds.front()
                                   << " on session " << sessionId,
                     !txnParticipant.checkStatementExecutedNoOplogEntryFetch(entryStmtIds.front()));
-            prevWriteOpTime = txnParticipant.getLastWriteOpTime();
+
+            // We could have an existing lastWriteOpTime for the same retryable write chain from a
+            // previously aborted migration. This could also happen if the tenant being migrated has
+            // previously resided in this replica set. So we want to start a new history chain
+            // instead of linking the newly generated no-op to the existing chain before the current
+            // migration starts. Otherwise, we could have duplicate entries for the same stmtId.
+            invariant(!_cloneFinishedRecipientOpTime.isNull());
+            if (txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime) {
+                prevWriteOpTime = txnParticipant.getLastWriteOpTime();
+            } else {
+                prevWriteOpTime = OpTime();
+            }
 
             // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
             noopEntry.setSessionId(sessionId);
@@ -754,6 +764,13 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
         }
 
         noopEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
+
+        LOGV2_DEBUG(5535700,
+                    2,
+                    "Tenant Oplog Applier writing session no-op",
+                    "tenant"_attr = _tenantId,
+                    "migrationUuid"_attr = _migrationUuid,
+                    "op"_attr = redact(noopEntry.toBSON()));
 
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
         writeConflictRetry(
