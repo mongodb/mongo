@@ -307,6 +307,10 @@ const kExpiredMigrationCertificates = {
     assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(
         donorRst.getPrimary().adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
+
+    donorRst.stopSet();
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
 })();
 
 (() => {
