@@ -40,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"

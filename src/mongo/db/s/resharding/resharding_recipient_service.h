@@ -32,16 +32,12 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/s/resharding/resharding_critical_section.h"
-#include "mongo/db/s/resharding/resharding_oplog_applier.h"
-#include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
+#include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
-
-class ReshardingCollectionCloner;
-class ReshardingTxnCloner;
 
 namespace resharding {
 
@@ -106,7 +102,8 @@ class ReshardingRecipientService::RecipientStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
     explicit RecipientStateMachine(const ReshardingRecipientService* recipientService,
-                                   const BSONObj& recipientDoc);
+                                   const BSONObj& recipientDoc,
+                                   ReshardingDataReplicationFactory dataReplicationFactory);
 
     ~RecipientStateMachine();
 
@@ -135,7 +132,8 @@ public:
 
 private:
     RecipientStateMachine(const ReshardingRecipientService* recipientService,
-                          const ReshardingRecipientDocument& recipientDoc);
+                          const ReshardingRecipientDocument& recipientDoc,
+                          ReshardingDataReplicationFactory dataReplicationFactory);
 
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
@@ -148,7 +146,8 @@ private:
         const CancellationToken& abortToken);
 
     ExecutorFuture<void> _applyThenTransitionToSteadyState(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _awaitAllDonorsBlockingWritesThenTransitionToStrictConsistency(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
@@ -189,8 +188,15 @@ private:
     // all conflict stash collections that are associated with the in-progress operation.
     void _dropOplogCollections(OperationContext* opCtx);
 
-    // Initializes the txn cloners for this resharding operation.
-    void _initTxnCloner(OperationContext* opCtx, const Timestamp& fetchTimestamp);
+    std::unique_ptr<ReshardingDataReplicationInterface> _makeDataReplication(
+        OperationContext* opCtx,
+        bool cloningDone,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    void _ensureDataReplicationStarted(
+        OperationContext* opCtx,
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     ReshardingMetrics* _metrics() const;
 
@@ -221,20 +227,13 @@ private:
     // opCtx as killed when the cancelToken has been cancelled.
     const std::shared_ptr<ThreadPool> _markKilledExecutor;
 
-    std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
-    std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
-
-    std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
-    std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers;
-
-    // The ReshardingOplogFetcher must be destructed before the corresponding ReshardingOplogApplier
-    // to ensure the future returned by awaitInsert() is always eventually readied.
-    std::vector<std::unique_ptr<ReshardingOplogFetcher>> _oplogFetchers;
-    std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
-    std::vector<ExecutorFuture<void>> _oplogFetcherFutures;
+    const ReshardingDataReplicationFactory _dataReplicationFactory;
+    SharedSemiFuture<void> _dataReplicationQuiesced;
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("RecipientStateMachine::_mutex");
+
+    std::unique_ptr<ReshardingDataReplicationInterface> _dataReplication;
 
     // Canceled when there is an unrecoverable error or stepdown.
     boost::optional<CancellationSource> _abortSource;

@@ -191,7 +191,6 @@ auto ReshardingTxnCloner::_withTemporaryOperationContext(Callable&& callable) {
 }
 
 SemiFuture<void> ReshardingTxnCloner::run(
-    ServiceContext* serviceContext,
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
