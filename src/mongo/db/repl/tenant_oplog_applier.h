@@ -95,6 +95,10 @@ public:
         return _numOpsApplied;
     }
 
+    /**
+     * This should only be called once before the applier starts.
+     */
+    void setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime);
 
     /**
      * Returns the optime the applier will start applying from. Used for testing.
@@ -158,10 +162,12 @@ private:
     const OpTime _beginApplyingAfterOpTime;             // (R)
     RandomAccessOplogBuffer* _oplogBuffer;              // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
+    // All no-op entries written by this tenant migration should have OpTime greater than this
+    // OpTime.
+    OpTime _cloneFinishedRecipientOpTime = OpTime();  // (R)
     // Keeps track of last applied donor and recipient optimes by the tenant oplog applier.
     // This gets updated only on batch boundaries.
     OpTimePair _lastAppliedOpTimesUpToLastBatch;  // (M)
-    std::vector<OpTimePair> _opTimeMapping;       // (M)
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;  // (S)

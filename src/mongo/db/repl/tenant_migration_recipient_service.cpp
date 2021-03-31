@@ -2057,6 +2057,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                    "migrationId"_attr = getMigrationUUID());
                        {
                            stdx::lock_guard lk(_mutex);
+                           _tenantOplogApplier->setCloneFinishedRecipientOpTime(
+                               *_stateDoc.getCloneFinishedRecipientOpTime());
                            uassertStatusOK(_tenantOplogApplier->startup());
                            _isRestartingOplogApplier = false;
                            _restartOplogApplierCondVar.notify_all();
