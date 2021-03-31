@@ -34,6 +34,8 @@ global:
         - "mongo/db/query/explain_options.h"
 
 imports:
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/access_checks.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/db/pipeline/exchange_spec.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
@@ -45,7 +47,7 @@ types:
     pipeline:
         bson_serialization_type: any
         description: "An array of objects specifying the aggregation pipeline."
-        cpp_type: "std::vector<mongo::BSONObj>" 
+        cpp_type: "std::vector<mongo::BSONObj>"
         deserializer: ::mongo::parsePipelineFromBSON
     aggregateCursor:
         bson_serialization_type: any
@@ -69,6 +71,61 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: "1"
+        access_check:
+            complex:
+                - check: is_coauthorized_with_client
+                - check: is_coauthorized_with
+                - check: should_ignore_auth_checks
+                - check: get_single_user
+                - check: lookup_user
+                - privilege: # many commands
+                    resource_pattern: exact_namespace
+                    action_type: [find, insert, update, remove]
+                - privilege: # $planCacheStats
+                    resource_pattern: exact_namespace
+                    action_type: planCacheRead
+                - privilege: # $changeStream
+                    resource_pattern: exact_namespace
+                    action_type: changeStream
+                - privilege: # $changeStream
+                    resource_pattern: database
+                    action_type: changeStream
+                - privilege: # $changeStream
+                    resource_pattern: any_normal
+                    action_type: changeStream
+                - privilege: # $changeStream
+                    resource_pattern: database
+                    action_type: find
+                - privilege: # $changeStream
+                    resource_pattern: any_normal
+                    action_type: find
+                - privilege: # $changeStream
+                    resource_pattern: cluster
+                    action_type: internal
+                - privilege: # $collstats
+                    resource_pattern: exact_namespace
+                    action_type: collStats
+                - privilege: # $currentOp
+                    resource_pattern: cluster
+                    action_type: inprog
+                - privilege: # $indexStats
+                    resource_pattern: exact_namespace
+                    action_type: indexStats
+                - privilege: # $listCachedAndActiveUsers
+                    resource_pattern: any_normal
+                    action_type: listCachedAndActiveUsers
+                - privilege: # $listSessions
+                    resource_pattern: cluster
+                    action_type: listSessions
+                - privilege: # various
+                    resource_pattern: exact_namespace
+                    action_type: bypassDocumentValidation
+                - privilege: # $operationMetrics
+                    resource_pattern: cluster
+                    action_type: operationMetrics
+                - privilege: # $backupCursorExtend, backupCursor
+                    resource_pattern: cluster
+                    action_type: fsync
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the

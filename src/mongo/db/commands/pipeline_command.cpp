@@ -200,6 +200,10 @@ public:
         return ReadWriteType::kRead;
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::AggregateCommand::kAuthorizationContract;
+    }
+
 } pipelineCmd;
 
 }  // namespace
