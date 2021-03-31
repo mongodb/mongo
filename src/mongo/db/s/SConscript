@@ -75,6 +75,7 @@ env.Library(
         'resharding/resharding_coordinator_service.cpp',
         'resharding/resharding_critical_section.cpp',
         'resharding/resharding_data_copy_util.cpp',
+        'resharding/resharding_data_replication.cpp',
         'resharding/resharding_donor_oplog_iterator.cpp',
         'resharding/resharding_donor_recipient_common.cpp',
         'resharding/resharding_donor_service.cpp',

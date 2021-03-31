@@ -357,12 +357,7 @@ protected:
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
-        return cloner
-            .run(getServiceContext(),
-                 executor,
-                 cleanupExecutor,
-                 cancelToken,
-                 makeMongoProcessInterface())
+        return cloner.run(executor, cleanupExecutor, cancelToken, makeMongoProcessInterface())
             .thenRunOn(executor)
             .onCompletion([](auto x) { return x; });
     }

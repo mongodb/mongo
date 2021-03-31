@@ -72,7 +72,6 @@ public:
         const boost::optional<LogicalSessionId>& startAfter);
 
     SemiFuture<void> run(
-        ServiceContext* serviceContext,
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
