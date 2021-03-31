@@ -63,6 +63,7 @@ WindowFunctionExecRemovableDocument::WindowFunctionExecRemovableDocument(
             [&](const int& upperIndex) { _upperBound = upperIndex; },
         },
         bounds.upper);
+    _memUsageBytes = sizeof(*this);
 }
 
 void WindowFunctionExecRemovableDocument::initialize() {

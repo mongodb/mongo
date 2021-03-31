@@ -207,7 +207,11 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
 
     // $_internalSetWindowFields
     result.push_back(make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx, simplePartitionByExpr, sortBy, outputFields));
+        expCtx,
+        simplePartitionByExpr,
+        sortBy,
+        outputFields,
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()));
 
     // $unset
     if (complexPartitionBy) {
@@ -246,7 +250,21 @@ Value DocumentSourceInternalSetWindowFields::serialize(
     }
     spec[SetWindowFieldsSpec::kOutputFieldName] = output.freezeToValue();
 
-    return Value(DOC(kStageName << spec.freeze()));
+    MutableDocument out;
+    out[getSourceName()] = Value(spec.freeze());
+
+    if (explain && *explain >= ExplainOptions::Verbosity::kExecStats) {
+        MutableDocument md;
+
+        for (auto&& [fieldName, function] : _executableOutputs) {
+            md[fieldName] =
+                Value(static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
+        }
+
+        out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
+    }
+
+    return Value(out.freezeToValue());
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::createFromBson(
@@ -278,14 +296,18 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
     }
 
     return make_intrusive<DocumentSourceInternalSetWindowFields>(
-        expCtx, partitionBy, sortBy, outputFields);
+        expCtx,
+        partitionBy,
+        sortBy,
+        outputFields,
+        internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load());
 }
 
 void DocumentSourceInternalSetWindowFields::initialize() {
-    _maxMemory = internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load();
     for (auto& wfs : _outputFields) {
         _executableOutputs[wfs.fieldName] =
             WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy);
+        _memoryTracker.set(wfs.fieldName, _executableOutputs[wfs.fieldName]->getApproximateSize());
     }
     _init = true;
 }
@@ -307,13 +329,19 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
 
     // Populate the output document with the result from each window function.
     MutableDocument addFieldsSpec;
-    size_t functionMemUsage = 0;
     for (auto&& [fieldName, function] : _executableOutputs) {
+        auto oldIteratorMemUsage = _iterator.getApproximateSize();
         addFieldsSpec.addField(fieldName, function->getNext());
-        functionMemUsage += function->getApproximateSize();
+
+        // Update the memory usage for this function after getNext().
+        _memoryTracker.set(fieldName, function->getApproximateSize());
+        // Account for the additional memory in the iterator cache.
+        _memoryTracker.set(_memoryTracker.currentMemoryBytes() +
+                           (_iterator.getApproximateSize() - oldIteratorMemUsage));
+
         uassert(5414201,
                 "Exceeded memory limit in DocumentSourceSetWindowFields",
-                functionMemUsage + _iterator.getApproximateSize() < _maxMemory);
+                _memoryTracker.currentMemoryBytes() < _memoryTracker._maxAllowedMemoryUsageBytes);
     }
 
     // Advance the iterator and handle partition/EOF edge cases.
@@ -321,8 +349,10 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         case PartitionIterator::AdvanceResult::kAdvanced:
             break;
         case PartitionIterator::AdvanceResult::kNewPartition:
-            // We've advanced to a new partition, reset the state of every function.
-            for (auto&& [_, function] : _executableOutputs) {
+            // We've advanced to a new partition, reset the state of every function as well as the
+            // memory tracker.
+            _memoryTracker.reset();
+            for (auto&& [fieldName, function] : _executableOutputs) {
                 function->reset();
             }
             break;

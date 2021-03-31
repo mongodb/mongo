@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
@@ -85,17 +86,18 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-
     DocumentSourceInternalSetWindowFields(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<boost::intrusive_ptr<Expression>> partitionBy,
         const boost::optional<SortPattern>& sortBy,
-        std::vector<WindowFunctionStatement> outputFields)
+        std::vector<WindowFunctionStatement> outputFields,
+        size_t maxMemoryBytes)
         : DocumentSource(kStageName, expCtx),
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy) {}
+          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy),
+          _memoryTracker{false /* allowDiskUse */, maxMemoryBytes} {};
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return StageConstraints(StreamType::kBlocking,
@@ -129,7 +131,6 @@ public:
     }
 
 private:
-    DocumentSource::GetNextResult getNextInput();
     void initialize();
 
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
@@ -137,9 +138,9 @@ private:
     std::vector<WindowFunctionStatement> _outputFields;
     PartitionIterator _iterator;
     StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
+    MemoryUsageTracker _memoryTracker;
     bool _init = false;
     bool _eof = false;
-    size_t _maxMemory = 0;
 };
 
 }  // namespace mongo

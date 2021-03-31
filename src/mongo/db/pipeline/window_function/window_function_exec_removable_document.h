@@ -69,12 +69,14 @@ public:
                                         WindowBounds::DocumentBased bounds)
         : WindowFunctionExecRemovableDocument(iter, std::move(input), std::move(function), bounds) {
         _sortBy = std::move(sortBy);
+        _memUsageBytes = sizeof(*this);
     }
 
     void reset() final {
         _function->reset();
         _values = std::queue<Value>();
         _initialized = false;
+        _memUsageBytes = sizeof(*this);
     }
 
 private:

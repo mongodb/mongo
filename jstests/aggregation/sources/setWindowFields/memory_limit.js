@@ -58,6 +58,7 @@ assert.commandWorked(coll.runCommand({
     }],
     cursor: {}
 }));
+
 // Test that the query fails with a window function that stores documents.
 assert.commandFailedWithCode(coll.runCommand({
     aggregate: coll.getName(),

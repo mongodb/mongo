@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/sorter/sorter.h"
 
@@ -193,24 +194,6 @@ protected:
     void doDispose() final;
 
 private:
-    struct MemoryUsageTracker {
-        struct AccumStatementMemoryTracker {
-            // Maximum memory consumption thus far observed. Only updated when data is spilled to
-            // disk during execution of the $group.
-            uint64_t maxMemoryBytes;
-            // Tracks the current memory footprint.
-            uint64_t currentMemoryBytes;
-        };
-
-        const bool allowDiskUse;
-        const size_t maxMemoryUsageBytes;
-
-        // Tracks current memory used. This variable will be reset if data is spilled to disk.
-        size_t memoryUsageBytes = 0;
-        // Tracks memory consumption per accumulation statement.
-        std::vector<AccumStatementMemoryTracker> accumStatementMemoryBytes;
-    };
-
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
@@ -247,7 +230,7 @@ private:
      * If we ran out of memory, finish all the pending operations so that some memory
      * can be freed.
      */
-    int freeMemory();
+    void freeMemory();
 
     Document makeDocument(const Value& id, const Accumulators& accums, bool mergeableOutput);
 
@@ -269,12 +252,11 @@ private:
 
     /**
      * Cleans up any pending memory usage. Throws error, if memory usage is above
-     * 'maxMemoryUsageBytes' and cannot spill to disk. The 'saveMemory' function should return
-     * the amount of memory saved by the cleanup.
+     * 'maxMemoryUsageBytes' and cannot spill to disk.
      *
      * Returns true, if the caller should spill to disk, false otherwise.
      */
-    bool shouldSpillWithAttemptToSaveMemory(std::function<int()> saveMemory);
+    bool shouldSpillWithAttemptToSaveMemory();
 
     std::vector<AccumulationStatement> _accumulatedFields;
 

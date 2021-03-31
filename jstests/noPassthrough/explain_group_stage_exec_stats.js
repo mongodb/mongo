@@ -45,7 +45,7 @@ const expectedAccumMemUsages = {
 function checkGroupStages(stages, expectedAccumMemUsages, isExecExplain, shouldSpillToDisk) {
     // Tracks the memory usage per accumulator in total as 'stages' passed in could be the explain
     // output across a cluster.
-    let totalAccmMemoryUsageBytes = 0;
+    let totalAccumMemoryUsageBytes = 0;
 
     for (let stage of stages) {
         assert(stage.hasOwnProperty("$group"), stage);
@@ -54,7 +54,7 @@ function checkGroupStages(stages, expectedAccumMemUsages, isExecExplain, shouldS
             assert(stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
             const maxAccmMemUsages = stage["maxAccumulatorMemoryUsageBytes"];
             for (let field of Object.keys(maxAccmMemUsages)) {
-                totalAccmMemoryUsageBytes += maxAccmMemUsages[field];
+                totalAccumMemoryUsageBytes += maxAccmMemUsages[field];
 
                 // Ensures that the expected accumulators are all included and the corresponding
                 // memory usage is in a reasonable range. Note that in debug mode, data will be
@@ -69,8 +69,11 @@ function checkGroupStages(stages, expectedAccumMemUsages, isExecExplain, shouldS
         }
     }
 
+    // Add some wiggle room to the total memory used compared to the limit parameter since the check
+    // for spilling to disk happens after each document is processed.
     if (shouldSpillToDisk)
-        assert.gt(maxMemoryLimitForGroupStage, totalAccmMemoryUsageBytes);
+        assert.gt(
+            maxMemoryLimitForGroupStage + 3 * 1024, totalAccumMemoryUsageBytes, tojson(stages));
 }
 
 let groupStages = getAggPlanStages(coll.explain("executionStats").aggregate(pipeline), "$group");
