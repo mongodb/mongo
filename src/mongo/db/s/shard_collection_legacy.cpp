@@ -74,6 +74,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
+// TODO (SERVER-54879): Remove this entire file after 5.0 branches
 namespace mongo {
 namespace {
 
@@ -193,7 +194,7 @@ void checkCollation(OperationContext* opCtx, const ShardsvrShardCollectionReques
     if (!requestedCollator && !actualCollator)
         return;
 
-    // TODO (SERVER-48639): If this check fails, this means the collation changed between the time
+    // If this check fails, this means the collation changed between the time
     // '_configsvrShardCollection' was called and the request got to the shard. Report the message
     // as if it failed on the config server in the first place.
     uassert(ErrorCodes::BadValue,
