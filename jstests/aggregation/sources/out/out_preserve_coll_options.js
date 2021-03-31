@@ -1,6 +1,6 @@
 // Tests that $out preserves the collection options of the "out" collection.
 // @tags: [
-//   uses_$out,
+//   does_not_support_transactions,
 // ]
 (function() {
 "use strict";
