@@ -43,50 +43,6 @@ namespace repl {
 
 namespace {
 
-DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
-    StringData commandString(objectField.firstElementFieldName());
-    if (commandString == "create") {
-        return DurableOplogEntry::CommandType::kCreate;
-    } else if (commandString == "renameCollection") {
-        return DurableOplogEntry::CommandType::kRenameCollection;
-    } else if (commandString == "drop") {
-        return DurableOplogEntry::CommandType::kDrop;
-    } else if (commandString == "collMod") {
-        return DurableOplogEntry::CommandType::kCollMod;
-    } else if (commandString == "applyOps") {
-        return DurableOplogEntry::CommandType::kApplyOps;
-    } else if (commandString == "dbCheck") {
-        return DurableOplogEntry::CommandType::kDbCheck;
-    } else if (commandString == "dropDatabase") {
-        return DurableOplogEntry::CommandType::kDropDatabase;
-    } else if (commandString == "emptycapped") {
-        return DurableOplogEntry::CommandType::kEmptyCapped;
-    } else if (commandString == "createIndexes") {
-        return DurableOplogEntry::CommandType::kCreateIndexes;
-    } else if (commandString == "startIndexBuild") {
-        return DurableOplogEntry::CommandType::kStartIndexBuild;
-    } else if (commandString == "commitIndexBuild") {
-        return DurableOplogEntry::CommandType::kCommitIndexBuild;
-    } else if (commandString == "abortIndexBuild") {
-        return DurableOplogEntry::CommandType::kAbortIndexBuild;
-    } else if (commandString == "dropIndexes") {
-        return DurableOplogEntry::CommandType::kDropIndexes;
-    } else if (commandString == "deleteIndexes") {
-        return DurableOplogEntry::CommandType::kDropIndexes;
-    } else if (commandString == "commitTransaction") {
-        return DurableOplogEntry::CommandType::kCommitTransaction;
-    } else if (commandString == "abortTransaction") {
-        return DurableOplogEntry::CommandType::kAbortTransaction;
-    } else if (commandString == "importCollection") {
-        return DurableOplogEntry::CommandType::kImportCollection;
-    } else {
-        uasserted(ErrorCodes::BadValue,
-                  str::stream() << "Unknown oplog entry command type: " << commandString
-                                << " Object field: " << redact(objectField));
-    }
-    MONGO_UNREACHABLE;
-}
-
 /**
  * Returns a document representing an oplog entry with the given fields.
  */
@@ -161,6 +117,50 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
 }
 
 }  // namespace
+
+DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
+    StringData commandString(objectField.firstElementFieldName());
+    if (commandString == "create") {
+        return DurableOplogEntry::CommandType::kCreate;
+    } else if (commandString == "renameCollection") {
+        return DurableOplogEntry::CommandType::kRenameCollection;
+    } else if (commandString == "drop") {
+        return DurableOplogEntry::CommandType::kDrop;
+    } else if (commandString == "collMod") {
+        return DurableOplogEntry::CommandType::kCollMod;
+    } else if (commandString == "applyOps") {
+        return DurableOplogEntry::CommandType::kApplyOps;
+    } else if (commandString == "dbCheck") {
+        return DurableOplogEntry::CommandType::kDbCheck;
+    } else if (commandString == "dropDatabase") {
+        return DurableOplogEntry::CommandType::kDropDatabase;
+    } else if (commandString == "emptycapped") {
+        return DurableOplogEntry::CommandType::kEmptyCapped;
+    } else if (commandString == "createIndexes") {
+        return DurableOplogEntry::CommandType::kCreateIndexes;
+    } else if (commandString == "startIndexBuild") {
+        return DurableOplogEntry::CommandType::kStartIndexBuild;
+    } else if (commandString == "commitIndexBuild") {
+        return DurableOplogEntry::CommandType::kCommitIndexBuild;
+    } else if (commandString == "abortIndexBuild") {
+        return DurableOplogEntry::CommandType::kAbortIndexBuild;
+    } else if (commandString == "dropIndexes") {
+        return DurableOplogEntry::CommandType::kDropIndexes;
+    } else if (commandString == "deleteIndexes") {
+        return DurableOplogEntry::CommandType::kDropIndexes;
+    } else if (commandString == "commitTransaction") {
+        return DurableOplogEntry::CommandType::kCommitTransaction;
+    } else if (commandString == "abortTransaction") {
+        return DurableOplogEntry::CommandType::kAbortTransaction;
+    } else if (commandString == "importCollection") {
+        return DurableOplogEntry::CommandType::kImportCollection;
+    } else {
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "Unknown oplog entry command type: " << commandString
+                                << " Object field: " << redact(objectField));
+    }
+    MONGO_UNREACHABLE;
+}
 
 // Static
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,

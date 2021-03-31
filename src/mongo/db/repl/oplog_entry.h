@@ -447,6 +447,8 @@ private:
     CommandType _commandType = CommandType::kNotCommand;
 };
 
+DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField);
+
 /**
  * Data structure that holds a DurableOplogEntry and other different run time state variables.
  */
