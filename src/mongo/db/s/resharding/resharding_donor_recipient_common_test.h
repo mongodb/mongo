@@ -126,6 +126,36 @@ protected:
         return CollectionMetadata(std::move(cm), kThisShard);
     }
 
+    ReshardingDonorDocument makeDonorStateDoc() {
+        DonorShardContext donorCtx;
+        donorCtx.setState(DonorStateEnum::kPreparingToDonate);
+
+        ReshardingDonorDocument doc(std::move(donorCtx), {kThisShard, kOtherShard});
+
+        NamespaceString sourceNss = kOriginalNss;
+        auto sourceUUID = UUID::gen();
+        auto commonMetadata = CommonReshardingMetadata(
+            UUID::gen(), sourceNss, sourceUUID, kTemporaryReshardingNss, kReshardingKeyPattern);
+
+        doc.setCommonReshardingMetadata(std::move(commonMetadata));
+        return doc;
+    }
+
+    ReshardingRecipientDocument makeRecipientStateDoc() {
+        RecipientShardContext recipCtx;
+        recipCtx.setState(RecipientStateEnum::kCloning);
+
+        ReshardingRecipientDocument doc(std::move(recipCtx), {kThisShard, kOtherShard}, 1000);
+
+        NamespaceString sourceNss = kOriginalNss;
+        auto sourceUUID = UUID::gen();
+        auto commonMetadata = CommonReshardingMetadata(
+            UUID::gen(), sourceNss, sourceUUID, kTemporaryReshardingNss, kReshardingKeyPattern);
+
+        doc.setCommonReshardingMetadata(std::move(commonMetadata));
+        return doc;
+    }
+
     ReshardingFields createCommonReshardingFields(const UUID& reshardingUUID,
                                                   CoordinatorStateEnum state) {
         auto fields = ReshardingFields(reshardingUUID);

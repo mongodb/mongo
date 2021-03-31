@@ -32,14 +32,17 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/storage/duplicate_key_error_info.h"
 
 #include <fmt/format.h>
 
+#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace resharding {
@@ -373,6 +376,49 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
 
     if (reshardingFields.getRecipientFields()) {
         processReshardingFieldsForRecipientCollection(opCtx, nss, metadata, reshardingFields);
+    }
+}
+
+void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) {
+    stdx::unordered_set<NamespaceString> namespacesToRefresh;
+    for (const NamespaceString homeToReshardingDocs :
+         {NamespaceString::kDonorReshardingOperationsNamespace,
+          NamespaceString::kRecipientReshardingOperationsNamespace}) {
+        PersistentTaskStore<CommonReshardingMetadata> store(homeToReshardingDocs);
+
+        store.forEach(opCtx, Query(), [&](CommonReshardingMetadata reshardingDoc) -> bool {
+            namespacesToRefresh.insert(reshardingDoc.getSourceNss());
+            namespacesToRefresh.insert(reshardingDoc.getTempReshardingNss());
+
+            return true;
+        });
+    }
+
+    for (const auto& nss : namespacesToRefresh) {
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
+
+        if (!scheduleAsyncRefresh) {
+            continue;
+        }
+
+        ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+            .then([svcCtx = opCtx->getServiceContext(), nss] {
+                ThreadClient tc("TriggerReshardingRecovery", svcCtx);
+                {
+                    stdx::lock_guard<Client> lk(*tc.get());
+                    tc->setSystemOperationKillableByStepdown(lk);
+                }
+
+                auto opCtx = tc->makeOperationContext();
+                onShardVersionMismatch(opCtx.get(), nss, boost::none /* shardVersionReceived */);
+            })
+            .onError([](const Status& status) {
+                LOGV2_WARNING(5498101,
+                              "Error on deferred shardVersion recovery execution",
+                              "error"_attr = redact(status));
+            })
+            .getAsync([](auto) {});
     }
 }
 

@@ -177,7 +177,6 @@ void validateReshardedChunks(const std::vector<mongo::BSONObj>& chunks,
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, chunk.getRecipientShardId()));
         validChunks.push_back(chunk);
     }
-
     checkForHolesAndOverlapsInChunks(validChunks, keyPattern);
 }
 
@@ -527,5 +526,4 @@ NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorS
                            "localReshardingConflictStash.{}.{}"_format(existingUUID.toString(),
                                                                        donorShardId.toString())};
 }
-
 }  // namespace mongo
