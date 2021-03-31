@@ -76,6 +76,8 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields);
 
+void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh);
+
 }  // namespace resharding
 
 }  // namespace mongo

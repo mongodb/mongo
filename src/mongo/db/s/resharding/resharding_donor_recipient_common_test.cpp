@@ -31,12 +31,15 @@
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common_test.h"
 
+#include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
@@ -213,6 +216,81 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOr
                        5274201);
 }
 
+TEST_F(ReshardingDonorRecipientCommonTest, ClearReshardingFilteringMetaData) {
+    OperationContext* opCtx = operationContext();
+
+    const bool scheduleAsyncRefresh = false;
+    auto doSetupFunc = [&] {
+        // Clear out the resharding donor/recipient metadata collections.
+        for (auto const& nss : {NamespaceString::kDonorReshardingOperationsNamespace,
+                                NamespaceString::kRecipientReshardingOperationsNamespace}) {
+            dropDatabase(opCtx, nss.db().toString()).ignore();
+        }
+
+        // Assert the prestate has no filtering metadata.
+        for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
+            AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
+            auto csr = CollectionShardingRuntime::get(opCtx, nss);
+            ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
+        }
+
+        // Add filtering metadata for the collection being resharded.
+        {
+            AutoGetCollection autoColl(opCtx, kOriginalNss, LockMode::MODE_IS);
+            auto csr = CollectionShardingRuntime::get(opCtx, kOriginalNss);
+            csr->setFilteringMetadata(opCtx,
+                                      makeShardedMetadataForOriginalCollection(opCtx, kThisShard));
+            ASSERT(csr->getCurrentMetadataIfKnown());
+        }
+
+        // Add filtering metadata for the temporary resharding namespace.
+        {
+            AutoGetCollection autoColl(opCtx, kTemporaryReshardingNss, LockMode::MODE_IS);
+            auto csr = CollectionShardingRuntime::get(opCtx, kTemporaryReshardingNss);
+            csr->setFilteringMetadata(
+                opCtx, makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard));
+            ASSERT(csr->getCurrentMetadataIfKnown());
+        }
+
+        // Prior to adding a resharding document, assert that attempting to clear filtering does
+        // nothing.
+        resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+        for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
+            AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
+            auto csr = CollectionShardingRuntime::get(opCtx, nss);
+            ASSERT(csr->getCurrentMetadataIfKnown());
+        }
+    };
+
+    doSetupFunc();
+    // Add a resharding donor document that targets the namespaces involved in resharding.
+    ReshardingDonorDocument donorDoc = makeDonorStateDoc();
+    ReshardingDonorService::DonorStateMachine::insertStateDocument(opCtx, donorDoc);
+
+    // Clear the filtering metadata (without scheduling a refresh) and assert the metadata is gone.
+    resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+    for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
+        AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
+    }
+
+    doSetupFunc();
+    // Add a resharding recipient document that targets the namespaces involved in resharding.
+    ReshardingRecipientDocument recipDoc = makeRecipientStateDoc();
+    ReshardingRecipientService::RecipientStateMachine::insertStateDocument(opCtx, recipDoc);
+
+    // Clear the filtering metadata (without scheduling a refresh) and assert the metadata is gone.
+    resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
+
+    for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
+        AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
+        auto csr = CollectionShardingRuntime::get(opCtx, nss);
+        ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
+    }
+}
 }  // namespace
 
 }  // namespace mongo

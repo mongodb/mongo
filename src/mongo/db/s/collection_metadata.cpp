@@ -184,6 +184,12 @@ void CollectionMetadata::toBSONBasic(BSONObjBuilder& bb) const {
     }
 }
 
+BSONObj CollectionMetadata::toBSON() const {
+    BSONObjBuilder builder;
+    toBSONBasic(builder);
+    return builder.obj();
+}
+
 std::string CollectionMetadata::toStringBasic() const {
     if (isSharded()) {
         return str::stream() << "collection version: " << _cm->getVersion().toString()
