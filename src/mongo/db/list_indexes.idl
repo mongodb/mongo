@@ -32,6 +32,8 @@ global:
         - "mongo/util/uuid.h"
 
 imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/db/create_indexes.idl"
 
@@ -157,6 +159,15 @@ commands:
         cpp_name: listIndexes
         strict: true
         api_version: "1"
+        access_check:
+            complex:
+                - check: is_authorized_to_parse_namespace_element
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: listIndexes
+                - privilege:
+                    resource_pattern: cluster
+                    action_type: useUUID
         fields:
             cursor:
                 type: SimpleCursorOptions

@@ -178,6 +178,9 @@ public:
         return aggregateResponse.responseOK;
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::DropIndexes::kAuthorizationContract;
+    }
 } dropIndexesCmd;
 
 }  // namespace

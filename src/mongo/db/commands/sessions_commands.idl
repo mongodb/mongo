@@ -30,6 +30,7 @@ global:
   cpp_namespace: "mongo"
 
 imports:
+  - "mongo/db/auth/access_checks.idl"
   - "mongo/db/logical_session_id.idl"
   - "mongo/idl/basic_types.idl"
 
@@ -43,6 +44,10 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+        access_check:
+            complex:
+              - check: get_single_user
+              - check: lookup_user
 
     refreshSessionsFromClient:
         description: "Parser for the refreshSessions command"
@@ -53,3 +58,7 @@ commands:
         strict: true
         api_version: "1"
         reply_type: OkReply
+        access_check:
+            complex:
+              - check: get_single_user
+              - check: lookup_user

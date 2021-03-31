@@ -32,6 +32,8 @@ global:
         - "mongo/util/uuid.h"
 
 imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
     - "mongo/idl/basic_types.idl"
 
 structs:
@@ -89,6 +91,15 @@ commands:
         cpp_name: listCollections
         strict: true
         api_version: "1"
+        access_check:
+            complex:
+                - check: is_authorized_for_any_action_on_resource
+                - check: is_authorized_for_any_action_on_any_resource_in_db
+                - check: should_ignore_auth_checks
+                - check: check_authorized_to_list_collections
+                - privilege:
+                    resource_pattern: database
+                    action_type: listCollections
         fields:
             cursor:
                 type: SimpleCursorOptions

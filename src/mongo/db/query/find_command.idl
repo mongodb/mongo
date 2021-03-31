@@ -36,6 +36,8 @@ global:
     - "mongo/db/query/max_time_ms_parser.h"
 
 imports:
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/access_checks.idl"
     - "mongo/db/logical_session_id.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
     - "mongo/idl/basic_types.idl"
@@ -72,6 +74,15 @@ commands:
     namespace: concatenate_with_db_or_uuid
     non_const_getter: true
     api_version: "1"
+    access_check:
+        complex:
+            - check: is_authorized_to_parse_namespace_element
+            - privilege:
+                resource_pattern: exact_namespace
+                action_type: find
+            - privilege:
+                resource_pattern: cluster
+                action_type: useUUID
     reply_type: CursorInitialReply
     fields:
       filter:
@@ -199,7 +210,7 @@ commands:
         default: mongo::BSONObj()
         unstable: true
       _use44SortKeys:
-        description: "An internal parameter used to determine the serialization format for sort 
+        description: "An internal parameter used to determine the serialization format for sort
         keys. TODO SERVER-47065: A 4.7+ node still has to accept the '_use44SortKeys' field, since
         it could be included in a command sent from a 4.4 mongos. When 5.0 becomes last-lts, this
         code to tolerate the '_use44SortKeys' field can be deleted."

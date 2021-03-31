@@ -141,6 +141,9 @@ public:
         }
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::CollMod::kAuthorizationContract;
+    }
 } collectionModCmd;
 
 }  // namespace

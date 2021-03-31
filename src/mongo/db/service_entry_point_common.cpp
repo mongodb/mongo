@@ -600,9 +600,11 @@ public:
                 // Ensure the lifetime of `_scopedMetrics` ends here.
                 _scopedMetrics = boost::none;
 
-                auto authzSession = AuthorizationSession::get(_execContext->client());
-                authzSession->verifyContract(
-                    _execContext->getCommand()->getAuthorizationContract());
+                if (!_execContext->client().isInDirectClient()) {
+                    auto authzSession = AuthorizationSession::get(_execContext->client());
+                    authzSession->verifyContract(
+                        _execContext->getCommand()->getAuthorizationContract());
+                }
 
                 if (status.isOK())
                     return;

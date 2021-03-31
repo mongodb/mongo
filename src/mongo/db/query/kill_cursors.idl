@@ -32,6 +32,8 @@ global:
         - "mongo/db/cursor_id.h"
 
 imports:
+    - "mongo/db/auth/access_checks.idl"
+    - "mongo/db/auth/action_type.idl"
     - "mongo/idl/basic_types.idl"
 
 types:
@@ -65,6 +67,18 @@ commands:
         description: "Kills a specified set of cursors by ID."
         command_name: killCursors
         api_version: "1"
+        access_check:
+            complex:
+                - check: is_coauthorized_with
+                - privilege:
+                    resource_pattern: cluster
+                    action_type: killAnyCursor
+                - privilege:
+                    resource_pattern: database
+                    action_type: killAnyCursor
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: killAnyCursor
         reply_type: KillCursorsReply
         cpp_name: KillCursorsRequest
         strict: true

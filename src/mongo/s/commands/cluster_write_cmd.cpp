@@ -673,6 +673,10 @@ private:
     LogicalOp getLogicalOp() const override {
         return LogicalOp::opInsert;
     }
+
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::write_ops::Insert::kAuthorizationContract;
+    }
 } clusterInsertCmd;
 
 class ClusterUpdateCmd final : public ClusterWriteCmd {
@@ -714,6 +718,10 @@ private:
         return LogicalOp::opUpdate;
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::write_ops::Update::kAuthorizationContract;
+    }
+
     // Update related command execution metrics.
     UpdateMetrics _updateMetrics;
 } clusterUpdateCmd;
@@ -751,6 +759,11 @@ private:
     LogicalOp getLogicalOp() const override {
         return LogicalOp::opDelete;
     }
+
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::write_ops::Delete::kAuthorizationContract;
+    }
+
 } clusterDeleteCmd;
 
 }  // namespace

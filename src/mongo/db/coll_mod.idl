@@ -31,6 +31,8 @@ global:
     - "mongo/db/commands/create_command_validation.h"
 
 imports:
+    - "mongo/db/auth/action_type.idl"
+    - "mongo/db/auth/access_checks.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/db/catalog/collection_options.idl"
 
@@ -68,7 +70,7 @@ structs:
             hidden_new:
                 optional: true
                 type: safeBool
-    
+
     CollModClusteredIndex:
         description: "A type representing the adjustable options on clustered indexes"
         strict: true
@@ -76,7 +78,7 @@ structs:
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted. This can
                               be disabled by passing in 'off' as a value"
-                type: 
+                type:
                     variant: [string, safeInt64]
 
 commands:
@@ -87,11 +89,20 @@ commands:
         cpp_name: collMod
         strict: true
         api_version: "1"
+        access_check:
+            complex:
+                - check: should_ignore_auth_checks
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: collMod
+                - privilege:
+                    resource_pattern: exact_namespace
+                    action_type: find
         fields:
             index:
                 description: "Index to be modified."
                 optional: true
-                type: CollModIndex            
+                type: CollModIndex
             validator:
                 description: "Specify validation rules or expressions for the collection."
                 type: object
@@ -109,7 +120,7 @@ commands:
                 type: ValidationAction
                 optional: true
             viewOn:
-                description: "The name of the source collection or view that 
+                description: "The name of the source collection or view that
                               'namespace' is based off of."
                 type: string
                 optional: true
@@ -117,7 +128,7 @@ commands:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
                 description: "An array that consists of the aggregation pipeline. Defines the view
-                              by applying the specified pipeline to the 'viewOn' collection or 
+                              by applying the specified pipeline to the 'viewOn' collection or
                               view."
                 type: array<object>
                 optional: true
