@@ -33,6 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
@@ -59,18 +60,12 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "reshardCollection command not enabled",
-                    resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrReshardCollection can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrReshardCollection must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
-
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
@@ -115,50 +110,62 @@ public:
                                         ShardKeyPattern(request().getKey()).getKeyPattern());
             }
 
-            const auto cm = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                             nss));
+            auto instance = ([&] {
+                FixedFCVRegion fixedFcv(opCtx);
 
-            auto tempReshardingNss = constructTemporaryReshardingNss(
-                nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
+                uassert(ErrorCodes::CommandNotSupported,
+                        "reshardCollection command not enabled",
+                        resharding::gFeatureFlagResharding.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
+                const auto cm = uassertStatusOK(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                        opCtx, nss));
+
+                auto tempReshardingNss = constructTemporaryReshardingNss(
+                    nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
 
-            boost::optional<std::vector<ReshardingZoneType>> zones;
-            if (request().getZones()) {
-                zones.emplace();
-                zones->reserve(request().getZones()->size());
-                for (const BSONObj& obj : request().getZones().get()) {
-                    zones->push_back(ReshardingZoneType::parse(
-                        IDLParserErrorContext("ReshardingZoneType"), obj));
+                boost::optional<std::vector<ReshardingZoneType>> zones;
+                if (request().getZones()) {
+                    zones.emplace();
+                    zones->reserve(request().getZones()->size());
+                    for (const BSONObj& obj : request().getZones().get()) {
+                        zones->push_back(ReshardingZoneType::parse(
+                            IDLParserErrorContext("ReshardingZoneType"), obj));
+                    }
+
+                    checkForOverlappingZones(zones.get());
                 }
 
-                checkForOverlappingZones(zones.get());
-            }
+                auto coordinatorDoc =
+                    ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
+                                                  {},   // donorShards
+                                                  {});  // recipientShards
 
-            auto coordinatorDoc =
-                ReshardingCoordinatorDocument(std::move(CoordinatorStateEnum::kUnused),
-                                              {},   // donorShards
-                                              {});  // recipientShards
+                // Generate the resharding metadata for the ReshardingCoordinatorDocument.
+                auto reshardingUUID = UUID::gen();
+                auto existingUUID = getCollectionUUIDFromChunkManger(ns(), cm);
+                auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
+                                                               ns(),
+                                                               std::move(existingUUID),
+                                                               std::move(tempReshardingNss),
+                                                               request().getKey());
+                coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
+                coordinatorDoc.setZones(std::move(zones));
+                coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
+                coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
-            // Generate the resharding metadata for the ReshardingCoordinatorDocument.
-            auto reshardingUUID = UUID::gen();
-            auto existingUUID = getCollectionUUIDFromChunkManger(ns(), cm);
-            auto commonMetadata = CommonReshardingMetadata(std::move(reshardingUUID),
-                                                           ns(),
-                                                           std::move(existingUUID),
-                                                           std::move(tempReshardingNss),
-                                                           request().getKey());
-            coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
-            coordinatorDoc.setZones(std::move(zones));
-            coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
-            coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
+                opCtx->setAlwaysInterruptAtStepDownOrUp();
+                auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+                auto service =
+                    registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
+                auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
+                    opCtx, service, coordinatorDoc.toBSON());
 
-            opCtx->setAlwaysInterruptAtStepDownOrUp();
-            auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-            auto service =
-                registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-            auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
-                opCtx, service, coordinatorDoc.toBSON());
+                instance->getCoordinatorDocWrittenFuture().get(opCtx);
+                return instance;
+            })();
 
             instance->getCompletionFuture().get(opCtx);
         }

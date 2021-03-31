@@ -943,6 +943,21 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
         .on(**executor, CancellationToken::uncancelable());
 }
 
+void ReshardingCoordinatorService::abortAllReshardCollection(OperationContext* opCtx) {
+    std::vector<SharedSemiFuture<void>> reshardingCoordinatorFutures;
+
+    for (auto& instance : getAllInstances(opCtx)) {
+        auto reshardingCoordinator =
+            checked_pointer_cast<ReshardingCoordinatorService::ReshardingCoordinator>(instance);
+        reshardingCoordinatorFutures.push_back(reshardingCoordinator->getCompletionFuture());
+        reshardingCoordinator->abort();
+    }
+
+    for (auto&& future : reshardingCoordinatorFutures) {
+        future.wait(opCtx);
+    }
+}
+
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     const ReshardingCoordinatorService* coordinatorService,
     const BSONObj& state,
@@ -1161,8 +1176,16 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 auto lg = stdx::lock_guard(_fulfillmentMutex);
                 if (status.isOK()) {
                     _completionPromise.emplaceValue();
+
+                    if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
+                        _coordinatorDocWrittenPromise.emplaceValue();
+                    }
                 } else {
                     _completionPromise.setError(status);
+
+                    if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
+                        _coordinatorDocWrittenPromise.setError(status);
+                    }
                 }
             }
 
@@ -1185,6 +1208,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                     auto lg = stdx::lock_guard(_fulfillmentMutex);
                     if (!_completionPromise.getFuture().isReady()) {
                         _completionPromise.setError(status);
+                    }
+
+                    if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
+                        _coordinatorDocWrittenPromise.setError(status);
                     }
                 }
                 _reshardingCoordinatorObserver->interrupt(status);
@@ -1262,6 +1289,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::onOkayToEnterCritical(
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kUnused) {
+        _coordinatorDocWrittenPromise.emplaceValue();
         ReshardingMetrics::get(cc().getServiceContext())->onStepUp();
         return;
     }
@@ -1272,6 +1300,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     _reshardingCoordinatorExternalState->insertCoordDocAndChangeOrigCollEntry(
         opCtx.get(), updatedCoordinatorDoc);
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+
+    _coordinatorDocWrittenPromise.emplaceValue();
 
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
     ReshardingMetrics::get(cc().getServiceContext())->onStart();

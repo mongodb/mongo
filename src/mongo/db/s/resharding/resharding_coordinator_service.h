@@ -190,6 +190,14 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
+    /**
+     * Tries to abort all active reshardCollection operations. Note that this doesn't differentiate
+     * between operations interrupted due to stepdown or abort. Callers who wish to confirm that
+     * the abort successfully went through should follow up with an inspection on the resharding
+     * coordinator docs to ensure that they are empty.
+     */
+    void abortAllReshardCollection(OperationContext* opCtx);
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
@@ -226,6 +234,14 @@ public:
      */
     SharedSemiFuture<void> getCompletionFuture() const {
         return _completionPromise.getFuture();
+    }
+
+    /**
+     * Returns a Future that will be resolved when the service has written the coordinator doc to
+     * storage
+     */
+    SharedSemiFuture<void> getCoordinatorDocWrittenFuture() const {
+        return _coordinatorDocWrittenPromise.getFuture();
     }
 
     boost::optional<BSONObj> reportForCurrentOp(
@@ -433,6 +449,9 @@ private:
      * that it's okay to proceed.
      */
     SharedPromise<void> _canEnterCritical;
+
+    // Promise that is fulfilled when coordinator doc has been written.
+    SharedPromise<void> _coordinatorDocWrittenPromise;
 
     // Promise that is fulfilled when the chain of work kicked off by run() has completed.
     SharedPromise<void> _completionPromise;
