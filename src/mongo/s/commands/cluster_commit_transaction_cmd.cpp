@@ -100,6 +100,9 @@ public:
         return true;
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::CommitTransaction::kAuthorizationContract;
+    }
 } clusterCommitTransactionCmd;
 
 }  // namespace

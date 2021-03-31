@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -114,6 +115,10 @@ public:
         auto abortRes = txnRouter.abortTransaction(opCtx);
         CommandHelpers::filterCommandReplyForPassthrough(abortRes, &result);
         return true;
+    }
+
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::AbortTransaction::kAuthorizationContract;
     }
 
 } clusterAbortTransactionCmd;

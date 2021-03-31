@@ -239,6 +239,9 @@ public:
                                     result.removeFields(ignorableFields));
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::ListCollections::kAuthorizationContract;
+    }
 } cmdListCollections;
 
 }  // namespace

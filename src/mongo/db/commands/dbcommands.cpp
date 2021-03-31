@@ -595,6 +595,9 @@ public:
         coll_mod_reply_validation::validateReply(reply);
     }
 
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::CollMod::kAuthorizationContract;
+    }
 } collectionModCommand;
 
 class DBStats : public ErrmsgCommandDeprecated {

@@ -176,6 +176,10 @@ public:
                 ErrorCodes::BadValue, "Error message field missing for 'not ok' result", hasErrMsg);
         }
     }
+
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &::mongo::CreateIndexesCommand::kAuthorizationContract;
+    }
 } createIndexesCmd;
 
 }  // namespace
