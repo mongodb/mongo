@@ -259,11 +259,17 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
             uassert(16980,
                     "Multi-update operations require all documents to have an '_id' field",
                     !request->isMulti() || args.criteria.hasField("_id"_sd));
-            args.fromMigrate = request->isFromMigration();
             args.storeDocOption = getStoreDocMode(*request);
             if (args.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
                 args.preImageDoc = oldObj.value().getOwned();
             }
+        }
+
+        // Ensure we set the type correctly
+        if (request->isFromMigration()) {
+            args.source = OperationSource::kFromMigrate;
+        } else if (request->isTimeseries()) {
+            args.source = OperationSource::kTimeseries;
         }
 
         if (inPlace) {

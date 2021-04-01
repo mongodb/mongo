@@ -277,7 +277,6 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     CollectionUpdateArgs args;
     args.update = updateMod;
     args.criteria = toUpdateIdDoc;
-    args.fromMigrate = false;
 
     collection->updateDocument(opCtx,
                                recordId,

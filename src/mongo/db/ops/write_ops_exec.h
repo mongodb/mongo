@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/update_result.h"
@@ -57,20 +58,6 @@ struct WriteResult {
 };
 
 /**
- * Enums used to differentiate between types of insert/update operations based on how they were
- * issued.
- */
-enum class InsertType {
-    kStandard,
-    kFromMigrate,  // From a chunk migration.
-    kTimeseries,
-};
-enum class UpdateType {
-    kStandard,
-    kTimeseries,
-};
-
-/**
  * Performs a batch of inserts, updates, or deletes.
  *
  * These functions handle all of the work of doing the writes, including locking, incrementing
@@ -89,10 +76,10 @@ enum class UpdateType {
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::Insert& op,
-                           const InsertType& type = InsertType::kStandard);
+                           const OperationSource& source = OperationSource::kStandard);
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::Update& op,
-                           const UpdateType& type = UpdateType::kStandard);
+                           const OperationSource& source = OperationSource::kStandard);
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& op);
 
 /**

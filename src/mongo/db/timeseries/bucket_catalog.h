@@ -190,9 +190,10 @@ public:
 
     /**
      * Prepares a batch for commit, transitioning it to an inactive state. Caller must already have
-     * commit rights on batch.
+     * commit rights on batch. Returns true if the batch was successfully prepared, or false if the
+     * batch was aborted.
      */
-    void prepareCommit(std::shared_ptr<WriteBatch> batch);
+    bool prepareCommit(std::shared_ptr<WriteBatch> batch);
 
     /**
      * Records the result of a batch commit. Caller must already have commit rights on batch, and
@@ -205,6 +206,12 @@ public:
      * must already have commit rights on batch, and batch must not be finished.
      */
     void abort(std::shared_ptr<WriteBatch> batch);
+
+    /**
+     * Marks any bucket with the specified OID as cleared and prevents any future inserts from
+     * landing in that bucket.
+     */
+    void clear(const OID& oid);
 
     /**
      * Clears the buckets for the given namespace.
@@ -461,6 +468,20 @@ private:
         AtomicWord<long long> numMeasurementsCommitted;
     };
 
+    enum class BucketState {
+        // Bucket can be inserted into, and does not have an outstanding prepared commit
+        kNormal,
+        // Bucket can be inserted into, and has a prepared commit outstanding.
+        kPrepared,
+        // Bucket can no longer be inserted into, does not have an outstanding prepared
+        // commit.
+        kCleared,
+        // Bucket can no longer be inserted into, but still has an outstanding
+        // prepared commit. Any writer other than the one who prepared the
+        // commit should receive a WriteConflictException.
+        kPreparedAndCleared,
+    };
+
     /**
      * Helper class to handle all the locking necessary to lookup and lock a bucket for use. This
      * is intended primarily for using a single bucket, including replacing it when it becomes full.
@@ -500,9 +521,13 @@ private:
         Date_t getTime() const;
 
     private:
-        // Helper to find and lock an open bucket for the given metadata if it exists. Requires a
-        // shared lock on the catalog. Returns true if the bucket exists and was locked.
-        bool _findOpenBucketAndLock(std::size_t hash);
+        /**
+         * Helper to find and lock an open bucket for the given metadata if it exists. Requires a
+         * shared lock on the catalog. Returns the state of the bucket if it is locked and usable.
+         * In case the bucket does not exist or was previously cleared and thus is not usable, the
+         * return value will be BucketState::kCleared.
+         */
+        BucketState _findOpenBucketAndLock(std::size_t hash);
 
         // Helper to find an open bucket for the given metadata if it exists, create it if it
         // doesn't, and lock it. Requires an exclusive lock on the catalog.
@@ -535,6 +560,12 @@ private:
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
     bool _removeBucket(Bucket* bucket, bool expiringBuckets);
+
+    /**
+     * Aborts any batches it can for the given bucket, then removes the bucket. If batch is
+     * non-null, it is assumed that the caller has commit rights for that batch.
+     */
+    void _abort(stdx::unique_lock<Mutex>& lk, Bucket* bucket, std::shared_ptr<WriteBatch> batch);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date
@@ -572,6 +603,16 @@ private:
     void _setIdTimestamp(Bucket* bucket, const Date_t& time);
 
     /**
+     * Changes the bucket state, taking into account the current state, the specified target state,
+     * and allowed state transitions. The return value, if set, is the final state of the bucket
+     * with the given id; if no such bucket exists, the return value will not be set.
+     *
+     * Ex. For a bucket with state kPrepared, and a target of kCleared, the return will be
+     * kPreparedAndCleared.
+     */
+    boost::optional<BucketState> _setBucketState(const OID& id, BucketState target);
+
+    /**
      * You must hold a lock on _bucketMutex when accessing _allBuckets or _openBuckets.
      * While holding a lock on _bucketMutex, you can take a lock on an individual bucket, then
      * release _bucketMutex. Any iterators on the protected structures should be considered invalid
@@ -594,6 +635,10 @@ private:
 
     // The current open bucket for each namespace and metadata pair.
     stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, Bucket*> _openBuckets;
+
+    // Bucket state
+    mutable Mutex _statesMutex = MONGO_MAKE_LATCH("BucketCatalog::_statesMutex");
+    stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
 
     // This mutex protects access to _idleBuckets
     mutable Mutex _idleMutex = MONGO_MAKE_LATCH("BucketCatalog::_idleMutex");

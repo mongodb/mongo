@@ -40,6 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_session_id.h"
@@ -88,8 +89,8 @@ struct CollectionUpdateArgs {
     // Document containing the _id field of the doc being updated.
     BSONObj criteria;
 
-    // True if this update comes from a chunk migration.
-    bool fromMigrate = false;
+    // Type of update. See OperationSource definition for more details.
+    OperationSource source = OperationSource::kStandard;
 
     StoreDocOption storeDocOption = StoreDocOption::None;
     bool preImageRecordingEnabledForCollection = false;

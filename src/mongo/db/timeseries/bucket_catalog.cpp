@@ -35,13 +35,16 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
@@ -128,6 +131,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     auto time = timeElem.Date();
 
     BucketAccess bucket{this, key, stats.get(), time};
+    invariant(bucket);
 
     StringSet newFieldNamesToBeInserted;
     uint32_t newFieldNamesSize = 0;
@@ -202,46 +206,59 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     return batch;
 }
 
-void BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
-    invariant(!batch->finished());
+bool BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
+    if (batch->finished()) {
+        // In this case, someone else aborted the batch behind our back. Oops.
+        return false;
+    }
 
     _waitToCommitBatch(batch);
 
     BucketAccess bucket(this, batch->bucket());
-    invariant(bucket);
+    if (!bucket) {
+        abort(batch);
+        return false;
+    }
+
+    invariant(_setBucketState(bucket->_id, BucketState::kPrepared));
 
     auto prevMemoryUsage = bucket->_memoryUsage;
     batch->_prepareCommit();
     _memoryUsage.fetchAndAdd(bucket->_memoryUsage - prevMemoryUsage);
 
     bucket->_batches.erase(batch->_lsid);
+
+    return true;
 }
 
 void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& info) {
     invariant(!batch->finished());
     invariant(!batch->active());
 
-    auto stats = _getExecutionStats(batch->bucket()->_ns);
-
     BucketAccess bucket(this, batch->bucket());
-    invariant(bucket);
 
     batch->_finish(info);
-    bucket->_preparedBatch.reset();
+    if (bucket) {
+        invariant(_setBucketState(bucket->_id, BucketState::kNormal));
+        bucket->_preparedBatch.reset();
+    }
 
     if (info.result.isOK()) {
+        auto& stats = batch->_stats;
         stats->numCommits.fetchAndAddRelaxed(1);
-        if (bucket->_numCommittedMeasurements == 0) {
+        if (batch->numPreviouslyCommittedMeasurements() == 0) {
             stats->numBucketInserts.fetchAndAddRelaxed(1);
         } else {
             stats->numBucketUpdates.fetchAndAddRelaxed(1);
         }
 
         stats->numMeasurementsCommitted.fetchAndAddRelaxed(batch->measurements().size());
-        bucket->_numCommittedMeasurements += batch->measurements().size();
+        if (bucket) {
+            bucket->_numCommittedMeasurements += batch->measurements().size();
+        }
     }
 
-    if (bucket->allCommitted()) {
+    if (bucket && bucket->allCommitted()) {
         if (bucket->_full) {
             // Everything in the bucket has been committed, and nothing more will be added since the
             // bucket is full. Thus, we can remove it.
@@ -255,6 +272,10 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
             // happened in BucketAccess::rollover, and that there is already a new open bucket for
             // this metadata.
             _markBucketNotIdle(ptr, false /* locked */);
+            {
+                stdx::lock_guard statesLk{_statesMutex};
+                _bucketStates.erase(ptr->_id);
+            }
             _allBuckets.erase(ptr);
         } else {
             _markBucketIdle(bucket);
@@ -265,54 +286,26 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
 void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
     invariant(batch);
     invariant(!batch->finished());
+    invariant(batch->_commitRights.load());
     Bucket* bucket = batch->bucket();
 
-    while (true) {
-        std::vector<std::shared_ptr<WriteBatch>> batchesToWaitOn;
+    // Before we access the bucket, make sure it's still there.
+    auto lk = _lockExclusive();
+    if (!_allBuckets.contains(bucket)) {
+        // Special case, bucket has already been cleared, and we need only abort this batch.
+        batch->_abort();
+        return;
+    }
 
-        {
-            auto lk = _lockExclusive();
+    stdx::unique_lock blk{bucket->_mutex};
+    _abort(blk, bucket, batch);
+}
 
-            // Before we access the bucket, make sure it's still there.
-            if (!_allBuckets.contains(bucket)) {
-                // Someone else already cleaned up the bucket while we didn't hold the lock.
-                invariant(batch->finished());
-                return;
-            }
-
-            stdx::unique_lock blk{bucket->_mutex};
-            if (bucket->allCommitted()) {
-                // No uncommitted batches left to abort, go ahead and remove the bucket.
-                blk.unlock();
-                _removeBucket(bucket, false /* expiringBuckets */);
-                break;
-            }
-
-            // For any uncommitted batches that we need to abort, see if we already have the rights,
-            // otherwise try to claim the rights and abort it. If we don't get the rights, then wait
-            // for the other writer to resolve the batch.
-            for (const auto& [_, active] : bucket->_batches) {
-                if (active == batch || active->claimCommitRights()) {
-                    active->_abort();
-                } else {
-                    batchesToWaitOn.push_back(active);
-                }
-            }
-            bucket->_batches.clear();
-
-            if (auto& prepared = bucket->_preparedBatch) {
-                if (prepared == batch) {
-                    prepared->_abort();
-                } else {
-                    batchesToWaitOn.push_back(prepared);
-                }
-                prepared.reset();
-            }
-        }
-
-        for (const auto& batchToWaitOn : batchesToWaitOn) {
-            batchToWaitOn->getResult().getStatus().ignore();
-        }
+void BucketCatalog::clear(const OID& oid) {
+    auto result = _setBucketState(oid, BucketState::kCleared);
+    if (result && *result == BucketState::kPreparedAndCleared) {
+        hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
+        throw WriteConflictException();
     }
 }
 
@@ -328,10 +321,10 @@ void BucketCatalog::clear(const NamespaceString& ns) {
         auto nextIt = std::next(it);
 
         const auto& bucket = *it;
-        _verifyBucketIsUnused(bucket.get());
+        stdx::unique_lock blk{bucket->_mutex};
         if (shouldClear(bucket->_ns)) {
             _executionStats.erase(bucket->_ns);
-            _removeBucket(bucket.get(), false /* expiringBuckets */);
+            _abort(blk, bucket.get(), nullptr);
         }
 
         it = nextIt;
@@ -394,7 +387,9 @@ BucketCatalog::StripedMutex::ExclusiveLock BucketCatalog::_lockExclusive() const
 void BucketCatalog::_waitToCommitBatch(const std::shared_ptr<WriteBatch>& batch) {
     while (true) {
         BucketAccess bucket{this, batch->bucket()};
-        invariant(bucket);
+        if (!bucket) {
+            return;
+        }
 
         auto current = bucket->_preparedBatch;
         if (!current) {
@@ -416,13 +411,40 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
     }
 
     invariant(bucket->_batches.empty());
+    invariant(!bucket->_preparedBatch);
 
     _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     _markBucketNotIdle(bucket, expiringBuckets /* locked */);
     _openBuckets.erase({std::move(bucket->_ns), std::move(bucket->_metadata)});
+    {
+        stdx::lock_guard statesLk{_statesMutex};
+        _bucketStates.erase(bucket->_id);
+    }
     _allBuckets.erase(it);
 
     return true;
+}
+
+void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
+                           Bucket* bucket,
+                           std::shared_ptr<WriteBatch> batch) {
+    // For any uncommitted batches that we need to abort, see if we already have the rights,
+    // otherwise try to claim the rights and abort it. If we don't get the rights, then wait
+    // for the other writer to resolve the batch.
+    for (const auto& [_, current] : bucket->_batches) {
+        current->_abort();
+    }
+    bucket->_batches.clear();
+
+    if (auto& prepared = bucket->_preparedBatch) {
+        if (prepared == batch) {
+            prepared->_abort();
+        }
+        prepared.reset();
+    }
+
+    lk.unlock();
+    _removeBucket(bucket, true /* bucketIsUnused */);
 }
 
 void BucketCatalog::_markBucketIdle(Bucket* bucket) {
@@ -482,6 +504,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(
     auto [it, inserted] = _allBuckets.insert(std::make_unique<Bucket>());
     Bucket* bucket = it->get();
     _setIdTimestamp(bucket, time);
+    _bucketStates.emplace(bucket->_id, BucketState::kNormal);
     _openBuckets[key] = bucket;
 
     if (openedDuetoMetadata) {
@@ -518,7 +541,52 @@ const std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutio
 }
 
 void BucketCatalog::_setIdTimestamp(Bucket* bucket, const Date_t& time) {
+    auto oldId = bucket->_id;
     bucket->_id.setTimestamp(durationCount<Seconds>(time.toDurationSinceEpoch()));
+    stdx::lock_guard statesLk{_statesMutex};
+    _bucketStates.erase(oldId);
+    _bucketStates.emplace(bucket->_id, BucketState::kNormal);
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(const OID& id,
+                                                                           BucketState target) {
+    stdx::lock_guard statesLk{_statesMutex};
+    auto it = _bucketStates.find(id);
+    if (it == _bucketStates.end()) {
+        return boost::none;
+    }
+
+    auto& [_, state] = *it;
+    switch (target) {
+        case BucketState::kNormal: {
+            if (state == BucketState::kPrepared) {
+                state = BucketState::kNormal;
+            } else if (state == BucketState::kPreparedAndCleared) {
+                state = BucketState::kCleared;
+            } else {
+                invariant(state != BucketState::kCleared);
+            }
+            break;
+        }
+        case BucketState::kPrepared: {
+            invariant(state == BucketState::kNormal);
+            state = BucketState::kPrepared;
+            break;
+        }
+        case BucketState::kCleared: {
+            if (state == BucketState::kNormal) {
+                state = BucketState::kCleared;
+            } else if (state == BucketState::kPrepared) {
+                state = BucketState::kPreparedAndCleared;
+            }
+            break;
+        }
+        case BucketState::kPreparedAndCleared: {
+            invariant(target != BucketState::kPreparedAndCleared);
+        }
+    }
+
+    return state;
 }
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
@@ -607,8 +675,8 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
 
     {
         auto lk = _catalog->_lockShared();
-        bool bucketExisted = _findOpenBucketAndLock(hash);
-        if (bucketExisted) {
+        auto bucketState = _findOpenBucketAndLock(hash);
+        if (bucketState == BucketState::kNormal || bucketState == BucketState::kPrepared) {
             return;
         }
     }
@@ -620,12 +688,21 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
 BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog, Bucket* bucket)
     : _catalog(catalog) {
     auto lk = _catalog->_lockShared();
-    auto it = _catalog->_allBuckets.find(bucket);
-    if (it == _catalog->_allBuckets.end()) {
+    auto bucketIt = _catalog->_allBuckets.find(bucket);
+    if (bucketIt == _catalog->_allBuckets.end()) {
         return;
     }
+
     _bucket = bucket;
     _acquire();
+
+    stdx::lock_guard statesLk{_catalog->_statesMutex};
+    auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
+    invariant(statesIt != _catalog->_bucketStates.end());
+    auto& [_, state] = *statesIt;
+    if (state == BucketState::kCleared) {
+        release();
+    }
 }
 
 BucketCatalog::BucketAccess::~BucketAccess() {
@@ -634,18 +711,27 @@ BucketCatalog::BucketAccess::~BucketAccess() {
     }
 }
 
-bool BucketCatalog::BucketAccess::_findOpenBucketAndLock(std::size_t hash) {
+BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketAndLock(std::size_t hash) {
     auto it = _catalog->_openBuckets.find(*_key, hash);
     if (it == _catalog->_openBuckets.end()) {
         // Bucket does not exist.
-        return false;
+        return BucketState::kCleared;
     }
 
     _bucket = it->second;
     _acquire();
-    _catalog->_markBucketNotIdle(_bucket, false /* locked */);
 
-    return true;
+    stdx::lock_guard statesLk{_catalog->_statesMutex};
+    auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
+    invariant(statesIt != _catalog->_bucketStates.end());
+    auto& [_, state] = *statesIt;
+    if (state == BucketState::kCleared || state == BucketState::kPreparedAndCleared) {
+        release();
+    } else {
+        _catalog->_markBucketNotIdle(_bucket, false /* locked */);
+    }
+
+    return state;
 }
 
 void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t hash) {
@@ -658,7 +744,20 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t has
 
     _bucket = it->second;
     _acquire();
-    _catalog->_markBucketNotIdle(_bucket, false /* locked */);
+
+    {
+        stdx::lock_guard statesLk{_catalog->_statesMutex};
+        auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
+        invariant(statesIt != _catalog->_bucketStates.end());
+        auto& [_, state] = *statesIt;
+        if (state == BucketState::kNormal || state == BucketState::kPrepared) {
+            _catalog->_markBucketNotIdle(_bucket, false /* locked */);
+            return;
+        }
+    }
+
+    _catalog->_abort(_guard, _bucket, nullptr);
+    _create();
 }
 
 void BucketCatalog::BucketAccess::_acquire() {
@@ -985,7 +1084,6 @@ StatusWith<BucketCatalog::CommitInfo> BucketCatalog::WriteBatch::getResult() con
 }
 
 BucketCatalog::Bucket* BucketCatalog::WriteBatch::bucket() const {
-    invariant(!finished());
     return _bucket;
 }
 
@@ -1083,7 +1181,6 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
 }
 
 void BucketCatalog::WriteBatch::_abort() {
-    invariant(_commitRights.load());
     _active = false;
     _promise.setError({ErrorCodes::TimeseriesBucketCleared,
                        str::stream() << "Time-series bucket " << _bucket->id() << " for "
