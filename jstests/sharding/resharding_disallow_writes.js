@@ -99,12 +99,12 @@ assert.commandWorked(sourceCollection.runCommand(
 
 // TODO(SERVER-54672): Uncomment the following operations.
 
-// assert.commandWorked(sourceCollection.runCommand(
-//   {createIndexes: collName, indexes: [{key: {yak: 1}, name: "yak_0"}]}));
+assert.commandWorked(sourceCollection.runCommand(
+    {createIndexes: collName, indexes: [{key: {yak: 1}, name: "yak_0"}]}));
 
-// assert.commandWorked(sourceCollection.runCommand({collMod: sourceCollection.getName()}));
+assert.commandWorked(sourceCollection.runCommand({collMod: sourceCollection.getName()}));
 
-// assert.commandWorked(sourceCollection.runCommand({dropIndexes: collName, index: {oldKey: 1}}));
+assert.commandWorked(sourceCollection.runCommand({dropIndexes: collName, index: {oldKey: 1}}));
 
 assert.commandWorked(sourceCollection.runCommand({drop: collName}));
 
