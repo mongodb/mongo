@@ -54,6 +54,9 @@ namespace {
 
 /**
  * Fulfills the promise if it isn't already fulfilled. Does nothing otherwise.
+ *
+ * This function is not thread-safe and must not be called concurrently with the promise being
+ * fulfilled by another thread.
  */
 void ensureFulfilledPromise(SharedPromise<void>& sp) {
     if (!sp.getFuture().isReady()) {
@@ -63,6 +66,9 @@ void ensureFulfilledPromise(SharedPromise<void>& sp) {
 
 /**
  * Fulfills the promise with an error if it isn't already fulfilled. Does nothing otherwise.
+ *
+ * This function is not thread-safe and must not be called concurrently with the promise being
+ * fulfilled by another thread.
  */
 void ensureFulfilledPromise(SharedPromise<void>& sp, Status error) {
     if (!sp.getFuture().isReady()) {
@@ -386,11 +392,8 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
                                                executor);
                    }))
         .thenRunOn(executor)
-        .onError([this, executor, chainCtx, errorSource](Status originalError) mutable {
+        .onError([executor, chainCtx, errorSource](Status originalError) mutable {
             errorSource.cancel();
-
-            ensureFulfilledPromise(_cloningDone, originalError);
-            ensureFulfilledPromise(_consistentButStale, originalError);
 
             return whenAll(
                        whenAllSettledOn(chainCtx->oplogFetcherFutures, executor),
@@ -400,15 +403,19 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
                        whenAllSettledOn(chainCtx->oplogApplierStrictlyConsistentFutures, executor))
                 .ignoreValue()
                 .thenRunOn(executor)
-                .onCompletion([originalError](auto x) { return originalError; });
+                .onCompletion([originalError](auto) { return originalError; });
         })
         // Fulfilling the _strictlyConsistent promise must be the very last thing in the future
         // chain because RecipientStateMachine, along with its ReshardingDataReplication member,
         // may be destructed immediately afterwards.
         .onCompletion([this](Status status) {
             if (status.isOK()) {
+                invariant(_cloningDone.getFuture().isReady());
+                invariant(_consistentButStale.getFuture().isReady());
                 _strictlyConsistent.emplaceValue();
             } else {
+                ensureFulfilledPromise(_cloningDone, status);
+                ensureFulfilledPromise(_consistentButStale, status);
                 _strictlyConsistent.setError(status);
             }
         })

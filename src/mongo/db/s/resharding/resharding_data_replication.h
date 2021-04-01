@@ -103,6 +103,9 @@ public:
      * This method exists on ReshardingDataReplicationInterface to allow the RecipientStateMachine
      * to transition from kCloning to kApplying before the fetched oplog entries start to be
      * applied.
+     *
+     * This function is safe to be called multiple times in sequence but must not be called
+     * concurrently by another thread.
      */
     virtual void startOplogApplication() = 0;
 
