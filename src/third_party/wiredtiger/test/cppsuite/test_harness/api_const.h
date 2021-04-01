@@ -45,6 +45,7 @@ static const char *DURATION_SECONDS = "duration_seconds";
 static const char *ENABLED = "enabled";
 static const char *ENABLE_LOGGING = "enable_logging";
 static const char *KEY_COUNT = "key_count";
+static const char *KEY_SIZE = "key_size";
 static const char *LIMIT = "limit";
 static const char *MAX = "max";
 static const char *MIN = "min";
@@ -63,6 +64,7 @@ static const char *OLDEST_TS = "oldest_timestamp";
 static const char *STABLE_TS = "stable_timestamp";
 
 /* Test harness consts. */
+static const char *DEFAULT_FRAMEWORK_SCHEMA = "key_format=S,value_format=S";
 static const char *TABLE_OPERATION_TRACKING = "table:operation_tracking";
 static const char *TABLE_SCHEMA_TRACKING = "table:schema_tracking";
 static const char *STATISTICS_URI = "statistics:";
