@@ -23,7 +23,6 @@ workload_generator=
 {
     collection_count=2
     key_count=5
-    key_format=i
     key_size=1
     ops_per_transaction=
     {
@@ -32,7 +31,6 @@ workload_generator=
     }
     read_threads=1
     value_size=10
-    value_format=S
 }
 workload_tracking=
 {
