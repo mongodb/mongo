@@ -8,7 +8,7 @@ DEFAULT_SSH_CONNECTION_OPTIONS = ("-o ServerAliveCountMax=10"
                                   " -o ServerAliveInterval=6"
                                   " -o StrictHostKeyChecking=no"
                                   " -o ConnectTimeout=30"
-                                  " -o ConnectionAttempts=20"
+                                  " -o ConnectionAttempts=10"
                                   " -o UserKnownHostsFile=/dev/null"
                                   " -o GSSAPIAuthentication=no"
                                   " -o CheckHostIP=no")
