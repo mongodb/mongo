@@ -4,7 +4,7 @@
  *
  * TODO SERVER-55470: This test should be removed when 5.0 becomes the lastLTS.
  *
- * @tags: [multiversion_incompatible, requires_replication, requires_fcv_49]
+ * @tags: [multiversion_incompatible, requires_replication]
  */
 (function() {
 "use strict";
@@ -17,7 +17,7 @@ const primary = rst.getPrimary();
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 assert.commandFailedWithCode(primary.getDB("foo").createCollection("system.resharding.123"),
                              ErrorCodes.InvalidNamespace);
-assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.9"}));
+assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 assert.commandWorked(primary.getDB("foo").createCollection("system.resharding.123"));
 assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
 assert.commandWorked(primary.getDB("foo").runCommand({"drop": "system.resharding.123"}));
