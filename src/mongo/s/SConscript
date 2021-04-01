@@ -151,6 +151,7 @@ env.Library(
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',
         'request_types/balancer_collection_status.idl',
+        'request_types/cleanup_reshard_collection.idl',
         'request_types/clear_jumbo_flag.idl',
         'request_types/clone_catalog_data.idl',
         'request_types/clone_collection_options_from_primary_shard.idl',

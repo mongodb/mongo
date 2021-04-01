@@ -2208,6 +2208,50 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "cleanupReshardCollection",
+          command: {cleanupReshardCollection: "test.x"},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                [{resource: {db: "test", collection: "x"}, actions: ["reshardCollection"]}],
+                  expectFail: true
+              },
+          ]
+        },
+        {
+          testname: "_configsvrCleanupReshardCollection",
+          command: {_configsvrCleanupReshardCollection: "test.x"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "_shardsvrCleanupReshardCollection",
+          command: {_shardsvrCleanupReshardCollection: "test.x", reshardingUUID: UUID()},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "cloneCollectionAsCapped",
           command: {cloneCollectionAsCapped: "x", toCollection: "y", size: 1000},
           skipSharded: true,

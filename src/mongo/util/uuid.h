@@ -99,6 +99,7 @@ class UUID {
     friend class ResumeIndexInfo;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;
+    friend class ShardsvrCleanupReshardCollection;
     friend class ShardsvrShardCollectionResponse;
     friend class ShardsvrRenameCollection;
     friend class TenantMigrationDonorDocument;
