@@ -10,13 +10,13 @@
  * multiple times.
  */
 
-var latestFCV = "4.9";
-var lastContinuousFCV = "4.8";
+var latestFCV = "5.0";
+var lastContinuousFCV = "4.9";
 var lastLTSFCV = "4.4";
 // The number of versions since the last-lts version. When numVersionsSinceLastLTS = 1,
 // lastContinuousFCV is equal to lastLTSFCV. This is used to calculate the expected minWireVersion
 // in jstests that use the lastLTSFCV. This should be updated on each release.
-var numVersionsSinceLastLTS = 3;
+var numVersionsSinceLastLTS = 4;
 
 /**
  * Returns the FCV associated with a binary version.

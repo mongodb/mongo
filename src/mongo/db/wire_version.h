@@ -92,9 +92,12 @@ enum WireVersion {
     // Supports features available from 4.9 and onwards.
     WIRE_VERSION_49 = 12,
 
+    // Supports features available from 5.0 and onwards.
+    WIRE_VERSION_50 = 13,
+
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = WIRE_VERSION_49,
+    LATEST_WIRE_VERSION = WIRE_VERSION_50,
 
     // Set this to LATEST_WIRE_VERSION - 1.
     LAST_CONT_WIRE_VERSION = LATEST_WIRE_VERSION - 1,

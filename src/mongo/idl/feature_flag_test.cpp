@@ -85,7 +85,7 @@ TEST(IDLFeatureFlag, Basic) {
     ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha"));
 
     ASSERT(feature_flags::gFeatureFlagToaster.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+           ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 }
 
 // Verify getVersion works correctly when enabled and not enabled
@@ -138,7 +138,7 @@ TEST_F(FeatureFlagTest, IsEnabledTrue) {
     // Test FCV checks with enabled flag
     // Test newest version
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
     ASSERT_TRUE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
@@ -164,7 +164,7 @@ TEST_F(FeatureFlagTest, IsEnabledFalse) {
     ASSERT_OK(_featureFlagSpoon->setFromString("false"));
 
     serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+        ServerGlobalParams::FeatureCompatibility::Version::kVersion50);
 
     ASSERT_FALSE(
         feature_flags::gFeatureFlagBlender.isEnabled(serverGlobalParams.featureCompatibility));
