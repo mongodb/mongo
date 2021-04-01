@@ -147,7 +147,7 @@ const twoDBucketsIndexSpec = {
     'meta': "2d"
 };
 assert.commandWorked(timeseriescoll.createIndex(twoDTimeseriesIndexSpec),
-                     'Failed to create a 2d on index: ' + tojson(twoDTimeseriesIndexSpec));
+                     'Failed to create a 2d index with: ' + tojson(twoDTimeseriesIndexSpec));
 
 // Insert a 2d index usable document.
 const twoDDoc = {
@@ -181,7 +181,7 @@ const twoDSphereBucketsIndexSpec = {
 };
 assert.commandWorked(
     timeseriescoll.createIndex(twoDSphereTimeseriesIndexSpec),
-    'Failed to create a 2dsphere on index: ' + tojson(twoDSphereTimeseriesIndexSpec));
+    'Failed to create a 2dsphere index with: ' + tojson(twoDSphereTimeseriesIndexSpec));
 
 // Insert a 2dsphere index usable document.
 const twoDSphereDoc = {
@@ -210,4 +210,56 @@ assert.eq(1,
 
 // TODO (SERVER-55239): do the above on the timeseriescoll, which doesn't currently work.
 // "errmsg" : "$geoNear is only valid as the first stage in a pipeline."
+
+/**
+ * Test wildcard index on time-series collection.
+ */
+
+jsTestLog("Testing wildcard index on time-series collection.");
+resetCollections();
+
+// Create a wildcard index on the time-series collection.
+const wildcardTimeseriesIndexSpec = {
+    [metaFieldName + '.$**']: 1
+};
+const wildcardBucketsIndexSpec = {
+    ['meta.$**']: 1
+};
+assert.commandWorked(
+    timeseriescoll.createIndex(wildcardTimeseriesIndexSpec),
+    'Failed to create a wildcard index with: ' + tojson(wildcardTimeseriesIndexSpec));
+
+const wildcard1Doc = {
+    _id: 0,
+    [timeFieldName]: ISODate(),
+    [metaFieldName]: {a: 1, b: 1, c: {d: 1, e: 1}},
+};
+const wildcard2Doc = {
+    _id: 1,
+    [timeFieldName]: ISODate(),
+    [metaFieldName]: {a: 2, b: 2, c: {d: 1, e: 2}},
+};
+const wildcard3Doc = {
+    _id: 0,
+    [timeFieldName]: ISODate(),
+    [metaFieldName]: {a: 3, b: 3, c: {d: 3, e: 3}},
+};
+assert.commandWorked(timeseriescoll.insert(wildcard1Doc));
+assert.commandWorked(timeseriescoll.insert(wildcard2Doc));
+assert.commandWorked(timeseriescoll.insert(wildcard3Doc));
+
+// Queries on 'metaFieldName' subfields should be able to use the wildcard index hint.
+const wildcardBucketsResults =
+    bucketscoll.find({'meta.c.d': 1}).hint(wildcardBucketsIndexSpec).toArray();
+assert.eq(2, wildcardBucketsResults.length, "Query results: " + tojson(wildcardBucketsResults));
+const wildcardTimeseriesResults =
+    timeseriescoll.find({[metaFieldName + '.c.d']: 1}).hint(wildcardBucketsIndexSpec).toArray();
+assert.eq(
+    2, wildcardTimeseriesResults.length, "Query results: " + tojson(wildcardTimeseriesResults));
+
+// The time-series index spec does not work as a hint.
+assert.commandFailedWithCode(assert.throws(() => timeseriescoll.find({[metaFieldName + '.c.d']: 1})
+                                                     .hint(wildcardTimeseriesIndexSpec)
+                                                     .toArray()),
+                                          ErrorCodes.BadValue);
 })();

@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
 #include "mongo/db/timeseries/timeseries_field_names.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 
 namespace mongo {
@@ -125,7 +128,7 @@ boost::optional<BSONObj> createTimeseriesIndexSpecFromBucketsIndexSpec(
         if (elem.fieldNameStringData() == controlMinTimeField) {
             if (!elem.isNumber()) {
                 // This index spec on the underlying buckets collection is not valid for
-                // time-series. Therefore, we will not convert the index spec..
+                // time-series. Therefore, we will not convert the index spec.
                 return {};
             }
 

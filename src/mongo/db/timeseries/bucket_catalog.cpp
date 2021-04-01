@@ -124,7 +124,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     auto timeElem = doc[options.getTimeField()];
     if (!timeElem || BSONType::Date != timeElem.type()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "'" << options.getTimeField() << "' must be present an contain a "
+                str::stream() << "'" << options.getTimeField() << "' must be present and contain a "
                               << "valid BSON UTC datetime value"};
     }
 

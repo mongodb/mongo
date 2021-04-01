@@ -27,6 +27,10 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 namespace timeseries {
 
