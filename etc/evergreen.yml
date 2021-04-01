@@ -2445,7 +2445,7 @@ functions:
           echo $user
 
           attempts=0
-          connection_attempts=${connection_attempts|25}
+          connection_attempts=${connection_attempts|60}
 
           # Check for remote connectivity
           while ! ssh \
@@ -9322,7 +9322,6 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: buildscripts_test
   - name: noPassthrough_gen
-  - name: powercycle_kill_mongod_smoke
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
   - name: compile_run_and_archive_dbtest_TG
@@ -9364,7 +9363,6 @@ buildvariants:
         - windows-vsCurrent-xlarge
     - name: burn_in_tests_gen
     - name: noPassthrough_gen
-    - name: powercycle_kill_mongod_smoke
 # Disabling as the following tests are not aware of feature flags.
 #    - name: buildscripts_test
 #    - name: server_discovery_and_monitoring_json_test_TG
@@ -9426,6 +9424,8 @@ buildvariants:
     - name: mqlrun
     - name: noPassthrough_gen
     - name: noPassthroughWithMongod_gen
+    - name: powercycle_kill_mongod_smoke
+    - name: powercycle_smoke
     - name: .replica_sets .common
     - name: .replica_sets .multi_oplog
     - name: replica_sets_ese_gen
@@ -10052,8 +10052,6 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: multiversion_gen
-  - name: powercycle_smoke
-  - name: powercycle_kill_mongod_smoke
   - name: .query_fuzzer
   - name: .random_multiversion_ds
   - name: .read_write_concern .large
@@ -10693,6 +10691,8 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_jscore_passthrough
   - name: .replica_sets .multi_oplog
+  - name: powercycle_kill_mongod_smoke
+  - name: powercycle_smoke
   - name: sasl
   - name: search
   - name: search_auth

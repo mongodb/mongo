@@ -801,7 +801,7 @@ def remote_handler(options, task_config, root_dir):
             # An internal crash on Windows is not immediate
             try:
                 LOGGER.info("Waiting after issuing internal crash!")
-                time.sleep(30)
+                time.sleep(60)
             except IOError:
                 pass
 
@@ -1095,7 +1095,7 @@ def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
 
     # We wait a bit, since files could still be flushed to disk, which was causing
     # rsync "file has vanished" errors.
-    time.sleep(5)
+    time.sleep(60)
 
     return 0
 
@@ -1650,7 +1650,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
                 ssh_failure_exit(ret, output)
             # Wait a bit after sending command to crash the server to avoid connecting to the
             # server before the actual crash occurs.
-            sleep_secs = 120 if _IS_WINDOWS else 10
+            sleep_secs = 120 if _IS_WINDOWS else 30
             time.sleep(sleep_secs)
 
         # Kill any running clients and cleanup temporary files.
