@@ -246,9 +246,26 @@ BSONObj getCollation(OperationContext* opCtx,
     return actualCollatorBSON;
 }
 
-void removeChunks(OperationContext* opCtx, const UUID& uuid) {
+void retryWriteOnStepdown(OperationContext* opCtx, const BatchedCommandRequest& request) {
     BatchWriteExecStats stats;
     BatchedCommandResponse response;
+
+    do {
+        response.clear();
+        try {
+            cluster::write(opCtx, request, &stats, &response, boost::none);
+        } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
+            response.setStatus(ex.toStatus());
+        } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& ex) {
+            response.setStatus(ex.toStatus());
+        }
+    } while (response.toStatus().isA<ErrorCategory::NotPrimaryError>() ||
+             response.toStatus().isA<ErrorCategory::ShutdownError>());
+
+    uassertStatusOK(response.toStatus());
+}
+
+void removeChunks(OperationContext* opCtx, const UUID& uuid) {
     BatchedCommandRequest deleteRequest([&]() {
         write_ops::Delete deleteOp(ChunkType::ConfigNS);
         deleteOp.setWriteCommandBase([] {
@@ -260,14 +277,13 @@ void removeChunks(OperationContext* opCtx, const UUID& uuid) {
             std::vector{write_ops::DeleteOpEntry(BSON(ChunkType::collectionUUID << uuid), false)});
         return deleteOp;
     }());
+
     deleteRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-    cluster::write(opCtx, deleteRequest, &stats, &response);
-    uassertStatusOK(response.toStatus());
+
+    retryWriteOnStepdown(opCtx, deleteRequest);
 }
 
 void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
-    BatchWriteExecStats stats;
-    BatchedCommandResponse response;
     BatchedCommandRequest updateRequest([&]() {
         write_ops::Update updateOp(ChunkType::ConfigNS);
         std::vector<write_ops::UpdateOpEntry> entries;
@@ -288,8 +304,7 @@ void upsertChunks(OperationContext* opCtx, std::vector<ChunkType>& chunks) {
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-    cluster::write(opCtx, updateRequest, &stats, &response);
-    uassertStatusOK(response.toStatus());
+    retryWriteOnStepdown(opCtx, updateRequest);
 }
 
 void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, CollectionType& coll) {
@@ -310,8 +325,7 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
 
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     try {
-        cluster::write(opCtx, updateRequest, &stats, &response);
-        uassertStatusOK(response.toStatus());
+        retryWriteOnStepdown(opCtx, updateRequest);
     } catch (const DBException&) {
         // If an error happens when contacting the config server, we don't know if the update
         // succeded or not, which might cause the local shard version to differ from the config
@@ -526,14 +540,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
             if (status.isOK()) {
                 LOGV2(5458701, "Collection created", "namespace"_attr = nss());
             } else {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-
                 // Do not remove the coordinator document if we have a stepdown related error.
-                if (repl::ReplicationCoordinator::get(opCtx)->getMemberState() !=
-                        repl::MemberState::RS_PRIMARY &&
-                    (status.isA<ErrorCategory::NotPrimaryError>() ||
-                     status.isA<ErrorCategory::ShutdownError>())) {
+                if (status.isA<ErrorCategory::NotPrimaryError>() ||
+                    status.isA<ErrorCategory::ShutdownError>()) {
                     uassertStatusOK(status);
                 }
 
