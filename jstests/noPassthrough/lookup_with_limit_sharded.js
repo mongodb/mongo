@@ -10,7 +10,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -27,7 +26,8 @@ other.drop();
 // unsharded collection.
 function checkUnshardedResults(pipeline, expectedPlanStage, expectedPipeline) {
     const explain = coll.explain().aggregate(pipeline);
-    assert.eq(explain.stages[0].$cursor.queryPlanner.winningPlan.stage, expectedPlanStage, explain);
+    assert.eq(
+        getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage, expectedPlanStage, explain);
     for (let i = 0; i < expectedPipeline.length; i++) {
         assert.eq(Object.keys(explain.stages[i + 1]), expectedPipeline[i], explain);
     }
@@ -99,7 +99,7 @@ const topKSortPipeline = [
 ];
 checkUnshardedResults(topKSortPipeline, "SORT", ["$lookup"]);
 const explain = coll.explain().aggregate(topKSortPipeline);
-assert.eq(explain.stages[0].$cursor.queryPlanner.winningPlan.limitAmount, 5, explain);
+assert.eq(getWinningPlan(explain.stages[0].$cursor.queryPlanner).limitAmount, 5, explain);
 
 // Tests on a sharded collection.
 coll.createIndex({x: 1});
