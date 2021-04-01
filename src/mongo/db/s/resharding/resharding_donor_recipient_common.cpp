@@ -381,7 +381,7 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
 
 void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) {
     stdx::unordered_set<NamespaceString> namespacesToRefresh;
-    for (const NamespaceString homeToReshardingDocs :
+    for (const NamespaceString& homeToReshardingDocs :
          {NamespaceString::kDonorReshardingOperationsNamespace,
           NamespaceString::kRecipientReshardingOperationsNamespace}) {
         PersistentTaskStore<CommonReshardingMetadata> store(homeToReshardingDocs);
