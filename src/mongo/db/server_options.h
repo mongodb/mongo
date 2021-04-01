@@ -200,9 +200,11 @@ struct ServerGlobalParams {
             kDowngradingFrom47To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.7 }
             kDowngradingFrom48To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.8 }
             kDowngradingFrom49To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 4.9 }
+            kDowngradingFrom50To44,  // { version: 4.4, targetVersion: 4.4, previousVersion: 5.0 }
             kUpgradingFrom44To47,    // { version: 4.4, targetVersion: 4.7 }
             kUpgradingFrom44To48,    // { version: 4.4, targetVersion: 4.8 }
             kUpgradingFrom44To49,    // { version: 4.4, targetVersion: 4.9 }
+            kUpgradingFrom44To50,    // { version: 4.4, targetVersion: 5.0 }
             kVersion47,              // { version: 4.7 }
             kDowngradingFrom48To47,  // { version: 4.7, targetVersion: 4.7, previousVersion: 4.8 }
             kUpgradingFrom47To48,    // { version: 4.7, targetVersion: 4.8 }
@@ -210,28 +212,31 @@ struct ServerGlobalParams {
             kDowngradingFrom49To48,  // { version: 4.8, targetVersion: 4.8, previousVersion: 4.9 }
             kUpgradingFrom48To49,    // { version: 4.8, targetVersion: 4.9 }
             kVersion49,              // { version: 4.9 }
+            kDowngradingFrom50To49,  // { version: 4.9, targetVersion: 4.9, previousVersion: 5.0 }
+            kUpgradingFrom49To50,    // { version: 4.9, targetVersion: 5.0 }
+            kVersion50,              // { version: 5.0 }
         };
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
-        static constexpr Version kLatest = Version::kVersion49;
-        static constexpr Version kLastContinuous = Version::kVersion48;
+        static constexpr Version kLatest = Version::kVersion50;
+        static constexpr Version kLastContinuous = Version::kVersion49;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
         // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
-        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To49;
+        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To50;
         static constexpr Version kUpgradingFromLastContinuousToLatest =
-            Version::kUpgradingFrom48To49;
-        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom49To44;
+            Version::kUpgradingFrom49To50;
+        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom50To44;
         static constexpr Version kDowngradingFromLatestToLastContinuous =
-            Version::kDowngradingFrom49To48;
+            Version::kDowngradingFrom50To49;
         // kUpgradingFromLastLTSToLastContinuous is only ever set to a valid FCV when
         // kLastLTS and kLastContinuous are not equal. Otherwise, this value should be set to
         // kInvalid.
         static constexpr Version kUpgradingFromLastLTSToLastContinuous =
-            Version::kUpgradingFrom44To48;
+            Version::kUpgradingFrom44To49;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This

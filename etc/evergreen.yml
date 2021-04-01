@@ -431,12 +431,12 @@ functions:
         END_OF_CREDS
 
   "git get project": &git_get_project
-    command: git.get_project
-    params:
-      directory: src
-      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-        enterprise: ${enterprise_rev}
-        wtdevelop: ${wtdevelop_rev}
+    - command: git.get_project
+      params:
+        directory: ${git_project_directory|src}
+        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+          enterprise: ${enterprise_rev}
+          wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts": &fetch_artifacts
     command: s3.get
@@ -1251,7 +1251,7 @@ functions:
           --platform $platform                               \
           --architecture $architecture                       \
           --githubOauthToken "${github_token}"               \
-          --useLatest 4.4 4.7 4.8
+          --useLatest 4.4 4.7 4.8 4.9
 
         # This is primarily for tests for infrastructure which don't always need the latest
         # binaries.
@@ -1753,6 +1753,8 @@ functions:
         if [ "${is_patch}" = "true" ]; then
           MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
         fi
+
+        echo "MONGO_VERSION = ${MONGO_VERSION}"
 
         ${activate_virtualenv}
 
@@ -10213,7 +10215,7 @@ buildvariants:
   - rhel80-small
   expansions: &enterprise-rhel-80-64-bit-multiversion
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_47,requires_fcv_48,requires_fcv_49,multiversion_incompatible
+      --excludeWithAnyTags=requires_fcv_47,requires_fcv_48,requires_fcv_49,requires_fcv_50,multiversion_incompatible
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
