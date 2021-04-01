@@ -200,7 +200,7 @@ protected:
         reshardingFields.setDonorFields(TypeCollectionDonorFields(
             coordinatorDoc.getTempReshardingNss(),
             coordinatorDoc.getReshardingKey(),
-            resharding::extractShardIds(coordinatorDoc.getRecipientShards())));
+            extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards())));
 
         auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
             coordinatorDoc,
@@ -475,7 +475,7 @@ protected:
         TypeCollectionDonorFields donorField(
             expectedCoordinatorDoc.getTempReshardingNss(),
             expectedCoordinatorDoc.getReshardingKey(),
-            resharding::extractShardIds(expectedCoordinatorDoc.getRecipientShards()));
+            extractShardIdsFromParticipantEntries(expectedCoordinatorDoc.getRecipientShards()));
         expectedReshardingFields.setDonorFields(donorField);
         if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
             AbortReason abortReasonStruct;
@@ -522,10 +522,11 @@ protected:
             TypeCollectionReshardingFields reshardingFields(
                 expectedCoordinatorDoc.getReshardingUUID());
             reshardingFields.setState(expectedCoordinatorDoc.getState());
-            reshardingFields.setDonorFields(TypeCollectionDonorFields(
-                expectedCoordinatorDoc.getTempReshardingNss(),
-                expectedCoordinatorDoc.getReshardingKey(),
-                resharding::extractShardIds(expectedCoordinatorDoc.getRecipientShards())));
+            reshardingFields.setDonorFields(
+                TypeCollectionDonorFields(expectedCoordinatorDoc.getTempReshardingNss(),
+                                          expectedCoordinatorDoc.getReshardingKey(),
+                                          extractShardIdsFromParticipantEntries(
+                                              expectedCoordinatorDoc.getRecipientShards())));
 
             auto originalNssCatalogEntry = makeOriginalCollectionCatalogEntry(
                 expectedCoordinatorDoc,

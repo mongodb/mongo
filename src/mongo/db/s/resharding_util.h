@@ -138,6 +138,34 @@ Status getStatusFromAbortReason(ClassWithAbortReason& c) {
 }
 
 /**
+ * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries.
+ */
+template <class T>
+std::vector<ShardId> extractShardIdsFromParticipantEntries(
+    const std::vector<T>& participantShardEntries) {
+    std::vector<ShardId> shardIds(participantShardEntries.size());
+    std::transform(participantShardEntries.begin(),
+                   participantShardEntries.end(),
+                   shardIds.begin(),
+                   [](const auto& shardEntry) { return shardEntry.getId(); });
+    return shardIds;
+}
+
+/**
+ * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries as a set.
+ */
+template <class T>
+std::set<ShardId> extractShardIdsFromParticipantEntriesAsSet(
+    const std::vector<T>& participantShardEntries) {
+    std::set<ShardId> shardIds;
+    std::transform(participantShardEntries.begin(),
+                   participantShardEntries.end(),
+                   std::inserter(shardIds, shardIds.end()),
+                   [](const auto& shardEntry) { return shardEntry.getId(); });
+    return shardIds;
+}
+
+/**
  * Helper method to construct a DonorShardEntry with the fields specified.
  */
 DonorShardEntry makeDonorShard(ShardId shardId,
