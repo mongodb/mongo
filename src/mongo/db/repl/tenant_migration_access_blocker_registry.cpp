@@ -26,11 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 
 namespace mongo {
+using MtabType = TenantMigrationAccessBlocker::BlockerType;
+using MtabPair = TenantMigrationAccessBlockerRegistry::DonorRecipientAccessBlockerPair;
 
 const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry>
     TenantMigrationAccessBlockerRegistry::get =
@@ -39,42 +40,70 @@ const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry>
 void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
-
+    auto mtabType = mtab->getType();
     // Assume that all tenant ids (i.e. 'tenantId') have equal length.
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
-
     if (it != _tenantMigrationAccessBlockers.end()) {
-        uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  str::stream() << "Found active migration for tenantId \"" << tenantId << "\"");
+        if (it->second.getAccessBlocker(mtabType)) {
+            uasserted(ErrorCodes::ConflictingOperationInProgress,
+                      str::stream()
+                          << "Found active migration for tenantId \"" << tenantId << "\"");
+        }
+        // The migration protocol guarantees that the original donor node must be garbage collected
+        // before it can be chosen as a recipient under the same tenant. Therefore, we only expect
+        // to have both recipient and donor access blockers in the case of back-to-back migrations
+        // where the node participates first as a recipient then a donor.
+        invariant(mtabType == MtabType::kDonor);
+        it->second.setAccessBlocker(mtab);
+        return;
     }
-
-    _tenantMigrationAccessBlockers.emplace(tenantId, mtab);
+    MtabPair mtabPair;
+    mtabPair.setAccessBlocker(mtab);
+    _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
-void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId) {
+void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType type) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
     invariant(it != _tenantMigrationAccessBlockers.end());
+    auto mtabPair = it->second;
+    mtabPair.clearAccessBlocker(type);
+    if (!mtabPair.getAccessBlocker(MtabType::kDonor) &&
+        !mtabPair.getAccessBlocker(MtabType::kRecipient)) {
+        _tenantMigrationAccessBlockers.erase(it);
+    }
+}
 
-    _tenantMigrationAccessBlockers.erase(it);
+boost::optional<MtabPair>
+TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(StringData dbName) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    return _getTenantMigrationAccessBlockersForDbName(dbName, lg);
 }
 
 std::shared_ptr<TenantMigrationAccessBlocker>
-TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(StringData dbName) {
+TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(StringData dbName,
+                                                                               MtabType type) {
     stdx::lock_guard<Latch> lg(_mutex);
+    auto mtabPair = _getTenantMigrationAccessBlockersForDbName(dbName, lg);
+    if (!mtabPair) {
+        return nullptr;
+    }
+    return mtabPair->getAccessBlocker(type);
+}
 
-    auto it = std::find_if(
-        _tenantMigrationAccessBlockers.begin(),
-        _tenantMigrationAccessBlockers.end(),
-        [dbName](
-            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
-            StringData tenantId = blocker.first;
-            return dbName.startsWith(tenantId + "_");
-        });
+boost::optional<MtabPair>
+TenantMigrationAccessBlockerRegistry::_getTenantMigrationAccessBlockersForDbName(StringData dbName,
+                                                                                 WithLock) {
+    auto it = std::find_if(_tenantMigrationAccessBlockers.begin(),
+                           _tenantMigrationAccessBlockers.end(),
+                           [dbName](const std::pair<std::string, MtabPair>& blocker) {
+                               StringData tenantId = blocker.first;
+                               return dbName.startsWith(tenantId + "_");
+                           });
 
     if (it == _tenantMigrationAccessBlockers.end()) {
-        return nullptr;
+        return boost::none;
     } else {
         return it->second;
     }
@@ -82,12 +111,12 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(S
 
 std::shared_ptr<TenantMigrationAccessBlocker>
 TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId(
-    StringData tenantId) {
+    StringData tenantId, MtabType type) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
     if (it != _tenantMigrationAccessBlockers.end()) {
-        return it->second;
+        return it->second.getAccessBlocker(type);
     } else {
         return nullptr;
     }
@@ -102,25 +131,27 @@ void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(
     BSONObjBuilder* builder) const {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    std::for_each(
-        _tenantMigrationAccessBlockers.begin(),
-        _tenantMigrationAccessBlockers.end(),
-        [builder](
-            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
-            blocker.second->appendInfoForServerStatus(builder);
-        });
+    for (auto& [_, mtabPair] : _tenantMigrationAccessBlockers) {
+        if (auto recipientMtab = mtabPair.getAccessBlocker(MtabType::kRecipient)) {
+            recipientMtab->appendInfoForServerStatus(builder);
+        }
+        if (auto donorMtab = mtabPair.getAccessBlocker(MtabType::kDonor)) {
+            donorMtab->appendInfoForServerStatus(builder);
+        }
+    }
 }
 
 void TenantMigrationAccessBlockerRegistry::onMajorityCommitPointUpdate(repl::OpTime opTime) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    std::for_each(
-        _tenantMigrationAccessBlockers.begin(),
-        _tenantMigrationAccessBlockers.end(),
-        [opTime](
-            const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
-            blocker.second->onMajorityCommitPointUpdate(opTime);
-        });
+    for (auto& [_, mtabPair] : _tenantMigrationAccessBlockers) {
+        if (auto recipientMtab = mtabPair.getAccessBlocker(MtabType::kRecipient)) {
+            recipientMtab->onMajorityCommitPointUpdate(opTime);
+        }
+        if (auto donorMtab = mtabPair.getAccessBlocker(MtabType::kDonor)) {
+            donorMtab->onMajorityCommitPointUpdate(opTime);
+        }
+    }
 }
 
 }  // namespace mongo

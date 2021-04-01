@@ -81,6 +81,7 @@ Counter64 ttlDeletedDocuments;
 ServerStatusMetricField<Counter64> ttlPassesDisplay("ttl.passes", &ttlPasses);
 ServerStatusMetricField<Counter64> ttlDeletedDocumentsDisplay("ttl.deletedDocuments",
                                                               &ttlDeletedDocuments);
+using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
 class TTLMonitor : public BackgroundJob {
 public:
@@ -267,7 +268,8 @@ private:
         if (coll.getDb() &&
             nullptr !=
                 (mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                            .getTenantMigrationAccessBlockerForDbName(coll.getDb()->name())) &&
+                            .getTenantMigrationAccessBlockerForDbName(coll.getDb()->name(),
+                                                                      MtabType::kRecipient)) &&
             mtab->checkIfShouldBlockTTL()) {
             LOGV2_DEBUG(53768,
                         1,

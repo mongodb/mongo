@@ -53,7 +53,8 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 TenantMigrationDonorAccessBlocker::TenantMigrationDonorAccessBlocker(
     ServiceContext* serviceContext, std::string tenantId, std::string recipientConnString)
-    : _serviceContext(serviceContext),
+    : TenantMigrationAccessBlocker(BlockerType::kDonor),
+      _serviceContext(serviceContext),
       _tenantId(std::move(tenantId)),
       _recipientConnString(std::move(recipientConnString)) {
     _asyncBlockingOperationsExecutor = TenantMigrationAccessBlockerExecutor::get(serviceContext)

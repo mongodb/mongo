@@ -56,7 +56,8 @@ TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
     UUID migrationId,
     std::string tenantId,
     std::string donorConnString)
-    : _serviceContext(serviceContext),
+    : TenantMigrationAccessBlocker(BlockerType::kRecipient),
+      _serviceContext(serviceContext),
       _migrationId(migrationId),
       _tenantId(std::move(tenantId)),
       _donorConnString(std::move(donorConnString)) {
