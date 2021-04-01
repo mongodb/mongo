@@ -372,16 +372,15 @@ def export_file_generator(target, source, env, for_signature):
         script = None
         ret_value = None
 
-
-    if script and not for_signature:
+    if script:
         # ninja workaround:
         #   This is redundant for scons because the content signiture of this generator
         #   will cause the targets to be out of date. However ninja is not able to
-        #   content signature checks for expansions, so we setup the explicit depends
+        #   content signature checks for expansions, so we setup the implicit depends
         #   to create this dependency for ninja.
         #
         # TODO remove this after https://jira.mongodb.org/browse/SERVER-54253
-        env.Depends(target, script)
+        target.add_to_implicit([script])
 
     return ret_value
 
