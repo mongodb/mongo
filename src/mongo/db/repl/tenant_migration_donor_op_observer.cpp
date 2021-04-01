@@ -66,7 +66,8 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         // the write.
         opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .remove(donorStateDoc.getTenantId());
+                .remove(donorStateDoc.getTenantId(),
+                        TenantMigrationAccessBlocker::BlockerType::kDonor);
         });
     }
 }
@@ -142,7 +143,8 @@ public:
             // been aborted and forgotten.
             if (_donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
                 TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                    .remove(_donorStateDoc.getTenantId());
+                    .remove(_donorStateDoc.getTenantId(),
+                            TenantMigrationAccessBlocker::BlockerType::kDonor);
             }
             return;
         }
@@ -262,7 +264,8 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .remove(tenantIdToDeleteDecoration(opCtx).get());
+                .remove(tenantIdToDeleteDecoration(opCtx).get(),
+                        TenantMigrationAccessBlocker::BlockerType::kDonor);
         });
     }
 }

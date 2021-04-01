@@ -39,11 +39,17 @@
 namespace mongo {
 
 /**
- * Tenant access blocking interface used by TenantMigrationDonorAccessBlocker.
+ * Tenant access blocking interface used by TenantMigrationDonorAccessBlocker and
+ * TenantMigrationRecipientAccessBlocker.
  */
 class TenantMigrationAccessBlocker {
 public:
-    TenantMigrationAccessBlocker() = default;
+    /**
+     * The blocker type determines the context in which the access blocker is used.
+     */
+    enum class BlockerType { kDonor, kRecipient };
+
+    TenantMigrationAccessBlocker(BlockerType type) : _type(type) {}
     virtual ~TenantMigrationAccessBlocker() = default;
 
     /**
@@ -97,6 +103,16 @@ public:
      * thrown based on the given status.
      */
     virtual void recordTenantMigrationError(Status status) = 0;
+
+    /**
+     * Returns the type of access blocker.
+     */
+    virtual BlockerType getType() {
+        return _type;
+    }
+
+private:
+    const BlockerType _type;
 };
 
 }  // namespace mongo

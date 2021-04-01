@@ -101,7 +101,8 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                     // re-allow reads and future migrations with the same tenantId as this migration
                     // has already been aborted and forgotten.
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .remove(recipientStateDoc.getTenantId());
+                        .remove(recipientStateDoc.getTenantId(),
+                                TenantMigrationAccessBlocker::BlockerType::kRecipient);
                     return;
                 }
                 // Once the state doc is marked garbage collectable the TTL deletions should be
@@ -159,7 +160,8 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .remove(tenantIdToDeleteDecoration(opCtx).get());
+                .remove(tenantIdToDeleteDecoration(opCtx).get(),
+                        TenantMigrationAccessBlocker::BlockerType::kRecipient);
         });
     }
 }
