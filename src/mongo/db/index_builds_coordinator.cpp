@@ -570,17 +570,32 @@ std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuilds(
     OperationContext* opCtx,
     const NamespaceString collectionNss,
     const UUID collectionUUID,
-    const std::string& reason) {
-    LOGV2(23879,
-          "About to abort all index builders",
-          "namespace"_attr = collectionNss,
-          "uuid"_attr = collectionUUID,
-          "reason"_attr = reason);
+    const std::string& reason,
+    const bool onlyAbortTwoPhaseIndexBuilds) {
+    if (onlyAbortTwoPhaseIndexBuilds) {
+        LOGV2(5500800,
+              "About to abort all two phase index builders",
+              "namespace"_attr = collectionNss,
+              "uuid"_attr = collectionUUID,
+              "reason"_attr = reason);
+    } else {
+        LOGV2(23879,
+              "About to abort all index builders",
+              "namespace"_attr = collectionNss,
+              "uuid"_attr = collectionUUID,
+              "reason"_attr = reason);
+    }
+
 
     auto collIndexBuilds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         stdx::unique_lock<Latch> lk(_mutex);
         auto indexBuildFilter = [=](const auto& replState) {
-            return collectionUUID == replState.collectionUUID;
+            if (onlyAbortTwoPhaseIndexBuilds) {
+                return collectionUUID == replState.collectionUUID &&
+                    IndexBuildProtocol::kTwoPhase == replState.protocol;
+            } else {
+                return collectionUUID == replState.collectionUUID;
+            }
         };
         return _filterIndexBuilds_inlock(lk, indexBuildFilter);
     }();
@@ -608,15 +623,31 @@ void IndexBuildsCoordinator::_awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& l
 
 void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
                                                       StringData db,
-                                                      const std::string& reason) {
-    LOGV2(4612302,
-          "About to abort all index builders running for collections in the given database",
-          "database"_attr = db,
-          "reason"_attr = reason);
+                                                      const std::string& reason,
+                                                      const bool onlyAbortTwoPhaseIndexBuilds) {
+    if (onlyAbortTwoPhaseIndexBuilds) {
+        LOGV2(5500801,
+              "About to abort all two phase index builders running for collections in the given "
+              "database",
+              "database"_attr = db,
+              "reason"_attr = reason);
+    } else {
+        LOGV2(4612302,
+              "About to abort all index builders running for collections in the given database",
+              "database"_attr = db,
+              "reason"_attr = reason);
+    }
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         stdx::unique_lock<Latch> lk(_mutex);
-        auto indexBuildFilter = [=](const auto& replState) { return db == replState.dbName; };
+        auto indexBuildFilter = [=](const auto& replState) {
+            if (onlyAbortTwoPhaseIndexBuilds) {
+                return db == replState.dbName &&
+                    IndexBuildProtocol::kTwoPhase == replState.protocol;
+            } else {
+                return db == replState.dbName;
+            }
+        };
         return _filterIndexBuilds_inlock(lk, indexBuildFilter);
     }();
     for (auto replState : builds) {

@@ -79,7 +79,8 @@ rst.awaitReplication();
 rst.awaitSecondaryNodes();
 
 // Check the that secondary hit the background operation in progress error.
-checkLog.containsJson(secondary, 23879, {reason: "Aborting index builds during initial sync"});
+checkLog.containsJson(
+    secondary, 5500800, {reason: "Aborting two phase index builds during initial sync"});
 
 IndexBuildTest.resumeIndexBuilds(secondary);
 

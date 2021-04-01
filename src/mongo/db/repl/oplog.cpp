@@ -158,13 +158,14 @@ bool shouldBuildInForeground(OperationContext* opCtx,
     return false;
 }
 
-void abortIndexBuilds(OperationContext* opCtx,
-                      const OplogEntry::CommandType& commandType,
-                      const NamespaceString& nss,
-                      const std::string& reason) {
+void abortTwoPhaseIndexBuilds(OperationContext* opCtx,
+                              const OplogEntry::CommandType& commandType,
+                              const NamespaceString& nss,
+                              const std::string& reason) {
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
     if (commandType == OplogEntry::CommandType::kDropDatabase) {
-        indexBuildsCoordinator->abortDatabaseIndexBuilds(opCtx, nss.db(), reason);
+        indexBuildsCoordinator->abortDatabaseIndexBuilds(
+            opCtx, nss.db(), reason, true /* onlyAbortTwoPhaseIndexBuilds */);
     } else if (commandType == OplogEntry::CommandType::kDrop ||
                commandType == OplogEntry::CommandType::kDropIndexes ||
                commandType == OplogEntry::CommandType::kRenameCollection) {
@@ -172,7 +173,8 @@ void abortIndexBuilds(OperationContext* opCtx,
             CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, nss);
         invariant(collUUID);
 
-        indexBuildsCoordinator->abortCollectionIndexBuilds(opCtx, nss, *collUUID, reason);
+        indexBuildsCoordinator->abortCollectionIndexBuilds(
+            opCtx, nss, *collUUID, reason, true /* onlyAbortTwoPhaseIndexBuilds */);
     }
 }
 
@@ -1522,14 +1524,19 @@ Status applyCommand_inlock(OperationContext* opCtx,
             }
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
                 if (mode == OplogApplication::Mode::kInitialSync) {
-                    abortIndexBuilds(opCtx,
-                                     entry.getCommandType(),
-                                     nss,
-                                     "Aborting index builds during initial sync");
+                    // We only want to abort two phase index builds on an initial syncing node
+                    // because single phase index builds don't communicate back to the primary
+                    // and they may have already been completed on the primary.
+                    // For single phase index builds, we instead wait for the index build to
+                    // complete before applying the conflicting DDL operation.
+                    abortTwoPhaseIndexBuilds(opCtx,
+                                             entry.getCommandType(),
+                                             nss,
+                                             "Aborting two phase index builds during initial sync");
                     LOGV2_DEBUG(4665900,
                                 1,
                                 "Conflicting DDL operation encountered during initial sync; "
-                                "aborting index build and retrying",
+                                "aborting two phase index builds and retrying",
                                 "db"_attr = nss.db());
                 }
 
@@ -1557,14 +1564,19 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 auto ns = cmd->parse(opCtx, OpMsgRequest::fromDBAndBody(nss.db(), o))->ns();
 
                 if (mode == OplogApplication::Mode::kInitialSync) {
-                    abortIndexBuilds(opCtx,
-                                     entry.getCommandType(),
-                                     ns,
-                                     "Aborting index builds during initial sync");
+                    // We only want to abort two phase index builds on an initial syncing node
+                    // because single phase index builds don't communicate back to the primary
+                    // and they may have already been completed on the primary.
+                    // For single phase index builds, we instead wait for the index build to
+                    // complete before applying the conflicting DDL operation.
+                    abortTwoPhaseIndexBuilds(opCtx,
+                                             entry.getCommandType(),
+                                             ns,
+                                             "Aborting two phase index builds during initial sync");
                     LOGV2_DEBUG(4665901,
                                 1,
                                 "Conflicting DDL operation encountered during initial sync; "
-                                "aborting index build and retrying",
+                                "aborting two phase index build and retrying",
                                 "namespace"_attr = ns);
                 }
 

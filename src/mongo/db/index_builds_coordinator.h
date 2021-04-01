@@ -222,7 +222,8 @@ public:
     std::vector<UUID> abortCollectionIndexBuilds(OperationContext* opCx,
                                                  const NamespaceString collectionNss,
                                                  const UUID collectionUUID,
-                                                 const std::string& reason);
+                                                 const std::string& reason,
+                                                 const bool onlyAbortTwoPhaseIndexBuilds = false);
 
     /**
      * Signals all of the index builds on the specified 'db' to abort and then waits until the index
@@ -235,7 +236,8 @@ public:
      */
     void abortDatabaseIndexBuilds(OperationContext* opCtx,
                                   StringData db,
-                                  const std::string& reason);
+                                  const std::string& reason,
+                                  const bool onlyAbortTwoPhaseIndexBuilds = false);
 
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
