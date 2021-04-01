@@ -32,6 +32,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/user_cache_acquisition_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -417,6 +418,25 @@ public:
      */
     std::string getNS() const {
         return _ns;
+    }
+
+    /**
+     * Returns a const pointer to the authorization user cache statistics for the current operation.
+     * This can only be used for reading (i.e., when logging or profiling).
+     */
+    const UserCacheAcquisitionStats* getReadOnlyUserCacheAcquisitionStats() const {
+        return &_userCacheAcquisitionStats;
+    }
+
+    /**
+     * Returns an instance of UserCacheAcquisitionStatsHandle. By doing so, it automatically records
+     * the start of the user cache access attempt upon creation. If the cache access is not
+     * completed and recorded normally before it is about to be destroyed (i.e., due to an
+     * exception), it will be automatically recorded as complete then.
+     */
+    UserCacheAcquisitionStatsHandle getMutableUserCacheAcquisitionStats(Client* client,
+                                                                        TickSource* tickSource) {
+        return UserCacheAcquisitionStatsHandle(&_userCacheAcquisitionStats, client, tickSource);
     }
 
     /**
@@ -814,6 +834,8 @@ private:
     std::string _planSummary;
     boost::optional<SingleThreadedLockStats>
         _lockStatsBase;  // This is the snapshot of lock stats taken when curOp is constructed.
+
+    UserCacheAcquisitionStats _userCacheAcquisitionStats;
 
     TickSource* _tickSource = nullptr;
 };

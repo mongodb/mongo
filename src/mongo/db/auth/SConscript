@@ -156,6 +156,7 @@ env.Library(
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/global_settings',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/idl/feature_flag',
@@ -461,6 +462,17 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/net/network',
         'authentication_restriction',
+    ],
+)
+
+env.Library(
+    target='user_cache_acquisition_stats',
+    source=[
+        'user_cache_acquisition_stats.cpp'
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        'auth',
     ],
 )
 

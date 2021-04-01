@@ -936,6 +936,14 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
         s << " locks:" << locks.obj().toString();
     }
 
+    auto userCacheAcquisitionStats = curop.getReadOnlyUserCacheAcquisitionStats();
+    if (userCacheAcquisitionStats->shouldReport()) {
+        StringBuilder userCacheAcquisitionStatsBuilder;
+        userCacheAcquisitionStats->toString(&userCacheAcquisitionStatsBuilder,
+                                            opCtx->getServiceContext()->getTickSource());
+        s << " authorization:" << userCacheAcquisitionStatsBuilder.str();
+    }
+
     BSONObj flowControlObj = makeFlowControlObject(flowControlStats);
     if (flowControlObj.nFields() > 0) {
         s << " flowControl:" << flowControlObj.toString();
@@ -1107,6 +1115,14 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("locks", locks.obj());
     }
 
+    auto userCacheAcquisitionStats = curop.getReadOnlyUserCacheAcquisitionStats();
+    if (userCacheAcquisitionStats->shouldReport()) {
+        BSONObjBuilder userCacheAcquisitionStatsBuilder;
+        userCacheAcquisitionStats->report(&userCacheAcquisitionStatsBuilder,
+                                          opCtx->getServiceContext()->getTickSource());
+        pAttrs->add("authorization", userCacheAcquisitionStatsBuilder.obj());
+    }
+
     BSONObj flowControlObj = makeFlowControlObject(flowControlStats);
     if (flowControlObj.nFields() > 0) {
         pAttrs->add("flowControl", flowControlObj);
@@ -1228,6 +1244,15 @@ void OpDebug::append(OperationContext* opCtx,
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
         lockStats.report(&locks);
+    }
+
+    {
+        auto userCacheAcquisitionStats = curop.getReadOnlyUserCacheAcquisitionStats();
+        if (userCacheAcquisitionStats->shouldReport()) {
+            BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart("authorization"));
+            userCacheAcquisitionStats->report(&userCacheAcquisitionStatsBuilder,
+                                              opCtx->getServiceContext()->getTickSource());
+        }
     }
 
     {
@@ -1485,6 +1510,15 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
                 args.opCtx->lockState()->getLockerInfo(args.curop.getLockStatsBase())) {
             BSONObjBuilder locks(b.subobjStart(field));
             lockerInfo->stats.report(&locks);
+        }
+    });
+
+    addIfNeeded("authorization", [](auto field, auto args, auto& b) {
+        auto userCacheAcquisitionStats = args.curop.getReadOnlyUserCacheAcquisitionStats();
+        if (userCacheAcquisitionStats->shouldReport()) {
+            BSONObjBuilder userCacheAcquisitionStatsBuilder(b.subobjStart(field));
+            userCacheAcquisitionStats->report(&userCacheAcquisitionStatsBuilder,
+                                              args.opCtx->getServiceContext()->getTickSource());
         }
     });
 

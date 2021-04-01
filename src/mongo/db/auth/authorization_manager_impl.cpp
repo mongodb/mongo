@@ -52,6 +52,7 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/logv2/log.h"
@@ -455,6 +456,7 @@ Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
 
 namespace {
 MONGO_FAIL_POINT_DEFINE(authUserCacheBypass);
+MONGO_FAIL_POINT_DEFINE(authUserCacheSleep);
 }  // namespace
 
 StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* opCtx,
@@ -491,7 +493,17 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
         return userHandle;
     }
 
+    // Track wait time and user cache access statistics for the current op for logging. An extra
+    // second of delay is added via the failpoint for testing.
+    auto userCacheAcquisitionStats = CurOp::get(opCtx)->getMutableUserCacheAcquisitionStats(
+        opCtx->getClient(), opCtx->getServiceContext()->getTickSource());
+    if (authUserCacheSleep.shouldFail()) {
+        sleepsecs(1);
+    }
+
     auto cachedUser = _userCache.acquire(opCtx, request);
+
+    userCacheAcquisitionStats.recordCacheAccessEnd();
     invariant(cachedUser);
 
     LOGV2_DEBUG(20226, 1, "Returning user from cache", "user"_attr = userName);

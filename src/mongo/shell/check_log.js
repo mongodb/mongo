@@ -75,8 +75,16 @@ checkLog = (function() {
         return false;
     };
 
+    /*
+     * Acts just like checkContainsOnceJson but introduces the `expectedCount and `isRelaxed params.
+     * `isRelaxed` is used to determine how object attributes are handled for matching purposes. If
+     * `isRelaxed` is true, then only the fields included in the object in attrsDict will be checked
+     * for in the corresponding object in the log. Otherwise, the objects will be checked for
+     * complete equality. In addition, the `expectedCount` param ensures that the log appears
+     * exactly as many times as expected.
+     */
     const checkContainsWithCountJson = function(
-        conn, id, attrsDict, expectedCount, severity = null) {
+        conn, id, attrsDict, expectedCount, severity = null, isRelaxed = false) {
         const logMessages = getGlobalLog(conn);
         if (logMessages === null) {
             return false;
@@ -93,7 +101,7 @@ checkLog = (function() {
                 throw ex;
             }
 
-            if (_compareLogs(obj, id, severity, attrsDict)) {
+            if (_compareLogs(obj, id, severity, attrsDict, isRelaxed)) {
                 count++;
             }
         }
@@ -127,19 +135,19 @@ checkLog = (function() {
      * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
      * the provided 'msg' is found in the logs, or it times out. Throws an exception on timeout.
      */
-    let contains = function(conn, msg, timeout = 5 * 60 * 1000, retryIntervalMS = 300) {
+    let contains = function(conn, msg, timeoutMillis = 5 * 60 * 1000, retryIntervalMS = 300) {
         // Don't run the hang analyzer because we don't expect contains() to always succeed.
         assert.soon(
             function() {
                 return checkContainsOnce(conn, msg);
             },
             'Could not find log entries containing the following message: ' + msg,
-            timeout,
+            timeoutMillis,
             retryIntervalMS,
             {runHangAnalyzer: false});
     };
 
-    let containsJson = function(conn, id, attrsDict, timeout = 5 * 60 * 1000) {
+    let containsJson = function(conn, id, attrsDict, timeoutMillis = 5 * 60 * 1000) {
         // Don't run the hang analyzer because we don't expect contains() to always succeed.
         assert.soon(
             function() {
@@ -147,7 +155,26 @@ checkLog = (function() {
             },
             'Could not find log entries containing the following id: ' + id +
                 ', and attrs: ' + tojson(attrsDict),
-            timeout,
+            timeoutMillis,
+            300,
+            {runHangAnalyzer: false});
+    };
+
+    /*
+     * Calls checkContainsWithCountJson with the `isRelaxed` parameter set to true at regular
+     * intervals on the provided connection 'conn' until a log with id 'id' and all of the
+     * attributes in 'attrsDict' is found `expectedCount` times or the timeout (in ms) is reached.
+     */
+    let containsRelaxedJson = function(
+        conn, id, attrsDict, expectedCount = 1, timeoutMillis = 5 * 60 * 1000) {
+        // Don't run the hang analyzer because we don't expect contains() to always succeed.
+        assert.soon(
+            function() {
+                return checkContainsWithCountJson(conn, id, attrsDict, expectedCount, null, true);
+            },
+            'Could not find log entries containing the following id: ' + id +
+                ', and attrs: ' + tojson(attrsDict),
+            timeoutMillis,
             300,
             {runHangAnalyzer: false});
     };
@@ -160,7 +187,7 @@ checkLog = (function() {
      * 'expectedCount'. Early returns when at least 'expectedCount' entries are found.
      */
     let containsWithCount = function(
-        conn, msg, expectedCount, timeout = 5 * 60 * 1000, exact = true) {
+        conn, msg, expectedCount, timeoutMillis = 5 * 60 * 1000, exact = true) {
         let expectedStr = exact ? 'exactly ' : 'at least ';
         assert.soon(
             function() {
@@ -190,7 +217,7 @@ checkLog = (function() {
             },
             'Did not find ' + expectedStr + expectedCount + ' log entries containing the ' +
                 'following message: ' + msg,
-            timeout,
+            timeoutMillis,
             300);
     };
 
@@ -198,8 +225,9 @@ checkLog = (function() {
      * Similar to containsWithCount, but checks whether there are at least 'expectedCount'
      * instances of 'msg' in the logs.
      */
-    let containsWithAtLeastCount = function(conn, msg, expectedCount, timeout = 5 * 60 * 1000) {
-        containsWithCount(conn, msg, expectedCount, timeout, /*exact*/ false);
+    let containsWithAtLeastCount = function(
+        conn, msg, expectedCount, timeoutMillis = 5 * 60 * 1000) {
+        containsWithCount(conn, msg, expectedCount, timeoutMillis, /*exact*/ false);
     };
 
     /*
@@ -255,23 +283,38 @@ checkLog = (function() {
         return (Array.isArray(value) ? `[${serialized.join(',')}]` : `{${serialized.join(',')}}`);
     };
 
-    // Internal helper to compare objects filed by field.
-    const _deepEqual = function(object1, object2) {
+    /**
+     * Internal helper to compare objects filed by field. object1 is considered as the object
+     * from the log, while object2 is considered as the expected object from the test. If
+     * `isRelaxed` is true, then object1 must contain all of the fields in object2, but can contain
+     * other fields as well. By default, this checks for an exact match between object1 and object2.
+     */
+    const _deepEqual = function(object1, object2, isRelaxed = false) {
         if (object1 == null || object2 == null) {
             return false;
         }
         const keys1 = Object.keys(object1);
         const keys2 = Object.keys(object2);
 
-        if (keys1.length !== keys2.length) {
+        if (!isRelaxed && (keys1.length !== keys2.length)) {
             return false;
         }
 
-        for (const key of keys1) {
+        for (const key of keys2) {
             const val1 = object1[key];
             const val2 = object2[key];
+            // Check if val2 is a regex that needs to be matched.
+            if (val2 instanceof RegExp) {
+                if (!val2.test(val1)) {
+                    return false;
+                } else {
+                    continue;
+                }
+            }
+            // If they are any other type of object, then recursively call _deepEqual(). Otherwise
+            // perform a simple equality check.
             const areObjects = _isObject(val1) && _isObject(val2);
-            if (areObjects && !_deepEqual(val1, val2) || !areObjects && val1 !== val2) {
+            if (areObjects && !_deepEqual(val1, val2, isRelaxed) || !areObjects && val1 !== val2) {
                 return false;
             }
         }
@@ -284,8 +327,13 @@ checkLog = (function() {
         return object != null && typeof object === 'object';
     };
 
-    // Internal helper to check if a log's id, severity, and attributes match with what's expected.
-    const _compareLogs = function(obj, id, severity, attrsDict) {
+    /*
+     * Internal helper to check if a log's id, severity, and attributes match with what's expected.
+     * If `isRelaxed` is true, then the `_deepEqual()` helper function will only check that the
+     * fields specified in the attrsDict attribute are equal to those in the corresponding attribute
+     * of obj. Otherwise, `_deepEqual()` checks that both subobjects are identical.
+     */
+    const _compareLogs = function(obj, id, severity, attrsDict, isRelaxed = false) {
         if (obj.id !== id) {
             return false;
         }
@@ -300,7 +348,7 @@ checkLog = (function() {
                     return false;
                 }
             } else if (obj.attr[attrKey] !== attrValue && typeof obj.attr[attrKey] == "object") {
-                if (!_deepEqual(obj.attr[attrKey], attrValue)) {
+                if (!_deepEqual(obj.attr[attrKey], attrValue, isRelaxed)) {
                     return false;
                 }
             } else {
@@ -320,6 +368,7 @@ checkLog = (function() {
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
         containsJson: containsJson,
+        containsRelaxedJson: containsRelaxedJson,
         containsWithCount: containsWithCount,
         containsWithAtLeastCount: containsWithAtLeastCount,
         formatAsLogLine: formatAsLogLine,
