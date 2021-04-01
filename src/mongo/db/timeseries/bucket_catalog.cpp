@@ -847,162 +847,242 @@ Date_t BucketCatalog::BucketAccess::getTime() const {
     return _bucket->id().asDateT();
 }
 
+void BucketCatalog::MinMax::Data::setValue(const BSONElement& elem) {
+    auto requiredSize = elem.size() - elem.fieldNameSize() + 1;
+    if (_totalSize < requiredSize) {
+        _value = std::make_unique<char[]>(requiredSize);
+    }
+    // Store element as BSONElement buffer but strip out the field name
+    _value[0] = elem.type();
+    _value[1] = '\0';
+    memcpy(_value.get() + 2, elem.value(), elem.valuesize());
+    _totalSize = requiredSize;
+    _type = Type::kValue;
+    _updated = true;
+}
+
+void BucketCatalog::MinMax::Data::setObject() {
+    if (std::exchange(_type, Type::kObject) != Type::kObject) {
+        _updated = true;
+    }
+}
+
+void BucketCatalog::MinMax::Data::setRootObject() {
+    _type = Type::kObject;
+}
+
+void BucketCatalog::MinMax::Data::setArray() {
+    if (std::exchange(_type, Type::kArray) != Type::kArray) {
+        _updated = true;
+    }
+}
+
+BSONElement BucketCatalog::MinMax::Data::value() const {
+    return BSONElement(_value.get(), 1, _totalSize, BSONElement::CachedSizeTag{});
+}
+
+BSONType BucketCatalog::MinMax::Data::valueType() const {
+    return (BSONType)_value[0];
+}
+
+int BucketCatalog::MinMax::Data::valueSize() const {
+    return _totalSize;
+}
+
 void BucketCatalog::MinMax::update(const BSONObj& doc,
                                    boost::optional<StringData> metaField,
-                                   const StringData::ComparatorInterface* stringComparator,
-                                   const std::function<bool(int, int)>& comp) {
-    invariant(_type == Type::kObject || _type == Type::kUnset);
+                                   const StringData::ComparatorInterface* stringComparator) {
+    invariant(_min.type() == Type::kObject || _min.type() == Type::kUnset);
+    invariant(_max.type() == Type::kObject || _max.type() == Type::kUnset);
 
-    _type = Type::kObject;
+
+    _min.setRootObject();
+    _max.setRootObject();
     for (auto&& elem : doc) {
         if (metaField && elem.fieldNameStringData() == metaField) {
             continue;
         }
-        _updateWithMemoryUsage(&_object[elem.fieldName()], elem, stringComparator, comp);
+        _updateWithMemoryUsage(&_object[elem.fieldNameStringData()], elem, stringComparator);
     }
 }
 
 void BucketCatalog::MinMax::_update(BSONElement elem,
-                                    const StringData::ComparatorInterface* stringComparator,
-                                    const std::function<bool(int, int)>& comp) {
+                                    const StringData::ComparatorInterface* stringComparator) {
     auto typeComp = [&](BSONType type) {
-        return comp(elem.canonicalType() - canonicalizeBSONType(type), 0);
+        return elem.canonicalType() - canonicalizeBSONType(type);
     };
 
     if (elem.type() == Object) {
-        if (_type == Type::kObject || _type == Type::kUnset ||
-            (_type == Type::kArray && typeComp(Array)) ||
-            (_type == Type::kValue && typeComp(_value.firstElement().type()))) {
-            // Compare objects element-wise.
-            if (std::exchange(_type, Type::kObject) != Type::kObject) {
-                _updated = true;
-                _memoryUsage = 0;
-            }
+        auto shouldUpdateObject = [&](Data& data, auto compare) {
+            return data.type() == Type::kObject || data.type() == Type::kUnset ||
+                (data.type() == Type::kArray && compare(typeComp(Array), 0)) ||
+                (data.type() == Type::kValue && compare(typeComp(data.valueType()), 0));
+        };
+        bool updateMin = shouldUpdateObject(_min, std::less<int>{});
+        if (updateMin) {
+            _min.setObject();
+        }
+        bool updateMax = shouldUpdateObject(_max, std::greater<int>{});
+        if (updateMax) {
+            _max.setObject();
+        }
+
+        // Compare objects element-wise if min or max need to be updated
+        if (updateMin || updateMax) {
             for (auto&& subElem : elem.Obj()) {
                 _updateWithMemoryUsage(
-                    &_object[subElem.fieldName()], subElem, stringComparator, comp);
+                    &_object[subElem.fieldNameStringData()], subElem, stringComparator);
             }
         }
         return;
     }
 
     if (elem.type() == Array) {
-        if (_type == Type::kArray || _type == Type::kUnset ||
-            (_type == Type::kObject && typeComp(Object)) ||
-            (_type == Type::kValue && typeComp(_value.firstElement().type()))) {
-            // Compare arrays element-wise.
-            if (std::exchange(_type, Type::kArray) != Type::kArray) {
-                _updated = true;
-                _memoryUsage = 0;
-            }
+        auto shouldUpdateArray = [&](Data& data, auto compare) {
+            return data.type() == Type::kArray || data.type() == Type::kUnset ||
+                (data.type() == Type::kObject && compare(typeComp(Object), 0)) ||
+                (data.type() == Type::kValue && compare(typeComp(data.valueType()), 0));
+        };
+        bool updateMin = shouldUpdateArray(_min, std::less<int>{});
+        if (updateMin) {
+            _min.setArray();
+        }
+        bool updateMax = shouldUpdateArray(_max, std::greater<int>{});
+        if (updateMax) {
+            _max.setArray();
+        }
+        // Compare objects element-wise if min or max need to be updated
+        if (updateMin || updateMax) {
             auto elemArray = elem.Array();
             if (_array.size() < elemArray.size()) {
                 _array.resize(elemArray.size());
             }
             for (size_t i = 0; i < elemArray.size(); i++) {
-                _updateWithMemoryUsage(&_array[i], elemArray[i], stringComparator, comp);
+                _updateWithMemoryUsage(&_array[i], elemArray[i], stringComparator);
             }
         }
         return;
     }
 
-    if (_type == Type::kUnset || (_type == Type::kObject && typeComp(Object)) ||
-        (_type == Type::kArray && typeComp(Array)) ||
-        (_type == Type::kValue &&
-         comp(elem.woCompare(_value.firstElement(), false, stringComparator), 0))) {
-        _type = Type::kValue;
-        _value = elem.wrap();
-        _updated = true;
-        _memoryUsage = _value.objsize();
-    }
+    auto maybeUpdateValue = [&](Data& data, auto compare) {
+        if (data.type() == Type::kUnset ||
+            (data.type() == Type::kObject && compare(typeComp(Object), 0)) ||
+            (data.type() == Type::kArray && compare(typeComp(Array), 0)) ||
+            (data.type() == Type::kValue &&
+             compare(elem.woCompare(data.value(), false, stringComparator), 0))) {
+            data.setValue(elem);
+        }
+    };
+    maybeUpdateValue(_min, std::less<int>{});
+    maybeUpdateValue(_max, std::greater<int>{});
 }
 
 void BucketCatalog::MinMax::_updateWithMemoryUsage(
-    MinMax* minMax,
-    BSONElement elem,
-    const StringData::ComparatorInterface* stringComparator,
-    const std::function<bool(int, int)>& comp) {
+    MinMax* minMax, BSONElement elem, const StringData::ComparatorInterface* stringComparator) {
     _memoryUsage -= minMax->getMemoryUsage();
-    minMax->_update(elem, stringComparator, comp);
+    minMax->_update(elem, stringComparator);
     _memoryUsage += minMax->getMemoryUsage();
 }
 
-BSONObj BucketCatalog::MinMax::toBSON() const {
-    invariant(_type == Type::kObject);
+BSONObj BucketCatalog::MinMax::min() const {
+    invariant(_min.type() == Type::kObject);
 
     BSONObjBuilder builder;
-    _append(&builder);
+    _append(&builder, GetMin());
     return builder.obj();
 }
 
-void BucketCatalog::MinMax::_append(BSONObjBuilder* builder) const {
-    invariant(_type == Type::kObject);
+BSONObj BucketCatalog::MinMax::max() const {
+    invariant(_max.type() == Type::kObject);
+
+    BSONObjBuilder builder;
+    _append(&builder, GetMax());
+    return builder.obj();
+}
+
+template <typename GetDataFn>
+void BucketCatalog::MinMax::_append(BSONObjBuilder* builder, GetDataFn getData) const {
+    invariant(getData(*this).type() == Type::kObject);
 
     for (const auto& minMax : _object) {
-        invariant(minMax.second._type != Type::kUnset);
-        if (minMax.second._type == Type::kObject) {
+        const Data& data = getData(minMax.second);
+        invariant(data.type() != Type::kUnset);
+        if (data.type() == Type::kObject) {
             BSONObjBuilder subObj(builder->subobjStart(minMax.first));
-            minMax.second._append(&subObj);
-        } else if (minMax.second._type == Type::kArray) {
+            minMax.second._append(&subObj, getData);
+        } else if (data.type() == Type::kArray) {
             BSONArrayBuilder subArr(builder->subarrayStart(minMax.first));
-            minMax.second._append(&subArr);
+            minMax.second._append(&subArr, getData);
         } else {
-            builder->append(minMax.second._value.firstElement());
+            builder->appendAs(data.value(), minMax.first);
         }
     }
 }
 
-void BucketCatalog::MinMax::_append(BSONArrayBuilder* builder) const {
-    invariant(_type == Type::kArray);
+template <typename GetDataFn>
+void BucketCatalog::MinMax::_append(BSONArrayBuilder* builder, GetDataFn getData) const {
+    invariant(getData(*this).type() == Type::kArray);
 
     for (const auto& minMax : _array) {
-        invariant(minMax._type != Type::kUnset);
-        if (minMax._type == Type::kObject) {
+        const Data& data = getData(minMax);
+        invariant(data.type() != Type::kUnset);
+        if (data.type() == Type::kObject) {
             BSONObjBuilder subObj(builder->subobjStart());
-            minMax._append(&subObj);
-        } else if (minMax._type == Type::kArray) {
+            minMax._append(&subObj, getData);
+        } else if (data.type() == Type::kArray) {
             BSONArrayBuilder subArr(builder->subarrayStart());
-            minMax._append(&subArr);
+            minMax._append(&subArr, getData);
         } else {
-            builder->append(minMax._value.firstElement());
+            builder->append(data.value());
         }
     }
 }
 
-BSONObj BucketCatalog::MinMax::getUpdates() {
-    invariant(_type == Type::kObject);
+BSONObj BucketCatalog::MinMax::minUpdates() {
+    invariant(_min.type() == Type::kObject);
 
     BSONObjBuilder builder;
-    _appendUpdates(&builder);
+    _appendUpdates(&builder, GetMin());
     return builder.obj();
 }
 
-bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder) {
-    invariant(_type == Type::kObject || _type == Type::kArray);
+BSONObj BucketCatalog::MinMax::maxUpdates() {
+    invariant(_max.type() == Type::kObject);
+
+    BSONObjBuilder builder;
+    _appendUpdates(&builder, GetMax());
+    return builder.obj();
+}
+
+template <typename GetDataFn>
+bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder, GetDataFn getData) {
+    const auto& data = getData(*this);
+    invariant(data.type() == Type::kObject || data.type() == Type::kArray);
 
     bool appended = false;
-    if (_type == Type::kObject) {
+    if (data.type() == Type::kObject) {
         bool hasUpdateSection = false;
         BSONObjBuilder updateSection;
         StringMap<BSONObj> subDiffs;
         for (auto& minMax : _object) {
-            invariant(minMax.second._type != Type::kUnset);
-            if (minMax.second._updated) {
-                if (minMax.second._type == Type::kObject) {
+            const auto& subdata = getData(minMax.second);
+            invariant(subdata.type() != Type::kUnset);
+            if (subdata.updated()) {
+                if (subdata.type() == Type::kObject) {
                     BSONObjBuilder subObj(updateSection.subobjStart(minMax.first));
-                    minMax.second._append(&subObj);
-                } else if (minMax.second._type == Type::kArray) {
+                    minMax.second._append(&subObj, getData);
+                } else if (subdata.type() == Type::kArray) {
                     BSONArrayBuilder subArr(updateSection.subarrayStart(minMax.first));
-                    minMax.second._append(&subArr);
+                    minMax.second._append(&subArr, getData);
                 } else {
-                    updateSection.append(minMax.second._value.firstElement());
+                    updateSection.appendAs(subdata.value(), minMax.first);
                 }
-                minMax.second._clearUpdated();
+                minMax.second._clearUpdated(getData);
                 appended = true;
                 hasUpdateSection = true;
-            } else if (minMax.second._type != Type::kValue) {
+            } else if (subdata.type() != Type::kValue) {
                 BSONObjBuilder subDiff;
-                if (minMax.second._appendUpdates(&subDiff)) {
+                if (minMax.second._appendUpdates(&subDiff, getData)) {
                     // An update occurred at a lower level, so append the sub diff.
                     subDiffs[doc_diff::kSubDiffSectionFieldPrefix + minMax.first] = subDiff.obj();
                     appended = true;
@@ -1021,24 +1101,25 @@ bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder) {
         builder->append(doc_diff::kArrayHeader, true);
         DecimalCounter<size_t> count;
         for (auto& minMax : _array) {
-            invariant(minMax._type != Type::kUnset);
-            if (minMax._updated) {
+            const auto& subdata = getData(minMax);
+            invariant(subdata.type() != Type::kUnset);
+            if (subdata.updated()) {
                 std::string updateFieldName = str::stream()
                     << doc_diff::kUpdateSectionFieldName << StringData(count);
-                if (minMax._type == Type::kObject) {
+                if (subdata.type() == Type::kObject) {
                     BSONObjBuilder subObj(builder->subobjStart(updateFieldName));
-                    minMax._append(&subObj);
-                } else if (minMax._type == Type::kArray) {
+                    minMax._append(&subObj, getData);
+                } else if (subdata.type() == Type::kArray) {
                     BSONArrayBuilder subArr(builder->subarrayStart(updateFieldName));
-                    minMax._append(&subArr);
+                    minMax._append(&subArr, getData);
                 } else {
-                    builder->appendAs(minMax._value.firstElement(), updateFieldName);
+                    builder->appendAs(subdata.value(), updateFieldName);
                 }
-                minMax._clearUpdated();
+                minMax._clearUpdated(getData);
                 appended = true;
-            } else if (minMax._type != Type::kValue) {
+            } else if (subdata.type() != Type::kValue) {
                 BSONObjBuilder subDiff;
-                if (minMax._appendUpdates(&subDiff)) {
+                if (minMax._appendUpdates(&subDiff, getData)) {
                     // An update occurred at a lower level, so append the sub diff.
                     builder->append(str::stream() << doc_diff::kSubDiffSectionFieldPrefix
                                                   << StringData(count),
@@ -1053,23 +1134,26 @@ bool BucketCatalog::MinMax::_appendUpdates(BSONObjBuilder* builder) {
     return appended;
 }
 
-void BucketCatalog::MinMax::_clearUpdated() {
-    invariant(_type != Type::kUnset);
+template <typename GetDataFn>
+void BucketCatalog::MinMax::_clearUpdated(GetDataFn getData) {
+    auto& data = getData(*this);
+    invariant(data.type() != Type::kUnset);
 
-    _updated = false;
-    if (_type == Type::kObject) {
+    data.clearUpdated();
+    if (data.type() == Type::kObject) {
         for (auto& minMax : _object) {
-            minMax.second._clearUpdated();
+            minMax.second._clearUpdated(getData);
         }
-    } else if (_type == Type::kArray) {
+    } else if (_min.type() == Type::kArray) {
         for (auto& minMax : _array) {
-            minMax._clearUpdated();
+            minMax._clearUpdated(getData);
         }
     }
 }
 
 uint64_t BucketCatalog::MinMax::getMemoryUsage() const {
-    return _memoryUsage + (sizeof(MinMax) * (_object.size() + _array.size()));
+    return _memoryUsage + _min.valueSize() + _min.valueSize() +
+        (sizeof(MinMax) * (_object.size() + _array.size()));
 }
 
 BucketCatalog::WriteBatch::WriteBatch(Bucket* bucket,
@@ -1160,22 +1244,16 @@ void BucketCatalog::WriteBatch::_prepareCommit() {
     }
     _newFieldNamesToBeInserted = std::move(newFieldNamesToBeInserted);
 
-    _bucket->_memoryUsage -= _bucket->_min.getMemoryUsage() + _bucket->_max.getMemoryUsage();
+    _bucket->_memoryUsage -= _bucket->_minmax.getMemoryUsage();
     for (const auto& doc : _measurements) {
-        _bucket->_min.update(doc,
-                             _bucket->_metadata.getMetaField(),
-                             _bucket->_metadata.getComparator(),
-                             std::less<>{});
-        _bucket->_max.update(doc,
-                             _bucket->_metadata.getMetaField(),
-                             _bucket->_metadata.getComparator(),
-                             std::greater<>{});
+        _bucket->_minmax.update(
+            doc, _bucket->_metadata.getMetaField(), _bucket->_metadata.getComparator());
     }
-    _bucket->_memoryUsage += _bucket->_min.getMemoryUsage() + _bucket->_max.getMemoryUsage();
+    _bucket->_memoryUsage += _bucket->_minmax.getMemoryUsage();
 
     const bool isUpdate = _numPreviouslyCommittedMeasurements > 0;
-    _min = isUpdate ? _bucket->_min.getUpdates() : _bucket->_min.toBSON();
-    _max = isUpdate ? _bucket->_max.getUpdates() : _bucket->_max.toBSON();
+    _min = isUpdate ? _bucket->_minmax.minUpdates() : _bucket->_minmax.min();
+    _max = isUpdate ? _bucket->_minmax.maxUpdates() : _bucket->_minmax.max();
 }
 
 void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
