@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -41,6 +42,46 @@ class TenantMigrationAccessBlockerRegistry {
         delete;
 
 public:
+    struct DonorRecipientAccessBlockerPair {
+        DonorRecipientAccessBlockerPair() = default;
+        DonorRecipientAccessBlockerPair(
+            std::shared_ptr<TenantMigrationDonorAccessBlocker> donor,
+            std::shared_ptr<TenantMigrationRecipientAccessBlocker> recipient)
+            : _donor(donor), _recipient(recipient) {}
+
+        const std::shared_ptr<TenantMigrationAccessBlocker> getAccessBlocker(
+            TenantMigrationAccessBlocker::BlockerType type) const {
+            if (type == TenantMigrationAccessBlocker::BlockerType::kDonor) {
+                return _donor;
+            }
+            return _recipient;
+        }
+
+        void setAccessBlocker(std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+            invariant(mtab);
+            if (mtab->getType() == TenantMigrationAccessBlocker::BlockerType::kDonor) {
+                invariant(!_donor);
+                _donor = mtab;
+            } else {
+                invariant(!_recipient);
+                _recipient = mtab;
+            }
+        }
+
+        void clearAccessBlocker(TenantMigrationAccessBlocker::BlockerType type) {
+            if (type == TenantMigrationAccessBlocker::BlockerType::kDonor) {
+                invariant(_donor);
+                _donor.reset();
+            } else {
+                invariant(_recipient);
+                _recipient.reset();
+            }
+        }
+
+    private:
+        std::shared_ptr<TenantMigrationAccessBlocker> _donor;
+        std::shared_ptr<TenantMigrationAccessBlocker> _recipient;
+    };
     TenantMigrationAccessBlockerRegistry() = default;
     static const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry> get;
 
@@ -53,22 +94,30 @@ public:
     /**
      * Invariants that an entry for tenantId exists, and then removes the entry for (tenantId, mtab)
      */
-    void remove(StringData tenantId);
+    void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and
-     * returns the first TenantMigrationAccessBlocker it finds whose tenantId is a prefix for
+     * returns the first 'DonorRecipientAccessBlockerPair' it finds whose tenantId is a prefix for
      * dbName.
      */
-    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbName(
+    boost::optional<DonorRecipientAccessBlockerPair> getTenantMigrationAccessBlockerForDbName(
         StringData dbName);
+
+    /**
+     * Iterates through each of the TenantMigrationAccessBlockers and
+     * returns the first 'TenantMigrationAccessBlocker' it finds whose 'tenantId' is a prefix for
+     * 'dbName' and is of the requested type.
+     */
+    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbName(
+        StringData dbName, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Searches through TenantMigrationAccessBlockers and
      * returns the TenantMigrationAccessBlocker that matches tenantId.
      */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
-        StringData tenantId);
+        StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Shuts down each of the TenantMigrationAccessBlockers and releases the shared_ptrs to the
@@ -93,8 +142,10 @@ public:
     void onMajorityCommitPointUpdate(repl::OpTime opTime);
 
 private:
-    using TenantMigrationAccessBlockersMap =
-        StringMap<std::shared_ptr<TenantMigrationAccessBlocker>>;
+    using TenantMigrationAccessBlockersMap = StringMap<DonorRecipientAccessBlockerPair>;
+
+    boost::optional<DonorRecipientAccessBlockerPair> _getTenantMigrationAccessBlockersForDbName(
+        StringData dbName, WithLock);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
     TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;

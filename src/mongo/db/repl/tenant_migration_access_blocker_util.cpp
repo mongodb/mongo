@@ -56,27 +56,27 @@ MONGO_FAIL_POINT_DEFINE(skipRecoverTenantMigrationAccessBlockers);
 namespace tenant_migration_access_blocker {
 
 namespace {
+using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
 constexpr char kThreadNamePrefix[] = "TenantMigrationWorker-";
 constexpr char kPoolName[] = "TenantMigrationWorkerThreadPool";
 constexpr char kNetName[] = "TenantMigrationWorkerNetwork";
 
 const auto donorStateDocToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
-
 }  // namespace
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
     return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tenantId));
+            .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kDonor));
 }
 
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
     return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tenantId));
+            .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
 }
 
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
@@ -131,65 +131,104 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
 }
 
 SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
-    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbName(dbName);
+    // We need to check both donor and recipient access blockers in the case where two
+    // migrations happen back-to-back before the old recipient state (from the first
+    // migration) is garbage collected.
+    auto mtabPair = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                        .getTenantMigrationAccessBlockerForDbName(dbName);
 
-    if (!mtab) {
+    if (!mtabPair) {
         return Status::OK();
     }
 
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
-
-    auto canReadFuture = mtab->getCanReadFuture(opCtx);
-
-    // Optimisation: if the future is already ready, we are done.
-    if (canReadFuture.isReady()) {
-        auto status = canReadFuture.getNoThrow();
-        mtab->recordTenantMigrationError(status);
-        return status;
-    }
-
-    auto executor = mtab->getAsyncBlockingOperationsExecutor();
+    // Source to cancel waiting on the 'canReadFutures'.
+    CancellationSource cancelCanReadSource;
+    const auto donorMtab = mtabPair->getAccessBlocker(MtabType::kDonor);
+    const auto recipientMtab = mtabPair->getAccessBlocker(MtabType::kRecipient);
+    // A vector of futures where the donor access blocker's 'getCanReadFuture' will always precede
+    // the recipient's.
     std::vector<ExecutorFuture<void>> futures;
-    futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
+    std::shared_ptr<executor::TaskExecutor> executor;
+    if (donorMtab) {
+        auto canReadFuture = donorMtab->getCanReadFuture(opCtx);
+        if (canReadFuture.isReady()) {
+            auto status = canReadFuture.getNoThrow();
+            donorMtab->recordTenantMigrationError(status);
+            if (!recipientMtab) {
+                return status;
+            }
+        }
+        executor = donorMtab->getAsyncBlockingOperationsExecutor();
+        futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
+    }
+    if (recipientMtab) {
+        auto canReadFuture = recipientMtab->getCanReadFuture(opCtx);
+        if (canReadFuture.isReady()) {
+            auto status = canReadFuture.getNoThrow();
+            recipientMtab->recordTenantMigrationError(status);
+            if (!donorMtab) {
+                return status;
+            }
+        }
+        executor = recipientMtab->getAsyncBlockingOperationsExecutor();
+        futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
+    }
 
     if (opCtx->hasDeadline()) {
-        auto deadlineReachedFuture =
-            executor->sleepUntil(opCtx->getDeadline(), cancelTimeoutSource.token());
-        // The timeout condition is optional with index #1.
-        futures.push_back(std::move(deadlineReachedFuture));
+        // Cancel waiting for operations if we timeout.
+        executor->sleepUntil(opCtx->getDeadline(), cancelTimeoutSource.token())
+            .getAsync([cancelCanReadSource](auto) mutable { cancelCanReadSource.cancel(); });
     }
 
-    return whenAny(std::move(futures))
+    return future_util::withCancellation(whenAll(std::move(futures)), cancelCanReadSource.token())
         .thenRunOn(executor)
-        .then([cancelTimeoutSource, opCtx, mtab, executor](WhenAnyResult<void> result) mutable {
-            const auto& [status, idx] = result;
-            if (idx == 0) {
-                // Read unblock condition finished first.
-                cancelTimeoutSource.cancel();
-                mtab->recordTenantMigrationError(status);
-                return status;
-            } else if (idx == 1) {
-                // Deadline finished first, throw error.
+        .then([cancelTimeoutSource, donorMtab, recipientMtab](std::vector<Status> results) mutable {
+            cancelTimeoutSource.cancel();
+            auto resultIter = results.begin();
+            const auto donorMtabStatus = donorMtab ? *resultIter++ : Status::OK();
+            const auto recipientMtabStatus = recipientMtab ? *resultIter : Status::OK();
+            if (!donorMtabStatus.isOK()) {
+                donorMtab->recordTenantMigrationError(donorMtabStatus);
+                LOGV2(5519301,
+                      "Received error while waiting on donor access blocker",
+                      "error"_attr = donorMtabStatus);
+            }
+            if (!recipientMtabStatus.isOK()) {
+                recipientMtab->recordTenantMigrationError(recipientMtabStatus);
+                LOGV2(5519302,
+                      "Received error while waiting on recipient access blocker",
+                      "error"_attr = recipientMtabStatus);
+                if (donorMtabStatus.isOK()) {
+                    return recipientMtabStatus;
+                }
+            }
+            return donorMtabStatus;
+        })
+        .onError<ErrorCodes::CallbackCanceled>(
+            [cancelCanReadSource, donorMtab, recipientMtab, opCtx](Status status) mutable {
+                cancelCanReadSource.cancel();
+                // At least one of 'donorMtab' or 'recipientMtab' must exist if we timed out here.
+                BSONObj info =
+                    donorMtab ? donorMtab->getDebugInfo() : recipientMtab->getDebugInfo();
+                if (recipientMtab) {
+                    info = info.addField(
+                        recipientMtab->getDebugInfo().getField("donorConnectionString"));
+                }
                 return Status(opCtx->getTimeoutError(),
                               "Read timed out waiting for tenant migration blocker",
-                              mtab->getDebugInfo());
-            }
-            MONGO_UNREACHABLE;
-        })
-        .onError([cancelTimeoutSource](Status status) mutable {
-            cancelTimeoutSource.cancel();
-            return status;
-        })
+                              info);
+            })
         .semi();  // To require continuation in the user executor.
 }
 
 void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringData dbName) {
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kLinearizableReadConcern) {
+        // Only the donor access blocker will block linearizable reads.
         if (auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                            .getTenantMigrationAccessBlockerForDbName(dbName)) {
+                            .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor)) {
             auto status = mtab->checkIfLinearizableReadWasAllowed(opCtx);
             mtab->recordTenantMigrationError(status);
             uassertStatusOK(status);
@@ -198,8 +237,10 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
 }
 
 void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName) {
+    // The migration protocol guarantees the recipient will not get writes until the migration
+    // is committed.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbName(dbName);
+                    .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
 
     if (mtab) {
         auto status = mtab->checkIfCanWrite();
@@ -209,8 +250,9 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName) {
 }
 
 Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
+    // We only block index builds on the donor.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbName(dbName);
+                    .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
 
     if (mtab) {
         // This log is included for synchronization of the tenant migration buildindex jstests.

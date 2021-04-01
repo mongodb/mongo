@@ -270,10 +270,6 @@ const migrationOpts2 = {
     tenantId: kTenantId,
 };
 
-// TODO(SERVER-55193): Make back-to-back migration work and remove this 'remove'
-assert.commandWorked(
-    recipientRst.getPrimary().getDB("config").tenantMigrationRecipients.remove({}));
-
 assert.commandWorked(tenantMigrationTest2.runMigration(migrationOpts2));
 
 // Print the no-op oplog entries for debugging purposes.
