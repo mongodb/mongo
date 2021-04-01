@@ -811,9 +811,16 @@ env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
     converter=variable_shlex_converter)
 
+default_destdir = '$BUILD_ROOT/install'
+if get_option('ninja') and get_option('build-tools') == 'next':
+    # Workaround for SERVER-53952 where issues wih different
+    # ninja files building to the same install dir. Different
+    # ninja files need to build to different install dirs.
+    default_destdir = '$BUILD_DIR/install'
+
 env_vars.Add('DESTDIR',
     help='Where builds will install files',
-    default='$BUILD_ROOT/install')
+    default=default_destdir)
 
 env_vars.Add('DSYMUTIL',
     help='Path to the dsymutil utility',
