@@ -254,8 +254,9 @@ var ReshardingTest = class {
      * @param expectedErrorCode - the expected response code for the reshardCollection command.
      *
      * @param postCheckConsistencyFn - a function for evaluating additional correctness
-     * assertions. This function is called in the critical section, after the `reshardCollection`
-     * command has shuffled data, but before the coordinator persists a decision.
+     * assertions. This function is called in the critical section after a successful
+     * `reshardCollection` command has shuffled data, but before the response is returned to the
+     * client.
      *
      * @param postDecisionPersistedFn - a function for evaluating addition assertions after
      * the decision has been persisted, but before the resharding operation finishes and returns
@@ -423,7 +424,6 @@ var ReshardingTest = class {
         } else {
             this._callFunctionSafely(() => {
                 this._pauseCoordinatorInSteadyStateFailpoint.off();
-                postCheckConsistencyFn();
                 this._pauseCoordinatorBeforeDecisionPersistedFailpoint.off();
                 postDecisionPersistedFn();
                 this._pauseCoordinatorBeforeCompletionFailpoint.off();
