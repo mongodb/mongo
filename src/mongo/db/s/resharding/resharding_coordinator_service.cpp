@@ -201,7 +201,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 TypeCollectionRecipientFields constructRecipientFields(
     const ReshardingCoordinatorDocument& coordinatorDoc) {
     TypeCollectionRecipientFields recipientFields(
-        resharding::extractShardIds(coordinatorDoc.getDonorShards()),
+        extractShardIdsFromParticipantEntries(coordinatorDoc.getDonorShards()),
         coordinatorDoc.getSourceUUID(),
         coordinatorDoc.getSourceNss(),
         resharding::gReshardingMinimumOperationDurationMillis.load());
@@ -234,7 +234,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             TypeCollectionDonorFields donorFields(
                 coordinatorDoc.getTempReshardingNss(),
                 coordinatorDoc.getReshardingKey(),
-                resharding::extractShardIds(coordinatorDoc.getRecipientShards()));
+                extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards()));
 
             BSONObjBuilder updateBuilder;
             {
@@ -1392,7 +1392,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _factory->makeOperationContext(&cc());
-    auto recipientIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
+    auto recipientIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
 
     NamespaceString nssToRefresh;
     // Refresh the temporary namespace if the coordinator is in state 'kError' just in case the
@@ -1417,7 +1417,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _factory->makeOperationContext(&cc());
-    auto donorIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
+    auto donorIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
 
     auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss());
     sharding_util::sendCommandToShards(opCtx.get(),
@@ -1431,8 +1431,9 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsTo
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = _factory->makeOperationContext(&cc());
 
-    auto donorShardIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
-    auto recipientShardIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
+    auto donorShardIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getDonorShards());
+    auto recipientShardIds =
+        extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
     std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
     participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
 
