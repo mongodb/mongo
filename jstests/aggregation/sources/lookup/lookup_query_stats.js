@@ -14,6 +14,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/analyze_plan.js");  // for 'getAggPlanStages'
+
 const testDB = db.getSiblingDB("lookup_query_stats");
 testDB.dropDatabase();
 
@@ -21,6 +23,10 @@ const localColl = testDB.getCollection("local");
 const fromColl = testDB.getCollection("foreign");
 const foreignDocCount = 10;
 const localDocCount = 2;
+
+const kExecutionStats = "executionStats";
+const kAllPlansExecution = "allPlansExecution";
+const kQueryPlanner = "queryPlanner";
 
 // Keeps track of the last query execution stats.
 let lastScannedObjects = 0;
@@ -36,7 +42,7 @@ let insertDocumentToCollection = function(collection, docCount, fieldName) {
     assert.commandWorked(bulk.execute());
 };
 
-let doAggregationLookup = function(localColl, fromColl) {
+let aggregationLookupPipeline = function(localColl, fromColl) {
     return localColl.aggregate([
         {
             $lookup: {
@@ -48,7 +54,15 @@ let doAggregationLookup = function(localColl, fromColl) {
         },
         {
             $sort: {localField: 1}
-        }]).toArray();
+        }]);
+};
+
+let doAggregationLookup = function(localColl, fromColl) {
+    return aggregationLookupPipeline(localColl, fromColl).toArray();
+};
+
+let explainAggregationLookup = function(localColl, fromColl, verbosityLevel) {
+    return aggregationLookupPipeline(localColl.explain(verbosityLevel), fromColl);
 };
 
 let getCurrentQueryExecutorStats = function() {
@@ -61,6 +75,46 @@ let getCurrentQueryExecutorStats = function() {
     lastScannedKeys = queryExecutor.scanned;
 
     return [curScannedObjects, curScannedKeys];
+};
+
+let checkExplainOutputForVerLevel = function(explainOutput, expected, verbosityLevel) {
+    let lkpStages = getAggPlanStages(explainOutput, "$lookup");
+    assert.eq(lkpStages.length, 1, lkpStages);
+    let lkpStage = lkpStages[0];
+    if (verbosityLevel && verbosityLevel !== kQueryPlanner) {
+        assert(lkpStage.hasOwnProperty("totalDocsExamined"), lkpStage);
+        assert.eq(lkpStage.totalDocsExamined, expected.totalDocsExamined, lkpStage);
+        assert(lkpStage.hasOwnProperty("totalKeysExamined"), lkpStage);
+        assert.eq(lkpStage.totalKeysExamined, expected.totalKeysExamined, lkpStage);
+        assert(lkpStage.hasOwnProperty("collectionScans"), lkpStage);
+        assert.eq(lkpStage.collectionScans, expected.collectionScans, lkpStage);
+        assert(lkpStage.hasOwnProperty("indexesUsed"), lkpStage);
+        assert(Array.isArray(lkpStage.indexesUsed), lkpStage);
+        assert.eq(lkpStage.indexesUsed, expected.indexesUsed, lkpStage);
+    } else {  // If no `verbosityLevel` is passed or 'queryPlanner' is passed.
+        assert(!lkpStage.hasOwnProperty("totalDocsExamined"), lkpStage);
+        assert(!lkpStage.hasOwnProperty("totalKeysExamined"), lkpStage);
+        assert(!lkpStage.hasOwnProperty("collectionScans"), lkpStage);
+        assert(!lkpStage.hasOwnProperty("indexesUsed"), lkpStage);
+    }
+};
+
+let checkExplainOutputForAllVerbosityLevels = function(localColl, fromColl, expectedExplainResult) {
+    // The `explain` verbosity level: 'allPlansExecution'.
+    let explainAllPlansOutput = explainAggregationLookup(localColl, fromColl, kAllPlansExecution);
+    checkExplainOutputForVerLevel(explainAllPlansOutput, expectedExplainResult, kAllPlansExecution);
+
+    // The `explain` verbosity level: 'executionStats'.
+    let explainExecStatsOutput = explainAggregationLookup(localColl, fromColl, kExecutionStats);
+    checkExplainOutputForVerLevel(explainExecStatsOutput, expectedExplainResult, kExecutionStats);
+
+    // The `explain` verbosity level: 'queryPlanner'.
+    let explainQueryPlannerOutput = explainAggregationLookup(localColl, fromColl, kQueryPlanner);
+    checkExplainOutputForVerLevel(explainQueryPlannerOutput, expectedExplainResult, kQueryPlanner);
+
+    // The `explain` verbosity level is not passed.
+    let explainOutput = explainAggregationLookup(localColl, fromColl);
+    checkExplainOutputForVerLevel(explainOutput, expectedExplainResult);
 };
 
 let testQueryExecutorStatsWithCollectionScan = function() {
@@ -82,6 +136,10 @@ let testQueryExecutorStatsWithCollectionScan = function() {
 
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
+
+    let expectedExplainResult =
+        {totalDocsExamined: 20, totalKeysExamined: 0, collectionScans: 4, indexesUsed: []};
+    checkExplainOutputForAllVerbosityLevels(localColl, fromColl, expectedExplainResult);
 };
 
 let createIndexForCollection = function(collection, fieldName) {
@@ -111,6 +169,14 @@ let testQueryExecutorStatsWithIndexScan = function() {
     // Number of keys scanned in the foreign collection should be equal number of keys in local
     // collection.
     assert.eq(localDocCount, curScannedKeys);
+
+    let expectedExplainResult = {
+        totalDocsExamined: 2,
+        totalKeysExamined: 2,
+        collectionScans: 0,
+        indexesUsed: ["foreignField_1"]
+    };
+    checkExplainOutputForAllVerbosityLevels(localColl, fromColl, expectedExplainResult);
 };
 
 insertDocumentToCollection(fromColl, foreignDocCount, "foreignField");

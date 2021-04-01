@@ -286,6 +286,12 @@ private:
      */
     void recordPlanSummaryStats(const Pipeline& pipeline);
 
+    /**
+     * Given a mutable document, appends execution stats such as 'totalDocsExamined',
+     * 'totalKeysExamined', 'collectionScans', 'indexesUsed', etc. to it.
+     */
+    void appendSpecificExecStats(MutableDocument& doc) const;
+
     DocumentSourceLookupStats _stats;
 
     NamespaceString _fromNs;

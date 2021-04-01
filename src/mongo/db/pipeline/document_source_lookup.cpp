@@ -790,6 +790,19 @@ void DocumentSourceLookUp::recordPlanSummaryStats(const Pipeline& pipeline) {
     }
 }
 
+void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
+    const PlanSummaryStats& stats = _stats.planSummaryStats;
+    doc["totalDocsExamined"] = Value(static_cast<long long>(stats.totalDocsExamined));
+    doc["totalKeysExamined"] = Value(static_cast<long long>(stats.totalKeysExamined));
+    doc["collectionScans"] = Value(stats.collectionScans);
+    std::vector<Value> indexesUsedVec;
+    std::transform(stats.indexesUsed.begin(),
+                   stats.indexesUsed.end(),
+                   std::back_inserter(indexesUsedVec),
+                   [](std::string idx) -> Value { return Value(idx); });
+    doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
+}
+
 void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
 
@@ -831,6 +844,11 @@ void DocumentSourceLookUp::serializeToArrayWithBothSyntaxes(
                           << _unwindSrc->preserveNullAndEmptyArrays() << "includeArrayIndex"
                           << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
+
+        if (explain.get() >= ExplainOptions::Verbosity::kExecStats) {
+            appendSpecificExecStats(output);
+        }
+
         array.push_back(output.freezeToValue());
     } else {
         array.push_back(output.freezeToValue());
