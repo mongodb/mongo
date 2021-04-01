@@ -6778,7 +6778,6 @@ tasks:
     vars:
       resmoke_args: --suites=read_only --storageEngine=wiredTiger
 
-# TODO (SERVER-43758): once read only tests can use replica sets remove the counter flag.
 - <<: *task_template
   name: read_only_sharded
   tags: ["read_only"]
@@ -6786,7 +6785,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: "--suites=read_only_sharded --storageEngine=wiredTiger  --mongodSetParameters='{featureFlagDisableIncompleteShardingDDLSupport: true}'"
+      resmoke_args: --suites=read_only_sharded --storageEngine=wiredTiger
 
 - <<: *task_template
   name: session_jscore_passthrough

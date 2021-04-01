@@ -24,62 +24,137 @@ StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
 
 ShardedFixture = function() {
     this.nShards = 3;
+    this.nConfigs = 3;
 };
 
 ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-    // TODO: SERVER-43758 Tests where shards are started in read-only mode
-    // cannot use replica set shards, because replication requires doing writes
-    // to run an election.
-    this.shardingTest =
-        new ShardingTest({mongos: 1, shards: this.nShards, other: {shardAsReplicaSet: false}});
+    this.st =
+        new ShardingTest({mongos: 1, config: this.nConfigs, shards: this.nShards, rs: {nodes: 1}});
 
-    this.paths = this.shardingTest.getDBPaths();
+    // This information will be needed later on to set up the shards on read only mode.
+    this.dbPaths = [];
+    this.ports = [];
+    this.hosts = [];
+    for (let i = 0; i < this.nShards; ++i) {
+        let primary = this.st["rs" + i].getPrimary();
+        this.dbPaths.push(primary.dbpath);
+        this.ports.push(primary.port);
+        this.hosts.push(primary.host);
+    }
 
     jsTest.log("sharding test collection...");
 
     // Use a hashed shard key so we actually hit multiple shards.
-    this.shardingTest.shardColl(test.name, {_id: "hashed"}, false);
+    this.st.shardColl(test.name, {_id: "hashed"}, false);
 
-    test.load(this.shardingTest.getDB("test")[test.name]);
+    test.load(this.st.getDB("test")[test.name]);
 };
 
 ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
-    jsTest.log("restarting shards...");
-    for (var i = 0; i < this.nShards; ++i) {
-        // Write the shard's shardIdentity to a config file under
-        // sharding._overrideShardIdentity, since the shardIdentity must be provided through
-        // overrideShardIdentity when running in queryableBackupMode, and is only allowed to
-        // be set via config file.
+    const docs = [{_id: 1}];
+    let shardIdentities = [];
+    let readOnlyShards = [];
+    let operationTimes = [];
 
-        var shardIdentity =
-            this.shardingTest["d" + i].getDB("admin").getCollection("system.version").findOne({
-                _id: "shardIdentity"
-            });
-        assert.neq(null, shardIdentity);
+    for (let i = 0; i < this.nShards; ++i) {
+        let primary = this.st["rs" + i].getPrimary();
+        shardIdentities.push(
+            primary.getDB("admin").getCollection("system.version").findOne({_id: "shardIdentity"}));
+        assert.neq(null, shardIdentities[i]);
+        // Get operation time so the read only shard recover all the info.
+        operationTimes.push(
+            assert
+                .commandWorked(primary.getDB('_temporary_db')
+                                   .runCommand({insert: '_temporary_coll' + i, documents: docs}))
+                .operationTime);
+    }
 
-        // Construct a string representation of the config file (replace all instances of
-        // multiple consecutive whitespace characters in the string representation of the
-        // shardIdentity JSON document, including newlines, with single white spaces).
-        var configFileStr = "sharding:\n  _overrideShardIdentity: '" +
+    this.st.stopAllShards({noCleanData: true, restart: true, skipValidations: true});
+
+    jsTest.log("Restarting shards as read only standalone instances...");
+    for (let i = 0; i < this.nShards; ++i) {
+        let dbPath = this.dbPaths[i];
+        let port = this.ports[i];
+        let operationTime = operationTimes[i];
+
+        jsTestLog("Renaming local.system collection on shard " + i);
+
+        let tempMongod =
+            MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
+        // Rename the local.system collection to prevent problems with replset configurations.
+        tempMongod.getDB('local').getCollection('system').renameCollection('_system');
+        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidations: true, wait: true});
+
+        let shardIdentity = shardIdentities[i];
+        let host = this.hosts[i];
+
+        // Change the connection string format so the router can create a standalone targeter
+        // instead of a replica set targeter.
+        this.st.config.shards.update({_id: shardIdentity.shardName}, {$set: {host: host}});
+
+        // Restart the shard as standalone on read only mode.
+        let configFileStr = "sharding:\n _overrideShardIdentity: '" +
             tojson(shardIdentity).replace(/\s+/g, ' ') + "'";
-
         // Use the os-specific path delimiter.
-        var delim = _isWindows() ? '\\' : '/';
-        var configFilePath = this.paths[i] + delim + "config-for-shard-" + i + ".yml";
+        jsTestLog('Seting up shard ' + i + ' with new shard identity ' + tojson(shardIdentity));
+        let delim = _isWindows() ? '\\' : '/';
+        let configFilePath = dbPath + delim + "config-for-shard-" + i + ".yml";
 
         writeFile(configFilePath, configFileStr);
 
-        var opts =
-            {config: configFilePath, queryableBackupMode: "", shardsvr: "", dbpath: this.paths[i]};
-
-        assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
-        this.shardingTest.restartMongod(i, opts);
+        readOnlyShards.push(MongoRunner.runMongod({
+            config: configFilePath,
+            dbpath: dbPath,
+            port: port,
+            queryableBackupMode: "",
+            restart: true,
+            shardsvr: "",
+            setParameter: {recoverToOplogTimestamp: tojson({timestamp: operationTime})}
+        }));
     }
 
-    jsTest.log("restarting mongos...");
-    this.shardingTest.restartMongos(0);
-    test.exec(this.shardingTest.getDB("test")[test.name]);
-    this.shardingTest.stop();
+    // Restart the config server  and the router so they can reload the shard registry.
+    jsTest.log("Restarting the config server...");
+    for (let i = 0; i < this.nConfig; ++i) {
+        this.st.restartConfigServer(i);
+    }
+
+    jsTest.log("Restarting mongos...");
+    this.st.restartMongos(0);
+    test.exec(this.st.getDB("test")[test.name]);
+
+    for (let i = 0; i < this.nShards; ++i) {
+        let dbPath = this.dbPaths[i];
+        let port = this.ports[i];
+
+        // Stop the read only shards.
+        MongoRunner.stopMongod(readOnlyShards[i],
+                               {noCleanData: true, skipValidations: true, wait: true});
+
+        // Run a temporary mongod to rename the local.system collection.
+        let tempMongod =
+            MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
+        tempMongod.getDB('local').getCollection('_system').renameCollection('system', true);
+        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidations: true, wait: true});
+
+        let shardIdentity = shardIdentities[i];
+        let host = this.hosts[i];
+        this.st.config.shards.update({_id: shardIdentity.shardName},
+                                     {$set: {host: shardIdentity.shardName + '/' + host}});
+
+        // Restart the shard to have a well behaved departure.
+        this.st.restartShardRS(i);
+    }
+
+    // Restart the config server and the router so the shard registry refreshes and enable the RSM
+    // again.
+    for (let i = 0; i < this.nConfigs; ++i) {
+        this.st.restartConfigServer(i);
+    }
+
+    this.st.restartMongos(0);
+
+    this.st.stop();
 };
 
 runReadOnlyTest = function(test) {
