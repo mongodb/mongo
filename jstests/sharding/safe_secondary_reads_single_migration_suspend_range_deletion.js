@@ -117,6 +117,7 @@ let testCases = {
     captrunc: {skip: "primary only"},
     checkShardingIndex: {skip: "primary only"},
     cleanupOrphaned: {skip: "primary only"},
+    cleanupReshardCollection: {skip: "primary only"},
     clearJumboFlag: {skip: "primary only"},
     clearLog: {skip: "does not return user data"},
     clone: {skip: "primary only"},
