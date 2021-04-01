@@ -178,8 +178,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     {primaryShardId},
                     **executor);
 
-                // TODO SERVER-55149 stop broadcasting to all shards for unsharded collections
-
                 // We need to send the drop to all the shards because both movePrimary and
                 // moveChunk leave garbage behind for sharded collections.
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
