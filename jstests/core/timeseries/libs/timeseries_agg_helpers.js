@@ -3,7 +3,7 @@ load("jstests/core/timeseries/libs/timeseries.js");
 /**
  * Helper class for aggregate tests with time-series collection.
  */
-class TimeseriesAggTests {
+var TimeseriesAggTests = class {
     /**
      * Gets a test db object based on the test suite name.
      */
@@ -107,4 +107,4 @@ class TimeseriesAggTests {
             .sort({"time": 1})
             .toArray();
     }
-}
+};
