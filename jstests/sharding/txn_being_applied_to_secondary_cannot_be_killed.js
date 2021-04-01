@@ -18,7 +18,7 @@ const ns = dbName + "." + collName;
 // transaction to be aborted before committing, but low enough that the test
 // won't be unnecessarily slow when we wait for the periodic transaction
 // abort job to run.
-TestData.transactionLifetimeLimitSeconds = 10;
+TestData.transactionLifetimeLimitSeconds = 30;
 
 const rsOpts = {
     // Make secondaries unelectable.
@@ -85,12 +85,12 @@ jsTest.log("Waiting for secondary to apply the prepare oplog entry.");
 failPoint.wait();
 
 // Wait for the periodic transaction abort job to run while oplog
-// application is hanging. The job should run every 10 seconds due to the
-// transactionLifetimeLimitSeconds parameter being set to 10 above, so the
-// likelihood of it running while sleeping 30 seconds is high. If it does
+// application is hanging. The job should run every 30 seconds due to the
+// transactionLifetimeLimitSeconds parameter being set to 30 above, so the
+// likelihood of it running while sleeping 60 seconds is high. If it does
 // not run, the test will trivially pass without testing the desired
 // behavior, but it will not cause the test to fail.
-sleep(30000);
+sleep(2 * TestData.transactionLifetimeLimitSeconds);
 
 jsTest.log("Turning off " + applyOpsHangBeforePreparingTransaction + " failpoint.");
 // Allow oplog application to continue by turning off the failpoint. The
