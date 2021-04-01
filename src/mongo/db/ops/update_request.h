@@ -193,12 +193,20 @@ public:
         return _updateOp.getMulti();
     }
 
-    void setFromMigration(bool value = true) {
-        _fromMigration = value;
+    void setSource(OperationSource source) {
+        _source = source;
+    }
+
+    OperationSource source() const {
+        return _source;
     }
 
     bool isFromMigration() const {
-        return _fromMigration;
+        return _source == OperationSource::kFromMigrate;
+    }
+
+    bool isTimeseries() const {
+        return _source == OperationSource::kTimeseries;
     }
 
     void setFromOplogApplication(bool value = true) {
@@ -286,7 +294,8 @@ public:
         builder << " god: " << _god;
         builder << " upsert: " << isUpsert();
         builder << " multi: " << isMulti();
-        builder << " fromMigration: " << _fromMigration;
+        builder << " fromMigration: " << isFromMigration();
+        builder << " timeseries: " << isTimeseries();
         builder << " fromOplogApplication: " << _fromOplogApplication;
         builder << " isExplain: " << static_cast<bool>(_explain);
         return builder.str();
@@ -319,8 +328,8 @@ private:
     // updates, never user updates.
     bool _god = false;
 
-    // True if this update is on behalf of a chunk migration.
-    bool _fromMigration = false;
+    // See Source declaration
+    OperationSource _source = OperationSource::kStandard;
 
     // True if this update was triggered by the application of an oplog entry.
     bool _fromOplogApplication = false;

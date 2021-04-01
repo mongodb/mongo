@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/stdx/future.h"
@@ -445,7 +446,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
     ASSERT(batch2->newFieldNamesToBeInserted().count("a")) << batch2->toBSON();
 }
 
-TEST_F(BucketCatalogTest, AbortBatchWithOutstandingInsertsOnBucket) {
+TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     auto batch1 = _bucketCatalog
                       ->insert(_opCtx,
                                _ns1,
@@ -470,27 +471,56 @@ TEST_F(BucketCatalogTest, AbortBatchWithOutstandingInsertsOnBucket) {
                       .getValue();
     ASSERT_NE(batch1, batch2);
 
-    ASSERT_EQ(0, _getNumWaits(_ns1));
-
-    // Aborting the batch will have to wait for the commit of batch1 to finish, then will proceed
-    // to abort batch2.
     ASSERT(batch2->claimCommitRights());
-    auto task = Task{[&]() { _bucketCatalog->abort(batch2); }};
-    // Add a little extra wait to make sure abort actually gets to the blocking point.
-    stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
-    ASSERT(task.future().valid());
-    ASSERT(stdx::future_status::timeout == task.future().wait_for(stdx::chrono::microseconds(1)))
-        << "clear finished before expected";
+    _bucketCatalog->abort(batch2);
+    ASSERT(batch2->finished());
+    ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
     _bucketCatalog->finish(batch1, _commitInfo);
     ASSERT(batch1->finished());
+    ASSERT_OK(batch1->getResult().getStatus());
+}
 
-    // Now the clear should be able to continue, and will eventually abort batch2.
-    task.future().wait();
-    ASSERT_EQ(1, _getNumWaits(_ns1));
-    ASSERT(batch2->finished());
-    ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
-    ASSERT_EQ(1, _getNumWaits(_ns1));
+TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
+    auto batch = _bucketCatalog
+                     ->insert(_opCtx,
+                              _ns1,
+                              _getCollator(_ns1),
+                              _getTimeseriesOptions(_ns1),
+                              BSON(_timeField << Date_t::now()),
+                              BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                     .getValue();
+    ASSERT(batch->claimCommitRights());
+    _bucketCatalog->prepareCommit(batch);
+    ASSERT_EQ(batch->measurements().size(), 1);
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
+
+    ASSERT_THROWS(_bucketCatalog->clear(batch->bucket()->id()), WriteConflictException);
+
+    _bucketCatalog->abort(batch);
+    ASSERT(batch->finished());
+    ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
+}
+
+TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrows) {
+    auto batch = _bucketCatalog
+                     ->insert(_opCtx,
+                              _ns1,
+                              _getCollator(_ns1),
+                              _getTimeseriesOptions(_ns1),
+                              BSON(_timeField << Date_t::now()),
+                              BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                     .getValue();
+    ASSERT(batch->claimCommitRights());
+
+    _bucketCatalog->abort(batch);
+    ASSERT(batch->finished());
+    ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
+
+    bool prepared = _bucketCatalog->prepareCommit(batch);
+    ASSERT(!prepared);
+    ASSERT(batch->finished());
+    ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 }
 
 TEST_F(BucketCatalogTest, CombiningWithInsertsFromOtherClients) {

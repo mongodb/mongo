@@ -61,6 +61,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -201,7 +202,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kUpdate);
     oplogEntry.setObject(args.updateArgs.update);
     oplogEntry.setObject2(args.updateArgs.criteria);
-    oplogEntry.setFromMigrateIfTrue(args.updateArgs.fromMigrate);
+    oplogEntry.setFromMigrateIfTrue(args.updateArgs.source == OperationSource::kFromMigrate);
     // oplogLink could have been changed to include pre/postImageOpTime by the previous no-op write.
     repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, args.updateArgs.stmtIds);
     if (args.updateArgs.oplogSlot) {
@@ -595,7 +596,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     }
 
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!args.updateArgs.fromMigrate) {
+        if (args.updateArgs.source != OperationSource::kFromMigrate) {
             shardObserveUpdateOp(opCtx,
                                  args.nss,
                                  args.updateArgs.preImageDoc,
@@ -618,6 +619,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs.updatedDoc["_id"], args.updateArgs.updatedDoc);
+    } else if (args.nss.isTimeseriesBucketsCollection()) {
+        if (args.updateArgs.source != OperationSource::kTimeseries) {
+            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            bucketCatalog.clear(args.updateArgs.updatedDoc["_id"].OID());
+        }
     }
 }
 
@@ -634,6 +640,11 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
     destinedRecipientDecoration(opCtx) = op.getDestinedRecipient();
 
     shardObserveAboutToDelete(opCtx, nss, doc);
+
+    if (nss.isTimeseriesBucketsCollection()) {
+        auto& bucketCatalog = BucketCatalog::get(opCtx);
+        bucketCatalog.clear(doc["_id"].OID());
+    }
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,

@@ -430,7 +430,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                                        *metadata->getChunkManager(),
                                        args.updateArgs.updatedDoc,
                                        args.updateArgs.updatedDoc.objsize(),
-                                       args.updateArgs.fromMigrate);
+                                       args.updateArgs.source == OperationSource::kFromMigrate);
     }
 }
 

@@ -249,7 +249,9 @@ UpdateResult Helpers::upsert(OperationContext* opCtx,
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
     request.setUpsert();
-    request.setFromMigration(fromMigrate);
+    if (fromMigrate) {
+        request.setSource(OperationSource::kFromMigrate);
+    }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
     return ::mongo::update(opCtx, context.db(), request);
@@ -268,7 +270,9 @@ void Helpers::update(OperationContext* opCtx,
 
     request.setQuery(filter);
     request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(updateMod));
-    request.setFromMigration(fromMigrate);
+    if (fromMigrate) {
+        request.setSource(OperationSource::kFromMigrate);
+    }
     request.setYieldPolicy(PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
     ::mongo::update(opCtx, context.db(), request);

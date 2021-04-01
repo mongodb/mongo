@@ -36,7 +36,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -543,7 +543,7 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::Insert& wholeOp,
-                           const InsertType& type) {
+                           const OperationSource& source) {
     // Insert performs its own retries, so we should only be within a WriteUnitOfWork when run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -615,7 +615,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
             // A time-series insert can combine multiple writes into a single operation, and thus
             // can have multiple statement ids associated with it if it is retryable.
-            batch.emplace_back(type == InsertType::kTimeseries && wholeOp.getStmtIds()
+            batch.emplace_back(source == OperationSource::kTimeseries && wholeOp.getStmtIds()
                                    ? *wholeOp.getStmtIds()
                                    : std::vector<StmtId>{stmtId},
                                toInsert);
@@ -627,7 +627,7 @@ WriteResult performInserts(OperationContext* opCtx,
         }
 
         bool canContinue = insertBatchAndHandleErrors(
-            opCtx, wholeOp, batch, &lastOpFixer, &out, type == InsertType::kFromMigrate);
+            opCtx, wholeOp, batch, &lastOpFixer, &out, source == OperationSource::kFromMigrate);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
@@ -772,7 +772,8 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const std::vector<StmtId>& stmtIds,
     const write_ops::UpdateOpEntry& op,
     LegacyRuntimeConstants runtimeConstants,
-    const boost::optional<BSONObj>& letParams) {
+    const boost::optional<BSONObj>& letParams,
+    OperationSource source) {
     globalOpCounters.gotUpdate();
     ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForUpdate(opCtx->getWriteConcern());
     auto& curOp = *CurOp::get(opCtx);
@@ -799,6 +800,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     request.setYieldPolicy(opCtx->inMultiDocumentTransaction()
                                ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
                                : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    request.setSource(source);
 
     size_t numAttempts = 0;
     while (true) {
@@ -834,7 +836,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::Update& wholeOp,
-                           const UpdateType& type) {
+                           const OperationSource& source) {
     // Update performs its own retries, so we should not be in a WriteUnitOfWork unless run in a
     // transaction.
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -886,7 +888,7 @@ WriteResult performUpdates(OperationContext* opCtx,
 
             // A time-series insert can combine multiple writes into a single operation, and thus
             // can have multiple statement ids associated with it if it is retryable.
-            auto stmtIds = type == UpdateType::kTimeseries && wholeOp.getStmtIds()
+            auto stmtIds = source == OperationSource::kTimeseries && wholeOp.getStmtIds()
                 ? *wholeOp.getStmtIds()
                 : std::vector<StmtId>{stmtId};
 
@@ -895,7 +897,8 @@ WriteResult performUpdates(OperationContext* opCtx,
                                                                           stmtIds,
                                                                           singleOp,
                                                                           runtimeConstants,
-                                                                          wholeOp.getLet()));
+                                                                          wholeOp.getLet(),
+                                                                          source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
             const bool canContinue = handleError(opCtx,

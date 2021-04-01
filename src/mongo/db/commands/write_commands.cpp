@@ -77,6 +77,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeCommit);
+MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeWrite);
 MONGO_FAIL_POINT_DEFINE(failTimeseriesInsert);
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
@@ -563,7 +564,7 @@ public:
                 write_ops::Insert::parse({"CmdInsert::_performTimeseriesInsert"}, request);
 
             return _getTimeseriesSingleWriteResult(write_ops_exec::performInserts(
-                opCtx, timeseriesInsertBatch, write_ops_exec::InsertType::kTimeseries));
+                opCtx, timeseriesInsertBatch, OperationSource::kTimeseries));
         }
 
         StatusWith<SingleWriteResult> _performTimeseriesUpdate(
@@ -592,7 +593,7 @@ public:
             timeseriesUpdateBatch.setWriteCommandBase(std::move(writeCommandBase));
 
             return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
-                opCtx, timeseriesUpdateBatch, write_ops_exec::UpdateType::kTimeseries));
+                opCtx, timeseriesUpdateBatch, OperationSource::kTimeseries));
         }
 
         void _commitTimeseriesBucket(OperationContext* opCtx,
@@ -603,11 +604,23 @@ public:
                                      std::vector<BSONObj>* errors,
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
-                                     std::vector<size_t>* updatesToRetry) const {
+                                     std::vector<size_t>* docsToRetry) const {
             auto& bucketCatalog = BucketCatalog::get(opCtx);
 
             auto metadata = bucketCatalog.getMetadata(batch->bucket());
-            bucketCatalog.prepareCommit(batch);
+            bool prepared = bucketCatalog.prepareCommit(batch);
+            if (!prepared) {
+                invariant(batch->finished());
+                invariant(batch->getResult().getStatus() == ErrorCodes::TimeseriesBucketCleared,
+                          str::stream()
+                              << "Got unexpected error (" << batch->getResult().getStatus()
+                              << ") preparing time-series bucket to be committed for " << ns()
+                              << ": " << redact(request().toBSON({})));
+                docsToRetry->push_back(index);
+                return;
+            }
+
+            hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
             auto result = batch->numPreviouslyCommittedMeasurements() == 0
                 ? _performTimeseriesInsert(opCtx, batch, metadata, stmtIds)
@@ -624,7 +637,7 @@ public:
                 // No document in the buckets collection was found to update, meaning that it was
                 // removed.
                 bucketCatalog.abort(batch);
-                updatesToRetry->push_back(index);
+                docsToRetry->push_back(index);
                 return;
             }
 
@@ -715,7 +728,7 @@ public:
 
             hangTimeseriesInsertBeforeCommit.pauseWhileSet();
 
-            std::vector<size_t> updatesToRetry;
+            std::vector<size_t> docsToRetry;
 
             for (auto& [batch, index] : batches) {
                 bool shouldCommit = batch->claimCommitRights();
@@ -739,7 +752,7 @@ public:
                                             errors,
                                             opTime,
                                             electionId,
-                                            &updatesToRetry);
+                                            &docsToRetry);
                     batch.reset();
                 }
             }
@@ -757,7 +770,7 @@ public:
                                   << ") waiting for time-series bucket to be committed for " << ns()
                                   << ": " << redact(request().toBSON({})));
 
-                    updatesToRetry.push_back(index);
+                    docsToRetry.push_back(index);
                     continue;
                 }
 
@@ -774,7 +787,7 @@ public:
                 }
             }
 
-            return updatesToRetry;
+            return docsToRetry;
         }
 
         void _performTimeseriesWritesSubset(OperationContext* opCtx,
@@ -784,17 +797,11 @@ public:
                                             boost::optional<repl::OpTime>* opTime,
                                             boost::optional<OID>* electionId,
                                             bool* containsRetry) const {
-            std::vector<size_t> updatesToRetry;
+            std::vector<size_t> docsToRetry;
             do {
-                updatesToRetry = _performUnorderedTimeseriesWrites(opCtx,
-                                                                   start,
-                                                                   numDocs,
-                                                                   errors,
-                                                                   opTime,
-                                                                   electionId,
-                                                                   containsRetry,
-                                                                   updatesToRetry);
-            } while (!updatesToRetry.empty());
+                docsToRetry = _performUnorderedTimeseriesWrites(
+                    opCtx, start, numDocs, errors, opTime, electionId, containsRetry, docsToRetry);
+            } while (!docsToRetry.empty());
         }
 
         void _performTimeseriesWrites(OperationContext* opCtx,
