@@ -3447,10 +3447,10 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
     BSONObj newConfigObj = newConfig.toBSON();
     audit::logReplSetReconfig(opCtx->getClient(), &oldConfigObj, &newConfigObj);
 
-    bool isManualReconfig = opCtx->getClient()->hasRemote();
-    Status validateStatus = isManualReconfig
-        ? validateConfigForReconfig(oldConfig, newConfig, force)
-        : validateConfigForOplogReconfig(oldConfig, newConfig);
+    // User reconfigs should not allow IP addresses in split horizons.
+    bool allowSplitHorizonIP = !opCtx->getClient()->hasRemote();
+    Status validateStatus =
+        validateConfigForReconfig(oldConfig, newConfig, force, allowSplitHorizonIP);
     if (!validateStatus.isOK()) {
         LOGV2_ERROR(21420,
                     "replSetReconfig got {error} while validating {newConfig}",

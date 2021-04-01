@@ -426,10 +426,10 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     return findSelfInConfigIfElectable(externalState, newConfig, ctx);
 }
 
-Status _validateConfigForReconfig(const ReplSetConfig& oldConfig,
-                                  const ReplSetConfig& newConfig,
-                                  bool force,
-                                  bool allowSplitHorizonIP) {
+Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
+                                 const ReplSetConfig& newConfig,
+                                 bool force,
+                                 bool allowSplitHorizonIP) {
     Status status =
         allowSplitHorizonIP ? newConfig.validateAllowingSplitHorizonIP() : newConfig.validate();
     if (!status.isOK()) {
@@ -469,18 +469,6 @@ Status _validateConfigForReconfig(const ReplSetConfig& oldConfig,
 
     return Status::OK();
 }
-
-Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
-                                 const ReplSetConfig& newConfig,
-                                 bool force) {
-    return _validateConfigForReconfig(oldConfig, newConfig, force, false);
-}
-
-Status validateConfigForOplogReconfig(const ReplSetConfig& oldConfig,
-                                      const ReplSetConfig& newConfig) {
-    return _validateConfigForReconfig(oldConfig, newConfig, true, true);
-}
-
 
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
