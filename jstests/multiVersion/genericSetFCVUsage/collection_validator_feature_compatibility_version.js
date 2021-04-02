@@ -12,18 +12,26 @@
 const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
-// The 'testCases' array should be populated with
+// These arrays should be populated with
 //
 //      { validator: { ... }, nonMatchingDocument: { ... }, lastStableErrCode }
 //
-// objects that use query features new in the latest version of mongod. Note that this also
+// objects that use query features in new versions of mongod. Note that this also
 // includes new aggregation expressions able to be used with the $expr match expression. This
 // test ensures that a collection validator accepts the new query feature when the feature
 // compatibility version is the latest version, and rejects it when the feature compatibility
 // version is the last version.
 // The 'lastStableErrCode' field indicates what error the last version would throw when
 // parsing the validator.
-const testCases = [
+const testCasesLastContinuous = [
+    //
+    // Populate with any new expressions.
+    //
+];
+
+const testCasesLastStable = testCasesLastContinuous.concat([
+    // These expressions were introduced in 4.9.
+    // TODO SERVER-53028: Remove these cases when 5.0 becomes lastLTS.
     {
         validator: {
             $expr: {
@@ -84,12 +92,17 @@ const testCases = [
         nonMatchingDocument: {a: 1},
         lastStableErrCode: 168
     },
-];
+]);
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test
 // cases 'testCases' and using a previous stable version 'lastVersion' of mongod. 'lastVersion' can
 // have values "last-lts" and "last-continuous".
-function testCollectionValidatorFCVBehavior(lastVersion) {
+function testCollectionValidatorFCVBehavior(lastVersion, testCases) {
+    if (testCases.length === 0) {
+        jsTestLog("Skipping setup for tests against " + lastVersion + " since there are none");
+        return;
+    }
+
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
     assert.neq(null, conn, "mongod was unable to start up");
 
@@ -282,7 +295,7 @@ function testCollectionValidatorFCVBehavior(lastVersion) {
 
     MongoRunner.stopMongod(conn);
 }
-for (const version of ["last-lts", "last-continuous"]) {
-    testCollectionValidatorFCVBehavior(version);
-}
+
+testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);
+testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
 }());
