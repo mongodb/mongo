@@ -225,8 +225,8 @@ public:
                         !cmd.getAutoIndexId());
 
                 // Perform index spec validation.
-                idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
-                    opCtx, idIndexSpec, serverGlobalParams.featureCompatibility));
+                idIndexSpec =
+                    uassertStatusOK(index_key_validate::validateIndexSpec(opCtx, idIndexSpec));
                 uassertStatusOK(index_key_validate::validateIdIndexSpec(idIndexSpec));
 
                 // Validate or fill in _id index collation.

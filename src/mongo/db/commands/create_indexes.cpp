@@ -58,7 +58,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_lookup.h"
@@ -101,7 +100,6 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
     constexpr auto k_id_ = "_id_"_sd;
     constexpr auto kStar = "*"_sd;
 
-    const auto& featureCompatability = serverGlobalParams.featureCompatibility;
     const auto ns = cmd.getNamespace();
     const bool ignoreUnknownIndexOptions = cmd.getIgnoreUnknownIndexOptions();
 
@@ -112,8 +110,7 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
             parsedIndexSpec = index_key_validate::removeUnknownFields(parsedIndexSpec);
         }
 
-        auto indexSpecStatus =
-            index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec, featureCompatability);
+        auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
         uassertStatusOK(indexSpecStatus.getStatus().withContext(
             str::stream() << "Error in specification " << parsedIndexSpec.toString()));
 

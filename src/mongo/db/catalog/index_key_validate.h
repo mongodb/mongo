@@ -32,7 +32,6 @@
 #include <functional>
 
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 class BSONObj;
@@ -55,10 +54,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
  * has any missing attributes filled in. If the index specification is malformed, then an error
  * status is returned.
  */
-StatusWith<BSONObj> validateIndexSpec(
-    OperationContext* opCtx,
-    const BSONObj& indexSpec,
-    const ServerGlobalParams::FeatureCompatibility& featureCompatibility);
+StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.

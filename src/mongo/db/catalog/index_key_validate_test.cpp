@@ -294,42 +294,28 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithV
 TEST(IndexKeyValidateTest, CompoundHashedIndex) {
     // Validation succeeds with hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a : 'hashed', b: 1}, name: 'index'}")));
 
     // Validation succeeds with non-hashed prefix in the index.
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {b: 1, a : 'hashed', c: 1}, name: 'index'}")));
 }
 
 TEST(IndexKeyValidateTest, Background) {
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a: 1}, name: 'index', background: true}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: true}")));
 
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a: 1}, name: 'index', background: 1}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: 1}")));
 
     ASSERT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a: 1}, name: 'index', background: 0}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: 0}")));
 
     ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a: 1}, name: 'index', background: 'foo'}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: 'foo'}")));
 
     ASSERT_NOT_OK(index_key_validate::validateIndexSpec(
-        nullptr,
-        fromjson("{key: {a: 1}, name: 'index', background: []}"),
-        ServerGlobalParams::FeatureCompatibility()));
+        nullptr, fromjson("{key: {a: 1}, name: 'index', background: []}")));
 }
 
 }  // namespace
