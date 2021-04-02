@@ -44,6 +44,10 @@ namespace {
 
 using namespace fmt::literals;
 
+/**
+ * This test fixture does not create any resharding POSs and should be preferred to
+ * `ReshardingDonorRecipientCommonTest` when they are not required.
+ */
 class ReshardingDonorRecipientCommonInternalsTest : public ShardServerTestFixture {
 public:
     const UUID kExistingUUID = UUID::gen();
@@ -153,6 +157,11 @@ protected:
             UUID::gen(), sourceNss, sourceUUID, kTemporaryReshardingNss, kReshardingKeyPattern);
 
         doc.setCommonReshardingMetadata(std::move(commonMetadata));
+
+        // A document in the cloning state requires a fetch timestamp.
+        FetchTimestamp ts;
+        ts.setFetchTimestamp(kFetchTimestamp);
+        doc.setFetchTimestampStruct(ts);
         return doc;
     }
 
@@ -235,6 +244,10 @@ protected:
     }
 };
 
+/**
+ * This fixture starts with the above internals test and also creates (notably) the resharding donor
+ * and recipient POSs.
+ */
 class ReshardingDonorRecipientCommonTest : public ReshardingDonorRecipientCommonInternalsTest {
 public:
     void setUp() override {
@@ -242,16 +255,16 @@ public:
 
         WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
-        _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
+        _primaryOnlyServiceRegistry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
 
         std::unique_ptr<ReshardingDonorService> donorService =
             std::make_unique<ReshardingDonorService>(getServiceContext());
-        _registry->registerService(std::move(donorService));
+        _primaryOnlyServiceRegistry->registerService(std::move(donorService));
 
         std::unique_ptr<ReshardingRecipientService> recipientService =
             std::make_unique<ReshardingRecipientService>(getServiceContext());
-        _registry->registerService(std::move(recipientService));
-        _registry->onStartup(operationContext());
+        _primaryOnlyServiceRegistry->registerService(std::move(recipientService));
+        _primaryOnlyServiceRegistry->onStartup(operationContext());
 
         stepUp();
     }
@@ -261,7 +274,7 @@ public:
 
         Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
 
-        _registry->onShutdown();
+        _primaryOnlyServiceRegistry->onShutdown();
 
         Grid::get(operationContext())->clearForUnitTests();
 
@@ -279,11 +292,11 @@ public:
         replCoord->setMyLastAppliedOpTimeAndWallTime(
             repl::OpTimeAndWallTime(repl::OpTime(Timestamp(1, 1), _term), Date_t()));
 
-        _registry->onStepUpComplete(operationContext(), _term);
+        _primaryOnlyServiceRegistry->onStepUpComplete(operationContext(), _term);
     }
 
 protected:
-    repl::PrimaryOnlyServiceRegistry* _registry;
+    repl::PrimaryOnlyServiceRegistry* _primaryOnlyServiceRegistry;
     long long _term = 0;
 };
 
