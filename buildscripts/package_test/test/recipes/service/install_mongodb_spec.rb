@@ -58,6 +58,11 @@ if os[:arch] == 'x86_64'
       its('exit_status') { should eq 0 }
       its('stderr') { should eq '' }
     end
+  elsif os[:name] == 'suse'
+    describe command("install_compass") do
+      its('exit_status') { should eq 1 }
+      its('stderr') { should match /You are using an unsupported platform/ }
+    end
   else
     describe command("install_compass") do
       its('exit_status') { should eq 1 }
@@ -67,7 +72,7 @@ if os[:arch] == 'x86_64'
 else
   describe command("install_compass") do
     its('exit_status') { should eq 1 }
-    its('stderr') { should match /Sorry, MongoDB Compass is only supported on 64-bit Intel platforms./ }
+    its('stderr') { should match /Sorry, MongoDB Compass is only supported on 64-bit Intel platforms/ }
   end
 end
 
@@ -120,7 +125,14 @@ if sysvinit
 end
 
 if systemd
-  describe file('/lib/systemd/system/mongod.service') do
+  unit_file_prefix = ''
+  if os[:name] == 'suse'
+    # Putting systemd unit files in /usr, which may be a separate partition
+    # and therefore not available during isolated startups, is bad practice.
+    # But it's what SUSE has chosen to do, so we have to deal with it.
+    unit_file_prefix = '/usr'
+  end
+  describe file("#{unit_file_prefix}/lib/systemd/system/mongod.service") do
     it { should be_file }
   end
 end
