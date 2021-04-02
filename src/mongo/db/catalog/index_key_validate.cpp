@@ -365,8 +365,8 @@ StatusWith<BSONObj> validateIndexSpec(
 
             const IndexVersion requestedIndexVersion =
                 static_cast<IndexVersion>(*requestedIndexVersionAsInt);
-            auto creationAllowedStatus = IndexDescriptor::isIndexVersionAllowedForCreation(
-                requestedIndexVersion, featureCompatibility, indexSpec);
+            auto creationAllowedStatus =
+                IndexDescriptor::isIndexVersionAllowedForCreation(requestedIndexVersion, indexSpec);
             if (!creationAllowedStatus.isOK()) {
                 return creationAllowedStatus;
             }

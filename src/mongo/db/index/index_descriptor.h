@@ -38,7 +38,6 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -110,10 +109,8 @@ public:
      * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and
      * returns ErrorCodes::CannotCreateIndex otherwise.
      */
-    static Status isIndexVersionAllowedForCreation(
-        IndexVersion indexVersion,
-        const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
-        const BSONObj& indexSpec);
+    static Status isIndexVersionAllowedForCreation(IndexVersion indexVersion,
+                                                   const BSONObj& indexSpec);
 
     /**
      * Returns the index version to use if it isn't specified in the index specification.
