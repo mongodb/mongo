@@ -1,3 +1,11 @@
+%if 0%{?suse_version}
+%define _sharedstatedir %{_localstatedir}/lib
+%endif
+
+%if ! %{defined _docdir}
+%define _docdir %{_datadir}/doc
+%endif
+
 %if ! %{defined _rundir}
 %define _rundir %{_localstatedir}/run
 %endif
