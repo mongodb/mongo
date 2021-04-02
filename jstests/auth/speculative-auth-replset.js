@@ -5,6 +5,40 @@
 (function() {
 'use strict';
 
+const kAuthenticationSuccessfulLogId = 5286306;
+const kAuthenticationFailedLogId = 5286307;
+
+function countAuthInLog(conn) {
+    let logCounts = {speculative: 0, cluster: 0, speculativeCluster: 0};
+
+    checkLog.getGlobalLog(conn).forEach((line) => {
+        // Iterate through the log and verify our auth.
+        const entry = JSON.parse(line);
+        if (entry.id === kAuthenticationSuccessfulLogId) {
+            // Successful auth.
+            if (entry.attr.isSpeculative) {
+                logCounts.speculative += 1;
+            }
+            if (entry.attr.isClusterMember) {
+                logCounts.cluster += 1;
+            }
+            if (entry.attr.isSpeculative && entry.attr.isClusterMember) {
+                logCounts.speculativeCluster += 1;
+            }
+        } else if (entry.id === kAuthenticationFailedLogId) {
+            // Authentication can fail legitimately because the secondary abandons the connection
+            // during shutdown.
+            assert.eq(entry.attr.error.code, ErrorCodes.AuthenticationAbandoned);
+        } else {
+            // Irrelevant.
+            return;
+        }
+    });
+
+    print(`Found log entries for authentication in the following amounts: ${tojson(logCounts)}`);
+    return logCounts;
+}
+
 const rst = new ReplSetTest({nodes: 1, keyFile: 'jstests/libs/key1'});
 rst.startSet();
 rst.initiate();
@@ -69,16 +103,20 @@ Object.keys(initialMechStats).forEach(function(mech) {
     // Capture new statistics, and assert that they're consistent.
     const newMechStats = getMechStats(admin);
     printjson(newMechStats);
-    assert.eq(newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.received,
-              newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
-    assert.eq(newMechStats["SCRAM-SHA-256"].clusterAuthenticate.received,
-              newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
 
     // Speculative and cluster statistics should be incremented by intracluster auth.
-    assert.gt(newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.received,
+    assert.gt(newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful,
               initialMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
-    assert.gt(newMechStats["SCRAM-SHA-256"].clusterAuthenticate.received,
+    assert.gt(newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful,
               initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
+
+    const logCounts = countAuthInLog(admin);
+    assert.eq(logCounts.speculative,
+              newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
+    assert.eq(logCounts.cluster, newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
+    assert.gt(logCounts.speculativeCluster,
+              0,
+              "Expected to observe at least one speculative cluster authentication attempt");
 }
 
 admin.logout();
