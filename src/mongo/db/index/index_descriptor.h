@@ -101,11 +101,6 @@ public:
     static bool isIndexVersionSupported(IndexVersion indexVersion);
 
     /**
-     * Returns a set of the currently supported index versions.
-     */
-    static std::set<IndexVersion> getSupportedIndexVersions();
-
-    /**
      * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and
      * returns ErrorCodes::CannotCreateIndex otherwise.
      */
