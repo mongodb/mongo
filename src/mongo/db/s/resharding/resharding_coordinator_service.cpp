@@ -1273,8 +1273,12 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
             const auto criticalSectionTimeout =
                 Milliseconds(resharding::gReshardingCriticalSectionTimeoutMillis.load());
+            const auto criticalSectionExpiresAt = (*executor)->now() + criticalSectionTimeout;
+            LOGV2_INFO(
+                5573001, "Engaging critical section", "timeoutAt"_attr = criticalSectionExpiresAt);
+
             auto swCbHandle = (*executor)->scheduleWorkAt(
-                (*executor)->now() + criticalSectionTimeout,
+                criticalSectionExpiresAt,
                 [this](const executor::TaskExecutor::CallbackArgs& cbData) {
                     if (!cbData.status.isOK()) {
                         return;
