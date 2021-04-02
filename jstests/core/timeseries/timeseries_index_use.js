@@ -197,10 +197,9 @@ assert.commandWorked(coll.insert([
     {_id: 2, [timeFieldName]: ISODate('2010-01-01 00:00:00.000Z'), [metaFieldName]: "bye bye"}
 ]));
 
-// TODO SERVER-55096: re-enable these tests once indexes inherit collation from collection.
 // Test index on metaField when collection collation matches query collation.
-// testQueryUsesIndex({'meta': {$eq: "bye bye"}}, 1, {'meta': 1}, {}, collation);
-// testQueryUsesIndex({'meta': {$gte: "hello hello"}}, 2, {'meta': -1}, {}, collation);
+testQueryUsesIndex({'meta': {$eq: "bye bye"}}, 1, {'meta': 1}, {}, collation);
+testQueryUsesIndex({'meta': {$gte: "hello hello"}}, 2, {'meta': -1}, {}, collation);
 
 resetCollections(collation);
 assert.commandWorked(coll.insert([
@@ -221,8 +220,7 @@ assert.commandWorked(coll.insert([
     }
 ]));
 
-// TODO SERVER-55096: re-enable these tests once indexes inherit collation from collection.
 // Test index on subfields of metaField when collection collation matches query collation.
-// testQueryUsesIndex({'meta.a': {$eq: "bye bye"}}, 1, {'meta.a': 1}, {}, collation);
-// testQueryUsesIndex({'meta.b': {$gt: "bye bye"}}, 2, {'meta.b': -1}, {}, collation);
+testQueryUsesIndex({'meta.a': {$eq: "bye bye"}}, 1, {'meta.a': 1}, {}, collation);
+testQueryUsesIndex({'meta.b': {$gt: "bye bye"}}, 2, {'meta.b': -1}, {}, collation);
 })();
