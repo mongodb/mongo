@@ -148,7 +148,7 @@ public:
         std::vector<BSONObj> _measurements;
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
         BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
-        uint32_t _numPreviouslyCommittedMeasurements;
+        uint32_t _numPreviouslyCommittedMeasurements = 0;
         StringSet _newFieldNamesToBeInserted;
 
         bool _active = true;
