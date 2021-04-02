@@ -12,7 +12,7 @@
 load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/analyze_plan.js");
 
-const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
+let conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
 
 // Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
 // that the parallel suite runs this test only on WT configurations.
@@ -23,7 +23,7 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 }
 
 const dbName = jsTestName();
-const testDB = conn.getDB(dbName);
+let testDB = conn.getDB(dbName);
 assert.commandWorked(testDB.dropDatabase());
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
@@ -32,9 +32,10 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(testDB.getMongo())) {
     return;
 }
 
-// In order to trigger the optimized sample path we need at least 100 buckets in the bucket
-// collection.
-const nBuckets = 101;
+const nBuckets = 40;
+
+const timeFieldName = "time";
+const metaFieldName = "m";
 
 let assertUniqueDocuments = function(docs) {
     let seen = new Set();
@@ -45,6 +46,9 @@ let assertUniqueDocuments = function(docs) {
 };
 
 let assertPlanForSample = (explainRes, backupPlanSelected) => {
+    // The trial stage should always appear in the output, regardless of which plan won.
+    assert(aggPlanHasStage(explainRes, "TRIAL"), explainRes);
+
     if (backupPlanSelected) {
         assert(aggPlanHasStage(explainRes, "UNPACK_BUCKET"), explainRes);
         assert(!aggPlanHasStage(explainRes, "$_internalUnpackBucket"));
@@ -70,16 +74,16 @@ let assertPlanForSample = (explainRes, backupPlanSelected) => {
     }
 };
 
-let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
-    const coll = testDB.getCollection("timeseries_sample");
-    coll.drop();
-
-    const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
-
-    const timeFieldName = "time";
-    const metaFieldName = "m";
+/**
+ * Creates the collection 'coll' as a time-series collection, and inserts data such that there are
+ * the given number of measurementsPerBucket (assuming there are 'nBuckets'). Returns the total
+ * number of measurement documents inserted into the collection.
+ */
+function fillBuckets(coll, measurementsPerBucket) {
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+
+    const bucketsColl = testDB.getCollection("system.buckets." + coll.getName());
     assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
     let numDocs = nBuckets * measurementsPerBucket;
@@ -92,6 +96,15 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
 
     let buckets = bucketsColl.find().toArray();
     assert.eq(nBuckets, buckets.length, buckets);
+
+    return numDocs;
+}
+
+let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
+    const coll = testDB.getCollection("timeseries_sample");
+    coll.drop();
+
+    let numDocs = fillBuckets(coll, measurementsPerBucket);
 
     // Check the time-series view to make sure we have the correct number of docs and that there are
     // no duplicates after sampling.
@@ -113,15 +126,21 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
     assert.eq(1, result.length, result);
 
     // Check that $sample hasn't been absorbed by $_internalUnpackBucket when the
-    // sample size is sufficiently large.
-    sampleSize = 100;
+    // sample size is sufficiently large. The server will never try to use random cursor-based
+    // sampling for timeseries collections when the requested sample exceeds 1% of the maximum
+    // measurement count. Since the maximum number of measurements per bucket is 100, this means
+    // that we expect to use a top-k plan (without using 'TrialStage') when the sample size exceeds
+    // 'nBuckets'.
+    sampleSize = nBuckets + 10;
     const unoptimizedSamplePlan = coll.explain().aggregate([{$sample: {size: sampleSize}}]);
     let bucketStage = getAggPlanStage(unoptimizedSamplePlan, "$_internalUnpackBucket");
+    assert.neq(bucketStage, null, unoptimizedSamplePlan);
     assert.eq(bucketStage["$_internalUnpackBucket"]["sample"], undefined);
     assert(aggPlanHasStage(unoptimizedSamplePlan, "$sample"));
+    assert(!aggPlanHasStage(unoptimizedSamplePlan, "TRIAL"));
 
     const unoptimizedResult = coll.aggregate([{$sample: {size: sampleSize}}]).toArray();
-    assert.eq(100, unoptimizedResult.length, unoptimizedResult);
+    assert.eq(Math.min(sampleSize, numDocs), unoptimizedResult.length, unoptimizedResult);
     assertUniqueDocuments(unoptimizedResult);
 
     // Check that a sampleSize greater than the number of measurements doesn't cause an infinte
@@ -154,6 +173,48 @@ runSampleTests(1, true);
 // Test the case where the buckets are 95% full. Here we expect the optimized
 // SAMPLE_FROM_TIMESERIES_BUCKET plan to be used.
 runSampleTests(95, false);
+
+// Restart the mongod in order to raise the maximum bucket size to 1000.
+MongoRunner.stopMongod(conn);
+conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 1000}});
+testDB = conn.getDB(dbName);
+const coll = testDB.getCollection("timeseries_sample");
+
+// Create a timeseries collection that has 40 buckets, each with 900 documents.
+const measurementsPerBucket = 900;
+let numDocs = fillBuckets(coll, measurementsPerBucket);
+assert.eq(numDocs, measurementsPerBucket * nBuckets);
+
+// Run a sample query where the sample size is large enough to merit multiple batches.
+assert.eq(150, coll.aggregate([{$sample: {size: 150}}]).itcount());
+
+// Explain the $sample. Given that the buckets are mostly full, we expect the trial to succeed. We
+// should see a TRIAL stage, and it should have selected the SAMPLE_FROM_TIMESERIES_BUCKET plan. The
+// initial batch of data collected during the trial period will be returned via a QUEUED_DATA_STAGE.
+const explainRes = coll.explain("executionStats").aggregate([{$sample: {size: 150}}]);
+const trialStage = getAggPlanStage(explainRes, "TRIAL");
+assert.neq(trialStage, null, explainRes);
+const orStage = getPlanStage(trialStage, "OR");
+assert.neq(orStage, null, explainRes);
+const queuedDataStage = getPlanStage(orStage, "QUEUED_DATA");
+assert.neq(queuedDataStage, null, explainRes);
+
+// Verify that the SAMPLE_FROM_TIMESERIES_BUCKET stage exists in the plan and has reasonable
+// runtime stats.
+const sampleFromBucketStage = getPlanStage(orStage, "SAMPLE_FROM_TIMESERIES_BUCKET");
+assert.neq(sampleFromBucketStage, null, explainRes);
+assert(sampleFromBucketStage.hasOwnProperty("nBucketsDiscarded"), sampleFromBucketStage);
+assert.gte(sampleFromBucketStage.nBucketsDiscarded, 0, sampleFromBucketStage);
+assert(sampleFromBucketStage.hasOwnProperty("dupsDropped"), sampleFromBucketStage);
+assert.gte(sampleFromBucketStage.dupsDropped, 0, sampleFromBucketStage);
+// Since we are returning a sample size of 150, we expect to test at least that many dups.
+assert(sampleFromBucketStage.hasOwnProperty("dupsTested"));
+assert.gte(sampleFromBucketStage.dupsTested, 150, sampleFromBucketStage);
+
+// The SAMPLE_FROM_TIMESERIES_BUCKET stage reads from a MULTI_ITERATOR stage, which in turn reads
+// from a storage-provided random cursor.
+const multiIteratorStage = getPlanStage(sampleFromBucketStage, "MULTI_ITERATOR");
+assert.neq(multiIteratorStage, null, explainRes);
 
 MongoRunner.stopMongod(conn);
 })();
