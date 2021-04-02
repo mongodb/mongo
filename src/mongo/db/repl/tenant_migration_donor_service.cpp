@@ -70,6 +70,10 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterFetchingAndStoringKeys);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileUpdatingStateDoc);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeInsertingDonorStateDoc);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const std::string kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
@@ -88,13 +92,15 @@ bool shouldStopSendingRecipientCommand(Status status) {
         !(ErrorCodes::isRetriableError(status) ||
           // Returned if findHost() is unable to target the recipient in 15 seconds, which may
           // happen after a failover.
-          status == ErrorCodes::FailedToSatisfyReadPreference);
+          status == ErrorCodes::FailedToSatisfyReadPreference ||
+          ErrorCodes::isInterruption(status));
 }
 
 bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status) {
     // TODO (SERVER-54926): Convert HostUnreachable error in
     // _fetchAndStoreRecipientClusterTimeKeyDocs to specific error.
-    return status.isOK() || !ErrorCodes::isRetriableError(status) ||
+    return status.isOK() ||
+        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status)) ||
         status.code() == ErrorCodes::HostUnreachable;
 }
 void checkForTokenInterrupt(const CancellationToken& token) {
@@ -148,6 +154,8 @@ ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
                auto opCtx = opCtxHolder.get();
                DBDirectClient client(opCtx);
 
+               pauseTenantMigrationBeforeCreatingStateDocumentTTLIndex.pauseWhileSet(opCtx);
+
                BSONObj result;
                client.runCommand(
                    nss.db().toString(),
@@ -172,6 +180,8 @@ ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
                DBDirectClient client(opCtx);
+
+               pauseTenantMigrationBeforeCreatingExternalKeysTTLIndex.pauseWhileSet(opCtx);
 
                BSONObj result;
                client.runCommand(
@@ -413,6 +423,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
 
+               pauseTenantMigrationBeforeInsertingDonorStateDoc.pauseWhileSet(opCtx);
+
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
                writeConflictRetry(
@@ -453,6 +465,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
+
+               pauseTenantMigrationDonorWhileUpdatingStateDoc.pauseWhileSet(opCtx);
 
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
@@ -657,12 +671,9 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-
     const auto cmdObj = [&] {
         auto donorConnString =
-            repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+            repl::ReplicationCoordinator::get(_serviceContext)->getConfig().getConnectionString();
 
         RecipientSyncData request;
         request.setDbName(NamespaceString::kAdminDb);
@@ -688,11 +699,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const CancellationToken& token) {
 
-    auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
-
     auto donorConnString =
-        repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
+        repl::ReplicationCoordinator::get(_serviceContext)->getConfig().getConnectionString();
 
     RecipientForgetMigration request;
     request.setDbName(NamespaceString::kAdminDb);

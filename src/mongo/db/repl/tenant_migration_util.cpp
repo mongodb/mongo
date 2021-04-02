@@ -61,6 +61,7 @@ const std::set<std::string> kSensitiveFieldNames{"donorCertificateForRecipient",
                                                  "recipientCertificateForDonor"};
 
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeStoringExternalClusterTimeKeyDocs);
 
 }  // namespace
 
@@ -80,6 +81,8 @@ repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionD
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
     auto nss = NamespaceString::kExternalKeysCollectionNamespace;
+
+    pauseTenantMigrationBeforeStoringExternalClusterTimeKeyDocs.pauseWhileSet(opCtx);
 
     for (auto& keyDoc : keyDocs) {
         AutoGetCollection collection(opCtx, nss, MODE_IX);

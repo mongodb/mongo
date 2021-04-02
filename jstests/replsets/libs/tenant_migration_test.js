@@ -42,13 +42,13 @@ function TenantMigrationTest({
     donorRst.asCluster(donorRst.nodes, () => {
         donorRst.getPrimary();
         donorRst.awaitReplication();
-        createTenantMigrationRecipientRoleIfNotExist(donorRst);
+        TenantMigrationUtil.createTenantMigrationRecipientRoleIfNotExist(donorRst);
     });
 
     recipientRst.asCluster(recipientRst.nodes, () => {
         recipientRst.getPrimary();
         recipientRst.awaitReplication();
-        createTenantMigrationDonorRoleIfNotExist(recipientRst);
+        TenantMigrationUtil.createTenantMigrationDonorRoleIfNotExist(recipientRst);
     });
 
     /**
@@ -77,71 +77,13 @@ function TenantMigrationTest({
     }
 
     /**
-     * Returns true if the given database role already exists.
-     */
-    function roleExists(db, roleName) {
-        const roles = db.getRoles({rolesInfo: 1, showPrivileges: false, showBuiltinRoles: false});
-        const fullRoleName = `${db.getName()}.${roleName}`;
-        for (let role of roles) {
-            if (role._id == fullRoleName) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Creates a role for tenant migration donor if it doesn't exist.
-     */
-    function createTenantMigrationDonorRoleIfNotExist(rst) {
-        const adminDB = rst.getPrimary().getDB("admin");
-
-        if (roleExists(adminDB, "tenantMigrationDonorRole")) {
-            return;
-        }
-
-        assert.commandWorked(adminDB.runCommand({
-            createRole: "tenantMigrationDonorRole",
-            privileges: [
-                {resource: {cluster: true}, actions: ["runTenantMigration"]},
-                {resource: {db: "admin", collection: "system.keys"}, actions: ["find"]}
-            ],
-            roles: []
-        }));
-    }
-
-    /**
-     * Creates a role for tenant migration recipient if it doesn't exist.
-     */
-    function createTenantMigrationRecipientRoleIfNotExist(rst) {
-        const adminDB = rst.getPrimary().getDB("admin");
-
-        if (roleExists(adminDB, "tenantMigrationRecipientRole")) {
-            return;
-        }
-
-        assert.commandWorked(adminDB.runCommand({
-            createRole: "tenantMigrationRecipientRole",
-            privileges: [
-                {resource: {cluster: true}, actions: ["listDatabases", "useUUID"]},
-                {resource: {db: "", collection: ""}, actions: ["listCollections"]},
-                {
-                    resource: {anyResource: true},
-                    actions: ["dbStats", "collStats", "find", "listIndexes"]
-                }
-            ],
-            roles: []
-        }));
-    }
-
-    /**
      * Creates a role for running find command against config.external_validation_keys if it
      * doesn't exist.
      */
     function createFindExternalClusterTimeKeysRoleIfNotExist(rst) {
         const adminDB = rst.getPrimary().getDB("admin");
 
-        if (roleExists(adminDB, "findExternalClusterTimeKeysRole")) {
+        if (TenantMigrationUtil.roleExists(adminDB, "findExternalClusterTimeKeysRole")) {
             return;
         }
 
