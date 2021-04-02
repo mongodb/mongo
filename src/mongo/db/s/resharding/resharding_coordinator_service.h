@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
@@ -371,6 +372,12 @@ private:
 
     // Holds the cancellation tokens relevant to the ReshardingCoordinator.
     std::unique_ptr<CoordinatorCancellationTokenHolder> _ctHolder;
+
+    // ThreadPool used by CancelableOperationContext.
+    // CancelableOperationContext must have a thread that is always available to it to mark its
+    // opCtx as killed when the cancelToken has been cancelled.
+    const std::shared_ptr<ThreadPool> _markKilledExecutor;
+    boost::optional<CancelableOperationContextFactory> _factory;
 
     // Protects promises below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorService::_mutex");

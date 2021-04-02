@@ -844,7 +844,14 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
       _id(state["_id"].wrap().getOwned()),
       _coordinatorService(coordinatorService),
       _coordinatorDoc(ReshardingCoordinatorDocument::parse(
-          IDLParserErrorContext("ReshardingCoordinatorStateDoc"), state)) {
+          IDLParserErrorContext("ReshardingCoordinatorStateDoc"), state)),
+      _markKilledExecutor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "ReshardingCoordinatorCancelableOpCtxPool";
+          options.minThreads = 1;
+          options.maxThreads = 1;
+          return options;
+      }())) {
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 }
 
@@ -938,10 +945,14 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
         .then([this, executor] { return _awaitAllRecipientsFinishedApplying(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
+        .onCompletion([this](auto passthroughFuture) {
+            _factory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+            return passthroughFuture;
+        })
         .onError([this, self = shared_from_this(), executor](
                      Status status) -> StatusWith<ReshardingCoordinatorDocument> {
             {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = _factory->makeOperationContext(&cc());
                 reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(opCtx.get());
             }
 
@@ -979,7 +990,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisionAndFinishRe
         })
         .onError([this, self = shared_from_this(), executor](Status status) {
             {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = _factory->makeOperationContext(&cc());
                 reshardingPauseCoordinatorBeforeStartingErrorFlow.pauseWhileSet(opCtx.get());
             }
 
@@ -996,6 +1007,9 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
     _ctHolder = std::make_unique<CoordinatorCancellationTokenHolder>(stepdownToken);
+    _markKilledExecutor->startup();
+    _factory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
+
     return _runUntilReadyToPersistDecision(executor)
         .then([this, self = shared_from_this(), executor](
                   const ReshardingCoordinatorDocument& updatedCoordinatorDoc) {
@@ -1010,7 +1024,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                 markCompleted(status);
             }
 
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _factory->makeOperationContext(&cc());
             reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
                 opCtx.get(), _ctHolder->getStepdownToken());
 
@@ -1097,7 +1111,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
         return;
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
 
@@ -1114,7 +1128,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
         return;
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
 
     auto shardsAndChunks =
@@ -1204,7 +1218,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = _factory->makeOperationContext(&cc());
                 reshardingPauseCoordinatorBeforeCloning.pauseWhileSetAndNotCanceled(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
@@ -1249,7 +1263,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
         .thenRunOn(**executor)
         .then([this, executor](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = _factory->makeOperationContext(&cc());
                 reshardingPauseCoordinatorInSteadyState.pauseWhileSetAndNotCanceled(
                     opCtx.get(), _ctHolder->getAbortToken());
             }
@@ -1299,7 +1313,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDecisionPersisted);
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSetAndNotCanceled(
         opCtx.get(), _ctHolder->getAbortToken());
 
@@ -1343,7 +1357,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
                                          _ctHolder->getStepdownToken())
         .thenRunOn(**executor)
         .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _factory->makeOperationContext(&cc());
             resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(),
                                                                 coordinatorDocsChangedOnDisk[1]);
         });
@@ -1363,7 +1377,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     emplaceApproxBytesToCopyIfExists(updatedCoordinatorDoc, std::move(approxCopySize));
     emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx.get(),
                                                                            updatedCoordinatorDoc);
 
@@ -1373,7 +1387,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     auto recipientIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
 
     NamespaceString nssToRefresh;
@@ -1398,7 +1412,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
     auto donorIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
 
     auto refreshCmd = createFlushReshardingStateChangeCommand(_coordinatorDoc.getSourceNss());
@@ -1411,7 +1425,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefres
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(
     const NamespaceString& nss, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _factory->makeOperationContext(&cc());
 
     auto donorShardIds = resharding::extractShardIds(_coordinatorDoc.getDonorShards());
     auto recipientShardIds = resharding::extractShardIds(_coordinatorDoc.getRecipientShards());
