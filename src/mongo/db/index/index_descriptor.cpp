@@ -31,14 +31,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 
 #include <algorithm>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -146,10 +147,8 @@ std::set<IndexVersion> IndexDescriptor::getSupportedIndexVersions() {
     return {IndexVersion::kV1, IndexVersion::kV2};
 }
 
-Status IndexDescriptor::isIndexVersionAllowedForCreation(
-    IndexVersion indexVersion,
-    const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
-    const BSONObj& indexSpec) {
+Status IndexDescriptor::isIndexVersionAllowedForCreation(IndexVersion indexVersion,
+                                                         const BSONObj& indexSpec) {
     switch (indexVersion) {
         case IndexVersion::kV1:
         case IndexVersion::kV2:
