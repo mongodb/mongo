@@ -1,4 +1,4 @@
-// @tags: [requires_replication]
+// @tags: [requires_replication,tenant_migration_incompatible]
 (function() {
 // SERVER-28285 When renameCollection drops the target collection, it should just generate
 // a single oplog entry, so we cannot end up in a state where the drop has succeeded, but
