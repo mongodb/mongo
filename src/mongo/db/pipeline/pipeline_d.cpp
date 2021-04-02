@@ -112,8 +112,24 @@ createRandomCursorExecutor(const CollectionPtr& coll,
     invariant(opCtx->lockState()->isCollectionLockedForMode(coll->ns(), MODE_IS));
 
     static const double kMaxSampleRatioForRandCursor = 0.05;
-    if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
-        return std::pair{nullptr, false};
+    if (!expCtx->ns.isTimeseriesBucketsCollection()) {
+        if (sampleSize > numRecords * kMaxSampleRatioForRandCursor || numRecords <= 100) {
+            return std::pair{nullptr, false};
+        }
+    } else {
+        // Suppose that a time-series bucket collection is observed to contain 200 buckets, and the
+        // 'gTimeseriesBucketMaxCount' parameter is set to 1000. If all buckets are full, then the
+        // maximum possible measurment count would be 200 * 1000 = 200,000. While the
+        // 'SampleFromTimeseriesBucket' plan is more efficient when the sample size is small
+        // relative to the total number of measurements in the time-series collection, for larger
+        // sample sizes the top-k sort based sample is faster. Experiments have approximated that
+        // the tipping point is roughly when the requested sample size is greater than 1% of the
+        // maximum possible number of measurements in the collection (i.e. numBuckets *
+        // maxMeasurementsPerBucket).
+        static const double kCoefficient = 0.01;
+        if (sampleSize > kCoefficient * numRecords * gTimeseriesBucketMaxCount) {
+            return std::pair{nullptr, false};
+        }
     }
 
     // Attempt to get a random cursor from the RecordStore.
