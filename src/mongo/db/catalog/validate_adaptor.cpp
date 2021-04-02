@@ -495,18 +495,6 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         size_t validatedSize = 0;
         Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
 
-        // TODO SERVER-54481 : Disable double validate.
-        auto doubleValidateRecord = traverseRecordStoreCursor->seekExact(opCtx, record->id);
-        if (!doubleValidateRecord || doubleValidateRecord->id != record->id ||
-            doubleValidateRecord->data.size() != record->data.size()) {
-            LOGV2(
-                5355600,
-                "Document corruption details - Document validation failure; double validate failed",
-                "recordId"_attr = record->id);
-            results->errors.push_back("Detected one or more invalid documents. See logs.");
-            results->valid = false;
-        }
-
         // RecordStores are required to return records in RecordId order.
         if (prevRecordId.isValid()) {
             invariant(prevRecordId < record->id);
