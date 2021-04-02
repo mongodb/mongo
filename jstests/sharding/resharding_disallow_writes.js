@@ -97,8 +97,6 @@ assert.commandWorked(sourceCollection.runCommand(
 assert.commandWorked(sourceCollection.runCommand(
     {delete: collName, deletes: [{q: {_id: 0, oldKey: -20}, limit: 1}]}));
 
-// TODO(SERVER-54672): Uncomment the following operations.
-
 assert.commandWorked(sourceCollection.runCommand(
     {createIndexes: collName, indexes: [{key: {yak: 1}, name: "yak_0"}]}));
 
