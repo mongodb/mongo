@@ -95,10 +95,6 @@ Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss,
         });
 
     auto generatedOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    WriteConcernResult result;
-    uassertStatusOK(waitForWriteConcern(
-        opCtx.get(), generatedOpTime, WriteConcerns::kMajorityWriteConcern, &result));
-
     return generatedOpTime.getTimestamp();
 }
 
