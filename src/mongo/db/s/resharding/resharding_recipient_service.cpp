@@ -571,14 +571,14 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
     }
 
-    {
-        auto opCtx = cc().makeOperationContext();
-        reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
-    }
-
     auto opCtx = cc().makeOperationContext();
     return _updateCoordinator(opCtx.get(), executor)
         .then([this, abortToken] {
+            {
+                auto opCtx = cc().makeOperationContext();
+                reshardingPauseRecipientDuringOplogApplication.pauseWhileSet(opCtx.get());
+            }
+
             return future_util::withCancellation(_dataReplication->awaitStrictlyConsistent(),
                                                  abortToken);
         })
