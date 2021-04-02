@@ -216,7 +216,7 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOr
                        5274201);
 }
 
-TEST_F(ReshardingDonorRecipientCommonTest, ClearReshardingFilteringMetaData) {
+TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMetaData) {
     OperationContext* opCtx = operationContext();
 
     const bool scheduleAsyncRefresh = false;
