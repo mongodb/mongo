@@ -36,7 +36,7 @@ const db = primary.getDB("test");
 const session = primary.startSession({causalConsistency: false});
 const sessionDb = session.getDatabase("test");
 
-assert.commandWorked(db.runCommand({create: "mycoll"}));
+assert.commandWorked(db.runCommand({create: "mycoll", writeConcern: {w: "majority"}}));
 
 jsTestLog("Starting transaction");
 session.startTransaction();
