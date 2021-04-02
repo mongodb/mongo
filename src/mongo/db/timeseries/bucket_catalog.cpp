@@ -285,8 +285,13 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
 
 void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
     invariant(batch);
-    invariant(!batch->finished());
     invariant(batch->_commitRights.load());
+
+    if (batch->finished()) {
+        invariant(batch->getResult().getStatus() == ErrorCodes::TimeseriesBucketCleared);
+        return;
+    }
+
     Bucket* bucket = batch->bucket();
 
     // Before we access the bucket, make sure it's still there.
