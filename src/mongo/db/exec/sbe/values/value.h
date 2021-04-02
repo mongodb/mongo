@@ -70,11 +70,10 @@ using SpoolId = int64_t;
 using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
-class SortSpec;
 
-static constexpr size_t kStringMaxDisplayLength = 160;
-static constexpr size_t kBinDataMaxDisplayLength = 80;
-static constexpr size_t kNewUUIDLength = 16;
+static constexpr std::int32_t kStringMaxDisplayLength = 160;
+static constexpr std::int32_t kBinDataMaxDisplayLength = 80;
+static constexpr std::int32_t kNewUUIDLength = 16;
 
 /**
  * Type dispatch tags.
@@ -141,9 +140,6 @@ enum class TypeTags : uint8_t {
 
     // Pointer to fts::FTSMatcher for full text search.
     ftsMatcher,
-
-    // Pointer to a SortSpec object.
-    sortSpec,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -611,6 +607,8 @@ public:
         _compile();
     }
 
+    PcreRegex(StringData pattern) : PcreRegex(pattern, "") {}
+
     PcreRegex(const PcreRegex& other) : PcreRegex(other._pattern, other._options) {}
 
     PcreRegex& operator=(const PcreRegex& other) {
@@ -656,7 +654,7 @@ private:
     std::string _pattern;
     std::string _options;
 
-    pcre* _pcrePtr = nullptr;
+    pcre* _pcrePtr;
 };
 
 constexpr size_t kSmallStringMaxLength = 7;
@@ -931,10 +929,6 @@ inline fts::FTSMatcher* getFtsMatcherView(Value val) noexcept {
     return reinterpret_cast<fts::FTSMatcher*>(val);
 }
 
-inline SortSpec* getSortSpecView(Value val) noexcept {
-    return reinterpret_cast<SortSpec*>(val);
-}
-
 /**
  * Pattern and flags of Regex are stored in BSON as two C strings written one after another.
  *
@@ -1013,8 +1007,6 @@ std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer&);
 
 std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
 
-std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
-
 void releaseValue(TypeTags tag, Value val) noexcept;
 
 inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
@@ -1077,8 +1069,6 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyBsonDBPointer(getBsonDBPointerView(val));
         case TypeTags::ftsMatcher:
             return makeCopyFtsMatcher(*getFtsMatcherView(val));
-        case TypeTags::sortSpec:
-            return makeCopySortSpec(*getSortSpecView(val));
         default:
             break;
     }
@@ -1291,6 +1281,7 @@ private:
 std::pair<TypeTags, Value> arrayToSet(TypeTags tag,
                                       Value val,
                                       CollatorInterface* collator = nullptr);
+
 }  // namespace value
 }  // namespace sbe
 }  // namespace mongo
