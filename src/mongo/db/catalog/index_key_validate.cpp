@@ -60,8 +60,6 @@ namespace index_key_validate {
 
 std::function<void(std::set<StringData>&)> filterAllowedIndexFieldNames;
 
-using std::string;
-
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
@@ -118,7 +116,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
     if (key.isEmpty())
         return Status(code, "Index keys cannot be empty.");
 
-    string pluginName = IndexNames::findPluginName(key);
+    auto pluginName = IndexNames::findPluginName(key);
     if (pluginName.size()) {
         if (!IndexNames::isKnownName(pluginName))
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
