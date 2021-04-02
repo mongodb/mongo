@@ -28,6 +28,7 @@ var ReshardingTest = class {
         numRecipients: numRecipients = 1,
         reshardInPlace: reshardInPlace = false,
         minimumOperationDurationMS: minimumOperationDurationMS = undefined,
+        criticalSectionTimeoutMS: criticalSectionTimeoutMS = 24 * 60 * 60 * 1000 /* 1 day */,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -44,6 +45,8 @@ var ReshardingTest = class {
                                                : this._numDonors + this._numRecipients;
         /** @private */
         this._minimumOperationDurationMS = minimumOperationDurationMS;
+        /** @private */
+        this._criticalSectionTimeoutMS = criticalSectionTimeoutMS;
 
         // Properties set by setup().
         /** @private */
@@ -84,6 +87,11 @@ var ReshardingTest = class {
         if (this._minimumOperationDurationMS !== undefined) {
             config.setParameter.reshardingMinimumOperationDurationMillis =
                 this._minimumOperationDurationMS;
+        }
+
+        if (this._criticalSectionTimeoutMS !== -1) {
+            config.setParameter.reshardingCriticalSectionTimeoutMillis =
+                this._criticalSectionTimeoutMS;
         }
 
         this._st = new ShardingTest({

@@ -28,8 +28,15 @@ var st = new ShardingTest({
     shards: 1,
     config: 1,
     mongos: 1,
-    mongosOptions: {setParameter: {featureFlagResharding: true}},
-    configOptions: {setParameter: {featureFlagResharding: true}}
+    other: {
+        mongosOptions: {setParameter: {featureFlagResharding: true}},
+        configOptions: {
+            setParameter: {
+                featureFlagResharding: true,
+                reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000
+            }
+        }
+    }
 });
 
 const dbName = "test";
