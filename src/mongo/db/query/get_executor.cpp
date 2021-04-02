@@ -1167,22 +1167,20 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
                                  size_t plannerOptions) {
     invariant(cq);
     auto expCtx = cq->getExpCtxRaw();
-    const auto& sortPattern = cq->getSortPattern();
+    auto sortPattern = cq->getSortPattern();
     const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
     const bool isNotCount = !(plannerOptions & QueryPlannerParams::IS_COUNT);
     const bool doesNotContainMetadataRequirements = cq->metadataDeps().none();
-    const bool doesNotSortOnMetaOrPathWithNumericComponents =
+    const bool doesNotSortOnDottedPath =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
-            return part.fieldPath &&
-                !FieldRef(part.fieldPath->fullPath()).hasNumericPathComponents();
+            return part.fieldPath && part.fieldPath->getPathLength() == 1;
         });
     // OP_QUERY style find commands are not currently supported by SBE.
     const bool isNotLegacy = !CurOp::get(opCtx)->isLegacyQuery();
     // Queries against a time-series collection are not currently supported by SBE.
     const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        isNotLegacy && isQueryNotAgainstTimeseriesCollection &&
-        doesNotSortOnMetaOrPathWithNumericComponents;
+        doesNotSortOnDottedPath && isNotLegacy && isQueryNotAgainstTimeseriesCollection;
 }
 }  // namespace
 
