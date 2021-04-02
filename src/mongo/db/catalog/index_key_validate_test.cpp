@@ -47,15 +47,23 @@ namespace {
 using IndexVersion = IndexDescriptor::IndexVersion;
 using index_key_validate::validateKeyPattern;
 
+/**
+ * Returns a set of the currently supported index versions.
+ */
+std::set<IndexVersion> getSupportedIndexVersions() {
+    return {IndexVersion::kV1, IndexVersion::kV2};
+}
+
+
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("x" << 1), indexVersion));
         ASSERT_OK(validateKeyPattern(BSON("x" << 5), indexVersion));
     }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallNegativeIntSucceeds) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("x" << -1), indexVersion));
         ASSERT_OK(validateKeyPattern(BSON("x" << -5), indexVersion));
     }
@@ -98,19 +106,19 @@ TEST(IndexKeyValidateTest, KeyElementValueOfNaNSucceedsForV1Indexes) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementValuePositiveFloatingPointSucceeds) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("x" << 0.1), indexVersion));
     }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueNegativeFloatingPointSucceeds) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("x" << -0.1), indexVersion));
     }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfBadPluginStringFails) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         auto status = validateKeyPattern(BSON("x"
                                               << "foobar"),
                                          indexVersion);
@@ -177,21 +185,21 @@ TEST(IndexKeyValidateTest, KeyElementMaxKeyValueSucceedsForV1Indexes) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementObjectValueFails) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   validateKeyPattern(BSON("x" << BSON("y" << 1)), indexVersion));
     }
 }
 
 TEST(IndexKeyValidateTest, KeyElementArrayValueFails) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   validateKeyPattern(BSON("x" << BSON_ARRAY(1)), indexVersion));
     }
 }
 
 TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dGeoIndex) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
                                               << "2d"),
                                      indexVersion));
@@ -199,7 +207,7 @@ TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dGeoIndex) {
 }
 
 TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dsphereGeoIndex) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
                                               << "2dsphere"),
                                      indexVersion));
@@ -207,7 +215,7 @@ TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dsphereGeoIndex) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameTextFailsOnNonTextIndex) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         auto status = validateKeyPattern(BSON("_fts" << 1), indexVersion);
         ASSERT_NOT_OK(status);
         ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
@@ -215,7 +223,7 @@ TEST(IndexKeyValidateTest, KeyElementNameTextFailsOnNonTextIndex) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
-    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+    for (auto indexVersion : getSupportedIndexVersions()) {
         ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "_fts"
                                               << "text"),
                                      indexVersion));
