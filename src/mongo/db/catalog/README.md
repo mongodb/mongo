@@ -1718,6 +1718,27 @@ schema, per returned document:
 }
 ```
 
+# Time-series Collections
+
+## Clustered Collections
+
+Collections clustered by _id store documents in _id-order on the RecordStore. Unlike regular
+collections, they do not require a separate index from _id values to RecordIds. RecordIDs are
+encoded using each document's _id value, rather than a 64-bit integer. Currently, this value must be
+an ObjectId.
+
+Clustered collections may be created with the `clusteredIndex` collection creation option, but this
+feature is limited to internal time-series buckets collections only.
+
+## TTL Deletions
+
+Like a secondary TTL index, clustered collections can delete old data when created with the
+`expireAfterSeconds` collection creation option.
+
+The TTL monitor will only delete data from a time-series bucket collection when a bucket's minimum
+time, _id, is past the expiration plus the bucket maximum time span (default 1 hour). This
+procedure avoids deleting buckets with data that is not older than the expiration time.
+
 # Glossary
 **binary comparable**: Two values are binary comparable if the lexicographical order over their byte
 representation, from lower memory addresses to higher addresses, is the same as the defined ordering
