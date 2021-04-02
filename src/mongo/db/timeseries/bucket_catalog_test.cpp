@@ -481,7 +481,51 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     ASSERT_OK(batch1->getResult().getStatus());
 }
 
-TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
+TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
+    auto batch = _bucketCatalog
+                     ->insert(_opCtx,
+                              _ns1,
+                              _getCollator(_ns1),
+                              _getTimeseriesOptions(_ns1),
+                              BSON(_timeField << Date_t::now()),
+                              BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                     .getValue();
+    ASSERT(batch->claimCommitRights());
+
+    _bucketCatalog->clear(_ns1);
+
+    bool prepared = _bucketCatalog->prepareCommit(batch);
+    ASSERT(!prepared);
+    ASSERT(batch->finished());
+    ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
+
+    batch = _bucketCatalog
+                ->insert(_opCtx,
+                         _ns1,
+                         _getCollator(_ns1),
+                         _getTimeseriesOptions(_ns1),
+                         BSON(_timeField << Date_t::now()),
+                         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow)
+                .getValue();
+    ASSERT(batch->claimCommitRights());
+    _bucketCatalog->prepareCommit(batch);
+    ASSERT_EQ(batch->measurements().size(), 1);
+    ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
+
+    _bucketCatalog->clear(_ns1);
+
+    // Even though bucket has been cleared, finish should still report success. Basically, in this
+    // case we know that the write succeeded, so it must have happened before the namespace drop
+    // operation got the collection lock. So the write did actually happen, but is has since been
+    // removed, and that's fine for our purposes. The finish just records the result to the batch
+    // and updates some statistics.
+    _bucketCatalog->finish(batch, _commitInfo);
+    ASSERT(batch->finished());
+    ASSERT_OK(batch->getResult().getStatus());
+}
+
+
+TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     auto batch = _bucketCatalog
                      ->insert(_opCtx,
                               _ns1,
@@ -502,7 +546,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     ASSERT_EQ(batch->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 }
 
-TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrows) {
+TEST_F(BucketCatalogTest, PrepareCommitOnAlreadyAbortedBatch) {
     auto batch = _bucketCatalog
                      ->insert(_opCtx,
                               _ns1,
