@@ -16,7 +16,6 @@
  *     requires_find_command,
  *     requires_getmore,
  *     requires_non_retryable_writes,
- *     sbe_incompatible,
  * ]
  */
 (function() {
