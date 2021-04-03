@@ -101,13 +101,6 @@ public:
     static bool isIndexVersionSupported(IndexVersion indexVersion);
 
     /**
-     * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and
-     * returns ErrorCodes::CannotCreateIndex otherwise.
-     */
-    static Status isIndexVersionAllowedForCreation(IndexVersion indexVersion,
-                                                   const BSONObj& indexSpec);
-
-    /**
      * Returns the index version to use if it isn't specified in the index specification.
      */
     static IndexVersion getDefaultIndexVersion();

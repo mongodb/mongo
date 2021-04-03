@@ -105,6 +105,21 @@ static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kNamespaceFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
+
+/**
+ * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and
+ * returns ErrorCodes::CannotCreateIndex otherwise.
+ */
+Status isIndexVersionAllowedForCreation(IndexVersion indexVersion, const BSONObj& indexSpec) {
+    switch (indexVersion) {
+        case IndexVersion::kV1:
+        case IndexVersion::kV2:
+            return Status::OK();
+    }
+    return {ErrorCodes::CannotCreateIndex,
+            str::stream() << "Invalid index specification " << indexSpec
+                          << "; cannot create an index with v=" << static_cast<int>(indexVersion)};
+}
 }  // namespace
 
 Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
@@ -363,7 +378,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             const IndexVersion requestedIndexVersion =
                 static_cast<IndexVersion>(*requestedIndexVersionAsInt);
             auto creationAllowedStatus =
-                IndexDescriptor::isIndexVersionAllowedForCreation(requestedIndexVersion, indexSpec);
+                isIndexVersionAllowedForCreation(requestedIndexVersion, indexSpec);
             if (!creationAllowedStatus.isOK()) {
                 return creationAllowedStatus;
             }

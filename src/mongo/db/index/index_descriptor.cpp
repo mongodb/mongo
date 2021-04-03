@@ -143,18 +143,6 @@ bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     return false;
 }
 
-Status IndexDescriptor::isIndexVersionAllowedForCreation(IndexVersion indexVersion,
-                                                         const BSONObj& indexSpec) {
-    switch (indexVersion) {
-        case IndexVersion::kV1:
-        case IndexVersion::kV2:
-            return Status::OK();
-    }
-    return {ErrorCodes::CannotCreateIndex,
-            str::stream() << "Invalid index specification " << indexSpec
-                          << "; cannot create an index with v=" << static_cast<int>(indexVersion)};
-}
-
 IndexVersion IndexDescriptor::getDefaultIndexVersion() {
     return IndexVersion::kV2;
 }
