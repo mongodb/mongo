@@ -33,7 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 #include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
@@ -61,6 +61,15 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "_shardsvrCleanupReshardCollection must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            ReshardingDonorCleaner donorCleaner(ns(), request().getReshardingUUID());
+            donorCleaner.clean(opCtx);
+
+            ReshardingRecipientCleaner recipientCleaner(ns(), request().getReshardingUUID());
+            recipientCleaner.clean(opCtx);
         }
 
     private:
