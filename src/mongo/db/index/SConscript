@@ -9,12 +9,9 @@ env.Library(
         source=[
             'index_descriptor.cpp',
         ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/catalog/collection',
-            '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        ],
         LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/catalog/index_catalog',
             '$BUILD_DIR/mongo/db/index_names',
             '$BUILD_DIR/mongo/db/matcher/expressions',
             '$BUILD_DIR/mongo/db/namespace_string',
