@@ -180,7 +180,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/index/key_generator',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/matcher/expressions',
@@ -283,6 +282,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'collection_catalog',
+        'index_catalog',
     ]
 )
 
@@ -345,6 +345,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/fail_point",
         "collection_catalog",
         "database_holder",
+        "index_catalog",
         "throttle_cursor",
     ]
 )
@@ -492,6 +493,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/update_index_data',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
     ],
     LIBDEPS_TYPEINFO=[
         '$BUILD_DIR/mongo/db/index/index_access_methods'
