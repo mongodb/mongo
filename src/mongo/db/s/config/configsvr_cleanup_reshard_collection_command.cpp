@@ -33,8 +33,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
@@ -63,6 +62,24 @@ public:
             uassert(ErrorCodes::InvalidOptions,
                     "_configsvrCleanupReshardCollection must be called with majority writeConcern",
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            repl::ReadConcernArgs::get(opCtx) =
+                repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
+
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
+            const auto collEntry = catalogClient->getCollection(opCtx, ns());
+            if (!collEntry.getReshardingFields()) {
+                // If the collection entry doesn't have resharding fields, we assume that the
+                // resharding operation has already been cleaned up.
+                return;
+            }
+
+            ReshardingCoordinatorCleaner cleaner(
+                ns(), collEntry.getReshardingFields()->getReshardingUUID());
+            cleaner.clean(opCtx);
+
+            // TODO SERVER-54035 Implement post-cleanup removal of reshardingFields to indicate
+            // complete cleanup.
         }
 
     private:
