@@ -126,7 +126,17 @@ const testCommitProtocol = function(shouldCommit, failpointData) {
         coordinatorOpsToKill = coordinator.getDB("admin")
                                    .aggregate([
                                        {$currentOp: {'allUsers': true, 'idleConnections': true}},
-                                       {$match: {desc: "TransactionCoordinator"}}
+                                       {
+                                           $match: {
+                                               $and: [
+                                                   {desc: "TransactionCoordinator"},
+                                                   // Filter out the prepareTransaction op on the
+                                                   // coordinator itself since killing it would
+                                                   // cause the transaction to abort.
+                                                   {"command.prepareTransaction": {$exists: false}}
+                                               ]
+                                           }
+                                       }
                                    ])
                                    .toArray();
 
