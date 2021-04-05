@@ -29,8 +29,10 @@ function testClient(conn, cert, name, shouldSucceed) {
                                      script);
 
     assert.eq(shouldSucceed, exitCode === 0, "exitCode = " + tojson(exitCode));
-    assert.eq(!shouldSucceed,
-              rawMongoProgramOutput().includes('No verified subject name available from client'));
+    assert.soon(() => {
+        return !shouldSucceed ===
+            rawMongoProgramOutput().includes('No verified subject name available from client');
+    });
 }
 
 function runTest(conn) {
