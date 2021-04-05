@@ -140,13 +140,12 @@ void ProjectionNode::applyProjections(const Document& inputDoc, MutableDocument*
 
     while (it.more()) {
         auto fieldName = it.fieldName();
-        absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
 
-        if (_projectedFields.find(fieldNameKey) != _projectedFields.end()) {
+        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
             outputProjectedField(
                 fieldName, applyLeafProjectionToValue(it.next().second), outputDoc);
             ++projectedFields;
-        } else if (auto childIt = _children.find(fieldNameKey); childIt != _children.end()) {
+        } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
             outputProjectedField(
                 fieldName, childIt->second->applyProjectionsToValue(it.next().second), outputDoc);
             ++projectedFields;

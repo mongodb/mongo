@@ -622,6 +622,22 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
     return {nullptr, match};
 }
 
+std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
+    DocumentSource* src) const {
+    if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
+        nextProject && _bucketUnpacker.bucketSpec().metaField) {
+        // If we have an exclusion project, we can push down just the parts on the metaField.
+        if (nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
+            return nextProject->extractProjectOnFieldAndRename(
+                _bucketUnpacker.bucketSpec().metaField.get(), timeseries::kBucketMetaFieldName);
+        }
+
+        // TODO: SERVER-55727
+    }
+
+    return {BSONObj{}, false};
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -692,6 +708,27 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
                 match->serialize(&bob);
                 container->insert(itr, DocumentSourceMatch::create(bob.obj(), pExpCtx));
             }
+        }
+    }
+
+    // TODO: SERVER-54766: replace this logic.
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
+    // Attempt to push down a $project on the metaField past $_internalUnpackBucket.
+    if (auto [metaProject, deleteRemainder] = extractProjectForPushDown(std::next(itr)->get());
+        !metaProject.isEmpty()) {
+        container->insert(itr,
+                          DocumentSourceProject::createFromBson(
+                              BSON("$project" << metaProject).firstElement(), getContext()));
+
+        if (deleteRemainder) {
+            // We have pushed down the entire $project. Remove the old $project from the pipeline,
+            // then attempt to optimize this stage again.
+            container->erase(std::next(itr));
+            return std::prev(itr) == container->begin() ? std::prev(itr)
+                                                        : std::prev(std::prev(itr));
         }
     }
 

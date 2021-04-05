@@ -86,6 +86,7 @@ env.Library(
     target='projection_executor',
     source=[
         'add_fields_projection_executor.cpp',
+        'exclusion_projection_executor.cpp',
         'inclusion_projection_executor.cpp',
         'projection_executor_builder.cpp',
         'projection_executor_utils.cpp',

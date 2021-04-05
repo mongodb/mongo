@@ -66,12 +66,11 @@ void FastPathEligibleInclusionNode::_applyProjections(BSONObj bson, BSONObjBuild
     while (it.more() && nFieldsNeeded > 0) {
         const auto bsonElement{it.next()};
         const auto fieldName{bsonElement.fieldNameStringData()};
-        const absl::string_view fieldNameKey{fieldName.rawData(), fieldName.size()};
 
-        if (_projectedFields.find(fieldNameKey) != _projectedFields.end()) {
+        if (_projectedFields.find(fieldName) != _projectedFields.end()) {
             bob->append(bsonElement);
             --nFieldsNeeded;
-        } else if (auto childIt = _children.find(fieldNameKey); childIt != _children.end()) {
+        } else if (auto childIt = _children.find(fieldName); childIt != _children.end()) {
             auto child = static_cast<FastPathEligibleInclusionNode*>(childIt->second.get());
 
             if (bsonElement.type() == BSONType::Object) {

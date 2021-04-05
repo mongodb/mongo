@@ -160,9 +160,9 @@ protected:
     // Writes the given value to the output doc, replacing the existing value of 'field' if present.
     virtual void outputProjectedField(StringData field, Value val, MutableDocument* outDoc) const;
 
-    stdx::unordered_map<std::string, std::unique_ptr<ProjectionNode>> _children;
-    stdx::unordered_map<std::string, boost::intrusive_ptr<Expression>> _expressions;
-    stdx::unordered_set<std::string> _projectedFields;
+    StringMap<std::unique_ptr<ProjectionNode>> _children;
+    StringMap<boost::intrusive_ptr<Expression>> _expressions;
+    StringSet _projectedFields;
     ProjectionPolicies _policies;
     std::string _pathToNode;
 

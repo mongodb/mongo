@@ -117,6 +117,17 @@ public:
         return _parsedTransform->extractComputedProjections(oldName, newName, reservedNames);
     }
 
+    /**
+     * If this transformation is a project, removes and returns a BSONObj representing the part of
+     * this project that depends only on 'oldName'. Also returns a bool indicating whether this
+     * entire project is extracted. In the extracted $project, 'oldName' is renamed to 'newName'.
+     * 'oldName' should not be dotted.
+     */
+    std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
+                                                            const StringData& newName) {
+        return _parsedTransform->extractProjectOnFieldAndRename(oldName, newName);
+    }
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

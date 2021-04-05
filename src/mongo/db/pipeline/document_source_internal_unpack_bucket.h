@@ -178,6 +178,14 @@ public:
     bool pushDownComputedMetaProjection(Pipeline::SourceContainer::iterator itr,
                                         Pipeline::SourceContainer* container);
 
+    /**
+     * If 'src' represents an exclusion $project, attempts to extract the parts of 'src' that are
+     * only on the metaField. Returns a BSONObj representing the extracted project and a bool
+     * indicating whether all of 'src' was extracted. In the extracted $project, the metaField is
+     * renamed from the user defined name to 'kBucketMetaFieldName'.
+     */
+    std::pair<BSONObj, bool> extractProjectForPushDown(DocumentSource* src) const;
+
 private:
     GetNextResult doGetNext() final;
 

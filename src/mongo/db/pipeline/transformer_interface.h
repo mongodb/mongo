@@ -80,5 +80,10 @@ public:
         const std::set<StringData>& reservedNames) {
         return {BSONObj{}, false};
     }
+
+    virtual std::pair<BSONObj, bool> extractProjectOnFieldAndRename(const StringData& oldName,
+                                                                    const StringData& newName) {
+        return {BSONObj{}, false};
+    }
 };
 }  // namespace mongo
