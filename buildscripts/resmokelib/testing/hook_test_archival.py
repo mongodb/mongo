@@ -37,52 +37,8 @@ class HookTestArchival(object):
             elif archive_config["hooks"]:
                 for hook in hooks:
                     self.hooks.append(hook["class"])
-
         self._tests_repeat = {}
         self._lock = threading.Lock()
-
-    def _should_archive(self, success):
-        """Determine whether archiving should be done."""
-        return config.ARCHIVE_FILE and self.archive_instance \
-            and (not success or self.on_success)
-
-    def _archive_hook(self, logger, result, manager):
-        """
-        Provide helper to archive hooks.
-
-        :param logger: Where the logging output should be placed.
-        :param result: A TestResult named tuple containing the test, hook, and outcome.
-        :param manager: FixtureTestCaseManager object for the calling Job.
-        """
-        if not result.hook.REGISTERED_NAME in self.hooks:
-            return
-
-        test_name = "{}:{}".format(result.test.short_name(), result.hook.REGISTERED_NAME)
-        self._archive_hook_or_test(logger, test_name, result.test, manager)
-
-    def _archive_test(self, logger, result, manager):
-        """
-        Provide helper to archive tests.
-
-        :param logger: Where the logging output should be placed.
-        :param result: A TestResult named tuple containing the test, hook, and outcome.
-        :param manager: FixtureTestCaseManager object for the calling Job.
-
-        """
-        test_name = result.test.test_name
-
-        if self.archive_all:
-            test_match = True
-        else:
-            test_match = False
-            for arch_test in self.tests:
-                # Ensure that the test_name is in the same format as the arch_test.
-                if os.path.normpath(test_name) == os.path.normpath(arch_test):
-                    test_match = True
-                    break
-
-        if test_match:
-            self._archive_hook_or_test(logger, test_name, result.test, manager)
 
     def archive(self, logger, result, manager):
         """
@@ -92,12 +48,31 @@ class HookTestArchival(object):
         :param result: A TestResult named tuple containing the test, hook, and outcome.
         :param manager: FixtureTestCaseManager object for the calling Job.
         """
-        if not self._should_archive(result.success):
+
+        success = result.success
+        should_archive = (config.ARCHIVE_FILE and self.archive_instance
+                          and (not success or self.on_success))
+
+        if not should_archive:
             return
-        if result.hook:
-            self._archive_hook(logger, result, manager)
+
+        if result.hook and result.hook.REGISTERED_NAME in self.hooks:
+            test_name = "{}:{}".format(result.test.short_name(), result.hook.REGISTERED_NAME)
+            should_archive = True
         else:
-            self._archive_test(logger, result, manager)
+            test_name = result.test.test_name
+            if self.archive_all:
+                should_archive = True
+            else:
+                should_archive = False
+                for arch_test in self.tests:
+                    # Ensure that the test_name is in the same format as the arch_test.
+                    if os.path.normpath(test_name) == os.path.normpath(arch_test):
+                        should_archive = True
+                        break
+
+        if should_archive or config.FORCE_ARCHIVE_ALL_DATA_FILES:
+            self._archive_hook_or_test(logger, test_name, result.test, manager)
 
     def _archive_hook_or_test(self, logger, test_name, test, manager):
         """Trigger archive of data files for a test or hook."""

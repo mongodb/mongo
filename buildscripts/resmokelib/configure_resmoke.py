@@ -202,6 +202,20 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:
         _config.ARCHIVE_FILE = None
+    else:
+        required_builder_names = set([
+            "ubuntu1804-debug-aubsan-lite",
+            "linux-64-debug",
+            "enterprise-windows-required",
+            "enterprise-rhel-62-64-bit",
+            "enterprise-ubuntu-dynamic-1604-clang",
+        ])
+        # Enable archival globally for all required mainline builders.
+        if (_config.EVERGREEN_VARIANT_NAME is not None
+                and _config.EVERGREEN_VARIANT_NAME in required_builder_names
+                and not _config.EVERGREEN_PATCH_BUILD):
+            _config.FORCE_ARCHIVE_ALL_DATA_FILES = True
+
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
     _config.ARCHIVE_LIMIT_TESTS = config.pop("archive_limit_tests")
 
