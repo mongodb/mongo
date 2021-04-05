@@ -60,8 +60,7 @@ const awaitInsert = startParallelShell(
 fpInsert.wait();
 
 const modified = buckets[0];
-// This corrupts the bucket, but it's fine here.
-modified.control.max[timeFieldName] = times[1];
+modified.control.closed = true;
 
 const fpUpdate = configureFailPoint(conn, "hangTimeseriesDirectModificationBeforeWriteConflict");
 const awaitUpdate = startParallelShell(
@@ -87,7 +86,8 @@ assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 1));
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
-assert.eq(buckets[0].control.max[timeFieldName], times[1]);
+assert.eq(buckets[0].control.max[timeFieldName], times[0]);
+assert(buckets[0].control.closed);
 
 // Now another insert should generate a new bucket.
 
@@ -97,7 +97,7 @@ assert.docEq(coll.find().sort({_id: 1}).toArray(), [docs[0], docs[2]]);
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 2);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
-assert.eq(buckets[0].control.max[timeFieldName], times[1]);
+assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 assert.eq(buckets[1].control.min[timeFieldName], times[2]);
 assert.eq(buckets[1].control.max[timeFieldName], times[2]);
 
