@@ -813,7 +813,7 @@ env_vars.Add('CXXFLAGS',
     converter=variable_shlex_converter)
 
 default_destdir = '$BUILD_ROOT/install'
-if get_option('ninja') and get_option('build-tools') == 'next':
+if get_option('ninja') != 'disabled' and get_option('build-tools') == 'next':
     # Workaround for SERVER-53952 where issues wih different
     # ninja files building to the same install dir. Different
     # ninja files need to build to different install dirs.
