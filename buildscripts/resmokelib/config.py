@@ -510,6 +510,10 @@ ARCHIVE_FILE = "archive.json"
 # S3 Bucket to upload archive files.
 ARCHIVE_BUCKET = "mongodatafiles"
 
+# Force archive all files where appropriate. Eventually we want this to be the default option.
+# For now, only the mainline required builders have this option enabled.
+FORCE_ARCHIVE_ALL_DATA_FILES = False
+
 # Benchmark options set internally by resmoke.py
 BENCHMARK_OUT_FORMAT = "json"
 
