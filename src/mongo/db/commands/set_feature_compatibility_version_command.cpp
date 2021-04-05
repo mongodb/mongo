@@ -49,10 +49,12 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -411,6 +413,8 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
         }
 
+        _cancelTenantMigrations(opCtx);
+
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
@@ -535,6 +539,8 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
         }
 
+        _cancelTenantMigrations(opCtx);
+
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
@@ -640,6 +646,20 @@ private:
         LOGV2(4975602,
               "Downgrading on-disk format to reflect the last-continuous version.",
               "last_continuous_version"_attr = FCVP::kLastContinuous);
+    }
+
+    /**
+     * Kills all tenant migrations active on this node, for both donors and recipients.
+     * Called after reaching an upgrading or downgrading state.
+     */
+    void _cancelTenantMigrations(OperationContext* opCtx) {
+        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
+            auto donorService = checked_cast<TenantMigrationDonorService*>(
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
+            donorService->abortAllMigrations(opCtx);
+        }
     }
 
 } setFeatureCompatibilityVersionCommand;

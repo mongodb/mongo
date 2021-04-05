@@ -68,6 +68,11 @@ public:
             _serviceContext, this, initialState);
     }
 
+    /**
+     * Sends an abort to all tenant migration instances on this donor.
+     */
+    void abortAllMigrations(OperationContext* opCtx);
+
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
         struct DurableState {

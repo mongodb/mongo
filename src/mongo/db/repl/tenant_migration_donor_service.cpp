@@ -141,6 +141,15 @@ void setPromiseOkIfNotReady(WithLock lk, Promise& promise) {
 
 }  // namespace
 
+void TenantMigrationDonorService::abortAllMigrations(OperationContext* opCtx) {
+    LOGV2(5356301, "Aborting all tenant migrations on donor");
+    auto instances = getAllInstances(opCtx);
+    for (auto& instance : instances) {
+        auto typedInstance = checked_pointer_cast<TenantMigrationDonorService::Instance>(instance);
+        typedInstance->onReceiveDonorAbortMigration();
+    }
+}
+
 // Note this index is required on both the donor and recipient in a tenant migration, since each
 // will copy cluster time keys from the other. The donor service is set up on all mongods on stepup
 // to primary, so this index will be created on both donors and recipients.
@@ -738,6 +747,13 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
         if (!_stateDoc.getMigrationStart()) {
             _stateDoc.setMigrationStart(_serviceContext->getFastClockSource()->now());
         }
+    }
+
+    // We must abort the migration if we try to start or resume while upgrading or downgrading.
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        LOGV2(5356302, "Must abort tenant migration as donor is upgrading or downgrading");
+        onReceiveDonorAbortMigration();
     }
 
     auto abortToken = _initAbortMigrationSource(token);

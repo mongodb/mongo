@@ -331,6 +331,11 @@ protected:
      */
     std::shared_ptr<executor::TaskExecutor> getInstanceCleanupExecutor() const;
 
+    /**
+     * Returns shared pointers to all Instance objects that belong to this service.
+     */
+    std::vector<std::shared_ptr<Instance>> getAllInstances(OperationContext* opCtx);
+
 private:
     /**
      * Represents a PrimaryOnlyService::Instance that has already been scheduled to be run.

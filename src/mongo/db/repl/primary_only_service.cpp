@@ -535,6 +535,36 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
     return it->second.getInstance();
 }
 
+std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::getAllInstances(
+    OperationContext* opCtx) {
+    // If this operation is holding any database locks, then it must have opted into getting
+    // interrupted at stepdown to prevent deadlocks.
+    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+
+    std::vector<std::shared_ptr<PrimaryOnlyService::Instance>> instances;
+
+    stdx::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(
+        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+
+    if (_state == State::kShutdown || _state == State::kPaused) {
+        invariant(_activeInstances.empty());
+        return instances;
+    }
+    if (_state == State::kRebuildFailed) {
+        uassertStatusOK(_rebuildStatus);
+        return instances;
+    }
+    invariant(_state == State::kRunning);
+
+    for (auto& [instanceId, instance] : _activeInstances) {
+        instances.emplace_back(instance.getInstance());
+    }
+
+    return instances;
+}
+
 void PrimaryOnlyService::releaseInstance(const InstanceID& id, Status status) {
     auto savedInstanceNodeHandle = [&]() {
         stdx::lock_guard lk(_mutex);
