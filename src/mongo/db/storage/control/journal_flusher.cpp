@@ -115,8 +115,21 @@ void JournalFlusher::run() {
             _currentSharedPromise->emplaceValue();
         } catch (const AssertionException& e) {
             invariant(ErrorCodes::isShutdownError(e.code()) ||
-                          e.code() == ErrorCodes::InterruptedDueToReplStateChange,
+                          e.code() == ErrorCodes::InterruptedDueToReplStateChange ||
+                          e.code() == ErrorCodes::Interrupted,  // Can be caused by killOp.
                       e.toString());
+
+            if (e.code() == ErrorCodes::Interrupted) {
+                // This thread should not be affected by killOp. Therefore, the thread will
+                // immediately restart the journal flush without sending errors to waiting callers.
+                // The opCtx error should already be cleared of the interrupt by the ON_BLOCK_EXIT
+                // handling above.
+                LOGV2(5574501,
+                      "The JournalFlusher received and is ignoring a killOp error: the user should "
+                      "not kill mongod internal threads",
+                      "JournalFlusherError"_attr = e.toString());
+                continue;
+            }
 
             // Signal the waiters that the fsync was interrupted.
             _currentSharedPromise->setError(e.toStatus());
