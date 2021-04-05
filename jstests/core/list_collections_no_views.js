@@ -6,6 +6,8 @@
  *   assumes_superuser_permissions,
  *   # applyOps is not retryable.
  *   requires_non_retryable_commands,
+ *   # The drop of offending views may not happen on the donor after a committed migration.
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {
