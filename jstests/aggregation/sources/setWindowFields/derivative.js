@@ -126,6 +126,38 @@ assert.docEq(result, [
     {time: 7, y: 118, dy: +3 / 3},
 ]);
 
+// Example with range-based bounds.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {time: 0, y: 10},
+    {time: 10, y: 12},
+    {time: 11, y: 15},
+    {time: 12, y: 19},
+    {time: 13, y: 24},
+    {time: 20, y: 30},
+]));
+result = coll.aggregate([
+                 {
+                     $setWindowFields: {
+                         sortBy: {time: 1},
+                         output: {
+                             dy: {$derivative: {input: "$y"}, window: {range: [-10, 0]}},
+                         }
+                     }
+                 },
+                 {$unset: "_id"},
+                 {$sort: {time: 1}},
+             ])
+             .toArray();
+assert.docEq(result, [
+    {time: 0, y: 10, dy: null},
+    {time: 10, y: 12, dy: (12 - 10) / (10 - 0)},
+    {time: 11, y: 15, dy: (15 - 12) / (11 - 10)},
+    {time: 12, y: 19, dy: (19 - 12) / (12 - 10)},
+    {time: 13, y: 24, dy: (24 - 12) / (13 - 10)},
+    {time: 20, y: 30, dy: (30 - 12) / (20 - 10)},
+]);
+
 // 'outputUnit' only supports 'week' and smaller.
 coll.drop();
 function explainUnit(outputUnit) {
@@ -254,5 +286,40 @@ assert.sameMembers(result, [
     {time: ISODate("2020-01-01T00:01:00.000Z"), y: 4, dy: -1 / (60 * 1000)},
     {time: ISODate("2020-01-01T00:02:00.000Z"), y: 6, dy: +2 / (60 * 1000)},
     {time: ISODate("2020-01-01T00:03:00.000Z"), y: 5, dy: -1 / (60 * 1000)},
+]);
+
+// Example with time-based bounds.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {time: ISODate("2020-01-01T00:00:00"), y: 10},
+    {time: ISODate("2020-01-01T00:00:10"), y: 12},
+    {time: ISODate("2020-01-01T00:00:11"), y: 15},
+    {time: ISODate("2020-01-01T00:00:12"), y: 19},
+    {time: ISODate("2020-01-01T00:00:13"), y: 24},
+    {time: ISODate("2020-01-01T00:00:20"), y: 30},
+]));
+result = coll.aggregate([
+                 {
+                     $setWindowFields: {
+                         sortBy: {time: 1},
+                         output: {
+                             dy: {
+                                 $derivative: {input: "$y", outputUnit: 'second'},
+                                 window: {range: [-10, 0], unit: 'second'}
+                             },
+                         }
+                     }
+                 },
+                 {$unset: "_id"},
+                 {$sort: {time: 1}},
+             ])
+             .toArray();
+assert.docEq(result, [
+    {time: ISODate("2020-01-01T00:00:00.00Z"), y: 10, dy: null},
+    {time: ISODate("2020-01-01T00:00:10.00Z"), y: 12, dy: (12 - 10) / (10 - 0)},
+    {time: ISODate("2020-01-01T00:00:11.00Z"), y: 15, dy: (15 - 12) / (11 - 10)},
+    {time: ISODate("2020-01-01T00:00:12.00Z"), y: 19, dy: (19 - 12) / (12 - 10)},
+    {time: ISODate("2020-01-01T00:00:13.00Z"), y: 24, dy: (24 - 12) / (13 - 10)},
+    {time: ISODate("2020-01-01T00:00:20.00Z"), y: 30, dy: (30 - 12) / (20 - 10)},
 ]);
 })();

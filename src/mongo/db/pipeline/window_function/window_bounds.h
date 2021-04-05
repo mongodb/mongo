@@ -75,19 +75,12 @@ struct WindowBounds {
         Bound<int> upper;
     };
     struct RangeBased {
-        // Range-based bounds can be any numeric type: int, double, Decimal, etc.
         Bound<Value> lower;
         Bound<Value> upper;
-    };
-    struct TimeBased {
-        // Although time-based bounds look similar to range-based, they are more restricted:
-        // the numbers must be integers, like $dateAdd / $dateDiff.
-        Bound<int> lower;
-        Bound<int> upper;
-        TimeUnit unit;
+        boost::optional<TimeUnit> unit;
     };
 
-    stdx::variant<DocumentBased, RangeBased, TimeBased> bounds;
+    stdx::variant<DocumentBased, RangeBased> bounds;
 
     static WindowBounds defaultBounds() {
         return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};

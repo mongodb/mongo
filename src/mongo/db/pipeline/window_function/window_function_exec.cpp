@@ -74,6 +74,7 @@ std::unique_ptr<WindowFunctionExec> translateDerivative(
         iter, deriv.input(), sortExpr, deriv.bounds(), deriv.outputUnit());
 }
 
+
 }  // namespace
 
 std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
@@ -106,7 +107,6 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
                         part.fieldPath != boost::none && !part.expression);
                 auto sortByExpr = ExpressionFieldPath::createPathFromString(
                     expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
-
                 if (stdx::holds_alternative<WindowBounds::Unbounded>(rangeBounds.lower)) {
                     return std::make_unique<WindowFunctionExecNonRemovableRange>(
                         iter,
@@ -123,9 +123,7 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
                         bounds);
                 }
             },
-            [&](const WindowBounds::TimeBased& timeBounds) -> std::unique_ptr<WindowFunctionExec> {
-                uasserted(5397902, "Time based windows are not currently supported");
-            }},
+        },
         bounds.bounds);
 }
 

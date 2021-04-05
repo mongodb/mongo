@@ -183,17 +183,18 @@ WindowBounds WindowBounds::parse(BSONObj args,
                     str::stream() << "'" << kArgUnit << "' must be a string",
                     unit.type() == BSONType::String);
 
-            auto parseInt = [](Value v) -> int {
+            auto parseInt = [](Value v) -> Value {
                 uassert(ErrorCodes::FailedToParse,
                         str::stream()
                             << "With '" << kArgUnit << "', range-based bounds must be an integer",
                         v.integral());
-                return v.coerceToInt();
+                return v;
             };
-            auto lower = parseBound<int>(expCtx, lowerElem, parseInt);
-            auto upper = parseBound<int>(expCtx, upperElem, parseInt);
+            // Syntactically, time-based bounds can't be fractional. So parse as int.
+            auto lower = parseBound<Value>(expCtx, lowerElem, parseInt);
+            auto upper = parseBound<Value>(expCtx, upperElem, parseInt);
             checkBoundsForward(lower, upper);
-            bounds = WindowBounds{TimeBased{lower, upper, parseTimeUnit(unit.str())}};
+            bounds = WindowBounds{RangeBased{lower, upper, parseTimeUnit(unit.str())}};
         } else {
             // Parse range-based bounds.
             uassert(ErrorCodes::FailedToParse,
@@ -231,13 +232,9 @@ void WindowBounds::serialize(MutableDocument& args) const {
                     serializeBound(rangeBounds.lower),
                     serializeBound(rangeBounds.upper),
                 }};
-            },
-            [&](const TimeBased& timeBounds) {
-                args[kArgRange] = Value{std::vector<Value>{
-                    serializeBound(timeBounds.lower),
-                    serializeBound(timeBounds.upper),
-                }};
-                args[kArgUnit] = Value{serializeTimeUnit(timeBounds.unit)};
+                if (rangeBounds.unit) {
+                    args[kArgUnit] = Value{serializeTimeUnit(*rangeBounds.unit)};
+                }
             },
         },
         bounds);

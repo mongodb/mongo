@@ -225,9 +225,10 @@ private:
 
     // Internal helpers for 'getEndpoints()'.
     boost::optional<std::pair<int, int>> getEndpointsRangeBased(
-        const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
+        const WindowBounds::RangeBased& bounds, const boost::optional<std::pair<int, int>>& hint);
     boost::optional<std::pair<int, int>> getEndpointsDocumentBased(
-        const WindowBounds& bounds, const boost::optional<std::pair<int, int>>& hint);
+        const WindowBounds::DocumentBased& bounds,
+        const boost::optional<std::pair<int, int>>& hint);
 
     ExpressionContext* _expCtx;
     DocumentSource* _source;

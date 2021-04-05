@@ -223,27 +223,51 @@ Value decimalAdd(const Value& left, const Value& right) {
     // user can't observe the type.
     return Value(left.coerceToDecimal().add(right.coerceToDecimal()));
 }
+
+
 }  // namespace
 
 optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
-    const WindowBounds& bounds, const optional<std::pair<int, int>>& hint) {
+    const WindowBounds::RangeBased& range, const optional<std::pair<int, int>>& hint) {
+
     tassert(5429404, "Missing _sortExpr with range-based bounds", _sortExpr != boost::none);
-    // TODO SERVER-54295: time-based bounds
-    uassert(5429402,
-            "Time-based bounds not supported yet",
-            stdx::holds_alternative<WindowBounds::RangeBased>(bounds.bounds));
-    auto range = stdx::get<WindowBounds::RangeBased>(bounds.bounds);
 
     auto lessThan = _expCtx->getValueComparator().getLessThan();
 
     Value base = (*_sortExpr)->evaluate(*(*this)[0], &_expCtx->variables);
-    uassert(5429413,
+    if (range.unit) {
+        uassert(
+            5429513,
+            str::stream() << "Invalid range: Expected the sortBy field to be a Date, but it was "
+                          << base.getType(),
+            base.getType() == BSONType::Date);
+    } else {
+        uassert(
+            5429413,
             "Invalid range: For windows that involve date or time ranges, a unit must be provided.",
             base.getType() != BSONType::Date);
-    uassert(5429414,
+        uassert(
+            5429414,
             str::stream() << "Invalid range: Expected the sortBy field to be a number, but it was "
                           << base.getType(),
             base.numeric());
+    }
+    auto add = [&](const Value& base, const Value& delta) -> Value {
+        if (range.unit) {
+            return Value{
+                dateAdd(base.coerceToDate(), *range.unit, delta.coerceToInt(), TimeZone())};
+        } else {
+            tassert(5429406, "Range-based bounds are specified as a number", delta.numeric());
+            return decimalAdd(base, delta);
+        }
+    };
+    auto hasExpectedType = [&](const Value& v) -> bool {
+        if (range.unit) {
+            return v.getType() == BSONType::Date;
+        } else {
+            return v.numeric();
+        }
+    };
 
     // 'lower' is the smallest offset in the partition that's within the lower bound of the window.
     optional<int> lower = stdx::visit(
@@ -269,13 +293,13 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                         return boost::none;
                     }
                     Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (v.numeric()) {
+                    if (hasExpectedType(v)) {
                         return i;
                     }
                 }
             },
             [&](const Value& delta) -> optional<int> {
-                Value threshold = decimalAdd(base, delta);
+                Value threshold = add(base, delta);
 
                 // Start from the beginning, or the hint, whichever is higher.
                 // Note that the hint may no longer be a valid offset, if some documents were
@@ -324,7 +348,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
                 boost::optional<Document> doc;
                 for (int i = start; (doc = (*this)[i]); ++i) {
                     Value v = (*_sortExpr)->evaluate(*doc, &_expCtx->variables);
-                    if (!v.numeric()) {
+                    if (!hasExpectedType(v)) {
                         // The previously scanned doc is the rightmost numeric one. Since we start
                         // from '0', 'hint', or 'lower', which are all numeric, we should never hit
                         // this case on the first iteration.
@@ -339,8 +363,7 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
             },
             [&](const Value& delta) -> optional<int> {
                 // Pull in documents until the sortBy value crosses 'base + delta'.
-                tassert(5429406, "Range-based bounds are specified as a number", delta.numeric());
-                Value threshold = decimalAdd(base, delta);
+                Value threshold = add(base, delta);
 
                 // If there's no hint, start scanning from the lower bound.
                 // If there is a hint, start from whichever is greater: lower bound or hint.
@@ -385,9 +408,8 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsRangeBased(
 }
 
 optional<std::pair<int, int>> PartitionIterator::getEndpointsDocumentBased(
-    const WindowBounds& bounds, const optional<std::pair<int, int>>& hint = boost::none) {
-    tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
-    auto docBounds = stdx::get<WindowBounds::DocumentBased>(bounds.bounds);
+    const WindowBounds::DocumentBased& docBounds,
+    const optional<std::pair<int, int>>& hint = boost::none) {
     optional<int> lowerBound = numericBound(docBounds.lower);
     optional<int> upperBound = numericBound(docBounds.upper);
     tassert(5423302,
@@ -430,10 +452,19 @@ optional<std::pair<int, int>> PartitionIterator::getEndpointsDocumentBased(
 
 optional<std::pair<int, int>> PartitionIterator::getEndpoints(
     const WindowBounds& bounds, const optional<std::pair<int, int>>& hint = boost::none) {
-    if (!stdx::holds_alternative<WindowBounds::DocumentBased>(bounds.bounds)) {
-        return getEndpointsRangeBased(bounds, hint);
-    }
-    return getEndpointsDocumentBased(bounds, hint);
+
+    tassert(5423301, "getEndpoints assumes there is a current document", (*this)[0] != boost::none);
+
+    return stdx::visit(
+        visit_helper::Overloaded{
+            [&](const WindowBounds::DocumentBased docBounds) {
+                return getEndpointsDocumentBased(docBounds, hint);
+            },
+            [&](const WindowBounds::RangeBased rangeBounds) {
+                return getEndpointsRangeBased(rangeBounds, hint);
+            },
+        },
+        bounds.bounds);
 }
 
 void PartitionIterator::getNextDocument() {

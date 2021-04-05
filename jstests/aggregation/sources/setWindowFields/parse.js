@@ -19,8 +19,6 @@ if (!featureEnabled) {
 const coll = db.setWindowFields_parse;
 coll.drop();
 
-assert.commandWorked(coll.insert({ts: 0}));
-
 function run(stage, extraCommandArgs = {}) {
     return coll.runCommand(
         Object.merge({aggregate: coll.getName(), pipeline: [stage], cursor: {}}, extraCommandArgs));
@@ -87,15 +85,15 @@ assert.commandWorked(
     runWindowFunction({$sum: "$a", window: {range: [NumberDecimal('1.42'), NumberLong(5)]}}));
 
 // Time-based bounds:
-assert.commandFailedWithCode(
-    runWindowFunction({"$sum": "$a", window: {range: [-3, 'unbounded'], unit: 'hour'}}), 5397902);
+assert.commandWorked(
+    runWindowFunction({"$sum": "$a", window: {range: [-3, 'unbounded'], unit: 'hour'}}));
 
 // Numeric bounds can be a constant expression:
 let expr = {$add: [2, 2]};
 assert.commandWorked(runWindowFunction({"$sum": "$a", window: {documents: [expr, expr]}}));
 assert.commandWorked(runWindowFunction({"$sum": "$a", window: {range: [expr, expr]}}));
-assert.commandFailedWithCode(
-    runWindowFunction({"$sum": "$a", window: {range: [expr, expr], unit: 'hour'}}), 5397902);
+assert.commandWorked(
+    runWindowFunction({"$sum": "$a", window: {range: [expr, expr], unit: 'hour'}}));
 // But 'current' and 'unbounded' are not expressions: they're more like keywords.
 assert.commandFailedWithCode(
     runWindowFunction({"$sum": "$a", window: {documents: [{$const: 'current'}, 3]}}),

@@ -205,15 +205,13 @@ coll.insert([
     {x: ''},
     {x: {}},
 ]);
-assert.throws(() => {
-    run([range(+999, +999)]);
-}, [], 'Invalid range: Expected the sortBy field to be a number');
-assert.throws(() => {
-    run([range(-999, +999)]);
-}, [], 'Invalid range: Expected the sortBy field to be a number');
-assert.throws(() => {
-    run([range('unbounded', 'unbounded')]);
-}, [], 'Invalid range: Expected the sortBy field to be a number');
+let error;
+error = assert.throws(() => run([range(+999, +999)]));
+assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
+error = assert.throws(() => run([range(-999, +999)]));
+assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
+error = assert.throws(() => run([range('unbounded', 'unbounded')]));
+assert.includes(error.message, 'Invalid range: Expected the sortBy field to be a number');
 
 // Another case, involving ties and expiration.
 coll.drop();
