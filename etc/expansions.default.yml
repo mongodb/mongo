@@ -1,0 +1,39 @@
+# All expansions in this file must be strings.
+# Additionally, we assume that bools are "true" and "false", not "True" and
+# "False" (note leading case) throughout the codebase.
+# Always wrap the following words in quotes: "true", "false", "null"
+report_file: src/report.json
+archive_file: src/archive.json
+decompress: tar xzvf
+private_key_file: /dev/null
+aws_profile_remote: default
+resmoke_jobs_factor: "1"
+resmoke_jobs_max: "0"
+timeout_secs: "0"
+exec_timeout_secs: "0"
+python: /opt/mongodbtoolchain/v3/bin/python3
+multiversion_edition: base
+multiversion_platform: linux_x86_64
+multiversion_architecture: x86_64
+disable_unit_tests: "false"
+skip_tests: /dev/null
+resmoke_jobs: "1"
+should_shuffle: "true"
+continue_on_failure: "true"
+install_dir: dist-test/bin
+is_patch: "false"
+install_directory: /data/mongo-install-directory
+task_install_action: hardlink
+num_scons_link_jobs_available: "0.25"
+show_scons_timings: "true"
+compiling_for_test: "false"
+scons_cache_mode: nolinked
+is_commit_queue: "false"
+use_scons_cache: "false"
+npm_command: jstestfuzz
+connection_attempts: "25"
+tar: tar
+cmake_path: /opt/cmake/bin/cmake
+content_type: application/x-gzip
+jstestfuzz_concurrent_num_files: "10"
+curator_release: "latest"

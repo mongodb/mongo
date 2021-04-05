@@ -11,6 +11,7 @@ import json
 import os
 import re
 import sys
+import shlex
 import yaml
 
 VERSION_JSON = "version.json"
@@ -94,8 +95,8 @@ def generate_scons_cache_expansions():
                 scons_cache_mode = "nolinked"
 
             if os.getenv("USE_SCONS_CACHE") not in (None, False, "false", ""):
-                expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(
-                    scons_cache_mode, default_cache_path)
+                expansions["scons_cache_args"] = "--cache={0} --cache-dir={1}".format(
+                    scons_cache_mode, shlex.quote(default_cache_path))
     return expansions
 
 
