@@ -64,10 +64,10 @@ server_parameters:
     cpp_varname: gRequireApiVersion
     default: false
 
-  acceptAPIVersion2:
+  acceptApiVersion2:
     description: "Allow users to issue commands that include apiVersion: \"2\". Test only."
     test_only: true
     set_at: startup
     cpp_vartype: bool
-    cpp_varname: acceptAPIVersion2
+    cpp_varname: acceptApiVersion2
     default: false
