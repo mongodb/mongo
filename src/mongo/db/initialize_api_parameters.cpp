@@ -59,7 +59,7 @@ const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody
     if (apiParamsFromClient.getApiVersion()) {
         auto apiVersionFromClient = apiParamsFromClient.getApiVersion().value();
         if (apiVersionFromClient == "2") {
-            uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", acceptAPIVersion2);
+            uassert(ErrorCodes::APIVersionError, "Cannot accept API version 2", acceptApiVersion2);
         } else {
             uassert(ErrorCodes::APIVersionError,
                     "API version must be \"1\"",
