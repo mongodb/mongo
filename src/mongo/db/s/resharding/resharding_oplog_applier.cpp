@@ -155,8 +155,6 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToke
             return _applyBatch(applyBatchOpCtx.get(), true /* isForSessionApplication */);
         })
         .then([this] {
-            _env->metrics()->onOplogEntriesApplied(_currentBatchToApply.size());
-
             if (_currentBatchToApply.empty()) {
                 // It is possible that there are no more oplog entries from the last point we
                 // resumed from.
@@ -343,11 +341,19 @@ Timestamp ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationCont
 
     PersistentTaskStore<ReshardingOplogApplierProgress> store(
         NamespaceString::kReshardingApplierProgressNamespace);
+
+    BSONObjBuilder builder;
+    builder.append("$set",
+                   BSON(ReshardingOplogApplierProgress::kProgressFieldName << oplogId.toBSON()));
+    builder.append("$inc",
+                   BSON(ReshardingOplogApplierProgress::kNumEntriesAppliedFieldName
+                        << static_cast<long long>(_currentBatchToApply.size())));
+
     store.upsert(
         opCtx,
         QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
-        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
-                            << oplogId.toBSON())));
+        builder.obj());
+    _env->metrics()->onOplogEntriesApplied(_currentBatchToApply.size());
 
     _currentBatchToApply.clear();
     _currentDerivedOps.clear();

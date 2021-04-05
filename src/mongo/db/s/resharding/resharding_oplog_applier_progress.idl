@@ -54,3 +54,8 @@ structs:
                 description: >-
                     The minimum point where the resharding oplog applier can start without missing
                     any oplog it needs to process.
+            numEntriesApplied:
+                type: long
+                description: >-
+                    The total number of oplog entries that have been applied by this
+                    ReshardingOplogApplier.

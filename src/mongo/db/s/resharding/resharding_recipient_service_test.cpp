@@ -632,13 +632,19 @@ TEST_F(ReshardingRecipientServiceTest, FindApplierIdToResumeFrom) {
 
 
     DBDirectClient client(opCtx);
-    client.update(
-        NamespaceString::kReshardingApplierProgressNamespace.ns(),
-        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId0.toBSON()),
-        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
-                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp1))),
-        true /* upsert */,
-        false /* multi */);
+    auto updateApplierProgress = [&client](auto sourceId, auto clusterTime, auto ts) {
+        client.update(
+            NamespaceString::kReshardingApplierProgressNamespace.ns(),
+            QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId.toBSON()),
+            BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                                << BSON("clusterTime" << clusterTime << "ts" << ts)
+                                << ReshardingOplogApplierProgress::kNumEntriesAppliedFieldName
+                                << 1LL)), /* not used for this test */
+            true /* upsert */,
+            false /* multi */);
+    };
+
+    updateApplierProgress(sourceId0, timestamp3, timestamp1);
 
     // SourceId0 resumes from the progress field but sourceId1 still uses FetchTimestamp.
     ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
@@ -646,14 +652,7 @@ TEST_F(ReshardingRecipientServiceTest, FindApplierIdToResumeFrom) {
     ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
             ReshardingDonorOplogId{timestamp0, timestamp0}));
 
-
-    client.update(
-        NamespaceString::kReshardingApplierProgressNamespace.ns(),
-        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId1.toBSON()),
-        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
-                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp1))),
-        true /* upsert */,
-        false /* multi */);
+    updateApplierProgress(sourceId1, timestamp3, timestamp1);
 
     // Both resume from the progress field.
     ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
@@ -661,21 +660,8 @@ TEST_F(ReshardingRecipientServiceTest, FindApplierIdToResumeFrom) {
     ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId1, timestamp0) ==
             ReshardingDonorOplogId{timestamp3, timestamp1}));
 
-
-    client.update(
-        NamespaceString::kReshardingApplierProgressNamespace.ns(),
-        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId0.toBSON()),
-        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
-                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp3))),
-        true /* upsert */,
-        false /* multi */);
-    client.update(
-        NamespaceString::kReshardingApplierProgressNamespace.ns(),
-        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << sourceId1.toBSON()),
-        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
-                            << BSON("clusterTime" << timestamp3 << "ts" << timestamp2))),
-        true /* upsert */,
-        false /* multi */);
+    updateApplierProgress(sourceId0, timestamp3, timestamp3);
+    updateApplierProgress(sourceId1, timestamp3, timestamp2);
 
     // Resume from the updated progress value.
     ASSERT((resharding::getApplierIdToResumeFrom(opCtx, sourceId0, timestamp0) ==
