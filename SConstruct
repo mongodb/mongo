@@ -2499,13 +2499,21 @@ if env.TargetOSIs('posix'):
     if not "tbaa" in selected_experimental_optimizations:
         env.Append(CCFLAGS=["-fno-strict-aliasing"])
 
-    # The hidden visibility requires that we have libunwind in play.
-    if "vishidden" in selected_experimental_optimizations and use_libunwind:
+    # Enabling hidden visibility on non-darwin requires that we have
+    # libunwind in play, since glibc backtrace will not work
+    # correctly.
+    if "vishidden" in selected_experimental_optimizations and (env.TargetOSIs('darwin') or use_libunwind):
         if link_model.startswith('dynamic'):
             # In dynamic mode, we can't make the default visibility
             # hidden because not all libraries have export tags. But
             # we can at least make inlines hidden.
-            env.Append(CXXFLAGS=["-fvisibility-inlines-hidden"])
+            #
+            # TODO: Except on macOS, where we observe lots of crashes
+            # when we enable this. We should investigate further but
+            # it isn't relevant for the purpose of exploring these
+            # flags on linux, where they seem to work fine.
+            if not env.TargetOSIs('darwin'):
+                env.Append(CXXFLAGS=["-fvisibility-inlines-hidden"])
         else:
             # In static mode, we need an escape hatch for a few
             # libraries that don't work correctly when built with
