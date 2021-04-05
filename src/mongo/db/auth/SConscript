@@ -165,8 +165,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/ssl_types',
         'address_restriction',
         'auth',
-        'auth_types',
-        'auth_umc',
         'authorization_manager_global',
         'authprivilege',
         'builtin_roles',
@@ -180,6 +178,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',
+        'auth_types',
+        'auth_umc',
     ],
 )
 
@@ -220,13 +220,11 @@ env.Library(
         'privilege_parser.cpp',
         'resource_pattern.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
@@ -249,17 +247,15 @@ env.Library(
         'impersonation_session.cpp',
         'user_management_commands_parser.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
         'address_restriction',
         'auth',
         'authprivilege',
     ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
-    ]
 )
 
 env.Library(
