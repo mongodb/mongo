@@ -404,6 +404,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, CanceledCloningBatch) {
@@ -552,6 +553,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(20, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
@@ -653,6 +655,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
@@ -743,6 +746,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
@@ -842,6 +846,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
@@ -897,6 +902,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
@@ -969,6 +975,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
@@ -1058,6 +1065,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
@@ -1147,6 +1155,689 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingApplicationRules) {
+    // This case tests applying rule #2 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 3),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 4),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 4));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 4), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       InsertOpShouldTurnIntoReplacementUpdateOnOutputCollectionUseReshardingApplicationRules) {
+    // This case tests applying rule #3 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Make sure a doc with {_id: 1} exists in the output collection before applying an insert with
+    // the same _id. This donor shard owns these docs under the original shard key (it owns the
+    // range {sk: 0} -> {sk: maxKey}).
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << 1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // We should have replaced the existing doc in the output collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(1, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       InsertOpShouldWriteToStashCollectionUseReshardingApplicationRules) {
+    // This case tests applying rules #1 and #4 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 3),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Make sure a doc with {_id: 1} exists in the output collection before applying inserts with
+    // the same _id. This donor shard does not own the doc {_id: 1, sk: -1} under the original shard
+    // key, so we should apply rule #4 and insert the doc into the stash collection.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
+    // sk: 2} should have been inserted into the stash collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, x: 1}. We should have applied rule
+    // #1 and turned the last insert op into a replacement update on the stash collection, so the
+    // doc {_id: 1, x: 3} should now exist in the stash collection.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 3), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollNonEmptyStashCollForThisDonorUseReshardingApplicationRules) {
+    // This case tests applying rule #1 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
+    // {_id: 1}. This will force the doc {_id: 1, sk: 1} to be inserted to the stash collection for
+    // this donor shard.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
+    // sk: 2} should have been inserted into the stash collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // We should have applied rule #1 and deleted the doc with {_id : 1} from the stash collection
+    // for this donor.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The output collection should remain unchanged.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollShouldDoNothingUseReshardingApplicationRules) {
+    // This case tests applying rules #2 and #3 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1 << "sk" << -1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 2),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
+    // donor shard before applying the deletes.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The doc {_id: 1, sk: -1} that exists in the output collection does not belong to this donor
+    // shard, so we should have applied rule #3 and done nothing and the doc should still be in the
+    // output collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // There does not exist a doc with {_id : 2} in the output collection, so we should have applied
+    // rule #2 and done nothing.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The doc with {_id: 1, sk: -1} should still exist.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollAllStashCollsEmptyUseReshardingApplicationRules) {
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 2),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Apply the inserts first so there exists docs in the output collection
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // None of the stash collections have docs with _id == [op _id], so we should not have found any
+    // docs to insert into the output collection with either {_id : 1} or {_id : 2}.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
+
+    // Assert that the delete on the output collection was run in a transaction by looking in the
+    // oplog for an applyOps entry with a "d" op on 'appliedToNs'.
+    doc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         BSON("o.applyOps.0.op"
+                              << "d"
+                              << "o.applyOps.0.ns" << appliedToNs().ns()));
+    ASSERT(!doc.isEmpty());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollNonEmptyStashCollForOtherDonorUseReshardingApplicationRules) {
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kDelete,
+                                BSON("_id" << 1),
+                                boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Make sure a doc with {_id: 1} exists in the stash collection for the other donor shard. The
+    // stash collection for this donor shard is empty.
+    DBDirectClient client(operationContext());
+    client.insert(stashCollections()[1].toString(), BSON("_id" << 1 << "sk" << -3));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The output collection should now hold the doc {_id: 1, sk: 1}.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1), doc);
+
+    // The stash collection for this donor shard still should be empty.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The stash collection for the other donor shard should still hold the doc {_id: 1, sk: -3}.
+    doc = client.findOne(stashCollections()[1].toString(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -3), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // We should have applied rule #4 and deleted the doc that was in the output collection {_id: 1,
+    // sk: 1}, deleted the doc with the same _id {_id: 1, sk: -3} in the other donor shard's stash
+    // collection and inserted this doc into the output collection.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -3), doc);
+
+    // This donor shard's stash collection should remain empty.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The other donor shard's stash collection should now be empty.
+    doc = client.findOne(stashCollections()[1].toString(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+
+    // Assert that the delete on the output collection was run in a transaction by looking in the
+    // oplog for an applyOps entry with the following ops: ["d" op on 'appliedToNs', "d" on
+    // 'otherStashNs'. "i" on 'appliedToNs'].
+    doc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         BSON("o.applyOps.0.op"
+                              << "d"
+                              << "o.applyOps.0.ns" << appliedToNs().ns() << "o.applyOps.1.op"
+                              << "d"
+                              << "o.applyOps.1.ns" << stashCollections()[1].toString()
+                              << "o.applyOps.2.op"
+                              << "i"
+                              << "o.applyOps.2.ns" << appliedToNs().ns()));
+    ASSERT(!doc.isEmpty());
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateShouldModifyStashCollectionUseReshardingApplicationRules) {
+    // This case tests applying rule #1 described in
+    // ReshardingOplogApplicationRules::_applyUpdate_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
+    // {_id: 1}. This will force the doc {_id: 1, sk: 2} to be inserted to the stash collection for
+    // this donor shard.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
+    // sk: 2} should have been inserted into the stash collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // We should have applied rule #1 and updated the doc with {_id : 1} in the stash collection
+    // for this donor to now have the new field 'x'.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2 << "x" << 1), doc);
+
+    // The output collection should remain unchanged.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateShouldDoNothingUseReshardingApplicationRules) {
+    // This case tests applying rules #2 and #3 described in
+    // ReshardingOplogApplicationRules::_applyUpdate_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 2)),
+                                BSON("_id" << 2)));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 1 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(5, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
+    // donor shard before applying the updates.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
+
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    // The doc {_id: 1, sk: -1} that exists in the output collection does not belong to this donor
+    // shard, so we should have applied rule #3 and done nothing and the doc should still be in the
+    // output collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // There does not exist a doc with {_id : 2} in the output collection, so we should have applied
+    // rule #2 and done nothing.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The doc with {_id: 1, sk: -1} should still exist.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
+}
+
+TEST_F(ReshardingOplogApplierTest, UpdateOutputCollUseReshardingApplicationRules) {
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyUpdate_inlock.
+    std::deque<repl::OplogEntry> crudOps;
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 1 << "sk" << 1),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2 << "sk" << 2),
+                                boost::none));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 1)),
+                                BSON("_id" << 1)));
+    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                                repl::OpTypeEnum::kUpdate,
+                                BSON("$set" << BSON("x" << 2)),
+                                BSON("_id" << 2)));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
+    boost::optional<ReshardingOplogApplier> applier;
+    auto executor = makeTaskExecutorForApplier();
+    auto writerPool = repl::makeReplWriterPool(kWriterPoolSize);
+    applier.emplace(makeApplierEnv(),
+                    sourceId(),
+                    oplogNs(),
+                    crudNs(),
+                    crudUUID(),
+                    stashCollections(),
+                    0U, /* myStashIdx */
+                    Timestamp(6, 3),
+                    std::move(iterator),
+                    chunkManager(),
+                    executor,
+                    writerPool.get());
+
+    // Apply the inserts first so there exists docs in the output collection.
+    auto cancelToken = operationContext()->getCancellationToken();
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2), doc);
+
+    future = applier->applyUntilDone(cancelToken);
+    future.get();
+
+    // We should have updated both docs in the output collection to include the new field "x".
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1 << "x" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2 << "x" << 2), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseReshardingApplicationRules) {
@@ -1201,6 +1892,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getTs());
+    ASSERT_EQ(1, progressDoc->getNumEntriesApplied());
 }
 
 TEST_F(ReshardingOplogApplierTest,
@@ -2928,8 +3620,15 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     applier.applyUntilCloneFinishedTs(cancelToken).get();  // Stop at clone timestamp 7
     ASSERT_EQ(metricsAppliedCount(),
               4);  // Applied timestamps {5,6,7}, and {8} drafts in on the batch.
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
+
     applier.applyUntilDone(cancelToken).get();
     ASSERT_EQ(metricsAppliedCount(), 5);  // Now includes timestamp {9}
+    progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(5, progressDoc->getNumEntriesApplied());
 }
 
 }  // unnamed namespace
