@@ -495,6 +495,7 @@ env.CppUnitTest(
         'resharding/resharding_metrics_test.cpp',
         'resharding/resharding_oplog_applier_test.cpp',
         'resharding/resharding_oplog_batch_preparer_test.cpp',
+        'resharding/resharding_oplog_crud_application_test.cpp',
         'resharding/resharding_oplog_fetcher_test.cpp',
         'resharding/resharding_oplog_session_application_test.cpp',
         'resharding/resharding_recipient_service_test.cpp',
