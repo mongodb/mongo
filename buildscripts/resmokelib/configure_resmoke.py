@@ -49,8 +49,12 @@ def _validate_options(parser, args):
 
     if args.run_all_feature_flag_tests:
         if not os.path.isfile(ALL_FEATURE_FLAG_FILE):
-            parser.error("To run tests with disabled feature flags, the %s file must exist" %
-                         ALL_FEATURE_FLAG_FILE)
+            parser.error(
+                "To run tests with all feature flags, the %s file must exist and be placed in"
+                " your working directory. The file can be downloaded from the artifacts tarball"
+                " in Evergreen. Alternatively, if you know which feature flags you want to enable,"
+                " you can use the --additionalFeatureFlags command line argument" %
+                ALL_FEATURE_FLAG_FILE)
 
     def get_set_param_errors(process_params):
         agg_set_params = collections.defaultdict(list)
