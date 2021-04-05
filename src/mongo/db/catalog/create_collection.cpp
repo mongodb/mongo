@@ -168,7 +168,8 @@ Status _createTimeseries(OperationContext* opCtx,
                     bsonType: 'object',
                     required: ['%s'],
                     properties: {'%s': {bsonType: 'date'}}
-                }
+                },
+                closed: {bsonType: 'bool'}
             }
         },
         data: {bsonType: 'object'},

@@ -52,8 +52,7 @@ assert.eq(buckets[0].control.min[timeFieldName], times[0]);
 assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 
 let modified = buckets[0];
-// This corrupts the bucket, but it's fine here.
-modified.control.max[timeFieldName] = times[1];
+modified.control.closed = true;
 let updateResult = assert.commandWorked(bucketsColl.update({_id: buckets[0]._id}, modified));
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
@@ -61,7 +60,8 @@ assert.eq(updateResult.nModified, 1);
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
 assert.eq(buckets[0].control.min[timeFieldName], times[0]);
-assert.eq(buckets[0].control.max[timeFieldName], times[1]);
+assert.eq(buckets[0].control.max[timeFieldName], times[0]);
+assert(buckets[0].control.closed);
 
 assert.commandWorked(coll.insert(docs[1]));
 assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 2));
@@ -80,8 +80,7 @@ let awaitInsert = startParallelShell(
 fpInsert.wait();
 
 modified = buckets[1];
-// This corrupts the bucket, but it's fine here.
-modified.control.max[timeFieldName] = times[2];
+modified.control.closed = true;
 updateResult = assert.commandWorked(bucketsColl.update({_id: buckets[1]._id}, modified));
 assert.eq(updateResult.nMatched, 1);
 assert.eq(updateResult.nModified, 1);
@@ -94,7 +93,8 @@ assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 3));
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 3);
 assert.eq(buckets[1].control.min[timeFieldName], times[1]);
-assert.eq(buckets[1].control.max[timeFieldName], times[2]);
+assert.eq(buckets[1].control.max[timeFieldName], times[1]);
+assert(buckets[1].control.closed);
 assert.eq(buckets[2].control.min[timeFieldName], times[2]);
 assert.eq(buckets[2].control.max[timeFieldName], times[2]);
 
