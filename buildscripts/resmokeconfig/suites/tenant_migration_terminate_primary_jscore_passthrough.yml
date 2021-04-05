@@ -207,6 +207,7 @@ selector:
 
 executor:
   archive:
+    tests: true
     hooks:
       - CheckReplDBHash
       - CheckReplOplogs
