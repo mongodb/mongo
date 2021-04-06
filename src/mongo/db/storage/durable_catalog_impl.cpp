@@ -415,6 +415,7 @@ std::string DurableCatalogImpl::_newRand() {
 }
 
 bool DurableCatalogImpl::_hasEntryCollidingWithRand(WithLock) const {
+    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     for (auto it = _catalogIdToEntryMap.begin(); it != _catalogIdToEntryMap.end(); ++it) {
         if (StringData(it->second.ident).endsWith(_rand))
             return true;
