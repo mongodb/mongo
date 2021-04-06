@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
@@ -103,7 +104,8 @@ public:
      * greater than or equal to reshardingCloneFinishedTs.
      * It is undefined to call applyUntilCloneFinishedTs more than once.
      */
-    ExecutorFuture<void> applyUntilCloneFinishedTs(CancellationToken cancelToken);
+    ExecutorFuture<void> applyUntilCloneFinishedTs(CancellationToken cancelToken,
+                                                   CancelableOperationContextFactory factory);
 
     /**
      * Applies oplog from the iterator until it is exhausted or hits an error. It is an error to
@@ -112,7 +114,8 @@ public:
      * It is an error to call this when applyUntilCloneFinishedTs future returns an error.
      * It is undefined to call applyUntilDone more than once.
      */
-    ExecutorFuture<void> applyUntilDone(CancellationToken cancelToken);
+    ExecutorFuture<void> applyUntilDone(CancellationToken cancelToken,
+                                        CancelableOperationContextFactory factory);
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
         OperationContext* opCtx, const ReshardingSourceId& id);
@@ -131,18 +134,22 @@ private:
      * Returns a future that becomes ready when the next batch of oplog entries have been collected
      * and applied.
      */
-    ExecutorFuture<void> _scheduleNextBatch(CancellationToken cancelToken);
+    ExecutorFuture<void> _scheduleNextBatch(CancellationToken cancelToken,
+                                            CancelableOperationContextFactory factory);
 
     /**
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all
      * worker threads to finish (even when some of them finished early due to an error).
      */
-    Future<void> _applyBatch(OperationContext* opCtx, bool isForSessionApplication);
+    Future<void> _applyBatch(OperationContext* opCtx,
+                             bool isForSessionApplication,
+                             CancelableOperationContextFactory factory);
 
     /**
      * Apply a slice of oplog entries from the current batch for a worker thread.
      */
-    Status _applyOplogBatchPerWorker(std::vector<const repl::OplogEntry*>* ops);
+    Status _applyOplogBatchPerWorker(std::vector<const repl::OplogEntry*>* ops,
+                                     CancelableOperationContextFactory factory);
 
     /**
      * Apply the oplog entries.

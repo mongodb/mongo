@@ -70,12 +70,6 @@ ServiceContext::UniqueClient makeKillableClient(ServiceContext* serviceContext, 
     return client;
 }
 
-ServiceContext::UniqueOperationContext makeInterruptibleOperationContext() {
-    auto opCtx = cc().makeOperationContext();
-    opCtx->setAlwaysInterruptAtStepDownOrUp();
-    return opCtx;
-}
-
 }  // anonymous namespace
 
 ReshardingOplogApplier::ReshardingOplogApplier(
@@ -107,29 +101,31 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _oplogIter(std::move(oplogIterator)) {}
 
 ExecutorFuture<void> ReshardingOplogApplier::applyUntilCloneFinishedTs(
-    CancellationToken cancelToken) {
+    CancellationToken cancelToken, CancelableOperationContextFactory factory) {
     invariant(_stage == ReshardingOplogApplier::Stage::kStarted);
 
     // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
     // collectively guarantee that the ReshardingOplogApplier instances will outlive `_executor` and
     // `_writerPool`.
     return ExecutorFuture(_executor)
-        .then([this, cancelToken] { return _scheduleNextBatch(cancelToken); })
+        .then([this, cancelToken, factory] { return _scheduleNextBatch(cancelToken, factory); })
         .onError([this](Status status) { return _onError(status); });
 }
 
-ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone(CancellationToken cancelToken) {
+ExecutorFuture<void> ReshardingOplogApplier::applyUntilDone(
+    CancellationToken cancelToken, CancelableOperationContextFactory factory) {
     invariant(_stage == ReshardingOplogApplier::Stage::kReachedCloningTS);
 
     // It is safe to capture `this` because PrimaryOnlyService and RecipientStateMachine
     // collectively guarantee that the ReshardingOplogApplier instances will outlive `_executor` and
     // `_writerPool`.
     return ExecutorFuture(_executor)
-        .then([this, cancelToken] { return _scheduleNextBatch(cancelToken); })
+        .then([this, cancelToken, factory] { return _scheduleNextBatch(cancelToken, factory); })
         .onError([this](Status status) { return _onError(status); });
 }
 
-ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToken cancelToken) {
+ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(
+    CancellationToken cancelToken, CancelableOperationContextFactory factory) {
     return ExecutorFuture(_executor)
         .then([this, cancelToken] {
             auto batchClient = makeKillableClient(_service(), kClientName);
@@ -137,24 +133,24 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToke
 
             return _oplogIter->getNextBatch(_executor, cancelToken);
         })
-        .then([this](OplogBatch batch) {
+        .then([this, factory](OplogBatch batch) {
             LOGV2_DEBUG(5391002, 3, "Starting batch", "batchSize"_attr = batch.size());
             _currentBatchToApply = std::move(batch);
 
             auto applyBatchClient = makeKillableClient(_service(), kClientName);
             AlternativeClientRegion acr(applyBatchClient);
-            auto applyBatchOpCtx = makeInterruptibleOperationContext();
+            auto applyBatchOpCtx = factory.makeOperationContext(&cc());
 
-            return _applyBatch(applyBatchOpCtx.get(), false /* isForSessionApplication */);
+            return _applyBatch(applyBatchOpCtx.get(), false /* isForSessionApplication */, factory);
         })
-        .then([this] {
+        .then([this, factory] {
             auto applyBatchClient = makeKillableClient(_service(), kClientName);
             AlternativeClientRegion acr(applyBatchClient);
-            auto applyBatchOpCtx = makeInterruptibleOperationContext();
+            auto applyBatchOpCtx = factory.makeOperationContext(&cc());
 
-            return _applyBatch(applyBatchOpCtx.get(), true /* isForSessionApplication */);
+            return _applyBatch(applyBatchOpCtx.get(), true /* isForSessionApplication */, factory);
         })
-        .then([this] {
+        .then([this, factory] {
             if (_currentBatchToApply.empty()) {
                 // It is possible that there are no more oplog entries from the last point we
                 // resumed from.
@@ -170,7 +166,7 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToke
 
             auto scheduleBatchClient = makeKillableClient(_service(), kClientName);
             AlternativeClientRegion acr(scheduleBatchClient);
-            auto opCtx = makeInterruptibleOperationContext();
+            auto opCtx = factory.makeOperationContext(&cc());
 
             auto lastAppliedTs = _clearAppliedOpsAndStoreProgress(opCtx.get());
 
@@ -183,7 +179,7 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToke
 
             return true;
         })
-        .then([this, cancelToken](bool moreToApply) {
+        .then([this, cancelToken, factory](bool moreToApply) {
             if (!moreToApply) {
                 return ExecutorFuture(_executor);
             }
@@ -194,12 +190,13 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(CancellationToke
                     Status{ErrorCodes::CallbackCanceled,
                            "Resharding oplog applier aborting due to abort or stepdown"});
             }
-            return _scheduleNextBatch(cancelToken);
+            return _scheduleNextBatch(cancelToken, factory);
         });
 }
 
 Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx,
-                                                 bool isForSessionApplication) {
+                                                 bool isForSessionApplication,
+                                                 CancelableOperationContextFactory factory) {
     if (isForSessionApplication) {
         _currentWriterVectors = _batchPreparer.makeSessionOpWriterVectors(_currentBatchToApply);
     } else {
@@ -222,11 +219,11 @@ Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx,
             continue;
         }
 
-        _writerPool->schedule([this, &writer](auto scheduleStatus) {
+        _writerPool->schedule([this, &writer, factory](auto scheduleStatus) {
             if (!scheduleStatus.isOK()) {
                 _onWriterVectorDone(scheduleStatus);
             } else {
-                _onWriterVectorDone(_applyOplogBatchPerWorker(&writer));
+                _onWriterVectorDone(_applyOplogBatchPerWorker(&writer, factory));
             }
         });
     }
@@ -235,8 +232,8 @@ Future<void> ReshardingOplogApplier::_applyBatch(OperationContext* opCtx,
 }
 
 Status ReshardingOplogApplier::_applyOplogBatchPerWorker(
-    std::vector<const repl::OplogEntry*>* ops) {
-    auto opCtx = makeInterruptibleOperationContext();
+    std::vector<const repl::OplogEntry*>* ops, CancelableOperationContextFactory factory) {
+    auto opCtx = factory.makeOperationContext(&cc());
 
     for (const auto& op : *ops) {
         try {

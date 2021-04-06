@@ -233,10 +233,14 @@ private:
         CancelableOperationContextFactory opCtxFactory);
 
     std::vector<SharedSemiFuture<void>> _runOplogAppliersUntilConsistentButStale(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken);
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory opCtxFactory);
 
     std::vector<SharedSemiFuture<void>> _runOplogAppliersUntilStrictlyConsistent(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken);
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory opCtxFactory);
 
     // _collectionCloner is left as nullptr when make() is called with cloningDone=true.
     const std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;

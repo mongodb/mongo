@@ -46,7 +46,7 @@ CancelableOperationContext::CancelableOperationContext(ServiceContext::UniqueOpe
                               .then([sharedBlock = _sharedBlock, opCtx = _opCtx.get()] {
                                   if (!sharedBlock->done.swap(true)) {
                                       stdx::lock_guard<Client> lk(*opCtx->getClient());
-                                      opCtx->markKilled(ErrorCodes::CallbackCanceled);
+                                      opCtx->markKilled(ErrorCodes::Interrupted);
                                   }
                               })
                               .semi()} {}
