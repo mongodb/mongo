@@ -56,6 +56,34 @@ The following changes are permitted in V:
 - Any change in behaviors not in V.
 - Performance changes.
 
+
+### Enforcing Compatibility
+
+To ensure new commits don’t introduce breaking changes to the current API version, we’ve written a
+[compatibility checker script](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py).
+All commands in a stable API version must specify their inputs and outputs in IDL to be
+compatibility checked (the only exception is the `explain` command whose output is not part of API
+V1). As a side note, many command implementations derive from `TypedCommand`, which ensures
+that the implementation uses the IDL spec.
+
+The compatibility checker script compares IDL files from the new commit against both the base
+commit and all [releases](https://github.com/mongodb/mongo/blob/10439de079b03a981ead7f5566e6f539a6f9becd/buildscripts/idl/checkout_idl_files_from_past_releases.py)
+from 5.0.0 onwards. This compatibility checker script will run in evergreen patch builds
+and in the commit queue.
+
+### The BSON serialization `any` type
+
+The `bson_serialization_type` is used to define the BSON type that an IDL field will serialize to.
+In some cases, we need custom serializers defined in C++ to perform more complex logic,
+such as validating the given type or accepting multiple types for the field. If we use these custom
+serializers, we specify the `bson_serialization_type` to be `any`. However, the compatibility
+checker script can’t type check  `any` , since the main logic for the type exists outside of the
+IDL file. As many commands have valid reasons for using type `any`, we do not restrict usage.
+Instead, the command must be added to an [allowlist](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py#L52).
+This also applies to any `unstable` fields. This is to prevent unexpected errors when modifying
+a field from `unstable` to `stable`. By intentionally opting in, we assume the implementer
+understands the implications and has valid reasons to use `any`.
+
 ## Versioned API implementation
 
 All `Command` subclasses implement `apiVersions()`, which returns the set of API versions the
