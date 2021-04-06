@@ -313,8 +313,6 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     auto registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
 
     std::vector<std::unique_ptr<repl::PrimaryOnlyService>> services;
-    services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
-    services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
@@ -322,6 +320,10 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
+    } else {
+        // Tenant migrations are not supported in sharded clusters.
+        services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
+        services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
     }
 
     for (auto& service : services) {
@@ -1020,12 +1022,14 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
     } else {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+        // Tenant migrations are not supported in sharded clusters.
+        opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
+        opObserverRegistry->addObserver(
+            std::make_unique<repl::TenantMigrationRecipientOpObserver>());
     }
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
-    opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
-    opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationRecipientOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
