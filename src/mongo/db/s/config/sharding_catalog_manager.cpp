@@ -558,27 +558,53 @@ void ShardingCatalogManager::_removePre49LegacyMetadata(OperationContext* opCtx)
 void ShardingCatalogManager::upgradeMetadataFor49(OperationContext* opCtx) {
     LOGV2(5276704, "Starting metadata upgrade to 4.9");
 
-    _removePre49LegacyMetadata(opCtx);
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        _createDBTimestampsFor49(opCtx);
-        _upgradeCollectionsAndChunksMetadataFor49(opCtx);
+    try {
+        _removePre49LegacyMetadata(opCtx);
+    } catch (const DBException& e) {
+        LOGV2(5276708, "Failed to upgrade sharding metadata: {error}", "error"_attr = e.toString());
+        throw;
     }
 
     LOGV2(5276705, "Successfully upgraded metadata to 4.9");
 }
 
-void ShardingCatalogManager::downgradeMetadataToPre49(OperationContext* opCtx) {
-    LOGV2(5276706, "Starting metadata downgrade to pre 4.9");
+void ShardingCatalogManager::upgradeMetadataFor50(OperationContext* opCtx) {
+    LOGV2(5581200, "Starting metadata upgrade to 5.0");
 
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
-        _downgradeConfigDatabasesEntriesToPre49(opCtx);
-        _downgradeCollectionsAndChunksMetadataToPre49(opCtx);
+        try {
+            _createDBTimestampsFor50(opCtx);
+            _upgradeCollectionsAndChunksMetadataFor50(opCtx);
+        } catch (const DBException& e) {
+            LOGV2(5581201,
+                  "Failed to upgrade sharding metadata: {error}",
+                  "error"_attr = e.toString());
+            throw;
+        }
     }
 
-    LOGV2(5276707, "Successfully downgraded metadata to pre 4.9");
+    LOGV2(5581202, "Successfully upgraded metadata to 5.0");
 }
 
-void ShardingCatalogManager::_createDBTimestampsFor49(OperationContext* opCtx) {
+void ShardingCatalogManager::downgradeMetadataToPre50(OperationContext* opCtx) {
+    LOGV2(5581203, "Starting metadata downgrade to pre 5.0");
+
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
+        try {
+            _downgradeConfigDatabasesEntriesToPre50(opCtx);
+            _downgradeCollectionsAndChunksMetadataToPre50(opCtx);
+        } catch (const DBException& e) {
+            LOGV2(5581204,
+                  "Failed to downgrade sharding metadata: {error}",
+                  "error"_attr = e.toString());
+            throw;
+        }
+    }
+
+    LOGV2(5581205, "Successfully downgraded metadata to pre 5.0");
+}
+
+void ShardingCatalogManager::_createDBTimestampsFor50(OperationContext* opCtx) {
     LOGV2(5258802, "Starting upgrade of config.databases");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -633,7 +659,7 @@ void ShardingCatalogManager::_createDBTimestampsFor49(OperationContext* opCtx) {
     LOGV2(5258803, "Successfully upgraded config.databases");
 }
 
-void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
+void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre50(OperationContext* opCtx) {
     LOGV2(5258806, "Starting downgrade of config.databases");
 
     updateConfigDocumentDBDirect(
@@ -680,7 +706,7 @@ void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre49(OperationCo
     LOGV2(5258807, "Successfully downgraded config.databases");
 }
 
-void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(OperationContext* opCtx) {
+void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor50(OperationContext* opCtx) {
     LOGV2(5276700, "Starting upgrade of config.collections and config.chunks");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -807,7 +833,7 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor49(Operation
     LOGV2(5276701, "Successfully upgraded config.collections and config.chunks");
 }
 
-void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre49(
+void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre50(
     OperationContext* opCtx) {
     LOGV2(5276702, "Starting downgrade of config.collections and config.chunks");
 

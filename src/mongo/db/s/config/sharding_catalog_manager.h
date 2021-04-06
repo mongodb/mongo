@@ -412,12 +412,20 @@ public:
     void upgradeMetadataFor49(OperationContext* opCtx);
 
     /**
-     * Patches-up persistent metadata for downgrade from 4.9.
+     * Patches-up persistent metadata for 5.0.
      *
-     * It shall be called when downgrading from 4.9 to an earlier version.
+     * It shall be called when upgrading to 5.0 or newer versions.
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void downgradeMetadataToPre49(OperationContext* opCtx);
+    void upgradeMetadataFor50(OperationContext* opCtx);
+
+    /**
+     * Patches-up persistent metadata for downgrade from 5.0.
+     *
+     * It shall be called when downgrading from 5.0  to an earlier version.
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void downgradeMetadataToPre50(OperationContext* opCtx);
 
     //
     // For Diagnostics
@@ -538,13 +546,13 @@ private:
     /**
      * Removes all entries from the config server's config.collections where 'dropped' is true.
      *
-     * Before v5.0, when a collection was dropped, its entry in config.collections remained, tagged
+     * Before 4.9, when a collection was dropped, its entry in config.collections remained, tagged
      * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
      * metadata.
      *
      * It shall be called when upgrading to 4.9 or newer versions.
      *
-     * TODO SERVER-53283: Remove once 5.0 has been released.
+     * TODO SERVER-53283: Remove once 5.0 has becomes last-lts.
      */
     void _removePre49LegacyMetadata(OperationContext* opCtx);
 
@@ -552,17 +560,17 @@ private:
      * Creates a 'version.timestamp' for each one of the entries in the config server's
      * config.databases where it didn't already exist before.
      *
-     * TODO SERVER-53283: Remove once 5.0 has been released.
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _createDBTimestampsFor49(OperationContext* opCtx);
+    void _createDBTimestampsFor50(OperationContext* opCtx);
 
     /**
      * Downgrades the config.databases entries to prior 4.9 version. More specifically, it removes
      * the 'version.timestamp' field from all the documents in config.databases.
      *
-     * TODO SERVER-53283: Remove once 5.0 has been released.
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx);
+    void _downgradeConfigDatabasesEntriesToPre50(OperationContext* opCtx);
 
     /**
      * For each one of the entries in config.collections where there is no 'timestamp',
@@ -571,9 +579,9 @@ private:
      * a 'collectionUuid' field matching the uuid of the collection.
      * - Creates a 'timestamp' in its entry in config.collections.
      *
-     * TODO SERVER-53283: Remove once 5.0 has been released.
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _upgradeCollectionsAndChunksMetadataFor49(OperationContext* opCtx);
+    void _upgradeCollectionsAndChunksMetadataFor50(OperationContext* opCtx);
 
     /**
      * For each one of the entries in config.collections where there is a 'timestamp',
@@ -582,9 +590,9 @@ private:
      * unset the 'collectionUuid' field.
      * - Unsets the 'timestamp' in its entry in config.collections.
      *
-     * TODO SERVER-53283: Remove once 5.0 has been released.
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _downgradeCollectionsAndChunksMetadataToPre49(OperationContext* opCtx);
+    void _downgradeCollectionsAndChunksMetadataToPre50(OperationContext* opCtx);
 
     // The owning service context
     ServiceContext* const _serviceContext;
