@@ -145,7 +145,7 @@ public:
 }  // namespace
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
-    BSONObj initialState) const {
+    BSONObj initialState) {
     return std::make_shared<DonorStateMachine>(std::move(initialState),
                                                std::make_unique<ExternalStateImpl>());
 }

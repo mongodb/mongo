@@ -817,7 +817,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
 }  // namespace resharding
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
-    BSONObj initialState) const {
+    BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(this, std::move(initialState));
 }
 
