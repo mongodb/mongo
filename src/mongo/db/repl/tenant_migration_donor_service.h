@@ -63,8 +63,7 @@ public:
         return limits;
     }
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
-        BSONObj initialState) const override {
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<TenantMigrationDonorService::Instance>(
             _serviceContext, this, initialState);
     }
