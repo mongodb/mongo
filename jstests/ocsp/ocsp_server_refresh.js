@@ -1,12 +1,12 @@
 // Check that OCSP verification works
-// @tags: [requires_http_client]
+// @tags: [requires_http_client, requires_ocsp_stapling]
 
 load("jstests/ocsp/lib/mock_ocsp.js");
 
 (function() {
 "use strict";
 
-if (determineSSLProvider() != "openssl") {
+if (!supportsStapling()) {
     return;
 }
 
