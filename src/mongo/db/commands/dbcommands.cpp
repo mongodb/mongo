@@ -398,7 +398,7 @@ public:
                 return 1;
             }
             exec = InternalPlanner::collectionScan(
-                opCtx, ns, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;

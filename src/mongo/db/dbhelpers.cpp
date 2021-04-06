@@ -187,9 +187,12 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
     const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    if (!collection) {
+        return false;
+    }
 
-    auto exec = InternalPlanner::collectionScan(
-        opCtx, ns, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    auto exec =
+        InternalPlanner::collectionScan(opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -209,9 +212,12 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     boost::optional<AutoGetOplog> autoOplog;
     const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
+    if (!collection) {
+        return false;
+    }
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, ns, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
+        opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.

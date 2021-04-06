@@ -68,15 +68,17 @@ public:
     };
 
     /**
-     * Returns a collection scan.  Caller owns pointer.
+     * Returns a collection scan. Refer to CollectionScanParams for usage of 'minRecord' and
+     * 'maxRecord'.
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
-        StringData ns,
         const CollectionPtr* collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const Direction direction = FORWARD,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none);
+        boost::optional<RecordId> resumeAfterRecordId = boost::none,
+        boost::optional<RecordId> minRecord = boost::none,
+        boost::optional<RecordId> maxRecord = boost::none);
 
     /**
      * Returns a FETCH => DELETE plan.
