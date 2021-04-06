@@ -1344,6 +1344,13 @@ def ninja_always_serial(self, num, taskmaster):
     self.job = SCons.Job.Serial(taskmaster)
 
 
+def ninja_print_conf_log(s, target, source, env):
+    """Command line print only for conftest to generate a correct conf log."""
+    if target and "conftest" in str(target[0]):
+        action = SCons.Action._ActionAction()
+        action.print_cmd_line(s, target, source, env)
+
+
 class NinjaNoResponseFiles(SCons.Platform.TempFileMunge):
     """Overwrite the __call__ method of SCons' TempFileMunge to not delete."""
 
@@ -1561,7 +1568,7 @@ def generate(env):
     SCons.Executor.Executor._get_unchanged_targets = SCons.Executor.Executor._get_targets
 
     # Replace false action messages with nothing.
-    env["PRINT_CMD_LINE_FUNC"] = ninja_noop
+    env["PRINT_CMD_LINE_FUNC"] = ninja_print_conf_log
 
     # This reduces unnecessary subst_list calls to add the compiler to
     # the implicit dependencies of targets. Since we encode full paths
