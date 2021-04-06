@@ -139,11 +139,11 @@ ExecutorFuture<void> ReshardingOplogApplier::_scheduleNextBatch(
     CancellationToken cancelToken,
     CancelableOperationContextFactory factory) {
     return ExecutorFuture(executor)
-        .then([this, executor, cancelToken] {
+        .then([this, executor, cancelToken, factory] {
             auto batchClient = makeKillableClient(_service(), kClientName);
             AlternativeClientRegion acr(batchClient);
 
-            return _oplogIter->getNextBatch(executor, cancelToken);
+            return _oplogIter->getNextBatch(executor, cancelToken, factory);
         })
         .then([this, executor, cancelToken, factory](OplogBatch batch) {
             LOGV2_DEBUG(5391002, 3, "Starting batch", "batchSize"_attr = batch.size());

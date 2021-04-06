@@ -77,10 +77,12 @@ public:
     }
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) override {
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory factory) override {
         // This operation context is unused by the function but confirms that the Client calling
         // getNextBatch() doesn't already have an operation context.
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = factory.makeOperationContext(&cc());
 
         return ExecutorFuture(std::move(executor)).then([this] {
             std::vector<repl::OplogEntry> ret;

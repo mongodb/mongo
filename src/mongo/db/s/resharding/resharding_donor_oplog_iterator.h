@@ -31,6 +31,7 @@
 
 #include <vector>
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -69,7 +70,9 @@ public:
      *    final oplog entry hasn't been returned yet.
      */
     virtual ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) = 0;
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory factory) = 0;
 };
 
 /**
@@ -94,7 +97,9 @@ public:
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<std::vector<repl::OplogEntry>> getNextBatch(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) override;
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory factory) override;
 
     static constexpr auto kActualOpFieldName = "actualOp"_sd;
     static constexpr auto kPreImageOpFieldName = "preImageOp"_sd;
