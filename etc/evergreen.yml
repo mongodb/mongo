@@ -10168,6 +10168,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.sharded !.repl
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: noPassthrough_gen
+  - name: replica_sets
     distros:
     - rhel80-medium
 

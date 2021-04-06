@@ -8,7 +8,11 @@
  * transaction. The secondary will fail to apply the update operation in phase 3 but initial sync
  * completes nevertheless.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

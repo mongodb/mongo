@@ -3,11 +3,12 @@
  * sets the multikey flag.
  *
  * @tags: [
- *  uses_transactions,
- *  uses_prepare_transaction,
- *  requires_persistence,
- *  # Multiversion testing does not support tests that kill and restart nodes.
- *  multiversion_incompatible
+ *   # Multiversion testing does not support tests that kill and restart nodes.
+ *   multiversion_incompatible,
+ *   requires_persistence,
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
  * ]
  */
 (function() {

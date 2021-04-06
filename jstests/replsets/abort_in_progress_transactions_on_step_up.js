@@ -1,7 +1,11 @@
 /**
  * Tests primary aborts in-progress transactions on stepup.
  *
- * @tags: [uses_transactions, exclude_from_large_txns]
+ * @tags: [
+ *   exclude_from_large_txns,
+ *   sbe_incompatible,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

@@ -10,7 +10,11 @@
  * This ensures that we can correctly replicate prepare oplog entries that were received
  * during initial sync.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

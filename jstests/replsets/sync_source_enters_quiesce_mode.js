@@ -3,8 +3,9 @@
  * enters quiesce mode.
  *
  * @tags: [
- *   requires_fcv_47,
  *   live_record_incompatible,
+ *   requires_fcv_47,
+ *   sbe_incompatible,
  * ]
  */
 (function() {
