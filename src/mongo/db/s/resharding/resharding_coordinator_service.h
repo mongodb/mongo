@@ -168,8 +168,7 @@ public:
         return ThreadPool::Limits();
     }
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
-        BSONObj initialState) const override;
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,

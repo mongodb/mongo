@@ -265,7 +265,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(
-    BSONObj initialStateDoc) const {
+    BSONObj initialStateDoc) {
     return std::make_shared<TenantMigrationRecipientService::Instance>(
         _serviceContext, this, initialStateDoc);
 }

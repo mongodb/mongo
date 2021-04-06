@@ -31,6 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 
@@ -57,9 +58,37 @@ public:
         return ThreadPool::Limits();
     }
 
-    std::shared_ptr<Instance> constructInstance(BSONObj initialState) const override;
+    std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
 
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
+
+private:
+    std::shared_ptr<ShardingDDLCoordinator> _constructCoordinator(BSONObj initialState) const;
+
+    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token) override;
+
+    void _afterStepDown() override;
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
+
+    // When the node stepDown the state is set to kPaused and all the new DDL operation will be
+    // blocked. On step-up we set _coordinatorsToWait to the numbers of coordinators that needs to
+    // be recovered and we enter in kRecovering state. Once all coordinators have been recovered we
+    // move to kRecovered state and we unblock all new incoming DDL.
+    enum class State {
+        kPaused,
+        kRecovering,
+        kRecovered,
+    };
+
+    State _state = State::kPaused;
+
+    stdx::condition_variable _recoveredCV;
+
+    // This counter is set up at stepUp and reprensent the number of coordinator instances
+    // that needs to be recovered from disk.
+    size_t _numCoordinatorsToWait{0};
 };
 
 }  // namespace mongo

@@ -202,7 +202,7 @@ ReshardingDonorOplogId getApplierIdToResumeFrom(OperationContext* opCtx,
 }  // namespace resharding
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
-    BSONObj initialState) const {
+    BSONObj initialState) {
     return std::make_shared<RecipientStateMachine>(
         this, std::move(initialState), ReshardingDataReplication::make);
 }
