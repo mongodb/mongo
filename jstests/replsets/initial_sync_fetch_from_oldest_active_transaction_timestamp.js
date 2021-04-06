@@ -10,7 +10,11 @@
  * won't be fetched during oplog application and trying to apply the commitTransaction oplog entry
  * will cause initial sync to fail.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

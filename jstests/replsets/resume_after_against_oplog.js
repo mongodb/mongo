@@ -2,7 +2,10 @@
  * Tests the behavior of the 'postBatchResumeToken' and '$_resumeAfter' fields in 'find' and
  * 'getMore' requests and responses on the oplog.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ *   requires_fcv_47,
+ *   sbe_incompatible,
+ * ]
  */
 
 (function() {

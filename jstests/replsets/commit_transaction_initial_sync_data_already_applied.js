@@ -9,7 +9,11 @@
  * operations will fail, but a later operation will need to succeed to pass the test. This will show
  * that operations from a transaction are executed in separate storage transactions.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {

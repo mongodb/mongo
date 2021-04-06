@@ -4,7 +4,11 @@
  * 2. Test that rollback can successfully recover aborted prepared transactions that were prepared
  * and aborted between the stable timestamp and the common point.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 (function() {
 "use strict";

@@ -7,7 +7,11 @@
  * This tests the oldestActiveTransactionTimestamp, which is calculated from the "startOpTime"
  * field of documents in the config.transactions collection.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [
+ *   sbe_incompatible,
+ *   uses_prepare_transaction,
+ *   uses_transactions,
+ * ]
  */
 
 (function() {
