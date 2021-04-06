@@ -135,10 +135,12 @@ variables:
   max_hosts: 1
   tasks: []
   setup_task:
+  - func: "f_expansions_write"
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   - func: "f_expansions_write"
   teardown_task:
+  - func: "f_expansions_write"
   - func: "attach scons logs"
   - func: "attach report"
   - func: "attach artifacts"
@@ -171,6 +173,7 @@ variables:
         ${archive_file|src/archive.json}
   setup_group_can_fail_task: true
   setup_group:
+  - func: "f_expansions_write"
   - command: manifest.load
   - func: "git get project"
   - func: "kill processes"
@@ -191,9 +194,11 @@ variables:
   - func: "generate compile expansions"
   - func: "f_expansions_write"
   teardown_group:
+  - func: "f_expansions_write"
   - func: "umount shared scons directory"
   - func: "cleanup environment"
   timeout:
+  - func: "f_expansions_write"
   - func: "run hang analyzer"
 
 # Use this template for enterprise Windows testing coverage on non-pushing
@@ -895,6 +900,7 @@ functions:
       file: src/perf.json
 
   "do setup":
+  - *f_expansions_write
   - *set_up_venv
   - *upload_pip_requirements
   - *set_task_expansion_macros
@@ -912,7 +918,9 @@ functions:
   - *collect_system_resource_info
 
   "do non-compile setup":
+  - *f_expansions_write
   - *set_task_expansion_macros
+  - *f_expansions_write
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
@@ -920,7 +928,9 @@ functions:
   - *set_up_credentials
 
   "do benchmark setup":
+  - *f_expansions_write
   - *set_task_expansion_macros
+  - *f_expansions_write
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
@@ -1215,7 +1225,7 @@ functions:
     - *f_expansions_write
     - command: expansions.write
       params:
-        file: src/expansions.yml
+        file: expansions.yml
     - *configure_evergreen_api_credentials
     - *configure_selected_tests_credentials
     - command: shell.exec
@@ -1230,7 +1240,7 @@ functions:
           # Only run on master branch
           if [ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]; then
             ${activate_virtualenv}
-            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --selected-tests-config .selected_tests.yml
+            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file ../expansions.yml --selected-tests-config .selected_tests.yml
           fi
     - command: archive.targz_pack
       params:
@@ -1256,6 +1266,7 @@ functions:
           - src/selected_tests_config/*.json
 
   "generate burn in tags":
+    - *f_expansions_write
     - command: expansions.write
       params:
         file: src/expansions.yml
@@ -1274,7 +1285,7 @@ functions:
           # Multiversion exclusions can be used when selecting tests.
           $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
 
-          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file expansions.yml
+          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file ../expansions.yml
     - command: archive.targz_pack
       params:
         target: burn_in_tags_gen.tgz
@@ -1297,14 +1308,13 @@ functions:
           - src/generated_burn_in_tags_config/burn_in_tags_gen.json
 
   "generate randomized multiversion tasks":
+    - *f_expansions_write
     - *set_task_expansion_macros
+    - *f_expansions_write
     - *set_up_venv
     - *upload_pip_requirements
-    - *f_expansions_write
     - *configure_evergreen_api_credentials
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
+    - *f_expansions_write
 
     - command: shell.exec
       type: test
@@ -1315,7 +1325,7 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
     - *do_multiversion_setup
     - command: shell.exec
       params:
@@ -1352,6 +1362,8 @@ functions:
         exec_timeout_secs: 10800  # 3 hours
         timeout_secs: 10800  # 3 hours
 
+    - *f_expansions_write
+
     - command: generate.tasks
       params:
         optional: true
@@ -1359,11 +1371,16 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate resmoke tasks":
+    - *f_expansions_write
     - *set_task_expansion_macros
+    - *f_expansions_write
     - *set_up_venv
     - *upload_pip_requirements
     - *f_expansions_write
     - *configure_evergreen_api_credentials
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
 
     - command: shell.exec
       type: test
@@ -1400,6 +1417,8 @@ functions:
         exec_timeout_secs: 10800  # 3 hours
         timeout_secs: 10800  # 3 hours
 
+    - *f_expansions_write
+
     - command: generate.tasks
       params:
         optional: true
@@ -1408,6 +1427,7 @@ functions:
 
   # Used by generator
   "run generated tests":
+  - *f_expansions_write
   - *retrieve_generated_test_configuration
   - *extract_generated_test_configuration
   - command: expansions.update
@@ -1419,6 +1439,7 @@ functions:
         value: mongodata_aws
       - key: aws_secret_remote
         value: ${mongodatafiles_aws_secret}
+  - *f_expansions_write
   - *set_up_remote_credentials
   - *f_expansions_write
   - *determine_resmoke_jobs
@@ -1439,7 +1460,9 @@ functions:
     - *f_expansions_write
     - *determine_task_timeout
     - *update_task_timeout_expansions
+    - *f_expansions_write
     - *update_task_timeout
+    - *f_expansions_write
     - command: expansions.update
       params:
         env:
@@ -1452,6 +1475,7 @@ functions:
           value: mongodata_aws
         - key: aws_secret_remote
           value: ${mongodatafiles_aws_secret}
+    - *f_expansions_write
     - *set_up_remote_credentials
     - *f_expansions_write
     - *determine_resmoke_jobs
@@ -1565,6 +1589,7 @@ functions:
     - *f_expansions_write
 
   "do jepsen setup":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -1685,15 +1710,17 @@ functions:
 
 
   "generate explicit multiversion tasks":
+    - *f_expansions_write
     - *set_task_expansion_macros
+    - *f_expansions_write
     - *set_up_venv
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - *upload_pip_requirements
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - *do_multiversion_setup
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
 
     - command: shell.exec
       type: test
@@ -1704,7 +1731,7 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
           $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${use_multiversion}
 
     - command: archive.targz_pack
@@ -1731,6 +1758,8 @@ functions:
         exec_timeout_secs: 10800  # 3 hours
         timeout_secs: 10800  # 3 hours
 
+    - *f_expansions_write
+
     - command: generate.tasks
       params:
         optional: true
@@ -1738,13 +1767,16 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate implicit multiversion tasks":
+    - *f_expansions_write
     - *set_task_expansion_macros
+    - *f_expansions_write
     - *set_up_venv
     - *f_expansions_write
     - *configure_evergreen_api_credentials
     - command: expansions.write
       params:
-        file: src/expansions.yml
+        file: expansions.yml
+    - *configure_evergreen_api_credentials
     - *do_multiversion_setup
     - command: shell.exec
       params:
@@ -1755,7 +1787,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file expansions.yml
+          $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file ../expansions.yml
           $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${task_path_suffix}
 
     - command: archive.targz_pack
@@ -1782,6 +1814,8 @@ functions:
         exec_timeout_secs: 10800  # 3 hours
         timeout_secs: 10800  # 3 hours
 
+    - *f_expansions_write
+
     - command: generate.tasks
       params:
         # Optional b/c reruns of this task will produce no JSON files to avoid
@@ -1791,13 +1825,14 @@ functions:
           - src/generated_resmoke_config/*.json
 
   "generate fuzzer tasks":
+    - *f_expansions_write
     - *set_task_expansion_macros
+    - *f_expansions_write
     - *set_up_venv
-    - *upload_pip_requirements
-
     - command: expansions.write
       params:
-        file: src/expansions.yml
+        file: expansions.yml
+    - *upload_pip_requirements
 
     - command: shell.exec
       params:
@@ -1808,7 +1843,7 @@ functions:
           set -o verbose
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file expansions.yml
+          $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file ../expansions.yml
 
     - command: archive.targz_pack
       params:
@@ -1832,6 +1867,7 @@ functions:
       params:
         exec_timeout_secs: 10800  # 3 hours
         timeout_secs: 10800  # 3 hours
+    - *f_expansions_write
 
     - command: generate.tasks
       params:
@@ -1889,6 +1925,7 @@ functions:
 
   # Used by generator
   "run jstestfuzz":
+    - *f_expansions_write
     - command: subprocess.exec
       params:
         binary: bash
@@ -1938,6 +1975,7 @@ functions:
           $python buildscripts/idl/run_tests.py
 
   "run powercycle test":
+    - *f_expansions_write
     - command: shell.exec
       type: test
       params:
@@ -1966,10 +2004,11 @@ functions:
       params:
         ignore_missing_file: true
         file: src/powercycle_exit.yml
+    - *f_expansions_write
 
     - command: expansions.write
       params:
-        file: src/expansions.yml
+        file: expansions.yml
 
     - command: shell.exec
       params:
@@ -2086,6 +2125,7 @@ functions:
         test "$verified" = "true"
 
   "set up EC2 instance": &set_up_ec2_instance
+    - *f_expansions_write
     - command: expansions.write
       params:
         file: src/expansions.yml
@@ -2144,6 +2184,7 @@ functions:
     - command: expansions.update
       params:
         file: src/powercycle_ip_address.yml
+    - *f_expansions_write
 
     - command: expansions.write
       params:
@@ -2280,6 +2321,7 @@ functions:
       optional: true
 
   "save code coverage data":
+    - *f_expansions_write
     - *process_code_coverage_data
     - *tar_code_coverage_data
     - *archive_code_coverage_data
@@ -2363,6 +2405,7 @@ functions:
       optional: true
 
   "save mongo coredumps":
+  - *f_expansions_write
   - *gather_mongo_coredumps
   - *tar_mongo_coredumps
   - *archive_mongo_coredumps
@@ -2708,6 +2751,7 @@ functions:
 
 # Pre task steps
 pre:
+  - func: "f_expansions_write"
   - command: manifest.load
   - func: "git get project"
   - func: "kill processes"
@@ -2718,6 +2762,7 @@ pre:
 
 # Post task steps
 post:
+  - func: "f_expansions_write"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
@@ -2739,6 +2784,7 @@ post:
 
 # Timeout steps
 timeout:
+  - func: "f_expansions_write"
   - func: "run hang analyzer"
   - func: "wait for resmoke to shutdown"
 
@@ -2766,6 +2812,7 @@ tasks:
   depends_on:
     - name: compile_dist_test
   commands:
+    - *f_expansions_write
     - func: "scons compile"
       vars:
         targets: >-
@@ -2997,6 +3044,7 @@ tasks:
 - name: clang_tidy
   exec_timeout_secs: 3600 # 1 hour timeout for the task overall
   commands:
+    - *f_expansions_write
     - func: "scons compile"
       vars:
         targets: generated-sources compiledb
@@ -3026,6 +3074,7 @@ tasks:
   depends_on:
     - name: compile_unittests
   commands:
+    - *f_expansions_write
     - func: "run diskstats"
     - func: "f_expansions_write"
     - func: "monitor process threads"
@@ -3100,6 +3149,7 @@ tasks:
   depends_on:
     - name: compile_dbtest
   commands:
+    - *f_expansions_write
     - func: "run diskstats"
     - func: "f_expansions_write"
     - func: "monitor process threads"
@@ -3309,6 +3359,7 @@ tasks:
 
 - name: stitch_support_create_lib
   commands:
+    - *f_expansions_write
     - func: "scons compile"
       vars:
         targets: install-stitch-support install-stitch-support-debug install-stitch-support-dev
@@ -3374,7 +3425,9 @@ tasks:
 - name: compile_benchmarks
   depends_on: []
   commands:
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
@@ -3414,11 +3467,14 @@ tasks:
 ## lint ##
 - name: lint_pylinters
   commands:
+    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -3427,11 +3483,14 @@ tasks:
 
 - name: lint_clang_format
   commands:
+    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -3440,11 +3499,14 @@ tasks:
 
 - name: lint_eslint
   commands:
+    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -3453,11 +3515,14 @@ tasks:
 
 - name: lint_cpplint
   commands:
+    - *f_expansions_write
     - command: timeout.update
       params:
         # 40 minutes
         exec_timeout_secs: 2400
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -3467,7 +3532,9 @@ tasks:
 - name: lint_yaml
   depends_on: []
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "f_expansions_write"
@@ -3482,6 +3549,7 @@ tasks:
 
 - name: lint_shellscripts
   commands:
+  - *f_expansions_write
   - command: subprocess.exec
     type: test
     params:
@@ -3491,7 +3559,9 @@ tasks:
 
 - name: lint_errorcodes
   commands:
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
@@ -3502,7 +3572,9 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "do setup"
@@ -3518,10 +3590,11 @@ tasks:
 
 - name: burn_in_tests_gen
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
   - func: "upload pip requirements"
-  - *f_expansions_write
   - func: "configure evergreen api credentials"
   - *do_multiversion_setup
   - command: subprocess.exec
@@ -3556,7 +3629,9 @@ tasks:
 
 - name: burn_in_tests_multiversion_gen
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "f_expansions_write"
@@ -4454,7 +4529,9 @@ tasks:
 - name: lint_fuzzer_sanity_patch
   patch_only: true
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "get added and modified patch files"
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity patch"
@@ -4462,7 +4539,9 @@ tasks:
 # Check that the mutational fuzzer can parse all JS filess.
 - name: lint_fuzzer_sanity_all
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "setup jstestfuzz"
   - func: "lint fuzzer sanity all"
 
@@ -4630,12 +4709,11 @@ tasks:
   depends_on:
     - name: archive_dist_test_debug
   commands:
-  - func: "set task expansion macros"
-  - func: "set up venv"
-    vars:
-      pip_dir: ${workdir}/src/etc/pip
-  - func: "upload pip requirements"
   - *f_expansions_write
+  - func: "set task expansion macros"
+  - *f_expansions_write
+  - func: "set up venv"
+  - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
   - func: "generate burn in tags"
@@ -4647,10 +4725,10 @@ tasks:
 
 - name: selected_tests_gen
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
-    vars:
-      pip_dir: ${workdir}/src/etc/pip
   - func: "upload pip requirements"
   - func: "generate selected tests"
 
@@ -5013,6 +5091,7 @@ tasks:
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "set up win mount script"
   - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
@@ -5029,6 +5108,7 @@ tasks:
 - <<: *task_template
   name: external_auth
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "f_expansions_write"
   - command: subprocess.exec
@@ -5045,6 +5125,7 @@ tasks:
 - <<: *task_template
   name: external_auth_aws
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "f_expansions_write"
   - command: subprocess.exec
@@ -6358,6 +6439,7 @@ tasks:
 - <<: *task_template
   name: snmp
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "do snmp setup"
   - func: "run tests"
@@ -6592,6 +6674,7 @@ tasks:
   name: watchdog_wiredtiger
   tags: ["watchdog"]
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "do watchdog setup"
   - func: "run tests"
@@ -6604,6 +6687,7 @@ tasks:
   name: watchdog_inmemory
   tags: ["watchdog"]
   commands:
+  - *f_expansions_write
   - func: "do setup"
   - func: "do watchdog setup"
   - func: "run tests"
@@ -6663,7 +6747,9 @@ tasks:
 - name: powercycle_smoke_skip_compile
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   commands:
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - func: "upload pip requirements"
     - *f_expansions_write
@@ -6806,7 +6892,9 @@ tasks:
   depends_on:
   - name: archive_dist_test_debug
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "run idl tests"
@@ -6814,8 +6902,8 @@ tasks:
 - name: blackduck_scanner
   patchable: false
   commands:
+  - *f_expansions_write
   - func: "do non-compile setup"
-  - func: "f_expansions_write"
   - command: subprocess.exec
     type: setup
     params:
@@ -6836,6 +6924,7 @@ tasks:
 
 - name: tla_plus
   commands:
+  - *f_expansions_write
   - func: "do non-compile setup"
   - command: subprocess.exec
     type: setup
@@ -6851,6 +6940,7 @@ tasks:
 - name: buildscripts_test
   depends_on: []
   commands:
+  - *f_expansions_write
   - func: "do non-compile setup"
   - func: "set up remote credentials"
   - *f_expansions_write
@@ -6886,6 +6976,7 @@ tasks:
   depends_on:
     - name: compile_dist_test
   commands:
+    - *f_expansions_write
     - func: "scons compile"
       vars:
         targets: >-
@@ -7676,7 +7767,9 @@ tasks:
 - name: validate_commit_message
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
+  - *f_expansions_write
   - func: "set task expansion macros"
+  - *f_expansions_write
   - func: "set up venv"
   - command: shell.exec
     type: test
@@ -7703,7 +7796,9 @@ tasks:
 - name: check_for_todos
   exec_timeout_secs: 600 # 10 minute timeout
   commands:
+    - *f_expansions_write
     - func: "set task expansion macros"
+    - *f_expansions_write
     - func: "set up venv"
     - command: shell.exec
       type: test

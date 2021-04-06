@@ -10,7 +10,7 @@ from typing_extensions import TypedDict
 from buildscripts.evglint.yamlhandler import load
 from buildscripts.evglint import rules
 from buildscripts.evglint.model import LintRule, LintError
-from buildscripts.evglint.helpers import iterate_commands
+import buildscripts.evglint.helpers as h
 
 
 class TestRulebreaker(unittest.TestCase):
@@ -125,7 +125,7 @@ class TestHelpers(unittest.TestCase):
     def test_iterate_commands(self):
         """test iterate_commands."""
         yaml_dict = load(TestRulebreaker.RULEBREAKER.format(inject_here=""))
-        gen = iterate_commands(yaml_dict)
+        gen = h.iterate_commands(yaml_dict)
         count = 0
         for _ in gen:
             count = count + 1
@@ -139,11 +139,57 @@ tasks:
     def test_iterate_commands_no_commands(self):
         """Test iterate_commands when the yaml has no commands."""
         yaml_dict = load(TestHelpers.I_CANT_BELIEVE_THAT_VALIDATES)
-        gen = iterate_commands(yaml_dict)
+        gen = h.iterate_commands(yaml_dict)
         count = 0
         for _ in gen:
             count = count + 1
         self.assertEqual(count, 0)
+
+    def test_iterate_command_lists(self):
+        """test iterate_command_lists."""
+        yaml_dict = load(TestRulebreaker.RULEBREAKER.format(inject_here=""))
+        gen = h.iterate_command_lists(yaml_dict)
+        count = 0
+        for _ in gen:
+            count = count + 1
+        self.assertEqual(count, 12)
+
+    def test_iterate_command_lists_no_commands(self):
+        """Test iterate_command_lists when the yaml has no commands."""
+        yaml_dict = load(TestHelpers.I_CANT_BELIEVE_THAT_VALIDATES)
+        gen = h.iterate_command_lists(yaml_dict)
+        count = 0
+        for _ in gen:
+            count = count + 1
+        self.assertEqual(count, 0)
+
+    def test_match_expansions_write(self):
+        """Test match_expansions_write."""
+        cmd = {}
+        self.assertFalse(h.match_expansions_write(cmd))
+        cmd = {
+            "command": "expansions.write", "params": {"file": "expansions.yml", "redacted": True}
+        }
+        self.assertTrue(h.match_expansions_write(cmd))
+
+    def test_iterate_fn_calls_context(self):
+        """Test iterate_fn_calls_context."""
+        yaml_dict = load(TestRulebreaker.RULEBREAKER.format(inject_here=""))
+        gen = h.iterate_fn_calls_context(yaml_dict)
+        count = 0
+        for _ in gen:
+            count = count + 1
+        self.assertEqual(count, 2)
+
+    def test_match_subprocess_exec(self):
+        """Test match_subprocess_exec."""
+        cmd = {}
+        self.assertFalse(h.match_subprocess_exec(cmd))
+        cmd = {
+            "command": "subprocess.exec",
+            "params": {"binary": "bash", "args": ["./src/evergreen/something.sh"]}
+        }
+        self.assertTrue(h.match_subprocess_exec(cmd))
 
 
 class _RuleExpect(TypedDict):
@@ -388,8 +434,9 @@ tasks:
             """,
                 "errors":
                     [("Function 'cat i'm a kitty cat, and i test test test and i test test test', "
-                      "command 0, key-value pair 0 is an expansions.update command a multi-line "
-                      "values, which is forbidden. For long-form values, prefer expansions.write.")]
+                      "command 0, key-value pair 0 is an expansions.update command with multi-line "
+                      "values embedded in the yaml, which is forbidden. For long-form values, use "
+                      "the files parameter of expansions.update.")]
             },
         ]
 
@@ -439,47 +486,289 @@ tasks:
         ]
 
 
-class TestShellExecBootstrapsShell(_BaseTestClasses.RuleTest):
-    """Test shell-exec-bootstraps-shell."""
+class TestRequiredExpansionsWrite(_BaseTestClasses.RuleTest):
+    """Test required-expansions-write."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.func = rules.subprocess_exec_bootstraps_shell
+        self.func = rules.required_expansions_write
         self.table = [
             {
                 'raw_yaml':
                     """
 functions:
-    "test":
+    # this function can serve in lieu of an expansions.write call
+    "f_expansions_write": &f_expansions_write
+        command: expansions.write
+        params:
+          file: expansions.yml
+          redacted: true
+
+    # this function cannot, because redacted is not True
+    "f_expansions_write2": &f_expansions_write2
+        command: expansions.write
+        params:
+          file: expansions.yml
+
+    "dangerous_fn": &dangerous_fn
+        # will not generate errors because this is a dict defintion. Errors
+        # will be generated if this function is called with arguments
         command: subprocess.exec
         params:
           binary: bash
           args:
             - "src/evergreen/do_something.sh"
-          env:
-            python: ${python}
-            workdir: ${workdir}
+
+    "dangerous_fn2": &dangerous_fn2
+        # will not generate errors because this is a dict defintion.
+        command: expansions.update
+
+    "test1":
+        # needs expansions.write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+        # only ONE of these should generate an error
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test2a":
+        # correct
+        - func: "f_expansions_write"
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test2b":
+        # correct
+        - *f_expansions_write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test2c":
+        # function isn't a compatible substitution
+        - *f_expansions_write2
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test3":
+        # correct because the subprocess.exec call is a script outside
+        # of evergreen
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "somewhere/else/do_something.sh"
+    "test3a":
+        # needs expansions.write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "somewhere/else/do_something.sh"
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test4a":
+        # need an expansions.write call after expansions.update
+        - command: expansions.update
+    "test4b":
+        # need an expansions.write call after expansions.update
+        - command: expansions.update
+        - command: shell.exec
+        - *f_expansions_write
+    "test4c":
+        # no errors
+        - command: expansions.update
+        - *f_expansions_write
+    "test4d":
+        # errors, because an incompatible function is called
+        - *f_expansions_write2
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+    "test5":
+        # errors, because an incompatible function is called
+        - command: expansions.update
+        - func: f_expansions_write2
+
+    "test6":
+        # error because this needs an expansions write call after dangerous_fn2
+        - *f_expansions_write
+        - func: "dangerous_fn2"
+          vars:
+            test: test
+
+    "test7":
+        # error, needs an expansion.write at the end
+        - command: expansions.update
+        - *f_expansions_write
+        - command: timeout.update
+
+    "test8":
+        # no errors
+        - command: expansions.update
+        - *f_expansions_write
+        - command: timeout.update
+        - *f_expansions_write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "somewhere/else/do_something.sh"
+        - command: timeout.update
+        - *f_expansions_write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+
+    "test8b":
+        - command: expansions.update
+        - command: timeout.update
+        - *f_expansions_write
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "somewhere/else/do_something.sh"
+        - command: timeout.update
+        - command: subprocess.exec
+          params:
+            binary: bash
+            args:
+              - "src/evergreen/do_something.sh"
+
 tasks:
 - name: test
-            """, "errors": []
-            },
-            {
-                "raw_yaml":
-                    """
-functions:
-    "test":
-        command: subprocess.exec
-        params:
-          binary: sh
-          args:
-            - "src/evergreen/do_something.sh"
-tasks:
-- name: test
-            """,
+  commands:
+    # need an expansions.write call here
+    - command: shell.exec
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/do_something.sh"
+- name: test1
+  commands:
+    - func: "dangerous_fn"
+      vars:
+        test: true
+
+- name: test2
+  commands:
+  # need an expansions.write call after expansions.update
+    - command: expansions.update
+    - command: shell.exec
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/do_something.sh"
+- name: test3
+  commands:
+    # an expansions.write call is required here.
+    - func: dangerous_fn
+        """,
                 "errors": [
-                    "Function 'test', command is a subprocess.exec command that calls an evergreen shell script through a binary other than bash, which is unsupported.",
-                    "Function 'test', command is a subprocess.exec command that calls an evergreen shell script without a correctly set environment. You must set 'params.env.workdir' to '${workdir}'.",
-                    "Function 'test', command is a subprocess.exec command that calls an evergreen shell script without a correctly set environment. You must set 'params.env.python' to '${python}'.",
+                    "Function 'test1', command 0 calls an evergreen shell script without a "
+                    'preceding expansions.write call. Always call expansions.write with params: '
+                    'file: expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Function 'test2c', command 1 calls an evergreen shell script without a "
+                    'preceding expansions.write call. Always call expansions.write with params: '
+                    'file: expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Function 'test3a', command 1 calls an evergreen shell script without a "
+                    'preceding expansions.write call. Always call expansions.write with params: '
+                    'file: expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Function 'test4a', command 0 is an expansions.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'expansions.update.',
+                    "Function 'test4b', command 0 is an expansions.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'expansions.update.',
+                    "Function 'test4d', command 1 calls an evergreen shell script without a "
+                    'preceding expansions.write call. Always call expansions.write with params: '
+                    'file: expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Function 'test5', command 0 is an expansions.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'expansions.update.',
+                    "Function 'test6', command 1, (function call: dangerous_fn2) is an "
+                    'expansions.update command that is not immediately followed by an '
+                    'expansions.write call. Always call expansions.write with params: file: '
+                    'expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) after calling expansions.update.",
+                    "Function 'test7', command 2 is an timeout.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'timeout.update.',
+                    "Function 'test8b', command 0 is an expansions.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'expansions.update.',
+                    "Function 'test8b', command 4 is an timeout.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'timeout.update.',
+                    "Task 'test', command 1 calls an evergreen shell script without a preceding "
+                    'expansions.write call. Always call expansions.write with params: file: '
+                    'expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Task 'test1', command 0, (function call: dangerous_fn) calls an evergreen "
+                    'shell script without a preceding expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) before calling an evergreen "
+                    'shell script via subprocess.exec.',
+                    "Task 'test2', command 0 is an expansions.update command that is not "
+                    'immediately followed by an expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) after calling "
+                    'expansions.update.',
+                    "Task 'test2', command 2 calls an evergreen shell script without a preceding "
+                    'expansions.write call. Always call expansions.write with params: file: '
+                    'expansions.yml; redacted: true, (or use one of these functions: '
+                    "['f_expansions_write']) before calling an evergreen shell script via "
+                    'subprocess.exec.',
+                    "Task 'test3', command 0, (function call: dangerous_fn) calls an evergreen "
+                    'shell script without a preceding expansions.write call. Always call '
+                    'expansions.write with params: file: expansions.yml; redacted: true, (or use '
+                    "one of these functions: ['f_expansions_write']) before calling an evergreen "
+                    'shell script via subprocess.exec.',
+                    "Task 'test1', command 0 (function call: 'dangerous_fn') cannot safely take "
+                    'arguments. Call expansions.write with params: file: expansions.yml; '
+                    "redacted: true, (or use one of these functions: ['f_expansions_write']) in "
+                    'the function, or do not pass arguments to it.'
                 ]
             },
         ]
