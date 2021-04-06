@@ -51,6 +51,8 @@ IndexBuildTest.assertIndexBuildCurrentOpContents(secondaryDB, opId, (op) => {
 // Step up the secondary and hang the process.
 assert.commandWorked(
     secondary.adminCommand({configureFailPoint: "hangIndexBuildOnStepUp", mode: "alwaysOn"}));
+// Wait for replication to ensure the step up does not fail due to a lagged secondary.
+rst.awaitReplication();
 const awaitStepUp = startParallelShell(() => {
     assert.commandWorked(db.adminCommand({replSetStepUp: 1}));
 }, secondary.port);
