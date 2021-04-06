@@ -437,6 +437,7 @@ error_codes:
     - {code: 9001,name: SocketException,categories: [NetworkError,RetriableError]}
     - {code: 9996,name: OBSOLETE_RecvStaleConfig}
     - {code: 10003,name: CannotGrowDocumentInCappedNamespace}
+    - {code: 10058,name: LegacyNotPrimary}
     - {code: 10107,name: NotWritablePrimary,categories: [NotPrimaryError,RetriableError]}
     - {code: 10334,name: BSONObjectTooLarge}
     - {code: 11000,name: DuplicateKey,extra: DuplicateKeyErrorInfo}
