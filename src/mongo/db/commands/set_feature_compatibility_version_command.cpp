@@ -330,18 +330,15 @@ private:
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Upgrade metadata created before FCV 4.9.
-            //
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
             if (requestedVersion >= FeatureCompatibility::Version::kVersion49) {
-                try {
-                    ShardingCatalogManager::get(opCtx)->upgradeMetadataFor49(opCtx);
-                } catch (const DBException& e) {
-                    LOGV2(5276708,
-                          "Failed to upgrade sharding metadata: {error}",
-                          "error"_attr = e.toString());
-                    throw;
-                }
+                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor49(opCtx);
+            }
+
+            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
+            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
+            if (requestedVersion >= FeatureCompatibility::kLatest) {
+                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50(opCtx);
             }
 
             // Upgrade shards after config finishes its upgrade.
@@ -451,18 +448,10 @@ private:
                 !failDowngrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Downgrade metadata created in FCV 4.9.
-            //
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion < FeatureCompatibility::Version::kVersion49) {
-                try {
-                    ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre49(opCtx);
-                } catch (const DBException& e) {
-                    LOGV2(5276709,
-                          "Failed to downgrade sharding metadata: {error}",
-                          "error"_attr = e.toString());
-                    throw;
-                }
+            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
+            if (requestedVersion < FeatureCompatibility::kLatest) {
+                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50(opCtx);
             }
 
             // Downgrade shards after config finishes its downgrade.
