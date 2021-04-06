@@ -287,7 +287,7 @@ private:
         // If the 'useSecondaryDelaySecs' feature flag is enabled in the upgraded FCV, issue a
         // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
         if (repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() && isReplSet &&
-            requestedVersion == ServerGlobalParams::FeatureCompatibility::kLatest) {
+            requestedVersion >= repl::feature_flags::gUseSecondaryDelaySecs.getVersion()) {
             // Wait for the current config to be committed before starting a new reconfig.
             waitForCurrentConfigCommitment(opCtx);
 

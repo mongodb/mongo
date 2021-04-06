@@ -121,6 +121,11 @@ Status isFCVCompatible(const ReplSetConfig& config) {
         version == ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastContinuousToLatest) {
         version = ServerGlobalParams::FeatureCompatibility::kLatest;
     }
+    //(Generic FCV reference): feature flag support
+    if (version ==
+        ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLastContinuous) {
+        version = ServerGlobalParams::FeatureCompatibility::kLastContinuous;
+    }
 
     ServerGlobalParams::FeatureCompatibility targetFCV;
     targetFCV.setVersion(version);
