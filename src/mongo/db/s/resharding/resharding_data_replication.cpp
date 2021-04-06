@@ -359,8 +359,8 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     chainCtx->oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token());
     chainCtx->collectionClonerFuture =
         _runCollectionCloner(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
-    chainCtx->txnClonerFutures =
-        _runTxnCloners(executor, cleanupExecutor, errorSource.token(), minimumOperationDuration);
+    chainCtx->txnClonerFutures = _runTxnCloners(
+        executor, cleanupExecutor, errorSource.token(), opCtxFactory, minimumOperationDuration);
 
     return whenAllSucceed(
                whenAllSucceedOn(chainCtx->oplogFetcherFutures, executor),
@@ -440,6 +440,7 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
     std::shared_ptr<executor::TaskExecutor> executor,
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
+    CancelableOperationContextFactory opCtxFactory,
     Milliseconds minimumOperationDuration) {
     std::vector<SharedSemiFuture<void>> txnClonerFutures;
     txnClonerFutures.reserve(_txnCloners.size());
@@ -447,8 +448,12 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
     for (const auto& txnCloner : _txnCloners) {
         txnClonerFutures.emplace_back(
             executor->sleepFor(minimumOperationDuration, cancelToken)
-                .then([executor, cleanupExecutor, cancelToken, txnCloner = txnCloner.get()] {
-                    return txnCloner->run(executor, cleanupExecutor, cancelToken);
+                .then([executor,
+                       cleanupExecutor,
+                       cancelToken,
+                       opCtxFactory,
+                       txnCloner = txnCloner.get()] {
+                    return txnCloner->run(executor, cleanupExecutor, cancelToken, opCtxFactory);
                 })
                 .share());
     }

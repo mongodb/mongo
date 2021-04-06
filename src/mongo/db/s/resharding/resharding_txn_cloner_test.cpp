@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
@@ -353,11 +354,25 @@ protected:
             ? customCancelToken.get()
             : operationContext()->getCancellationToken();
 
+        auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestReshardCloneConfigTransactionsCancelableOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+        CancelableOperationContextFactory opCtxFactory(cancelToken, cancelableOpCtxExecutor);
+
         // There isn't a guarantee that the reference count to `executor` has been decremented after
         // .run() returns. We schedule a trivial task on the task executor to ensure the callback's
         // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
         // triggering an invariant due to the task executor's thread having a Client still.
-        return cloner.run(executor, cleanupExecutor, cancelToken, makeMongoProcessInterface())
+        return cloner
+            .run(executor,
+                 cleanupExecutor,
+                 cancelToken,
+                 std::move(opCtxFactory),
+                 makeMongoProcessInterface())
             .thenRunOn(executor)
             .onCompletion([](auto x) { return x; });
     }

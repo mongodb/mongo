@@ -226,6 +226,7 @@ private:
         std::shared_ptr<executor::TaskExecutor> executor,
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
+        CancelableOperationContextFactory opCtxFactory,
         Milliseconds minimumOperationDuration);
 
     std::vector<SharedSemiFuture<void>> _runOplogFetchers(

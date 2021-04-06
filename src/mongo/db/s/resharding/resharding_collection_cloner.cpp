@@ -36,7 +36,6 @@
 #include <utility>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"

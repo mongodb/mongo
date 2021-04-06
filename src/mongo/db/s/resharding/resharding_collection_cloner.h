@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
@@ -49,7 +50,6 @@ class TaskExecutor;
 
 }  // namespace executor
 
-class CancelableOperationContextFactory;
 class OperationContext;
 class MongoProcessInterface;
 class ReshardingMetrics;
