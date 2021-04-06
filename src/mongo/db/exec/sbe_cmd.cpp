@@ -142,6 +142,18 @@ public:
 
         return true;
     }
+
+    // This is a test-only command so shouldn't be enabled in production, but we try to require
+    // auth on new test commands anyway, just in case someone enables them by mistake.
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) const override {
+        auto authSession = AuthorizationSession::get(opCtx->getClient());
+        if (!authSession->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+        return Status::OK();
+    }
 };
 
 MONGO_REGISTER_TEST_COMMAND(SBECommand);
