@@ -3012,16 +3012,18 @@ tasks:
         content_type: application/gzip
         display_name: Binaries
 
-    - command: shell.exec
+    - command: expansions.write
+      params:
+        file: expansions.yml
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-          ${activate_virtualenv}
-          $python buildscripts/idl/gen_all_feature_flag_list.py --import-dir src --import-dir src/mongo/db/modules/enterprise/src
+        binary: bash
+        args:
+          - "src/evergreen/gen_feature_flags.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -3150,13 +3152,17 @@ tasks:
 
 - name: libdeps_graph_linting
   commands:
-    - command: shell.exec
+    - command: expansions.write
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${activate_virtualenv}
-          python -m pip install -r etc/pip/libdeps-requirements.txt
+        file: expansions.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/libdeps_setup.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
     - func: "scons compile"
       vars:
@@ -3168,19 +3174,14 @@ tasks:
         targets:
           generate-libdeps-graph
 
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          GRAPH_FILE=$(find build -name "libdeps.graphml")
-          python buildscripts/libdeps/gacli.py --graph-file $GRAPH_FILE > results.txt
-          gzip $GRAPH_FILE
-          mv $GRAPH_FILE.gz .
+        binary: bash
+        args:
+          - "src/evergreen/libdeps_run.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
     - command: s3.put
       params:
@@ -3370,42 +3371,17 @@ tasks:
 
 - name: embedded_sdk_build_cdriver
   commands:
-    - command: shell.exec
+    - command: expansions.write
       params:
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          VERSION=${version}
-          WORKDIR=${workdir}
-
-          # build in a different directory then we run tests so that we can verify that the linking
-          # of tests are not relying any built in absolute paths
-          FINAL_PREFIX=$WORKDIR/src/build/mongo-embedded-sdk-$VERSION
-          BUILD_PREFIX=$FINAL_PREFIX-tmp
-
-          rm -rf mongo-c-driver
-
-          # NOTE: If you change the C Driver version here, also change the substitution in the CocoaPod podspec below in the apple builder.
-          git clone --branch r1.13 --depth 1 https://github.com/mongodb/mongo-c-driver.git
-          cd mongo-c-driver
-
-          # Fixup VERSION so we don't end up with -dev on it. Remove this once we are building a stable version and CDRIVER-2861 is resolved.
-          cp -f VERSION_RELEASED VERSION_CURRENT
-
-          trap "cat CMakeFiles/CMakeOutput.log" EXIT
-          export ${compile_env|}
-          ${cmake_path|/opt/cmake/bin/cmake} -DCMAKE_INSTALL_PREFIX=$BUILD_PREFIX -DENABLE_SHM_COUNTERS=OFF -DENABLE_SNAPPY=OFF -DENABLE_AUTOMATIC_INIT_AND_CLEANUP=OFF -DENABLE_TESTS=OFF -DENABLE_EXAMPLES=OFF -DENABLE_STATIC=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=${cdriver_cmake_osx_deployment_target|} ${cdriver_cmake_flags}
-          trap - EXIT # cancel the previous trap '...' EXIT
-          make install VERBOSE=1
-
-          # TODO: Remove this when we upgrade to a version of the C driver that has CDRIVER-2854 fixed.
-          mkdir -p $BUILD_PREFIX/share/doc/mongo-c-driver
-          cp COPYING $BUILD_PREFIX/share/doc/mongo-c-driver
-          cp THIRD_PARTY_NOTICES $BUILD_PREFIX/share/doc/mongo-c-driver
-
-          mv $BUILD_PREFIX $FINAL_PREFIX
+        file: expansions.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/embedded_sdk_build_cdriver.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
 - name: embedded_sdk_install_dev
   commands:
@@ -3429,24 +3405,17 @@ tasks:
 
 - name: embedded_sdk_s3_put
   commands:
-    # Not using archive.targz_pack here because I can't get it to work.
-    - command: shell.exec
+    - command: expansions.write
       params:
-        working_dir: "src/build"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          cat <<EOF > mongo-embedded-sdk-${version}/README-Licenses.txt
-          The software accompanying this file is Copyright (C) 2018 MongoDB, Inc. and
-          is licensed to you on the terms set forth in the following files:
-            - mongo-c-driver: share/doc/mongo-c-driver/COPYING
-            - mongo_embedded: share/doc/mongo_embedded/LICENSE-Embedded.txt
-            - mongoc_embedded: share/doc/mongo_embedded/LICENSE-Embedded.txt
-          EOF
-
-          tar cfvz embedded-sdk.tgz mongo-embedded-sdk-${version}
+        file: expansions.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/embedded_sdk_s3_tar.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -3478,16 +3447,18 @@ tasks:
 
 - name: embedded_sdk_tests_s3_put
   commands:
-    # Not using archive.targz_pack here because I can't get it to work.
-    - command: shell.exec
+    - command: expansions.write
       params:
-        working_dir: "src/build"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          tar cfvz embedded-sdk-tests.tgz mongo-embedded-sdk-${version}
+        file: expansions.yml
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/embedded_sdk_s3_tar.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
     # Upload it so we can download from EVG.
     - command: s3.put
@@ -7101,36 +7072,27 @@ tasks:
   patchable: false
   commands:
   - func: "do non-compile setup"
-  - command: shell.exec
+  - command: expansions.write
+    params:
+      file: expansions.yml
+  - command: subprocess.exec
     type: setup
     params:
-      working_dir: src
+      binary: bash
       silent: true
-      shell: bash
-      script: |
-        # Create the Evergreen API credentials
-        cat > .restconfig.json <<END_OF_CREDS
-        {
-        "baseurl": "${blackduck_url}",
-        "username": "${blackduck_username}",
-        "password": "${blackduck_password}",
-        "debug": false,
-        "insecure" : false
-        }
-        END_OF_CREDS
-  - command: shell.exec
-    type: test
+      args:
+        - "src/evergreen/blackduck_setup.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
+  - command: subprocess.exec
     params:
-      working_dir: src/
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # activate the virtualenv if it has been set up
-        ${activate_virtualenv}
-
-        python buildscripts/blackduck_hub.py -v scan_and_report --build_logger=mci.buildlogger --build_logger_task_id=${task_id} --report_file=report.json
+      binary: bash
+      args:
+        - "src/evergreen/blackduck_hub.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
 
 - name: tla_plus
   commands:
@@ -7195,18 +7157,17 @@ tasks:
         task_compile_flags: >-
           --separate-debug
           --legacy-tarball
-    - command: shell.exec
+    - command: expansions.write
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ $(find . -name mongocryptd${exe} | wc -l) -eq 1 ] ; then
-            # Validate that this build_variant is listed as a known enterprise task for mongocryptd
-            PATH=$PATH:$HOME $python ../buildscripts/validate_mongocryptd.py --variant "${build_variant}" ../etc/evergreen.yml
-          fi
+        file: expansions.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/package.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
     - command: s3.put
       params:
         aws_key: ${aws_key}
