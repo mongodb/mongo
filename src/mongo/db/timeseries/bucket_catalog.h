@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
 #include <queue>
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
@@ -44,6 +45,10 @@ namespace mongo {
 class BucketCatalog {
     struct ExecutionStats;
     class MinMax;
+
+    // Number of new field names we can hold in NewFieldNames without needing to allocate memory.
+    static constexpr std::size_t kNumStaticNewFields = 10;
+    using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
 public:
     class Bucket;
@@ -95,7 +100,7 @@ public:
         const std::vector<BSONObj>& measurements() const;
         const BSONObj& min() const;
         const BSONObj& max() const;
-        const StringSet& newFieldNamesToBeInserted() const;
+        const StringMap<std::size_t>& newFieldNamesToBeInserted() const;
         uint32_t numPreviouslyCommittedMeasurements() const;
 
         /**
@@ -119,7 +124,7 @@ public:
         /**
          * Record a set of new-to-the-bucket fields. Active batches only.
          */
-        void _recordNewFields(StringSet&& fields);
+        void _recordNewFields(NewFieldNames&& fields);
 
         /**
          * Prepare the batch for commit. Sets min/max appropriately, records the number of documents
@@ -150,7 +155,7 @@ public:
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
         BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
         uint32_t _numPreviouslyCommittedMeasurements = 0;
-        StringSet _newFieldNamesToBeInserted;
+        StringMap<std::size_t> _newFieldNamesToBeInserted;  // Value is hash of string key
 
         bool _active = true;
 
@@ -282,7 +287,7 @@ private:
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
             return H::combine(std::move(h),
-                              std::hash<std::string_view>()(std::string_view(
+                              absl::Hash<absl::string_view>()(absl::string_view(
                                   metadata._sorted.objdata(), metadata._sorted.objsize())));
         }
 
@@ -481,7 +486,7 @@ public:
          */
         void _calculateBucketFieldsAndSizeChange(const BSONObj& doc,
                                                  boost::optional<StringData> metaField,
-                                                 StringSet* newFieldNamesToBeInserted,
+                                                 NewFieldNames* newFieldNamesToBeInserted,
                                                  uint32_t* newFieldNamesSize,
                                                  uint32_t* sizeToBeAdded) const;
 

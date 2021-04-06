@@ -681,7 +681,7 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     ASSERT(batch2->claimCommitRights());
     _bucketCatalog->prepareCommit(batch2);
     ASSERT_EQ(batch2->newFieldNamesToBeInserted().size(), 1);
-    ASSERT_EQ(*batch2->newFieldNamesToBeInserted().begin(), _timeField);
+    ASSERT_EQ(batch2->newFieldNamesToBeInserted().begin()->first, _timeField);
     _bucketCatalog->finish(batch2, _commitInfo);
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
