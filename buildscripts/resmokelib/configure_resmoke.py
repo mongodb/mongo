@@ -318,7 +318,9 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
         _config.ARCHIVE_FILE = None
     else:
         # Enable archival globally for all required mainline builders.
-        if "-required" in _config.EVERGREEN_VARIANT_NAME and not _config.EVERGREEN_PATCH_BUILD:
+        if (_config.EVERGREEN_VARIANT_NAME is not None
+                and "-required" in _config.EVERGREEN_VARIANT_NAME
+                and not _config.EVERGREEN_PATCH_BUILD):
             _config.FORCE_ARCHIVE_ALL_DATA_FILES = True
 
     _config.ARCHIVE_LIMIT_MB = config.pop("archive_limit_mb")
