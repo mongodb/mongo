@@ -113,6 +113,12 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* 
                                              boost::none); /* collUUID */
 }
 
+bool isRetriableOplogFetcherError(Status oplogFetcherStatus) {
+    return oplogFetcherStatus == ErrorCodes::InvalidSyncSource ||
+        oplogFetcherStatus == ErrorCodes::TooStaleToSyncFromSource ||
+        oplogFetcherStatus == ErrorCodes::ShutdownInProgress;
+}
+
 }  // namespace
 
 // A convenient place to set test-specific parameters.
@@ -1313,9 +1319,23 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
                     "tenantId"_attr = getTenantId(),
                     "migrationId"_attr = getMigrationUUID(),
                     "error"_attr = oplogFetcherStatus);
+        if (isRetriableOplogFetcherError(oplogFetcherStatus)) {
+            LOGV2_DEBUG(5535500,
+                        1,
+                        "Recipient migration service oplog fetcher received retriable error, "
+                        "excluding donor host as sync source and retrying",
+                        "tenantId"_attr = getTenantId(),
+                        "migrationId"_attr = getMigrationUUID(),
+                        "error"_attr = oplogFetcherStatus);
+
+            stdx::lock_guard lk(_mutex);
+            const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+            _excludeDonorHost(lk,
+                              _client->getServerHostAndPort(),
+                              now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
+        }
         _interrupt(oplogFetcherStatus, /*skipWaitingForForgetMigration=*/false);
     }
-    _oplogFetcherStatus = oplogFetcherStatus;
 }
 
 void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint* fp,
@@ -2098,7 +2118,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             if (_taskState.isInterrupted()) {
                 status = _taskState.getInterruptStatus();
             }
-            if (ErrorCodes::isRetriableError(status) && !_taskState.isExternalInterrupt() &&
+            if ((ErrorCodes::isRetriableError(status) || isRetriableOplogFetcherError(status)) &&
+                !_taskState.isExternalInterrupt() &&
                 _stateDocPersistedPromise.getFuture().isReady()) {
                 // Reset the task state and clear the interrupt status.
                 if (!_taskState.isRunning()) {
@@ -2106,7 +2127,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 }
                 _isRestartingOplogApplier = true;
                 // Clean up the async components before retrying the future chain.
-                _oplogFetcherStatus = boost::none;
                 std::unique_ptr<OplogFetcher> savedDonorOplogFetcher;
                 std::shared_ptr<TenantOplogApplier> savedTenantOplogApplier;
 

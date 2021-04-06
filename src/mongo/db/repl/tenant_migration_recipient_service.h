@@ -540,8 +540,6 @@ public:
         std::unique_ptr<TenantMigrationSharedData> _sharedData;  // (S)
         // Indicates whether the main task future continuation chain state kicked off by run().
         TaskState _taskState;  // (M)
-        // Used to indicate whether the migration is able to be retried on fetcher error.
-        boost::optional<Status> _oplogFetcherStatus;  // (M)
 
         // Promise that is resolved when the state document is initialized and persisted.
         SharedPromise<void> _stateDocPersistedPromise;  // (W)
