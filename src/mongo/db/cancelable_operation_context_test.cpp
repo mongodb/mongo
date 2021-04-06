@@ -99,7 +99,7 @@ TEST_F(CancelableOperationContextTest, KilledWhenCancellationSourceIsCanceled) {
 
     cancelSource.cancel();
     waitForAllEarlierTasksToComplete();
-    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
 }
 
 TEST_F(CancelableOperationContextTest, SafeWhenCancellationSourceIsCanceledUnderClientMutex) {
@@ -119,7 +119,7 @@ TEST_F(CancelableOperationContextTest, SafeWhenCancellationSourceIsCanceledUnder
         cancelSource.cancel();
     }
     waitForAllEarlierTasksToComplete();
-    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
 }
 
 TEST_F(CancelableOperationContextTest, SafeWhenDestructedBeforeCancellationSourceIsCanceled) {

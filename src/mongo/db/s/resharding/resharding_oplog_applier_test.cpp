@@ -33,6 +33,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
@@ -298,6 +299,18 @@ protected:
         return executor;
     }
 
+    CancelableOperationContextFactory makeCancelableOpCtxForApplier(CancellationToken cancelToken) {
+        auto executor = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestReshardOplogApplierCancelableOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+
+        return CancelableOperationContextFactory(cancelToken, executor);
+    }
+
     static constexpr int kWriterPoolSize = 4;
     const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
     const NamespaceString kCrudNs{"foo.bar"};
@@ -337,10 +350,11 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 }
 
@@ -381,7 +395,8 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -391,7 +406,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -443,8 +458,10 @@ TEST_F(ReshardingOplogApplierTest, CanceledCloningBatch) {
     // Cancel the rescheduling of the next batch.
     auto abortSource = CancellationSource();
     abortSource.cancel();
+    auto cancelToken = abortSource.token();
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
 
-    auto future = applier->applyUntilCloneFinishedTs(abortSource.token());
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
@@ -486,12 +503,14 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                     writerPool.get());
 
     auto abortSource = CancellationSource();
-    auto future = applier->applyUntilCloneFinishedTs(abortSource.token());
+    auto cancelToken = abortSource.token();
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     abortSource.cancel();
 
-    future = applier->applyUntilDone(abortSource.token());
+    future = applier->applyUntilDone(cancelToken, factory);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
@@ -523,7 +542,8 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -541,7 +561,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     for (int x = 0; x < 19; x++) {
@@ -585,7 +605,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
 
@@ -634,10 +655,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
 
@@ -685,7 +707,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -732,10 +755,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
@@ -780,7 +804,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -831,10 +856,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -884,7 +910,8 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -948,10 +975,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
 
@@ -1005,7 +1033,8 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
     executor->shutdown();
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
@@ -1049,11 +1078,12 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     executor->shutdown();
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -1095,7 +1125,8 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
     writerPool->shutdown();
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
@@ -1139,11 +1170,12 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     writerPool->shutdown();
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 
@@ -1192,14 +1224,15 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
 
@@ -1239,7 +1272,8 @@ TEST_F(ReshardingOplogApplierTest,
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
 
@@ -1700,10 +1734,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, GroupInserts) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1788,10 +1823,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1875,10 +1911,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1936,10 +1973,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -1990,10 +2028,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2055,10 +2094,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2110,10 +2150,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2167,10 +2208,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2225,10 +2267,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2282,7 +2325,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2293,7 +2337,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
 
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2347,7 +2391,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2358,7 +2403,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
 
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if session info was not compatible.
@@ -2419,10 +2464,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPreImage) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2486,10 +2532,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWriteWithPostImage) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2536,10 +2583,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithLowerExistingTxn) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2587,10 +2635,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithHigherExistingTxnNum) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if txn info was not compatible.
@@ -2647,10 +2696,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithEqualExistingTxnNum) {
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     DBDirectClient client(operationContext());
@@ -2701,10 +2751,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithActiveUnpreparedTxnSameT
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Ops should always be applied regardless of conflict with existing txn.
@@ -2759,10 +2810,11 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnActiveUnpreparedTxnWithLower
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if txn info was not compatible.
@@ -2816,7 +2868,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommi
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2827,7 +2880,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillCommi
 
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if txn info was not compatible.
@@ -2877,7 +2930,8 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
                     writerPool.get());
 
     auto cancelToken = operationContext()->getCancellationToken();
-    auto future = applier->applyUntilCloneFinishedTs(cancelToken);
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier->applyUntilCloneFinishedTs(cancelToken, factory);
 
     // Sleep a little bit to make the applier block on the prepared transaction.
     sleepmillis(200);
@@ -2888,7 +2942,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, ApplyTxnWithPreparedTxnThatWillAbort
 
     future.get();
 
-    future = applier->applyUntilDone(cancelToken);
+    future = applier->applyUntilDone(cancelToken, factory);
     future.get();
 
     // Op should always be applied, even if txn info was not compatible.
@@ -2934,15 +2988,16 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     ASSERT_EQ(metricsAppliedCount(), 0);
 
     auto cancelToken = operationContext()->getCancellationToken();
+    auto factory = makeCancelableOpCtxForApplier(cancelToken);
 
-    applier.applyUntilCloneFinishedTs(cancelToken).get();  // Stop at clone timestamp 7
+    applier.applyUntilCloneFinishedTs(cancelToken, factory).get();  // Stop at clone timestamp 7
     ASSERT_EQ(metricsAppliedCount(),
               4);  // Applied timestamps {5,6,7}, and {8} drafts in on the batch.
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
 
-    applier.applyUntilDone(cancelToken).get();
+    applier.applyUntilDone(cancelToken, factory).get();
     ASSERT_EQ(metricsAppliedCount(), 5);  // Now includes timestamp {9}
     progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);

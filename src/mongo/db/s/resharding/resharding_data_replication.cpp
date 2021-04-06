@@ -327,7 +327,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     // oplog application begin. This similarly applies to _runOplogAppliersUntilStrictlyConsistent()
     // and the _consistentButStale promise being fulfilled.
     auto oplogApplierConsistentButStaleFutures =
-        _runOplogAppliersUntilConsistentButStale(executor, errorSource.token());
+        _runOplogAppliersUntilConsistentButStale(executor, errorSource.token(), opCtxFactory);
 
     auto fulfillConsistentButStaleFuture =
         resharding::whenAllSucceedOn(oplogApplierConsistentButStaleFutures, executor)
@@ -335,7 +335,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
             .share();
 
     auto oplogApplierStrictlyConsistentFutures =
-        _runOplogAppliersUntilStrictlyConsistent(executor, errorSource.token());
+        _runOplogAppliersUntilStrictlyConsistent(executor, errorSource.token(), opCtxFactory);
 
     // We must additionally wait for fulfillCloningDoneFuture and fulfillConsistentButStaleFuture to
     // become ready to ensure their corresponding promises aren't being fulfilled while the
@@ -433,7 +433,9 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogFetchers
 
 std::vector<SharedSemiFuture<void>>
 ReshardingDataReplication::_runOplogAppliersUntilConsistentButStale(
-    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogApplierFutures;
     oplogApplierFutures.reserve(_oplogAppliers.size());
 
@@ -443,8 +445,8 @@ ReshardingDataReplication::_runOplogAppliersUntilConsistentButStale(
         oplogApplierFutures.emplace_back(
             future_util::withCancellation(_startOplogApplication.getFuture(), cancelToken)
                 .thenRunOn(executor)
-                .then([applier = applier.get(), cancelToken] {
-                    return applier->applyUntilCloneFinishedTs(cancelToken);
+                .then([applier = applier.get(), cancelToken, opCtxFactory] {
+                    return applier->applyUntilCloneFinishedTs(cancelToken, opCtxFactory);
                 })
                 .share());
     }
@@ -454,7 +456,9 @@ ReshardingDataReplication::_runOplogAppliersUntilConsistentButStale(
 
 std::vector<SharedSemiFuture<void>>
 ReshardingDataReplication::_runOplogAppliersUntilStrictlyConsistent(
-    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogApplierFutures;
     oplogApplierFutures.reserve(_oplogAppliers.size());
 
@@ -464,8 +468,8 @@ ReshardingDataReplication::_runOplogAppliersUntilStrictlyConsistent(
         oplogApplierFutures.emplace_back(
             future_util::withCancellation(_consistentButStale.getFuture(), cancelToken)
                 .thenRunOn(executor)
-                .then([applier = applier.get(), cancelToken] {
-                    return applier->applyUntilDone(cancelToken);
+                .then([applier = applier.get(), cancelToken, opCtxFactory] {
+                    return applier->applyUntilDone(cancelToken, opCtxFactory);
                 })
                 .share());
     }
