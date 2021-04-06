@@ -62,11 +62,15 @@ public:
 
         _fastClockSource = std::make_unique<SystemClockSource>();
         _sessionCache = new WiredTigerSessionCache(_conn, _fastClockSource.get());
+
+        WiredTigerUtil::notifyStartupComplete();
     }
 
     ~WiredTigerIndexHarnessHelper() final {
         delete _sessionCache;
         _conn->close(_conn, nullptr);
+
+        WiredTigerUtil::resetTableLoggingInfo();
     }
 
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {

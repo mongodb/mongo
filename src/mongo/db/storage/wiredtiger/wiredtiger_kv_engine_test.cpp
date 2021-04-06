@@ -68,6 +68,7 @@ public:
     virtual KVEngine* restartEngine() override {
         _engine.reset(nullptr);
         _engine = makeEngine();
+        _engine->notifyStartupComplete();
         return _engine.get();
     }
 
