@@ -857,8 +857,14 @@ public:
 
     BSONElement next() {
         verify(_fields);
-        if (_cur < _nfields)
-            return BSONElement(_fields[_cur++]);
+        if (_cur < _nfields) {
+            const auto& element = _fields[_cur++];
+            return BSONElement(element.fieldName.rawData() - 1,  // Include type byte
+                               element.fieldName.size() + 1,     // Add null terminator
+                               element.totalSize,
+                               BSONElement::CachedSizeTag{});
+        }
+
         return BSONElement();
     }
 
@@ -868,7 +874,11 @@ protected:
 
 private:
     const int _nfields;
-    const std::unique_ptr<const char*[]> _fields;
+    struct Field {
+        StringData fieldName;
+        int totalSize;
+    };
+    const std::unique_ptr<Field[]> _fields;
     int _cur;
 };
 

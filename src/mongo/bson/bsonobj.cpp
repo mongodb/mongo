@@ -798,7 +798,7 @@ StringBuilder& operator<<(StringBuilder& s, const BSONObj& o) {
 class BSONIteratorSorted::ElementFieldCmp {
 public:
     ElementFieldCmp(bool isArray);
-    bool operator()(const char* s1, const char* s2) const;
+    bool operator()(const Field& lhs, const Field& rhs) const;
 
 private:
     str::LexNumCmp _cmp;
@@ -806,18 +806,18 @@ private:
 
 BSONIteratorSorted::ElementFieldCmp::ElementFieldCmp(bool isArray) : _cmp(!isArray) {}
 
-bool BSONIteratorSorted::ElementFieldCmp::operator()(const char* s1, const char* s2) const {
-    // Skip the type byte and compare field names.
-    return _cmp(s1 + 1, s2 + 1);
+bool BSONIteratorSorted::ElementFieldCmp::operator()(const Field& lhs, const Field& rhs) const {
+    // Just compare field names.
+    return _cmp(lhs.fieldName, rhs.fieldName);
 }
 
 BSONIteratorSorted::BSONIteratorSorted(const BSONObj& o, const ElementFieldCmp& cmp)
-    : _nfields(o.nFields()), _fields(new const char*[_nfields]) {
+    : _nfields(o.nFields()), _fields(std::make_unique<Field[]>(_nfields)) {
     int x = 0;
     BSONObjIterator i(o);
     while (i.more()) {
-        _fields[x++] = i.next().rawdata();
-        verify(_fields[x - 1]);
+        auto elem = i.next();
+        _fields[x++] = {elem.fieldNameStringData(), elem.size()};
     }
     verify(x == _nfields);
     std::sort(_fields.get(), _fields.get() + _nfields, cmp);
