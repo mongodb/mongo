@@ -63,6 +63,10 @@ public:
                     repl::feature_flags::gTenantMigrations.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are not available in sharded clusters",
+                    serverGlobalParams.clusterRole == ClusterRole::None);
+
             // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
             uassert(
                 5356101,
@@ -179,6 +183,11 @@ public:
                     "recipientForgetMigration command not enabled",
                     repl::feature_flags::gTenantMigrations.isEnabled(
                         serverGlobalParams.featureCompatibility));
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "tenant migrations are not available in sharded clusters",
+                    serverGlobalParams.clusterRole == ClusterRole::None);
+
             const auto& cmd = request();
 
             auto recipientService =
