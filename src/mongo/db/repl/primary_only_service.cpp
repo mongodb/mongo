@@ -416,6 +416,8 @@ void PrimaryOnlyService::onStepDown() {
 
     _state = State::kPaused;
     _rebuildStatus = Status::OK();
+
+    _afterStepDown();
 }
 
 void PrimaryOnlyService::shutdown() {

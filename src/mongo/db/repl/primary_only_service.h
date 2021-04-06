@@ -299,7 +299,7 @@ protected:
     /**
      * Constructs a new Instance object with the given initial state.
      */
-    virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) const = 0;
+    virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) = 0;
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
@@ -402,6 +402,13 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
         return ExecutorFuture<void>(**executor, Status::OK());
     };
+
+    /**
+     * Called at the end of the service stepdown procedure.
+     * In order to not block the stepdown procedure, no blocking work must be done in this
+     * function.
+     */
+    virtual void _afterStepDown() {}
 
     /**
      * Called as part of onStepUp.  Queries the state document collection for this
