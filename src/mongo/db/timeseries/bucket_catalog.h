@@ -136,9 +136,10 @@ public:
 
         /**
          * Abandon the write batch and notify any waiters that the bucket has been cleared. Must
-         * have commit rights.
+         * have commit rights. Parameter controls whether the function is allowed to access the
+         * bucket.
          */
-        void _abort();
+        void _abort(bool canAccessBucket);
 
 
         Bucket* _bucket;

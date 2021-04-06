@@ -298,7 +298,7 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
     auto lk = _lockExclusive();
     if (!_allBuckets.contains(bucket)) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
-        batch->_abort();
+        batch->_abort(false);
         return;
     }
 
@@ -437,13 +437,13 @@ void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
     // otherwise try to claim the rights and abort it. If we don't get the rights, then wait
     // for the other writer to resolve the batch.
     for (const auto& [_, current] : bucket->_batches) {
-        current->_abort();
+        current->_abort(true);
     }
     bucket->_batches.clear();
 
     if (auto& prepared = bucket->_preparedBatch) {
         if (prepared == batch) {
-            prepared->_abort();
+            prepared->_abort(true);
         }
         prepared.reset();
     }
@@ -1185,11 +1185,16 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
     _bucket = nullptr;
 }
 
-void BucketCatalog::WriteBatch::_abort() {
+void BucketCatalog::WriteBatch::_abort(bool canAccessBucket) {
     _active = false;
-    _promise.setError({ErrorCodes::TimeseriesBucketCleared,
-                       str::stream() << "Time-series bucket " << _bucket->id() << " for "
-                                     << _bucket->_ns << " was cleared"});
+    std::string bucketIdentification;
+    if (canAccessBucket) {
+        bucketIdentification.append(str::stream()
+                                    << _bucket->id() << " for " << _bucket->_ns << " ");
+    }
+    _promise.setError(
+        {ErrorCodes::TimeseriesBucketCleared,
+         str::stream() << "Time-series bucket " << bucketIdentification << "was cleared"});
     _bucket = nullptr;
 }
 
