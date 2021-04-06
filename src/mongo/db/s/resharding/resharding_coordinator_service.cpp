@@ -480,10 +480,12 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
     }();
     const auto chunksUpdate = [&]() {
         if (newCollectionTimestamp) {
-            return BSON("$set" << BSON("lastmodEpoch" << newCollectionEpoch));
+            return BSON("$set" << BSON(ChunkType::epoch << newCollectionEpoch
+                                                        << ChunkType::timestamp
+                                                        << *newCollectionTimestamp));
         } else {
-            return BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns() << "lastmodEpoch"
-                                            << newCollectionEpoch));
+            return BSON("$set" << BSON(ChunkType::ns << coordinatorDoc.getSourceNss().ns()
+                                                     << ChunkType::epoch << newCollectionEpoch));
         }
     }();
     auto chunksRequest = BatchedCommandRequest::buildUpdateOp(ChunkType::ConfigNS,
