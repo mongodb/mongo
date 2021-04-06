@@ -11,11 +11,15 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+const conn = MongoRunner.runMongod();
+
+if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
+const dbName = jsTestName();
 let collCount = 0;
 
 const testOptions = function(allowed,
@@ -31,7 +35,7 @@ const testOptions = function(allowed,
                                  // passing all the test assertions.
                                  tearDown: (testDB, collName) => {},
                              }) {
-    const testDB = db.getSiblingDB(jsTestName());
+    const testDB = conn.getDB(dbName);
     const collName = 'timeseries_' + collCount++;
     const bucketsCollName = 'system.buckets.' + collName;
 
@@ -145,7 +149,7 @@ testTimeseriesNamespaceExists((testDB, collName) => {
 
 // Tests that schema validation is enabled on the bucket collection.
 {
-    const testDB = db.getSiblingDB(jsTestName());
+    const testDB = conn.getDB(dbName);
     const coll = testDB.getCollection('timeseries_' + collCount++);
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
@@ -174,4 +178,6 @@ testTimeseriesNamespaceExists((testDB, collName) => {
                                  ErrorCodes.DocumentValidationFailure);
     assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
 }
+
+MongoRunner.stopMongod(conn);
 })();
