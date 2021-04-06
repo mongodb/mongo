@@ -756,6 +756,10 @@ Status WiredTigerUtil::setTableLogging(WT_SESSION* session, const std::string& u
 
     invariant(_tableLoggingInfo.isFirstTable);
     invariant(!_tableLoggingInfo.hasPreviouslyIncompleteTableChecks);
+
+    // When repair or a forced modification to the table logging settings isn't running, check that
+    // the first table is the catalog.
+    invariant(uri == "table:_mdb_catalog", str::stream() << "First table checked was: " << uri);
     _tableLoggingInfo.isFirstTable = false;
 
     // Check if the first tables logging settings need to be modified.
