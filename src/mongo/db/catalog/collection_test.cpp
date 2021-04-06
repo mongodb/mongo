@@ -214,57 +214,6 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
     ASSERT_EQ(notifier->getVersion(), thisVersion);
 }
 
-TEST_F(CollectionTest, CreateTimeseriesBucketCollection) {
-    NamespaceString nss("test.system.buckets.a");
-    invariant(nss.isTimeseriesBucketsCollection());
-
-    AutoGetOrCreateDb databaseWriteGuard(operationContext(), nss.db(), MODE_IX);
-    auto db = databaseWriteGuard.getDb();
-    invariant(db);
-
-    Lock::CollectionLock lk(operationContext(), nss, MODE_IX);
-
-    const BSONObj idxSpec = BSON("v" << IndexDescriptor::getDefaultIndexVersion() << "name"
-                                     << "_id_"
-                                     << "key" << BSON("_id" << 1));
-
-    CollectionOptions options;
-    options.clusteredIndex = ClusteredIndexOptions{};
-    {
-        WriteUnitOfWork wuow(operationContext());
-
-        // Database::createCollection() ignores the index spec if the _id index is not required on
-        // the collection.
-        Collection* collection = db->createCollection(operationContext(),
-                                                      nss,
-                                                      options,
-                                                      /*createIdIndex=*/true,
-                                                      /*idIndex=*/
-                                                      idxSpec);
-        ASSERT(collection);
-        ASSERT_EQ(0, collection->getIndexCatalog()->numIndexesTotal(operationContext()));
-
-        StatusWith<BSONObj> swSpec = collection->getIndexCatalog()->createIndexOnEmptyCollection(
-            operationContext(), idxSpec);
-        ASSERT_NOT_OK(swSpec.getStatus());
-        ASSERT_EQ(swSpec.getStatus().code(), ErrorCodes::CannotCreateIndex);
-        ASSERT_STRING_CONTAINS(
-            swSpec.getStatus().reason(),
-            "cannot create an _id index on a collection already clustered by _id");
-
-        // Rollback.
-    }
-
-    {
-        WriteUnitOfWork wuow(operationContext());
-        auto collection =
-            db->createCollection(operationContext(), nss, options, /*createIdIndex=*/false);
-        ASSERT(collection);
-        ASSERT_EQ(0, collection->getIndexCatalog()->numIndexesTotal(operationContext()));
-        wuow.commit();
-    }
-}
-
 TEST_F(CatalogTestFixture, CollectionPtrNoYieldTag) {
     CollectionMock mock(NamespaceString("test.t"));
 

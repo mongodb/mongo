@@ -70,6 +70,7 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
                                    StringData ns,
                                    StringData ident,
                                    const CollectionOptions& options) {
+    uassert(5555900, "The 'clusteredIndex' option is not supported", !options.clusteredIndex);
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = true;
     return Status::OK();

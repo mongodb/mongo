@@ -169,7 +169,6 @@ public:
             // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
             // end.
             auto exec = InternalPlanner::collectionScan(opCtx,
-                                                        fullNs.ns(),
                                                         &collection.getCollection(),
                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                         InternalPlanner::BACKWARD);

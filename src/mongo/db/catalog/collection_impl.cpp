@@ -1497,12 +1497,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
     boost::optional<RecordId> resumeAfterRecordId) const {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-    return InternalPlanner::collectionScan(opCtx,
-                                           yieldableCollection->ns().ns(),
-                                           &yieldableCollection,
-                                           yieldPolicy,
-                                           direction,
-                                           resumeAfterRecordId);
+    return InternalPlanner::collectionScan(
+        opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
 }
 
 void CollectionImpl::setNs(NamespaceString nss) {

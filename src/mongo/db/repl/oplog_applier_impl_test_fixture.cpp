@@ -334,7 +334,6 @@ void checkTxnTable(OperationContext* opCtx,
 CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceString& nss)
     : _collToScan(opCtx, nss),
       _exec(InternalPlanner::collectionScan(opCtx,
-                                            nss.ns(),
                                             &_collToScan.getCollection(),
                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                             InternalPlanner::FORWARD)) {}

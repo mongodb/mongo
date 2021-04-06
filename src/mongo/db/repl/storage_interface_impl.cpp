@@ -697,17 +697,57 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 }
                 // Use collection scan.
                 planExecutor = isFind
-                    ? InternalPlanner::collectionScan(opCtx,
-                                                      nsOrUUID.toString(),
-                                                      &collection,
-                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                      direction)
+                    ? InternalPlanner::collectionScan(
+                          opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, direction)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
                           &collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction);
+            } else if (*indexName == kIdIndexName && collection->isClustered()) {
+                // This collection is clustered by _id. Use a bounded collection scan, since a
+                // separate _id index is likely not available.
+                if (boundInclusion != BoundInclusion::kIncludeBothStartAndEndKeys) {
+                    return Result(
+                        ErrorCodes::InvalidOptions,
+                        "bound inclusion must be BoundInclusion::kIncludeBothStartAndEndKeys for "
+                        "bounded collection scan");
+                }
+
+                // Note: this is a limitation of this helper, not bounded collection scans.
+                if (direction != InternalPlanner::FORWARD) {
+                    return Result(ErrorCodes::InvalidOptions,
+                                  "bounded collection scans only support forward scans");
+                }
+
+                boost::optional<RecordId> minRecord, maxRecord;
+                if (!startKey.isEmpty()) {
+                    auto oid = startKey.firstElement().OID();
+                    minRecord = RecordId(oid.view().view(), OID::kOIDSize);
+                }
+
+                if (!endKey.isEmpty()) {
+                    auto oid = endKey.firstElement().OID();
+                    maxRecord = RecordId(oid.view().view(), OID::kOIDSize);
+                }
+
+                planExecutor = isFind
+                    ? InternalPlanner::collectionScan(opCtx,
+                                                      &collection,
+                                                      PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                                      direction,
+                                                      boost::none /* resumeAfterId */,
+                                                      minRecord,
+                                                      maxRecord)
+                    : InternalPlanner::deleteWithCollectionScan(
+                          opCtx,
+                          &collection,
+                          makeDeleteStageParamsForDeleteDocuments(),
+                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                          direction,
+                          minRecord,
+                          maxRecord);
             } else {
                 // Use index scan.
                 auto indexCatalog = collection->getIndexCatalog();
@@ -1118,12 +1158,8 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     invariant(oplog);
     invariant(opCtx->lockState()->isLocked());
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
-        InternalPlanner::collectionScan(opCtx,
-                                        NamespaceString::kRsOplogNamespace.ns(),
-                                        &oplog,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                        InternalPlanner::BACKWARD);
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec = InternalPlanner::collectionScan(
+        opCtx, &oplog, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
 
     // A record id in the oplog collection is equivalent to the document's timestamp field.
     RecordId desiredRecordId = RecordId(timestamp.asULL());

@@ -50,36 +50,21 @@ namespace mongo {
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
-    StringData ns,
     const CollectionPtr* coll,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction,
-    boost::optional<RecordId> resumeAfterRecordId) {
+    boost::optional<RecordId> resumeAfterRecordId,
+    boost::optional<RecordId> minRecord,
+    boost::optional<RecordId> maxRecord) {
     const auto& collection = *coll;
+    invariant(collection);
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(ns));
-
-    if (!collection) {
-        auto eof = std::make_unique<EOFStage>(expCtx.get());
-        // Takes ownership of 'ws' and 'eof'.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(expCtx,
-                                        std::move(ws),
-                                        std::move(eof),
-                                        &CollectionPtr::null,
-                                        yieldPolicy,
-                                        false, /* whether owned BSON must be returned */
-                                        NamespaceString(ns));
-        invariant(statusWithPlanExecutor.isOK());
-        return std::move(statusWithPlanExecutor.getValue());
-    }
-
-    invariant(ns == collection->ns().ns());
-
-    auto cs = _collectionScan(expCtx, ws.get(), &collection, direction, resumeAfterRecordId);
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+    auto cs = _collectionScan(
+        expCtx, ws.get(), &collection, direction, resumeAfterRecordId, minRecord, maxRecord);
 
     // Takes ownership of 'ws' and 'cs'.
     auto statusWithPlanExecutor =

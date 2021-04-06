@@ -175,7 +175,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     auto exec =
         InternalPlanner::collectionScan(opCtx,
-                                        fromNss.ns(),
                                         &fromCollection,
                                         PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
                                         InternalPlanner::FORWARD);
