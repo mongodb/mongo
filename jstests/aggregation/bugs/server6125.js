@@ -1,3 +1,4 @@
+(function() {
 //
 // testing $sort aggregation pipeline for heterogeneity (SERVER-6125)
 // method:
@@ -6,9 +7,6 @@
 // Save the array members to the db.
 // aggregate($sort)
 // iterate through the array ensuring the _ids are in the correct order
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 // to make results array nested (problem 2)
 function nestArray(nstArray) {
@@ -96,3 +94,4 @@ runSort({a: -1}, false, "p3");
 // problem 4, reverse order sort with nested array
 runSort({"a": -1}, true, "p4a");
 runSort({"a.b": -1}, true, "p4b");
+})();
