@@ -1,6 +1,10 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_writes]
+// @tags: [
+//   assumes_no_implicit_collection_creation_after_drop,
+//   requires_multi_updates,
+//   requires_non_retryable_writes,
+// ]
 
 // Tests for the arrayFilters option to update and findAndModify.
 (function() {

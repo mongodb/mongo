@@ -65,32 +65,6 @@ selector:
   - jstests/core/notablescan_capped.js
   # captrunc command is not blocked during tenant migration.
   - jstests/core/capped6.js
-  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
-  - jstests/core/batch_write_collation_estsize.js
-  - jstests/core/bulk_api_ordered.js
-  - jstests/core/bulk_api_unordered.js
-  - jstests/core/fts_querylang.js
-  - jstests/core/idhack.js
-  - jstests/core/index_arr2.js
-  - jstests/core/role_management_helpers.js
-  - jstests/core/roles_info.js
-  - jstests/core/server1470.js
-  - jstests/core/update_arrayFilters.js
-  - jstests/core/update_arraymatch2.js
-  - jstests/core/update_arraymatch3.js
-  - jstests/core/update_arraymatch5.js
-  - jstests/core/update_hint.js
-  - jstests/core/update_multi3.js
-  - jstests/core/update_multi4.js
-  - jstests/core/update_multi5.js
-  - jstests/core/update_pipeline_shell_helpers.js
-  - jstests/core/update_with_pipeline.js
-  - jstests/core/update7.js
-  - jstests/core/updatei.js
-  - jstests/core/updatej.js
-  - jstests/core/updatel.js
-  - jstests/core/where_system_js.js
-  - jstests/core/write_result.js
 
   #
   # Blacklists from causally_consistent_jscore_passthrough.yml
@@ -160,6 +134,8 @@ selector:
   - requires_profiling
   # emptycapped command is blocked during tenant migration.
   - requires_emptycapped
+  # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
+  - requires_multi_updates
   ##
   # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
   # override when it refuses to replace the readPreference of a particular command. Above each tag

@@ -2,6 +2,7 @@
 //   assumes_superuser_permissions,
 //   assumes_write_concern_unchanged,
 //   requires_auth,
+//   requires_multi_updates,
 //   requires_non_retryable_commands,
 // ]
 

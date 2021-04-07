@@ -3,6 +3,7 @@
 //   # This test expects a function stored in the system.js collection to be available to $where,
 //   # which may not be the case if it is implicitly sharded in a passthrough.
 //   assumes_unsharded_collection,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_scripting,
 // ]
