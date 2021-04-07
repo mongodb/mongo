@@ -977,14 +977,10 @@ wiredtiger_open_tiered_storage_configuration = [
             authentication string identifier'''),
         Config('bucket', '', r'''
             bucket string identifier where the objects should reside'''),
-        Config('cluster', '', r'''
-            unique string identifier identifying the cluster owning these objects.
-            This identifier is used in naming since objects multiple instances can share
-            the object storage bucket'''),
-        Config('member', '', r'''
-            unique string identifier identifying the member within a cluster.
-            This identifier is used in naming objects since multiple nodes in a
-            cluster could write to the same table in the object storage bucket'''),
+        Config('bucket_prefix', '', r'''
+            unique string prefix to identify our objects in the bucket.
+            Multiple instances can share the storage bucket and this
+            identifier is used in naming objects'''),
         Config('name', 'none', r'''
             Permitted values are \c "none"
             or custom storage name created with
