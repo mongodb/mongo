@@ -110,6 +110,7 @@ class test_rollback_to_stable_base(wttest.WiredTigerTestCase):
             count += 1
         session.commit_transaction()
         self.assertEqual(count, nrows)
+        cursor.close()
 
 # Test that rollback to stable clears the remove operation.
 class test_rollback_to_stable01(test_rollback_to_stable_base):
