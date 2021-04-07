@@ -70,6 +70,11 @@ namespace mongo {
  *     Only applicable to write concern, and indicates that it originated from the (deprecated)
  *     'settings.getLastErrorDefaults' field of the replica set configuration.
  *
+ *   - "internalWriteDefault":
+ *     Only applicable to write concern on internal writes, and indicates that the internal client
+ *     did not supply an explicit write concern, so this write concern represents the corresponding
+ *     server default for internal writes, ie. {w: 1, wtimeout: 0}.
+ *
  * A ReadWriteConcernProvenance object may only have a single Source value throughout its lifetime;
  * once the Source has been set, attempting to change it will trigger an invariant.  This ensures
  * the integrity of the provenance value as the operation makes its way through the server (and
@@ -83,6 +88,7 @@ public:
     static constexpr StringData kImplicitDefault = "implicitDefault"_sd;
     static constexpr StringData kCustomDefault = "customDefault"_sd;
     static constexpr StringData kGetLastErrorDefaults = "getLastErrorDefaults"_sd;
+    static constexpr StringData kInternalWriteDefault = "internalWriteDefault"_sd;
 
     ReadWriteConcernProvenance() = default;
 

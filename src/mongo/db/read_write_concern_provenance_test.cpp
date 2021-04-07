@@ -67,6 +67,12 @@ TEST(ReadWriteConcernProvenanceTest, GetLastErrorDefaults) {
     ASSERT_FALSE(provenance.isClientSupplied());
 }
 
+TEST(ReadWriteConcernProvenanceTest, InternalWriteDefault) {
+    ReadWriteConcernProvenance provenance(ReadWriteConcernProvenance::Source::internalWriteDefault);
+    ASSERT_TRUE(provenance.hasSource());
+    ASSERT_FALSE(provenance.isClientSupplied());
+}
+
 TEST(ReadWriteConcernProvenanceTest, SetSourceFromUnsetToUnset) {
     ReadWriteConcernProvenance provenance;
     provenance.setSource(boost::none);

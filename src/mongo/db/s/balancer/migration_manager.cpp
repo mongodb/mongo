@@ -485,7 +485,7 @@ std::shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule
     // server default writeConcern.
     if (!builder.hasField(WriteConcernOptions::kWriteConcernField)) {
         builder.append(WriteConcernOptions::kWriteConcernField,
-                       WriteConcernOptions::kImplicitDefault);
+                       WriteConcernOptions::kInternalWriteDefault);
     }
 
     stdx::lock_guard<Latch> lock(_mutex);

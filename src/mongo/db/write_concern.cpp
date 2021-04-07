@@ -165,6 +165,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
         } else if (getLastErrorDefaultsWasApplied) {
             provenance.setSource(ReadWriteConcernProvenance::Source::getLastErrorDefaults);
+        } else if (opCtx->getClient()->isInDirectClient() || isInternalClient) {
+            provenance.setSource(ReadWriteConcernProvenance::Source::internalWriteDefault);
         } else {
             provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
         }
@@ -179,7 +181,8 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
         // does not specify writeConcern when writing to the config server.
         writeConcern = {
             WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
-        writeConcern.getProvenance().setSource(ReadWriteConcernProvenance::Source::implicitDefault);
+        writeConcern.getProvenance().setSource(
+            ReadWriteConcernProvenance::Source::internalWriteDefault);
     } else {
         Status wcStatus = validateWriteConcern(opCtx, writeConcern);
         if (!wcStatus.isOK()) {

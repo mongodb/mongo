@@ -178,7 +178,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
                          << 1 << "maxClusterTime" << clusterTime.asTimestamp() << "data"
                          << BSON("noop write for afterClusterTime read concern" << 1)
                          << WriteConcernOptions::kWriteConcernField
-                         << WriteConcernOptions::kImplicitDefault),
+                         << WriteConcernOptions::kInternalWriteDefault),
                     onRemoteCmdScheduled,
                     onRemoteCmdComplete);
 

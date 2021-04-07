@@ -254,6 +254,7 @@ enums:
             implicitDefault: "implicitDefault"
             customDefault: "customDefault"
             getLastErrorDefaults: "getLastErrorDefaults"
+            internalWriteDefault: "internalWriteDefault"
 
     CollationCaseFirst:
         description: Sort order of case differences.

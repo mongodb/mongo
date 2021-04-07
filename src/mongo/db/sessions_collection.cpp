@@ -278,8 +278,8 @@ BSONObj SessionsCollection::generateCreateIndexesCmd() {
     CreateIndexesCommand createIndexes(NamespaceString::kLogicalSessionsNamespace);
     createIndexes.setIndexes({index.toBSON()});
 
-    return createIndexes.toBSON(
-        BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions::kImplicitDefault));
+    return createIndexes.toBSON(BSON(WriteConcernOptions::kWriteConcernField
+                                     << WriteConcernOptions::kInternalWriteDefault));
 }
 
 BSONObj SessionsCollection::generateCollModCmd() {
@@ -293,7 +293,7 @@ BSONObj SessionsCollection::generateCollModCmd() {
 
     indexBuilder.done();
     collModCmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                             WriteConcernOptions::kImplicitDefault);
+                             WriteConcernOptions::kInternalWriteDefault);
     collModCmdBuilder.done();
 
     return collModCmdBuilder.obj();

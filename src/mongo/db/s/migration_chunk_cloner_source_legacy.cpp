@@ -299,10 +299,10 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
 
     // Commands sent to shards that accept writeConcern, must always have writeConcern. So if the
     // StartChunkCloneRequest didn't add writeConcern (from secondaryThrottle), then we add the
-    // implicit server default writeConcern.
+    // internal server default writeConcern.
     if (!cmdBuilder.hasField(WriteConcernOptions::kWriteConcernField)) {
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                          WriteConcernOptions::kImplicitDefault);
+                          WriteConcernOptions::kInternalWriteDefault);
     }
 
     auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());

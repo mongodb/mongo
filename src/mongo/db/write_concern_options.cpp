@@ -76,10 +76,10 @@ const BSONObj WriteConcernOptions::Acknowledged(BSON("w" << W_NORMAL));
 const BSONObj WriteConcernOptions::Unacknowledged(BSON("w" << W_NONE));
 const BSONObj WriteConcernOptions::Majority(BSON("w" << WriteConcernOptions::kMajority));
 
-// The "kImplicitDefault" write concern, used by internal operations, is deliberately empty (no
+// The "kInternalWriteDefault" write concern, used by internal operations, is deliberately empty (no
 // 'w' or 'wtimeout' specified). This allows internal operations to specify a write concern, while
 // still allowing it to be either w:1 or automatically upconverted to w:majority on configsvrs.
-const BSONObj WriteConcernOptions::kImplicitDefault;
+const BSONObj WriteConcernOptions::kInternalWriteDefault;
 
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutSystem;
 constexpr Seconds WriteConcernOptions::kWriteConcernTimeoutMigration;

@@ -646,10 +646,15 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     bool clientSuppliedWriteConcern = !_parc->_wc->usedDefault;
     bool customDefaultWriteConcernWasApplied = false;
+    bool isInternalClient =
+        (opCtx->getClient()->session() &&
+         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 
     if (supportsWriteConcern && !clientSuppliedWriteConcern &&
-        (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName))) {
-        // This command supports WC, but wasn't given one - so apply the default, if there is one.
+        (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
+        !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
+        // This command is not from a DBDirectClient or internal client, and supports WC, but
+        // wasn't given one - so apply the default, if there is one.
         if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
                                        .getDefaultWriteConcern(opCtx)) {
             _parc->_wc = *wcDefault;
@@ -685,6 +690,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                 provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
             } else if (customDefaultWriteConcernWasApplied) {
                 provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
+            } else if (opCtx->getClient()->isInDirectClient() || isInternalClient) {
+                provenance.setSource(ReadWriteConcernProvenance::Source::internalWriteDefault);
             } else {
                 provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
             }
