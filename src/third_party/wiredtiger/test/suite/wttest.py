@@ -201,14 +201,15 @@ class WiredTigerTestCase(unittest.TestCase):
     conn_extensions = ()
 
     @staticmethod
-    def globalSetup(preserveFiles = False, useTimestamp = False,
+    def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
                     longtest = False, ignoreStdout = False, seedw = 0, seedz = 0, hookmgr = None):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
             d += '.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
-        shutil.rmtree(d, ignore_errors=True)
+        if removeAtStart:
+            shutil.rmtree(d, ignore_errors=True)
         os.makedirs(d)
         wtscenario.set_long_run(longtest)
         WiredTigerTestCase._parentTestdir = d
