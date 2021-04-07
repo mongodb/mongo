@@ -189,7 +189,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.assertEquals(got, expect)
 
     def test_local_locations(self):
-        # Test using various buckets, clusters
+        # Test using various buckets, hosts
 
         session = self.session
         local = self.conn.get_storage_source('local_store')
