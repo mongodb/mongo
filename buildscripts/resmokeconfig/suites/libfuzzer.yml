@@ -4,4 +4,7 @@ selector:
   root: build/libfuzzer_tests.txt
 
 executor:
-  config: {}
+  config:
+    corpus_directory_stem: corpora
+  hooks:
+  - class: LibfuzzerHook
