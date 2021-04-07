@@ -10,9 +10,9 @@
  */
 
 (function() {
-const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
-    "use strict";
+"use strict";
 
+const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     load("jstests/core/timeseries/libs/timeseries.js");
     load("jstests/libs/fail_point_util.js");
     load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
@@ -39,16 +39,16 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
-    const donarPrimary = tenantMigrationTest.getDonorPrimary();
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    if (!TenantMigrationUtil.isFeatureFlagEnabled(donarPrimary)) {
+    if (!TenantMigrationUtil.isFeatureFlagEnabled(donorPrimary)) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         tenantMigrationTest.stop();
         recipientRst.stopSet();
         return;
     }
 
-    if (isTimeSeries && !TimeseriesTest.timeseriesCollectionsEnabled(donarPrimary)) {
+    if (isTimeSeries && !TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
         jsTestLog("Skipping test because the time-series collection feature flag is disabled");
         tenantMigrationTest.stop();
         recipientRst.stopSet();
@@ -57,7 +57,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
 
     const tenantId = "testTenantId";
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
-    const donorDB = donarPrimary.getDB(dbName);
+    const donorDB = donorPrimary.getDB(dbName);
     const collName = "testColl";
 
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
@@ -87,7 +87,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     // Start a migration and wait for recipient to hang after cloning 2 documents.
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     hangDuringCollectionClone.wait();
-    assert.soon(() => recipientColl.find().itcount() === 2);
+    assert.soon(() => recipientColl.find().itcount() === batchSize);
 
     // Insert some documents that will be fetched by the recipient. This is to test that on
     // failover, the fetcher will resume fetching from where it left off. The system is expected
