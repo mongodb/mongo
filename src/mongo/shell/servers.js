@@ -1273,6 +1273,14 @@ function appendSetParameterArgs(argArray) {
                             continue;
                         }
 
+                        // Only set the 'enableTwoPhaseIndexBuild' parameter if it has not already
+                        // been set, so that tests will not try to set this parameter more than
+                        // once.
+                        if (paramName === "enableTwoPhaseIndexBuild" &&
+                            argArrayContains("enableTwoPhaseIndexBuild")) {
+                            continue;
+                        }
+
                         // Do not set this if test commands are not enabled or we are not on a new
                         // enough version.
                         if (paramName === "assertStableTimestampEqualsAppliedThroughOnRecovery" &&
