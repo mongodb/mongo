@@ -951,8 +951,6 @@ connection_reconfigure_statistics_log_configuration = [
 ]
 
 tiered_storage_configuration_common = [
-    Config('auth_token', '', r'''
-        authentication token string'''),
     Config('local_retention', '300', r'''
         time in seconds to retain data on tiered storage on the local tier for
         faster read access''',
