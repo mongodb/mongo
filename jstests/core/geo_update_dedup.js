@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because single updates are not targeted.
 // @tags: [
 //   assumes_unsharded_collection,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 

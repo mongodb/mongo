@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_fastcount,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 

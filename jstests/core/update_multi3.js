@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [requires_multi_updates, requires_non_retryable_writes]
 
 t = db.update_multi3;
 

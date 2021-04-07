@@ -5,6 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   assumes_write_concern_unchanged,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 //   requires_fastcount,
 // ]

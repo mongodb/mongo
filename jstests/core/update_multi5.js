@@ -1,4 +1,4 @@
-// @tags: [assumes_balancer_off, requires_non_retryable_writes]
+// @tags: [assumes_balancer_off, requires_multi_updates, requires_non_retryable_writes]
 
 // tests that $addToSet works in a multi-update.
 (function() {

@@ -1,5 +1,6 @@
 // Test the $text query operator.
 // @tags: [
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 (function() {
