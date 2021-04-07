@@ -23,7 +23,6 @@ noinst_PROGRAMS = \
 	ex_pack \
 	ex_process \
 	ex_schema \
-	ex_storage_source \
 	ex_smoke \
 	ex_stat \
 	ex_sync \
