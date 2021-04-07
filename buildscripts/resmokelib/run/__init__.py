@@ -10,6 +10,9 @@ import shlex
 import sys
 import time
 import shutil
+import tempfile
+import requests
+import dateutil.parser
 
 import curatorbin
 import pkg_resources
@@ -33,6 +36,8 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import process
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
+from buildscripts.resmokelib.run import runtime_recorder
+from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
 _MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
@@ -54,6 +59,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._jasper_server = None
         self._interrupted = False
         self._exit_code = 0
+
+        runtime_recorder.setup_start_time(start_time)
 
     def _setup_logging(self):
         logging.loggers.configure_loggers()

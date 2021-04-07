@@ -318,6 +318,9 @@ EVERGREEN_VARIANT_NAME = None
 # the commit hash.
 EVERGREEN_VERSION_ID = None
 
+# The url that retrieve the debug symbol from a patch build.
+DEBUG_SYMBOL_PATCH_URL = None
+
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
 

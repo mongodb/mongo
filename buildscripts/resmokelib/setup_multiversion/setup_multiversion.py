@@ -112,7 +112,7 @@ class SetupMultiversion(Subcommand):
                 install_dir = os.path.join(self.install_dir, version)
 
                 self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
-                                   bin_suffix)
+                                   bin_suffix, self.link_dir)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -178,7 +178,9 @@ class SetupMultiversion(Subcommand):
 
         return urls
 
-    def setup_mongodb(self, artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix):
+    @staticmethod
+    def setup_mongodb(artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix=None,
+                      link_dir=None):
         # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
@@ -189,7 +191,9 @@ class SetupMultiversion(Subcommand):
                 os.remove(tarball)
 
         if binaries_url is not None:
-            download.symlink_version(bin_suffix, install_dir, self.link_dir)
+            if not link_dir:
+                raise ValueError("link_dir must be specified if downloading binaries")
+            download.symlink_version(bin_suffix, install_dir, link_dir)
 
     def get_buildvariant_name(self, major_minor_version):
         """Return buildvariant name.

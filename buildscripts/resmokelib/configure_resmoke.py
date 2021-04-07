@@ -313,6 +313,24 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     _config.CEDAR_URL = config.pop("cedar_url")
     _config.CEDAR_RPC_PORT = config.pop("cedar_rpc_port")
 
+    def calculate_debug_symbol_url():
+        url = "https://mciuploads.s3.amazonaws.com/"
+        project_name = _config.EVERGREEN_PROJECT_NAME
+        variant_name = _config.EVERGREEN_VARIANT_NAME
+        revision = _config.EVERGREEN_REVISION
+        task_id = _config.EVERGREEN_TASK_ID
+        if (variant_name is not None) and (revision is not None) and (task_id is not None):
+            url = "/".join([
+                project_name, variant_name, revision, task_id,
+                f"/debugsymbols/debugsymbols-{task_id}"
+            ])
+            url = url + ".tgz" if sys.platform == "win32" else ".zip"
+            return url
+        return None
+
+    if _config.DEBUG_SYMBOL_PATCH_URL is None:
+        _config.DEBUG_SYMBOL_PATCH_URL = calculate_debug_symbol_url()
+
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:
         _config.ARCHIVE_FILE = None
