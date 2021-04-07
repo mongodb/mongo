@@ -178,11 +178,8 @@ checkCommand(st.s.getDB(dbName),
              false,
              setupFuncs.createDatabase,
              cleanupFuncs.dropDatabase);
-checkCommandConfigSvr(
-    {_configsvrDropCollection: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
 // dropDatabase
-
 // We can't use the checkCommandMongos wrapper because we need a connection to the test
 // database.
 checkCommand(st.s.getDB(dbName),
@@ -192,8 +189,6 @@ checkCommand(st.s.getDB(dbName),
              false,
              setupFuncs.createDatabase,
              cleanupFuncs.dropDatabase);
-checkCommandConfigSvr(
-    {_configsvrDropDatabase: dbName}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
 MongoRunner.stopMongos(newShard);
 st.stop();
