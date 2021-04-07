@@ -301,7 +301,9 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     if (status.isOK()) {
         status = _authenticate(opCtx, mechanism, user, cmdObj);
     }
-    audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
+    auto event = audit::AuthenticateEvent(
+        mechanism, user.getDB(), user.getUser(), [](BSONObjBuilder*) {}, status.code());
+    audit::logAuthentication(opCtx->getClient(), event);
 
     if (!status.isOK()) {
         if (!serverGlobalParams.quiet.load()) {

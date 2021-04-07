@@ -53,6 +53,7 @@
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/sequence_util.h"
@@ -186,17 +187,27 @@ Status doSaslStep(OperationContext* opCtx,
     // Passing in a payload and extracting a responsePayload
     StatusWith<std::string> swResponse = mechanism.step(opCtx, payload);
 
+    auto makeLogAttributes = [&]() {
+        logv2::DynamicAttributes attrs;
+        attrs.add("mechanism", mechanism.mechanismName());
+        attrs.add("speculative", session->isSpeculative());
+        attrs.add("principalName", mechanism.getPrincipalName());
+        attrs.add("authenticationDatabase", mechanism.getAuthenticationDatabase());
+        attrs.addDeepCopy("remote", opCtx->getClient()->getRemote().toString());
+        {
+            auto bob = BSONObjBuilder();
+            mechanism.appendExtraInfo(&bob);
+            attrs.add("extraInfo", bob.obj());
+        }
+
+        return attrs;
+    };
+
     if (!swResponse.isOK()) {
-        LOGV2(20249,
-              "SASL {mechanism} authentication failed for "
-              "{principalName} on {authenticationDatabase} from client "
-              "{client} ; {result}",
-              "Authentication failed",
-              "mechanism"_attr = mechanism.mechanismName(),
-              "principalName"_attr = mechanism.getPrincipalName(),
-              "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-              "client"_attr = opCtx->getClient()->getRemote().toString(),
-              "result"_attr = redact(swResponse.getStatus()));
+        auto attrs = makeLogAttributes();
+        auto errorString = redact(swResponse.getStatus());
+        attrs.add("error", errorString);
+        LOGV2(20249, "Authentication failed", attrs);
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
@@ -217,14 +228,8 @@ Status doSaslStep(OperationContext* opCtx,
         }
 
         if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20250,
-                  "Successfully authenticated as principal {principalName} on "
-                  "{authenticationDatabase} from client {client} with mechanism {mechanism}",
-                  "Successful authentication",
-                  "mechanism"_attr = mechanism.mechanismName(),
-                  "principalName"_attr = mechanism.getPrincipalName(),
-                  "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-                  "client"_attr = opCtx->getClient()->session()->remote());
+            auto attrs = makeLogAttributes();
+            LOGV2(20250, "Authentication succeeded", attrs);
         }
         if (session->isSpeculative()) {
             status = authCounter.incSpeculativeAuthenticateSuccessful(
@@ -322,7 +327,9 @@ bool runSaslStart(OperationContext* opCtx,
 
     auto status = authCounter.incAuthenticateReceived(mechanismName);
     if (!status.isOK()) {
-        audit::logAuthentication(client, mechanismName, UserName("", db), status.code());
+        auto event = audit::AuthenticateEvent(
+            mechanismName, db, ""_sd, [&](BSONObjBuilder*) {}, status.code());
+        audit::logAuthentication(client, event);
         uassertStatusOK(status);
         MONGO_UNREACHABLE;
     }
@@ -331,8 +338,18 @@ bool runSaslStart(OperationContext* opCtx,
     auto swSession = doSaslStart(opCtx, db, cmdObj, &result, &principalName, speculative);
 
     if (!swSession.isOK() || swSession.getValue()->getMechanism().isSuccess()) {
-        audit::logAuthentication(
-            client, mechanismName, UserName(principalName, db), swSession.getStatus().code());
+        auto event = audit::AuthenticateEvent(
+            mechanismName,
+            db,
+            principalName,
+            [&](BSONObjBuilder* bob) {
+                if (swSession.isOK()) {
+                    swSession.getValue()->getMechanism().appendExtraInfo(bob);
+                }
+            },
+            swSession.getStatus().code());
+        audit::logAuthentication(client, event);
+
         uassertStatusOK(swSession.getStatus());
         if (swSession.getValue()->getMechanism().isSuccess()) {
             uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanismName));
@@ -393,11 +410,13 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     CommandHelpers::appendCommandStatusNoThrow(result, status);
 
     if (mechanism.isSuccess() || !status.isOK()) {
-        audit::logAuthentication(
-            client,
-            mechanism.mechanismName(),
-            UserName(mechanism.getPrincipalName(), mechanism.getAuthenticationDatabase()),
-            status.code());
+        auto event =
+            audit::AuthenticateEvent(mechanism.mechanismName(),
+                                     mechanism.getAuthenticationDatabase(),
+                                     mechanism.getPrincipalName(),
+                                     [&](BSONObjBuilder* bob) { mechanism.appendExtraInfo(bob); },
+                                     status.code());
+        audit::logAuthentication(client, event);
         if (mechanism.isSuccess()) {
             uassertStatusOK(
                 authCounter.incAuthenticateSuccessful(mechanism.mechanismName().toString()));

@@ -25,7 +25,7 @@ if (isJsonLog(conn)) {
 
         return log.id === 20250 && log.attr.principalName === "root" &&
             log.attr.authenticationDatabase === "admin" &&
-            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.client);
+            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.remote);
     }
 
     function checkSCRAMfail(element, index, array) {
@@ -33,7 +33,7 @@ if (isJsonLog(conn)) {
 
         return log.id === 20249 && /SCRAM-SHA-\d+/.test(log.attr.mechanism) &&
             log.attr.principalName === "root" && log.attr.authenticationDatabase === "admin" &&
-            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.client);
+            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(log.attr.remote);
     }
 
     assert(log.some(checkAuthSuccess));

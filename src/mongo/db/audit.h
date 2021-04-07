@@ -39,11 +39,13 @@
 #include "mongo/db/auth/user.h"
 #include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 
 class AuthorizationSession;
 class BSONObj;
+class BSONObjBuilder;
 class Client;
 class NamespaceString;
 class OperationContext;
@@ -70,12 +72,59 @@ public:
 };
 
 /**
+ * AuthenticateEvent is a opaque view into a finished authentication handshake.
+ *
+ * This object is only valid within its initial stack context.
+ */
+class AuthenticateEvent {
+public:
+    using Appender = std::function<void(BSONObjBuilder*)>;
+
+    AuthenticateEvent(StringData mechanism,
+                      StringData db,
+                      StringData user,
+                      Appender appender,
+                      ErrorCodes::Error result)
+        : _mechanism(mechanism),
+          _db(db),
+          _user(user),
+          _appender(std::move(appender)),
+          _result(result) {}
+
+    StringData getMechanism() const {
+        return _mechanism;
+    }
+
+    StringData getDatabase() const {
+        return _db;
+    }
+
+    StringData getUser() const {
+        return _user;
+    }
+
+    ErrorCodes::Error getResult() const {
+        return _result;
+    }
+
+    void appendExtraInfo(BSONObjBuilder* bob) const {
+        _appender(bob);
+    }
+
+private:
+    StringData _mechanism;
+    StringData _db;
+    StringData _user;
+
+    Appender _appender;
+
+    ErrorCodes::Error _result;
+};
+
+/**
  * Logs the result of an authentication attempt.
  */
-void logAuthentication(Client* client,
-                       StringData mechanism,
-                       const UserName& user,
-                       ErrorCodes::Error result);
+void logAuthentication(Client* client, const AuthenticateEvent& event);
 
 //
 // Authorization (authz) logging functions.
