@@ -312,6 +312,19 @@ public:
         return bob.obj()["oplogEntriesFetched"_sd].Long();
     }
 
+    CancelableOperationContextFactory makeCancelableOpCtx() {
+        auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {
+            ThreadPool::Options options;
+            options.poolName = "TestReshardOplogFetcherCancelableOpCtxPool";
+            options.minThreads = 1;
+            options.maxThreads = 1;
+            return options;
+        }());
+
+        return CancelableOperationContextFactory(operationContext()->getCancellationToken(),
+                                                 cancelableOpCtxExecutor);
+    }
+
 protected:
     const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
 
@@ -348,7 +361,8 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
 
-        fetcher.iterate(&cc());
+        auto factory = makeCancelableOpCtx();
+        fetcher.iterate(&cc(), factory);
     });
 
     requestPassthroughHandler(fetcherJob);
@@ -381,7 +395,8 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
         fetcher.setInitialBatchSizeForTest(2);
         fetcher.setMaxBatchesForTest(maxBatches);
 
-        fetcher.iterate(&cc());
+        auto factory = makeCancelableOpCtx();
+        fetcher.iterate(&cc(), factory);
         return fetcher.getLastSeenTimestamp();
     });
 
@@ -418,7 +433,8 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
         // Status has a private default constructor so we wrap it in a boost::optional to placate
         // the Windows compiler.
         try {
-            fetcher.iterate(&cc());
+            auto factory = makeCancelableOpCtx();
+            fetcher.iterate(&cc(), factory);
             // Test failure case.
             return boost::optional<Status>(Status::OK());
         } catch (...) {
@@ -467,7 +483,8 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
         ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
-        return fetcher.iterate(&cc());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
     });
     ASSERT_TRUE(requestPassthroughHandler(fetcherJob));
     ASSERT_FALSE(hasSeenStartAtFuture.isReady());
@@ -493,7 +510,8 @@ TEST_F(ReshardingOplogFetcherTest, TestAwaitInsert) {
         ThreadClient tc("RunnerForFetcher", _svcCtx, nullptr);
         fetcher.useReadConcernForTest(false);
         fetcher.setInitialBatchSizeForTest(2);
-        return fetcher.iterate(&cc());
+        auto factory = makeCancelableOpCtx();
+        return fetcher.iterate(&cc(), factory);
     });
     ASSERT_TRUE(requestPassthroughHandler(fetcherJob));
     ASSERT_TRUE(hasSeenStartAtFuture.isReady());
