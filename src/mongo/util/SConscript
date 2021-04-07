@@ -761,6 +761,9 @@ stacktraceEnv.CppUnitTest(
         'stacktrace_test.cpp',
     ],
     LIBDEPS=stacktrace_test_LIBDEPS,
+    EXPORT_SYMBOLS=[
+        'mongo_stacktrace_test_detail_testFunctionWithLinkage',
+    ],
 )
 
 stacktraceEnv.Benchmark(
