@@ -46,20 +46,10 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     _tableID = tableID;
     _ru = WiredTigerRecoveryUnit::get(opCtx);
     _session = _ru->getSession();
-    _readOnce = _ru->getReadOnce();
-
-    // Attempt to retrieve the cursor from the cache. Cursors using the 'read_once' option will
-    // not be in the cache.
-    if (!_readOnce) {
-        _cursor = _session->getCachedCursor(uri, tableID);
-        if (_cursor) {
-            return;
-        }
-    }
 
     // Construct a new cursor with the provided options.
     str::stream builder;
-    if (_readOnce) {
+    if (_ru->getReadOnce()) {
         builder << "read_once=true,";
     }
     // Add this option last to avoid needing a trailing comma. This enables an optimization in
@@ -68,24 +58,23 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
         builder << "overwrite=false";
     }
 
-    const std::string config = builder;
+    _config = builder;
+
+    // Attempt to retrieve a cursor from the cache.
+    _cursor = _session->getCachedCursor(tableID, _config);
+    if (_cursor) {
+        return;
+    }
+
     try {
-        _cursor = _session->getNewCursor(uri, config.c_str());
+        _cursor = _session->getNewCursor(uri, _config.c_str());
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
         LOGV2_FATAL_NOTRACE(50883, "{ex}", "Cursor not found", "error"_attr = ex);
     }
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
-    dassert(_ru->getReadOnce() == _readOnce);
-
-    // Read-once cursors will never take cursors from the cursor cache, and should never release
-    // cursors into the cursor cache.
-    if (_readOnce) {
-        _session->closeCursor(_cursor);
-    } else {
-        _session->releaseCursor(_tableID, _cursor);
-    }
+    _session->releaseCursor(_tableID, _cursor, _config);
 }
 
 void WiredTigerCursor::reset() {
