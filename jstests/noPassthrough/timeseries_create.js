@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_fcv_49,
+ *   requires_wiredtiger,
  * ]
  */
 (function() {
@@ -151,6 +152,7 @@ testTimeseriesNamespaceExists((testDB, collName) => {
 {
     const testDB = conn.getDB(dbName);
     const coll = testDB.getCollection('timeseries_' + collCount++);
+    coll.drop();
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
@@ -177,6 +179,30 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandFailedWithCode(bucketsColl.insert({invalid_bucket_field: 1}),
                                  ErrorCodes.DocumentValidationFailure);
     assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
+}
+
+// Tests that the indexOptionDefaults collection creation option is applied when creating indexes
+// on a time-series collection.
+// This test case uses wiredtiger collection/index creation options, which should already be
+// enforced by the use of the 'requires_wiredtiger' test tag at the top of this file.
+{
+    const testDB = conn.getDB(dbName);
+    const coll = testDB.getCollection('timeseries_' + collCount++);
+    coll.drop();
+    assert.commandFailedWithCode(testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: 'tt', metaField: 'mm'},
+        indexOptionDefaults: {storageEngine: {wiredTiger: {configString: 'invalid_option=xxx,'}}}
+    }),
+                                 ErrorCodes.BadValue);
+    // Sample wiredtiger configuration option from wt_index_option_defaults.js.
+    assert.commandWorked(testDB.createCollection(coll.getName(), {
+        timeseries: {timeField: 'tt', metaField: 'mm'},
+        indexOptionDefaults: {storageEngine: {wiredTiger: {configString: 'split_pct=88,'}}}
+    }));
+    assert.commandWorked(coll.insert({tt: ISODate(), mm: 'aaa'}));
+    assert.commandWorked(coll.createIndex({mm: 1}));
+    const indexCreationString = coll.stats({indexDetails: true}).indexDetails.mm_1.creationString;
+    assert.neq(-1, indexCreationString.indexOf(',split_pct=88,'), indexCreationString);
 }
 
 MongoRunner.stopMongod(conn);
