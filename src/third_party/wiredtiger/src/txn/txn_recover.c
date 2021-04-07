@@ -558,6 +558,7 @@ __recovery_correct_write_gen(WT_SESSION_IMPL *session)
     WT_DECL_RET;
     char *config, *uri;
 
+    uri = NULL;
     WT_RET(__wt_metadata_cursor(session, &cursor));
     while ((ret = cursor->next(cursor)) == 0) {
         WT_ERR(cursor->get_key(cursor, &uri));
@@ -573,6 +574,8 @@ __recovery_correct_write_gen(WT_SESSION_IMPL *session)
     WT_ERR_NOTFOUND_OK(ret, false);
 
 err:
+    if (ret != 0 && uri != NULL)
+        __wt_err(session, ret, "unable to correct write gen for %s", uri);
     WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
 }
@@ -586,6 +589,7 @@ static int
 __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
     WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
     WT_LSN lsn;
     uint32_t fileid, lsnfile, lsnoffset;
 
@@ -606,7 +610,9 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
           "metadata corruption: files %s and %s have the same file ID %u", uri,
           r->files[fileid].uri, fileid);
     WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
-    WT_RET(__wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
+    if ((ret = __wt_config_getones(r->session, config, "checkpoint_lsn", &cval)) != 0)
+        WT_RET_MSG(
+          r->session, ret, "Failed recovery setup for %s: cannot parse config '%s'", uri, config);
     /* If there is no checkpoint logged for the file, apply everything. */
     if (cval.type != WT_CONFIG_ITEM_STRUCT)
         WT_INIT_LSN(&lsn);
@@ -614,8 +620,9 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
     else if (sscanf(cval.str, "(%" SCNu32 ",%" SCNu32 ")", &lsnfile, &lsnoffset) == 2)
         WT_SET_LSN(&lsn, lsnfile, lsnoffset);
     else
-        WT_RET_MSG(
-          r->session, EINVAL, "Failed to parse checkpoint LSN '%.*s'", (int)cval.len, cval.str);
+        WT_RET_MSG(r->session, EINVAL,
+          "Failed recovery setup for %s: cannot parse checkpoint LSN '%.*s'", uri, (int)cval.len,
+          cval.str);
     WT_ASSIGN_LSN(&r->files[fileid].ckpt_lsn, &lsn);
 
     __wt_verbose(r->session, WT_VERB_RECOVERY,
@@ -627,7 +634,9 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
         WT_ASSIGN_LSN(&r->max_ckpt_lsn, &lsn);
 
     /* Update the base write gen based on this file's configuration. */
-    return (__wt_metadata_update_base_write_gen(r->session, config));
+    if ((ret = __wt_metadata_update_base_write_gen(r->session, config)) != 0)
+        WT_RET_MSG(r->session, ret, "Failed recovery setup for %s: cannot update write gen", uri);
+    return (0);
 }
 
 /*
