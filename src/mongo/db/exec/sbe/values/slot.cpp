@@ -36,7 +36,7 @@
 #include "mongo/util/bufreader.h"
 
 namespace mongo::sbe::value {
-static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
+static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
     auto tag = static_cast<TypeTags>(buf.read<uint8_t>());
     Value val;
 
@@ -44,25 +44,27 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::Nothing:
             break;
         case TypeTags::NumberInt32:
-            val = bitcastFrom<int32_t>(buf.read<int32_t>());
+            val = bitcastFrom<int32_t>(buf.read<LittleEndian<int32_t>>());
             break;
         case TypeTags::RecordId:
         case TypeTags::NumberInt64:
-            val = bitcastFrom<int64_t>(buf.read<int64_t>());
+            val = bitcastFrom<int64_t>(buf.read<LittleEndian<int64_t>>());
             break;
         case TypeTags::NumberDouble:
-            val = bitcastFrom<double>(buf.read<double>());
+            val = bitcastFrom<double>(buf.read<LittleEndian<double>>());
             break;
         case TypeTags::NumberDecimal: {
-            auto [decTag, decVal] = makeCopyDecimal(Decimal128{buf.read<Decimal128::Value>()});
+            uint64_t low = buf.read<LittleEndian<uint64_t>>();
+            uint64_t high = buf.read<LittleEndian<uint64_t>>();
+            auto [decTag, decVal] = makeCopyDecimal(Decimal128{Decimal128::Value{low, high}});
             val = decVal;
             break;
         }
         case TypeTags::Date:
-            val = bitcastFrom<int64_t>(buf.read<int64_t>());
+            val = bitcastFrom<int64_t>(buf.read<LittleEndian<int64_t>>());
             break;
         case TypeTags::Timestamp:
-            val = bitcastFrom<uint64_t>(buf.read<uint64_t>());
+            val = bitcastFrom<uint64_t>(buf.read<LittleEndian<uint64_t>>());
             break;
         case TypeTags::Boolean:
             val = bitcastFrom<bool>(buf.read<char>());
@@ -91,12 +93,12 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             break;
         }
         case TypeTags::Array: {
-            auto cnt = buf.read<size_t>();
+            auto cnt = buf.read<LittleEndian<size_t>>();
             auto [arrTag, arrVal] = makeNewArray();
             auto arr = getArrayView(arrVal);
             arr->reserve(cnt);
             for (size_t idx = 0; idx < cnt; ++idx) {
-                auto [tag, val] = deserializeTagVal(buf);
+                auto [tag, val] = deserializeValue(buf);
                 arr->push_back(tag, val);
             }
             tag = arrTag;
@@ -104,12 +106,12 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             break;
         }
         case TypeTags::ArraySet: {
-            auto cnt = buf.read<size_t>();
+            auto cnt = buf.read<LittleEndian<size_t>>();
             auto [arrTag, arrVal] = makeNewArraySet();
             auto arr = getArraySetView(arrVal);
             arr->reserve(cnt);
             for (size_t idx = 0; idx < cnt; ++idx) {
-                auto [tag, val] = deserializeTagVal(buf);
+                auto [tag, val] = deserializeValue(buf);
                 arr->push_back(tag, val);
             }
             tag = arrTag;
@@ -117,13 +119,13 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             break;
         }
         case TypeTags::Object: {
-            auto cnt = buf.read<size_t>();
+            auto cnt = buf.read<LittleEndian<size_t>>();
             auto [objTag, objVal] = makeNewObject();
             auto obj = getObjectView(objVal);
             obj->reserve(cnt);
             for (size_t idx = 0; idx < cnt; ++idx) {
                 auto fieldName = buf.readCStr();
-                auto [tag, val] = deserializeTagVal(buf);
+                auto [tag, val] = deserializeValue(buf);
                 obj->push_back({fieldName.rawData(), fieldName.size()}, tag, val);
             }
             tag = objTag;
@@ -190,18 +192,18 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
 
 MaterializedRow MaterializedRow::deserializeForSorter(BufReader& buf,
                                                       const SorterDeserializeSettings&) {
-    auto cnt = buf.read<size_t>();
+    auto cnt = buf.read<LittleEndian<size_t>>();
     MaterializedRow result{cnt};
 
     for (size_t idx = 0; idx < cnt; ++idx) {
-        auto [tag, val] = deserializeTagVal(buf);
+        auto [tag, val] = deserializeValue(buf);
         result.reset(idx, true, tag, val);
     }
 
     return result;
 }
 
-static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
+static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
     buf.appendUChar(static_cast<uint8_t>(tag));
 
     switch (tag) {
@@ -218,7 +220,7 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendNum(bitcastTo<double>(val));
             break;
         case TypeTags::NumberDecimal:
-            buf.appendStruct(bitcastTo<Decimal128>(val).getValue());
+            buf.appendNum(value::bitcastTo<Decimal128>(val));
             break;
         case TypeTags::Date:
             buf.appendNum(bitcastTo<int64_t>(val));
@@ -239,8 +241,8 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         case TypeTags::StringSmall: {
             // Small strings cannot contain null bytes, so it is safe to serialize them as plain
-            // C-strings. Null byte is implicitly added at the end by 'buf.appendStr'.
-            buf.appendStr(getStringView(tag, val));
+            // C-strings with a null terminator.
+            buf.appendStr(getStringView(tag, val), true /* includeEndingNull */);
             break;
         }
         case TypeTags::StringBig:
@@ -256,7 +258,7 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendNum(arr->size());
             for (size_t idx = 0; idx < arr->size(); ++idx) {
                 auto [tag, val] = arr->getAt(idx);
-                serializeTagValue(buf, tag, val);
+                serializeValue(buf, tag, val);
             }
             break;
         }
@@ -264,7 +266,7 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             auto arr = getArraySetView(val);
             buf.appendNum(arr->size());
             for (auto& kv : arr->values()) {
-                serializeTagValue(buf, kv.first, kv.second);
+                serializeValue(buf, kv.first, kv.second);
             }
             break;
         }
@@ -272,9 +274,9 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             auto obj = getObjectView(val);
             buf.appendNum(obj->size());
             for (size_t idx = 0; idx < obj->size(); ++idx) {
-                buf.appendStr(obj->field(idx));
+                buf.appendStr(obj->field(idx), true /* includeEndingNull */);
                 auto [tag, val] = obj->getAt(idx);
-                serializeTagValue(buf, tag, val);
+                serializeValue(buf, tag, val);
             }
             break;
         }
@@ -315,8 +317,8 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
         }
         case TypeTags::bsonRegex: {
             auto regex = getBsonRegexView(val);
-            buf.appendStr(regex.pattern);
-            buf.appendStr(regex.flags);
+            buf.appendStr(regex.pattern, true /* includeEndingNull */);
+            buf.appendStr(regex.flags, true /* includeEndingNull */);
             break;
         }
         case TypeTags::bsonJavascript: {
@@ -342,7 +344,7 @@ void MaterializedRow::serializeForSorter(BufBuilder& buf) const {
 
     for (size_t idx = 0; idx < size(); ++idx) {
         auto [tag, val] = getViewOfValue(idx);
-        serializeTagValue(buf, tag, val);
+        serializeValue(buf, tag, val);
     }
 }
 
