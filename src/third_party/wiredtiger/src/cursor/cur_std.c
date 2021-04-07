@@ -1113,8 +1113,11 @@ __wt_cursor_init(
 
     session = CUR2S(cursor);
 
-    if (cursor->internal_uri == NULL)
+    if (cursor->internal_uri == NULL) {
+        /* Various cursor code assumes there is an internal URI, so there better be one to set. */
+        WT_ASSERT(session, uri != NULL);
         WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));
+    }
 
     /*
      * append The append flag is only relevant to column stores.
