@@ -2238,14 +2238,12 @@ struct __wt_connection {
 	 * @config{tiered_storage = (, enable tiered storage.  Enabling tiered storage may use one
 	 * session from the configured session_max., a set of related configuration options defined
 	 * below.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;auth_token, authentication token string., a
-	 * string; default empty.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds
-	 * to retain data on tiered storage on the local tier for faster read access., an integer
-	 * between 0 and 10000; default \c 300.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;object_target_size,
-	 * the approximate size of objects before creating them on the tiered storage tier., an
-	 * integer between 100K and 10TB; default \c 10M.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;local_retention, time in seconds to retain data
+	 * on tiered storage on the local tier for faster read access., an integer between 0 and
+	 * 10000; default \c 300.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;object_target_size, the
+	 * approximate size of objects before creating them on the tiered storage tier., an integer
+	 * between 100K and 10TB; default \c 10M.}
 	 * @config{ ),,}
 	 * @config{verbose, enable messages for various events.  Options are given as a list\, such
 	 * as <code>"verbose=[evictserver\,read]"</code>., a list\, with values chosen from the
