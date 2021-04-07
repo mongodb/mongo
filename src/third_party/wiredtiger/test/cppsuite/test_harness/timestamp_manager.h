@@ -88,7 +88,7 @@ class timestamp_manager : public component {
              * Keep a time window between the stable and oldest ts less than the max defined in the
              * configuration.
              */
-            testutil_assert(_stable_ts > _oldest_ts);
+            testutil_assert(_stable_ts >= _oldest_ts);
             if ((_stable_ts - _oldest_ts) > _oldest_lag) {
                 _oldest_ts = _stable_ts - _oldest_lag;
                 if (!config.empty())

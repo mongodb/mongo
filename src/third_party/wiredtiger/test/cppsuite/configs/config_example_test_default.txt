@@ -1,6 +1,4 @@
-# Sets up a basic database with 2 collections and 5 keys and run thread for 10 seconds.
-# All components are enabled.
-# Used as a basic test for the framework.
+# Same parameters as config_poc_test_default
 duration_seconds=10
 cache_size_mb=1000
 enable_logging=true

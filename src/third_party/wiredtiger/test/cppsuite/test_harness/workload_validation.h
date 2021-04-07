@@ -251,6 +251,10 @@ class workload_validation {
                 database.collections[key_collection_name].values->insert(pair);
                 break;
             }
+            case tracking_operation::UPDATE:
+                database.collections[key_collection_name].values->at(key).value =
+                  key_value_t(value);
+                break;
             default:
                 testutil_die(DEBUG_ABORT, "Unexpected operation in the tracking table: %d",
                   value_operation_type);
@@ -271,10 +275,10 @@ class workload_validation {
     check_reference(
       WT_SESSION *session, const std::string &collection_name, const database &database)
     {
-        bool is_valid = true;
+        bool is_valid;
         collection_t collection;
         key_t key;
-        key_value_t key_str, *value;
+        key_value_t key_str;
 
         /* Check the collection exists on disk. */
         is_valid = verify_collection_state(session, collection_name, true);
@@ -403,7 +407,7 @@ class workload_validation {
         testutil_check(cursor->search(cursor));
         testutil_check(cursor->get_value(cursor, &value));
 
-        return (value == expected_value);
+        return (key_value_t(value) == expected_value);
     }
 };
 } // namespace test_harness

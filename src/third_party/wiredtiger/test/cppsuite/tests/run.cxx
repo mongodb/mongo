@@ -33,6 +33,7 @@
 #include "test_harness/debug_utils.h"
 #include "test_harness/test.h"
 
+#include "example_test.cxx"
 #include "poc_test.cxx"
 
 std::string
@@ -107,10 +108,12 @@ run_test(const std::string &test_name, const std::string &config_name = "")
         cfg_path = config_name;
     cfg = parse_configuration_from_file(cfg_path);
 
-    test_harness::debug_print("Configuration\t: " + cfg, DEBUG_INFO);
+    test_harness::debug_print("Configuration\t:" + cfg, DEBUG_INFO);
 
     if (test_name == "poc_test")
         poc_test(cfg, test_name).run();
+    else if (test_name == "example_test")
+        example_test(cfg, test_name).run();
     else {
         test_harness::debug_print("Test not found: " + test_name, DEBUG_ERROR);
         error_code = -1;
@@ -127,7 +130,7 @@ main(int argc, char *argv[])
 {
     std::string cfg, config_name, test_name;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {"poc_test"};
+    const std::vector<std::string> all_tests = {"example_test", "poc_test"};
 
     /* Parse args
      * -C   : Configuration. Cannot be used with -f.
