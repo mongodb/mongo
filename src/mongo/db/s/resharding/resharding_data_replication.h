@@ -230,7 +230,9 @@ private:
         Milliseconds minimumOperationDuration);
 
     std::vector<SharedSemiFuture<void>> _runOplogFetchers(
-        std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken);
+        std::shared_ptr<executor::TaskExecutor> executor,
+        CancellationToken cancelToken,
+        CancelableOperationContextFactory opCtxFactory);
 
     std::vector<SharedSemiFuture<void>> _runOplogAppliersUntilConsistentButStale(
         std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken);

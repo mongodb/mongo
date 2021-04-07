@@ -304,7 +304,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     Milliseconds minimumOperationDuration) {
     CancellationSource errorSource(cancelToken);
 
-    auto oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token());
+    auto oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token(), opCtxFactory);
 
     auto collectionClonerFuture =
         _runCollectionCloner(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
@@ -414,13 +414,15 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
 }
 
 std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runOplogFetchers(
-    std::shared_ptr<executor::TaskExecutor> executor, CancellationToken cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory opCtxFactory) {
     std::vector<SharedSemiFuture<void>> oplogFetcherFutures;
     oplogFetcherFutures.reserve(_oplogFetchers.size());
 
     for (const auto& fetcher : _oplogFetchers) {
         oplogFetcherFutures.emplace_back(
-            fetcher->schedule(_oplogFetcherExecutor, cancelToken).share());
+            fetcher->schedule(_oplogFetcherExecutor, cancelToken, opCtxFactory).share());
     }
 
     return oplogFetcherFutures;

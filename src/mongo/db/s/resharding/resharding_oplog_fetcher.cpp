@@ -132,10 +132,13 @@ Future<void> ReshardingOplogFetcher::awaitInsert(const ReshardingDonorOplogId& l
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::schedule(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const CancellationToken& cancelToken,
+    CancelableOperationContextFactory factory) {
     return ExecutorFuture(executor)
-        .then(
-            [this, executor, cancelToken] { return _reschedule(std::move(executor), cancelToken); })
+        .then([this, executor, cancelToken, factory] {
+            return _reschedule(std::move(executor), cancelToken, factory);
+        })
         .onError([](Status status) {
             LOGV2_INFO(5192101, "Resharding oplog fetcher aborting", "reason"_attr = status);
             return status;
@@ -143,14 +146,16 @@ ExecutorFuture<void> ReshardingOplogFetcher::schedule(
 }
 
 ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& cancelToken) {
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const CancellationToken& cancelToken,
+    CancelableOperationContextFactory factory) {
     return ExecutorFuture(executor)
-        .then([this, executor, cancelToken] {
+        .then([this, executor, cancelToken, factory] {
             ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service());
-            return iterate(client.get());
+            return iterate(client.get(), factory);
         })
         .then([executor, cancelToken](bool moreToCome) {
             // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
@@ -160,7 +165,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                 return moreToCome;
             });
         })
-        .then([this, executor, cancelToken](bool moreToCome) {
+        .then([this, executor, cancelToken, factory](bool moreToCome) {
             if (!moreToCome) {
                 return ExecutorFuture(std::move(executor));
             }
@@ -171,14 +176,14 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                     Status{ErrorCodes::CallbackCanceled,
                            "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
-            return _reschedule(std::move(executor), cancelToken);
+            return _reschedule(std::move(executor), cancelToken, factory);
         });
 }
 
-bool ReshardingOplogFetcher::iterate(Client* client) {
+bool ReshardingOplogFetcher::iterate(Client* client, CancelableOperationContextFactory factory) {
     std::shared_ptr<Shard> targetShard;
     {
-        auto opCtxRaii = client->makeOperationContext();
+        auto opCtxRaii = factory.makeOperationContext(client);
         opCtxRaii->checkForInterrupt();
 
         StatusWith<std::shared_ptr<Shard>> swDonor =
@@ -193,7 +198,7 @@ bool ReshardingOplogFetcher::iterate(Client* client) {
     }
 
     try {
-        return consume(client, targetShard.get());
+        return consume(client, factory, targetShard.get());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         return false;
     } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
@@ -207,8 +212,10 @@ bool ReshardingOplogFetcher::iterate(Client* client) {
     }
 }
 
-void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceString nss) {
-    auto opCtxRaii = client->makeOperationContext();
+void ReshardingOplogFetcher::_ensureCollection(Client* client,
+                                               CancelableOperationContextFactory factory,
+                                               const NamespaceString nss) {
+    auto opCtxRaii = factory.makeOperationContext(client);
     auto opCtx = opCtxRaii.get();
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -228,8 +235,9 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceSt
     });
 }
 
-AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(Client* client) {
-    auto opCtxRaii = client->makeOperationContext();
+AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(
+    Client* client, CancelableOperationContextFactory factory) {
+    auto opCtxRaii = factory.makeOperationContext(client);
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
 
@@ -263,12 +271,14 @@ AggregateCommandRequest ReshardingOplogFetcher::_makeAggregateCommandRequest(Cli
     return aggRequest;
 }
 
-bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
-    _ensureCollection(client, _toWriteInto);
+bool ReshardingOplogFetcher::consume(Client* client,
+                                     CancelableOperationContextFactory factory,
+                                     Shard* shard) {
+    _ensureCollection(client, factory, _toWriteInto);
 
-    auto aggRequest = _makeAggregateCommandRequest(client);
+    auto aggRequest = _makeAggregateCommandRequest(client, factory);
 
-    auto opCtxRaii = client->makeOperationContext();
+    auto opCtxRaii = factory.makeOperationContext(client);
     int batchesProcessed = 0;
     bool moreToCome = true;
     // Note that the oplog entries are *not* being copied with a tailable cursor.
@@ -276,13 +286,13 @@ bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
-        [this, &batchesProcessed, &moreToCome](const std::vector<BSONObj>& batch) {
+        [this, &batchesProcessed, &moreToCome, factory](const std::vector<BSONObj>& batch) {
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service(),
                                 nullptr);
-            auto opCtxRaii = cc().makeOperationContext();
+            auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
 
             // Noting some possible optimizations:
