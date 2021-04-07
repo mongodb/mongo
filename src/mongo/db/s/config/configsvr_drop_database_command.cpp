@@ -29,20 +29,24 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/util/scopeguard.h"
 
 // TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {
 namespace {
+
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using FCVersion = FeatureCompatibility::Version;
 
 /**
  * Internal sharding command run on config servers to drop a database.
@@ -86,14 +90,14 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return cmdObj.firstElement().str();
     }
 
     bool run(OperationContext* opCtx,
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         uassert(ErrorCodes::IllegalOperation,
                 "_configsvrDropDatabase can only be run on config servers",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -113,6 +117,13 @@ public:
                 str::stream() << "dropDatabase must be called with majority writeConcern, got "
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+        FixedFCVRegion fcvRegion(opCtx);
+
+        uassert(ErrorCodes::CommandNotSupported,
+                "The _configsvrDropDatabase command is only supported under feature compatibility "
+                "version 4.4",
+                fcvRegion == FCVersion::kFullyDowngradedTo44);
 
         dropDatabaseLegacy(opCtx, dbname);
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);

@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/drop_collection_legacy.h"
@@ -41,6 +42,9 @@
 // TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {
 namespace {
+
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using FCVersion = FeatureCompatibility::Version;
 
 /**
  * Internal sharding command run on config servers to drop a collection from a database.
@@ -106,6 +110,13 @@ public:
                 str::stream() << "dropCollection must be called with majority writeConcern, got "
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+        FixedFCVRegion fcvRegion(opCtx);
+
+        uassert(ErrorCodes::CommandNotSupported,
+                "The _configsvrDropCollection command is only supported under feature "
+                "compatibility version 4.4",
+                fcvRegion == FCVersion::kFullyDowngradedTo44);
 
         dropCollectionLegacy(opCtx, nss);
 
