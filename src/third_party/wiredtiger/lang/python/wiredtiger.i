@@ -75,10 +75,10 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 %typemap(in, numinputs=0) WT_FILE_HANDLE ** (WT_FILE_HANDLE *temp = NULL) {
-	$1 = &temp;
+    $1 = &temp;
  }
-%typemap(in, numinputs=0) WT_LOCATION_HANDLE ** (WT_LOCATION_HANDLE *temp = NULL) {
-	$1 = &temp;
+%typemap(in, numinputs=0) WT_FILE_SYSTEM ** (WT_FILE_SYSTEM *temp = NULL) {
+    $1 = &temp;
  }
 %typemap(in, numinputs=0) WT_STORAGE_SOURCE ** (WT_STORAGE_SOURCE *temp = NULL) {
 	$1 = &temp;
@@ -190,12 +190,12 @@ from packing import pack, unpack
 	$1 = &val;
 }
 
-%typemap(in,numinputs=0) (char ***object_list, int *countp) (char **list, uint32_t nentries) {
+%typemap(in,numinputs=0) (char ***dirlist, int *countp) (char **list, uint32_t nentries) {
 	$1 = &list;
 	$2 = &nentries;
 }
 
-%typemap(argout) (char ***object_list, int *countp) {
+%typemap(argout) (char ***dirlist, int *countp) {
 	int i;
 	char **list;
 
@@ -203,8 +203,8 @@ from packing import pack, unpack
 	list = (*$1);
 	/*
 	 * When we're done with the individual C strings, free them.
-	 * In theory, we should call the ss_location_list_free() method,
-	 * but that's awkward, since we don't have the storage_source and session.
+	 * In theory, we should call the fs_directory_list_free() method,
+	 * but that's awkward, since we don't have the file system and session.
 	 */
 	for (i = 0; i < *$2; i++) {
 		PyObject *o = PyString_InternFromString(list[i]);
@@ -219,8 +219,8 @@ from packing import pack, unpack
 	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_file_handle, 0);
 }
 
-%typemap(argout) WT_LOCATION_HANDLE ** {
-	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_location_handle, 0);
+%typemap(argout) WT_FILE_SYSTEM ** {
+	$result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1), SWIGTYPE_p___wt_file_system, 0);
 }
 
 %typemap(argout) WT_STORAGE_SOURCE ** {
@@ -340,8 +340,8 @@ DESTRUCTOR(__wt_connection, close)
 DESTRUCTOR(__wt_cursor, close)
 DESTRUCTOR(__wt_file_handle, close)
 DESTRUCTOR(__wt_session, close)
-DESTRUCTOR(__wt_storage_source, close)
-DESTRUCTOR(__wt_location_handle, close)
+DESTRUCTOR(__wt_storage_source, ss_terminate)
+DESTRUCTOR(__wt_file_system, fs_terminate)
 
 /*
  * OVERRIDE_METHOD must be used when overriding or extending an existing
@@ -518,7 +518,7 @@ SELFHELPER(struct __wt_connection, connection)
 SELFHELPER(struct __wt_session, session)
 SELFHELPER(struct __wt_cursor, cursor)
 SELFHELPER(struct __wt_file_handle, file_handle)
-SELFHELPER(struct __wt_location_handle, location_handle)
+SELFHELPER(struct __wt_file_system, file_system)
 SELFHELPER(struct __wt_storage_source, storage_source)
 
  /*
@@ -985,40 +985,42 @@ typedef int int_void;
 };
 %enddef
 
-SIDESTEP_METHOD(__wt_storage_source, ss_location_handle,
-  (WT_SESSION *session, const char *config, WT_LOCATION_HANDLE **handle),
-  (self, session, config, handle))
+SIDESTEP_METHOD(__wt_storage_source, ss_customize_file_system,
+  (WT_SESSION *session, const char *bucket_name, const char *prefix,
+    const char *auth_token, const char *config, WT_FILE_SYSTEM **file_systemp),
+  (self, session, bucket_name, prefix, auth_token, config, file_systemp))
 
-SIDESTEP_METHOD(__wt_location_handle, close,
+SIDESTEP_METHOD(__wt_storage_source, ss_flush,
+  (WT_SESSION *session, WT_FILE_SYSTEM *file_system,
+    const char *name, const char *config),
+  (self, session, file_system, name, config))
+
+SIDESTEP_METHOD(__wt_storage_source, terminate,
   (WT_SESSION *session),
   (self, session))
 
-SIDESTEP_METHOD(__wt_storage_source, ss_exist,
-  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
-    const char *name, bool *existp),
-  (self, session, location_handle, name, existp))
+SIDESTEP_METHOD(__wt_file_system, fs_exist,
+  (WT_SESSION *session, const char *name, bool *existp),
+  (self, session, name, existp))
 
-SIDESTEP_METHOD(__wt_storage_source, ss_flush,
-  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
-    const char *name, const char *config),
-  (self, session, location_handle, name, config))
+SIDESTEP_METHOD(__wt_file_system, fs_open_file,
+  (WT_SESSION *session, const char *name, WT_FS_OPEN_FILE_TYPE file_type,
+    uint32_t flags, WT_FILE_HANDLE **file_handlep),
+  (self, session, name, file_type, flags, file_handlep))
 
-SIDESTEP_METHOD(__wt_storage_source, ss_open_object,
-  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
-    const char *name, uint32_t flags, WT_FILE_HANDLE **file_handlep),
-  (self, session, location_handle, name, flags, file_handlep))
+SIDESTEP_METHOD(__wt_file_system, fs_remove,
+  (WT_SESSION *session, const char *name, uint32_t flags),
+  (self, session, name, flags))
 
-SIDESTEP_METHOD(__wt_storage_source, ss_remove,
-  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
-    const char *name, uint32_t flags),
-  (self, session, location_handle, name, flags))
+SIDESTEP_METHOD(__wt_file_system, fs_rename,
+  (WT_SESSION *session, const char *from, const char *to, uint32_t flags),
+  (self, session, from, to, flags))
 
-SIDESTEP_METHOD(__wt_storage_source, ss_size,
-  (WT_SESSION *session, WT_LOCATION_HANDLE *location_handle,
-    const char *name, wt_off_t *sizep),
-  (self, session, location_handle, name, sizep))
+SIDESTEP_METHOD(__wt_file_system, fs_size,
+  (WT_SESSION *session, const char *name, wt_off_t *sizep),
+  (self, session, name, sizep))
 
-SIDESTEP_METHOD(__wt_storage_source, terminate,
+SIDESTEP_METHOD(__wt_file_system, terminate,
   (WT_SESSION *session),
   (self, session))
 
@@ -1092,20 +1094,26 @@ SIDESTEP_METHOD(__wt_file_handle, fh_write,
     }
 };
 
-%ignore __wt_storage_source::ss_location_list;
-%rename (ss_location_list) __wt_storage_source::_ss_location_list;
-%extend __wt_storage_source {
-    int _ss_location_list(WT_SESSION *session, WT_LOCATION_HANDLE *handle, const char *prefix,
-      uint32_t limit, char ***object_list, int *countp) {
-        return (self->ss_location_list(self, session, handle, prefix, limit, object_list, countp));
+%ignore __wt_file_system::fs_directory_list;
+%ignore __wt_file_system::fs_directory_list_single;
+%rename (fs_directory_list) __wt_file_system::_fs_directory_list;
+%rename (fs_directory_list_single) __wt_file_system::_fs_directory_list_single;
+%extend __wt_file_system {
+    int _fs_directory_list(WT_SESSION *session, const char *directory, const char *prefix,
+      char ***dirlist, int *countp) {
+        return (self->fs_directory_list(self, session, directory, prefix, dirlist, countp));
+    }
+    int _fs_directory_list_single(WT_SESSION *session, const char *directory, const char *prefix,
+      char ***dirlist, int *countp) {
+        return (self->fs_directory_list_single(self, session, directory, prefix, dirlist, countp));
     }
 };
 
 /*
- * No need for a location_list_free method, as the list and its components
- * are freed immediately after the location_list call.
+ * No need for a directory_list_free method, as the list and its components
+ * are freed immediately after the directory_list call.
  */
-%ignore __wt_storage_source::ss_location_list_free;
+%ignore __wt_file_system::fs_directory_list_free;
 
 %{
 int diagnostic_build() {
@@ -1164,7 +1172,7 @@ OVERRIDE_METHOD(__wt_session, WT_SESSION, log_printf, (self, msg))
 %rename(Connection) __wt_connection;
 %rename(FileHandle) __wt_file_handle;
 %rename(StorageSource) __wt_storage_source;
-%rename(LocationHandle) __wt_location_handle;
+%rename(FileSystem) __wt_file_system;
 
 %include "wiredtiger.h"
 
@@ -1441,7 +1449,7 @@ def _rename_with_prefix(prefix, toclass):
 _rename_with_prefix('WT_STAT_CONN_', stat.conn)
 _rename_with_prefix('WT_STAT_DSRC_', stat.dsrc)
 _rename_with_prefix('WT_STAT_SESSION_', stat.session)
-_rename_with_prefix('WT_SS_', StorageSource)
+_rename_with_prefix('WT_FS_', FileSystem)
 _rename_with_prefix('WT_FILE_HANDLE_', FileHandle)
 del _rename_with_prefix
 %}
