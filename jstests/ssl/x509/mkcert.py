@@ -777,7 +777,7 @@ def main():
     global CONFIG
 
     items_to_process = parse_command_line()
-    CONFIG = yaml.load(open(CONFIGFILE, 'r'))
+    CONFIG = yaml.load(open(CONFIGFILE, 'r'), Loader=yaml.FullLoader)
     validate_config()
     items = select_items(items_to_process)
     items = sort_items(items)
