@@ -277,6 +277,7 @@ experimental_optimizations = [
     'builtin-memcmp',
     'fnsi',
     'nofp',
+    'nordyn',
     'sandybridge',
     'tbaa',
     'treevec',
@@ -2561,20 +2562,47 @@ if env.TargetOSIs('posix'):
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
-    if env.TargetOSIs('darwin'):
-        if env.TargetOSIs('macOS'):
-            env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
-    else:
+    env.Append(
+        LINKFLAGS=[
+            "-Wl,-bind_at_load" if env.TargetOSIs('macOS') else "-Wl,-z,now",
+        ],
+    )
+
+    # We need to use rdynamic for backtraces with glibc unless we have libunwind.
+    nordyn = (env.TargetOSIs('darwin') or use_libunwind)
+
+    # And of course only do rdyn if the experimenter asked for it.
+    nordyn &= ("nordyn" in selected_experimental_optimizations)
+
+    if nordyn:
+        def export_symbol_generator(source, target, env, for_signature):
+            symbols = copy.copy(env.get('EXPORT_SYMBOLS', []))
+            for lib in libdeps.get_libdeps(source, target, env, for_signature):
+                if lib.env:
+                    symbols.extend(lib.env.get('EXPORT_SYMBOLS', []))
+            export_expansion = '${EXPORT_SYMBOL_FLAG}'
+            return [f'-Wl,{export_expansion}{symbol}' for symbol in symbols]
+        env['EXPORT_SYMBOL_GEN'] = export_symbol_generator
+
+        # For darwin, we need the leading underscore but for others we
+        # don't. Hacky but it works to jam that distinction into the
+        # flag itself, since it already differs on darwin.
+        if env.TargetOSIs('darwin'):
+            env['EXPORT_SYMBOL_FLAG'] = "-exported_symbol,_"
+        else:
+            env['EXPORT_SYMBOL_FLAG'] = "--export-dynamic-symbol,"
+
         env.Append(
-            LINKFLAGS=[
-                "-Wl,-z,now",
+            PROGLINKFLAGS=[
+                '$EXPORT_SYMBOL_GEN'
             ],
+        )
+    elif not env.TargetOSIs('darwin'):
+        env.Append(
             PROGLINKFLAGS=[
                 "-rdynamic",
-            ]
+            ],
         )
-
-    env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
     for key in ('HOME', 'TERM'):

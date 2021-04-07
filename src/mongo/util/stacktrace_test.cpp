@@ -69,13 +69,17 @@
 #include <unistd.h>
 #endif  //  __linux__
 
+// Needs to have linkage so we can test metadata. Needs to be extern
+// "C" so it doesn't get mangled so we can name it with EXPORT_SYMBOLS
+// in SConscript.
+extern "C" MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_EXPORT void
+mongo_stacktrace_test_detail_testFunctionWithLinkage() {
+    printf("...");
+}
+
 namespace mongo {
 
 namespace stack_trace_test_detail {
-/** Needs to have linkage so we can test metadata. */
-MONGO_COMPILER_NOINLINE MONGO_COMPILER_API_EXPORT void testFunctionWithLinkage() {
-    printf("...");
-}
 
 struct RecursionParam {
     std::uint64_t n;
@@ -320,7 +324,7 @@ TEST(StackTrace, MetadataGenerator) {
         std::string symbolSub;
     } const tests[] = {
         {
-            reinterpret_cast<void*>(&stack_trace_test_detail::testFunctionWithLinkage),
+            reinterpret_cast<void*>(&mongo_stacktrace_test_detail_testFunctionWithLinkage),
             "stacktrace_test",
             "testFunctionWithLinkage",
         },
@@ -356,7 +360,7 @@ TEST(StackTrace, MetadataGeneratorFunctionMeasure) {
     // Measure the size of a C++ function as a test of metadata retrieval.
     // Load increasing addresses until the metadata's symbol name changes.
     StackTraceAddressMetadataGenerator gen;
-    void* fp = reinterpret_cast<void*>(&stack_trace_test_detail::testFunctionWithLinkage);
+    void* fp = reinterpret_cast<void*>(&mongo_stacktrace_test_detail_testFunctionWithLinkage);
     const auto& meta = gen.load(fp);
     if (!meta.symbol())
         return;  // No symbol for `fp`. forget it.
