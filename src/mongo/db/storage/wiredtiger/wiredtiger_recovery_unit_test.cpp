@@ -99,6 +99,7 @@ public:
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
+        params.overwrite = true;
         params.isEphemeral = false;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
@@ -615,7 +616,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
     ASSERT(!commitTs);
 }
 
-TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
+TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsCached) {
     auto opCtx = clientAndCtx1.second.get();
 
     // Hold the global lock throughout the test to avoid having the global lock destructor
@@ -649,7 +650,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
 
     ru->abandonSnapshot();
 
-    // Test 2: A read-once operation should create a new cursor and immediately close it when done.
+    // Test 2: A read-once operation should create a new cursor because it has a different
+    // configuration. This will be released into the cache.
 
     ru->setReadOnce(true);
 
@@ -657,16 +659,94 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     ru->getSession()->closeAllCursors(uri);
     cachedCursorsBefore = ru->getSession()->cachedCursors();
 
-    // The subsequent read operation will use a read_once cursor, which will not be from the cache,
-    // and will not be released into the cache.
+    // The subsequent read operation will create a new read_once cursor and release into the cache.
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
-    // No new cursors should have been released into the cache.
-    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore);
+    // A new cursor should have been released into the cache.
+    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore);
     // All opened cursors are closed.
     ASSERT_EQ(0, ru->getSession()->cursorsOut());
 
     ASSERT(ru->getReadOnce());
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, CacheMixedOverwrite) {
+    auto opCtx = clientAndCtx1.second.get();
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.A"));
+    auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
+
+    // Hold the global lock throughout the test to avoid having the global lock destructor
+    // prematurely abandon snapshots.
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+
+    // Close all cached cursors to establish a 'before' state.
+    auto session = ru->getSession();
+    ru->getSession()->closeAllCursors(uri);
+    int cachedCursorsBefore = ru->getSession()->cachedCursors();
+
+    // Use a large, unused table ID for this test to ensure we don't collide with any other table
+    // ids.
+    int tableId = 999999999;
+    WT_CURSOR* cursor;
+
+    // Expect no cached cursors.
+    {
+        auto config = "";
+        cursor = session->getCachedCursor(tableId, config);
+        ASSERT_FALSE(cursor);
+
+        cursor = session->getNewCursor(uri, config);
+        ASSERT(cursor);
+        session->releaseCursor(tableId, cursor, config);
+        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
+    }
+
+    cachedCursorsBefore = session->cachedCursors();
+
+    // Use a different overwrite setting, expect no cached cursors.
+    {
+        auto config = "overwrite=false";
+        cursor = session->getCachedCursor(tableId, config);
+        ASSERT_FALSE(cursor);
+
+        cursor = session->getNewCursor(uri, config);
+        ASSERT(cursor);
+        session->releaseCursor(tableId, cursor, config);
+        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
+    }
+
+    cachedCursorsBefore = session->cachedCursors();
+
+    // Expect cursors to be cached.
+    {
+        auto config = "";
+        cursor = session->getCachedCursor(tableId, config);
+        ASSERT(cursor);
+        session->releaseCursor(tableId, cursor, config);
+        ASSERT_EQ(session->cachedCursors(), cachedCursorsBefore);
+    }
+
+    // Expect cursors to be cached.
+    {
+        auto config = "overwrite=false";
+        cursor = session->getCachedCursor(tableId, config);
+        ASSERT(cursor);
+        session->releaseCursor(tableId, cursor, config);
+        ASSERT_EQ(session->cachedCursors(), cachedCursorsBefore);
+    }
+
+    // Use yet another cursor config, and expect no cursors to be cached.
+    {
+        auto config = "overwrite=true";
+        cursor = session->getCachedCursor(tableId, config);
+        ASSERT_FALSE(cursor);
+
+        cursor = session->getNewCursor(uri, config);
+        ASSERT(cursor);
+        session->releaseCursor(tableId, cursor, config);
+        ASSERT_GT(session->cachedCursors(), cachedCursorsBefore);
+    }
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithDurableTimestamp) {
