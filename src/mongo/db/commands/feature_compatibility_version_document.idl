@@ -58,3 +58,9 @@ structs:
         optional: true
         validator:
           callback: "FeatureCompatibilityVersionParser::validatePreviousVersionField"
+      changeTimestamp:
+        description: "Timestamp used to identify the 2-phase setFCV request. Both phases (kStart and
+                      kComplete) must have the same timestamp for the entire sequence, and every new
+                      sequence started must strictly have incrementing timestamp."
+        type: timestamp
+        optional: true

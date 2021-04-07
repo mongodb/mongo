@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version_document_gen.h"
+#include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 
@@ -56,13 +57,19 @@ public:
     static void fassertInitializedAfterStartup(OperationContext* opCtx);
 
     /**
+     * Returns the on-disk feature compatibility version document if it exists.
+     */
+    static boost::optional<BSONObj> findFeatureCompatibilityVersionDocument(
+        OperationContext* opCtx);
+
+    /**
      * uassert that a transition from fromVersion to newVersion is permitted. Different rules apply
      * if the request is from a config server.
      */
     static void validateSetFeatureCompatibilityVersionRequest(
-        ServerGlobalParams::FeatureCompatibility::Version fromVersion,
-        ServerGlobalParams::FeatureCompatibility::Version newVersion,
-        bool isFromConfigServer);
+        OperationContext* opCtx,
+        const SetFeatureCompatibilityVersion& setFCVRequest,
+        ServerGlobalParams::FeatureCompatibility::Version fromVersion);
 
     /**
      * Updates the on-disk feature compatibility version document for the transition fromVersion ->
@@ -73,6 +80,7 @@ public:
         ServerGlobalParams::FeatureCompatibility::Version fromVersion,
         ServerGlobalParams::FeatureCompatibility::Version newVersion,
         bool isFromConfigServer,
+        boost::optional<Timestamp> timestamp,
         bool setTargetVersion);
 
     /**

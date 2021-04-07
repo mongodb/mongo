@@ -56,6 +56,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -294,13 +295,43 @@ public:
             return true;
         }
 
-        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
+        boost::optional<Timestamp> changeTimestamp;
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // The Config Server creates a new ID (i.e., timestamp) when it receives an upgrade or
+            // downgrade request. Alternatively, the request refers to a previously aborted
+            // operation for which the local FCV document must contain the ID to be reused.
+
+            if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+                const auto now = VectorClock::get(opCtx)->getTime();
+                changeTimestamp = now.clusterTime().asTimestamp();
+            } else {
+                auto fcvObj =
+                    FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
+                auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
+                    IDLParserErrorContext("featureCompatibilityVersionDocument"), fcvObj.get());
+                changeTimestamp = fcvDoc.getChangeTimestamp();
+                invariant(changeTimestamp);
+            }
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                   request.getPhase()) {
+            // Shards receive the timestamp from the Config Server's request.
+            changeTimestamp = request.getChangeTimestamp();
+            uassert(5563500,
+                    "The 'timestamp' field is missing even though the node is running as a shard. "
+                    "This may indicate that the 'setFeatureCompatibilityVersion' command was "
+                    "invoked directly against the shard or that the config server has not been "
+                    "upgraded to at least version 5.0.",
+                    changeTimestamp);
+        }
+
         FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
-            actualVersion, requestedVersion, isFromConfigServer);
+            opCtx, request, actualVersion);
 
         uassert(5563600,
                 "'phase' field is only valid to be specified on shards",
                 !request.getPhase() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
@@ -316,6 +347,7 @@ public:
                     actualVersion,
                     requestedVersion,
                     isFromConfigServer,
+                    changeTimestamp,
                     true /* setTargetVersion */);
             }
 
@@ -331,19 +363,15 @@ public:
             }
         }
 
+        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
-
-        uassert(5563601,
-                "Cannot transition to fully upgraded or fully downgraded state if we are not in "
-                "kUpgrading or kDowngrading state",
-                serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
         hangAfterStartingFCVTransition.pauseWhileSet(opCtx);
 
         if (requestedVersion > actualVersion) {
-            _runUpgrade(opCtx, request);
+            _runUpgrade(opCtx, request, changeTimestamp);
         } else {
-            _runDowngrade(opCtx, request);
+            _runDowngrade(opCtx, request, changeTimestamp);
         }
 
         {
@@ -356,6 +384,7 @@ public:
                 serverGlobalParams.featureCompatibility.getVersion(),
                 requestedVersion,
                 isFromConfigServer,
+                changeTimestamp,
                 false /* setTargetVersion */);
         }
 
@@ -363,13 +392,16 @@ public:
     }
 
 private:
-    void _runUpgrade(OperationContext* opCtx, const SetFeatureCompatibilityVersion& request) {
+    void _runUpgrade(OperationContext* opCtx,
+                     const SetFeatureCompatibilityVersion& request,
+                     boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
             requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
+            requestPhase1.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
@@ -434,6 +466,7 @@ private:
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             auto requestPhase2 = request;
             requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
+            requestPhase2.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
@@ -483,13 +516,16 @@ private:
         }
     }
 
-    void _runDowngrade(OperationContext* opCtx, const SetFeatureCompatibilityVersion& request) {
+    void _runDowngrade(OperationContext* opCtx,
+                       const SetFeatureCompatibilityVersion& request,
+                       boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
             requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
+            requestPhase1.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
@@ -572,6 +608,7 @@ private:
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             auto requestPhase2 = request;
             requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
+            requestPhase2.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
