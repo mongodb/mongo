@@ -55,6 +55,7 @@ static const char *RATE_PER_SECOND = "rate_per_second";
 static const char *READ_THREADS = "read_threads";
 static const char *STABLE_LAG = "stable_lag";
 static const char *STAT_CACHE_SIZE = "stat_cache_size";
+static const char *UPDATE_THREADS = "update_threads";
 static const char *VALUE_SIZE = "value_size";
 
 /* WiredTiger API consts. */

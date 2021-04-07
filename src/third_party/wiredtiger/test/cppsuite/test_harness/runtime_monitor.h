@@ -104,7 +104,7 @@ class cache_limit_statistic : public statistic {
             debug_print(error_string, DEBUG_ERROR);
             testutil_assert(use_percent < limit);
         } else
-            debug_print("Usage: " + std::to_string(use_percent), DEBUG_TRACE);
+            debug_print("Cache usage: " + std::to_string(use_percent), DEBUG_TRACE);
     }
 
     private:

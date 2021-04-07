@@ -31,6 +31,7 @@
 
 #include <thread>
 
+#include "database_operation.h"
 #include "thread_context.h"
 
 namespace test_harness {
@@ -56,10 +57,10 @@ class thread_manager {
      */
     template <typename Callable>
     void
-    add_thread(thread_context *tc, Callable &&fct)
+    add_thread(thread_context *tc, database_operation *db_operation, Callable &&fct)
     {
         tc->set_running(true);
-        std::thread *t = new std::thread(fct, std::ref(*tc));
+        std::thread *t = new std::thread(fct, std::ref(*tc), std::ref(*db_operation));
         _workers.push_back(t);
     }
 
