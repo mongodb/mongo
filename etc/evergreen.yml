@@ -6288,6 +6288,7 @@ tasks:
       fallback_num_sub_suites: 37
 
 - name: tenant_migration_jscore_passthrough_gen
+  tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6297,6 +6298,7 @@ tasks:
       fallback_num_sub_suites: 10
 
 - name: tenant_migration_causally_consistent_jscore_passthrough_gen
+  tags: ["tenant_migration"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6306,7 +6308,7 @@ tasks:
       fallback_num_sub_suites: 10
 
 - name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
-  tags: ["txn"]
+  tags: ["tenant_migration", "txn"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -10344,9 +10346,6 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: tenant_migration_jscore_passthrough_gen
-  - name: tenant_migration_causally_consistent_jscore_passthrough_gen
-  - name: tenant_migration_multi_stmt_txn_jscore_passthrough_gen
   - name: multiversion_gen
   - name: .query_fuzzer
   - name: .random_multiversion_ds
@@ -10381,6 +10380,7 @@ buildvariants:
   - name: sharded_multi_stmt_txn_jscore_passthrough
   - name: snmp
   - name: .stitch
+  - name: .tenant_migration
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -12140,6 +12140,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: snmp
+  - name: .tenant_migration
   - name: .watchdog
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
@@ -12314,6 +12315,7 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: snmp
   - name: .stitch
+  - name: .tenant_migration
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
