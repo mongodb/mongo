@@ -105,6 +105,7 @@ public:
         std::string engineName;
         bool isCapped;
         KeyFormat keyFormat;
+        bool overwrite;
         bool isEphemeral;
         boost::optional<int64_t> oplogMaxSize;
         CappedCallback* cappedCallback;
@@ -328,6 +329,8 @@ private:
     const bool _isCapped;
     // The format of this RecordStore's RecordId keys.
     const KeyFormat _keyFormat;
+    // Whether or not to allow writes to overwrite existing records with the same RecordId.
+    const bool _overwrite;
     // True if the storage engine is an in-memory storage engine
     const bool _isEphemeral;
     // True if WiredTiger is logging updates to this table

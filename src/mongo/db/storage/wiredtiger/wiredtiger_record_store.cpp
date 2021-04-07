@@ -837,6 +837,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
       _engineName(params.engineName),
       _isCapped(params.isCapped),
       _keyFormat(params.keyFormat),
+      _overwrite(params.overwrite),
       _isEphemeral(params.isEphemeral),
       _isLogged(!isTemp() &&
                 WiredTigerUtil::useTableLogging(
@@ -1243,7 +1244,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     for (size_t i = 0; i < nRecords; i++)
         totalLength += records[i].data.size();
 
-    WiredTigerCursor curwrap(_uri, _tableId, true, opCtx);
+    WiredTigerCursor curwrap(_uri, _tableId, _overwrite, opCtx);
     curwrap.assertInActiveTxn();
     WT_CURSOR* c = curwrap.get();
     invariant(c);
@@ -1295,6 +1296,22 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
+
+        if (ret == WT_DUPLICATE_KEY) {
+            invariant(!_overwrite);
+            invariant(_keyFormat == KeyFormat::String);
+
+            // Generate a useful error message that is consistent with duplicate key error messages
+            // on indexes.
+            BSONObjBuilder builder;
+            builder.append("", OID::from(record.id.strData()));
+            return buildDupKeyErrorStatus(builder.obj(),
+                                          NamespaceString(ns()),
+                                          "" /* indexName */,
+                                          BSON("_id" << 1),
+                                          BSONObj() /* collation */);
+        }
+
         if (ret)
             return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
 
@@ -1347,10 +1364,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     auto sessRaii = cache->getSession();
     WT_CURSOR* cursor = writeConflictRetry(opCtx, "getLatestOplogTimestamp", "local.oplog.rs", [&] {
-        auto cachedCursor = sessRaii->getCachedCursor(_uri, _tableId);
+        auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
         return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
     });
-    ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
+    ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
     int ret = cursor->prev(cursor);
     if (ret == WT_NOTFOUND) {
         return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
@@ -1372,10 +1389,10 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         auto sessRaii = cache->getSession();
         WT_CURSOR* cursor =
             writeConflictRetry(opCtx, "getEarliestOplogTimestamp", "local.oplog.rs", [&] {
-                auto cachedCursor = sessRaii->getCachedCursor(_uri, _tableId);
+                auto cachedCursor = sessRaii->getCachedCursor(_tableId, "");
                 return cachedCursor ? cachedCursor : sessRaii->getNewCursor(_uri);
             });
-        ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor); });
+        ON_BLOCK_EXIT([&] { sessRaii->releaseCursor(_tableId, cursor, ""); });
         auto ret = cursor->next(cursor);
         if (ret == WT_NOTFOUND) {
             return Status(ErrorCodes::CollectionIsEmpty, "oplog is empty");
