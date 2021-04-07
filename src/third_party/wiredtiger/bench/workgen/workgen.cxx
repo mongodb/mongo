@@ -178,7 +178,7 @@ int WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn) {
     char uri[BUF_SIZE];
 
     cycle_count = 0;
-    if (ret = conn->open_session(conn, NULL, NULL, &session) != 0) {
+    if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
         THROW("Error Opening a Session.");
     }
 
