@@ -194,10 +194,7 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
     StringBuilder sb;
     sb << "E11000 duplicate key error";
     sb << " collection: " << collectionNamespace;
-    if (indexName.size()) {
-        // This helper may be used for clustered collections when there is no _id index.
-        sb << " index: " << indexName;
-    }
+    sb << " index: " << indexName;
     if (hasCollation) {
         sb << " collation: " << indexCollation;
     }

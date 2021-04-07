@@ -1471,8 +1471,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.engineName = _canonicalName;
     params.isCapped = options.capped;
     params.keyFormat = (options.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
-    // Record stores clustered by _id need to guarantee uniqueness by preventing overwrites.
-    params.overwrite = options.clusteredIndex ? false : true;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
@@ -1612,7 +1610,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.engineName = _canonicalName;
     params.isCapped = false;
     params.keyFormat = KeyFormat::Long;
-    params.overwrite = true;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
     // Temporary collections do not need to persist size information to the size storer.

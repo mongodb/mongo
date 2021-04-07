@@ -78,7 +78,7 @@ protected:
     uint64_t _tableID;
     WiredTigerRecoveryUnit* _ru;
     WiredTigerSession* _session;
-    std::string _config;
+    bool _readOnce;
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
