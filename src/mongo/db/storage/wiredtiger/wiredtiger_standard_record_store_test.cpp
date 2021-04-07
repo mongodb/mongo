@@ -123,7 +123,6 @@ public:
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = collOptions.clusteredIndex ? KeyFormat::String : KeyFormat::Long;
-        params.overwrite = collOptions.clusteredIndex ? false : true;
         params.isEphemeral = false;
         params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
@@ -164,7 +163,6 @@ public:
         params.engineName = kWiredTigerEngineName;
         params.isCapped = true;
         params.keyFormat = KeyFormat::Long;
-        params.overwrite = true;
         params.isEphemeral = false;
         // Large enough not to exceed capped limits.
         params.oplogMaxSize = 1024 * 1024 * 1024;
@@ -259,7 +257,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.engineName = kWiredTigerEngineName;
         params.isCapped = false;
         params.keyFormat = KeyFormat::Long;
-        params.overwrite = true;
         params.isEphemeral = false;
         params.cappedCallback = nullptr;
         params.sizeStorer = &ss;

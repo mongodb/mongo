@@ -111,13 +111,10 @@ void _openCursor(WT_SESSION* session,
 }
 }  // namespace
 
-WT_CURSOR* WiredTigerSession::getCachedCursor(uint64_t id, const std::string& config) {
+WT_CURSOR* WiredTigerSession::getCachedCursor(const std::string& uri, uint64_t id) {
     // Find the most recently used cursor
     for (CursorCache::iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
-        // Ensure that all properties of this cursor are identical to avoid mixing cursor
-        // configurations. Note that this uses an exact string match, so cursor configurations with
-        // parameters in different orders will not be considered equivalent.
-        if (i->_id == id && i->_config == config) {
+        if (i->_id == id) {
             WT_CURSOR* c = i->_cursor;
             _cursors.erase(i);
             _cursorsOut++;
@@ -134,7 +131,7 @@ WT_CURSOR* WiredTigerSession::getNewCursor(const std::string& uri, const char* c
     return cursor;
 }
 
-void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config) {
+void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor) {
     invariant(_session);
     invariant(cursor);
     _cursorsOut--;
@@ -142,7 +139,7 @@ void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR* cursor, const std:
     invariantWTOK(cursor->reset(cursor));
 
     // Cursors are pushed to the front of the list and removed from the back
-    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor, config));
+    _cursors.push_front(WiredTigerCachedCursor(id, _cursorGen++, cursor));
 
     // A negative value for wiredTigercursorCacheSize means to use hybrid caching.
     std::uint32_t cacheSize = abs(gWiredTigerCursorCacheSize.load());
