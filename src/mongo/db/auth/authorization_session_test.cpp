@@ -159,6 +159,8 @@ const ResourcePattern thirdProfileCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("third.system.profile")));
 
 TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
+    authzSession->startContractTracking();
+
     // Check that disabling auth checks works
     ASSERT_FALSE(
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
@@ -1344,6 +1346,8 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
                              << "string");
     BSONObj uuidObj = BSON("a" << UUID::gen());
     BSONObj invalidObj = BSON("a" << 12);
+
+    authzSession->startContractTracking();
 
     // Strings require no privileges
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
