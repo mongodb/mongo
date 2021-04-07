@@ -3453,7 +3453,6 @@ tasks:
       params:
         file: expansions.yml
     - command: subprocess.exec
-      type: test
       params:
         binary: bash
         args:
@@ -7088,6 +7087,7 @@ tasks:
         python: ${python}
         workdir: ${workdir}
   - command: subprocess.exec
+    type: test
     params:
       binary: bash
       args:
