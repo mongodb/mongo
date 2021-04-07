@@ -1,7 +1,4 @@
 // Confirms the $planCacheStats output format includes information about failed plans.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 
@@ -9,6 +6,10 @@ const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_plan_cache_list_failed_plans");
 const coll = testDB.test;
+const isSBEEnabled = (() => {
+    const getParam = testDB.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 
 coll.drop();
 
@@ -37,7 +38,12 @@ const creationExecStats = planCacheEntry.creationExecStats;
 assert.eq(creationExecStats.length, 2, planCacheEntry);
 // We expect that the first plan succeed, and the second failed.
 assert(!creationExecStats[0].hasOwnProperty("failed"), planCacheEntry);
-assert.eq(creationExecStats[1].failed, true, planCacheEntry);
+// SBE will not report the 'failed' field.
+if (isSBEEnabled) {
+    assert(!creationExecStats[1].hasOwnProperty("failed"), planCacheEntry);
+} else {
+    assert.eq(creationExecStats[1].failed, true, planCacheEntry);
+}
 
 // The failing plan should have a score of 0.
 const candidatePlanScores = planCacheEntry.candidatePlanScores;
