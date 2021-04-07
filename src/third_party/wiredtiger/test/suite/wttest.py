@@ -43,7 +43,7 @@ except ImportError:
 
 from contextlib import contextmanager
 import errno, glob, os, re, shutil, sys, time, traceback
-import wiredtiger, wtscenario
+import wiredtiger, wtscenario, wthooks
 
 def shortenWithEllipsis(s, maxlen):
     if len(s) > maxlen:
@@ -183,6 +183,7 @@ class ExtensionList(list):
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
     _printOnceSeen = {}
+    _ttyDescriptor = None   # set this early, to allow tty() to be called any time.
 
     # conn_config can be overridden to add to basic connection configuration.
     # Can be a string or a callable function or lambda expression.
@@ -202,7 +203,7 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False, ignoreStdout = False, seedw = 0, seedz = 0):
+                    longtest = False, ignoreStdout = False, seedw = 0, seedz = 0, hookmgr = None):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -224,9 +225,11 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._stderr = sys.stderr
         WiredTigerTestCase._concurrent = False
         WiredTigerTestCase._globalSetup = True
-        WiredTigerTestCase._ttyDescriptor = None
         WiredTigerTestCase._seeds = [521288629, 362436069]
         WiredTigerTestCase._randomseed = False
+        if hookmgr == None:
+            hookmgr = wthooks.WiredTigerHookManager()
+        WiredTigerTestCase._hookmgr = hookmgr
         if seedw != 0 and seedz != 0:
             WiredTigerTestCase._randomseed = True
             WiredTigerTestCase._seeds = [seedw, seedz]
