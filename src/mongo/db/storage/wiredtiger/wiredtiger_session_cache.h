@@ -47,12 +47,13 @@ class WiredTigerSessionCache;
 
 class WiredTigerCachedCursor {
 public:
-    WiredTigerCachedCursor(uint64_t id, uint64_t gen, WT_CURSOR* cursor)
-        : _id(id), _gen(gen), _cursor(cursor) {}
+    WiredTigerCachedCursor(uint64_t id, uint64_t gen, WT_CURSOR* cursor, const std::string& config)
+        : _id(id), _gen(gen), _cursor(cursor), _config(config) {}
 
     uint64_t _id;   // Source ID, assigned to each URI
     uint64_t _gen;  // Generation, used to age out old cursors
     WT_CURSOR* _cursor;
+    std::string _config;  // Cursor config. Do not serve cursors with different configurations
 };
 
 /**
@@ -91,12 +92,12 @@ public:
     }
 
     /**
-     * Gets a cursor on the table id 'id'.
+     * Gets a cursor on the table id 'id' with optional configuration, 'config'.
      *
      * This may return a cursor from the cursor cache and these cursors should *always* be released
      * into the cache by calling releaseCursor().
      */
-    WT_CURSOR* getCachedCursor(const std::string& uri, uint64_t id);
+    WT_CURSOR* getCachedCursor(uint64_t id, const std::string& config);
 
 
     /**
@@ -121,8 +122,10 @@ public:
     /**
      * Release a cursor into the cursor cache and close old cursors if the number of cursors in the
      * cache exceeds wiredTigerCursorCacheSize.
+     * The exact cursor config that was used to create the cursor must be provided or subsequent
+     * users will retrieve cursors with incorrect configurations.
      */
-    void releaseCursor(uint64_t id, WT_CURSOR* cursor);
+    void releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config);
 
     /**
      * Close a cursor without releasing it into the cursor cache.
