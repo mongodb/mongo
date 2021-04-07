@@ -1,5 +1,6 @@
 // @tags: [
 //   assumes_balancer_off,
+//   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
 (function() {

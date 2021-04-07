@@ -3,7 +3,7 @@
 // This test uses a multi-update, which is not retryable. The behavior it is testing is also not
 // true of sharded clusters, since one shard may continue applying updates while the other
 // encounters an error.
-// @tags: [requires_non_retryable_writes, assumes_unsharded_collection]
+// @tags: [requires_multi_updates, requires_non_retryable_writes, assumes_unsharded_collection]
 
 t = db.jstests_updatej;
 t.drop();

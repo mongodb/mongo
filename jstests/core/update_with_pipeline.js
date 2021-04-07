@@ -6,6 +6,7 @@
  *
  * @tags: [
  *   requires_find_command,
+ *   requires_multi_updates,
  *   requires_non_retryable_writes,
  * ]
  */
