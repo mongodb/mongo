@@ -75,7 +75,7 @@ constexpr StringData ADMIN_DBNAME = "admin"_sd;
 bool checkContracts() {
 
     // Only check contracts if the feature is enabled.
-    // TODO SERVER-52364 - Remove feature flag check
+    // TODO SERVER-55908 - Remove feature flag check
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
         !feature_flags::gFeatureFlagAuthorizationContract.isEnabled(
             serverGlobalParams.featureCompatibility)) {
