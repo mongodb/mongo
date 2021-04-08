@@ -1736,6 +1736,7 @@ functions:
         env:
           python: ${python}
           workdir: ${workdir}
+          patch_compile_flags: ${patch_compile_flags}
 
   "generate compile expansions":
     command: shell.exec
