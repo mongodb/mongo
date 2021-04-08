@@ -3453,10 +3453,11 @@ tasks:
       params:
         file: expansions.yml
     - command: subprocess.exec
+      type: test
       params:
         binary: bash
         args:
-          - "src/evergreen/embedded_sdk_s3_tar.sh"
+          - "src/evergreen/embedded_sdk_tests_s3_tar.sh"
         env:
           python: ${python}
           workdir: ${workdir}
@@ -3476,32 +3477,26 @@ tasks:
 
 - name: embedded_sdk_run_tests
   commands:
-    - command: shell.exec
+    - command: expansions.write
+      params:
+        file: expansions.yml
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o verbose
-          set -o errexit
-
-          ${activate_virtualenv}
-          "build/mongo-embedded-sdk-${version}/bin/mongo_embedded_test"
-          "build/mongo-embedded-sdk-${version}/bin/mongoc_embedded_test"
-
-    # If this is a patch build, blow away the file so our subsequent and optional s3.put
-    # doesn't run. That way, we won't overwrite the latest part in our patches.
-    - command: shell.exec
+        binary: bash
+        args:
+          - "src/evergreen/embedded_sdk_run_tests.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
+    - command: subprocess.exec
       params:
-        working_dir: "src/build"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          if [ "${is_patch}" = "true" ]; then
-            rm -f src/build/embedded-sdk.tgz
-          fi
+        binary: bash
+        args:
+          - "src/evergreen/embedded_sdk_run_tests_post.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
 - name: embedded_sdk_s3_put_latest
   commands:
@@ -3549,15 +3544,17 @@ tasks:
           --modules=
           --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
-    - command: shell.exec
+    - command: expansions.write
       params:
-        working_dir: "src/build"
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          tar cfvz stitch-support.tgz stitch-support-lib-${version}
+        file: expansions.yml
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/stitch_support_create_lib_tar.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -3586,16 +3583,18 @@ tasks:
 
 - name: stitch_support_run_tests
   commands:
-    - command: shell.exec
+    - command: expansions.write
+      params:
+        file: expansions.yml
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          "build/stitch-support-lib-${version}/bin/stitch_support_test"
+        binary: bash
+        args:
+          - "src/evergreen/stitch_support_run_tests.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
 - name: compile_benchmarks
   depends_on: []
@@ -3695,17 +3694,18 @@ tasks:
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
-  - command: shell.exec
+  - command: expansions.write
+    params:
+      file: expansions.yml
+  - command: subprocess.exec
     type: test
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        ./buildscripts/yamllinters.sh
+      binary: bash
+      args:
+        - "src/evergreen/lint_yaml.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
 
 - name: lint_errorcodes
   commands:
@@ -3724,23 +3724,18 @@ tasks:
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "do setup"
-    - command: shell.exec
+    - command: expansions.write
+      params:
+        file: expansions.yml
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-          ${activate_virtualenv}
-
-          $python buildscripts/idl/check_versioned_api_commands_have_idl_definitions.py -v --include src --include src/mongo/db/modules/enterprise/src --installDir dist-test/bin 1
-          $python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
-          find idls -maxdepth 1 -mindepth 1 -type d | while read dir;
-          do
-            echo "Performing idl check compatibility with release: $dir:";
-            $python buildscripts/idl/idl_check_compatibility.py -v --include src --include src/mongo/db/modules/enterprise/src "$dir/src" src;
-          done
+        binary: bash
+        args:
+          - "src/evergreen/check_idl_compat.sh"
+        env:
+          python: ${python}
+          workdir: ${workdir}
 
 - name: burn_in_tests_gen
   commands:
@@ -3749,29 +3744,18 @@ tasks:
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - *do_multiversion_setup
-  - command: shell.exec
+  - command: expansions.write
+    params:
+      file: expansions.yml
+  - command: subprocess.exec
     type: test
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${activate_virtualenv}
-
-        # Multiversion exclusions can be used when selecting tests.
-        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
-
-        # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
-        # is used to for finding the associated tasks from a different build varaint than the
-        # burn_in_tests_gen task executes on.
-        build_variant_opts="--build-variant=${build_variant}"
-        if [ -n "${burn_in_tests_build_variant|}" ]; then
-          build_variant_opts="--build-variant=${burn_in_tests_build_variant} --run-build-variant=${build_variant}"
-        fi
-        burn_in_args="$burn_in_args --repeat-tests-min=2 --repeat-tests-max=1000 --repeat-tests-secs=600"
-        # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/evergreen_burn_in_tests.py --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_gen.json --task_id ${task_id} $burn_in_args --verbose
+      binary: bash
+      args:
+        - "src/evergreen/burn_in_tests.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
   - command: archive.targz_pack
     params:
       target: src/burn_in_tests_gen.tgz
@@ -3801,29 +3785,18 @@ tasks:
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
-  - command: shell.exec
+  - command: expansions.write
+    params:
+      file: expansions.yml
+  - command: subprocess.exec
     type: test
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        # Capture a list of new and modified tests. The expansion macro burn_in_tests_build_variant
-        # is used for finding the associated tasks from a different build variant than the
-        # burn_in_tests_multiversion_gen task executes on.
-        build_variant_opts="--build-variant=${build_variant}"
-        if [ -n "${burn_in_tests_build_variant|}" ]; then
-          build_variant_opts="--build-variant=${burn_in_tests_build_variant} --run-build-variant=${build_variant}"
-        fi
-
-        burn_in_args="$burn_in_args"
-        # Evergreen executable is in $HOME.
-        PATH=$PATH:$HOME $python buildscripts/burn_in_tests_multiversion.py --task_id=${task_id} --project=${project} $build_variant_opts --distro=${distro_id} --generate-tasks-file=burn_in_tests_multiversion_gen.json $burn_in_args --verbose
-        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion
-
+      binary: bash
+      args:
+        - "src/evergreen/burn_in_tests_multiversion.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
 
   - command: archive.targz_pack
     params:
@@ -5267,26 +5240,14 @@ tasks:
   name: external_auth
   commands:
   - func: "do setup"
-  - command: shell.exec
+  - command: subprocess.exec
     params:
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${activate_virtualenv}
-
-        # Not all git get project calls clone into ${workdir}/src so we allow
-        # callers to tell us where the pip requirements files are.
-        pip_dir="${pip_dir}"
-        if [[ -z $pip_dir ]]; then
-          # Default to most common location
-          pip_dir="${workdir}/src/etc/pip"
-        fi
-
-        # Same as above we have to use quotes to preserve the
-        # Windows path separator
-        external_auth_txt="$pip_dir/external-auth-requirements.txt"
-        python -m pip install -r "$external_auth_txt"
+      binary: bash
+      args:
+        - "src/evergreen/external_auth_pip.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth --excludeWithAnyTags=requires_domain_controller --storageEngine=wiredTiger
@@ -5295,53 +5256,26 @@ tasks:
   name: external_auth_aws
   commands:
   - func: "do setup"
-  - command: shell.exec
+  - command: expansions.write
     params:
-      working_dir: src
+      file: expansions.yml
+  - command: subprocess.exec
+    params:
+      binary: bash
       silent: true
-      shell: bash
-      script: |
-        set -o errexit
-        cat <<EOF > aws_e2e_setup.json
-        {
-            "iam_auth_ecs_account" : "${iam_auth_ecs_account}",
-            "iam_auth_ecs_secret_access_key" : "${iam_auth_ecs_secret_access_key}",
-            "iam_auth_ecs_account_arn": "arn:aws:iam::557821124784:user/authtest_fargate_user",
-            "iam_auth_ecs_cluster": "${iam_auth_ecs_cluster}",
-            "iam_auth_ecs_task_definition": "${iam_auth_ecs_task_definition}",
-            "iam_auth_ecs_subnet_a": "${iam_auth_ecs_subnet_a}",
-            "iam_auth_ecs_subnet_b": "${iam_auth_ecs_subnet_b}",
-            "iam_auth_ecs_security_group": "${iam_auth_ecs_security_group}",
-
-            "iam_auth_assume_aws_account" : "${iam_auth_assume_aws_account}",
-            "iam_auth_assume_aws_secret_access_key" : "${iam_auth_assume_aws_secret_access_key}",
-            "iam_auth_assume_role_name" : "${iam_auth_assume_role_name}",
-
-            "iam_auth_ec2_instance_account" : "${iam_auth_ec2_instance_account}",
-            "iam_auth_ec2_instance_secret_access_key" : "${iam_auth_ec2_instance_secret_access_key}",
-            "iam_auth_ec2_instance_profile" : "${iam_auth_ec2_instance_profile}"
-        }
-        EOF
-  - command: shell.exec
+      args:
+        - "src/evergreen/external_auth_aws_setup.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
+  - command: subprocess.exec
     params:
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-        ${activate_virtualenv}
-
-        # Not all git get project calls clone into ${workdir}/src so we allow
-        # callers to tell us where the pip requirements files are.
-        pip_dir="${pip_dir}"
-        if [[ -z $pip_dir ]]; then
-          # Default to most common location
-          pip_dir="${workdir}/src/etc/pip"
-        fi
-
-        # Same as above we have to use quotes to preserve the
-        # Windows path separator
-        external_auth_txt="$pip_dir/components/aws.req"
-        python -m pip install -r "$external_auth_txt"
+      binary: bash
+      args:
+        - "src/evergreen/external_auth_aws_pip.sh"
+      env:
+        python: ${python}
+        workdir: ${workdir}
   - func: "run tests"
     vars:
       resmoke_args: --suites=external_auth_aws --storageEngine=wiredTiger
