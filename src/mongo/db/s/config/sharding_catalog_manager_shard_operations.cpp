@@ -640,26 +640,16 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
 
-        SetFeatureCompatibilityVersion setFcvCmd([&] {
-            // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
-            if (fcvRegion == FeatureCompatibility::kLatest ||
-                fcvRegion == FeatureCompatibility::kUpgradingFromLastContinuousToLatest ||
-                fcvRegion == FeatureCompatibility::kUpgradingFromLastLTSToLatest) {
-                return FeatureCompatibility::kLatest;
-            } else if (fcvRegion == FeatureCompatibility::kLastContinuous ||
-                       fcvRegion == FeatureCompatibility::kDowngradingFromLatestToLastContinuous ||
-                       fcvRegion == FeatureCompatibility::kUpgradingFromLastLTSToLastContinuous) {
-                // (Generic FCV reference): These FCV checks should exist across LTS binary
-                // versions.
-                return FeatureCompatibility::kLastContinuous;
-            } else {
-                // (Generic FCV reference): This FCV reference should exist across LTS binary
-                // versions.
-                invariant(fcvRegion == FeatureCompatibility::kDowngradingFromLatestToLastLTS ||
-                          fcvRegion == FeatureCompatibility::kLastLTS);
-                return FeatureCompatibility::kLastLTS;
-            }
-        }());
+        uassert(5563603,
+                "Cannot add shard while in upgrading/downgrading FCV state",
+                !fcvRegion->isUpgradingOrDowngrading());
+
+        // (Generic FCV reference): These FCV checks should exist across LTS binary versions.
+        invariant(fcvRegion == FeatureCompatibility::kLatest ||
+                  fcvRegion == FeatureCompatibility::kLastContinuous ||
+                  fcvRegion == FeatureCompatibility::kLastLTS);
+
+        SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
         setFcvCmd.setDbName(NamespaceString::kAdminDb);
         // TODO (SERVER-50954): Remove this FCV check once 4.4 is no longer the last LTS version.
         if (fcvRegion->isGreaterThanOrEqualTo(FeatureCompatibility::Version::kVersion47)) {

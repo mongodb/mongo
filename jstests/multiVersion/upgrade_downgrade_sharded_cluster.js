@@ -217,12 +217,31 @@ function setupInitialStateOnOldVersion(oldVersion) {
     testChunkCollectionUuidFieldSetup();
 }
 
+function checkConfigAndShardsFCV(expectedFCV) {
+    var configFCV = st.configRS.getPrimary()
+                        .adminCommand({getParameter: 1, featureCompatibilityVersion: 1})
+                        .featureCompatibilityVersion.version;
+    assert.eq(expectedFCV, configFCV);
+
+    var shard0FCV = st.rs0.getPrimary()
+                        .adminCommand({getParameter: 1, featureCompatibilityVersion: 1})
+                        .featureCompatibilityVersion.version;
+    assert.eq(expectedFCV, shard0FCV);
+
+    var shard1FCV = st.rs1.getPrimary()
+                        .adminCommand({getParameter: 1, featureCompatibilityVersion: 1})
+                        .featureCompatibilityVersion.version;
+    assert.eq(expectedFCV, shard1FCV);
+}
+
 function runChecksAfterUpgrade() {
     const isFeatureFlagEnabled =
         assert
             .commandWorked(st.configRS.getPrimary().adminCommand(
                 {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
             .featureFlagShardingFullDDLSupportTimestampedVersion.value;
+
+    checkConfigAndShardsFCV(latestFCV);
 
     testDroppedAndDistributionModeFieldsChecksAfterUpgrade();
 
@@ -239,12 +258,14 @@ function setupStateBeforeDowngrade() {
     testAllowedMigrationsFieldSetup();
 }
 
-function runChecksAfterFCVDowngrade() {
+function runChecksAfterFCVDowngrade(oldVersion) {
     const isFeatureFlagEnabled =
         assert
             .commandWorked(st.configRS.getPrimary().adminCommand(
                 {getParameter: 1, featureFlagShardingFullDDLSupportTimestampedVersion: 1}))
             .featureFlagShardingFullDDLSupportTimestampedVersion.value;
+
+    checkConfigAndShardsFCV(oldVersion);
 
     if (isFeatureFlagEnabled) {
         testAllowedMigrationsFieldChecksAfterFCVDowngrade();
@@ -281,9 +302,10 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     setupInitialStateOnOldVersion(oldVersion);
 
     // Upgrade the entire cluster to the latest version.
-    jsTest.log('upgrading cluster');
+    jsTest.log('upgrading cluster binaries');
     st.upgradeCluster(latestFCV);
 
+    jsTest.log('upgrading cluster FCV');
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     // Tests after upgrade
@@ -297,7 +319,7 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion}));
 
     // Tests after FCV downgrade to oldVersion
-    runChecksAfterFCVDowngrade();
+    runChecksAfterFCVDowngrade(oldVersion);
 
     // Downgrade binaries back to oldVersion
     jsTest.log('downgrading cluster binaries');
