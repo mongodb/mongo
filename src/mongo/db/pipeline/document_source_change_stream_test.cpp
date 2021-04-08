@@ -579,6 +579,39 @@ TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
                        40573);
 }
 
+TEST_F(ChangeStreamStageTest, CannotCreateStageForSystemCollection) {
+    auto expressionContext = getExpCtx();
+    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: false}}");
+    ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(ChangeStreamStageTest, CanCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrue) {
+    auto expressionContext = getExpCtx();
+    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->inMongos = false;
+    const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+}
+
+TEST_F(ChangeStreamStageTest,
+       CannotCreateStageForSystemCollectionWhenAllowToRunOnSystemNSIsTrueAndInMongos) {
+    auto expressionContext = getExpCtx();
+    expressionContext->ns = NamespaceString{"db", "system.namespace"};
+    expressionContext->inMongos = true;
+    const auto spec = fromjson("{$changeStream: {allowToRunOnSystemNS: true}}");
+    ASSERT_THROWS_CODE(DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+}
+
+TEST_F(ChangeStreamStageTest, CanCreateStageForNonSystemCollection) {
+    const auto spec = fromjson("{$changeStream: {}}");
+    DocumentSourceChangeStream::createFromBson(spec.firstElement(), getExpCtx());
+}
+
 TEST_F(ChangeStreamStageTest, ShowMigrationsFailsOnMongos) {
     auto expCtx = getExpCtx();
     expCtx->inMongos = true;

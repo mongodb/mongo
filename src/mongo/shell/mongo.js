@@ -697,6 +697,16 @@ Mongo.prototype._extractChangeStreamOptions = function(options) {
         delete options.allChangesForCluster;
     }
 
+    if (options.hasOwnProperty("allowToRunOnConfigDB")) {
+        changeStreamOptions.allowToRunOnConfigDB = options.allowToRunOnConfigDB;
+        delete options.allowToRunOnConfigDB;
+    }
+
+    if (options.hasOwnProperty("allowToRunOnSystemNS")) {
+        changeStreamOptions.allowToRunOnSystemNS = options.allowToRunOnSystemNS;
+        delete options.allowToRunOnSystemNS;
+    }
+
     return [{$changeStream: changeStreamOptions}, options];
 };
 

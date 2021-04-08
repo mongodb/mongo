@@ -570,11 +570,14 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                           << " database",
             expCtx->ns.isAdminDB() ? spec.getAllChangesForCluster() : isNotBannedInternalDB);
 
-    // Prevent $changeStream from running on internal collections in any database.
+    // Prevent $changeStream from running on internal collections in any database. A stream may run
+    // against the internal collections iff 'allowToRunOnSystemNS' is true and the stream is not
+    // opened through a mongos process.
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
-                          << " collection",
-            !expCtx->ns.isSystem());
+                          << " collection"
+                          << (spec.getAllowToRunOnSystemNS() ? " through mongos" : ""),
+            !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inMongos));
 }
 
 }  // namespace mongo

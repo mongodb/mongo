@@ -150,3 +150,10 @@ structs:
                              'config' database, which is usually banned. This flag is used
                              internally to allow mongoS to open a stream on 'config.shards', in
                              order to monitor for the addition of new shards to the cluster.
+
+            allowToRunOnSystemNS:
+                cpp_name: allowToRunOnSystemNS
+                type: bool
+                default: false
+                description: An internal flag indicating whether the change stream may be opened on
+                             a system collection.
