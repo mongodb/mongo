@@ -14,6 +14,13 @@
 (function() {
 "use strict";
 
+// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring
+// that the parallel suite runs this test only on WT configurations.
+if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredTiger") {
+    jsTest.log("Skipping test on non-WT storage engine: " + jsTest.options().storageEngine);
+    return;
+}
+
 const collName = 'system.buckets.test';
 const coll = db[collName];
 coll.drop();
