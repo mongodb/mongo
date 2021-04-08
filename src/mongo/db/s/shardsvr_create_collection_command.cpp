@@ -42,6 +42,7 @@
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/timeseries/timeseries_lookup.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
@@ -119,11 +120,16 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
             !shardKeyPattern.isHashedPattern() ||
                 !(request.getUnique() && request.getUnique().value()));
 
+    // Ensure that a time-series collection cannot be sharded
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "can't shard time-series collection " << nss,
+            !timeseries::getTimeseriesOptions(opCtx, nss));
+
     // Ensure the namespace is valid.
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss.isSystem() || nss == NamespaceString::kLogicalSessionsNamespace ||
-                nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection());
+                nss.isTemporaryReshardingCollection());
 
     auto optNumInitialChunks = request.getNumInitialChunks();
     if (optNumInitialChunks) {
