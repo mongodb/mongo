@@ -121,12 +121,8 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            bool useNewPath = [&] {
-                return feature_flags::gShardingFullDDLSupport.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-            }();
+            bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility);
 
             if (!useNewPath) {
                 return renameCollectionLegacy(opCtx, req, fromNss);
