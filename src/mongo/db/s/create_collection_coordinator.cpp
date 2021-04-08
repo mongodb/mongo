@@ -42,6 +42,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/timeseries/timeseries_lookup.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -572,11 +573,16 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
             "the hashed field by declaring an additional (non-hashed) unique index on the field.",
             !_shardKeyPattern->isHashedPattern() || !_doc.getUnique().value_or(false));
 
+    // Ensure that a time-series collection cannot be sharded
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "can't shard time-series collection " << nss(),
+            !timeseries::getTimeseriesOptions(opCtx, nss()));
+
     // Ensure the namespace is valid.
     uassert(ErrorCodes::IllegalOperation,
             "can't shard system namespaces",
             !nss().isSystem() || nss() == NamespaceString::kLogicalSessionsNamespace ||
-                nss().isTemporaryReshardingCollection() || nss().isTimeseriesBucketsCollection());
+                nss().isTemporaryReshardingCollection());
 
     if (_doc.getNumInitialChunks()) {
         // Ensure numInitialChunks is within valid bounds.
