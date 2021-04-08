@@ -484,7 +484,7 @@ void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
     }
 
     lk.unlock();
-    _removeBucket(bucket, true /* bucketIsUnused */);
+    _removeBucket(bucket, false /* expiringBuckets */);
 }
 
 void BucketCatalog::_markBucketIdle(Bucket* bucket) {
