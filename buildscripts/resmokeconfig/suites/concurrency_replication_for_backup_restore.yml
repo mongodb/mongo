@@ -9,6 +9,7 @@ selector:
   exclude_files:
   # These workloads use up to 100MB of memory, which can overwhelm test hosts.
   - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_match.js
   - jstests/concurrency/fsm_workloads/agg_sort.js
   - jstests/concurrency/fsm_workloads/agg_sort_external.js
   - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
