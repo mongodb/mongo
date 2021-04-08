@@ -161,7 +161,7 @@ public:
     /**
      * Clears the in-memory state of the view catalog.
      */
-    static void clear(const Database* db);
+    static void clear(OperationContext* opCtx, const Database* db);
 
     /**
      * The view catalog needs to ignore external changes for its own modifications.

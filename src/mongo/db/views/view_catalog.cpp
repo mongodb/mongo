@@ -234,12 +234,12 @@ Status ViewCatalog::_reload(OperationContext* opCtx, ViewCatalogLookupBehavior l
     return Status::OK();
 }
 
-void ViewCatalog::clear(const Database* db) {
+void ViewCatalog::clear(OperationContext* opCtx, const Database* db) {
     auto catalog = getViewCatalog(db).writer();
 
     // First, iterate through the views on this database and audit them before they are dropped.
     for (auto&& view : catalog->_viewMap) {
-        audit::logDropView(&cc(),
+        audit::logDropView(opCtx->getClient(),
                            (*view.second).name(),
                            (*view.second).viewOn().ns(),
                            (*view.second).pipeline(),

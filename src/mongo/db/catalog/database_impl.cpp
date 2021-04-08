@@ -393,7 +393,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                           << numIndexesInProgress << " index builds in progress.",
             numIndexesInProgress == 0);
 
-    audit::logDropCollection(&cc(), nss);
+    audit::logDropCollection(opCtx->getClient(), nss);
 
     auto serviceContext = opCtx->getServiceContext();
     Top::get(serviceContext).collectionDropped(nss);
@@ -527,7 +527,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
                                       NamespaceString fromNss,
                                       NamespaceString toNss,
                                       bool stayTemp) const {
-    audit::logRenameCollection(&cc(), fromNss, toNss);
+    audit::logRenameCollection(opCtx->getClient(), fromNss, toNss);
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(fromNss, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(toNss, MODE_X));
@@ -626,7 +626,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
             ViewCatalog::createView(opCtx, this, viewName, viewOnNss, pipeline, options.collation);
     }
 
-    audit::logCreateView(&cc(), viewName, viewOnNss.toString(), pipeline, status.code());
+    audit::logCreateView(
+        opCtx->getClient(), viewName, viewOnNss.toString(), pipeline, status.code());
     return status;
 }
 
@@ -685,7 +686,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     assertMovePrimaryInProgress(opCtx, nss);
-    audit::logCreateCollection(&cc(), nss);
+    audit::logCreateCollection(opCtx->getClient(), nss);
 
     LOGV2(20320,
           "createCollection: {namespace} with {generatedUUID_generated_provided} UUID: "
