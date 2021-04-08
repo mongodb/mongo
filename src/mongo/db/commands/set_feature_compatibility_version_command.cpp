@@ -247,16 +247,40 @@ public:
         FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
             actualVersion, requestedVersion, isFromConfigServer);
 
+        uassert(5563600,
+                "'phase' field is only valid to be specified on shards",
+                !request.getPhase() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
         checkInitialSyncFinished(opCtx);
 
-        // Start transition to 'requestedVersion' by updating the local FCV document to a
-        // 'kUpgrading' or 'kDowngrading' state, respectively.
-        FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-            opCtx,
-            actualVersion,
-            requestedVersion,
-            isFromConfigServer,
-            true /* setTargetVersion */);
+        if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
+            // Start transition to 'requestedVersion' by updating the local FCV document to a
+            // 'kUpgrading' or 'kDowngrading' state, respectively.
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                actualVersion,
+                requestedVersion,
+                isFromConfigServer,
+                true /* setTargetVersion */);
+
+            if (request.getPhase() == SetFCVPhaseEnum::kStart) {
+                invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                if (actualVersion > requestedVersion) {
+                    // Downgrading
+                    // TODO SERVER-55898: Release fcvChangeRegion and wait for DDLCoordinators to
+                    // drain
+                }
+                // If we are only running phase-1, then we are done
+                return true;
+            }
+        }
+
+        invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
+
+        uassert(5563601,
+                "Cannot transition to fully upgraded or fully downgraded state if we are not in "
+                "kUpgrading or kDowngrading state",
+                serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
         hangAfterStartingFCVTransition.pauseWhileSet(opCtx);
 
@@ -281,6 +305,15 @@ public:
 private:
     void _runUpgrade(OperationContext* opCtx, const SetFeatureCompatibilityVersion& request) {
         const auto requestedVersion = request.getCommandParameter();
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Tell the shards to enter phase-1 of setFCV
+            auto requestPhase1 = request;
+            requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
+            uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
+        }
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
@@ -338,10 +371,12 @@ private:
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50(opCtx);
             }
 
-            // Upgrade shards after config finishes its upgrade.
+            // Tell the shards to enter phase-2 of setFCV (fully upgraded)
+            auto requestPhase2 = request;
+            requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
+                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
         }
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -380,6 +415,15 @@ private:
 
     void _runDowngrade(OperationContext* opCtx, const SetFeatureCompatibilityVersion& request) {
         const auto requestedVersion = request.getCommandParameter();
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Tell the shards to enter phase-1 of setFCV
+            auto requestPhase1 = request;
+            requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
+            uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
+        }
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
@@ -451,10 +495,12 @@ private:
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50(opCtx);
             }
 
-            // Downgrade shards after config finishes its downgrade.
+            // Tell the shards to enter phase-2 of setFCV (fully downgraded)
+            auto requestPhase2 = request;
+            requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
+                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);

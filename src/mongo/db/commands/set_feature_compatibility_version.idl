@@ -34,6 +34,14 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
 
+enums:
+    SetFCVPhase:
+        description: "Enum that defines the phases of the 2-phase setFCV protocol."
+        type: string
+        values:
+            kStart: "start"
+            kComplete: "complete"
+
 commands:
     setFeatureCompatibilityVersion:
         description: "Parser for the 'setFeatureCompatibilityVersion' command."
@@ -59,4 +67,11 @@ commands:
                               order to be able to add such a shard to a cluster, which is currently
                               running at last-continuous."
                 type: safeBool
+                optional: true
+            phase:
+                description: "An enum that indicates whether the the command is requesting the shard
+                              to enter phase-1 (kStart) or phase-2 (kComplete) of the 2-phase setFCV
+                              protocol. Only valid to be specified for shards. If not specified on a
+                              shard, it will run the full setFCV sequence (both phases)."
+                type: SetFCVPhase
                 optional: true
