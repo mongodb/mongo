@@ -65,26 +65,21 @@ namespace {
 
 const WriteConcernOptions kNoWaitWriteConcern{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)};
 
-Timestamp generateMinFetchTimestamp(const NamespaceString& sourceNss) {
-    auto opCtx = cc().makeOperationContext();
-
+Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceString& sourceNss) {
     // Do a no-op write and use the OpTime as the minFetchTimestamp
     writeConflictRetry(
-        opCtx.get(),
-        "resharding donor minFetchTimestamp",
-        NamespaceString::kRsOplogNamespace.ns(),
-        [&] {
-            AutoGetDb db(opCtx.get(), sourceNss.db(), MODE_IX);
-            Lock::CollectionLock collLock(opCtx.get(), sourceNss, MODE_S);
+        opCtx, "resharding donor minFetchTimestamp", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            AutoGetDb db(opCtx, sourceNss.db(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, sourceNss, MODE_S);
 
-            AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 
             const std::string msg = str::stream()
                 << "All future oplog entries on the namespace " << sourceNss.ns()
                 << " must include a 'destinedRecipient' field";
-            WriteUnitOfWork wuow(opCtx.get());
+            WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                opCtx.get(),
+                opCtx,
                 NamespaceString::kForceOplogBatchBoundaryNamespace,
                 boost::none,
                 BSON("msg" << msg),
@@ -204,7 +199,14 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
-      _externalState{std::move(externalState)} {
+      _externalState{std::move(externalState)},
+      _markKilledExecutor(std::make_shared<ThreadPool>([] {
+          ThreadPool::Options options;
+          options.poolName = "ReshardingDonorCancelableOpCtxPool";
+          options.minThreads = 1;
+          options.maxThreads = 1;
+          return options;
+      }())) {
     invariant(_externalState);
 }
 
@@ -269,7 +271,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_notifyCoordinat
     return withAutomaticRetry(**executor,
                               abortToken,
                               [this, executor] {
-                                  auto opCtx = cc().makeOperationContext();
+                                  auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                                   return _updateCoordinator(opCtx.get(), executor);
                               })
         .then([this, abortToken] {
@@ -296,10 +298,10 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
             _transitionState(DonorStateEnum::kDone);
         }
 
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         return _updateCoordinator(opCtx.get(), executor).then([this] {
             {
-                auto opCtx = cc().makeOperationContext();
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 removeDonorDocFailpoint.pauseWhileSet(opCtx.get());
             }
             _removeDonorDocument();
@@ -311,12 +313,15 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
     auto abortToken = _initAbortSource(stepdownToken);
+    _markKilledExecutor->startup();
+    _cancelableOpCtxFactory.emplace(abortToken, _markKilledExecutor);
 
     return _runUntilBlockingWritesOrErrored(executor, abortToken)
         .then([this, executor, abortToken] {
             return _notifyCoordinatorAndAwaitDecision(executor, abortToken);
         })
-        .onCompletion([executor, stepdownToken, abortToken](Status status) {
+        .onCompletion([this, executor, stepdownToken, abortToken](Status status) {
+            _cancelableOpCtxFactory.emplace(stepdownToken, _markKilledExecutor);
             if (stepdownToken.isCanceled()) {
                 // Propagate any errors from the donor stepping down.
                 return ExecutorFuture<bool>(**executor, status);
@@ -416,7 +421,7 @@ void ReshardingDonorService::DonorStateMachine::
     int64_t documentsToClone = 0;
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
         AutoGetCollection coll(rawOpCtx, _metadata.getSourceNss(), MODE_IS);
@@ -436,12 +441,15 @@ void ReshardingDonorService::DonorStateMachine::
     // the {atClusterTime: <fetchTimestamp>} read on the config.cache.chunks namespace would fail
     // with a SnapshotUnavailable error response.
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         _externalState->refreshCatalogCache(opCtx.get(), _metadata.getTempReshardingNss());
         _externalState->waitForCollectionFlush(opCtx.get(), _metadata.getTempReshardingNss());
     }
 
-    Timestamp minFetchTimestamp = generateMinFetchTimestamp(_metadata.getSourceNss());
+    Timestamp minFetchTimestamp = [this] {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        return generateMinFetchTimestamp(opCtx.get(), _metadata.getSourceNss());
+    }();
 
     LOGV2_DEBUG(5390702,
                 2,
@@ -463,7 +471,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     return _updateCoordinator(opCtx.get(), executor)
         .then([this, abortToken] {
             return future_util::withCancellation(_allRecipientsDoneCloning.getFuture(), abortToken);
@@ -497,7 +505,7 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         auto rawOpCtx = opCtx.get();
 
         auto generateOplogEntry = [&](ShardId destinedRecipient) {
@@ -575,7 +583,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     }
 
     {
-        auto opCtx = cc().makeOperationContext();
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
@@ -698,7 +706,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_updateCoordinat
         .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
         .thenRunOn(**executor)
         .then([this] {
-            auto opCtx = cc().makeOperationContext();
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             auto shardId = _externalState->myShardId(opCtx->getServiceContext());
 
             BSONObjBuilder updateBuilder;
@@ -727,7 +735,7 @@ void ReshardingDonorService::DonorStateMachine::insertStateDocument(
 
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
     DonorShardContext&& newDonorCtx) {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     PersistentTaskStore<ReshardingDonorDocument> store(
         NamespaceString::kDonorReshardingOperationsNamespace);
     store.update(
@@ -741,7 +749,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
 }
 
 void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
-    auto opCtx = cc().makeOperationContext();
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
     const auto& nss = NamespaceString::kDonorReshardingOperationsNamespace;
     writeConflictRetry(opCtx.get(), "DonorStateMachine::_removeDonorDocument", nss.toString(), [&] {
