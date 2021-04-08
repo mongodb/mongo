@@ -32,9 +32,6 @@ const donorRst = new ReplSetTest({
         setParameter: {
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: 1,
-            // TODO (SERVER-54893): Make tenant_migration_recipient_rollback_recovery.js not use
-            // RollbackTest.
-            tenantMigrationDisableX509Auth: true
         }
     })
 });
@@ -58,57 +55,55 @@ function makeMigrationOpts(tenantMigrationTest, migrationId, tenantId) {
 }
 
 /**
- * Starts a recipient ReplSetTest and creates a TenantMigrationTest for it. Runs 'setUpFunc' and
- * then starts a RollbackTest from the recipient ReplSetTest. Runs 'rollbackOpsFunc' while it is in
- * rollback operations state (operations run in this state will be rolled back). Finally, runs
- * 'steadyStateFunc' after it is back in the replication steady state.
- *
- * See rollback_test.js for more information about RollbackTest.
+ * Starts a recipient ReplSetTest and creates a TenantMigrationTest for it. Runs 'setUpFunc' after
+ * initiating the recipient. Then, runs 'rollbackOpsFunc' while replication is disabled on the
+ * secondaries, shuts down the primary and restarts it after re-election to force the operations in
+ * 'rollbackOpsFunc' to be rolled back. Finally, runs 'steadyStateFunc' after it is back in the
+ * replication steady state.
  */
 function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
     const recipientRst = new ReplSetTest({
         name: "recipientRst",
         nodes: 3,
-        useBridge: true,
-        settings: {chainingAllowed: false},
         nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: 1,
-                tenantMigrationDisableX509Auth: true
             }
         })
     });
     recipientRst.startSet();
-    let config = recipientRst.getReplSetConfig();
-    config.members[2].priority = 0;
-    recipientRst.initiateWithHighElectionTimeout(config);
+    recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
     setUpFunc(tenantMigrationTest, donorRstArgs);
 
-    const recipientRollbackTest = new RollbackTest("recipientRst", recipientRst);
-    let recipientPrimary = recipientRollbackTest.getPrimary();
-    recipientRollbackTest.awaitLastOpCommitted();
+    let originalRecipientPrimary = recipientRst.getPrimary();
+    const originalRecipientSecondaries = recipientRst.getSecondaries();
+    recipientRst.awaitLastOpCommitted();
 
-    // Writes during this state will be rolled back.
-    recipientRollbackTest.transitionToRollbackOperations();
+    // Disable replication on the secondaries so that writes during this step will be rolled back.
+    stopServerReplication(originalRecipientSecondaries);
     rollbackOpsFunc(tenantMigrationTest, donorRstArgs);
 
-    // Transition to replication steady state.
-    recipientRollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-    recipientRollbackTest.transitionToSyncSourceOperationsDuringRollback();
-    recipientRollbackTest.transitionToSteadyStateOperations();
+    // Shut down the primary and re-enable replication to allow one of the secondaries to get
+    // elected, and make the writes above get rolled back on the original primary when it comes
+    // back up.
+    recipientRst.stop(originalRecipientPrimary);
+    restartServerReplication(originalRecipientSecondaries);
+    const newRecipientPrimary = recipientRst.getPrimary();
+    assert.neq(originalRecipientPrimary, newRecipientPrimary);
 
-    // Get the correct primary and secondary after the topology changes. The recipient replica set
-    // contains 3 nodes, and replication is disabled on the tiebreaker node. So there is only one
-    // secondary that the primary replicates data onto.
-    recipientPrimary = recipientRollbackTest.getPrimary();
-    let recipientSecondary = recipientRollbackTest.getSecondary();
-    steadyStateFunc(tenantMigrationTest, recipientPrimary, recipientSecondary);
+    // Restart the original primary.
+    originalRecipientPrimary =
+        recipientRst.start(originalRecipientPrimary, {waitForConnect: true}, true /* restart */);
+    originalRecipientPrimary.setSecondaryOk();
+    recipientRst.awaitReplication();
 
-    recipientRollbackTest.stop();
+    steadyStateFunc(tenantMigrationTest);
+
+    recipientRst.stopSet();
 }
 
 /**
@@ -141,12 +136,12 @@ function testRollbackInitialState() {
         });
     };
 
-    let steadyStateFunc = (tenantMigrationTest, recipientPrimary, recipientSecondary) => {
+    let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration restarted successfully on the new primary despite rollback.
         const stateRes = assert.commandWorked(migrationThread.returnData());
         assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
         tenantMigrationTest.assertRecipientNodesInExpectedState(
-            [recipientPrimary, recipientSecondary],
+            tenantMigrationTest.getRecipientRst().nodes,
             migrationId,
             migrationOpts.tenantId,
             TenantMigrationTest.RecipientState.kConsistent,
@@ -199,12 +194,12 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState,
         });
     };
 
-    let steadyStateFunc = (tenantMigrationTest, recipientPrimary, recipientSecondary) => {
+    let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration resumed successfully on the new primary despite the rollback.
         const stateRes = assert.commandWorked(migrationThread.returnData());
         assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
         tenantMigrationTest.waitForRecipientNodesToReachState(
-            [recipientPrimary, recipientSecondary],
+            tenantMigrationTest.getRecipientRst().nodes,
             migrationId,
             migrationOpts.tenantId,
             TenantMigrationTest.RecipientState.kConsistent,
@@ -252,14 +247,14 @@ function testRollBackMarkingStateGarbageCollectable() {
         });
     };
 
-    let steadyStateFunc = (tenantMigrationTest, recipientPrimary, recipientSecondary) => {
+    let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration state got garbage collected successfully despite the rollback.
         assert.commandWorked(forgetMigrationThread.returnData());
         tenantMigrationTest.waitForMigrationGarbageCollection(
             migrationId,
             migrationOpts.tenantId,
             tenantMigrationTest.getDonorRst().nodes,
-            [recipientPrimary, recipientSecondary]);
+            tenantMigrationTest.getRecipientRst().nodes);
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);
@@ -296,12 +291,12 @@ function testRollBackRandom() {
         sleep(Math.random() * kMaxSleepTimeMS);
     };
 
-    let steadyStateFunc = (tenantMigrationTest, recipientPrimary, recipientSecondary) => {
+    let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration completed and was garbage collected successfully despite the
         // rollback.
         migrationThread.join();
         tenantMigrationTest.waitForRecipientNodesToReachState(
-            [recipientPrimary, recipientSecondary],
+            tenantMigrationTest.getRecipientRst().nodes,
             migrationId,
             migrationOpts.tenantId,
             TenantMigrationTest.RecipientState.kDone,
@@ -310,7 +305,7 @@ function testRollBackRandom() {
             migrationId,
             migrationOpts.tenantId,
             tenantMigrationTest.getDonorRst().nodes,
-            [recipientPrimary, recipientSecondary]);
+            tenantMigrationTest.getRecipientRst().nodes);
     };
 
     testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc);

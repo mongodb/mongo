@@ -437,7 +437,7 @@ function TenantMigrationTest({
      */
     this.isDonorNodeInExpectedState = function(node, migrationId, tenantId, expectedState) {
         const configDonorsColl =
-            this.getDonorPrimary().getCollection("config.tenantMigrationDonors");
+            this.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
         if (configDonorsColl.findOne({_id: migrationId}).state !== expectedState) {
             return false;
         }
