@@ -30,7 +30,10 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
+    # TODO SERVER-55908 - Remove feature flag
     featureFlagAuthorizationContract:
       description: "Control support for authorization contracts for tests"
       cpp_varname: gFeatureFlagAuthorizationContract
-      default: false
+      default: true
+      version: 5.0
+

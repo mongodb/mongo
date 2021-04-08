@@ -207,7 +207,7 @@ private:
     // track it but reach a different decision after the command has been run because the FCV has
     // changed. We must record our first decision.
     //
-    // TODO SERVER-52364 - remove this variable after the feature flag is removed.
+    // TODO SERVER-55908 - remove this variable after the feature flag is removed.
     bool _checkContracts;
 };
 }  // namespace mongo
