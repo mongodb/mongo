@@ -1084,7 +1084,7 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     // Pulling indexName out as it is needed post descriptor release.
     string indexName = entry->descriptor()->indexName();
 
-    audit::logDropIndex(&cc(), indexName, _collection->ns());
+    audit::logDropIndex(opCtx->getClient(), indexName, _collection->ns());
 
     auto released = _readyIndexes.release(entry->descriptor());
     if (released) {

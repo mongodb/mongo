@@ -76,14 +76,14 @@ Status _dropView(OperationContext* opCtx,
                  bool clearBucketCatalog = false) {
     if (!db) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-        audit::logDropView(&cc(), collectionName, "", {}, status.code());
+        audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
         return status;
     }
     auto view =
         ViewCatalog::get(db)->lookupWithoutValidatingDurableViews(opCtx, collectionName.ns());
     if (!view) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-        audit::logDropView(&cc(), collectionName, "", {}, status.code());
+        audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
         return status;
     }
 
@@ -117,7 +117,7 @@ Status _dropView(OperationContext* opCtx,
     WriteUnitOfWork wunit(opCtx);
 
     audit::logDropView(
-        &cc(), collectionName, view->viewOn().ns(), view->pipeline(), ErrorCodes::OK);
+        opCtx->getClient(), collectionName, view->viewOn().ns(), view->pipeline(), ErrorCodes::OK);
 
     Status status = db->dropView(opCtx, collectionName);
     if (!status.isOK()) {
@@ -372,7 +372,7 @@ Status dropCollection(OperationContext* opCtx,
                 }
 
                 Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
-                audit::logDropView(&cc(), collectionName, "", {}, status.code());
+                audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
                 return status;
             }
 
