@@ -3,6 +3,7 @@
  */
 var TenantMigrationUtil = (function() {
     const kExternalKeysNs = "config.external_validation_keys";
+    const kCreateRstRetryIntervalMS = 100;
 
     /**
      * Returns the external keys for the given migration id.
@@ -95,7 +96,7 @@ var TenantMigrationUtil = (function() {
      */
     function runMigrationAsync(migrationOpts, donorRstArgs, retryOnRetryableErrors = false) {
         load("jstests/replsets/libs/tenant_migration_util.js");
-        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        const donorRst = TenantMigrationUtil.createRst(donorRstArgs, retryOnRetryableErrors);
 
         const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
         const cmdObj = {
@@ -126,7 +127,7 @@ var TenantMigrationUtil = (function() {
      */
     function forgetMigrationAsync(migrationIdString, donorRstArgs, retryOnRetryableErrors = false) {
         load("jstests/replsets/libs/tenant_migration_util.js");
-        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        const donorRst = TenantMigrationUtil.createRst(donorRstArgs, retryOnRetryableErrors);
         const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
         return TenantMigrationUtil.runTenantMigrationCommand(
             cmdObj, donorRst, retryOnRetryableErrors);
@@ -145,7 +146,7 @@ var TenantMigrationUtil = (function() {
      */
     function tryAbortMigrationAsync(migrationOpts, donorRstArgs, retryOnRetryableErrors = false) {
         load("jstests/replsets/libs/tenant_migration_util.js");
-        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        const donorRst = TenantMigrationUtil.createRst(donorRstArgs, retryOnRetryableErrors);
         const cmdObj = {
             donorAbortMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
@@ -200,6 +201,27 @@ var TenantMigrationUtil = (function() {
             waitForKeys: false,
         };
         return rstArgs;
+    }
+
+    /**
+     * Returns a new ReplSetTest created based on the given 'rstArgs'. If 'retryOnRetryableErrors'
+     * is true, retries on retryable errors (e.g. errors caused by shutdown).
+     */
+    function createRst(rstArgs, retryOnRetryableErrors) {
+        while (true) {
+            try {
+                return new ReplSetTest({rstArgs: rstArgs});
+            } catch (e) {
+                if (retryOnRetryableErrors && isNetworkError(e)) {
+                    jsTest.log(`Failed to create ReplSetTest for ${
+                        rstArgs.name} inside tenant migration thread: ${tojson(e)}. Retrying in ${
+                        kCreateRstRetryIntervalMS}ms.`);
+                    sleep(kCreateRstRetryIntervalMS);
+                    continue;
+                }
+                throw e;
+            }
+        }
     }
 
     /**
@@ -317,6 +339,7 @@ var TenantMigrationUtil = (function() {
         forgetMigrationAsync,
         tryAbortMigrationAsync,
         createRstArgs,
+        createRst,
         runTenantMigrationCommand,
         isFeatureFlagEnabled,
         getCertificateAndPrivateKey,
