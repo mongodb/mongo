@@ -34,13 +34,12 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/logv2/log.h"
 
-#include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
@@ -53,8 +52,8 @@ ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(Operati
     return checked_cast<ShardingDDLCoordinatorService*>(std::move(service));
 }
 
-std::shared_ptr<ShardingDDLCoordinator> ShardingDDLCoordinatorService::_constructCoordinator(
-    BSONObj initialState) const {
+std::shared_ptr<ShardingDDLCoordinatorService::Instance>
+ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) const {
     const auto op = extractShardingDDLCoordinatorMetadata(initialState);
     LOGV2(
         5390510, "Constructing new sharding DDL coordinator", "coordinatorDoc"_attr = op.toBSON());
@@ -79,61 +78,7 @@ std::shared_ptr<ShardingDDLCoordinator> ShardingDDLCoordinatorService::_construc
 }
 
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
-ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
-    auto coord = _constructCoordinator(std::move(initialState));
-    coord->getConstructionCompletionFuture()
-        .thenRunOn(getInstanceCleanupExecutor())
-        .getAsync([this](auto status) {
-            stdx::lock_guard lg(_mutex);
-            if (_recovered) {
-                return;
-            }
-            invariant(_coordinatorsToWait > 0);
-            if (--_coordinatorsToWait == 0) {
-                _recovered = true;
-                _recoveredCV.notify_all();
-            }
-        });
-    return coord;
-}
-
-void ShardingDDLCoordinatorService::_afterStepDown() {
-    stdx::lock_guard lg(_mutex);
-    _recovered = false;
-    _coordinatorsToWait = 0;
-}
-
-ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    return ExecutorFuture<void>(**executor)
-        .then([this] {
-            AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
-            auto opCtx = cc().makeOperationContext();
-            DBDirectClient client(opCtx.get());
-            const auto numCoordinators = client.count(getStateDocumentsNS());
-            stdx::lock_guard lg(_mutex);
-            _coordinatorsToWait = numCoordinators;
-            if (!_coordinatorsToWait) {
-                _recovered = true;
-                _recoveredCV.notify_all();
-            }
-        })
-        .onError([this](const Status& status) {
-            LOGV2_ERROR(5469630,
-                        "Failed to rebuild Sharding DDL coordinator service",
-                        "error"_attr = status);
-        });
-}
-
-std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSONObj coorDoc) {
-
-    {
-        // Wait for all coordinators to be recovered before to allow the creation of new ones.
-        stdx::unique_lock lk(_mutex);
-        opCtx->waitForConditionOrInterrupt(_recoveredCV, lk, [this]() { return _recovered; });
-    }
-
     auto coorMetadata = extractShardingDDLCoordinatorMetadata(coorDoc);
     const auto& nss = coorMetadata.getId().getNss();
 
