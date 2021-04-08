@@ -90,7 +90,8 @@ public:
         return ThreadPool::Limits();
     }
 
-    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
+    std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
+        BSONObj initialState) const override;
 };
 
 /**
