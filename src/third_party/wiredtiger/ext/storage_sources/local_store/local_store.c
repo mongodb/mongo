@@ -646,7 +646,7 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
             continue;
 
         /* Match only the indicated directory files. */
-        if (strncmp(basename, directory, dir_len) != 0)
+        if (directory != NULL && strncmp(basename, directory, dir_len) != 0)
             continue;
         basename += dir_len;
 
