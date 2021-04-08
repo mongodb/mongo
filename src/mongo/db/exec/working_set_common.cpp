@@ -69,7 +69,7 @@ std::string indexKeyVectorDebugString(const std::vector<IndexKeyDatum>& keyData)
 bool WorkingSetCommon::fetch(OperationContext* opCtx,
                              WorkingSet* workingSet,
                              WorkingSetID id,
-                             unowned_ptr<SeekableRecordCursor> cursor,
+                             SeekableRecordCursor* cursor,
                              const NamespaceString& ns) {
     WorkingSetMember* member = workingSet->get(id);
 

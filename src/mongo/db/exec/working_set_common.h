@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
@@ -52,7 +51,7 @@ public:
     static bool fetch(OperationContext* opCtx,
                       WorkingSet* workingSet,
                       WorkingSetID id,
-                      unowned_ptr<SeekableRecordCursor> cursor,
+                      SeekableRecordCursor* cursor,
                       const NamespaceString& ns);
 };
 

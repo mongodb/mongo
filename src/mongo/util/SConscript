@@ -669,7 +669,6 @@ icuEnv.CppUnitTest(
         'tick_source_test.cpp',
         'time_support_test.cpp',
         'unique_function_test.cpp',
-        'unowned_ptr_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

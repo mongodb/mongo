@@ -42,26 +42,26 @@ auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
     auto index = newSortedDataInterface(unique, partial);
-    insertToIndex(this, index, toInsert);
+    insertToIndex(this, index.get(), toInsert);
     return index;
 }
 
-void mongo::insertToIndex(unowned_ptr<OperationContext> opCtx,
-                          unowned_ptr<SortedDataInterface> index,
+void mongo::insertToIndex(OperationContext* opCtx,
+                          SortedDataInterface* index,
                           std::initializer_list<IndexKeyEntry> toInsert) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
-        ASSERT_OK(index->insert(opCtx, makeKeyString(index.get(), entry.key, entry.loc), true));
+        ASSERT_OK(index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), true));
     }
     wuow.commit();
 }
 
-void mongo::removeFromIndex(unowned_ptr<OperationContext> opCtx,
-                            unowned_ptr<SortedDataInterface> index,
+void mongo::removeFromIndex(OperationContext* opCtx,
+                            SortedDataInterface* index,
                             std::initializer_list<IndexKeyEntry> toRemove) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toRemove) {
-        index->unindex(opCtx, makeKeyString(index.get(), entry.key, entry.loc), true);
+        index->unindex(opCtx, makeKeyString(index, entry.key, entry.loc), true);
     }
     wuow.commit();
 }

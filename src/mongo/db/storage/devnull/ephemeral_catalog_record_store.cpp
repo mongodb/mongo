@@ -40,7 +40,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
-#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 

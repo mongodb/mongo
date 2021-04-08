@@ -38,7 +38,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/test_harness_helper.h"
-#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
@@ -128,15 +127,15 @@ KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
  *
  * Should be used for declaring and changing conditions, not for testing inserts.
  */
-void insertToIndex(unowned_ptr<OperationContext> opCtx,
-                   unowned_ptr<SortedDataInterface> index,
+void insertToIndex(OperationContext* opCtx,
+                   SortedDataInterface* index,
                    std::initializer_list<IndexKeyEntry> toInsert);
 
-inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
-                          unowned_ptr<SortedDataInterface> index,
+inline void insertToIndex(HarnessHelper* harness,
+                          SortedDataInterface* index,
                           std::initializer_list<IndexKeyEntry> toInsert) {
     auto client = harness->serviceContext()->makeClient("insertToIndex");
-    insertToIndex(harness->newOperationContext(client.get()), index, toInsert);
+    insertToIndex(harness->newOperationContext(client.get()).get(), index, toInsert);
 }
 
 /**
@@ -145,15 +144,15 @@ inline void insertToIndex(unowned_ptr<HarnessHelper> harness,
  *
  * Should be used for declaring and changing conditions, not for testing removes.
  */
-void removeFromIndex(unowned_ptr<OperationContext> opCtx,
-                     unowned_ptr<SortedDataInterface> index,
+void removeFromIndex(OperationContext* opCtx,
+                     SortedDataInterface* index,
                      std::initializer_list<IndexKeyEntry> toRemove);
 
-inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
-                            unowned_ptr<SortedDataInterface> index,
+inline void removeFromIndex(HarnessHelper* harness,
+                            SortedDataInterface* index,
                             std::initializer_list<IndexKeyEntry> toRemove) {
     auto client = harness->serviceContext()->makeClient("removeFromIndex");
-    removeFromIndex(harness->newOperationContext(client.get()), index, toRemove);
+    removeFromIndex(harness->newOperationContext(client.get()).get(), index, toRemove);
 }
 
 }  // namespace mongo

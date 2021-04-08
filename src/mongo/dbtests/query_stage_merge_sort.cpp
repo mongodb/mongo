@@ -648,7 +648,7 @@ public:
             // index.
             NamespaceString fakeNS("test", "coll");
             ASSERT_FALSE(
-                WorkingSetCommon::fetch(&_opCtx, &ws, id, coll->getCursor(&_opCtx), fakeNS));
+                WorkingSetCommon::fetch(&_opCtx, &ws, id, coll->getCursor(&_opCtx).get(), fakeNS));
 
             ++it;
             ++count;

@@ -255,7 +255,8 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
         // already.
         try {
-            if (!WorkingSetCommon::fetch(opCtx(), _ws, wsid, _recordCursor, collection()->ns())) {
+            if (!WorkingSetCommon::fetch(
+                    opCtx(), _ws, wsid, _recordCursor.get(), collection()->ns())) {
                 _ws->free(wsid);
                 textRecordData->score = -1;
                 return NEED_TIME;

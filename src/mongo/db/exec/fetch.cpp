@@ -103,7 +103,7 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
                 if (!_cursor)
                     _cursor = collection()->getCursor(opCtx());
 
-                if (!WorkingSetCommon::fetch(opCtx(), _ws, id, _cursor, collection()->ns())) {
+                if (!WorkingSetCommon::fetch(opCtx(), _ws, id, _cursor.get(), collection()->ns())) {
                     _ws->free(id);
                     return NEED_TIME;
                 }

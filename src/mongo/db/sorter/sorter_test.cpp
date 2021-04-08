@@ -372,22 +372,23 @@ public:
         const SortOptions opts = SortOptions().TempDir(tempDir.path()).ExtSortAllowed();
 
         {  // test empty (no limit)
-            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(opts)), std::make_shared<EmptyIterator>());
+            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(opts).get()),
+                                        std::make_shared<EmptyIterator>());
         }
         {  // test empty (limit 1)
-            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(1))),
+            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(1)).get()),
                                         std::make_shared<EmptyIterator>());
         }
         {  // test empty (limit 10)
-            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(10))),
+            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(10)).get()),
                                         std::make_shared<EmptyIterator>());
         }
 
         const auto runTests = [this, &opts](bool assertRanges) {
             {  // test all data ASC
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
-                addData(sorter);
-                ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
+                addData(sorter.get());
+                ASSERT_ITERATORS_EQUIVALENT(done(sorter.get()), correct());
                 ASSERT_EQ(numAdded(), sorter->numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
@@ -395,8 +396,8 @@ public:
             }
             {  // test all data DESC
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
-                addData(sorter);
-                ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
+                addData(sorter.get());
+                ASSERT_ITERATORS_EQUIVALENT(done(sorter.get()), correctReverse());
                 ASSERT_EQ(numAdded(), sorter->numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
@@ -410,10 +411,11 @@ public:
                 std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(ASC)),
                                                        makeSorter(opts, IWComparator(ASC))};
 
-                addData(sorters[0]);
-                addData(sorters[1]);
+                addData(sorters[0].get());
+                addData(sorters[1].get());
 
-                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0].get()),
+                                                        done(sorters[1].get())};
                 std::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
                 ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, ASC),
                                             mergeIterators(iters2, ASC));
@@ -427,11 +429,12 @@ public:
                 std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(DESC)),
                                                        makeSorter(opts, IWComparator(DESC))};
 
-                stdx::thread inBackground(&Basic::addData, this, sorters[0]);
-                addData(sorters[1]);
+                stdx::thread inBackground(&Basic::addData, this, sorters[0].get());
+                addData(sorters[1].get());
                 inBackground.join();
 
-                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0].get()),
+                                                        done(sorters[1].get())};
                 std::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
                 ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, DESC),
                                             mergeIterators(iters2, DESC));
@@ -461,7 +464,7 @@ public:
     }
 
     // add data to the sorter
-    virtual void addData(unowned_ptr<IWSorter> sorter) {
+    virtual void addData(IWSorter* sorter) {
         sorter->add(2, -2);
         sorter->add(1, -1);
         sorter->add(0, 0);
@@ -498,11 +501,11 @@ private:
         return std::shared_ptr<IWSorter>(IWSorter::make(adjustSortOptions(opts), comp));
     }
 
-    std::shared_ptr<IWIterator> done(unowned_ptr<IWSorter> sorter) {
+    std::shared_ptr<IWIterator> done(IWSorter* sorter) {
         return std::shared_ptr<IWIterator>(sorter->done());
     }
 
-    void assertRangeInfo(unowned_ptr<IWSorter> sorter, const SortOptions& opts) {
+    void assertRangeInfo(const std::shared_ptr<IWSorter>& sorter, const SortOptions& opts) {
         auto numRanges = correctNumRanges();
         if (numRanges == 0)
             return;
@@ -519,7 +522,7 @@ class Limit : public Basic {
     SortOptions adjustSortOptions(SortOptions opts) override {
         return opts.Limit(5);
     }
-    void addData(unowned_ptr<IWSorter> sorter) override {
+    void addData(IWSorter* sorter) override {
         sorter->add(0, 0);
         sorter->add(3, -3);
         sorter->add(4, -4);
@@ -546,7 +549,7 @@ class LimitExtreme : public Basic {
 };
 
 class Dupes : public Basic {
-    void addData(unowned_ptr<IWSorter> sorter) {
+    void addData(IWSorter* sorter) override {
         sorter->add(1, -1);
         sorter->add(-1, 1);
         sorter->add(1, -1);
@@ -590,7 +593,7 @@ public:
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
 
-    void addData(unowned_ptr<IWSorter> sorter) override {
+    void addData(IWSorter* sorter) override {
         for (int i = 0; i < NUM_ITEMS; i++)
             sorter->add(_array[i], -_array[i]);
     }

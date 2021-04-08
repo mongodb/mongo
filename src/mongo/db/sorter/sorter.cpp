@@ -64,7 +64,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
 
@@ -518,7 +517,9 @@ private:
     class STLComparator {  // uses greater rather than less-than to maintain a MinHeap
     public:
         explicit STLComparator(const Comparator& comp) : _comp(comp) {}
-        bool operator()(unowned_ptr<const Stream> lhs, unowned_ptr<const Stream> rhs) const {
+
+        template <typename Ptr>
+        bool operator()(const Ptr& lhs, const Ptr& rhs) const {
             // first compare data
             dassertCompIsSane(_comp, lhs->current(), rhs->current());
             int ret = _comp(lhs->current(), rhs->current());

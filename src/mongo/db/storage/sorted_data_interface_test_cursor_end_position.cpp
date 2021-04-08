@@ -52,7 +52,7 @@ void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
 
     // Dup key on end point. Illegal for unique indexes.
     if (!unique)
-        insertToIndex(opCtx, sorted, {{key3, loc2}});
+        insertToIndex(opCtx.get(), sorted.get(), {{key3, loc2}});
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key3, inclusive);
@@ -97,7 +97,7 @@ void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
 
     // Dup key on end point. Illegal for unique indexes.
     if (!unique)
-        insertToIndex(opCtx, sorted, {{key3, loc2}});
+        insertToIndex(opCtx.get(), sorted.get(), {{key3, loc2}});
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key3, inclusive);
@@ -158,7 +158,7 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, inclusive)), maybeKey3);
 
     cursor->saveUnpositioned();
-    removeFromIndex(opCtx, sorted, {{key3, loc1}});
+    removeFromIndex(opCtx.get(), sorted.get(), {{key3, loc1}});
     cursor->restore();
 
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key2, true, inclusive)), boost::none);
@@ -208,7 +208,7 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)), maybeKey2);
 
     cursor->saveUnpositioned();
-    removeFromIndex(opCtx, sorted, {{key2, loc1}});
+    removeFromIndex(opCtx.get(), sorted.get(), {{key2, loc1}});
     cursor->restore();
 
     ASSERT_EQ(cursor->seek(makeKeyStringForSeek(sorted.get(), key3, false, true)), boost::none);
@@ -252,8 +252,8 @@ void testSetEndPosition_Restore_Forward(bool unique) {
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key2, loc1));
 
     cursor->save();
-    removeFromIndex(opCtx,
-                    sorted,
+    removeFromIndex(opCtx.get(),
+                    sorted.get(),
                     {
                         {key2, loc1},
                         {key3, loc1},
@@ -293,8 +293,8 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key3, loc1));
 
     cursor->save();
-    removeFromIndex(opCtx,
-                    sorted,
+    removeFromIndex(opCtx.get(),
+                    sorted.get(),
                     {
                         {key2, loc1},
                         {key3, loc1},
@@ -333,8 +333,8 @@ void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
 
     // A potential source of bugs is not restoring end cursor with saveUnpositioned().
     cursor->saveUnpositioned();
-    insertToIndex(opCtx,
-                  sorted,
+    insertToIndex(opCtx.get(),
+                  sorted.get(),
                   {
                       {key2, loc1},  // in range
                       {key3, loc1},  // out of range
@@ -370,8 +370,8 @@ void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
               IndexKeyEntry(key4, loc1));
 
     cursor->saveUnpositioned();
-    insertToIndex(opCtx,
-                  sorted,
+    insertToIndex(opCtx.get(),
+                  sorted.get(),
                   {
                       {key2, loc1},  // in range
                       {key3, loc1},  // out of range
