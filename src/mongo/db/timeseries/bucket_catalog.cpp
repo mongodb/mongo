@@ -151,7 +151,7 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
             metadata.appendNull(*metaField);
         }
     }
-    auto key = std::make_tuple(ns, BucketMetadata{metadata.obj(), comparator});
+    auto key = BucketKey{ns, BucketMetadata{metadata.obj(), comparator}};
 
     auto stats = _getExecutionStats(ns);
     invariant(stats);
@@ -225,14 +225,15 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     if (bucket->_ns.isEmpty()) {
         // The namespace and metadata only need to be set if this bucket was newly created.
         bucket->_ns = ns;
-        bucket->_metadata = std::get<BucketMetadata>(key);
+        key.metadata.normalize();
+        bucket->_metadata = key.metadata;
 
         // The namespace is stored two times: the bucket itself and _openBuckets.
-        // The metadata is stored two times: the bucket itself and _openBuckets.
-        // A unique pointer to the bucket is stored once: _allBuckets.
-        // A raw pointer to the bucket is stored at most twice: _openBuckets, _idleBuckets.
+        // The metadata is stored two times, normalized and un-normalized. A unique pointer to the
+        // bucket is stored once: _allBuckets. A raw pointer to the bucket is stored at most twice:
+        // _openBuckets, _idleBuckets.
         bucket->_memoryUsage += (ns.size() * 2) + (bucket->_metadata.toBSON().objsize() * 2) +
-            sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
+            sizeof(Bucket) + sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
     } else {
         _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     }
@@ -463,7 +464,8 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
 
     _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     _markBucketNotIdle(bucket, expiringBuckets /* locked */);
-    _openBuckets.erase({std::move(bucket->_ns), std::move(bucket->_metadata)});
+    _removeNonNormalizedKeysForBucket(bucket);
+    _openBuckets.erase({bucket->_ns, std::move(bucket->_metadata)});
     {
         stdx::lock_guard statesLk{_statesMutex};
         _bucketStates.erase(bucket->_id);
@@ -471,6 +473,13 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
     _allBuckets.erase(it);
 
     return true;
+}
+
+void BucketCatalog::_removeNonNormalizedKeysForBucket(Bucket* bucket) {
+    auto comparator = bucket->_metadata.getComparator();
+    for (auto&& metadata : bucket->_nonNormalizedKeyMetadatas) {
+        _openBuckets.erase({bucket->_ns, {std::move(metadata), comparator}});
+    }
 }
 
 void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
@@ -543,11 +552,10 @@ std::size_t BucketCatalog::_numberOfIdleBuckets() const {
     return _idleBuckets.size();
 }
 
-BucketCatalog::Bucket* BucketCatalog::_allocateBucket(
-    const std::tuple<NamespaceString, BucketMetadata>& key,
-    const Date_t& time,
-    ExecutionStats* stats,
-    bool openedDuetoMetadata) {
+BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
+                                                      const Date_t& time,
+                                                      ExecutionStats* stats,
+                                                      bool openedDuetoMetadata) {
     _expireIdleBuckets(stats);
 
     auto [it, inserted] = _allBuckets.insert(std::make_unique<Bucket>());
@@ -640,16 +648,21 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(const
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
                                               const StringData::ComparatorInterface* comparator)
-    : _metadata(obj), _comparator(comparator) {
-    BSONObjBuilder objBuilder;
-    // We will get an object of equal size, just with reordered fields.
-    objBuilder.bb().reserveBytes(obj.objsize());
-    normalizeObject(&objBuilder, _metadata);
-    _sorted = objBuilder.obj();
+    : _metadata(obj), _comparator(comparator) {}
+
+void BucketCatalog::BucketMetadata::normalize() {
+    if (!_normalized) {
+        BSONObjBuilder objBuilder;
+        // We will get an object of equal size, just with reordered fields.
+        objBuilder.bb().reserveBytes(_metadata.objsize());
+        normalizeObject(&objBuilder, _metadata);
+        _metadata = objBuilder.obj();
+        _normalized = true;
+    }
 }
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return _sorted.binaryEqual(other._sorted);
+    return _metadata.binaryEqual(other._metadata);
 }
 
 const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
@@ -724,36 +737,69 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
 }
 
 BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
-                                          const std::tuple<NamespaceString, BucketMetadata>& key,
+                                          BucketKey& key,
                                           ExecutionStats* stats,
                                           const Date_t& time)
     : _catalog(catalog), _key(&key), _stats(stats), _time(&time) {
-    // precompute the hash outside the lock, since it's expensive
-    const auto& hasher = _catalog->_openBuckets.hash_function();
-    auto hash = hasher(*_key);
 
-    {
-        auto lk = _catalog->_lockShared();
-        auto bucketState = _findOpenBucketAndLock(hash);
-        if (bucketState == BucketState::kNormal || bucketState == BucketState::kPrepared) {
+    auto bucketFound = [](BucketState bucketState) {
+        return bucketState == BucketState::kNormal || bucketState == BucketState::kPrepared;
+    };
+
+    // First we try to find the bucket without normalizing the key as the normalization is an
+    // expensive operation.
+    auto hashedKey = BucketHasher{}.hashed_key(key);
+    if (bucketFound(_findOpenBucketThenLock(hashedKey))) {
+        return;
+    }
+
+    // If not found, we normalize the metadata object and try to find it again.
+    // Save a copy of the non-normalized metadata before normalizing so we can add this key if the
+    // bucket was found for the normalized metadata.
+    BSONObj nonNormalizedMetadata = key.metadata.toBSON();
+    key.metadata.normalize();
+    HashedBucketKey hashedNormalizedKey = BucketHasher{}.hashed_key(key);
+
+    // Re-construct the key as it were before normalization
+    auto originalBucketKey = key.withMetadata(nonNormalizedMetadata);
+    hashedKey.key = &originalBucketKey;
+
+    if (bucketFound(_findOpenBucketThenLock(hashedNormalizedKey))) {
+        // Bucket found, check if we have available slots to store the non-normalized key
+        if (_bucket->_nonNormalizedKeyMetadatas.size() ==
+            _bucket->_nonNormalizedKeyMetadatas.capacity()) {
+            return;
+        }
+
+        // Release the bucket as we need to acquire the exclusive lock for the catalog.
+        release();
+
+        // Find the bucket under a catalog exclusive lock for the catalog. It may have been modified
+        // since we released our locks. If found we store the key to avoid the need to normalize for
+        // future lookups with this incoming field order.
+        if (bucketFound(_findOpenBucketThenLockAndStoreKey(
+                hashedNormalizedKey, hashedKey, std::move(nonNormalizedMetadata)))) {
             return;
         }
     }
 
+    // Bucket not found, grab exclusive lock and create bucket
     auto lk = _catalog->_lockExclusive();
-    _findOrCreateOpenBucketAndLock(hash);
+    _findOrCreateOpenBucketThenLock(hashedNormalizedKey, hashedKey);
 }
 
 BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog, Bucket* bucket)
     : _catalog(catalog) {
-    auto lk = _catalog->_lockShared();
-    auto bucketIt = _catalog->_allBuckets.find(bucket);
-    if (bucketIt == _catalog->_allBuckets.end()) {
-        return;
-    }
+    {
+        auto lk = _catalog->_lockShared();
+        auto bucketIt = _catalog->_allBuckets.find(bucket);
+        if (bucketIt == _catalog->_allBuckets.end()) {
+            return;
+        }
 
-    _bucket = bucket;
-    _acquire();
+        _bucket = bucket;
+        _acquire();
+    }
 
     stdx::lock_guard statesLk{_catalog->_statesMutex};
     auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
@@ -770,16 +816,53 @@ BucketCatalog::BucketAccess::~BucketAccess() {
     }
 }
 
-BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketAndLock(std::size_t hash) {
-    auto it = _catalog->_openBuckets.find(*_key, hash);
-    if (it == _catalog->_openBuckets.end()) {
-        // Bucket does not exist.
-        return BucketState::kCleared;
+BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLock(
+    const HashedBucketKey& key) {
+    {
+        auto lk = _catalog->_lockShared();
+        auto it = _catalog->_openBuckets.find(key);
+        if (it == _catalog->_openBuckets.end()) {
+            // Bucket does not exist.
+            return BucketState::kCleared;
+        }
+
+        _bucket = it->second;
+        _acquire();
     }
 
-    _bucket = it->second;
-    _acquire();
+    return _confirmStateForAcquiredBucket();
+}
 
+BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLockAndStoreKey(
+    const HashedBucketKey& normalizedKey, const HashedBucketKey& key, BSONObj&& metadata) {
+    invariant(!isLocked());
+    {
+        auto lk = _catalog->_lockExclusive();
+        auto it = _catalog->_openBuckets.find(normalizedKey);
+        if (it == _catalog->_openBuckets.end()) {
+            // Bucket does not exist.
+            return BucketState::kCleared;
+        }
+
+        _bucket = it->second;
+        _acquire();
+
+        // Store the key if we still have free slots
+        if (_bucket->_nonNormalizedKeyMetadatas.size() <
+            _bucket->_nonNormalizedKeyMetadatas.capacity()) {
+            auto [_, inserted] = _catalog->_openBuckets.insert(std::make_pair(key, _bucket));
+            if (inserted) {
+                _bucket->_nonNormalizedKeyMetadatas.push_back(metadata);
+                // Increment the memory usage to store this key and value in _openBuckets
+                _bucket->_memoryUsage += key.key->ns.size() + metadata.objsize() + sizeof(_bucket);
+            }
+        }
+    }
+
+    return _confirmStateForAcquiredBucket();
+}
+
+BucketCatalog::BucketState BucketCatalog::BucketAccess::_confirmStateForAcquiredBucket() {
     stdx::lock_guard statesLk{_catalog->_statesMutex};
     auto statesIt = _catalog->_bucketStates.find(_bucket->_id);
     invariant(statesIt != _catalog->_bucketStates.end());
@@ -793,11 +876,12 @@ BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketAndLock(s
     return state;
 }
 
-void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t hash) {
-    auto it = _catalog->_openBuckets.find(*_key, hash);
+void BucketCatalog::BucketAccess::_findOrCreateOpenBucketThenLock(
+    const HashedBucketKey& normalizedKey, const HashedBucketKey& key) {
+    auto it = _catalog->_openBuckets.find(normalizedKey);
     if (it == _catalog->_openBuckets.end()) {
         // No open bucket for this metadata.
-        _create();
+        _create(normalizedKey, key);
         return;
     }
 
@@ -816,7 +900,7 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t has
     }
 
     _catalog->_abort(_guard, _bucket, nullptr, boost::none);
-    _create();
+    _create(normalizedKey, key);
 }
 
 void BucketCatalog::BucketAccess::_acquire() {
@@ -824,8 +908,12 @@ void BucketCatalog::BucketAccess::_acquire() {
     _guard = stdx::unique_lock<Mutex>(_bucket->_mutex);
 }
 
-void BucketCatalog::BucketAccess::_create(bool openedDuetoMetadata) {
-    _bucket = _catalog->_allocateBucket(*_key, *_time, _stats, openedDuetoMetadata);
+void BucketCatalog::BucketAccess::_create(const HashedBucketKey& normalizedKey,
+                                          const HashedBucketKey& key,
+                                          bool openedDuetoMetadata) {
+    _bucket = _catalog->_allocateBucket(normalizedKey, *_time, _stats, openedDuetoMetadata);
+    _catalog->_openBuckets[key] = _bucket;
+    _bucket->_nonNormalizedKeyMetadatas.push_back(key.key->metadata.toBSON());
     _acquire();
 }
 
@@ -861,11 +949,14 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
     release();
 
     // Precompute the hash outside the lock, since it's expensive.
-    const auto& hasher = _catalog->_openBuckets.hash_function();
-    auto hash = hasher(*_key);
+    auto prevMetadata = _key->metadata.toBSON();
+    _key->metadata.normalize();
+    auto hashedNormalizedKey = BucketHasher{}.hashed_key(*_key);
+    auto prevBucketKey = _key->withMetadata(prevMetadata);
+    auto hashedKey = BucketHasher{}.hashed_key(prevBucketKey);
 
     auto lk = _catalog->_lockExclusive();
-    _findOrCreateOpenBucketAndLock(hash);
+    _findOrCreateOpenBucketThenLock(hashedNormalizedKey, hashedKey);
 
     // Recheck if still full now that we've reacquired the bucket.
     bool sameBucket =
@@ -881,10 +972,14 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
             invariant(removed);
         } else {
             _bucket->_full = true;
+
+            // We will recreate a new bucket for the same key below. We also need to cleanup all
+            // extra metadata keys added for the old bucket instance.
+            _catalog->_removeNonNormalizedKeysForBucket(_bucket);
             release();
         }
 
-        _create(false /* openedDueToMetadata */);
+        _create(hashedNormalizedKey, hashedKey, false /* openedDueToMetadata */);
     }
 }
 

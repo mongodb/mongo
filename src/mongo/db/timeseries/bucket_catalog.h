@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/container/small_vector.hpp>
+#include <boost/container/static_vector.hpp>
 #include <queue>
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
@@ -277,6 +278,11 @@ private:
         BucketMetadata() = default;
         BucketMetadata(BSONObj&& obj, const StringData::ComparatorInterface* comparator);
 
+        bool normalized() const {
+            return _normalized;
+        }
+        void normalize();
+
         bool operator==(const BucketMetadata& other) const;
 
         const BSONObj& toBSON() const;
@@ -289,15 +295,13 @@ private:
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
             return H::combine(std::move(h),
                               absl::Hash<absl::string_view>()(absl::string_view(
-                                  metadata._sorted.objdata(), metadata._sorted.objsize())));
+                                  metadata._metadata.objdata(), metadata._metadata.objsize())));
         }
 
     private:
         BSONObj _metadata;
         const StringData::ComparatorInterface* _comparator = nullptr;
-
-        // This stores the _metadata object with all fields sorted to allow for binary comparisons.
-        BSONObj _sorted;
+        bool _normalized = false;
     };
 
     class MinMax {
@@ -467,6 +471,7 @@ private:
 public:
     class Bucket {
     public:
+        friend class BucketAccess;
         friend class BucketCatalog;
 
         /**
@@ -513,6 +518,11 @@ public:
 
         // The metadata of the data that this bucket contains.
         BucketMetadata _metadata;
+
+        // Extra metadata combinations that are supported without normalizing the metadata object.
+        static constexpr std::size_t kNumFieldOrderCombinationsWithoutNormalizing = 1;
+        boost::container::static_vector<BSONObj, kNumFieldOrderCombinationsWithoutNormalizing>
+            _nonNormalizedKeyMetadatas;
 
         // Top-level field names of the measurements that have been inserted into the bucket.
         StringSet _fieldNames;
@@ -582,6 +592,89 @@ private:
     };
 
     /**
+     * Key to lookup open Bucket for namespace and metadata.
+     */
+    struct BucketKey {
+        NamespaceString ns;
+        BucketMetadata metadata;
+
+        /**
+         * Creates a new BucketKey with a different internal metadata object.
+         */
+        BucketKey withMetadata(BSONObj meta) const {
+            return {ns, {std::move(meta), metadata.getComparator()}};
+        }
+
+        bool operator==(const BucketKey& other) const {
+            return ns == other.ns && metadata == other.metadata;
+        }
+
+        template <typename H>
+        friend H AbslHashValue(H h, const BucketKey& key) {
+            return H::combine(std::move(h), key.ns, key.metadata);
+        }
+    };
+
+    /**
+     * BucketKey with pre-calculated hash. To avoiding calculating the hash while holding locks.
+     *
+     * The unhashed BucketKey is stored inside HashedBucketKey by reference and must not go out of
+     * scope for the lifetime of the returned HashedBucketKey.
+     */
+    struct HashedBucketKey {
+        operator BucketKey() const {
+            return *key;
+        }
+        const BucketKey* key;
+        std::size_t hash;
+    };
+
+    /**
+     * Hasher to support heterogeneous lookup for BucketKey and HashedBucketKey.
+     */
+    struct BucketHasher {
+        // This using directive activates heterogeneous lookup in the hash table
+        using is_transparent = void;
+
+        std::size_t operator()(const BucketKey& key) const {
+            // Use the default absl hasher.
+            return absl::Hash<BucketKey>{}(key);
+        }
+
+        std::size_t operator()(const HashedBucketKey& key) const {
+            return key.hash;
+        }
+
+        /**
+         * Pre-calculates a hashed BucketKey.
+         */
+        HashedBucketKey hashed_key(const BucketKey& key) {
+            return HashedBucketKey{&key, operator()(key)};
+        }
+    };
+
+    /**
+     * Equality, provides comparison between hashed and unhashed bucket keys.
+     */
+    struct BucketEq {
+        // This using directive activates heterogeneous lookup in the hash table
+        using is_transparent = void;
+
+        bool operator()(const BucketKey& lhs, const BucketKey& rhs) const {
+            return lhs == rhs;
+        }
+        bool operator()(const BucketKey& lhs, const HashedBucketKey& rhs) const {
+            return lhs == *rhs.key;
+        }
+        bool operator()(const HashedBucketKey& lhs, const BucketKey& rhs) const {
+            return *lhs.key == rhs;
+        }
+        bool operator()(const HashedBucketKey& lhs, const HashedBucketKey& rhs) const {
+            return *lhs.key == *rhs.key;
+        }
+    };
+
+    /**
      * Helper class to handle all the locking necessary to lookup and lock a bucket for use. This
      * is intended primarily for using a single bucket, including replacing it when it becomes full.
      * If the usage pattern iterates over several buckets, you will instead want to use raw access
@@ -591,7 +684,7 @@ private:
     public:
         BucketAccess() = delete;
         BucketAccess(BucketCatalog* catalog,
-                     const std::tuple<NamespaceString, BucketMetadata>& key,
+                     BucketKey& key,
                      ExecutionStats* stats,
                      const Date_t& time);
         BucketAccess(BucketCatalog* catalog, Bucket* bucket);
@@ -621,26 +714,45 @@ private:
 
     private:
         /**
-         * Helper to find and lock an open bucket for the given metadata if it exists. Requires a
+         * Helper to find and lock an open bucket for the given metadata if it exists. Takes a
          * shared lock on the catalog. Returns the state of the bucket if it is locked and usable.
          * In case the bucket does not exist or was previously cleared and thus is not usable, the
          * return value will be BucketState::kCleared.
          */
-        BucketState _findOpenBucketAndLock(std::size_t hash);
+        BucketState _findOpenBucketThenLock(const HashedBucketKey& key);
+
+        /**
+         * Same as _findOpenBucketThenLock above but takes an exclusive lock on the catalog. In
+         * addition to finding the bucket it also store a non-normalized key if there are available
+         * slots in the bucket.
+         */
+        BucketState _findOpenBucketThenLockAndStoreKey(const HashedBucketKey& normalizedKey,
+                                                       const HashedBucketKey& key,
+                                                       BSONObj&& metadata);
+
+        /**
+         * Helper to determine the state of the bucket that is found by _findOpenBucketThenLock and
+         * _findOpenBucketThenLockAndStoreKey. Requires the bucket lock to be acquired before
+         * calling this function and it may release the lock depending on the state.
+         */
+        BucketState _confirmStateForAcquiredBucket();
 
         // Helper to find an open bucket for the given metadata if it exists, create it if it
         // doesn't, and lock it. Requires an exclusive lock on the catalog.
-        void _findOrCreateOpenBucketAndLock(std::size_t hash);
+        void _findOrCreateOpenBucketThenLock(const HashedBucketKey& normalizedKey,
+                                             const HashedBucketKey& key);
 
         // Lock _bucket.
         void _acquire();
 
         // Allocate a new bucket in the catalog, set the local state to that bucket, and aquire
         // a lock on it.
-        void _create(bool openedDuetoMetadata = true);
+        void _create(const HashedBucketKey& normalizedKey,
+                     const HashedBucketKey& key,
+                     bool openedDuetoMetadata = true);
 
         BucketCatalog* _catalog;
-        const std::tuple<NamespaceString, BucketMetadata>* _key = nullptr;
+        BucketKey* _key = nullptr;
         ExecutionStats* _stats = nullptr;
         const Date_t* _time = nullptr;
 
@@ -659,6 +771,12 @@ private:
      * Removes the given bucket from the bucket catalog's internal data structures.
      */
     bool _removeBucket(Bucket* bucket, bool expiringBuckets);
+
+    /**
+     * Removes extra non-normalized BucketKey's for the given bucket from the
+     * bucket catalog's internal data structures.
+     */
+    void _removeNonNormalizedKeysForBucket(Bucket* bucket);
 
     /**
      * Aborts any batches it can for the given bucket, then removes the bucket. If batch is
@@ -694,7 +812,7 @@ private:
     std::size_t _numberOfIdleBuckets() const;
 
     // Allocate a new bucket (and ID) and add it to the catalog
-    Bucket* _allocateBucket(const std::tuple<NamespaceString, BucketMetadata>& key,
+    Bucket* _allocateBucket(const BucketKey& key,
                             const Date_t& time,
                             ExecutionStats* stats,
                             bool openedDuetoMetadata);
@@ -736,7 +854,7 @@ private:
     stdx::unordered_set<std::unique_ptr<Bucket>> _allBuckets;
 
     // The current open bucket for each namespace and metadata pair.
-    stdx::unordered_map<std::tuple<NamespaceString, BucketMetadata>, Bucket*> _openBuckets;
+    stdx::unordered_map<BucketKey, Bucket*, BucketHasher, BucketEq> _openBuckets;
 
     // Bucket state
     mutable Mutex _statesMutex = MONGO_MAKE_LATCH("BucketCatalog::_statesMutex");
