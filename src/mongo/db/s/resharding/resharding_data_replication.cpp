@@ -35,6 +35,7 @@
 
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
@@ -74,50 +75,6 @@ void ensureFulfilledPromise(SharedPromise<void>& sp, Status error) {
     if (!sp.getFuture().isReady()) {
         sp.setError(error);
     }
-}
-
-/**
- * Converts a vector of SharedSemiFutures into a vector of ExecutorFutures.
- */
-std::vector<ExecutorFuture<void>> thenRunAllOn(
-    const std::vector<SharedSemiFuture<void>>& futures,
-    const std::shared_ptr<executor::TaskExecutor>& executor) {
-    std::vector<ExecutorFuture<void>> result;
-    result.reserve(futures.size());
-
-    for (const auto& future : futures) {
-        result.emplace_back(future.thenRunOn(executor));
-    }
-
-    return result;
-}
-
-/**
- * Given a vector of input futures, returns a future that becomes ready when either
- *
- *  (a) all of the input futures have become ready with success, or
- *  (b) one of the input futures has become ready with an error.
- *
- * This function returns an immediately ready future when the vector of input futures is empty.
- */
-ExecutorFuture<void> whenAllSucceedOn(const std::vector<SharedSemiFuture<void>>& futures,
-                                      std::shared_ptr<executor::TaskExecutor> executor) {
-    return !futures.empty()
-        ? whenAllSucceed(thenRunAllOn(futures, executor)).thenRunOn(std::move(executor))
-        : ExecutorFuture(std::move(executor));
-}
-
-/**
- * Given a vector of input futures, returns a future that becomes ready when all of the input
- * futures have become ready with success or failure.
- *
- * This function returns an immediately ready future when the vector of input futures is empty.
- */
-ExecutorFuture<void> whenAllSettledOn(const std::vector<SharedSemiFuture<void>>& futures,
-                                      std::shared_ptr<executor::TaskExecutor> executor) {
-    return !futures.empty()
-        ? whenAll(thenRunAllOn(futures, executor)).ignoreValue().thenRunOn(std::move(executor))
-        : ExecutorFuture(std::move(executor));
 }
 
 }  // namespace
@@ -345,66 +302,59 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     CancellationToken cancelToken,
     CancelableOperationContextFactory opCtxFactory,
     Milliseconds minimumOperationDuration) {
-    struct ChainContext {
-        SharedSemiFuture<void> collectionClonerFuture;
-        std::vector<SharedSemiFuture<void>> txnClonerFutures;
-        std::vector<SharedSemiFuture<void>> oplogFetcherFutures;
-        std::vector<SharedSemiFuture<void>> oplogApplierConsistentButStaleFutures;
-        std::vector<SharedSemiFuture<void>> oplogApplierStrictlyConsistentFutures;
-    };
-
-    auto chainCtx = std::make_shared<ChainContext>();
     CancellationSource errorSource(cancelToken);
 
-    chainCtx->oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token());
-    chainCtx->collectionClonerFuture =
+    auto oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token());
+
+    auto collectionClonerFuture =
         _runCollectionCloner(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
-    chainCtx->txnClonerFutures = _runTxnCloners(
+
+    auto txnClonerFutures = _runTxnCloners(
         executor, cleanupExecutor, errorSource.token(), opCtxFactory, minimumOperationDuration);
 
-    return whenAllSucceed(
-               whenAllSucceedOn(chainCtx->oplogFetcherFutures, executor),
-               whenAllSucceed(chainCtx->collectionClonerFuture.thenRunOn(executor),
-                              whenAllSucceedOn(chainCtx->txnClonerFutures, executor))
-                   .thenRunOn(executor)
-                   .then([this, executor, errorSource] {
-                       _cloningDone.emplaceValue();
+    auto fulfillCloningDoneFuture =
+        whenAllSucceed(collectionClonerFuture.thenRunOn(executor),
+                       resharding::whenAllSucceedOn(txnClonerFutures, executor))
+            .thenRunOn(executor)
+            .then([this] { _cloningDone.emplaceValue(); })
+            .share();
 
-                       // We must wait for the RecipientStateMachine to transition to kApplying
-                       // before starting to apply any oplog entries.
-                       return future_util::withCancellation(_startOplogApplication.getFuture(),
-                                                            errorSource.token());
-                   })
-                   .then([this, executor, chainCtx, errorSource] {
-                       chainCtx->oplogApplierConsistentButStaleFutures =
-                           _runOplogAppliersUntilConsistentButStale(executor, errorSource.token());
+    // Calling _runOplogAppliersUntilConsistentButStale() won't actually immediately start
+    // performing oplog application. Only after the _startOplogApplication promise is fulfilled will
+    // oplog application begin. This similarly applies to _runOplogAppliersUntilStrictlyConsistent()
+    // and the _consistentButStale promise being fulfilled.
+    auto oplogApplierConsistentButStaleFutures =
+        _runOplogAppliersUntilConsistentButStale(executor, errorSource.token());
 
-                       return whenAllSucceedOn(chainCtx->oplogApplierConsistentButStaleFutures,
-                                               executor);
-                   })
-                   .then([this, executor, chainCtx, errorSource] {
-                       _consistentButStale.emplaceValue();
+    auto fulfillConsistentButStaleFuture =
+        resharding::whenAllSucceedOn(oplogApplierConsistentButStaleFutures, executor)
+            .then([this] { _consistentButStale.emplaceValue(); })
+            .share();
 
-                       chainCtx->oplogApplierStrictlyConsistentFutures =
-                           _runOplogAppliersUntilStrictlyConsistent(executor, errorSource.token());
+    auto oplogApplierStrictlyConsistentFutures =
+        _runOplogAppliersUntilStrictlyConsistent(executor, errorSource.token());
 
-                       return whenAllSucceedOn(chainCtx->oplogApplierStrictlyConsistentFutures,
-                                               executor);
-                   }))
-        .thenRunOn(executor)
-        .onError([executor, chainCtx, errorSource](Status originalError) mutable {
-            errorSource.cancel();
+    // We must additionally wait for fulfillCloningDoneFuture and fulfillConsistentButStaleFuture to
+    // become ready to ensure their corresponding promises aren't being fulfilled while the
+    // .onCompletion() is running.
+    std::vector<SharedSemiFuture<void>> allFutures;
+    allFutures.reserve(3 + oplogFetcherFutures.size() + txnClonerFutures.size() +
+                       oplogApplierConsistentButStaleFutures.size() +
+                       oplogApplierStrictlyConsistentFutures.size());
 
-            return whenAll(
-                       whenAllSettledOn(chainCtx->oplogFetcherFutures, executor),
-                       chainCtx->collectionClonerFuture.thenRunOn(executor),
-                       whenAllSettledOn(chainCtx->txnClonerFutures, executor),
-                       whenAllSettledOn(chainCtx->oplogApplierConsistentButStaleFutures, executor),
-                       whenAllSettledOn(chainCtx->oplogApplierStrictlyConsistentFutures, executor))
-                .ignoreValue()
-                .thenRunOn(executor)
-                .onCompletion([originalError](auto) { return originalError; });
-        })
+    for (const auto& futureList : {oplogFetcherFutures,
+                                   {collectionClonerFuture},
+                                   txnClonerFutures,
+                                   {fulfillCloningDoneFuture},
+                                   oplogApplierConsistentButStaleFutures,
+                                   {fulfillConsistentButStaleFuture},
+                                   oplogApplierStrictlyConsistentFutures}) {
+        for (const auto& future : futureList) {
+            allFutures.emplace_back(future);
+        }
+    }
+
+    return resharding::cancelWhenAnyErrorThenQuiesce(allFutures, executor, errorSource)
         // Fulfilling the _strictlyConsistent promise must be the very last thing in the future
         // chain because RecipientStateMachine, along with its ReshardingDataReplication member,
         // may be destructed immediately afterwards.
@@ -483,7 +433,15 @@ ReshardingDataReplication::_runOplogAppliersUntilConsistentButStale(
     oplogApplierFutures.reserve(_oplogAppliers.size());
 
     for (const auto& applier : _oplogAppliers) {
-        oplogApplierFutures.emplace_back(applier->applyUntilCloneFinishedTs(cancelToken).share());
+        // We must wait for the RecipientStateMachine to transition to kApplying before starting to
+        // apply any oplog entries.
+        oplogApplierFutures.emplace_back(
+            future_util::withCancellation(_startOplogApplication.getFuture(), cancelToken)
+                .thenRunOn(executor)
+                .then([applier = applier.get(), cancelToken] {
+                    return applier->applyUntilCloneFinishedTs(cancelToken);
+                })
+                .share());
     }
 
     return oplogApplierFutures;
@@ -496,7 +454,15 @@ ReshardingDataReplication::_runOplogAppliersUntilStrictlyConsistent(
     oplogApplierFutures.reserve(_oplogAppliers.size());
 
     for (const auto& applier : _oplogAppliers) {
-        oplogApplierFutures.emplace_back(applier->applyUntilDone(cancelToken).share());
+        // We must wait for applyUntilCloneFinishedTs() to have returned before continuing to apply
+        // more oplog entries.
+        oplogApplierFutures.emplace_back(
+            future_util::withCancellation(_consistentButStale.getFuture(), cancelToken)
+                .thenRunOn(executor)
+                .then([applier = applier.get(), cancelToken] {
+                    return applier->applyUntilDone(cancelToken);
+                })
+                .share());
     }
 
     return oplogApplierFutures;
