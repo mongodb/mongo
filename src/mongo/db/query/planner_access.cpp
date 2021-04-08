@@ -209,6 +209,57 @@ bool isOplogTsLowerBoundPred(const mongo::MatchExpression* me) {
 
     return me->path() == repl::OpTime::kTimestampFieldName;
 }
+
+/**
+ * Helper function to add an RID range to collection scans.
+ * If the query solution tree contains a collection scan node with a suitable comparison
+ * predicate on '_id', we add a minRecord and maxRecord on the collection node.
+ */
+void handleRIDRangeScan(const MatchExpression* conjunct, CollectionScanNode* collScan) {
+    if (conjunct == nullptr) {
+        return;
+    }
+
+    auto* andMatchPtr = dynamic_cast<const AndMatchExpression*>(conjunct);
+    if (andMatchPtr != nullptr) {
+        for (size_t index = 0; index < andMatchPtr->numChildren(); index++) {
+            handleRIDRangeScan(andMatchPtr->getChild(index), collScan);
+        }
+        return;
+    }
+
+    if (conjunct->path() != "_id") {
+        return;
+    }
+
+    const bool hasMaxRecord = collScan->maxRecord.has_value();
+    const bool hasMinRecord = collScan->minRecord.has_value();
+
+    if (!hasMinRecord && !hasMaxRecord) {
+        if (auto eq = dynamic_cast<const EqualityMatchExpression*>(conjunct)) {
+            collScan->minRecord = record_id_helpers::keyForElem(eq->getData());
+            collScan->maxRecord = collScan->minRecord;
+            return;
+        }
+    }
+
+    if (!hasMaxRecord) {
+        if (auto ltConjunct = dynamic_cast<const LTMatchExpression*>(conjunct)) {
+            collScan->maxRecord = record_id_helpers::keyForElem(ltConjunct->getData());
+        } else if (auto lteConjunct = dynamic_cast<const LTEMatchExpression*>(conjunct)) {
+            collScan->maxRecord = record_id_helpers::keyForElem(lteConjunct->getData());
+        }
+    }
+
+    if (!hasMinRecord) {
+        if (auto gtConjunct = dynamic_cast<const GTMatchExpression*>(conjunct)) {
+            collScan->minRecord = record_id_helpers::keyForElem(gtConjunct->getData());
+        } else if (auto gteConjunct = dynamic_cast<const GTEMatchExpression*>(conjunct)) {
+            collScan->minRecord = record_id_helpers::keyForElem(gteConjunct->getData());
+        }
+    }
+}
+
 }  // namespace
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
@@ -289,6 +340,11 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
                                  "which does not imply a minimum 'ts' value ",
                 csn->assertTsHasNotFallenOffOplog);
     }
+
+    if (params.allowRIDRange && !csn->resumeAfterRecordId) {
+        handleRIDRangeScan(csn->filter.get(), csn.get());
+    }
+
     return csn;
 }
 

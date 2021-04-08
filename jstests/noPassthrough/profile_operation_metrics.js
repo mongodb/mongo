@@ -1440,7 +1440,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
-            assert.eq(profileDoc.cursorSeeks, 1);
+            assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
         }

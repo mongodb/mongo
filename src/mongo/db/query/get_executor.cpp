@@ -356,6 +356,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
             opCtx, collection, canonicalQuery->getFindCommandRequest().getTailable())) {
         plannerParams->options |= QueryPlannerParams::OPLOG_SCAN_WAIT_FOR_VISIBLE;
     }
+
+    if (collection->isClustered()) {
+        plannerParams->allowRIDRange = true;
+    }
 }
 
 bool shouldWaitForOplogVisibility(OperationContext* opCtx,

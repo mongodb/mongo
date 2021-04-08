@@ -41,7 +41,8 @@ struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
           indexFiltersApplied(false),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()) {}
+          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
+          allowRIDRange(false) {}
 
     enum Options {
         // You probably want to set this.
@@ -149,6 +150,10 @@ struct QueryPlannerParams {
     // plans via the MultiPlanStage, and the set of possible plans is very large for certain
     // index+query combinations.
     size_t maxIndexedSolutions;
+
+    // Set if we allow optimization which converts "_id" predicates into range collection scan using
+    // minRecord and maxRecord.
+    bool allowRIDRange;
 };
 
 }  // namespace mongo
