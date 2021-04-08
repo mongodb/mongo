@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_critical_section.h"
@@ -194,6 +195,12 @@ private:
     DonorShardContext _donorCtx;
 
     const std::unique_ptr<DonorStateMachineExternalState> _externalState;
+
+    // ThreadPool used by CancelableOperationContext.
+    // CancelableOperationContext must have a thread that is always available to it to mark its
+    // opCtx as killed when the cancelToken has been cancelled.
+    const std::shared_ptr<ThreadPool> _markKilledExecutor;
+    boost::optional<CancelableOperationContextFactory> _cancelableOpCtxFactory;
 
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("DonorStateMachine::_mutex");
