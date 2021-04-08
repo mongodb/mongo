@@ -70,6 +70,40 @@ certain properties:
 }
 ```
 
+## Indexes
+
+In order to support queries on the time-series collection that could benefit from indexed access
+rather than collection scans, indexes may be created on the time, meta-data, and meta-data subfields
+of a time-series collection. The index key specification provided by the user via `createIndex` will
+be converted to the underlying buckets collection's schema.
+* The details for mapping the index specificiation between the time-series collection and the
+  underlying buckets collection may be found in
+  [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
+
+Once the indexes have been created, they can be inspected through the `listIndexes` command or the
+`$indexStats` aggregation stage. `listIndexes` and `$indexStats` against a time-series collection
+will internally convert the underlying buckets collections' indexes and return time-series schema
+indexes. For example, a `{meta: 1}` index on the underlying buckets collection will appear as
+`{mm: 1}` when we run `listIndexes` on a time-series collection defined with `mm` for the meta-data
+field.
+
+`dropIndex` and `collMod` (`hidden: <bool>`, `expireAfterSeconds: <num>`) are also supported on
+time-series collections.
+
+Most index types are supported on time-series collections, including
+[hashed](https://docs.mongodb.com/manual/core/index-hashed/),
+[wildcard](https://docs.mongodb.com/manual/core/index-wildcard/),
+[sparse](https://docs.mongodb.com/manual/core/index-sparse/),
+[multikey](https://docs.mongodb.com/manual/core/index-multikey/), and
+[indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
+
+Index types that are not supported on time-series collections include
+[geo](https://docs.mongodb.com/manual/core/2dsphere/),
+[partial](https://docs.mongodb.com/manual/core/index-partial/),
+[unique](https://docs.mongodb.com/manual/core/index-unique/), and
+[text](https://docs.mongodb.com/manual/core/index-text/).
+
+# References
 See:
 [MongoDB Blog: Time Series Data and MongoDB: Part 2 - Schema Design Best Practices](https://www.mongodb.com/blog/post/time-series-data-and-mongodb-part-2-schema-design-best-practices)
 
