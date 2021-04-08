@@ -83,7 +83,7 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
             MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
         // Rename the local.system collection to prevent problems with replset configurations.
         tempMongod.getDB('local').getCollection('system').renameCollection('_system');
-        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidations: true, wait: true});
+        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidation: true, wait: true});
 
         let shardIdentity = shardIdentities[i];
         let host = this.hosts[i];
@@ -135,7 +135,7 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
         let tempMongod =
             MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
         tempMongod.getDB('local').getCollection('_system').renameCollection('system', true);
-        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidations: true, wait: true});
+        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidation: true, wait: true});
 
         let shardIdentity = shardIdentities[i];
         let host = this.hosts[i];
