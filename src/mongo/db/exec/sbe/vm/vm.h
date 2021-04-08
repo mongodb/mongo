@@ -148,6 +148,12 @@ std::pair<value::TypeTags, value::Value> genericCompare(
 
         auto threeWayResult = memcmp(lhsDBPtr.id, rhsDBPtr.id, sizeof(value::ObjectIdType));
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
+    } else if (lhsTag == value::TypeTags::bsonJavascript &&
+               rhsTag == value::TypeTags::bsonJavascript) {
+        auto lhsCode = value::getBsonJavascriptView(lhsValue);
+        auto rhsCode = value::getBsonJavascriptView(rhsValue);
+        return {value::TypeTags::Boolean,
+                value::bitcastFrom<bool>(op(lhsCode.compare(rhsCode), 0))};
     }
 
     return {value::TypeTags::Nothing, 0};
