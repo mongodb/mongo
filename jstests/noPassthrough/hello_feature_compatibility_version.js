@@ -6,7 +6,8 @@
 (function() {
 "use strict";
 
-const adminDB = db.getSiblingDB("admin");
+const conn = MongoRunner.runMongod();
+const adminDB = conn.getDB("admin");
 
 // This test manually runs hello/isMaster with the 'internalClient' field, which means that to the
 // mongod, the connection appears to be from another server. This makes mongod to return a
@@ -89,4 +90,6 @@ if (lastContinuousFCV !== lastLTSFCV) {
 runTest(lastLTSFCV, res.maxWireVersion - numVersionsSinceLastLTS, res.maxWireVersion, "hello");
 runTest(lastLTSFCV, res.maxWireVersion - numVersionsSinceLastLTS, res.maxWireVersion, "isMaster");
 runTest(lastLTSFCV, res.maxWireVersion - numVersionsSinceLastLTS, res.maxWireVersion, "ismaster");
+
+MongoRunner.stopMongod(conn);
 })();
