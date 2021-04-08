@@ -126,7 +126,7 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
 
     result.setField("limit", Value(limit));
 
-    if (maxDistance > 0)
+    if (maxDistance >= 0)
         result.setField("maxDistance", Value(maxDistance));
 
     if (minDistance > 0)
@@ -158,7 +158,7 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
 
     geoNear.append("num", limit);  // called limit in toBson
 
-    if (maxDistance > 0)
+    if (maxDistance >= 0)
         geoNear.append("maxDistance", maxDistance);
 
     if (minDistance > 0)
