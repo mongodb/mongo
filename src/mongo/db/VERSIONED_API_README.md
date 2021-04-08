@@ -31,7 +31,6 @@ version W.
   aggregation operators, aggregation stages and expressions, and CRUD operators.
 - Remove support for a BSON type, or any other BSON format change (besides adding a type).
 - Drop support for a wire protocol message type.
-- Drop support for an authentication mechanism.
 - Making the authorization requirements for StableCommand more restrictive.
 - Increase hello.minWireVersion (or decrease maxWireVersion, which we won't do).
 
@@ -49,6 +48,9 @@ The following changes are permitted in V:
 - Change order of fields in reply docs and sub-docs.
 - Add a CRUD syntax element.
 - Making the authorization requirements for StableCommand less restrictive.
+- Add and dropping support for an authentication mechanism. Authenticate mechanisms may need to be
+  removed due to security vulnerabilties and as such, there is no guarantee about their
+  compatibility.
 - Deprecate a behavior
 - Increase hello.maxWireVersion.
 - Any change in behaviors not in V.
