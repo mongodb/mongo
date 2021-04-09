@@ -1,5 +1,6 @@
 // @tags: [
 //   requires_getmore,
+//   requires_fcv_49,
 // ]
 
 // Test 2dsphere near search, called via find and $geoNear.
