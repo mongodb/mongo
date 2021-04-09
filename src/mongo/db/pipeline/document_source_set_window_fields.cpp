@@ -53,7 +53,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     document_source_set_window_fields::createFromBson,
     LiteParsedDocumentSource::AllowedWithApiStrict::kAlways,
     LiteParsedDocumentSource::AllowedWithClientType::kAny,
-    boost::none,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50,
     ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
 
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
@@ -62,7 +62,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     DocumentSourceInternalSetWindowFields::createFromBson,
     LiteParsedDocumentSource::AllowedWithApiStrict::kInternal,
     LiteParsedDocumentSource::AllowedWithClientType::kAny,
-    boost::none,
+    ServerGlobalParams::FeatureCompatibility::Version::kVersion50,
     ::mongo::feature_flags::gFeatureFlagWindowFunctions.isEnabledAndIgnoreFCV());
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFromBson(

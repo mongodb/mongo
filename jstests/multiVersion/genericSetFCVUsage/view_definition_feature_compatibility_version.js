@@ -12,12 +12,16 @@
 const testName = "view_definition_feature_compatibility_version_multiversion";
 const dbpath = MongoRunner.dataPath + testName;
 
+// An array of feature flags that must be enabled to run feature flag tests.
+const featureFlagsToEnable = ["featureFlagWindowFunctions"];
+
 // These arrays should be populated with aggregation pipelines that use
 // aggregation features in new versions of mongod. This test ensures that a view
 // definition accepts the new aggregation feature when the feature compatibility version is the
 // latest version, and rejects it when the feature compatibility version is the last
 // version.
 const testCasesLastContinuous = [];
+const testCasesLastContinuousWithFeatureFlags = [];
 
 // Anything that's incompatible with the last continuous release is incompatible with the last
 // stable release.
@@ -50,10 +54,14 @@ const testCasesLastStable = testCasesLastContinuous.concat([
     [{$project: {x: {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "month"}}}}],
 ]);
 
+const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([
+    [{$setWindowFields: {sortBy: {_id: 1}, output: {sum: {$sum: {input: "$val"}}}}}],
+]);
+
 // Tests Feature Compatibility Version behavior of view creation while using aggregation pipelines
 // 'testCases' and using a previous stable version 'lastVersion' of mongod.
 // 'lastVersion' can have values "last-lts" and "last-continuous".
-function testViewDefinitionFCVBehavior(lastVersion, testCases) {
+function testViewDefinitionFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
         jsTestLog("Skipping setup for tests against " + lastVersion + " since there are none");
         return;
@@ -62,6 +70,17 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases) {
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});
     assert.neq(null, conn, "mongod was unable to start up");
     let testDB = conn.getDB(testName);
+    for (let i = 0; i < featureFlags.length; i++) {
+        const command = {"getParameter": 1};
+        command[featureFlags[i]] = 1;
+        const featureEnabled =
+            assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
+        if (!featureEnabled) {
+            jsTestLog("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            MongoRunner.stopMongod(conn);
+            return;
+        }
+    }
 
     // Explicitly set feature compatibility version to the latest version.
     assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
@@ -235,5 +254,9 @@ function testViewDefinitionFCVBehavior(lastVersion, testCases) {
 }
 
 testViewDefinitionFCVBehavior("last-lts", testCasesLastStable);
+testViewDefinitionFCVBehavior(
+    "last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
 testViewDefinitionFCVBehavior("last-continuous", testCasesLastContinuous);
+testViewDefinitionFCVBehavior(
+    "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
 }());

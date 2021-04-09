@@ -12,6 +12,9 @@
 const testName = "collection_validator_feature_compatibility_version";
 const dbpath = MongoRunner.dataPath + testName;
 
+// An array of feature flags that must be enabled to run feature flag tests.
+const featureFlagsToEnable = [];
+
 // These arrays should be populated with
 //
 //      { validator: { ... }, nonMatchingDocument: { ... }, lastStableErrCode }
@@ -28,6 +31,7 @@ const testCasesLastContinuous = [
     // Populate with any new expressions.
     //
 ];
+const testCasesLastContinuousWithFeatureFlags = [];
 
 const testCasesLastStable = testCasesLastContinuous.concat([
     // These expressions were introduced in 4.9.
@@ -93,11 +97,12 @@ const testCasesLastStable = testCasesLastContinuous.concat([
         lastStableErrCode: 168
     },
 ]);
+const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([]);
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test
 // cases 'testCases' and using a previous stable version 'lastVersion' of mongod. 'lastVersion' can
 // have values "last-lts" and "last-continuous".
-function testCollectionValidatorFCVBehavior(lastVersion, testCases) {
+function testCollectionValidatorFCVBehavior(lastVersion, testCases, featureFlags = []) {
     if (testCases.length === 0) {
         jsTestLog("Skipping setup for tests against " + lastVersion + " since there are none");
         return;
@@ -107,6 +112,17 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases) {
     assert.neq(null, conn, "mongod was unable to start up");
 
     let testDB = conn.getDB(testName);
+    for (let i = 0; i < featureFlags.length; i++) {
+        const command = {"getParameter": 1};
+        command[featureFlags[i]] = 1;
+        const featureEnabled =
+            assert.commandWorked(testDB.adminCommand(command))[featureFlags[i]].value;
+        if (!featureEnabled) {
+            jsTestLog("Skipping test because the " + featureFlags[i] + " feature flag is disabled");
+            MongoRunner.stopMongod(conn);
+            return;
+        }
+    }
 
     let adminDB = conn.getDB("admin");
 
@@ -297,5 +313,9 @@ function testCollectionValidatorFCVBehavior(lastVersion, testCases) {
 }
 
 testCollectionValidatorFCVBehavior("last-lts", testCasesLastStable);
+testCollectionValidatorFCVBehavior(
+    "last-lts", testCasesLastStableWithFeatureFlags, featureFlagsToEnable);
 testCollectionValidatorFCVBehavior("last-continuous", testCasesLastContinuous);
+testCollectionValidatorFCVBehavior(
+    "last-continuous", testCasesLastContinuousWithFeatureFlags, featureFlagsToEnable);
 }());
