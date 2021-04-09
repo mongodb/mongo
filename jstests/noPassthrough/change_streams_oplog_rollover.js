@@ -94,7 +94,7 @@ function oplogIsRolledOver() {
     // oplog's current oldest entry. Said another way, the oplog is rolled over when
     // everything in the oplog is newer than what used to be the newest entry.
     return bsonWoCompare(mostRecentOplogEntry.ts,
-                         getLeastRecentOp({server: primaryNode, readConcern: "majority"}).ts) < 0;
+                         getFirstOplogEntry(primaryNode, {readConcern: "majority"}).ts) < 0;
 }
 
 while (!oplogIsRolledOver()) {

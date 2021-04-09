@@ -3,7 +3,6 @@ var wait;
 var occasionally;
 var reconnect;
 var getLatestOp;
-var getLeastRecentOp;
 var waitForAllMembers;
 var reconfig;
 var awaitOpTime;
@@ -154,16 +153,6 @@ getLatestOp = function(server) {
     server.getDB("admin").getMongo().setSecondaryOk();
     var log = server.getDB("local")['oplog.rs'];
     var cursor = log.find({}).sort({'$natural': -1}).limit(1);
-    if (cursor.hasNext()) {
-        return cursor.next();
-    }
-    return null;
-};
-
-getLeastRecentOp = function({server, readConcern}) {
-    server.getDB("admin").getMongo().setSecondaryOk();
-    const oplog = server.getDB("local").oplog.rs;
-    const cursor = oplog.find().sort({$natural: 1}).limit(1).readConcern(readConcern);
     if (cursor.hasNext()) {
         return cursor.next();
     }
@@ -631,16 +620,22 @@ getLastOpTime = function(conn) {
 /**
  * Returns the oldest oplog entry.
  */
-getFirstOplogEntry = function(conn) {
-    let firstEntry;
+getFirstOplogEntry = function(server, opts = {}) {
+    server.getDB("admin").getMongo().setSecondaryOk();
+
+    let firstEntryQuery = server.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1);
+    if (opts.readConcern) {
+        firstEntryQuery = firstEntryQuery.readConcern(opts.readConcern);
+    }
+
     // The query plan may yield between the cursor establishment and iterating to retrieve the first
     // result. During this yield it's possible for the oplog to "roll over" or shrink. This is rare,
     // but if these both happen the cursor will be unable to resume after yielding and return a
     // "CappedPositionLost" error. This can be safely retried.
+    let firstEntry;
     assert.soon(() => {
         try {
-            firstEntry =
-                conn.getDB('local').oplog.rs.find().sort({$natural: 1}).limit(1).toArray()[0];
+            firstEntry = firstEntryQuery.toArray()[0];
             return true;
         } catch (e) {
             if (e.code == ErrorCodes.CappedPositionLost) {
