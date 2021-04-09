@@ -11,17 +11,13 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
+// Ensures that resharding has acquired the db and collection distLocks. The fact that the entry in
+// config.reshardingOperations exists guarantees that the distLocks have already been acquired.
 function awaitReshardingStarted() {
     assert.soon(() => {
-        const op = st.admin
-                       .aggregate([
-                           {$currentOp: {allUsers: true, localOps: true}},
-                           {$match: {"command.reshardCollection": ns}},
-                       ])
-                       .toArray()[0];
-
-        return op !== undefined;
-    }, "failed to find reshardCollection in $currentOp output");
+        const coordinatorDoc = st.s.getCollection("config.reshardingOperations").findOne({ns: ns});
+        return coordinatorDoc !== null;
+    }, "resharding didn't start");
 }
 
 var st = new ShardingTest({
