@@ -69,7 +69,7 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
                 .operationTime);
     }
 
-    this.st.stopAllShards({noCleanData: true, restart: true, skipValidations: true});
+    this.st.stopAllShards({noCleanData: true, restart: true, skipValidation: true});
 
     jsTest.log("Restarting shards as read only standalone instances...");
     for (let i = 0; i < this.nShards; ++i) {
@@ -83,7 +83,8 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
             MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
         // Rename the local.system collection to prevent problems with replset configurations.
         tempMongod.getDB('local').getCollection('system').renameCollection('_system');
-        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidation: true, wait: true});
+        MongoRunner.stopMongod(
+            tempMongod, null, {noCleanData: true, skipValidation: true, wait: true});
 
         let shardIdentity = shardIdentities[i];
         let host = this.hosts[i];
@@ -128,14 +129,15 @@ ShardedFixture.prototype.runExecPhase = function runExecPhase(test) {
         let port = this.ports[i];
 
         // Stop the read only shards.
-        MongoRunner.stopMongod(readOnlyShards[i],
-                               {noCleanData: true, skipValidations: true, wait: true});
+        MongoRunner.stopMongod(
+            readOnlyShards[i], null, {noCleanData: true, skipValidation: true, wait: true});
 
         // Run a temporary mongod to rename the local.system collection.
         let tempMongod =
             MongoRunner.runMongod({port: port, dbpath: dbPath, noReplSet: true, noCleanData: true});
         tempMongod.getDB('local').getCollection('_system').renameCollection('system', true);
-        MongoRunner.stopMongod(tempMongod, {noCleanData: true, skipValidation: true, wait: true});
+        MongoRunner.stopMongod(
+            tempMongod, null, {noCleanData: true, skipValidation: true, wait: true});
 
         let shardIdentity = shardIdentities[i];
         let host = this.hosts[i];
