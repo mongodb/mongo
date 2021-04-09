@@ -140,7 +140,7 @@ IndexDataEntry::IndexDataEntry(const std::string& indexDataEntry)
     : _buffer(reinterpret_cast<const uint8_t*>(indexDataEntry.data())) {}
 
 std::string IndexDataEntry::create(RecordId loc, const KeyString::TypeBits& typeBits) {
-    uint64_t repr = loc.asLong();
+    uint64_t repr = loc.getLong();
     uint64_t typebitsSize = typeBits.getSize();
     std::string output(sizeof(repr) + sizeof(typebitsSize) + typebitsSize, '\0');
 

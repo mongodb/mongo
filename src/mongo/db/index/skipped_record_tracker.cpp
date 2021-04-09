@@ -68,12 +68,9 @@ void SkippedRecordTracker::finalizeTemporaryTable(OperationContext* opCtx,
 }
 
 void SkippedRecordTracker::record(OperationContext* opCtx, const RecordId& recordId) {
-    BSONObj toInsert;
-    recordId.withFormat([](RecordId::Null n) { invariant(false); },
-                        [&](int64_t rid) { toInsert = BSON(kRecordIdField << rid); },
-                        [&](const char* str, int size) {
-                            toInsert = BSON(kRecordIdField << std::string(str, size));
-                        });
+    BSONObjBuilder builder;
+    recordId.serializeToken(kRecordIdField, &builder);
+    BSONObj toInsert = builder.obj();
 
     // Lazily initialize table when we record the first document.
     if (!_skippedRecordsTable) {
@@ -143,16 +140,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         const BSONObj doc = record->data.toBson();
 
         // This is the RecordId of the skipped record from the collection.
-        RecordId skippedRecordId;
-        const KeyFormat keyFormat = collection->getRecordStore()->keyFormat();
-        if (keyFormat == KeyFormat::Long) {
-            skippedRecordId = RecordId(doc[kRecordIdField].Long());
-        } else {
-            invariant(keyFormat == KeyFormat::String);
-            const std::string recordIdStr = doc[kRecordIdField].String();
-            skippedRecordId = RecordId(recordIdStr.c_str(), recordIdStr.size());
-        }
-
+        RecordId skippedRecordId = RecordId::deserializeToken(doc[kRecordIdField]);
         WriteUnitOfWork wuow(opCtx);
 
         // If the record still exists, get a potentially new version of the document to index.

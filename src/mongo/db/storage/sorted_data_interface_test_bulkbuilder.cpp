@@ -111,8 +111,8 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordId) {
             sorted->makeBulkBuilder(opCtx.get(), true));
 
         RecordId reservedLoc(
-            RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
-        invariant(RecordId::isReserved<int64_t>(reservedLoc));
+            RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
+        invariant(RecordIdReservations::isReserved(reservedLoc));
 
         WriteUnitOfWork wuow(opCtx.get());
         ASSERT_OK(builder->addKey(makeKeyString(sorted.get(), key1, reservedLoc)));

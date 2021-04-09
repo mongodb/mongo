@@ -955,7 +955,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbhelpers',
-
         '$BUILD_DIR/mongo/db/repl/cloner_utils',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
@@ -1133,6 +1132,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'catalog/database_holder',
@@ -1150,7 +1150,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
-)
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/storage/key_string',
+    ],)
 
 env.Library(
     target='query_exec',
@@ -1296,6 +1298,7 @@ env.Library(
         'catalog/database_holder',
         'commands/server_status_core',
         'kill_sessions',
+        'record_id_helpers',
         'stats/resource_consumption_metrics',
     ],
 )
@@ -2412,6 +2415,7 @@ if wiredtiger:
             'query_exec',
             'range_arithmetic',
             'read_write_concern_defaults_mock',
+            'record_id_helpers',
             'repl/mock_repl_coord_server_fixture',
             'repl/oplog_interface_local',
             'repl/repl_coordinator_interface',

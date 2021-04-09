@@ -69,6 +69,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -723,13 +724,11 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
 
                 boost::optional<RecordId> minRecord, maxRecord;
                 if (!startKey.isEmpty()) {
-                    auto oid = startKey.firstElement().OID();
-                    minRecord = RecordId(oid.view().view(), OID::kOIDSize);
+                    minRecord = RecordId(record_id_helpers::keyForElem(startKey.firstElement()));
                 }
 
                 if (!endKey.isEmpty()) {
-                    auto oid = endKey.firstElement().OID();
-                    maxRecord = RecordId(oid.view().view(), OID::kOIDSize);
+                    maxRecord = RecordId(record_id_helpers::keyForElem(endKey.firstElement()));
                 }
 
                 planExecutor = isFind

@@ -245,10 +245,11 @@ void WorkingSetMember::serialize(BufBuilder& buf) const {
         recordId.withFormat([&](RecordId::Null n) { MONGO_UNREACHABLE_TASSERT(5472100); },
                             [&](int64_t rid) {
                                 buf.appendChar(static_cast<char>(RecordIdFormat::Long));
-                                buf.appendNum(recordId.asLong());
+                                buf.appendNum(recordId.getLong());
                             },
                             [&](const char* str, int size) {
                                 buf.appendChar(static_cast<char>(RecordIdFormat::String));
+                                buf.appendNum(size);
                                 buf.appendBuf(static_cast<const void*>(str), size);
                             });
     }
@@ -293,9 +294,9 @@ WorkingSetMember WorkingSetMember::deserialize(BufReader& buf) {
             wsm.recordId = RecordId{buf.read<LittleEndian<int64_t>>()};
         } else {
             invariant(recordIdFormat == RecordIdFormat::String);
-            invariant(static_cast<int>(RecordId::kSmallStrSize) == static_cast<int>(OID::kOIDSize));
-            const char* recordIdStr = static_cast<const char*>(buf.skip(RecordId::kSmallStrSize));
-            wsm.recordId = RecordId{recordIdStr, RecordId::kSmallStrSize};
+            auto size = buf.read<LittleEndian<int32_t>>();
+            const char* recordIdStr = static_cast<const char*>(buf.skip(size));
+            wsm.recordId = RecordId{recordIdStr, size};
         }
     }
 

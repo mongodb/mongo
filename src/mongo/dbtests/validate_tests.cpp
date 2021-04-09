@@ -960,7 +960,7 @@ public:
         // Insert additional multikey path metadata index keys.
         lockDb(MODE_X);
         const RecordId recordId(
-            RecordId::reservedIdFor<int64_t>(RecordId::Reservation::kWildcardMultikeyMetadataId));
+            RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
         const IndexCatalog* indexCatalog = coll->getIndexCatalog();
         auto descriptor = indexCatalog->findIndexByName(&_opCtx, indexName);
         auto accessMethod =
@@ -1088,8 +1088,8 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            RecordId recordId(RecordId::reservedIdFor<int64_t>(
-                RecordId::Reservation::kWildcardMultikeyMetadataId));
+            RecordId recordId(
+                RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
             const KeyString::Value indexKey =
                 KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
                                        BSON("" << 1 << ""

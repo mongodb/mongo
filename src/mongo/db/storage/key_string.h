@@ -544,6 +544,7 @@ public:
     void appendUndefined();
     void appendBinData(const BSONBinData& data);
     void appendSetAsArray(const BSONElementSet& set, const StringTransformFn& f = nullptr);
+    void appendOID(OID oid);
 
     /**
      * Appends a Discriminator byte and kEnd byte to a key string.
@@ -949,6 +950,7 @@ RecordId decodeRecordIdLongAtEnd(const void* buf, size_t size);
 
 /**
  * Decodes a RecordId string from the end of a buffer.
+ * The RecordId string length cannot be determined by looking at the start of the string.
  */
 RecordId decodeRecordIdStrAtEnd(const void* buf, size_t size);
 
@@ -961,7 +963,6 @@ size_t sizeWithoutRecordIdAtEnd(const void* bufferRaw, size_t bufSize);
  * Decodes a RecordId, consuming all bytes needed from reader.
  */
 RecordId decodeRecordIdLong(BufReader* reader);
-RecordId decodeRecordIdStr(BufReader* reader);
 
 int compare(const char* leftBuf, const char* rightBuf, size_t leftSize, size_t rightSize);
 
@@ -976,6 +977,16 @@ bool readSBEValue(BufReader* reader,
                   bool inverted,
                   Version version,
                   sbe::value::ValueBuilder* valueBuilder);
+
+/*
+ * Appends the first field of a key string to a BSON object.
+ * This does not accept TypeBits because callers of this function discard TypeBits.
+ */
+void appendSingleFieldToBSONAs(const char* buf,
+                               int len,
+                               StringData fieldName,
+                               BSONObjBuilder* builder,
+                               Version version = KeyString::Version::kLatestVersion);
 
 template <class BufferT>
 template <class T>

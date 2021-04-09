@@ -244,18 +244,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     const BSONObj& resumeAfterObj = query.getFindCommandRequest().getResumeAfter();
     if (!resumeAfterObj.isEmpty()) {
         BSONElement recordIdElem = resumeAfterObj["$recordId"];
-        switch (recordIdElem.type()) {
-            case jstNULL:
-                csn->resumeAfterRecordId = RecordId();
-                break;
-            case jstOID:
-                csn->resumeAfterRecordId =
-                    RecordId(recordIdElem.OID().view().view(), OID::kOIDSize);
-                break;
-            case NumberLong:
-            default:
-                csn->resumeAfterRecordId = RecordId(recordIdElem.numberLong());
-        }
+        csn->resumeAfterRecordId = RecordId::deserializeToken(recordIdElem);
     }
 
     const bool assertMinTsHasNotFallenOffOplog =

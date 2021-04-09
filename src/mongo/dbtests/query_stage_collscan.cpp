@@ -48,6 +48,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -600,8 +601,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredNonExistentRecord
     params.tailable = false;
 
     // Use RecordIds that don't exist. Expect to see all records.
-    params.minRecord = RecordId(OID().view().view(), OID::kOIDSize);
-    params.maxRecord = RecordId(OID::max().view().view(), OID::kOIDSize);
+    params.minRecord = record_id_helpers::keyForOID(OID());
+    params.maxRecord = record_id_helpers::keyForOID(OID::max());
 
     WorkingSet ws;
     auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
@@ -708,9 +709,10 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
 
     // Provide RecordId bounds with exclusive filters.
     StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
-        fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
-                              params.minRecord->toString(),
-                              params.maxRecord->toString())),
+        fromjson(fmt::sprintf(
+            "{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
+            record_id_helpers::toBSONAs(*params.minRecord, "").firstElement().OID().toString(),
+            record_id_helpers::toBSONAs(*params.maxRecord, "").firstElement().OID().toString())),
         _expCtx.get());
     ASSERT_OK(swMatch.getStatus());
     auto filter = std::move(swMatch.getValue());
@@ -772,9 +774,10 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
 
     // Provide RecordId bounds with exclusive filters.
     StatusWithMatchExpression swMatch = MatchExpressionParser::parse(
-        fromjson(fmt::sprintf("{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
-                              params.minRecord->toString(),
-                              params.maxRecord->toString())),
+        fromjson(fmt::sprintf(
+            "{_id: {$gt: ObjectId('%s'), $lt: ObjectId('%s')}}",
+            record_id_helpers::toBSONAs(*params.minRecord, "").firstElement().OID().toString(),
+            record_id_helpers::toBSONAs(*params.maxRecord, "").firstElement().OID().toString())),
         _expCtx.get());
     ASSERT_OK(swMatch.getStatus());
     auto filter = std::move(swMatch.getValue());

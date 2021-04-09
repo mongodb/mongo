@@ -46,7 +46,7 @@ for (let i = 0; i < 100; i++) {
 function checkRecordId(documents) {
     for (const document of documents) {
         assert(document.hasOwnProperty("$recordId"));
-        assert(document["$recordId"].isObjectId);
+        assert(isString(document["$recordId"]));
     }
 }
 

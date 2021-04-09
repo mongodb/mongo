@@ -302,7 +302,7 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
-        auto record = cursor->seekNear(RecordId(id1.asLong() + 1));
+        auto record = cursor->seekNear(RecordId(id1.getLong() + 1));
         ASSERT(record);
         ASSERT_EQ(id1, record->id);
         ASSERT(!cursor->next());

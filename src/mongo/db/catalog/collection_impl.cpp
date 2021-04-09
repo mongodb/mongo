@@ -63,6 +63,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -675,14 +676,8 @@ Status CollectionImpl::insertDocumentForBulkLoader(
 
     RecordId recordId;
     if (isClustered()) {
-        // Collections clustered by _id require ObjectId values.
-        BSONElement oidElem;
-        bool foundId = doc.getObjectID(oidElem);
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Document " << redact(doc) << " is missing the '_id' field",
-                foundId);
         invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-        recordId = RecordId(oidElem.OID().view().view(), OID::kOIDSize);
+        recordId = uassertStatusOK(record_id_helpers::keyForDoc(doc));
     }
 
     // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
@@ -758,16 +753,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
         RecordId recordId;
         if (isClustered()) {
-            // Collections clustered by _id require ObjectId values.
-            BSONElement oidElem;
-            if (!doc.getObjectID(oidElem)) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Document " << redact(doc) << " is missing the '_id' field");
-            }
-
             invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-            recordId = RecordId(oidElem.OID().view().view(), OID::kOIDSize);
+            recordId = uassertStatusOK(record_id_helpers::keyForDoc(doc));
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {

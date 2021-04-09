@@ -863,7 +863,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
     op1->recoveryUnit()->beginUnitOfWork(op1.get());
     Timestamp tsOne = Timestamp(
-        static_cast<unsigned long long>(_oplogOrderInsertOplog(op1.get(), rs, 1).asLong()));
+        static_cast<unsigned long long>(_oplogOrderInsertOplog(op1.get(), rs, 1).getLong()));
     op1->recoveryUnit()->commitUnitOfWork();
     // Asserting on a recovery unit without a snapshot.
     ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op1.get()));
@@ -882,7 +882,7 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
     op2->recoveryUnit()->beginUnitOfWork(op2.get());
     Timestamp tsThree = Timestamp(
-        static_cast<unsigned long long>(_oplogOrderInsertOplog(op2.get(), rs, 3).asLong()));
+        static_cast<unsigned long long>(_oplogOrderInsertOplog(op2.get(), rs, 3).getLong()));
     // Before committing, the query still only sees timestamp "1".
     ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op2.get()));
     op2->recoveryUnit()->commitUnitOfWork();

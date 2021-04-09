@@ -2888,7 +2888,7 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
             return metadata.hasGeoNearDistance() ? Value(metadata.getGeoNearDistance()) : Value();
         case MetaType::kGeoNearPoint:
             return metadata.hasGeoNearPoint() ? Value(metadata.getGeoNearPoint()) : Value();
-        case MetaType::kRecordId:
+        case MetaType::kRecordId: {
             // Be sure that a RecordId can be represented by a long long.
             static_assert(RecordId::kMinRepr >= std::numeric_limits<long long>::min());
             static_assert(RecordId::kMaxRepr <= std::numeric_limits<long long>::max());
@@ -2896,10 +2896,10 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
                 return Value();
             }
 
-            return metadata.getRecordId().withFormat(
-                [](RecordId::Null n) { return Value(); },
-                [](const int64_t rid) { return Value{static_cast<long long>(rid)}; },
-                [](const char* str, int len) { return Value(OID::from(str)); });
+            BSONObjBuilder builder;
+            metadata.getRecordId().serializeToken("", &builder);
+            return Value(builder.done().firstElement());
+        }
         case MetaType::kIndexKey:
             return metadata.hasIndexKey() ? Value(metadata.getIndexKey()) : Value();
         case MetaType::kSortKey:

@@ -2185,12 +2185,7 @@ void IndexBuildsCoordinator::_resumeIndexBuildFromPhase(
         resumeInfo.getPhase() == IndexBuildPhaseEnum::kCollectionScan) {
         boost::optional<RecordId> resumeAfterRecordId;
         if (resumeInfo.getCollectionScanPosition()) {
-            auto scanPosition = *resumeInfo.getCollectionScanPosition();
-            if (auto recordIdOIDPtr = stdx::get_if<OID>(&scanPosition)) {
-                resumeAfterRecordId.emplace(recordIdOIDPtr->view().view(), OID::kOIDSize);
-            } else if (auto recordIdLongPtr = stdx::get_if<int64_t>(&scanPosition)) {
-                resumeAfterRecordId.emplace(RecordId(*recordIdLongPtr));
-            }
+            resumeAfterRecordId = *resumeInfo.getCollectionScanPosition();
         }
 
         _scanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState, resumeAfterRecordId);

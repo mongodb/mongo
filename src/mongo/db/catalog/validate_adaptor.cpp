@@ -306,25 +306,19 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
         throw;
     }
 
+    const RecordId kWildcardMultikeyMetadataRecordId =
+        RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId);
     while (indexEntry) {
         if (!isFirstEntry) {
             _validateKeyOrder(
                 opCtx, index, indexEntry->keyString, prevIndexKeyStringValue, &indexResults);
         }
 
-        const RecordId kWildcardMultikeyMetadataRecordId = [&]() {
-            auto keyFormat = _validateState->getCollection()->getRecordStore()->keyFormat();
-            if (keyFormat == KeyFormat::Long) {
-                return RecordId::reservedIdFor<int64_t>(
-                    RecordId::Reservation::kWildcardMultikeyMetadataId);
-            } else {
-                invariant(keyFormat == KeyFormat::String);
-                return RecordId::reservedIdFor<OID>(
-                    RecordId::Reservation::kWildcardMultikeyMetadataId);
-            }
-        }();
-        if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
-            indexEntry->loc == kWildcardMultikeyMetadataRecordId) {
+        bool isMetadataKey = indexEntry->loc.withFormat(
+            [](RecordId::Null) { return false; },
+            [&](int64_t val) { return val == kWildcardMultikeyMetadataRecordId.getLong(); },
+            [](const char* str, int len) { return false; });
+        if (descriptor->getIndexType() == IndexType::INDEX_WILDCARD && isMetadataKey) {
             _indexConsistency->removeMultikeyMetadataPath(indexEntry->keyString, &indexInfo);
         } else {
             try {

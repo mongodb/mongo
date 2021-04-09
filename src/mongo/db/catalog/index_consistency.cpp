@@ -42,6 +42,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/storage_debug_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
@@ -501,11 +502,7 @@ BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
 
     BSONObjBuilder infoBuilder;
     infoBuilder.append("indexName", indexName);
-    infoBuilder.append(
-        "recordId",
-        recordId.withFormat([](RecordId::Null n) { return std::string("null"); },
-                            [](int64_t rid) { return std::to_string(rid); },
-                            [](const char* str, int size) { return OID::from(str).toString(); }));
+    recordId.serializeToken("recordId", &infoBuilder);
 
     if (!idKey.isEmpty()) {
         infoBuilder.append("idKey", idKey);

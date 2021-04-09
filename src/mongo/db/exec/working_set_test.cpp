@@ -34,6 +34,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
@@ -218,7 +219,7 @@ TEST_F(WorkingSetFixture, RecordIdLongAndObjStateCanRoundtripThroughSerializatio
     ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
-    ASSERT_EQ(roundtripped.recordId.asLong(), 43);
+    ASSERT_EQ(roundtripped.recordId.getLong(), 43);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
@@ -227,13 +228,14 @@ TEST_F(WorkingSetFixture, RecordIdStrAndObjStateCanRoundtripThroughSerialization
     member->doc.setValue(doc);
     member->doc.setSnapshotId(SnapshotId{42u});
     const OID oid = OID::gen();
-    member->recordId = RecordId{oid.view().view(), RecordId::kSmallStrSize};
+
+    member->recordId = record_id_helpers::keyForOID(oid);
     ws->transitionToRecordIdAndObj(id);
     auto roundtripped = roundtripWsmThroughSerialization(*member);
     ASSERT_EQ(WorkingSetMember::RID_AND_OBJ, roundtripped.getState());
     ASSERT_DOCUMENT_EQ(roundtripped.doc.value(), doc);
     ASSERT_EQ(roundtripped.doc.snapshotId().toNumber(), 42u);
-    ASSERT_EQ(OID::from(roundtripped.recordId.strData()), oid);
+    ASSERT_EQ(record_id_helpers::toBSONAs(roundtripped.recordId, "").firstElement().OID(), oid);
     ASSERT_FALSE(roundtripped.metadata());
 }
 
@@ -259,7 +261,7 @@ TEST_F(WorkingSetFixture, RecordIdAndIdxStateCanRoundtripThroughSerialization) {
 
     auto roundtripped = roundtripWsmThroughSerialization(*member);
     ASSERT_EQ(WorkingSetMember::RID_AND_IDX, roundtripped.getState());
-    ASSERT_EQ(roundtripped.recordId.asLong(), 43);
+    ASSERT_EQ(roundtripped.recordId.getLong(), 43);
     ASSERT_EQ(roundtripped.keyData.size(), 2u);
 
     ASSERT_BSONOBJ_EQ(roundtripped.keyData[0].indexKeyPattern, BSON("a" << 1 << "b" << 1));
@@ -313,7 +315,7 @@ TEST_F(WorkingSetFixture, WsmCanBeExtractedAndReinserted) {
     ASSERT_EQ(extractedWsm.getState(), WorkingSetMember::RID_AND_OBJ);
     ASSERT_DOCUMENT_EQ(extractedWsm.doc.value(), doc);
     ASSERT_EQ(extractedWsm.doc.snapshotId().toNumber(), 42u);
-    ASSERT_EQ(extractedWsm.recordId.asLong(), 43);
+    ASSERT_EQ(extractedWsm.recordId.getLong(), 43);
     ASSERT_FALSE(extractedWsm.metadata());
 
     auto emplacedId = ws->emplace(std::move(extractedWsm));
@@ -324,7 +326,7 @@ TEST_F(WorkingSetFixture, WsmCanBeExtractedAndReinserted) {
     ASSERT_EQ(emplacedWsm->getState(), WorkingSetMember::RID_AND_OBJ);
     ASSERT_DOCUMENT_EQ(emplacedWsm->doc.value(), doc);
     ASSERT_EQ(emplacedWsm->doc.snapshotId().toNumber(), 42u);
-    ASSERT_EQ(emplacedWsm->recordId.asLong(), 43);
+    ASSERT_EQ(emplacedWsm->recordId.getLong(), 43);
     ASSERT_FALSE(emplacedWsm->metadata());
 }
 

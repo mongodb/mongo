@@ -31,11 +31,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
-class RecordId;
 class Timestamp;
-
+class RecordId;
 namespace record_id_helpers {
 
 /**
@@ -45,9 +45,27 @@ namespace record_id_helpers {
 StatusWith<RecordId> keyForOptime(const Timestamp& opTime);
 
 /**
+ * For collections that use clustering by _id, converts various values into a RecordId.
+ */
+StatusWith<RecordId> keyForDoc(const BSONObj& doc);
+RecordId keyForElem(const BSONElement& elem);
+RecordId keyForOID(OID oid);
+
+/**
  * data and len must be the arguments from RecordStore::insert() on an oplog collection.
  */
-StatusWith<RecordId> extractKey(const char* data, int len);
+StatusWith<RecordId> extractKeyOptime(const char* data, int len);
+
+/**
+ * Helpers to append RecordIds to a BSON object builder. Note that this resolves the underlying BSON
+ * type of the RecordId if it stores a KeyString.
+ *
+ * This should be used for informational purposes only. This cannot be 'round-tripped' back into a
+ * RecordId because it loses information about the original RecordId format. If you require passing
+ * a RecordId as a token or storing for a resumable scan, for example, use RecordId::serializeToken.
+ */
+void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName);
+BSONObj toBSONAs(RecordId rid, StringData fieldName);
 
 }  // namespace record_id_helpers
 }  // namespace mongo

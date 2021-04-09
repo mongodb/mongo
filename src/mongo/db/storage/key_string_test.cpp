@@ -1279,6 +1279,67 @@ std::vector<BSONObj> thinElements(std::vector<BSONObj> elements,
 }
 }  // namespace
 
+namespace {
+RecordId ridFromOid(const OID& oid) {
+    KeyString::Builder builder(KeyString::Version::kLatestVersion);
+    builder.appendOID(oid);
+    return RecordId(builder.getBuffer(), builder.getSize());
+}
+}  // namespace
+
+TEST_F(KeyStringBuilderTest, RecordIdStr) {
+    const int kSize = 12;
+    for (int i = 0; i < kSize; i++) {
+        unsigned char buf[kSize];
+        memset(buf, 0x80, kSize);
+        buf[i] = 0xFE;
+
+        const RecordId rid = ridFromOid(OID::from(buf));
+
+        {  // Test encoding / decoding of single RecordIds
+            const KeyString::Builder ks(version, rid);
+            invariant(ks.getSize() == 14);
+
+            ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
+
+            if (rid.isValid()) {
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId(1)));
+                ASSERT_GT(ks, KeyString::Builder(version, ridFromOid(OID())));
+                ASSERT_LT(ks, KeyString::Builder(version, ridFromOid(OID::max())));
+
+                char bufLt[kSize];
+                memcpy(bufLt, buf, kSize);
+                bufLt[kSize - 1] -= 1;
+                auto ltRid = ridFromOid(OID::from(bufLt));
+                ASSERT(ltRid < rid);
+                ASSERT_GT(ks, KeyString::Builder(version, ltRid));
+
+                char bufGt[kSize];
+                memcpy(bufGt, buf, kSize);
+                bufGt[kSize - 1] += 1;
+                auto gtRid = ridFromOid(OID::from(bufGt));
+                ASSERT(gtRid > rid);
+                ASSERT_LT(ks, KeyString::Builder(version, gtRid));
+            }
+        }
+
+        for (int j = 0; j < kSize; j++) {
+            unsigned char otherBuf[kSize] = {0};
+            otherBuf[j] = 0xFE;
+            RecordId other = ridFromOid(OID::from(otherBuf));
+
+            if (rid == other) {
+                ASSERT_EQ(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
+            if (rid < other) {
+                ASSERT_LT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
+            if (rid > other) {
+                ASSERT_GT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
+            }
+        }
+    }
+}
 
 TEST_F(KeyStringBuilderTest, AllPermCompare) {
     std::vector<BSONObj> elements = getInterestingElements(version);
@@ -1435,8 +1496,8 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
                 ASSERT_GT(ks, KeyString::Builder(version, RecordId::minLong()));
                 ASSERT_LT(ks, KeyString::Builder(version, RecordId::maxLong()));
 
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId(rid.asLong() - 1)));
-                ASSERT_LT(ks, KeyString::Builder(version, RecordId(rid.asLong() + 1)));
+                ASSERT_GT(ks, KeyString::Builder(version, RecordId(rid.getLong() - 1)));
+                ASSERT_LT(ks, KeyString::Builder(version, RecordId(rid.getLong() + 1)));
             }
         }
 
@@ -1476,64 +1537,6 @@ TEST_F(KeyStringBuilderTest, RecordIds) {
                 ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), rid);
                 ASSERT_EQ(KeyString::decodeRecordIdLong(&reader), other);
                 ASSERT(reader.atEof());
-            }
-        }
-    }
-}
-
-TEST_F(KeyStringBuilderTest, RecordIdStr) {
-    const int kSize = 12;
-    for (int i = 0; i < kSize; i++) {
-        unsigned char buf[kSize];
-        memset(buf, 0x80, kSize);
-        buf[i] = 0xFE;
-        const RecordId rid = RecordId(reinterpret_cast<char*>(buf), kSize);
-
-        {  // Test encoding / decoding of single RecordIds
-            const KeyString::Builder ks(version, rid);
-            ASSERT_EQ(ks.getSize(), 12u);
-
-            ASSERT_EQ(KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize()), rid);
-
-            {
-                BufReader reader(ks.getBuffer(), ks.getSize());
-                ASSERT_EQ(KeyString::decodeRecordIdStr(&reader), rid);
-                ASSERT(reader.atEof());
-            }
-
-            if (rid.isValid()) {
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId(1)));
-                ASSERT_GT(
-                    ks, KeyString::Builder(version, RecordId(OID().view().view(), OID::kOIDSize)));
-                ASSERT_LT(
-                    ks,
-                    KeyString::Builder(version, RecordId(OID::max().view().view(), OID::kOIDSize)));
-
-                char bufLt[kSize];
-                memcpy(bufLt, buf, kSize);
-                bufLt[kSize - 1] -= 1;
-                ASSERT_GT(ks, KeyString::Builder(version, RecordId(bufLt, kSize)));
-
-                char bufGt[kSize];
-                memcpy(bufGt, buf, kSize);
-                bufGt[kSize - 1] += 1;
-                ASSERT_LT(ks, KeyString::Builder(version, RecordId(bufGt, kSize)));
-            }
-        }
-
-        for (int j = 0; j < kSize; j++) {
-            unsigned char otherBuf[kSize] = {0};
-            otherBuf[j] = 0xFE;
-            RecordId other = RecordId(reinterpret_cast<char*>(otherBuf), kSize);
-
-            if (rid == other) {
-                ASSERT_EQ(KeyString::Builder(version, rid), KeyString::Builder(version, other));
-            }
-            if (rid < other) {
-                ASSERT_LT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
-            }
-            if (rid > other) {
-                ASSERT_GT(KeyString::Builder(version, rid), KeyString::Builder(version, other));
             }
         }
     }

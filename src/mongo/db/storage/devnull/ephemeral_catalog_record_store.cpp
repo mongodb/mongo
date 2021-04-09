@@ -356,7 +356,7 @@ void EphemeralForTestRecordStore::deleteRecord(WithLock lk,
 StatusWith<RecordId> EphemeralForTestRecordStore::extractAndCheckLocForOplog(WithLock,
                                                                              const char* data,
                                                                              int len) const {
-    StatusWith<RecordId> status = record_id_helpers::extractKey(data, len);
+    StatusWith<RecordId> status = record_id_helpers::extractKeyOptime(data, len);
     if (!status.isOK())
         return status;
 
