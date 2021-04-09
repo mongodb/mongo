@@ -51,6 +51,66 @@ function resetCollections() {
 }
 
 /**
+ * Runs the find cmd on the time-series and buckets collections using 'bucketsIndexSpec' as an index
+ * hint. Tests that hide() and unhide() of the index allows find to use or fail to use the index,
+ * respectively. Tests that the listIndexes cmd returns the expected results from the time-series
+ * and buckets collections.
+ *
+ * Some indexes (e.g. wildcard) need queries specified to use an index: the 'timeseriesFindQuery'
+ * and 'bucketsFindQuery' can be used for this purpose.
+ */
+function hideUnhideListIndexes(
+    timeseriesIndexSpec, bucketsIndexSpec, timeseriesFindQuery = {}, bucketsFindQuery = {}) {
+    jsTestLog("Testing index spec, time-series: " + tojson(timeseriesIndexSpec) +
+              ", buckets: " + tojson(bucketsIndexSpec));
+
+    // Check that the index is usable.
+    assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+    assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+
+    // Check that listIndexes returns expected results.
+    listIndexesHasIndex(timeseriesIndexSpec);
+
+    // Hide the index and check that the find cmd no longer works with the 'bucketsIndexSpec' hint.
+    assert.commandWorked(timeseriescoll.hideIndex(timeseriesIndexSpec));
+    assert.commandFailedWithCode(
+        assert.throws(() => timeseriescoll.find().hint(bucketsIndexSpec).toArray()),
+                     ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        assert.throws(() => bucketscoll.find().hint(bucketsIndexSpec).toArray()),
+                     ErrorCodes.BadValue);
+
+    // Check that the index can still be found via listIndexes even if hidden.
+    listIndexesHasIndex(timeseriesIndexSpec);
+
+    // Unhide the index and check that the find cmd with 'bucketsIndexSpec' works again.
+    assert.commandWorked(timeseriescoll.unhideIndex(timeseriesIndexSpec));
+    assert.gt(timeseriescoll.find(timeseriesFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+    assert.gt(bucketscoll.find(bucketsFindQuery).hint(bucketsIndexSpec).toArray().length, 0);
+}
+
+/**
+ * Checks that listIndexes against the time-series collection returns the 'timeseriesIndexSpec'
+ * index. Expects only the 'timeseriesIndexSpec' index to exist.
+ */
+function listIndexesHasIndex(timeseriesIndexSpec) {
+    const timeseriesListIndexesCursor =
+        assert.commandWorked(testdb.runCommand({listIndexes: timeseriescoll.getName()})).cursor;
+
+    // Check the ns is OK.
+    assert.eq(timeseriescoll.getFullName(),
+              timeseriesListIndexesCursor.ns,
+              "Found unexpected namespace: " + tojson(timeseriesListIndexesCursor));
+
+    // Check for the index.
+    assert.eq(
+        1, timeseriesListIndexesCursor.firstBatch.length, tojson(timeseriesListIndexesCursor));
+    assert.docEq(timeseriesIndexSpec,
+                 timeseriesListIndexesCursor.firstBatch[0].key,
+                 "Found unexpected index spec: " + tojson(timeseriesListIndexesCursor));
+}
+
+/**
  * Test sparse index on time-series collection.
  */
 
@@ -82,6 +142,8 @@ assert.commandWorked(timeseriescoll.insert(sparseDocIndexed, {ordered: false}),
                      'Failed to insert sparseDocIndexed: ' + tojson(sparseDocIndexed));
 assert.commandWorked(timeseriescoll.insert(sparseDocNotIndexed, {ordered: false}),
                      'Failed to insert sparseDocNotIndexed: ' + tojson(sparseDocNotIndexed));
+
+hideUnhideListIndexes(sparseTimeseriesIndexSpec, sparseBucketsIndexSpec);
 
 // Check that only 1 of the 2 entries are returned. Note: index hints on a time-series collection
 // only work with the underlying buckets collection's index spec.
@@ -132,6 +194,8 @@ assert.eq({"meta.a": ["meta.a"]},
           planStage.multiKeyPaths,
           "Index has wrong multikey paths after insert; plan: " + tojson(planStage));
 
+hideUnhideListIndexes(multikeyTimeseriesIndexSpec, multikeyBucketsIndexSpec);
+
 /**
  * Test 2d index on time-series collection.
  */
@@ -164,6 +228,8 @@ assert.eq(1,
 
 // TODO (SERVER-55240): do the above on the timeseriescoll, which doesn't currently work.
 // "errmsg" : "$geoNear, $near, and $nearSphere are not allowed in this context"
+
+hideUnhideListIndexes(twoDTimeseriesIndexSpec, twoDBucketsIndexSpec);
 
 /**
  * Test 2dsphere index on time-series collection.
@@ -210,6 +276,8 @@ assert.eq(1,
 
 // TODO (SERVER-55239): do the above on the timeseriescoll, which doesn't currently work.
 // "errmsg" : "$geoNear is only valid as the first stage in a pipeline."
+
+hideUnhideListIndexes(twoDSphereTimeseriesIndexSpec, twoDSphereBucketsIndexSpec);
 
 /**
  * Test wildcard index on time-series collection.
@@ -262,4 +330,9 @@ assert.commandFailedWithCode(assert.throws(() => timeseriescoll.find({[metaField
                                                      .hint(wildcardTimeseriesIndexSpec)
                                                      .toArray()),
                                           ErrorCodes.BadValue);
+
+hideUnhideListIndexes(wildcardTimeseriesIndexSpec,
+                      wildcardBucketsIndexSpec,
+                      {[metaFieldName + '.c.d']: 1} /* timeseriesFindQuery */,
+                      {'meta.c.d': 1} /* bucketsFindQuery */);
 })();
