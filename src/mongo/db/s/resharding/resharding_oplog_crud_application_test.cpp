@@ -259,7 +259,7 @@ private:
                                                std::move(epoch),
                                                boost::none /* timestamp */,
                                                boost::none /* reshardingFields */,
-                                               false /* allowMigrations */,
+                                               true /* allowMigrations */,
                                                chunks);
 
         return ChunkManager(_myDonorId,

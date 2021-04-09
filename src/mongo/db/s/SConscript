@@ -494,6 +494,7 @@ env.CppUnitTest(
         'resharding_destined_recipient_test.cpp',
         'resharding/resharding_agg_test.cpp',
         'resharding/resharding_collection_cloner_test.cpp',
+        'resharding/resharding_data_replication_test.cpp',
         'resharding/resharding_donor_oplog_iterator_test.cpp',
         'resharding/resharding_donor_recipient_common_test.cpp',
         'resharding/resharding_metrics_test.cpp',

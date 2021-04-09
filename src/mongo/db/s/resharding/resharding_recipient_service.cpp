@@ -152,53 +152,6 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
         opCtx, reshardingNss, optionsAndIndexes);
 }
 
-std::vector<NamespaceString> ensureStashCollectionsExist(
-    OperationContext* opCtx,
-    const ChunkManager& cm,
-    const UUID& existingUUID,
-    const std::vector<DonorShardFetchTimestamp>& donorShards) {
-    // Use the same collation for the stash collections as the temporary resharding collection
-    auto collator = cm.getDefaultCollator();
-    BSONObj collationSpec = collator ? collator->getSpec().toBSON() : BSONObj();
-
-    std::vector<NamespaceString> stashCollections;
-    stashCollections.reserve(donorShards.size());
-
-    {
-        CollectionOptions options;
-        options.collation = std::move(collationSpec);
-        for (const auto& donor : donorShards) {
-            stashCollections.emplace_back(ReshardingOplogApplier::ensureStashCollectionExists(
-                opCtx, existingUUID, donor.getShardId(), options));
-        }
-    }
-
-    return stashCollections;
-}
-
-ReshardingDonorOplogId getFetcherIdToResumeFrom(OperationContext* opCtx,
-                                                NamespaceString oplogBufferNss,
-                                                Timestamp fetchTimestamp) {
-    AutoGetCollection collection(opCtx, oplogBufferNss, MODE_IS);
-    if (!collection) {
-        return ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp};
-    }
-
-    auto highestOplogBufferId = resharding::data_copy::findHighestInsertedId(opCtx, *collection);
-    return highestOplogBufferId.missing()
-        ? ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}
-        : ReshardingDonorOplogId::parse({"resharding::getFetcherIdToResumeFrom"},
-                                        highestOplogBufferId.getDocument().toBson());
-}
-
-ReshardingDonorOplogId getApplierIdToResumeFrom(OperationContext* opCtx,
-                                                ReshardingSourceId sourceId,
-                                                Timestamp fetchTimestamp) {
-    auto applierProgress = ReshardingOplogApplier::checkStoredProgress(opCtx, sourceId);
-    return !applierProgress ? ReshardingDonorOplogId{fetchTimestamp, fetchTimestamp}
-                            : applierProgress->getProgress();
-}
-
 }  // namespace resharding
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
