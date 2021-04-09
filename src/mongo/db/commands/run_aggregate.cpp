@@ -446,7 +446,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const AggregateCommandRequest& request,
     std::unique_ptr<CollatorInterface> collator,
-    boost::optional<UUID> uuid) {
+    boost::optional<UUID> uuid,
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
     setIgnoredShardVersionForMergeCursors(opCtx, request);
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
@@ -458,6 +459,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               CurOp::get(opCtx)->dbProfileLevel() > 0);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->inMultiDocumentTransaction = opCtx->inMultiDocumentTransaction();
+    expCtx->collationMatchesDefault = collationMatchesDefault;
 
     return expCtx;
 }
@@ -522,7 +524,8 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
                                            request,
                                            expCtx->getCollator() ? expCtx->getCollator()->clone()
                                                                  : nullptr,
-                                           uuid);
+                                           uuid,
+                                           expCtx->collationMatchesDefault);
 
             // Create a new pipeline for the consumer consisting of a single
             // DocumentSourceExchange.
@@ -579,6 +582,7 @@ Status runAggregate(OperationContext* opCtx,
     // The collation to use for this aggregation. boost::optional to distinguish between the case
     // where the collation has not yet been resolved, and where it has been resolved to nullptr.
     boost::optional<std::unique_ptr<CollatorInterface>> collatorToUse;
+    ExpressionContext::CollationMatchesDefault collatorToUseMatchesDefault;
 
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;
@@ -637,8 +641,10 @@ Status runAggregate(OperationContext* opCtx,
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
             // collation. We do not inherit the collection's default collation or UUID, since
             // the stream may be resuming from a point before the current UUID existed.
-            collatorToUse.emplace(PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
+            auto [collator, match] = PipelineD::resolveCollator(
+                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
+            collatorToUse.emplace(std::move(collator));
+            collatorToUseMatchesDefault = match;
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
@@ -654,13 +660,17 @@ Status runAggregate(OperationContext* opCtx,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  0);
-            collatorToUse.emplace(PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr));
+            auto [collator, match] = PipelineD::resolveCollator(
+                opCtx, request.getCollation().get_value_or(BSONObj()), nullptr);
+            collatorToUse.emplace(std::move(collator));
+            collatorToUseMatchesDefault = match;
         } else {
             // This is a regular aggregation. Lock the collection or view.
             ctx.emplace(opCtx, nss, AutoGetCollectionViewMode::kViewsPermitted);
-            collatorToUse.emplace(PipelineD::resolveCollator(
-                opCtx, request.getCollation().get_value_or(BSONObj()), ctx->getCollection()));
+            auto [collator, match] = PipelineD::resolveCollator(
+                opCtx, request.getCollation().get_value_or(BSONObj()), ctx->getCollection());
+            collatorToUse.emplace(std::move(collator));
+            collatorToUseMatchesDefault = match;
             if (ctx->getCollection()) {
                 uuid = ctx->getCollection()->uuid();
             }
@@ -752,7 +762,8 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         invariant(collatorToUse);
-        expCtx = makeExpressionContext(opCtx, request, std::move(*collatorToUse), uuid);
+        expCtx = makeExpressionContext(
+            opCtx, request, std::move(*collatorToUse), uuid, collatorToUseMatchesDefault);
 
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
 

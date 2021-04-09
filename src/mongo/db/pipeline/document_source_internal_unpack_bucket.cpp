@@ -545,7 +545,8 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
 std::unique_ptr<MatchExpression> createComparisonPredicate(
     const ComparisonMatchExpression* matchExpr,
     const BucketSpec& bucketSpec,
-    int bucketMaxSpanSeconds) {
+    int bucketMaxSpanSeconds,
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
     using namespace timeseries;
 
     // The control field's min and max are chosen using a field-order insensitive comparator, while
@@ -561,6 +562,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
     // min and max fields use, we will not perform this optimization on queries with null operands.
     if (matchExpr->getData().type() == BSONType::jstNULL)
         return nullptr;
+
+    // The control field's min and max are chosen based on the collation of the collection. If the
+    // query's collation does not match the collection's collation and the query operand is a
+    // string or compound type (skipped above) we will not perform this optimization.
+    if (collationMatchesDefault == ExpressionContext::CollationMatchesDefault::kNo &&
+        matchExpr->getData().type() == BSONType::String) {
+        return nullptr;
+    }
 
     // We must avoid mapping predicates on the meta field onto the control field.
     if (bucketSpec.metaField &&
@@ -658,7 +667,8 @@ DocumentSourceInternalUnpackBucket::createPredicatesOnBucketLevelField(
     } else if (ComparisonMatchExpression::isComparisonMatchExpression(matchExpr)) {
         return createComparisonPredicate(static_cast<const ComparisonMatchExpression*>(matchExpr),
                                          _bucketUnpacker.bucketSpec(),
-                                         _bucketMaxSpanSeconds);
+                                         _bucketMaxSpanSeconds,
+                                         pExpCtx->collationMatchesDefault);
     }
 
     return nullptr;

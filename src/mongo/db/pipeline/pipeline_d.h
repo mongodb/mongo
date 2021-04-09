@@ -134,17 +134,28 @@ public:
      * Resolves the collator to either the user-specified collation or, if none was specified, to
      * the collection-default collation.
      */
-    static std::unique_ptr<CollatorInterface> resolveCollator(OperationContext* opCtx,
-                                                              BSONObj userCollation,
-                                                              const CollectionPtr& collection) {
-        if (!userCollation.isEmpty()) {
-            return uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                       ->makeFromBSON(userCollation));
+    static std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
+    resolveCollator(OperationContext* opCtx,
+                    BSONObj userCollation,
+                    const CollectionPtr& collection) {
+        if (!collection || !collection->getDefaultCollator()) {
+            return {userCollation.isEmpty()
+                        ? nullptr
+                        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                              ->makeFromBSON(userCollation)),
+                    ExpressionContext::CollationMatchesDefault::kNoDefault};
         }
-
-        return (collection && collection->getDefaultCollator()
-                    ? collection->getDefaultCollator()->clone()
-                    : nullptr);
+        if (userCollation.isEmpty()) {
+            return {collection->getDefaultCollator()->clone(),
+                    ExpressionContext::CollationMatchesDefault::kYes};
+        }
+        auto userCollator = uassertStatusOK(
+            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
+        return {
+            std::move(userCollator),
+            CollatorInterface::collatorsMatch(collection->getDefaultCollator(), userCollator.get())
+                ? ExpressionContext::CollationMatchesDefault::kYes
+                : ExpressionContext::CollationMatchesDefault::kNo};
     }
 
 private:

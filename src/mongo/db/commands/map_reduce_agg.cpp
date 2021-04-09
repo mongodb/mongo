@@ -69,7 +69,7 @@ auto makeExpressionContext(OperationContext* opCtx,
             "mapReduce on a view is not supported",
             !ctx.getView());
 
-    auto resolvedCollator = PipelineD::resolveCollator(
+    auto [resolvedCollator, _] = PipelineD::resolveCollator(
         opCtx, parsedMr.getCollation().get_value_or(BSONObj()), ctx.getCollection());
 
     // The UUID of the collection for the execution namespace of this aggregation.
