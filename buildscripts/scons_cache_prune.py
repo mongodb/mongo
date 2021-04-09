@@ -24,6 +24,19 @@ GIGBYTES = 1024 * 1024 * 1024
 CacheItem = collections.namedtuple("CacheContents", ["path", "time", "size"])
 
 
+def get_cachefile_size(file_path):
+    """Get the size of the cachefile."""
+
+    if file_path.endswith('.cksum'):
+        size = 0
+        for cksum_path in os.listdir(file_path):
+            cksum_path = os.path.join(file_path, cksum_path)
+            size += os.stat(cksum_path).st_size
+    else:
+        size = os.stat(file_path).st_size
+    return size
+
+
 def collect_cache_contents(cache_path):
     """Collect the cache contents."""
     # map folder names to timestamps
@@ -37,15 +50,19 @@ def collect_cache_contents(cache_path):
         if os.path.isdir(path):
             for file_name in os.listdir(path):
                 file_path = os.path.join(path, file_name)
-                if os.path.isdir(file_path):
+                # Cache prune script is allowing only directories with this extension
+                # which comes from the validate_cache_dir.py tool in scons, it must match
+                # the extension set in that file.
+                if os.path.isdir(file_path) and not file_path.endswith('.cksum'):
                     LOGGER.warning(
                         "cache item %s is a directory and not a file. "
                         "The cache may be corrupt.", file_path)
                     continue
 
                 try:
+
                     item = CacheItem(path=file_path, time=os.stat(file_path).st_atime,
-                                     size=os.stat(file_path).st_size)
+                                     size=get_cachefile_size(file_path))
 
                     total += item.size
 
@@ -90,7 +107,10 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
                 LOGGER.warning("Unable to rename %s : %s", cache_item, err)
             else:
                 try:
-                    os.remove(to_remove)
+                    if os.path.isdir(to_remove):
+                        shutil.rmtree(to_remove)
+                    else:
+                        os.remove(to_remove)
                     total_size -= cache_item.size
                 except Exception as err:  # pylint: disable=broad-except
                     # this should not happen, but who knows?
