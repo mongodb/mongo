@@ -117,6 +117,8 @@ public:
         return DistributedPlanLogic{nullptr, this, boost::none};
     }
 
+    boost::intrusive_ptr<DocumentSource> optimize() final;
+
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
 
     DocumentSource::GetNextResult doGetNext();

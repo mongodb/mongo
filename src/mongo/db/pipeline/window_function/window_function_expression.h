@@ -97,6 +97,15 @@ public:
     using Parser = std::function<decltype(parse)>;
     static void registerParser(std::string functionName, Parser parser);
 
+    /**
+     * Optimizes the input expression using its own optimize() method.
+     */
+    void optimize() {
+        if (_input) {
+            _input = _input->optimize();
+        }
+    }
+
     Expression(ExpressionContext* expCtx,
                std::string accumulatorName,
                boost::intrusive_ptr<::mongo::Expression> input,

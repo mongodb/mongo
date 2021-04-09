@@ -217,6 +217,17 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
     return result;
 }
 
+intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() {
+    // The _partitionBy is already optimized in create(), along with _iterator which initializes
+    // with it. The _executableOutputs will be constructed using the expressions from the
+    // '_outputFields' on the first call to doGetNext(). As a result, only expressions in the
+    // '_outputFeilds' are optimized here.
+    for (auto&& outputField : _outputFields) {
+        outputField.expr->optimize();
+    }
+    return this;
+}
+
 Value DocumentSourceInternalSetWindowFields::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument spec;
