@@ -6,6 +6,9 @@
 //   uses_map_reduce_with_temp_collections,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   assumes_read_preference_unchanged,
+//   assumes_read_concern_unchanged,
+//   requires_fcv_50
 // ]
 (function() {
 "use strict";
@@ -32,7 +35,8 @@ function getOpCode() {
                 stringifiedCmd.search(source.getName()) >= 0;
         }
 
-        return cmdBody.mapreduce && cmdBody.mapreduce == source.getName();
+        return (cmdBody.mapreduce && cmdBody.mapreduce == source.getName()) ||
+            (cmdBody.isMapReduceCommand && cmdBody.aggregate == source.getName());
     }
 
     for (let i in inProg) {

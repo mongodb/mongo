@@ -814,7 +814,31 @@ var commandUnsupported = function(res) {
 };
 
 DB.prototype.currentOp = function(arg) {
-    var q = {};
+    // TODO CLOUDP-89361: The shell is connected to the Atlas Proxy, which currently does not
+    // support the $currentOp aggregation stage. Remove the legacy server command path once the
+    // proxy can support $currentOp.
+    if (this.serverStatus().hasOwnProperty("atlasVersion")) {
+        return this.currentOpLegacy(arg);
+    }
+
+    try {
+        const results = this.currentOpCursor(arg).toArray();
+        let res = {"inprog": results.length > 0 ? results : [], "ok": 1};
+        Object.defineProperty(res, "fsyncLock", {
+            get: function() {
+                throw Error(
+                    "fsyncLock is no longer included in the currentOp shell helper, run db.runCommand({currentOp: 1}) instead.");
+            }
+        });
+        return res;
+    } catch (e) {
+        return {"ok": 0, "code": e.code, "errmsg": "Error executing $currentOp: " + e.message};
+    }
+};
+DB.prototype.currentOP = DB.prototype.currentOp;
+
+DB.prototype.currentOpLegacy = function(arg) {
+    let q = {};
     if (arg) {
         if (typeof (arg) == "object")
             Object.extend(q, arg);
@@ -838,7 +862,51 @@ DB.prototype.currentOp = function(arg) {
     }
     return res;
 };
-DB.prototype.currentOP = DB.prototype.currentOp;
+
+DB.prototype.currentOpCursor = function(arg) {
+    let q = {};
+    if (arg) {
+        if (typeof (arg) == "object")
+            Object.extend(q, arg);
+        else if (arg)
+            q["$all"] = true;
+    }
+
+    // Convert the incoming currentOp command into an equivalent aggregate command
+    // of the form {aggregate:1, pipeline: [{$currentOp: {idleConnections: $all, allUsers:
+    // !$ownOps, truncateOps: false}}, {$match: {<user-defined filter>}}], cursor:{}}.
+    let pipeline = [];
+
+    let currOpArgs = {};
+    let currOpStage = {"$currentOp": currOpArgs};
+    currOpArgs["allUsers"] = !q["$ownOps"];
+    currOpArgs["idleConnections"] = !!q["$all"];
+    currOpArgs["truncateOps"] = false;
+
+    pipeline.push(currOpStage);
+
+    let matchArgs = {};
+    let matchStage = {"$match": matchArgs};
+    for (const fieldname of Object.keys(q)) {
+        if (fieldname !== "$all" && fieldname !== "$ownOps" && fieldname !== "$truncateOps") {
+            matchArgs[fieldname] = q[fieldname];
+        }
+    }
+
+    pipeline.push(matchStage);
+
+    // The legacy db.currentOp() shell helper ignored any explicitly set read preference and used
+    // the default, with the ability to also run on secondaries. To preserve this behavior we will
+    // temporarily set the session's read preference to "primaryPreferred".
+    const session = this.getSession();
+    const readPreference = session.getOptions().getReadPreference();
+    try {
+        session.getOptions().setReadPreference({mode: "primaryPreferred"});
+        return this.getSiblingDB("admin").aggregate(pipeline);
+    } finally {
+        session.getOptions().setReadPreference(readPreference);
+    }
+};
 
 DB.prototype.killOp = function(op) {
     if (!op)
