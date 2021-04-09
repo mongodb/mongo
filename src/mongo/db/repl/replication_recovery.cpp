@@ -686,7 +686,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
               str::stream() << "Should have found a oplog entry timestamp lte to "
                             << truncateAfterTimestamp.toString() << ", but instead found "
                             << redact(truncateAfterOplogEntryBSON.get()) << " with timestamp "
-                            << Timestamp(truncateAfterRecordId.asLong()).toString());
+                            << Timestamp(truncateAfterRecordId.getLong()).toString());
 
     // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.
     LOGV2(21553,

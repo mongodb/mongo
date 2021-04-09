@@ -52,9 +52,6 @@ public:
     static constexpr int64_t kMinRepr = LLONG_MIN;
     static constexpr int64_t kMaxRepr = LLONG_MAX;
 
-    // Fixed size of a RecordId that holds a char array
-    enum { kSmallStrSize = 12 };
-
     /**
      * A RecordId that compares less than all int64_t RecordIds that represent documents in a
      * collection.
@@ -71,14 +68,33 @@ public:
         return RecordId(kMaxRepr);
     }
 
-    RecordId() : _format(Format::kNull) {}
+    RecordId() {
+        _buffer[kBufEnd] = Format::kNull;
+    }
 
     /**
-     * RecordId supports holding either an int64_t or a 12 byte char array.
+     * Construct a RecordId that holds an int64_t. The raw value for RecordStore storage may be
+     * retrieved using getLong().
      */
-    explicit RecordId(int64_t repr) : _storage(repr), _format(Format::kLong) {}
-    explicit RecordId(const char* str, int32_t size)
-        : _storage(str, size), _format(Format::kSmallStr) {}
+    explicit RecordId(int64_t s) {
+        memcpy(_buffer, &s, sizeof(s));
+        _buffer[kBufEnd] = Format::kLong;
+    }
+
+    /**
+     * Construct a RecordId that holds a small binary string. The raw value for RecordStore storage
+     * may be retrieved using getStr().
+     */
+    explicit RecordId(const char* str, int32_t size) {
+        invariant(size > 0, "key size must be greater than 0");
+        // Must fit into the 16 byte buffer minus 1 byte for size and 1 format byte.
+        uassert(ErrorCodes::BadValue,
+                fmt::format("key size {} greater than maximum {}", size, kBufMaxSize - 2),
+                size + 2 <= kBufMaxSize);
+        _buffer[0] = static_cast<char>(size);
+        memcpy(_buffer + 1, str, size);
+        _buffer[kBufEnd] = Format::kSmallStr;
+    }
 
     /**
      * Construct a RecordId from two halves.
@@ -89,43 +105,63 @@ public:
     class Null {};
 
     /**
-     * Helpers to dispatch based on the underlying type.
+     * Helper to dispatch based on the underlying type. In most cases the RecordId type will be
+     * known in advance, but this may be used when the type is not known.
      */
     template <typename OnNull, typename OnLong, typename OnStr>
     auto withFormat(OnNull&& onNull, OnLong&& onLong, OnStr&& onStr) const {
-        switch (_format) {
+        switch (auto f = _format()) {
             case Format::kNull:
                 return onNull(Null());
             case Format::kLong:
-                return onLong(_storage._long);
-            case Format::kSmallStr:
-                return onStr(_storage._str, kSmallStrSize);
+                return onLong(getLong());
+            case Format::kSmallStr: {
+                auto str = getStr();
+                return onStr(str.rawData(), str.size());
+            }
             default:
                 MONGO_UNREACHABLE;
         }
     }
 
-    int64_t asLong() const {
+    /**
+     * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
+     * constructed with a 64-bit integer value or null; invariants otherwise.
+     */
+    int64_t getLong() const {
         // In the the int64_t format, null can also be represented by '0'.
-        if (_format == Format::kNull) {
+        if (_format() == Format::kNull) {
             return 0;
         }
-        invariant(_format == Format::kLong);
-        return _storage._long;
+        invariant(_format() == Format::kLong);
+        int64_t val;
+        memcpy(&val, _buffer, sizeof(val));
+        return val;
     }
 
-    const char* strData() const {
-        invariant(_format == Format::kSmallStr);
-        return _storage._str;
+    /**
+     * Returns the raw value to be used as a key in a RecordStore. Requires that this RecordId was
+     * constructed with a binary string value, and invariants otherwise.
+     */
+    const StringData getStr() const {
+        invariant(_format() == Format::kSmallStr);
+        char size = _buffer[0];
+        invariant(size > 0);
+        invariant(size < kBufMaxSize - 1);
+        return StringData(_buffer + 1, size);
     }
 
+    /**
+     * Returns true if this RecordId is not suitable for storage in a RecordStore.
+     */
     bool isNull() const {
-        // In the the int64_t format, null can also represented by '0'.
-        if (_format == Format::kLong) {
-            return _storage._long == 0;
+        // In the the int64_t format, null can also be represented by '0'.
+        if (_format() == Format::kLong) {
+            return getLong() == 0;
         }
-        return _format == Format::kNull;
+        return _format() == Format::kNull;
     }
+
 
     /**
      * Valid RecordIds are the only ones which may be used to represent Records. The range of valid
@@ -133,35 +169,40 @@ public:
      * used internally. All RecordIds outside of the valid range are sentinel values.
      */
     bool isValid() const {
-        return withFormat([](Null n) { return false; },
-                          [&](int64_t rid) { return rid > 0; },
-                          [&](const char* str, int size) { return true; });
+        return withFormat(
+            [](Null n) { return false; },
+            [&](int64_t rid) { return rid > 0; },
+            [&](const char* str, int size) { return size > 0 && size + 2 <= kBufMaxSize; });
     }
 
+    /**
+     * Compares two RecordIds. Requires that both RecordIds are of the same format, unless one or
+     * both are null. Null always compares less than every other RecordId format.
+     */
     int compare(const RecordId& rhs) const {
-        // Null always compares less than every other RecordId format.
-        if (_format == Format::kNull && rhs._format == Format::kNull) {
+        if (_format() == Format::kNull && rhs._format() == Format::kNull) {
             return 0;
-        } else if (_format == Format::kNull) {
+        } else if (_format() == Format::kNull) {
             return -1;
-        } else if (rhs._format == Format::kNull) {
+        } else if (rhs._format() == Format::kNull) {
             return 1;
         }
-        invariant(_format == rhs._format);
+        invariant(_format() == rhs._format());
         return withFormat(
             [](Null n) { return 0; },
             [&](const int64_t rid) {
-                return rid == rhs._storage._long ? 0 : rid < rhs._storage._long ? -1 : 1;
+                return rid == rhs.getLong() ? 0 : (rid > rhs.getLong()) ? 1 : -1;
             },
-            [&](const char* str, int size) { return memcmp(str, rhs._storage._str, size); });
+            [&](const char* str, int size) { return StringData(str, size).compare(rhs.getStr()); });
     }
 
     size_t hash() const {
         size_t hash = 0;
-        withFormat(
-            [](Null n) {},
-            [&](int64_t rid) { boost::hash_combine(hash, rid); },
-            [&](const char* str, int size) { boost::hash_combine(hash, std::string(str, size)); });
+        withFormat([](Null n) {},
+                   [&](int64_t rid) { boost::hash_combine(hash, rid); },
+                   [&](const char* str, int size) {
+                       boost::hash_combine(hash, std::string_view(str, size));
+                   });
         return hash;
     }
 
@@ -182,101 +223,97 @@ public:
         }
     };
 
-    void serialize(fmt::memory_buffer& buffer) const {
-        withFormat([&](Null n) { fmt::format_to(buffer, "RecordId(null)"); },
-                   [&](int64_t rid) { fmt::format_to(buffer, "RecordId({})", rid); },
+    /**
+     * Formats this RecordId into a human-readable BSON object that may be passed around and
+     * deserialized with deserializeToken().
+     * Note: This is not to be used as a key to a RecordStore.
+     */
+    void serializeToken(StringData fieldName, BSONObjBuilder* builder) const {
+        // Preserve the underlying format by using a different BSON type for each format.
+        withFormat([&](Null n) { builder->appendNull(fieldName); },
+                   [&](int64_t rid) { builder->append(fieldName, rid); },
                    [&](const char* str, int size) {
-                       fmt::format_to(buffer, "RecordId({})", hexblob::encodeLower(str, size));
-                   });
-    }
-
-    void serialize(BSONObjBuilder* builder) const {
-        withFormat([&](Null n) { builder->append("RecordId", "null"); },
-                   [&](int64_t rid) { builder->append("RecordId"_sd, rid); },
-                   [&](const char* str, int size) {
-                       builder->appendBinData("RecordId"_sd, size, BinDataGeneral, str);
+                       builder->append(fieldName, hexblob::encodeLower(str, size));
                    });
     }
 
     /**
-     * Enumerates all reserved ids that have been allocated for a specific purpose.
-     * The underlying value of the reserved Record ID is data-type specific and must be
-     * retrieved by the reservedIdFor() helper.
+     * Decode a token created by serializeToken().
      */
-    enum class Reservation { kWildcardMultikeyMetadataId };
+    static RecordId deserializeToken(const BSONElement& elem) {
+        if (elem.isNull()) {
+            return RecordId();
+        } else if (elem.isNumber()) {
+            return RecordId(elem.numberLong());
+        } else if (elem.type() == BSONType::String) {
+            auto str = hexblob::decode(elem.String());
+            return RecordId(str.c_str(), str.size());
+        } else {
+            uasserted(ErrorCodes::BadValue,
+                      fmt::format("Could not deserialize RecordId with type {}", elem.type()));
+        }
+    }
 
-    // These reserved ranges leave 2^20 possible reserved values.
+private:
+    enum { kBufEnd = 15, kBufMaxSize = 16 };
+
+    /**
+     * Specifies the storage format of this RecordId.
+     */
+    enum Format : int8_t {
+        /** Contains no value */
+        kNull,
+        /** int64_t */
+        kLong,
+        /** variable-length binary string, up to 14 bytes */
+        kSmallStr
+    };
+
+    Format _format() const {
+        return static_cast<Format>(_buffer[kBufEnd]);
+    }
+
+    // Storage for this RecordId.
+    // - The last byte stores the Format.
+    // - For the kLong type, the first 8 bytes encode the value in machine-endian order.
+    // - For the kSmallStr type, the first byte encodes the length and the remaining bytes encode
+    // the string.
+    char _buffer[kBufMaxSize];
+};
+
+/**
+ * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be
+ * stored in RecordStores.
+ */
+enum class ReservationId { kWildcardMultikeyMetadataId };
+
+/**
+ * Reservations tracks RecordId values that are reserved for specific usages and may not be stored
+ * in RecordStores.
+ */
+class RecordIdReservations {
+public:
     static constexpr int64_t kMinReservedLong = RecordId::kMaxRepr - (1024 * 1024);
-    static constexpr unsigned char kMinReservedOID[OID::kOIDSize] = {
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x00, 0x00};
 
     /**
      * Returns the reserved RecordId value for a given Reservation.
      */
-    template <typename T>
-    static RecordId reservedIdFor(Reservation res) {
+    static RecordId reservedIdFor(ReservationId res) {
         // There is only one reservation at the moment.
-        invariant(res == Reservation::kWildcardMultikeyMetadataId);
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return RecordId(kMinReservedLong);
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordId type");
-            OID minReserved(kMinReservedOID);
-            return RecordId(minReserved.view().view(), OID::kOIDSize);
-        }
+        invariant(res == ReservationId::kWildcardMultikeyMetadataId);
+        return RecordId(kMinReservedLong);
     }
 
     /**
      * Returns true if this RecordId falls within the reserved range for a given RecordId type.
      */
-    template <typename T>
     static bool isReserved(RecordId id) {
         if (id.isNull()) {
             return false;
         }
-        if constexpr (std::is_same_v<T, int64_t>) {
-            return id.asLong() >= kMinReservedLong && id.asLong() < RecordId::kMaxRepr;
-        } else {
-            static_assert(std::is_same_v<T, OID>, "Unsupported RecordId type");
-            return memcmp(id.strData(), kMinReservedOID, OID::kOIDSize) >= 0;
-        }
+        return id.getLong() >= kMinReservedLong && id.getLong() < RecordId::kMaxRepr;
     }
-
-private:
-    /**
-     * Specifies the storage format of this RecordId.
-     */
-    enum class Format : uint32_t {
-        /** Contains no value */
-        kNull,
-        /** int64_t */
-        kLong,
-        /** char[12] */
-        kSmallStr
-    };
-
-// Pack our union so that it only uses 12 bytes. The union will default to a 8 byte alignment,
-// making it 16 bytes total with 4 bytes of padding. Instead, we force the union to use a 4 byte
-// alignment, so it packs into 12 bytes. This leaves 4 bytes for our Format, allowing the RecordId
-// to use 16 bytes total.
-#pragma pack(push, 4)
-    union Storage {
-        int64_t _long;
-        char _str[kSmallStrSize];
-
-        Storage() {}
-        Storage(int64_t s) : _long(s) {}
-        Storage(const char* str, int32_t size) {
-            invariant(size == kSmallStrSize);
-            memcpy(_str, str, size);
-        }
-    };
-#pragma pack(pop)
-
-    Storage _storage;
-    Format _format;
 };
-
 
 inline bool operator==(RecordId lhs, RecordId rhs) {
     return lhs.compare(rhs) == 0;

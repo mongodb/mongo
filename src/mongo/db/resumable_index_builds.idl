@@ -37,6 +37,7 @@ global:
 
 imports:
     - "mongo/idl/basic_types.idl"
+    - "mongo/db/record_id.idl"
     - "mongo/db/sorter/sorter.idl"
 
 enums:
@@ -116,8 +117,7 @@ structs:
                 type: uuid
             collectionScanPosition:
                 description: "The last record id inserted into the sorter before shutdown"
-                type:
-                    variant: [objectid, safeInt64]
+                type: RecordId
                 optional: true
             indexes:
                 description: "The information needed to resume each specific index in this build"

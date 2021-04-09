@@ -186,47 +186,6 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
     }
 }
 
-TEST(SortedDataInterface, KeyFormatStringInsertReserved) {
-    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
-    const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
-        /*unique=*/false, /*partial=*/false, KeyFormat::String));
-    if (!sorted) {
-        // Not supported by this storage engine.
-        return;
-    }
-    const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    ASSERT(sorted->isEmpty(opCtx.get()));
-
-    RecordId reservedLoc(
-        RecordId::reservedIdFor<OID>(RecordId::Reservation::kWildcardMultikeyMetadataId));
-    invariant(RecordId::isReserved<OID>(reservedLoc));
-    {
-        WriteUnitOfWork uow(opCtx.get());
-        ASSERT_OK(sorted->insert(opCtx.get(),
-                                 makeKeyString(sorted.get(), key1, reservedLoc),
-                                 /*dupsAllowed*/ true));
-        uow.commit();
-    }
-    ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
-
-    auto ksSeek = makeKeyStringForSeek(sorted.get(), key1, true, true);
-    {
-        auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seek(ksSeek);
-        ASSERT(entry);
-        ASSERT_EQ(*entry, IndexKeyEntry(key1, reservedLoc));
-    }
-
-    {
-        auto cursor = sorted->newCursor(opCtx.get());
-        auto entry = cursor->seekForKeyString(ksSeek);
-        ASSERT(entry);
-        ASSERT_EQ(entry->loc, reservedLoc);
-        auto ks1 = makeKeyString(sorted.get(), key1, reservedLoc);
-        ASSERT_EQ(entry->keyString, ks1);
-    }
-}
-
 TEST(SortedDataInterface, KeyFormatStringUnindex) {
     const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(

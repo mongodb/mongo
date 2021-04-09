@@ -310,7 +310,7 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
         if (!findCommand.getResumeAfter().isEmpty()) {
             if (findCommand.getResumeAfter().nFields() != 1 ||
                 (findCommand.getResumeAfter()["$recordId"].type() != BSONType::NumberLong &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::jstOID &&
+                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::String &&
                  findCommand.getResumeAfter()["$recordId"].type() != BSONType::jstNULL)) {
                 return Status(
                     ErrorCodes::BadValue,

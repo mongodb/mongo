@@ -70,7 +70,7 @@ struct IndexKeyEntry {
 
     void serialize(BSONObjBuilder* builder) const {
         builder->append("key"_sd, key);
-        loc.serialize(builder);
+        loc.serializeToken("RecordId", builder);
     }
 
     BSONObj key;

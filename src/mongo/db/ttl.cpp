@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/service_context.h"
@@ -470,7 +471,8 @@ private:
         // timestamp or lower.
         auto endOID = OID();
         endOID.init(expirationDate, true /* max */);
-        const auto endId = RecordId(endOID.view().view(), OID::kOIDSize);
+
+        const auto endId = record_id_helpers::keyForOID(endOID);
 
         auto params = std::make_unique<DeleteStageParams>();
         params->isMulti = true;

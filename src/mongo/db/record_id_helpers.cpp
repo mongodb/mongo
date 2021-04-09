@@ -37,6 +37,8 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {
@@ -64,7 +66,7 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime) {
 /**
  * data and len must be the arguments from RecordStore::insert() on an oplog collection.
  */
-StatusWith<RecordId> extractKey(const char* data, int len) {
+StatusWith<RecordId> extractKeyOptime(const char* data, int len) {
     // Use the latest BSON validation version. Oplog entries are allowed to contain decimal data
     // even if decimal is disabled.
     if (kDebugBuild)
@@ -78,6 +80,47 @@ StatusWith<RecordId> extractKey(const char* data, int len) {
         return StatusWith<RecordId>(ErrorCodes::BadValue, "ts must be a Timestamp");
 
     return keyForOptime(elem.timestamp());
+}
+
+StatusWith<RecordId> keyForDoc(const BSONObj& doc) {
+    // Build a KeyString as the RecordId using the "_id" field.
+    BSONElement idElem;
+    bool foundId = doc.getObjectID(idElem);
+    if (!foundId) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Document " << redact(doc) << " is missing the '_id' field"};
+    }
+
+    return keyForElem(idElem);
+}
+
+RecordId keyForElem(const BSONElement& elem) {
+    // Intentionally discard the TypeBits since the type information will be stored in the _id of
+    // the original document. The consequence of this behavior is that _id values that compare
+    // similarly, but are of different types may not be used concurrently.
+    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    keyBuilder.appendBSONElement(elem);
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
+}
+
+RecordId keyForOID(OID oid) {
+    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    keyBuilder.appendOID(oid);
+    return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
+}
+
+void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName) {
+    rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
+                   [&](int64_t val) { builder->append(fieldName, val); },
+                   [&](const char* str, int len) {
+                       KeyString::appendSingleFieldToBSONAs(str, len, fieldName, builder);
+                   });
+}
+
+BSONObj toBSONAs(RecordId rid, StringData fieldName) {
+    BSONObjBuilder builder;
+    appendToBSONAs(rid, &builder, fieldName);
+    return builder.obj();
 }
 
 }  // namespace record_id_helpers

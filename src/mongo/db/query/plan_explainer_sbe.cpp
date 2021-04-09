@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/record_id_helpers.h"
 
 namespace mongo {
 namespace {
@@ -67,16 +68,10 @@ void statsToBSON(const QuerySolutionNode* node,
             auto csn = static_cast<const CollectionScanNode*>(node);
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
             if (csn->minRecord) {
-                csn->minRecord->withFormat(
-                    [&](RecordId::Null n) { bob->appendNull("minRecord"); },
-                    [&](int64_t rid) { bob->append("minRecord", rid); },
-                    [&](const char* str, int size) { bob->append("minRecord", OID::from(str)); });
+                record_id_helpers::appendToBSONAs(*csn->minRecord, bob, "minRecord");
             }
             if (csn->maxRecord) {
-                csn->maxRecord->withFormat(
-                    [&](RecordId::Null n) { bob->appendNull("maxRecord"); },
-                    [&](int64_t rid) { bob->append("maxRecord", rid); },
-                    [&](const char* str, int size) { bob->append("maxRecord", OID::from(str)); });
+                record_id_helpers::appendToBSONAs(*csn->maxRecord, bob, "maxRecord");
             }
             break;
         }

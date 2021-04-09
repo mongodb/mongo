@@ -30,40 +30,56 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/record_id.h"
+#include "mongo/db/record_id_helpers.h"
 
 #include <benchmark/benchmark.h>
 
 namespace mongo {
 namespace {
 
-RecordId incInt(RecordId r) {
-    return RecordId(r.asLong() + 1);
-}
-
-RecordId incOID(RecordId r) {
-    OID o = OID::from(r.strData());
-    o.setTimestamp(o.getTimestamp() + 1);
-    return RecordId(o.view().view(), OID::kOIDSize);
-}
-
 void BM_RecordIdCopyLong(benchmark::State& state) {
     RecordId rid(1 << 31);
     for (auto _ : state) {
+        RecordId tmp;
         benchmark::ClobberMemory();
-        benchmark::DoNotOptimize(rid = incInt(rid));
+        benchmark::DoNotOptimize(tmp = rid);
     }
 }
 
-void BM_RecordIdCopyOID(benchmark::State& state) {
-    RecordId rid(OID::gen().view().view(), OID::kOIDSize);
+void BM_RecordIdCopyString(benchmark::State& state) {
+    RecordId rid = record_id_helpers::keyForOID(OID::gen());
+    for (auto _ : state) {
+        RecordId tmp;
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(tmp = rid);
+    }
+}
+
+void BM_RecordIdFormatLong(benchmark::State& state) {
+    RecordId rid(1 << 31);
     for (auto _ : state) {
         benchmark::ClobberMemory();
-        benchmark::DoNotOptimize(rid = incOID(rid));
+        benchmark::DoNotOptimize(rid.withFormat([](RecordId::Null) { return false; },
+                                                [](std::int64_t val) { return false; },
+                                                [](const char* str, int size) { return false; }));
+    }
+}
+
+void BM_RecordIdFormatString(benchmark::State& state) {
+    RecordId rid = record_id_helpers::keyForOID(OID::gen());
+    for (auto _ : state) {
+        benchmark::ClobberMemory();
+        benchmark::DoNotOptimize(rid.withFormat([](RecordId::Null) { return false; },
+                                                [](std::int64_t val) { return false; },
+                                                [](const char* str, int size) { return false; }));
     }
 }
 
 BENCHMARK(BM_RecordIdCopyLong);
-BENCHMARK(BM_RecordIdCopyOID);
+BENCHMARK(BM_RecordIdCopyString);
+
+BENCHMARK(BM_RecordIdFormatLong);
+BENCHMARK(BM_RecordIdFormatString);
 
 }  // namespace
 }  // namespace mongo

@@ -77,10 +77,9 @@ public:
     BSONObj getPostBatchResumeToken() const {
         // Return a resume token compatible with resumable initial sync.
         if (_params.requestResumeToken) {
-            return _lastSeenId.withFormat(
-                [](RecordId::Null n) { return BSON("$recordId" << NullLabeler{}); },
-                [](int64_t rid) { return BSON("$recordId" << rid); },
-                [](const char* str, int size) { return BSON("$recordId" << OID::from(str)); });
+            BSONObjBuilder builder;
+            _lastSeenId.serializeToken("$recordId", &builder);
+            return builder.obj();
         }
         // Return a resume token compatible with resharding oplog sync.
         if (_params.shouldTrackLatestOplogTimestamp) {

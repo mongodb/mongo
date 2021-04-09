@@ -46,7 +46,6 @@
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/record_id_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -185,7 +184,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                     sbe::makeS<sbe::CoScanStage>(csn->nodeId()), 1, boost::none, csn->nodeId()),
                 csn->nodeId(),
                 *seekRecordIdSlot,
-                makeConstant(sbe::value::TypeTags::RecordId, seekRecordId->asLong())),
+                makeConstant(sbe::value::TypeTags::RecordId, seekRecordId->getLong())),
             std::move(stage),
             sbe::makeSV(),
             sbe::makeSV(*seekRecordIdSlot),
@@ -308,7 +307,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             std::move(stage),
             makeBinaryOp(sbe::EPrimBinary::lessEq,
                          makeVariable(*tsSlot),
-                         makeConstant(sbe::value::TypeTags::Timestamp, csn->maxRecord->asLong())),
+                         makeConstant(sbe::value::TypeTags::Timestamp, csn->maxRecord->getLong())),
             csn->nodeId());
     }
 
@@ -459,7 +458,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                 sbe::makeS<sbe::CoScanStage>(csn->nodeId()), 1, boost::none, csn->nodeId()),
             csn->nodeId(),
             seekSlot,
-            makeConstant(sbe::value::TypeTags::RecordId, csn->resumeAfterRecordId->asLong()));
+            makeConstant(sbe::value::TypeTags::RecordId, csn->resumeAfterRecordId->getLong()));
 
         // Construct a 'seek' branch of the 'union'. If we're succeeded to reposition the cursor,
         // the branch will output  the 'seekSlot' to start the real scan from, otherwise it will

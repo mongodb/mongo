@@ -890,13 +890,7 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
     // We can be interrupted by shutdown before inserting the first document from the collection
     // scan, in which case there is no _lastRecordIdInserted.
     if (_phase == IndexBuildPhaseEnum::kCollectionScan && _lastRecordIdInserted) {
-        _lastRecordIdInserted->withFormat(
-            [](RecordId::Null n) { invariant(false); },
-            [&](int64_t rid) { builder.append("collectionScanPosition", rid); },
-            [&](const char* str, int size) {
-                OID oid = OID::from(str);
-                builder.appendOID("collectionScanPosition", &oid);
-            });
+        _lastRecordIdInserted->serializeToken("collectionScanPosition", &builder);
     }
 
     BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));

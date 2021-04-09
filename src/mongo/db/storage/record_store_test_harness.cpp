@@ -32,6 +32,7 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 
+#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
@@ -425,11 +426,12 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     std::vector<Timestamp> timestamps(numRecords, Timestamp());
 
     for (int i = 0; i < numRecords; i++) {
-        BSONObj doc = BSON("i" << i);
+        BSONObj doc = BSON("_id" << OID::gen() << "i" << i);
         RecordData recordData = RecordData(doc.objdata(), doc.objsize());
         recordData.makeOwned();
 
-        records.push_back({RecordId(OID::gen().view().view(), OID::kOIDSize), recordData});
+        RecordId id = uassertStatusOK(record_id_helpers::keyForDoc(doc));
+        records.push_back({id, recordData});
     }
 
     {
@@ -476,10 +478,12 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
             ASSERT_EQ(0, strcmp(records.at(i).data.data(), rd.data()));
         }
 
-        RecordId minOid(OID().view().view(), OID::kOIDSize);
-        RecordId maxOid(OID::max().view().view(), OID::kOIDSize);
-        ASSERT_FALSE(rs->findRecord(opCtx.get(), minOid, nullptr));
-        ASSERT_FALSE(rs->findRecord(opCtx.get(), maxOid, nullptr));
+
+        RecordId minId = record_id_helpers::keyForOID(OID());
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), minId, nullptr));
+
+        RecordId maxId = record_id_helpers::keyForOID(OID::max());
+        ASSERT_FALSE(rs->findRecord(opCtx.get(), maxId, nullptr));
     }
 
     {
@@ -544,7 +548,9 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
 
         auto oid = OID::gen();
         oid.setTimestamp(timestamps[i].getSecs());
-        auto record = Record{RecordId(oid.view().view(), OID::kOIDSize), recordData};
+
+        auto id = record_id_helpers::keyForOID(oid);
+        auto record = Record{id, recordData};
         std::vector<Record> recVec = {record};
 
         WriteUnitOfWork wuow(opCtx.get());
@@ -557,9 +563,12 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     for (int i = 0; i < numRecords; i++) {
         // Generate an OID RecordId with a timestamp part and high bits elsewhere such that it
         // always compares greater than or equal to the OIDs we inserted.
+
+
         auto oid = OID::max();
         oid.setTimestamp(i);
-        auto rid = RecordId(oid.view().view(), OID::kOIDSize);
+
+        auto rid = record_id_helpers::keyForOID(oid);
         auto cur = rs->getCursor(opCtx.get());
         auto rec = cur->seekNear(rid);
         ASSERT(rec);
@@ -569,9 +578,11 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     for (int i = 0; i < numRecords; i++) {
         // Generate an OID RecordId with only a timestamp part and zeroes elsewhere such that it
         // always compares less than or equal to the OIDs we inserted.
+
         auto oid = OID();
         oid.setTimestamp(i);
-        auto rid = RecordId(oid.view().view(), OID::kOIDSize);
+
+        auto rid = record_id_helpers::keyForOID(oid);
         auto cur = rs->getCursor(opCtx.get(), false /* forward */);
         auto rec = cur->seekNear(rid);
         ASSERT(rec);

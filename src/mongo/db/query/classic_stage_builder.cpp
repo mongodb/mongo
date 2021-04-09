@@ -63,7 +63,6 @@
 #include "mongo/db/exec/text_or.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/logv2/log.h"
 
