@@ -71,11 +71,12 @@ class DocumentSource;
  *
  * An expression registered this way can be used in any featureCompatibilityVersion.
  */
-#define REGISTER_EXPRESSION(key, parser)                                      \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
-    (InitializerContext*) {                                                   \
-        Expression::registerExpression("$" #key, (parser), boost::none);      \
+#define REGISTER_EXPRESSION(key, parser)                                 \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,            \
+                              ("BeginExpressionRegistration"),           \
+                              ("EndExpressionRegistration"))             \
+    (InitializerContext*) {                                              \
+        Expression::registerExpression("$" #key, (parser), boost::none); \
     }
 
 /**
@@ -89,8 +90,9 @@ class DocumentSource;
  */
 #define REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION_WITH_MIN_VERSION(            \
     key, parser, featureFlag, minVersion)                                     \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                 \
+                              ("BeginExpressionRegistration"),                \
+                              ("EndExpressionRegistration"))                  \
     (InitializerContext*) {                                                   \
         if (featureFlag.isEnabledAndIgnoreFCV()) {                            \
             Expression::registerExpression("$" #key, (parser), (minVersion)); \
@@ -106,24 +108,26 @@ class DocumentSource;
  * compatibility version >= X, you would add this line:
  * REGISTER_EXPRESSION_WITH_MIN_VERSION(foo, ExpressionFoo::parse, X);
  */
-#define REGISTER_EXPRESSION_WITH_MIN_VERSION(key, parser, minVersion)         \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
-    (InitializerContext*) {                                                   \
-        Expression::registerExpression("$" #key, (parser), (minVersion));     \
+#define REGISTER_EXPRESSION_WITH_MIN_VERSION(key, parser, minVersion)     \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,             \
+                              ("BeginExpressionRegistration"),            \
+                              ("EndExpressionRegistration"))              \
+    (InitializerContext*) {                                               \
+        Expression::registerExpression("$" #key, (parser), (minVersion)); \
     }
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
  * for testing purposes.
  */
-#define REGISTER_TEST_EXPRESSION(key, parser)                                 \
-    MONGO_INITIALIZER_GENERAL(                                                \
-        addToExpressionParserMap_##key, ("default"), ("expressionParserMap")) \
-    (InitializerContext*) {                                                   \
-        if (getTestCommandsEnabled()) {                                       \
-            Expression::registerExpression("$" #key, (parser), boost::none);  \
-        }                                                                     \
+#define REGISTER_TEST_EXPRESSION(key, parser)                                \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                \
+                              ("BeginExpressionRegistration"),               \
+                              ("EndExpressionRegistration"))                 \
+    (InitializerContext*) {                                                  \
+        if (getTestCommandsEnabled()) {                                      \
+            Expression::registerExpression("$" #key, (parser), boost::none); \
+        }                                                                    \
     }
 
 class Expression : public RefCountable {

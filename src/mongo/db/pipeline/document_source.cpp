@@ -262,4 +262,8 @@ void DocumentSource::serializeToArray(vector<Value>& array,
     }
 }
 
+MONGO_INITIALIZER_GROUP(BeginDocumentSourceRegistration,
+                        ("default"),
+                        ("EndDocumentSourceRegistration"))
+MONGO_INITIALIZER_GROUP(EndDocumentSourceRegistration, ("BeginDocumentSourceRegistration"), ())
 }  // namespace mongo

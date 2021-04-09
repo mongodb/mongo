@@ -189,9 +189,8 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
     }
 }
 
-MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
-    // Nothing to do. This initializer exists to tie together all the individual initializers
-    // defined by REGISTER_WINDOW_FUNCTION and REGISTER_REMOVABLE_WINDOW_FUNCTION
-}
-
+MONGO_INITIALIZER_GROUP(BeginWindowFunctionRegistration,
+                        ("default"),
+                        ("EndWindowFunctionRegistration"))
+MONGO_INITIALIZER_GROUP(EndWindowFunctionRegistration, ("BeginWindowFunctionRegistration"), ())
 }  // namespace mongo::window_function

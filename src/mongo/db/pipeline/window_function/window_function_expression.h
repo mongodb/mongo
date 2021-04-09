@@ -45,16 +45,18 @@ class WindowFunctionExec;
 class PartitionIterator;
 }  // namespace mongo
 
-#define REGISTER_WINDOW_FUNCTION(name, parser)                                       \
-    MONGO_INITIALIZER_GENERAL(                                                       \
-        addToWindowFunctionMap_##name, ("default"), ("windowFunctionExpressionMap")) \
-    (InitializerContext*) {                                                          \
-        ::mongo::window_function::Expression::registerParser("$" #name, parser);     \
+#define REGISTER_WINDOW_FUNCTION(name, parser)                                   \
+    MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name,                     \
+                              ("BeginWindowFunctionRegistration"),               \
+                              ("EndWindowFunctionRegistration"))                 \
+    (InitializerContext*) {                                                      \
+        ::mongo::window_function::Expression::registerParser("$" #name, parser); \
     }
 
 #define REGISTER_REMOVABLE_WINDOW_FUNCTION(name, accumClass, wfClass)                              \
-    MONGO_INITIALIZER_GENERAL(                                                                     \
-        addToWindowFunctionMap_##name, ("default"), ("windowFunctionExpressionMap"))               \
+    MONGO_INITIALIZER_GENERAL(addToWindowFunctionMap_##name,                                       \
+                              ("BeginWindowFunctionRegistration"),                                 \
+                              ("EndWindowFunctionRegistration"))                                   \
     (InitializerContext*) {                                                                        \
         ::mongo::window_function::Expression::registerParser(                                      \
             "$" #name, ::mongo::window_function::ExpressionRemovable<accumClass, wfClass>::parse); \

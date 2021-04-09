@@ -7462,9 +7462,6 @@ Value ExpressionSetField::serialize(const bool explain) const {
                                     {"value"_sd, _value->serialize(explain)}}}});
 }
 
-MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
-    // Nothing to do. This initializer exists to tie together all the individual initializers
-    // defined by REGISTER_EXPRESSION / REGISTER_EXPRESSION_WITH_MIN_VERSION.
-}
-
+MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
+MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())
 }  // namespace mongo

@@ -47,8 +47,9 @@ namespace mongo {
     REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, boost::none)
 
 #define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion)                \
-    MONGO_INITIALIZER_GENERAL(                                                         \
-        addToAccumulatorFactoryMap_##key, ("default"), ("accumulatorParserMap"))       \
+    MONGO_INITIALIZER_GENERAL(addToAccumulatorFactoryMap_##key,                        \
+                              ("BeginAccumulatorRegistration"),                        \
+                              ("EndAccumulatorRegistration"))                          \
     (InitializerContext*) {                                                            \
         AccumulationStatement::registerAccumulator("$" #key, (factory), (minVersion)); \
     }

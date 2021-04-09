@@ -137,7 +137,10 @@ class Document;
  */
 #define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                     \
     key, liteParser, fullParser, allowedWithApiStrict, clientType, minVersion, ...) \
-    MONGO_INITIALIZER(addToDocSourceParserMap_##key)(InitializerContext*) {         \
+    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                        \
+                              ("BeginDocumentSourceRegistration"),                  \
+                              ("EndDocumentSourceRegistration"))                    \
+    (InitializerContext*) {                                                         \
         if (!__VA_ARGS__) {                                                         \
             return;                                                                 \
         }                                                                           \
