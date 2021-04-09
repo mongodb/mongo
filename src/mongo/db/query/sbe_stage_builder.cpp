@@ -1666,7 +1666,11 @@ SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterN
     auto [stage, outputs] = build(child, childReqs);
 
     invariant(outputs.getIndexKeySlots());
-    auto indexKeySlots = *outputs.getIndexKeySlots();
+    auto indexKeySlotsForShardKeyFields =
+        makeIndexKeyOutputSlotsMatchingParentReqs(indexKeyPattern,
+                                                  shardKeyIndexReqs,
+                                                  *childReqs.getIndexKeyBitset(),
+                                                  *outputs.getIndexKeySlots());
 
     auto shardKeySlot = _slotIdGenerator.generate();
 
@@ -1676,7 +1680,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterN
                                                         boost::none,
                                                         std::vector<std::string>{},
                                                         std::move(projectFields),
-                                                        indexKeySlots,
+                                                        indexKeySlotsForShardKeyFields,
                                                         true,
                                                         false,
                                                         filterNode->nodeId());
@@ -1690,7 +1694,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterN
                                                            indexKeyPattern,
                                                            *parentIndexKeyReqs,
                                                            *childReqs.getIndexKeyBitset(),
-                                                           indexKeySlots)});
+                                                           *outputs.getIndexKeySlots())});
 
     return {std::move(filterStage), std::move(outputs)};
 }
