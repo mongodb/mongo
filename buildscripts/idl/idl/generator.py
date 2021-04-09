@@ -1980,7 +1980,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 method_name = writer.get_method_name(field.type.serializer)
                 template_params['method_name'] = method_name
 
-                if field.type.is_array:
+                if field.chained:
+                    # Just directly call the serializer for chained structs without opening up a
+                    # nested document.
+                    self._writer.write_template('${access_member}.${method_name}(builder);')
+                elif field.type.is_array:
                     self._writer.write_template(
                         'BSONArrayBuilder arrayBuilder(builder->subarrayStart(${field_name}));')
                     with self._block('for (const auto& item : ${access_member}) {', '}'):
@@ -1988,7 +1992,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             'BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());')
                         self._writer.write_template('item.${method_name}(&subObjBuilder);')
                 else:
-                    self._writer.write_template('${access_member}.${method_name}(builder);')
+                    self._writer.write_template(
+                        '${access_member}.${method_name}(${field_name}, builder);')
 
     def _gen_serializer_method_struct(self, field):
         # type: (ast.Field) -> None
