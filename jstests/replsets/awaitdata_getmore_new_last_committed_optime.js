@@ -10,7 +10,6 @@
 // on a failpoint, we only run this test with storage engine that supports snapshot read.
 // @tags: [
 //   requires_snapshot_read,
-//   sbe_incompatible,
 // ]
 
 (function() {
