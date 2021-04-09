@@ -208,7 +208,7 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 }
 
 WriterVectors ReshardingOplogBatchPreparer::_makeEmptyWriterVectors() const {
-    return WriterVectors(size_t(resharding::gReshardingWriterThreadCount));
+    return WriterVectors(size_t(resharding::gReshardingOplogBatchTaskCount));
 }
 
 void ReshardingOplogBatchPreparer::_appendCrudOpToWriterVector(const OplogEntry* op,

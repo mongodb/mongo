@@ -160,21 +160,6 @@ std::shared_ptr<executor::TaskExecutor> ReshardingDataReplication::_makeOplogFet
     return executor;
 }
 
-std::vector<std::unique_ptr<ThreadPool>> ReshardingDataReplication::_makeOplogApplierWorkers(
-    size_t numDonors) {
-    std::vector<std::unique_ptr<ThreadPool>> oplogApplierWorkers;
-    oplogApplierWorkers.reserve(numDonors);
-
-    for (size_t i = 0; i < numDonors; ++i) {
-        oplogApplierWorkers.emplace_back(
-            repl::makeReplWriterPool(resharding::gReshardingWriterThreadCount,
-                                     "ReshardingOplogApplierWorker",
-                                     true /* isKillableByStepdown */));
-    }
-
-    return oplogApplierWorkers;
-}
-
 std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::_makeOplogAppliers(
     OperationContext* opCtx,
     ReshardingMetrics* metrics,
@@ -182,10 +167,8 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
     const std::vector<DonorShardFetchTimestamp>& donorShards,
     Timestamp cloneTimestamp,
     ChunkManager sourceChunkMgr,
-    std::shared_ptr<executor::TaskExecutor> executor,
     const std::vector<NamespaceString>& stashCollections,
-    const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers,
-    const std::vector<std::unique_ptr<ThreadPool>>& oplogApplierWorkers) {
+    const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers) {
     std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers;
     oplogAppliers.reserve(donorShards.size());
 
@@ -214,9 +197,7 @@ std::vector<std::unique_ptr<ReshardingOplogApplier>> ReshardingDataReplication::
             // {clusterTime: cloneTimestamp, ts: cloneTimestamp} as a resume token value.
             std::make_unique<ReshardingDonorOplogIterator>(
                 oplogBufferNss, std::move(idToResumeFrom), oplogFetchers[i].get()),
-            sourceChunkMgr,
-            executor,
-            oplogApplierWorkers[i].get()));
+            sourceChunkMgr));
     }
 
     return oplogAppliers;
@@ -230,8 +211,7 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     Timestamp cloneTimestamp,
     bool cloningDone,
     ShardId myShardId,
-    ChunkManager sourceChunkMgr,
-    std::shared_ptr<executor::TaskExecutor> executor) {
+    ChunkManager sourceChunkMgr) {
     std::unique_ptr<ReshardingCollectionCloner> collectionCloner;
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners;
 
@@ -243,7 +223,6 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
     auto oplogFetchers = _makeOplogFetchers(opCtx, metrics, metadata, donorShards, myShardId);
 
     auto oplogFetcherExecutor = _makeOplogFetcherExecutor(donorShards.size());
-    auto oplogApplierWorkers = _makeOplogApplierWorkers(donorShards.size());
 
     auto stashCollections = resharding::ensureStashCollectionsExist(
         opCtx, sourceChunkMgr, metadata.getSourceUUID(), donorShards);
@@ -254,15 +233,12 @@ std::unique_ptr<ReshardingDataReplicationInterface> ReshardingDataReplication::m
                                             donorShards,
                                             cloneTimestamp,
                                             std::move(sourceChunkMgr),
-                                            std::move(executor),
                                             stashCollections,
-                                            oplogFetchers,
-                                            oplogApplierWorkers);
+                                            oplogFetchers);
 
     return std::make_unique<ReshardingDataReplication>(std::move(collectionCloner),
                                                        std::move(txnCloners),
                                                        std::move(oplogAppliers),
-                                                       std::move(oplogApplierWorkers),
                                                        std::move(oplogFetchers),
                                                        std::move(oplogFetcherExecutor),
                                                        TrustedInitTag{});
@@ -272,14 +248,12 @@ ReshardingDataReplication::ReshardingDataReplication(
     std::unique_ptr<ReshardingCollectionCloner> collectionCloner,
     std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners,
     std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
-    std::vector<std::unique_ptr<ThreadPool>> oplogApplierWorkers,
     std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
     std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
     TrustedInitTag)
     : _collectionCloner{std::move(collectionCloner)},
       _txnCloners{std::move(txnCloners)},
       _oplogAppliers{std::move(oplogAppliers)},
-      _oplogApplierWorkers{std::move(oplogApplierWorkers)},
       _oplogFetchers{std::move(oplogFetchers)},
       _oplogFetcherExecutor{std::move(oplogFetcherExecutor)} {}
 
@@ -445,8 +419,8 @@ ReshardingDataReplication::_runOplogAppliersUntilConsistentButStale(
         oplogApplierFutures.emplace_back(
             future_util::withCancellation(_startOplogApplication.getFuture(), cancelToken)
                 .thenRunOn(executor)
-                .then([applier = applier.get(), cancelToken, opCtxFactory] {
-                    return applier->applyUntilCloneFinishedTs(cancelToken, opCtxFactory);
+                .then([applier = applier.get(), executor, cancelToken, opCtxFactory] {
+                    return applier->applyUntilCloneFinishedTs(executor, cancelToken, opCtxFactory);
                 })
                 .share());
     }
@@ -468,8 +442,8 @@ ReshardingDataReplication::_runOplogAppliersUntilStrictlyConsistent(
         oplogApplierFutures.emplace_back(
             future_util::withCancellation(_consistentButStale.getFuture(), cancelToken)
                 .thenRunOn(executor)
-                .then([applier = applier.get(), cancelToken, opCtxFactory] {
-                    return applier->applyUntilDone(cancelToken, opCtxFactory);
+                .then([applier = applier.get(), executor, cancelToken, opCtxFactory] {
+                    return applier->applyUntilDone(executor, cancelToken, opCtxFactory);
                 })
                 .share());
     }
@@ -479,10 +453,6 @@ ReshardingDataReplication::_runOplogAppliersUntilStrictlyConsistent(
 
 void ReshardingDataReplication::shutdown() {
     _oplogFetcherExecutor->shutdown();
-
-    for (const auto& worker : _oplogApplierWorkers) {
-        worker->shutdown();
-    }
 }
 
 }  // namespace mongo

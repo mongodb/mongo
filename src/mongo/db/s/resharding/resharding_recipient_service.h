@@ -195,9 +195,7 @@ private:
     void _dropOplogCollections(OperationContext* opCtx);
 
     std::unique_ptr<ReshardingDataReplicationInterface> _makeDataReplication(
-        OperationContext* opCtx,
-        bool cloningDone,
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        OperationContext* opCtx, bool cloningDone);
 
     void _ensureDataReplicationStarted(
         OperationContext* opCtx,

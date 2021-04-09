@@ -64,7 +64,7 @@ public:
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
      * committing the WUOW.
      */
-    Status applyOperation(OperationContext* opCtx, const repl::OplogEntry& opOrGroupedInserts);
+    Status applyOperation(OperationContext* opCtx, const repl::OplogEntry& op) const;
 
 private:
     // Applies an insert operation
@@ -72,27 +72,27 @@ private:
                              Database* db,
                              const CollectionPtr& outputColl,
                              const CollectionPtr& stashColl,
-                             const repl::OplogEntry& op);
+                             const repl::OplogEntry& op) const;
 
     // Applies an update operation
     void _applyUpdate_inlock(OperationContext* opCtx,
                              Database* db,
                              const CollectionPtr& outputColl,
                              const CollectionPtr& stashColl,
-                             const repl::OplogEntry& op);
+                             const repl::OplogEntry& op) const;
 
     // Applies a delete operation
     void _applyDelete_inlock(OperationContext* opCtx,
                              Database* db,
                              const CollectionPtr& outputColl,
                              const CollectionPtr& stashColl,
-                             const repl::OplogEntry& op);
+                             const repl::OplogEntry& op) const;
 
     // Queries '_stashNss' using 'idQuery'.
     BSONObj _queryStashCollById(OperationContext* opCtx,
                                 Database* db,
                                 const CollectionPtr& coll,
-                                const BSONObj& idQuery);
+                                const BSONObj& idQuery) const;
 
     // Namespace where operations should be applied, unless there is an _id conflict.
     const NamespaceString _outputNss;
