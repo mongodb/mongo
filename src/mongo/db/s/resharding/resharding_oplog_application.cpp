@@ -118,7 +118,7 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
       _sourceChunkMgr(std::move(sourceChunkMgr)) {}
 
 Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
-                                                       const repl::OplogEntry& op) {
+                                                       const repl::OplogEntry& op) const {
     LOGV2_DEBUG(49901, 3, "Applying op for resharding", "op"_attr = redact(op.toBSONForLogging()));
 
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
@@ -198,7 +198,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
                                                           Database* db,
                                                           const CollectionPtr& outputColl,
                                                           const CollectionPtr& stashColl,
-                                                          const repl::OplogEntry& op) {
+                                                          const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary insert operations are as follows:
      *
@@ -291,7 +291,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
                                                           Database* db,
                                                           const CollectionPtr& outputColl,
                                                           const CollectionPtr& stashColl,
-                                                          const repl::OplogEntry& op) {
+                                                          const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary update operations are as follows:
      *
@@ -375,7 +375,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
                                                           Database* db,
                                                           const CollectionPtr& outputColl,
                                                           const CollectionPtr& stashColl,
-                                                          const repl::OplogEntry& op) {
+                                                          const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary delete operations are as follows:
      *
@@ -519,7 +519,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
 BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* opCtx,
                                                              Database* db,
                                                              const CollectionPtr& coll,
-                                                             const BSONObj& idQuery) {
+                                                             const BSONObj& idQuery) const {
     const IndexCatalog* indexCatalog = coll->getIndexCatalog();
     uassert(4990100,
             str::stream() << "Missing _id index for collection " << _myStashNss.ns(),

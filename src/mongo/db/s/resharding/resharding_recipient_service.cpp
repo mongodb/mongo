@@ -461,10 +461,8 @@ void ReshardingRecipientService::RecipientStateMachine::
 }
 
 std::unique_ptr<ReshardingDataReplicationInterface>
-ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(
-    OperationContext* opCtx,
-    bool cloningDone,
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(OperationContext* opCtx,
+                                                                        bool cloningDone) {
     invariant(_cloneTimestamp);
 
     auto myShardId = ShardingState::get(opCtx->getServiceContext())->shardId();
@@ -479,8 +477,7 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(
                                    *_cloneTimestamp,
                                    cloningDone,
                                    std::move(myShardId),
-                                   std::move(sourceChunkMgr),
-                                   **executor);
+                                   std::move(sourceChunkMgr));
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationStarted(
@@ -490,7 +487,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
     const bool cloningDone = _recipientCtx.getState() > RecipientStateEnum::kCloning;
 
     if (!_dataReplication) {
-        auto dataReplication = _makeDataReplication(opCtx, cloningDone, executor);
+        auto dataReplication = _makeDataReplication(opCtx, cloningDone);
         _dataReplicationQuiesced =
             dataReplication
                 ->runUntilStrictlyConsistent(**executor,

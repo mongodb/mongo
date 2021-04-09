@@ -148,8 +148,7 @@ public:
         Timestamp cloneTimestamp,
         bool cloningDone,
         ShardId myShardId,
-        ChunkManager sourceChunkMgr,
-        std::shared_ptr<executor::TaskExecutor> executor);
+        ChunkManager sourceChunkMgr);
 
     // The TrustedInitTag being a private class makes this constructor effectively private. However,
     // it needs to technically be a public constructor for std::make_unique to be able to call it.
@@ -158,7 +157,6 @@ public:
     ReshardingDataReplication(std::unique_ptr<ReshardingCollectionCloner> collectionCloner,
                               std::vector<std::unique_ptr<ReshardingTxnCloner>> txnCloners,
                               std::vector<std::unique_ptr<ReshardingOplogApplier>> oplogAppliers,
-                              std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers,
                               std::vector<std::unique_ptr<ReshardingOplogFetcher>> oplogFetchers,
                               std::shared_ptr<executor::TaskExecutor> oplogFetcherExecutor,
                               TrustedInitTag);
@@ -200,8 +198,6 @@ private:
 
     static std::shared_ptr<executor::TaskExecutor> _makeOplogFetcherExecutor(size_t numDonors);
 
-    static std::vector<std::unique_ptr<ThreadPool>> _makeOplogApplierWorkers(size_t numDonors);
-
     static std::vector<std::unique_ptr<ReshardingOplogApplier>> _makeOplogAppliers(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
@@ -209,10 +205,8 @@ private:
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
         ChunkManager sourceChunkMgr,
-        std::shared_ptr<executor::TaskExecutor> executor,
         const std::vector<NamespaceString>& stashCollections,
-        const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers,
-        const std::vector<std::unique_ptr<ThreadPool>>& oplogApplierWorkers);
+        const std::vector<std::unique_ptr<ReshardingOplogFetcher>>& oplogFetchers);
 
     SharedSemiFuture<void> _runCollectionCloner(
         std::shared_ptr<executor::TaskExecutor> executor,
@@ -249,7 +243,6 @@ private:
     const std::vector<std::unique_ptr<ReshardingTxnCloner>> _txnCloners;
 
     const std::vector<std::unique_ptr<ReshardingOplogApplier>> _oplogAppliers;
-    const std::vector<std::unique_ptr<ThreadPool>> _oplogApplierWorkers;
 
     // The ReshardingOplogFetcher must be destructed before the corresponding ReshardingOplogApplier
     // to ensure the future returned by awaitInsert() is always eventually readied.

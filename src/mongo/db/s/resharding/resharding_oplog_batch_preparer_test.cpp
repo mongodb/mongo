@@ -143,7 +143,7 @@ protected:
     static constexpr size_t kNumWriterVectors = 2;
 
 private:
-    RAIIServerParameterControllerForTest controller{"reshardingWriterThreadCount",
+    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchTaskCount",
                                                     int(kNumWriterVectors)};
 };
 

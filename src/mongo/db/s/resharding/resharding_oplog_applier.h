@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/executor/task_executor.h"
@@ -46,7 +47,6 @@ namespace mongo {
 
 class ReshardingMetrics;
 class ServiceContext;
-class ThreadPool;
 
 /**
  * Applies oplog entries from a specific donor for resharding.
@@ -95,16 +95,15 @@ public:
                            size_t myStashIdx,
                            Timestamp reshardingCloneFinishedTs,
                            std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
-                           const ChunkManager& sourceChunkMgr,
-                           std::shared_ptr<executor::TaskExecutor> executor,
-                           ThreadPool* writerPool);
+                           const ChunkManager& sourceChunkMgr);
 
     /**
      * Applies oplog from the iterator until it has at least applied an oplog entry with timestamp
      * greater than or equal to reshardingCloneFinishedTs.
      * It is undefined to call applyUntilCloneFinishedTs more than once.
      */
-    ExecutorFuture<void> applyUntilCloneFinishedTs(CancellationToken cancelToken,
+    ExecutorFuture<void> applyUntilCloneFinishedTs(std::shared_ptr<executor::TaskExecutor> executor,
+                                                   CancellationToken cancelToken,
                                                    CancelableOperationContextFactory factory);
 
     /**
@@ -114,7 +113,8 @@ public:
      * It is an error to call this when applyUntilCloneFinishedTs future returns an error.
      * It is undefined to call applyUntilDone more than once.
      */
-    ExecutorFuture<void> applyUntilDone(CancellationToken cancelToken,
+    ExecutorFuture<void> applyUntilDone(std::shared_ptr<executor::TaskExecutor> executor,
+                                        CancellationToken cancelToken,
                                         CancelableOperationContextFactory factory);
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
@@ -134,32 +134,18 @@ private:
      * Returns a future that becomes ready when the next batch of oplog entries have been collected
      * and applied.
      */
-    ExecutorFuture<void> _scheduleNextBatch(CancellationToken cancelToken,
+    ExecutorFuture<void> _scheduleNextBatch(std::shared_ptr<executor::TaskExecutor> executor,
+                                            CancellationToken cancelToken,
                                             CancelableOperationContextFactory factory);
 
     /**
      * Setup the worker threads to apply the ops in the current buffer in parallel. Waits for all
      * worker threads to finish (even when some of them finished early due to an error).
      */
-    Future<void> _applyBatch(OperationContext* opCtx,
-                             bool isForSessionApplication,
-                             CancelableOperationContextFactory factory);
-
-    /**
-     * Apply a slice of oplog entries from the current batch for a worker thread.
-     */
-    Status _applyOplogBatchPerWorker(std::vector<const repl::OplogEntry*>* ops,
-                                     CancelableOperationContextFactory factory);
-
-    /**
-     * Apply the oplog entries.
-     */
-    Status _applyOplogEntry(OperationContext* opCtx, const repl::OplogEntry& op);
-
-    /**
-     * Record results from a writer vector for the current batch being applied.
-     */
-    void _onWriterVectorDone(Status status);
+    SemiFuture<void> _applyBatch(std::shared_ptr<executor::TaskExecutor> executor,
+                                 CancellationToken cancelToken,
+                                 CancelableOperationContextFactory factory,
+                                 bool isForSessionApplication);
 
     /**
      * Takes note that an error occurred and set the appropriate promise.
@@ -205,51 +191,20 @@ private:
 
     const ReshardingOplogBatchPreparer _batchPreparer;
 
+    const ReshardingOplogApplicationRules _crudApplication;
     const ReshardingOplogSessionApplication _sessionApplication;
+    const ReshardingOplogBatchApplier _batchApplier;
 
-    // Actually applies the ops, using special rules that apply only to resharding. Only used when
-    // the 'useReshardingOplogApplicationRules' server parameter is set to true.
-    ReshardingOplogApplicationRules _applicationRules;
-
-    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogApplier::_mutex");
-
-    // Member variable concurrency access rules:
-    //
-    // M - Mutex protected. Must hold _mutex when accessing
-    // R - Read relaxed. Can read freely without holding mutex because there are no case where
-    //     more than one thread will modify it concurrently while being read.
-    // S - Special case. Manages it's own concurrency. Can access without holding mutex.
-
-    // (S)
-    std::shared_ptr<executor::TaskExecutor> _executor;
-
-    // (S) Thread pool for replication oplog applier;
-    ThreadPool* _writerPool;
-
-    // (R) Buffer for the current batch of oplog entries to apply.
+    // Buffer for the current batch of oplog entries to apply.
     OplogBatch _currentBatchToApply;
 
-    // (R) Buffer for internally generated oplog entries that needs to be processed for this batch.
+    // Buffer for internally generated oplog entries that needs to be processed for this batch.
     std::list<repl::OplogEntry> _currentDerivedOps;
 
-    // (R) A temporary scratch pad that contains pointers to oplog entries in _currentBatchToApply
-    // that is used by the writer vector when applying oplog in parallel.
-    std::vector<std::vector<const repl::OplogEntry*>> _currentWriterVectors;
-
-    // (S) The promise to signal that a batch has finished applying.
-    Promise<void> _currentApplyBatchPromise;
-
-    // (M) Keeps track of how many writer vectors has been applied.
-    int _remainingWritersToWait{0};
-
-    // (M) Keeps track of the status from writer vectors. Will only keep one error if there are
-    // multiple occurrances.
-    Status _currentBatchConsolidatedStatus{Status::OK()};
-
-    // (R) The source of the oplog entries to be applied.
+    // The source of the oplog entries to be applied.
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> _oplogIter;
 
-    // (R) Tracks the current stage of this applier.
+    // Tracks the current stage of this applier.
     Stage _stage{Stage::kStarted};
 };
 
