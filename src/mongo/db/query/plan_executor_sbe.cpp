@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/plan_executor_sbe.h"
@@ -37,8 +39,12 @@
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
+// This failpoint is defined by the classic executor but is also accessed here.
+extern FailPoint planExecutorHangBeforeShouldWaitForInserts;
+
 PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  std::unique_ptr<CanonicalQuery> cq,
                                  sbe::CandidatePlans candidates,
@@ -232,6 +238,20 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
             _state = State::kClosed;
+
+            if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
+                    [this](const BSONObj& data) {
+                        if (data.hasField("namespace") &&
+                            _nss != NamespaceString(data.getStringField("namespace"))) {
+                            return false;
+                        }
+                        return true;
+                    }))) {
+                LOGV2(5567001,
+                      "PlanExecutor - planExecutorHangBeforeShouldWaitForInserts fail point "
+                      "enabled. Blocking until fail point is disabled");
+                planExecutorHangBeforeShouldWaitForInserts.pauseWhileSet();
+            }
 
             if (!insert_listener::shouldWaitForInserts(_opCtx, _cq.get(), _yieldPolicy.get())) {
                 return PlanExecutor::ExecState::IS_EOF;
