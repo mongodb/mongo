@@ -35,6 +35,7 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/s/shard_id.h"
@@ -120,7 +121,7 @@ public:
     /**
      * Returns a future that becomes ready when either
      *   (a) the recipient with respect to each donor shard has applied through the timestamp it has
-     *       finished cloning at (the fetchTimestamp), or
+     *       finished cloning at (the cloneTimestamp), or
      *   (b) the recipient has encountered an operation-fatal error.
      */
     virtual SharedSemiFuture<void> awaitConsistentButStale() = 0;
@@ -178,12 +179,28 @@ public:
 
     void shutdown() override;
 
+    // The following methods are called by ReshardingDataReplication::make() and only exposed
+    // publicly for unit-testing purposes.
+
+    static std::vector<NamespaceString> ensureStashCollectionsExist(
+        OperationContext* opCtx,
+        const ChunkManager& sourceChunkMgr,
+        const std::vector<DonorShardFetchTimestamp>& donorShards);
+
+    static ReshardingDonorOplogId getOplogFetcherResumeId(OperationContext* opCtx,
+                                                          const NamespaceString& oplogBufferNss,
+                                                          Timestamp minFetchTimestamp);
+
+    static ReshardingDonorOplogId getOplogApplierResumeId(OperationContext* opCtx,
+                                                          const ReshardingSourceId& sourceId,
+                                                          Timestamp minFetchTimestamp);
+
 private:
     static std::unique_ptr<ReshardingCollectionCloner> _makeCollectionCloner(
         ReshardingMetrics* metrics,
         const CommonReshardingMetadata& metadata,
         const ShardId& myShardId,
-        Timestamp fetchTimestamp);
+        Timestamp cloneTimestamp);
 
     static std::vector<std::unique_ptr<ReshardingTxnCloner>> _makeTxnCloners(
         const CommonReshardingMetadata& metadata,
