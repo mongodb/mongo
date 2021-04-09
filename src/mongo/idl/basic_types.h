@@ -172,14 +172,14 @@ public:
         uasserted(ErrorCodes::FailedToParse, "w has to be a number or string");
     }
 
-    void serializeWriteConcernW(BSONObjBuilder* builder) const {
+    void serializeWriteConcernW(StringData fieldName, BSONObjBuilder* builder) const {
         if (auto stringVal = stdx::get_if<std::string>(&_w)) {
-            builder->append("w", *stringVal);
+            builder->append(fieldName, *stringVal);
             return;
         }
         auto intVal = stdx::get_if<std::int64_t>(&_w);
         invariant(intVal);
-        builder->appendNumber("w", static_cast<long long>(*intVal));
+        builder->appendNumber(fieldName, static_cast<long long>(*intVal));
     }
 
     WriteConcernW() : _w{1}, _usedDefault{true} {};
