@@ -34,7 +34,7 @@ assert.commandWorked(adminDB.killOp(journalFlusherOp[0].opid));
 assert.commandWorked(testColl.insert({}, {writeConcern: {j: true}}));
 
 // Whenever the journal flusher tries to run, it should encounter the killOp Interrupt error.
-checkLog.containsJson(primary, 55745001);
+checkLog.containsJson(primary, 5574501);
 
 rst.stopSet();
 // MongoRunner.stopMongod(conn);
