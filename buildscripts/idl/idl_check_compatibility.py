@@ -50,6 +50,7 @@ from idl.compiler import CompilerImportResolver
 from idl_compatibility_errors import IDLCompatibilityContext, IDLCompatibilityErrorCollection, dump_errors
 
 ALLOW_ANY_TYPE_LIST: List[str] = [
+    # This list if only used in unit-tests.
     "commandAllowedAnyTypes",
     "commandAllowedAnyTypes-param-anyTypeParam",
     "commandAllowedAnyTypes-reply-anyTypeField",
@@ -69,6 +70,12 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "replyFieldCppTypeNotEqual-reply-cppTypeNotEqualReplyField",
     "commandCppTypeNotEqual",
     "commandParameterCppTypeNotEqual-param-cppTypeNotEqualParam",
+    "replyFieldSerializerNotEqual-reply-serializerNotEqualReplyField",
+    "commandSerializerNotEqual",
+    "commandParameterSerializerNotEqual-param-serializerNotEqualParam",
+    "replyFieldDeserializerNotEqual-reply-deserializerNotEqualReplyField",
+    "commandDeserializerNotEqual",
+    "commandParameterDeserializerNotEqual-param-deserializerNotEqualParam",
     "newlyAddedReplyFieldTypeBsonAnyAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField",
     "replyFieldTypeBsonAnyWithVariantUnstable-reply-bsonSerializationTypeWithVariantAnyUnstableReplyField",
     "newlyAddedParamBsonAnyAllowList-param-newlyAddedBsonAnyAllowListParam",
@@ -78,6 +85,12 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "commandParameterCppTypeNotEqualUnstable-param-cppTypeNotEqualParam",
     "replyFieldCppTypeNotEqualUnstable-reply-cppTypeNotEqualReplyUnstableField",
     "commandCppTypeNotEqualUnstable",
+    "commandParameterSerializerNotEqualUnstable-param-serializerNotEqualParam",
+    "replyFieldSerializerNotEqualUnstable-reply-serializerNotEqualReplyUnstableField",
+    "commandSerializerNotEqualUnstable",
+    "commandParameterDeserializerNotEqualUnstable-param-deserializerNotEqualParam",
+    "replyFieldDeserializerNotEqualUnstable-reply-deserializerNotEqualReplyUnstableField",
+    "commandDeserializerNotEqualUnstable",
 
     # TODO (SERVER-54956): Decide what to do with commands: (create, createIndexes).
     'create-param-backwards',
@@ -93,8 +106,17 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'saslContinue-param-payload',
     'saslContinue-reply-payload',
 
-    # TODO (SERVER-54925): Decide what to do with commands:
-    # (aggregate, find, update, delete, findAndModify, explain).
+    # These commands (aggregate, find, update, delete, findAndModify, explain) might contain some
+    # fields with type `any`. Currently, it's not possible to avoid the `any` type in those cases.
+    # Instead, here are the preventive measures in-place to catch unintentional breaking changes:
+    # 1- Added comments on top of custom serializers/deserializers (related to these fields) to
+    #    let the future developers know that their modifications to these methods might lead to
+    #    a breaking change in the API.
+    # 2- Added proper unit-tests to catch accidental changes to the custom serializers/deserializers
+    #    by over-fitting on the current implementation of these custom serializers/deserializers.
+    # 3- Added further checks to the current script (idl_check_compatibility.py) to check for
+    #    changing a custom serializer/deserializer and considering it as a potential breaking
+    #    change.
     'aggregate-param-pipeline',
     'aggregate-param-explain',
     'aggregate-param-allowDiskUse',
@@ -289,9 +311,20 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                 cmd_name, field_name, old_field_type.name, old_field.idl_file_path)
             return
 
+        # If cpp_type is changed, it's a potential breaking change.
         if old_field_type.cpp_type != new_field_type.cpp_type:
             ctxt.add_reply_field_cpp_type_not_equal_error(cmd_name, field_name, new_field_type.name,
                                                           new_field.idl_file_path)
+
+        # If serializer is changed, it's a potential breaking change.
+        if (not old_field.unstable) and old_field_type.serializer != new_field_type.serializer:
+            ctxt.add_reply_field_serializer_not_equal_error(
+                cmd_name, field_name, new_field_type.name, new_field.idl_file_path)
+
+        # If deserializer is changed, it's a potential breaking change.
+        if (not old_field.unstable) and old_field_type.deserializer != new_field_type.deserializer:
+            ctxt.add_reply_field_deserializer_not_equal_error(
+                cmd_name, field_name, new_field_type.name, new_field.idl_file_path)
 
     if isinstance(old_field_type, syntax.VariantType):
         # If the new type is not variant just check the single type.
@@ -542,8 +575,19 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                 cmd_name, old_type.name, old_field.idl_file_path, param_name, is_command_parameter)
             return
 
+        # If cpp_type is changed, it's a potential breaking change.
         if old_type.cpp_type != new_type.cpp_type:
             ctxt.add_command_or_param_cpp_type_not_equal_error(
+                cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
+
+        # If serializer is changed, it's a potential breaking change.
+        if (not old_field.unstable) and old_type.serializer != new_type.serializer:
+            ctxt.add_command_or_param_serializer_not_equal_error(
+                cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
+
+        # If deserializer is changed, it's a potential breaking change.
+        if (not old_field.unstable) and old_type.deserializer != new_type.deserializer:
+            ctxt.add_command_or_param_deserializer_not_equal_error(
                 cmd_name, new_type.name, new_field.idl_file_path, param_name, is_command_parameter)
 
     if isinstance(old_type, syntax.VariantType):

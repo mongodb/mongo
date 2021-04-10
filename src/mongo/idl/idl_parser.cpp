@@ -341,14 +341,26 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
     return output;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob) {}
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob) {
     if (!obj.isEmpty()) {
         bob->append(fieldName, obj);
     }
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 BSONObj parseOwnedBSON(BSONElement element) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected field " << element.fieldNameStringData()
@@ -357,6 +369,10 @@ BSONObj parseOwnedBSON(BSONElement element) {
     return element.Obj().getOwned();
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 bool parseBoolean(BSONElement element) {
     uassert(ErrorCodes::TypeMismatch,
             str::stream() << "Expected field " << element.fieldNameStringData()

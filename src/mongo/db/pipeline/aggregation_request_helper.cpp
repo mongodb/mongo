@@ -241,6 +241,10 @@ PlanExecutorPipeline::ResumableScanType getResumableScanType(const AggregateComm
 
 // Custom serializers/deserializers for AggregateCommandRequest.
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
     const BSONElement& explainElem) {
     uassert(ErrorCodes::TypeMismatch,
@@ -254,6 +258,10 @@ boost::optional<mongo::ExplainOptions::Verbosity> parseExplainModeFromBSON(
     return boost::none;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
                             StringData fieldName,
                             BSONObjBuilder* builder) {
@@ -264,6 +272,10 @@ void serializeExplainToBSON(const mongo::ExplainOptions::Verbosity& explain,
     return;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& cursorElem) {
     if (cursorElem.eoo()) {
         SimpleCursorOptions cursor;
@@ -284,6 +296,10 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
     return cursor;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void serializeAggregateCursorToBSON(const mongo::SimpleCursorOptions& cursor,
                                     StringData fieldName,
                                     BSONObjBuilder* builder) {

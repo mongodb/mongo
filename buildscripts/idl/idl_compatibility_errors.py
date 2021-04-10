@@ -112,6 +112,12 @@ ERROR_ID_ADDED_ACCESS_CHECK_FIELD = "ID0067"
 ERROR_ID_COMMAND_STRICT_TRUE_ERROR = "ID0068"
 ERROR_ID_GENERIC_ARGUMENT_REMOVED = "ID0069"
 ERROR_ID_GENERIC_ARGUMENT_REMOVED_REPLY_FIELD = "ID0070"
+ERROR_ID_COMMAND_PARAMETER_SERIALIZER_NOT_EQUAL = "ID0071"
+ERROR_ID_COMMAND_SERIALIZER_NOT_EQUAL = "ID0072"
+ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL = "ID0073"
+ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL = "ID0074"
+ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL = "ID0075"
+ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL = "ID0076"
 
 # TODO (SERVER-55203): Remove SKIPPED_COMMANDS logic.
 # Any breaking changes added to API V1 before releasing 5.0 should be added to SKIPPED_COMMANDS to
@@ -730,6 +736,22 @@ class IDLCompatibilityContext(object):
                          "that is not equal in the old and new versions.") %
                         (command_name, field_name, type_name), file)
 
+    def add_reply_field_serializer_not_equal_error(self, command_name: str, field_name: str,
+                                                   type_name: str, file: str) -> None:
+        """Add an error about the old and new reply field serializer not being equal."""
+        self._add_error(ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL, command_name,
+                        ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
+                         "serializer that is not equal in the old and new versions.") %
+                        (command_name, field_name, type_name), file)
+
+    def add_reply_field_deserializer_not_equal_error(self, command_name: str, field_name: str,
+                                                     type_name: str, file: str) -> None:
+        """Add an error about the old and new reply field deserializer not being equal."""
+        self._add_error(ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL, command_name,
+                        ("'%s' has a reply field or sub-field '%s' of type '%s' that has "
+                         "deserializer that is not equal in the old and new versions.") %
+                        (command_name, field_name, type_name), file)
+
     def add_new_reply_field_type_not_enum_error(self, command_name: str, field_name: str,
                                                 new_field_type: str, old_field_type: str,
                                                 file: str) -> None:
@@ -862,6 +884,38 @@ class IDLCompatibilityContext(object):
             self._add_error(
                 ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL, command_name,
                 ("'%s' or its sub-struct has command type '%s' that has cpp_type "
+                 "that is not equal in the old and new versions") % (command_name, type_name), file)
+
+    def add_command_or_param_serializer_not_equal_error(self, command_name: str, type_name: str,
+                                                        file: str, field_name: Optional[str],
+                                                        is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """Add an error about the old and new command or param serializer not being equal."""
+        if is_command_parameter:
+            self._add_error(ERROR_ID_COMMAND_PARAMETER_SERIALIZER_NOT_EQUAL, command_name,
+                            ("'%s' has field or sub-field '%s' of type '%s' that has  "
+                             "serializer that is not equal in the old and new versions") %
+                            (command_name, field_name, type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_COMMAND_SERIALIZER_NOT_EQUAL, command_name,
+                ("'%s' or its sub-struct has command type '%s' that has serializer "
+                 "that is not equal in the old and new versions") % (command_name, type_name), file)
+
+    def add_command_or_param_deserializer_not_equal_error(self, command_name: str, type_name: str,
+                                                          file: str, field_name: Optional[str],
+                                                          is_command_parameter: bool) -> None:
+        # pylint: disable=too-many-arguments,invalid-name
+        """Add an error about the old and new command or param deserializer not being equal."""
+        if is_command_parameter:
+            self._add_error(ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL, command_name,
+                            ("'%s' has field or sub-field '%s' of type '%s' that has  "
+                             "deserializer that is not equal in the old and new versions") %
+                            (command_name, field_name, type_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL, command_name,
+                ("'%s' or its sub-struct has command type '%s' that has deserializer "
                  "that is not equal in the old and new versions") % (command_name, type_name), file)
 
     def add_old_reply_field_bson_any_error(self, command_name: str, field_name: str,

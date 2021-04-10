@@ -554,6 +554,23 @@ TEST(AggregationRequestTest, ShouldRejectNoCursorNoExplain) {
         aggregation_request_helper::parseFromBSONForTests(nss, cursorRequest.done()).getStatus());
 }
 
+TEST(AggregationRequestTest, ShouldRejectNonObjectCursor) {
+    NamespaceString nss("a.collection");
+    const BSONObj validRequest = fromjson(
+        "{aggregate: 'collection',"
+        "pipeline: [{$match: {a: 'abc'}}],"
+        "cursor: {},"
+        "isMapReduceCommand: true,"
+        "$db: 'a'}");
+    const BSONObj nonObjCursorCommand = fromjson("{cursor: 1}");
+    aggregationRequestParseFailureHelper(
+        nss, validRequest, nonObjCursorCommand, ErrorCodes::TypeMismatch);
+
+    const BSONObj arrayCursorCommand = fromjson("{cursor: []}");
+    aggregationRequestParseFailureHelper(
+        nss, validRequest, arrayCursorCommand, ErrorCodes::TypeMismatch);
+}
+
 TEST(AggregationRequestTest, ShouldRejectExplainTrueWithSeparateExplainArg) {
     NamespaceString nss("a.collection");
     const BSONObj validRequest = fromjson(
