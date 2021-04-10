@@ -720,6 +720,14 @@ MutableReplSetConfig ReplSetConfig::getMutable() const {
     return *static_cast<const MutableReplSetConfig*>(this);
 }
 
+bool ReplSetConfig::isImplicitDefaultWriteConcernMajority() const {
+    // Only set defaultWC to majority when writable voting members are strictly more than voting
+    // majority. This will prevent arbiters from keeping the primary elected while no majority write
+    // can be fulfilled.
+    auto arbiters = _totalVotingMembers - _writableVotingMembersCount;
+    return arbiters == 0 || _writableVotingMembersCount > _majorityVoteCount;
+}
+
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {
     for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
         if (it->getId() == id) {

@@ -196,6 +196,12 @@ ReadWriteConcernDefaults::_getDefault(OperationContext* opCtx) {
     return boost::none;
 }
 
+void ReadWriteConcernDefaults::setImplicitDefaultWriteConcernMajority(
+    bool newImplicitDefaultWCMajority) {
+    invariant(!_implicitDefaultWriteConcernMajority);
+    _implicitDefaultWriteConcernMajority = newImplicitDefaultWCMajority;
+}
+
 boost::optional<ReadWriteConcernDefaults::ReadConcern>
 ReadWriteConcernDefaults::getDefaultReadConcern(OperationContext* opCtx) {
     auto current = getDefault(opCtx);

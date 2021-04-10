@@ -524,6 +524,11 @@ public:
      */
     MutableReplSetConfig getMutable() const;
 
+    /**
+     * Returns true if implicit default write concern should be majority.
+     */
+    bool isImplicitDefaultWriteConcernMajority() const;
+
 private:
     /**
      * Sets replica set ID to 'defaultReplicaSetId' if 'cfg' does not contain an ID.

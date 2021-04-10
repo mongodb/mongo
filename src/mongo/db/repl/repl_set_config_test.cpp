@@ -43,14 +43,32 @@ namespace mongo {
 namespace repl {
 namespace {
 
-// Creates a bson document reprsenting a replica set config doc with the given members, and votes
-BSONObj createConfigDoc(int members, int voters = ReplSetConfig::kMaxVotingMembers) {
+// Creates a bson document representing a replica set config doc with the given members and votes.
+BSONObj createConfigDocWithVoters(int members, int voters = ReplSetConfig::kMaxVotingMembers) {
     str::stream configJson;
     configJson << "{_id:'rs0', version:1, protocolVersion:1, members:[";
     for (int i = 0; i < members; ++i) {
         configJson << "{_id:" << i << ", host:'node" << i << "'";
         if (i >= voters) {
             configJson << ", votes:0, priority:0";
+        }
+        configJson << "}";
+        if (i != (members - 1))
+            configJson << ",";
+    }
+    configJson << "]}";
+    return fromjson(configJson);
+}
+
+// Creates a bson document representing a replica set config doc with the given members and
+// arbiters.
+BSONObj createConfigDocWithArbiters(int members, int arbiters = 0) {
+    str::stream configJson;
+    configJson << "{_id:'rs0', version:1, protocolVersion:1, members:[";
+    for (int i = 0; i < members; ++i) {
+        configJson << "{_id:" << i << ", host:'node" << i << "'";
+        if (i < arbiters) {
+            configJson << ", arbiterOnly:true";
         }
         configJson << "}";
         if (i != (members - 1))
@@ -489,9 +507,10 @@ TEST(ReplSetConfig, ParseFailsWithTooFewVoters) {
 
 TEST(ReplSetConfig, ParseFailsWithTooManyVoters) {
     ReplSetConfig config(
-        ReplSetConfig::parse(createConfigDoc(8, ReplSetConfig::kMaxVotingMembers)));
+        ReplSetConfig::parse(createConfigDocWithVoters(8, ReplSetConfig::kMaxVotingMembers)));
     ASSERT_OK(config.validate());
-    config = ReplSetConfig::parse(createConfigDoc(8, ReplSetConfig::kMaxVotingMembers + 1));
+    config =
+        ReplSetConfig::parse(createConfigDocWithVoters(8, ReplSetConfig::kMaxVotingMembers + 1));
     ASSERT_NOT_OK(config.validate());
 }
 
@@ -1524,7 +1543,7 @@ TEST(ReplSetConfig, CheckMaximumNodesOkay) {
     ReplSetConfig configA;
     ReplSetConfig configB;
     const int memberCount = 50;
-    configA = ReplSetConfig::parse(createConfigDoc(memberCount));
+    configA = ReplSetConfig::parse(createConfigDocWithVoters(memberCount));
     configB = ReplSetConfig::parse(configA.toBSON());
     ASSERT_OK(configA.validate());
     ASSERT_OK(configB.validate());
@@ -1535,7 +1554,7 @@ TEST(ReplSetConfig, CheckBeyondMaximumNodesFailsValidate) {
     ReplSetConfig configA;
     ReplSetConfig configB;
     const int memberCount = 51;
-    configA = ReplSetConfig::parse(createConfigDoc(memberCount));
+    configA = ReplSetConfig::parse(createConfigDocWithVoters(memberCount));
     configB = ReplSetConfig::parse(configA.toBSON());
     ASSERT_NOT_OK(configA.validate());
     ASSERT_NOT_OK(configB.validate());
@@ -1998,6 +2017,35 @@ TEST(ReplSetConfig, ConfigVersionAndTermToString) {
     ASSERT_EQ(ConfigVersionAndTerm(1, 1).toString(), "{version: 1, term: 1}");
     ASSERT_EQ(ConfigVersionAndTerm(1, 2).toString(), "{version: 1, term: 2}");
     ASSERT_EQ(ConfigVersionAndTerm(1, -1).toString(), "{version: 1, term: -1}");
+}
+TEST(ReplSetConfig, IsImplicitDefaultWriteConcernMajority) {
+    ReplSetConfig config(ReplSetConfig::parse(createConfigDocWithArbiters(1, 0)));
+    ASSERT_OK(config.validate());
+    ASSERT(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(2, 0));
+    ASSERT_OK(config.validate());
+    ASSERT(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(3, 0));
+    ASSERT_OK(config.validate());
+    ASSERT(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(3, 1));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(4, 1));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(5, 1));
+    ASSERT_OK(config.validate());
+    ASSERT(config.isImplicitDefaultWriteConcernMajority());
+
+    config = ReplSetConfig::parse(createConfigDocWithArbiters(5, 2));
+    ASSERT_OK(config.validate());
+    ASSERT_FALSE(config.isImplicitDefaultWriteConcernMajority());
 }
 }  // namespace
 }  // namespace repl
