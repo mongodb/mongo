@@ -79,6 +79,10 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
 
 namespace write_ops {
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 bool readMultiDeleteProperty(const BSONElement& limitElement) {
     // Using a double to avoid throwing away illegal fractional portion. Don't want to accept 0.5
     // here
@@ -90,6 +94,10 @@ bool readMultiDeleteProperty(const BSONElement& limitElement) {
     return limit == 0;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder) {
     builder->append(fieldName, isMulti ? 0 : 1);
 }
@@ -328,6 +336,10 @@ write_ops::UpdateModification::UpdateModification(const BSONObj& update, Classic
 write_ops::UpdateModification::UpdateModification(std::vector<BSONObj> pipeline)
     : _update{PipelineUpdate{std::move(pipeline)}} {}
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 write_ops::UpdateModification write_ops::UpdateModification::parseFromBSON(BSONElement elem) {
     return UpdateModification(elem);
 }
@@ -363,6 +375,10 @@ write_ops::UpdateModification::Type write_ops::UpdateModification::type() const 
         _update);
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
                                                     BSONObjBuilder* bob) const {
 

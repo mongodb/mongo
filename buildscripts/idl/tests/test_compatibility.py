@@ -92,7 +92,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path, "compatibility_test_fail/new"), ["src"])
 
         self.assertTrue(error_collection.has_errors())
-        self.assertTrue(error_collection.count() == 164)
+        self.assertEqual(error_collection.count(), 170)
 
         invalid_api_version_new_error = error_collection.get_error_by_command_name(
             "invalidAPIVersionNew")
@@ -211,6 +211,21 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_CPP_TYPE_NOT_EQUAL)
         self.assertRegex(
             str(command_parameter_cpp_type_not_equal_error), "commandParameterCppTypeNotEqual")
+
+        command_parameter_serializer_not_equal_error = error_collection.get_error_by_command_name(
+            "commandParameterSerializerNotEqual")
+        self.assertEqual(command_parameter_serializer_not_equal_error.error_id,
+                         idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_SERIALIZER_NOT_EQUAL)
+        self.assertRegex(
+            str(command_parameter_serializer_not_equal_error), "commandParameterSerializerNotEqual")
+
+        command_parameter_deserializer_not_equal_error = error_collection.get_error_by_command_name(
+            "commandParameterDeserializerNotEqual")
+        self.assertTrue(command_parameter_deserializer_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL)
+        self.assertRegex(
+            str(command_parameter_deserializer_not_equal_error),
+            "commandParameterDeserializerNotEqual")
 
         old_command_parameter_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
             "oldCommandParamTypeBsonAnyUnstable")
@@ -612,6 +627,20 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_REPLY_FIELD_CPP_TYPE_NOT_EQUAL)
         self.assertRegex(str(reply_field_cpp_type_not_equal_error), "replyFieldCppTypeNotEqual")
 
+        reply_field_serializer_not_equal_error = error_collection.get_error_by_command_name(
+            "replyFieldSerializerNotEqual")
+        self.assertTrue(reply_field_serializer_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL)
+        self.assertRegex(
+            str(reply_field_serializer_not_equal_error), "replyFieldSerializerNotEqual")
+
+        reply_field_deserializer_not_equal_error = error_collection.get_error_by_command_name(
+            "replyFieldDeserializerNotEqual")
+        self.assertTrue(reply_field_deserializer_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL)
+        self.assertRegex(
+            str(reply_field_deserializer_not_equal_error), "replyFieldDeserializerNotEqual")
+
         new_reply_field_type_struct_one_error = error_collection.get_error_by_command_name(
             "newReplyFieldTypeStructRecursiveOne")
         self.assertTrue(new_reply_field_type_struct_one_error.error_id ==
@@ -686,6 +715,18 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(command_cpp_type_not_equal_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_COMMAND_CPP_TYPE_NOT_EQUAL)
         self.assertRegex(str(command_cpp_type_not_equal_error), "commandCppTypeNotEqual")
+
+        command_serializer_not_equal_error = error_collection.get_error_by_command_name(
+            "commandSerializerNotEqual")
+        self.assertTrue(command_serializer_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_SERIALIZER_NOT_EQUAL)
+        self.assertRegex(str(command_serializer_not_equal_error), "commandSerializerNotEqual")
+
+        command_deserializer_not_equal_error = error_collection.get_error_by_command_name(
+            "commandDeserializerNotEqual")
+        self.assertTrue(command_deserializer_not_equal_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL)
+        self.assertRegex(str(command_deserializer_not_equal_error), "commandDeserializerNotEqual")
 
         old_type_bson_any_unstable_error = error_collection.get_error_by_command_name(
             "oldTypeBsonAnyUnstable")

@@ -51,11 +51,17 @@ constexpr int kRetryableAndTxnBatchWriteBSONSizeOverhead =
 /**
  * Parses the 'limit' property of a delete entry, which has inverted meaning from the 'multi'
  * property of an update.
+ *
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
  */
 bool readMultiDeleteProperty(const BSONElement& limitElement);
 
 /**
  * Writes the 'isMulti' value as a limit property.
+ *
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
  */
 void writeMultiDeleteProperty(bool isMulti, StringData fieldName, BSONObjBuilder* builder);
 
@@ -100,8 +106,16 @@ public:
 
     /**
      * These methods support IDL parsing of the "u" field from the update command and OP_UPDATE.
+     *
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
      */
     static UpdateModification parseFromBSON(BSONElement elem);
+
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const;
 
     // When parsing from legacy OP_UPDATE messages, we receive the "u" field as an object. When an

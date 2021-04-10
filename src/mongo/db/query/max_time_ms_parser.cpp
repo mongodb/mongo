@@ -62,6 +62,10 @@ StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt) {
     return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt) {
     return static_cast<int32_t>(uassertStatusOK(parseMaxTimeMS(maxTimeMSElt)));
 }

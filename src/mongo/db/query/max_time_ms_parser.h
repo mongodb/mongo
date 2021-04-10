@@ -56,6 +56,10 @@ static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
  */
 StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt);
 
 }  // namespace mongo

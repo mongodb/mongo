@@ -33,6 +33,10 @@
 
 namespace mongo {
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 BSONObj parseHint(const BSONElement& element) {
     if (element.type() == BSONType::String) {
         return BSON("$hint" << element.valueStringData());
@@ -44,6 +48,10 @@ BSONObj parseHint(const BSONElement& element) {
     MONGO_UNREACHABLE;
 }
 
+/**
+ * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+ * break because of it.
+ */
 void serializeHintToBSON(const BSONObj& hint, StringData fieldName, BSONObjBuilder* builder) {
     if (hint.isEmpty())
         return;

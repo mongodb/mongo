@@ -47,6 +47,10 @@ namespace mongo {
  */
 class OptionalBool {
 public:
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     static OptionalBool parseFromBSON(BSONElement element) {
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << element.fieldNameStringData()
@@ -76,6 +80,9 @@ public:
 
     /**
      * Serialize this object as a field in a document. If _value is empty, omit the field.
+     *
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
      */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
         if (_value) {
@@ -85,6 +92,9 @@ public:
 
     /**
      * Serialize this object as an element of a BSON array. If _value is empty, omit the entry.
+     *
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
      */
     void serializeToBSON(BSONArrayBuilder* builder) const {
         if (_value) {
@@ -112,6 +122,10 @@ private:
  */
 class IDLAnyType {
 public:
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     static IDLAnyType parseFromBSON(const BSONElement& element) {
         return IDLAnyType(element);
     }
@@ -119,10 +133,18 @@ public:
     IDLAnyType() = default;
     IDLAnyType(const BSONElement& element) : _element(element) {}
 
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
         builder->appendAs(_element, fieldName);
     }
 
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     void serializeToBSON(BSONArrayBuilder* builder) const {
         builder->append(_element);
     }
@@ -141,6 +163,10 @@ protected:
  */
 class IDLAnyTypeOwned : public IDLAnyType {
 public:
+    /**
+     * IMPORTANT: The method should not be modified, as API version input/output guarantees could
+     * break because of it.
+     */
     static IDLAnyTypeOwned parseFromBSON(const BSONElement& element) {
         return IDLAnyTypeOwned(element);
     }
