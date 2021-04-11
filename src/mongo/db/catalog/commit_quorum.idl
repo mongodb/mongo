@@ -33,7 +33,13 @@ global:
 
 types:
     CommitQuorum:
-        bson_serialization_type: any
+        # Union of string and safeInt.
+        bson_serialization_type:
+            - long
+            - int
+            - decimal
+            - double
+            - string
         description: "CommitQuorumOptions defines the required quorum for the index builds to 
                       commit."
         cpp_type: "mongo::CommitQuorumOptions"
