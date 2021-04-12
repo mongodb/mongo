@@ -56,6 +56,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -70,6 +71,19 @@ MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
+
+namespace {
+
+size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
+    if (numIndexSpecs == 0) {
+        return 0;
+    }
+
+    return static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
+        numIndexSpecs;
+}
+
+}  // namespace
 
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
@@ -200,12 +214,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
         std::vector<BSONObj> indexInfoObjs;
         indexInfoObjs.reserve(indexSpecs.size());
-        std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
-        if (!indexSpecs.empty()) {
-            eachIndexBuildMaxMemoryUsageBytes =
-                static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
-                indexSpecs.size();
-        }
+        std::size_t eachIndexBuildMaxMemoryUsageBytes =
+            getEachIndexBuildMaxMemoryUsageBytes(indexSpecs.size());
 
         // Initializing individual index build blocks below performs un-timestamped writes to the
         // durable catalog. It's possible for the onInit function to set multiple timestamps
@@ -405,96 +415,97 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         collection.restore();
     }
 
-    Timer t;
-
-    unsigned long long n = 0;
-
-    PlanYieldPolicy::YieldPolicy yieldPolicy;
-    if (isBackgroundBuilding()) {
-        yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
-    } else {
-        yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
-    }
-    auto exec = collection->makePlanExecutor(
-        opCtx, collection, yieldPolicy, Collection::ScanDirection::kForward, resumeAfterRecordId);
-
     // Hint to the storage engine that this collection scan should not keep data in the cache.
     bool readOnce = useReadOnceCursorsForIndexBuilds.load();
     opCtx->recoveryUnit()->setReadOnce(readOnce);
 
-    try {
-        // The phase will be kCollectionScan when resuming an index build from the collection scan
-        // phase.
-        invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
-                      _phase == IndexBuildPhaseEnum::kCollectionScan,
-                  IndexBuildPhase_serializer(_phase).toString());
-        _phase = IndexBuildPhaseEnum::kCollectionScan;
+    size_t numScanRestarts = 0;
+    bool restartCollectionScan = false;
+    do {
+        restartCollectionScan = false;
+        progress->reset(collection->numRecords(opCtx));
+        Timer timer;
 
-        BSONObj objToIndex;
-        RecordId loc;
-        PlanExecutor::ExecState state;
-        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
-               MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
-            opCtx->checkForInterrupt();
+        try {
+            // Resumable index builds can only be resumed prior to the oplog recovery phase of
+            // startup. When restarting the collection scan, any saved index build progress is lost.
+            _doCollectionScan(opCtx,
+                              collection,
+                              numScanRestarts == 0 ? resumeAfterRecordId : boost::none,
+                              &progress);
 
-            if (PlanExecutor::ADVANCED != state) {
-                continue;
+            LOGV2(20391,
+                  "Index build: collection scan done",
+                  "buildUUID"_attr = _buildUUID,
+                  "collectionUUID"_attr = _collectionUUID,
+                  logAttrs(collection->ns()),
+                  "totalRecords"_attr = progress->hits(),
+                  "readSource"_attr =
+                      RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
+                  "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())));
+        } catch (DBException& ex) {
+            if (ex.code() == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+                // Forced replica set re-configs will clear the majority committed snapshot,
+                // which may be used by the collection scan. The collection scan will restart
+                // from the beginning in this case.
+                restartCollectionScan = true;
+                logAndBackoff(
+                    5470300,
+                    ::mongo::logv2::LogComponent::kIndex,
+                    logv2::LogSeverity::Info(),
+                    ++numScanRestarts,
+                    "Index build: collection scan restarting",
+                    "buildUUID"_attr = _buildUUID,
+                    "collectionUUID"_attr = _collectionUUID,
+                    "totalRecords"_attr = progress->hits(),
+                    "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())),
+                    "phase"_attr = IndexBuildPhase_serializer(_phase),
+                    "collectionScanPosition"_attr = _lastRecordIdInserted,
+                    "readSource"_attr =
+                        RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
+                    "error"_attr = ex);
+
+                _lastRecordIdInserted = boost::none;
+                for (auto& index : _indexes) {
+                    index.bulk = index.real->initiateBulk(
+                        getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
+                        /*stateInfo=*/boost::none,
+                        collection->ns().db());
+                }
+            } else {
+                if (ex.isA<ErrorCategory::Interruption>() ||
+                    ex.isA<ErrorCategory::ShutdownError>() ||
+                    ErrorCodes::IndexBuildAborted == ex.code()) {
+                    // If the collection scan is stopped due to an interrupt or shutdown event, we
+                    // leave the internal state intact to ensure we have the correct information for
+                    // resuming this index build during startup and rollback.
+                } else {
+                    // Restore pre-collection scan state.
+                    _phase = IndexBuildPhaseEnum::kInitialized;
+                }
+
+                auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+                LOGV2(4984704,
+                      "Index build: collection scan stopped",
+                      "buildUUID"_attr = _buildUUID,
+                      "collectionUUID"_attr = _collectionUUID,
+                      "totalRecords"_attr = progress->hits(),
+                      "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())),
+                      "phase"_attr = IndexBuildPhase_serializer(_phase),
+                      "collectionScanPosition"_attr = _lastRecordIdInserted,
+                      "readSource"_attr = RecoveryUnit::toString(readSource),
+                      "error"_attr = ex);
+                ex.addContext(str::stream()
+                              << "collection scan stopped. totalRecords: " << progress->hits()
+                              << "; durationMillis: "
+                              << duration_cast<Milliseconds>(Seconds(timer.seconds()))
+                              << "; phase: " << IndexBuildPhase_serializer(_phase)
+                              << "; collectionScanPosition: " << _lastRecordIdInserted
+                              << "; readSource: " << RecoveryUnit::toString(readSource));
+                return ex.toStatus();
             }
-
-            progress->setTotalWhileRunning(collection->numRecords(opCtx));
-
-            uassertStatusOK(
-                _failPointHangDuringBuild(opCtx,
-                                          &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
-                                          "before",
-                                          objToIndex,
-                                          n));
-
-            // The external sorter is not part of the storage engine and therefore does not need a
-            // WriteUnitOfWork to write keys.
-            uassertStatusOK(_insert(opCtx, objToIndex, loc));
-
-            _failPointHangDuringBuild(opCtx,
-                                      &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
-                                      "after",
-                                      objToIndex,
-                                      n)
-                .ignore();
-
-            // Go to the next document.
-            progress->hit();
-            n++;
         }
-    } catch (DBException& ex) {
-        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>() ||
-            ErrorCodes::IndexBuildAborted == ex.code()) {
-            // If the collection scan is stopped because due to an interrupt or shutdown event, we
-            // leave the internal state intact to ensure we have the correct information for
-            // resuming this index build during startup and rollback.
-        } else {
-            // Restore pre-collection scan state.
-            _phase = IndexBuildPhaseEnum::kInitialized;
-        }
-
-        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-        LOGV2(4984704,
-              "Index build: collection scan stopped",
-              "buildUUID"_attr = _buildUUID,
-              "collectionUUID"_attr = _collectionUUID,
-              "totalRecords"_attr = n,
-              "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())),
-              "phase"_attr = IndexBuildPhase_serializer(_phase),
-              "collectionScanPosition"_attr = _lastRecordIdInserted,
-              "readSource"_attr = RecoveryUnit::toString(readSource),
-              "error"_attr = ex);
-        ex.addContext(str::stream()
-                      << "collection scan stopped. totalRecords: " << n
-                      << "; durationMillis: " << duration_cast<Milliseconds>(Seconds(t.seconds()))
-                      << "; phase: " << IndexBuildPhase_serializer(_phase)
-                      << "; collectionScanPosition: " << _lastRecordIdInserted
-                      << "; readSource: " << RecoveryUnit::toString(readSource));
-        return ex.toStatus();
-    }
+    } while (restartCollectionScan);
 
     if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
         LOGV2(20389,
@@ -520,28 +531,77 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             opCtx->lockState()->restoreLockState(opCtx, lockInfo);
             opCtx->recoveryUnit()->abandonSnapshot();
         } else {
-            invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for foreground index builds");
+            invariant(false,
+                      "the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for "
+                      "foreground index builds");
         }
         collection.restore();
     }
 
-    progress->finished();
-
-    LOGV2(20391,
-          "Index build: collection scan done",
-          "buildUUID"_attr = _buildUUID,
-          "collectionUUID"_attr = _collectionUUID,
-          logAttrs(collection->ns()),
-          "totalRecords"_attr = n,
-          "readSource"_attr =
-              RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
-          "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
+    progress.finished();
 
     Status ret = dumpInsertsFromBulk(opCtx, collection);
     if (!ret.isOK())
         return ret;
 
     return Status::OK();
+}
+
+void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
+                                        const CollectionPtr& collection,
+                                        boost::optional<RecordId> resumeAfterRecordId,
+                                        ProgressMeterHolder* progress) {
+    PlanYieldPolicy::YieldPolicy yieldPolicy;
+    if (isBackgroundBuilding()) {
+        yieldPolicy = PlanYieldPolicy::YieldPolicy::YIELD_AUTO;
+    } else {
+        yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
+    }
+
+    auto exec = collection->makePlanExecutor(
+        opCtx, collection, yieldPolicy, Collection::ScanDirection::kForward, resumeAfterRecordId);
+
+    // The phase will be kCollectionScan when resuming an index build from the collection
+    // scan phase.
+    invariant(_phase == IndexBuildPhaseEnum::kInitialized ||
+                  _phase == IndexBuildPhaseEnum::kCollectionScan,
+              IndexBuildPhase_serializer(_phase).toString());
+    _phase = IndexBuildPhaseEnum::kCollectionScan;
+
+    BSONObj objToIndex;
+    RecordId loc;
+    PlanExecutor::ExecState state;
+    while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
+           MONGO_unlikely(hangAfterStartingIndexBuild.shouldFail())) {
+        opCtx->checkForInterrupt();
+
+        if (PlanExecutor::ADVANCED != state) {
+            continue;
+        }
+
+        progress->get()->setTotalWhileRunning(collection->numRecords(opCtx));
+
+        uassertStatusOK(
+            _failPointHangDuringBuild(opCtx,
+                                      &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
+                                      "before",
+                                      objToIndex,
+                                      (*progress)->hits()));
+
+        // The external sorter is not part of the storage engine and therefore does not need
+        // a WriteUnitOfWork to write keys.
+        uassertStatusOK(_insert(opCtx, objToIndex, loc));
+
+        _failPointHangDuringBuild(opCtx,
+                                  &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
+                                  "after",
+                                  objToIndex,
+                                  (*progress)->hits())
+            .ignore();
+
+        // Go to the next document.
+        progress->hit();
+    }
 }
 
 Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,

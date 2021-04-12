@@ -60,6 +60,7 @@ class CollectionPtr;
 class MatchExpression;
 class NamespaceString;
 class OperationContext;
+class ProgressMeterHolder;
 
 /**
  * Builds one or more indexes.
@@ -311,6 +312,15 @@ private:
                                      unsigned long long iteration) const;
 
     Status _insert(OperationContext* opCtx, const BSONObj& wholeDocument, const RecordId& loc);
+
+    /**
+     * Performs a collection scan on the given collection and inserts the relevant index keys into
+     * the external sorter.
+     */
+    void _doCollectionScan(OperationContext* opCtx,
+                           const CollectionPtr& collection,
+                           boost::optional<RecordId> resumeAfterRecordId,
+                           ProgressMeterHolder* progress);
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
