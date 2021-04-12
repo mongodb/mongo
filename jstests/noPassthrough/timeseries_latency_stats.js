@@ -15,19 +15,24 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+const conn = MongoRunner.runMongod();
+
+if (!TimeseriesTest.timeseriesCollectionsEnabled(conn)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
-const coll = db.timeseries_latency_stats;
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+const testDB = conn.getDB('test');
+const coll = testDB.timeseries_latency_stats;
+const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
 coll.drop();
 
 const timeFieldName = 'time';
-assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
-assert.contains(bucketsColl.getName(), db.getCollectionNames());
+assert.commandWorked(
+    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 const getLatencyStats = () => {
     const stats = coll.aggregate([{$collStats: {latencyStats: {}}}]).next();
@@ -54,4 +59,6 @@ for (let i = 0; i < reps; ++i) {
 const stats3 = getLatencyStats();
 assert.eq(stats3.ops, 1 + reps);
 assert.gt(stats3.latency, stats2.latency);
+
+MongoRunner.stopMongod(conn);
 })();
