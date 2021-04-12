@@ -34,6 +34,7 @@ env.Library(
         'cluster_write.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/lasterror',
         'query/cluster_query',
         'write_ops/cluster_write_ops',
     ],
@@ -501,6 +502,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
         '$BUILD_DIR/mongo/db/initialize_server_security_state',
+        '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',

@@ -524,6 +524,8 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return {ErrorCodes::BadValue, "shard name cannot be empty"};
     }
 
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
     // Only one addShard operation can be in progress at a time.
     Lock::ExclusiveLock lk(opCtx->lockState(), _kShardMembershipLock);
 
@@ -543,8 +545,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return existingShard.getValue()->getName();
     }
 
-    const std::shared_ptr<Shard> shard{
-        Grid::get(opCtx)->shardRegistry()->createConnection(shardConnectionString)};
+    const std::shared_ptr<Shard> shard{shardRegistry->createConnection(shardConnectionString)};
     auto targeter = shard->getTargeter();
 
     auto stopMonitoringGuard = makeGuard([&] {
@@ -586,7 +587,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Check that the shard candidate does not have a local config.system.sessions collection
     auto res = _dropSessionsCollection(opCtx, targeter);
-
     if (!res.isOK()) {
         return res.withContext(
             "can't add shard with a local copy of config.system.sessions, please drop this "
@@ -626,7 +626,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     // Use the _addShard command to add the shard, which in turn inserts a shardIdentity document
     // into the shard and triggers sharding state initialization.
     auto addShardStatus = runCmdOnNewShard(addShardCmd.toBSON({}));
-
     if (!addShardStatus.isOK()) {
         return addShardStatus;
     }
@@ -695,34 +694,33 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                   "error"_attr = result.reason());
             return result;
         }
-    }
 
-    // Add all databases which were discovered on the new shard
-    for (const auto& dbName : dbNamesStatus.getValue()) {
-        boost::optional<Timestamp> clusterTime;
-        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            const auto now = VectorClock::get(opCtx)->getTime();
-            clusterTime = now.clusterTime().asTimestamp();
-        }
+        // Add all databases which were discovered on the new shard
+        for (const auto& dbName : dbNamesStatus.getValue()) {
+            boost::optional<Timestamp> clusterTime;
+            if (DatabaseEntryFormat::get(fcvRegion) == DatabaseEntryFormat::kUUIDandTimestamp) {
+                const auto now = VectorClock::get(opCtx)->getTime();
+                clusterTime = now.clusterTime().asTimestamp();
+            }
 
-        DatabaseType dbt(
-            dbName, shardType.getName(), false, DatabaseVersion(UUID::gen(), clusterTime));
+            DatabaseType dbt(
+                dbName, shardType.getName(), false, DatabaseVersion(UUID::gen(), clusterTime));
 
-        {
-            const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-                opCtx,
-                DatabaseType::ConfigNS,
-                BSON(DatabaseType::name(dbName)),
-                dbt.toBSON(),
-                true,
-                ShardingCatalogClient::kLocalWriteConcern);
-            if (!status.isOK()) {
-                LOGV2(21944,
-                      "Adding shard {connectionString} even though could not add database {db}",
-                      "Adding shard even though we could not add database",
-                      "connectionString"_attr = shardConnectionString.toString(),
-                      "db"_attr = dbName);
+            {
+                const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                    opCtx,
+                    DatabaseType::ConfigNS,
+                    BSON(DatabaseType::name(dbName)),
+                    dbt.toBSON(),
+                    true,
+                    ShardingCatalogClient::kLocalWriteConcern);
+                if (!status.isOK()) {
+                    LOGV2(21944,
+                          "Adding shard {connectionString} even though could not add database {db}",
+                          "Adding shard even though we could not add database",
+                          "connectionString"_attr = shardConnectionString.toString(),
+                          "db"_attr = dbName);
+                }
             }
         }
     }
@@ -736,7 +734,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // Ensure the added shard is visible to this process.
-    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     shardRegistry->reload(opCtx);
     if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
         return {ErrorCodes::OperationFailed,

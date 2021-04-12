@@ -31,4 +31,22 @@
 
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 
-namespace mongo {}  // namespace mongo
+namespace mongo {
+
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using FCVersion = FeatureCompatibility::Version;
+
+DatabaseEntryFormat::Format DatabaseEntryFormat::get(const FixedFCVRegion& fcvRegion) {
+    switch (fcvRegion->getVersion()) {
+        case FCVersion::kUpgradingFrom44To50:
+        case FCVersion::kUpgradingFrom49To50:
+        case FCVersion::kVersion50:
+            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
+                ? Format::kUUIDandTimestamp
+                : Format::kUUIDOnly;
+        default:
+            return Format::kUUIDOnly;
+    }
+}
+
+}  // namespace mongo
