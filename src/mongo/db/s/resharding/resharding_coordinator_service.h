@@ -42,7 +42,6 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
-
 namespace resharding {
 
 struct ParticipantShardsAndChunks {
@@ -78,10 +77,8 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc);
-}  // namespace resharding
 
-class ServiceContext;
-class OperationContext;
+}  // namespace resharding
 
 /**
  * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.

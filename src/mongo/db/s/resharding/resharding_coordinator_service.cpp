@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 
 #include "mongo/db/auth/authorization_session_impl.h"
@@ -429,7 +431,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
     if (expectedNumModified) {
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
     }
-}  // namespace
+}
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                                      std::vector<ChunkType> initialChunks,
@@ -545,6 +547,7 @@ void executeMetadataChangesInTxn(
                                                 changeMetadataFunc(opCtx, txnNumber);
                                             });
 }
+
 }  // namespace
 
 namespace resharding {
@@ -834,6 +837,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
+
 }  // namespace resharding
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
@@ -1188,8 +1192,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
                                                       std::move(shardsAndChunks.initialChunks),
                                                       std::move(zones));
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
-};
-
+}
 
 void emplaceApproxBytesToCopyIfExists(ReshardingCoordinatorDocument& coordinatorDoc,
                                       boost::optional<ReshardingApproxCopySize> approxCopySize) {
@@ -1385,7 +1388,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
     return Status::OK();
-};
+}
 
 ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsDone(

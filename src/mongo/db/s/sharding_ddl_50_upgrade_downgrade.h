@@ -29,11 +29,20 @@
 
 #pragma once
 
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/s/sharding_ddl_50_upgrade_downgrade_gen.h"
 
 namespace mongo {
 
-// TODO SERVER-56063: Add the DatabaseEntryFormat selector
+struct DatabaseEntryFormat {
+    enum Format {
+        kUUIDOnly,
+        kUUIDandTimestamp,
+    };
+
+    static Format get(const FixedFCVRegion& fcvRegion);
+};
+
 // TODO SERVER-56065: Add the CollectionEntryFormat selector
 
 }  // namespace mongo

@@ -199,9 +199,10 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                 optPrimaryShard ? *optPrimaryShard
                                 : selectShardForNewDatabase(opCtx, shardRegistry)));
 
+            FixedFCVRegion fcvRegion(opCtx);
+
             boost::optional<Timestamp> clusterTime;
-            if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
+            if (DatabaseEntryFormat::get(fcvRegion) == DatabaseEntryFormat::kUUIDandTimestamp) {
                 const auto now = VectorClock::get(opCtx)->getTime();
                 clusterTime = now.clusterTime().asTimestamp();
             }
