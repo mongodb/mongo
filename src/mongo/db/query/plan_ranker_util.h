@@ -143,8 +143,12 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         // For SBE, we need to store a serialized winning plan within the ranking decision to be
         // able to included it into the explain output for a cached plan stats, since we cannot
         // reconstruct it from a PlanStageStats tree.
-        auto explainer = plan_explainer_factory::make(
-            candidates[0].root.get(), &candidates[0].data, candidates[0].solution.get());
+
+        // Get the winning candidate's index to get the correct winning plan.
+        size_t winnerIdx = scoresAndCandidateIndices[0].second;
+        auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                      &candidates[winnerIdx].data,
+                                                      candidates[winnerIdx].solution.get());
         auto&& [stats, _] =
             explainer->getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
         SBEStatsDetails details;
