@@ -134,17 +134,11 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+            validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
+
             uassert(ErrorCodes::CommandFailed,
                     "Source and destination collections must be on the same database.",
                     fromNss.db() == toNss.db());
-
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Can't rename from internal namespace: " << fromNss,
-                    renameIsAllowedOnNS(fromNss));
-
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Can't rename to internal namespace: " << toNss,
-                    renameIsAllowedOnNS(toNss));
 
             auto coordinatorDoc = RenameCollectionCoordinatorDocument();
             coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
