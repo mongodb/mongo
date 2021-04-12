@@ -132,6 +132,8 @@ all:
     test_file: jstests/core/geo_near_point_query.js
   - ticket: SERVER-48179
     test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
+  - ticket: SERVER-55725
+    test_file: jstests/sharding/time_zone_info_mongos.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
