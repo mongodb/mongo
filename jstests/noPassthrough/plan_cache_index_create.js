@@ -3,11 +3,12 @@
  * index available to queries that had a cached plan prior to the build.
  * @tags: [
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {
 "use strict";
+
+load('jstests/libs/analyze_plan.js');  // For getCachedPlan().
 
 const dbName = "test";
 const collName = "coll";
@@ -36,9 +37,12 @@ function getIndexNameForCachedPlan(coll, query) {
     const plans = coll.getPlanCache().list([{$match: match}]);
     assert.eq(plans.length, 1, coll.getPlanCache().list());
     assert(plans[0].hasOwnProperty("cachedPlan"), plans);
-    assert(plans[0].cachedPlan.hasOwnProperty("inputStage"), plans);
-    assert(plans[0].cachedPlan.inputStage.hasOwnProperty("indexName"), plans);
-    return plans[0].cachedPlan.inputStage.indexName;
+
+    const cachedPlan = getCachedPlan(plans[0].cachedPlan);
+    assert(cachedPlan.hasOwnProperty("inputStage"), plans);
+    assert(cachedPlan.inputStage.hasOwnProperty("indexName"), plans);
+
+    return cachedPlan.inputStage.indexName;
 }
 
 function runTest({rst, readDB, writeDB}) {
