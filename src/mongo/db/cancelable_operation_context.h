@@ -43,8 +43,8 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Wrapper class around an OperationContext that calls markKilled(ErrorCodes::CallbackCanceled) when
- * the supplied CancellationToken is canceled.
+ * Wrapper class around an OperationContext that calls markKilled(ErrorCodes::Interrupted) when the
+ * supplied CancellationToken is canceled.
  *
  * This class is useful for having an OperationContext be interrupted when a CancellationToken is
  * canceled. Note that OperationContext::getCancellationToken() is instead useful for having a
@@ -52,10 +52,10 @@ class OperationContext;
  * enables bridging between OperationContext interruption and CancellationToken cancellation
  * arbitrarily.
  *
- * IMPORTANT: Executors are allowed to refuse work. markKilled(ErrorCodes::CallbackCanceled) won't
- * be called when the supplied CancellationToken is canceled if the task executor has already been
- * shut down, for example. Use a task executor bound to the process lifetime if you must guarantee
- * that the OperationContext is interrupted when the CancellationToken is canceled.
+ * IMPORTANT: Executors are allowed to refuse work. markKilled(ErrorCodes::Interrupted) won't be
+ * called when the supplied CancellationToken is canceled if the task executor has already been shut
+ * down, for example. Use a task executor bound to the process lifetime if you must guarantee that
+ * the OperationContext is interrupted when the CancellationToken is canceled.
  */
 class CancelableOperationContext {
 public:
