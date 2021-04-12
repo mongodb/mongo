@@ -35,11 +35,15 @@ rst.nodes.forEach(conn => {
 assert.commandWorked(collection.insert({_id: 1, comment: "should be seen by find command"}));
 assert.commandWorked(collection.insert({_id: 3, comment: "should be seen by find command"}));
 
-const earlierClusterTime = db.getSession().getOperationTime();
-
-assert.commandWorked(collection.insert({_id: 5, comment: "should be seen by getMore command"}));
-
-const clusterTime = db.getSession().getOperationTime();
+// Insert with w: majority so that the insert timestamp is majority committed and can be used as the
+// $_internalReadAtClusterTime for dbHash.
+const clusterTime = assert
+                        .commandWorked(db.runCommand({
+                            insert: collName,
+                            documents: [{_id: 5, comment: "should be seen by getMore command"}],
+                            writeConcern: {w: "majority"}
+                        }))
+                        .operationTime;
 
 let res = assert.commandWorked(db.runCommand({dbHash: 1}));
 const hashAfterOriginalInserts = {
