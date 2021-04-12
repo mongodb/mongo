@@ -1,5 +1,8 @@
 // Tests that an $merge stage is able to default the "on" fields to the correct value - even if one
 // or more of the involved nodes has a stale cache of the routing information.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

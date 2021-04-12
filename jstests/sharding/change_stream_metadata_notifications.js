@@ -1,6 +1,10 @@
 // Tests metadata notifications of change streams on sharded collections.
 // Legacy getMore fails after dropping the database that the original cursor is on.
-// @tags: [requires_find_command, requires_majority_read_concern]
+// @tags: [
+//   requires_find_command,
+//   requires_majority_read_concern,
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 

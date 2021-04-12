@@ -10078,6 +10078,14 @@ buildvariants:
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: noPassthrough_gen
   - name: replica_sets
+  - name: sharding_csrs_continuous_config_stepdown_gen
+  - name: sharding_ese_gcm_gen
+  - name: sharding_ese_gen
+  - name: sharding_gen
+  - name: sharding_last_lts_mongos_and_mixed_shards_gen
+  - name: sharding_max_mirroring_gen
+  - name: sharding_multiversion_gen
+  - name: sharding_update_v1_oplog_gen
     distros:
     - rhel80-medium
 

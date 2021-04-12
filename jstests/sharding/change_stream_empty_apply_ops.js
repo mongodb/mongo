@@ -4,6 +4,7 @@
 // SERVER-50769.
 // @tags: [
 //   requires_sharding,
+//   sbe_incompatible,
 //   uses_change_streams,
 //   uses_multi_shard_transaction,
 //   uses_transactions,

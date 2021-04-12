@@ -1,8 +1,9 @@
 // Tests that change streams is able to find and return results from new shards which are added
 // during cursor establishment.
 // @tags: [
+//   requires_majority_read_concern,
+//   sbe_incompatible,
 //   uses_change_streams,
-//   requires_majority_read_concern
 // ]
 (function() {
 'use strict';

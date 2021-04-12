@@ -1,5 +1,8 @@
 // Tests that an aggregation error which occurs on a sharded collection will send an error message
 // containing the host and port of the shard where the error occurred.
+// @tags: [
+//   sbe_incompatible,
+// ]
 (function() {
 "use strict";
 
