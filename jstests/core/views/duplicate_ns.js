@@ -6,6 +6,8 @@
  *   assumes_superuser_permissions,
  *   # applyOps is not retryable.
  *   requires_non_retryable_writes,
+ *   # Having duplicate namespaces is not supported and will cause tenant migrations to fail.
+ *   tenant_migration_incompatible,
  * ]
  */
 (function() {
