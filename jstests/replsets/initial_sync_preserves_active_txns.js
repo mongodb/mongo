@@ -8,7 +8,6 @@
  * field of documents in the config.transactions collection.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

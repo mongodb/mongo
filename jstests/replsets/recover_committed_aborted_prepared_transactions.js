@@ -5,7 +5,6 @@
  * and aborted between the stable timestamp and the common point.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

@@ -6,7 +6,6 @@
  * need to be applied other than the prepare transaction oplog entries.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

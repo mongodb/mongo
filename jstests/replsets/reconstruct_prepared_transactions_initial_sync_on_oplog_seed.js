@@ -9,7 +9,6 @@
  * entry is visible and the prepared transaction is properly reconstructed.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

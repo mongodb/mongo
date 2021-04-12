@@ -13,7 +13,6 @@
  * and be able to commit/abort them again.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]
