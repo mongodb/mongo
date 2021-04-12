@@ -6,7 +6,6 @@
  *   # Multiversion testing does not support tests that kill and restart nodes.
  *   multiversion_incompatible,
  *   requires_persistence,
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

@@ -3,7 +3,6 @@
  * stable timestamp at the end of rollback recovery.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

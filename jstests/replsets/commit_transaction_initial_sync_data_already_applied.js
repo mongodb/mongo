@@ -10,7 +10,6 @@
  * that operations from a transaction are executed in separate storage transactions.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

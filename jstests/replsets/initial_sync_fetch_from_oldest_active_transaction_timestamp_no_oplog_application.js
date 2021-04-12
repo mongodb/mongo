@@ -15,7 +15,6 @@
  * will cause initial sync to fail.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]

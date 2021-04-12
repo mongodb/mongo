@@ -11,7 +11,6 @@
  * fetches all the oplog entries it needs to reconstruct the prepared transaction.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_prepare_transaction,
  *   uses_transactions,
  * ]
