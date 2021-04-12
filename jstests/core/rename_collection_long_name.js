@@ -3,7 +3,13 @@
 // that is greater than 120 chars. To do this we create a long index name and try
 // and rename the collection to one with a much longer name. We use the test database
 // by default and we add this here to ensure we are using it
-// @tags: [requires_non_retryable_commands, assumes_unsharded_collection]
+// @tags: [
+//   # renameCollection is not supported on sharded collections
+//   assumes_unsharded_collection,
+//   requires_non_retryable_commands,
+//   assumes_unsharded_collection,
+//   assumes_no_implicit_index_creation,
+// ]
 
 (function() {
 'use strict';

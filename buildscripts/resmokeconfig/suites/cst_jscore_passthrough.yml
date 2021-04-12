@@ -372,7 +372,7 @@ selector:
   - jstests/core/removea.js
   - jstests/core/removeb.js
   - jstests/core/removec.js
-  - jstests/core/rename5.js
+  - jstests/core/rename_operator_missing_source.js
   - jstests/core/role_management_helpers.js
   - jstests/core/rollback_index_drop.js
   - jstests/core/server1470.js

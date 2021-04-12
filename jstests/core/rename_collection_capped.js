@@ -1,35 +1,18 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount, requires_capped]
-
-admin = db.getMongo().getDB("admin");
+/**
+ * Test renaming capped collection
+ *
+ * @tags: [
+ *   # renameCollection is not supported on sharded collections
+ *   assumes_unsharded_collection,
+ *   requires_non_retryable_commands,
+ *   requires_capped,
+ *   requires_collstats,
+ * ]
+ */
 
 a = db.jstests_rename_a;
 b = db.jstests_rename_b;
 c = db.jstests_rename_c;
-
-a.drop();
-b.drop();
-c.drop();
-
-a.save({a: 1});
-a.save({a: 2});
-a.createIndex({a: 1});
-a.createIndex({b: 1});
-
-c.save({a: 100});
-assert.commandFailed(
-    admin.runCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_c"}));
-
-assert.commandWorked(
-    admin.runCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}));
-assert.eq(0, a.find().count());
-
-assert.eq(2, b.find().count());
-assert(db.getCollectionNames().indexOf("jstests_rename_b") >= 0);
-assert(db.getCollectionNames().indexOf("jstests_rename_a") < 0);
-assert.eq(3, db.jstests_rename_b.getIndexes().length);
-assert.eq(0, db.jstests_rename_a.getIndexes().length);
-
-// now try renaming a capped collection
 
 a.drop();
 b.drop();
@@ -44,8 +27,8 @@ for (i = 0.1; i < 10; ++i) {
     a.save({i: i});
 }
 assert.commandWorked(
-    admin.runCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}));
-assert.eq(1, b.count({i: 9.1}));
+    db.adminCommand({renameCollection: "test.jstests_rename_a", to: "test.jstests_rename_b"}));
+assert.eq(1, b.countDocuments({i: 9.1}));
 printjson(b.stats());
 for (i = 10.1; i < 1000; ++i) {
     b.save({i: i});
@@ -54,8 +37,8 @@ printjson(b.stats());
 // res = b.find().sort({i:1});
 // while (res.hasNext()) printjson(res.next());
 
-assert.eq(1, b.count({i: i - 1}));  // make sure last is there
-assert.eq(0, b.count({i: 9.1}));    // make sure early one is gone
+assert.eq(1, b.countDocuments({i: i - 1}));  // make sure last is there
+assert.eq(0, b.countDocuments({i: 9.1}));    // make sure early one is gone
 
 assert(db.getCollectionNames().indexOf("jstests_rename_b") >= 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_a") < 0);
