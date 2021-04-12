@@ -145,6 +145,26 @@ const runTest = function(keyForCreate, hint) {
     assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
     assert.eq(1, coll.find().hint(hint).toArray().length);
     assert.commandWorked(coll.dropIndex('hide3'), 'failed to drop index: hide3');
+
+    // Check that user hints on queries will be allowed and will reference the indexes on the
+    // buckets collection directly.
+    assert.commandWorked(coll.createIndex(keyForCreate, {name: 'index_for_hint_test'}),
+                         'failed to create index index_for_hint_test: ' + tojson(keyForCreate));
+    // Specifying the index by name should work on both the time-series collection and the
+    // underlying buckets collection.
+    assert.eq(1, bucketsColl.find().hint('index_for_hint_test').toArray().length);
+    assert.eq(1, coll.find().hint('index_for_hint_test').toArray().length);
+    // Specifying the index by key pattern should work when we use the underlying buckets
+    // collection's schema.
+    assert.eq(1, bucketsColl.find().hint(hint).toArray().length);
+    assert.eq(1, coll.find().hint(hint).toArray().length);
+    // Specifying the index by key pattern on the time-series collection should not work.
+    assert.commandFailedWithCode(
+        assert.throws(() => bucketsColl.find().hint(keyForCreate).toArray()), ErrorCodes.BadValue);
+    assert.commandFailedWithCode(assert.throws(() => coll.find().hint(keyForCreate).toArray()),
+                                              ErrorCodes.BadValue);
+    assert.commandWorked(coll.dropIndex('index_for_hint_test'),
+                         'failed to drop index: index_for_hint_test');
 };
 
 /**
