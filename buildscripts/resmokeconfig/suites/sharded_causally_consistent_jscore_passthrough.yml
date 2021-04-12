@@ -27,7 +27,6 @@ selector:
   - jstests/core/index9.js  # "local" database.
   - jstests/core/invalidated_legacy_cursors.js # capped collections.
   - jstests/core/queryoptimizera.js  # "local" database.
-  - jstests/core/rename*.js # renameCollection.
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/tailable_cursor_invalidation.js # capped collections.
   - jstests/core/tailable_getmore_batch_size.js # capped collections.
@@ -44,7 +43,6 @@ selector:
   - jstests/core/create_indexes.js
   - jstests/core/list_indexes_non_existent_ns.js
   - jstests/core/mr_preserve_indexes.js
-  - jstests/core/rename6.js
   # The following tests fail because they expect no databases to be created. However a DB is created
   # automatically when we shard a collection.
   - jstests/core/dbcase.js

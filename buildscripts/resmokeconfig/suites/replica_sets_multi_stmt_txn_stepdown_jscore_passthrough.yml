@@ -108,7 +108,6 @@ selector:
   - jstests/core/field_name_validation.js
   - jstests/core/insert_illegal_doc.js
   - jstests/core/push_sort.js
-  - jstests/core/rename4.js
   - jstests/core/update_arrayFilters.js
   - jstests/core/update_dbref.js
   - jstests/core/updatel.js
@@ -126,7 +125,6 @@ selector:
   - jstests/core/dbref2.js
   - jstests/core/ref3.js
   - jstests/core/update3.js
-  - jstests/core/rename3.js
 
   ##
   ## Error: Unable to acquire lock within a max lock request timeout of '0ms' milliseconds

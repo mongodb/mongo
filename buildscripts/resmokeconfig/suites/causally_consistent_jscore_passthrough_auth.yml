@@ -83,7 +83,6 @@ selector:
   - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/orf.js #explain.executionStats is not CC
-  - jstests/core/rename7.js
   # getMore is not causally consistent if collection is dropped
   - jstests/core/drop3.js
   # Logical sessions require that only one user be authenticated,
@@ -100,7 +99,7 @@ selector:
   # These include operations the root user auth'd on the test database is not authorized to perform,
   # e.g. dropping or creating system collections.
   - jstests/core/list_collections_no_views.js
-  - jstests/core/rename8.js
+  - jstests/core/rename_collection_system_db.js
   - jstests/core/views/duplicate_ns.js
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/view_with_invalid_dbname.js

@@ -200,7 +200,6 @@ selector:
   - jstests/core/insert_illegal_doc.js
   - jstests/core/positional_projection.js
   - jstests/core/push_sort.js
-  - jstests/core/rename4.js
   - jstests/core/update_dbref.js
 
   # Trick for bypassing mongo shell validation in the test doesn't work because txn_override
@@ -214,7 +213,6 @@ selector:
   - jstests/core/dbref2.js
   - jstests/core/ref3.js
   - jstests/core/update3.js
-  - jstests/core/rename3.js
 
   ##
   ## Error: Unable to acquire lock within a max lock request timeout of '0ms' milliseconds

@@ -1,9 +1,18 @@
-// Test that a rename that overwrites its destination with an equivalent value of a different type
-// updates the type of the destination (SERVER-32109).
+/**
+ * Test that a rename that overwrites its destination with an equivalent value of a different type
+ * updates the type of the destination (SERVER-32109).
+ *
+ * @tags: [
+ *   requires_non_retryable_writes,
+ *   # update with multi:false is not supported on sharded collection
+ *   assumes_unsharded_collection,
+ * ]
+ */
+
 (function() {
 "use strict";
 
-let coll = db.rename_change_target_type;
+let coll = db.rename_operator_change_target_type;
 coll.drop();
 
 assert.commandWorked(coll.insert({to: NumberLong(100), from: 100}));

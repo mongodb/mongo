@@ -101,7 +101,6 @@ selector:
   - jstests/core/apitest_dbcollection.js
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/orf.js #explain.executionStats is not CC
-  - jstests/core/rename7.js
   # getMore is not causally consistent if collection is dropped
   - jstests/core/drop3.js
 

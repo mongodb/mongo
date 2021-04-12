@@ -1,8 +1,17 @@
-// @tags: [
-//   requires_non_retryable_commands,
-// ]
+/*
+ * Test rename operator
+ *
+ * @tags: [
+ *   requires_non_retryable_commands,
+ *   # Invalid update attempts can cause transactions to get aborted
+ *   # and inserted document to be deleted
+ *   does_not_support_transactions,
+ *   # update with multi:false is not supported on sharded collection
+ *   assumes_unsharded_collection,
+ * ]
+ */
 
-t = db.jstests_rename4;
+t = db.jstests_rename_operator;
 t.drop();
 
 function bad(f) {
