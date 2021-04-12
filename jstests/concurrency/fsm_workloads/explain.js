@@ -56,7 +56,7 @@ var $config = (function() {
             } else {
                 // In the sharding case, each shard has a winningPlan
                 res.queryPlanner.winningPlan.shards.forEach(function(shard) {
-                    assertAlways.eq(shard.winningPlan.stage, 'EOF', tojson(res));
+                    assertAlways.eq(getWinningPlan(shard).stage, 'EOF', tojson(res));
                 });
             }
         }
