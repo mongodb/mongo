@@ -2,6 +2,9 @@
 'use strict';
 
 // Include helpers for analyzing explain output.
+// @tags: [
+//   sbe_incompatible,
+// ]
 load("jstests/libs/analyze_plan.js");
 
 var s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});

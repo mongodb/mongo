@@ -3,7 +3,11 @@
 // so allows the shards to regularly report their advancing optimes in the absence of any new data,
 // which in turn allows the AsyncResultsMerger to return sorted results retrieved from the other
 // shards.
-// @tags: [uses_change_streams, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   sbe_incompatible,
+//   uses_change_streams,
+// ]
 (function() {
 "use strict";
 

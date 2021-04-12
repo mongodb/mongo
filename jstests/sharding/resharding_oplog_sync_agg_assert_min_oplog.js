@@ -1,7 +1,10 @@
 /**
  * Tests that the resharding operation will fail if a recipient shard would have missed oplog
  * entries from a donor shard.
- * @tags: [requires_fcv_47]
+ * @tags: [
+ *   requires_fcv_47,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

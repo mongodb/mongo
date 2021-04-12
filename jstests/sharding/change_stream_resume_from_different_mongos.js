@@ -1,5 +1,9 @@
 // Test resuming a change stream on a mongos other than the one the change stream was started on.
-// @tags: [uses_change_streams, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   sbe_incompatible,
+//   uses_change_streams,
+// ]
 (function() {
 "use strict";
 load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.

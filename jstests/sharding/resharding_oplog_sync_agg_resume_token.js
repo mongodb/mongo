@@ -2,7 +2,10 @@
  * Test that the postBatchResumeToken field is only included for the oplog namespace when
  * $_requestReshardingResumeToken is specified for an aggregate command.
  *
- * @tags: [requires_fcv_47]
+ * @tags: [
+ *   requires_fcv_47,
+ *   sbe_incompatible,
+ * ]
  */
 (function() {
 "use strict";

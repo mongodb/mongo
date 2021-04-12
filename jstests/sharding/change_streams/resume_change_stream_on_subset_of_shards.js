@@ -1,6 +1,10 @@
 // This tests resuming a change stream on a sharded collection where not all shards have a chunk in
 // the collection.
-// @tags: [uses_change_streams, requires_majority_read_concern]
+// @tags: [
+//   requires_majority_read_concern,
+//   sbe_incompatible,
+//   uses_change_streams,
+// ]
 (function() {
 "use strict";
 

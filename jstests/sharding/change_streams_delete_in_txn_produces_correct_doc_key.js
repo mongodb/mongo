@@ -1,6 +1,10 @@
 // Tests that 'delete' events within a multi-document transaction do not include the full document
 // but only the shard key and _id in the 'documentKey' field. Exercises the fix for SERVER-45987.
-// @tags: [uses_transactions, multiversion_incompatible]
+// @tags: [
+//   multiversion_incompatible,
+//   sbe_incompatible,
+//   uses_transactions,
+// ]
 
 (function() {
 "use strict";
