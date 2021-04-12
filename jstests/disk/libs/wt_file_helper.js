@@ -1,3 +1,5 @@
+load("jstests/libs/analyze_plan.js");
+
 /**
  * Get the URI of the wt collection file given the collection name.
  */
@@ -40,7 +42,7 @@ let assertQueryUsesIndex = function(coll, query, indexName) {
     let res = coll.find(query).explain();
     assert.commandWorked(res);
 
-    let inputStage = res.queryPlanner.winningPlan.inputStage;
+    let inputStage = getWinningPlan(res.queryPlanner).inputStage;
     assert.eq(inputStage.stage, "IXSCAN");
     assert.eq(inputStage.indexName, indexName);
 };
