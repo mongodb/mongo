@@ -745,10 +745,9 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
     validateAndRunRenameCollection(opCtx, sourceNs, targetNs, options);
 }
 
-void validateAndRunRenameCollection(OperationContext* opCtx,
-                                    const NamespaceString& source,
-                                    const NamespaceString& target,
-                                    const RenameCollectionOptions& options) {
+void validateNamespacesForRenameCollection(OperationContext* opCtx,
+                                           const NamespaceString& source,
+                                           const NamespaceString& target) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid source namespace: " << source.ns(),
             source.isValid());
@@ -785,6 +784,23 @@ void validateAndRunRenameCollection(OperationContext* opCtx,
                   "collection (admin.system.version) is not "
                   "allowed");
     }
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "renameCollection cannot accept a source collection that is in a "
+                             "drop-pending state: "
+                          << source,
+            !source.isDropPendingNamespace());
+
+    uassert(ErrorCodes::IllegalOperation,
+            "renaming system.views collection or renaming to system.views is not allowed",
+            !source.isSystemDotViews() && !target.isSystemDotViews());
+}
+
+void validateAndRunRenameCollection(OperationContext* opCtx,
+                                    const NamespaceString& source,
+                                    const NamespaceString& target,
+                                    const RenameCollectionOptions& options) {
+    validateNamespacesForRenameCollection(opCtx, source, target);
 
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         opCtx);
