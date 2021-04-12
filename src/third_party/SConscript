@@ -16,7 +16,7 @@ pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
-timelibSuffix = '-2018.01'
+timelibSuffix = '-2021.04'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 
