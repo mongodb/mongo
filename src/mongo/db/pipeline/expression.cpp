@@ -4996,11 +4996,11 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
         } else {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream()
-                              << "cant $subtract a " << typeName(rhs.getType()) << " from a Date");
+                              << "can't $subtract " << typeName(rhs.getType()) << " from Date");
         }
     } else {
         return Status(ErrorCodes::TypeMismatch,
-                      str::stream() << "cant $subtract a" << typeName(rhs.getType()) << " from a "
+                      str::stream() << "can't $subtract " << typeName(rhs.getType()) << " from "
                                     << typeName(lhs.getType()));
     }
 }
