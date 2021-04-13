@@ -191,12 +191,6 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                         << "' index must be a non-zero number, not a string.");
         }
 
-        // Check if the wildcard index is compounded. If it is the key is invalid because
-        // compounded wildcard indexes are disallowed.
-        if (pluginName == IndexNames::WILDCARD && key.nFields() != 1) {
-            return Status(code, "wildcard indexes do not allow compounding");
-        }
-
         // Ensure that the fields on which we are building the index are valid: a field must not
         // begin with a '$' unless it is part of a wildcard, DBRef or text index, and a field path
         // cannot contain an empty field. If a field cannot be created or updated, it should not be

@@ -66,6 +66,10 @@ public:
         return &_proj;
     }
 
+    BSONObj getKeyPattern() const {
+        return _keyPattern;
+    }
+
     /**
      * Applies the appropriate Wildcard projection to the input doc, and then adds one key-value
      * pair to the set 'keys' for each leaf node in the post-projection document:

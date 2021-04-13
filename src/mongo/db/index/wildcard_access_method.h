@@ -66,6 +66,10 @@ public:
         return _keyGen.getWildcardProjection();
     }
 
+    BSONObj getKeyPattern() const {
+        return _keyGen.getKeyPattern();
+    }
+
 private:
     void doGetKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                    const BSONObj& obj,

@@ -240,11 +240,20 @@ void WildcardKeyGenerator::_addMultiKey(SharedBufferFragmentBuilder& pooledBuffe
     // 'multikeyPaths' may be nullptr if the access method is being used in an operation which does
     // not require multikey path generation.
     if (multikeyPaths) {
-        auto key = BSON("" << 1 << "" << fullPath.dottedField());
+        BSONObjBuilder keyBuilder;
+        for (auto&& elem : _keyPattern) {
+            if (elem.fieldNameStringData() == "$**" ||
+                elem.fieldNameStringData().endsWith(".$**")) {
+                keyBuilder.append("", 1);
+                keyBuilder.append("", fullPath.dottedField());
+            } else {
+                keyBuilder.appendMinKey("");
+            }
+        }
         KeyString::PooledBuilder keyString(
             pooledBufferBuilder,
             _keyStringVersion,
-            key,
+            keyBuilder.obj(),
             _ordering,
             RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
         multikeyPaths->push_back(keyString.release());

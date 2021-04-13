@@ -50,6 +50,7 @@ enum class BoundInclusion {
  */
 struct OrderedIntervalList {
     OrderedIntervalList() {}
+    OrderedIntervalList(std::vector<Interval> intervals) : intervals(std::move(intervals)) {}
     OrderedIntervalList(const std::string& n) : name(n) {}
 
     // Must be ordered according to the index order.

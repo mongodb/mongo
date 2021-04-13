@@ -32,35 +32,72 @@
 #include "mongo/db/query/wildcard_multikey_paths.h"
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 
 namespace mongo {
 
+namespace {
+
+bool isWildcardPart(BSONElement keyPatternElem) {
+    return keyPatternElem.fieldNameStringData() == "$**" ||
+        keyPatternElem.fieldNameStringData().endsWith(".$**");
+}
+
 /**
  * Extracts the multikey path from a metadata key stored within a wildcard index.
  */
-static FieldRef extractMultikeyPathFromIndexKey(const IndexKeyEntry& entry) {
+static FieldRef extractMultikeyPathFromIndexKey(BSONObj keyPattern, const IndexKeyEntry& entry) {
     invariant(RecordIdReservations::isReserved(entry.loc));
     invariant(
         entry.loc.getLong() ==
         RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId).getLong());
 
     // Validate that the first piece of the key is the integer 1.
-    BSONObjIterator iter(entry.key);
-    invariant(iter.more());
-    const auto firstElem = iter.next();
-    invariant(firstElem.isNumber());
-    invariant(firstElem.numberInt() == 1);
-    invariant(iter.more());
+    BSONObjIterator indexIter(entry.key);
+    BSONObjIterator keyPatternIter(keyPattern);
+    while (keyPatternIter.more()) {
+        invariant(indexIter.more());
+        const auto indexKeyElem = indexIter.next();
+        const auto keyPatternElem = keyPatternIter.next();
+        if (isWildcardPart(keyPatternElem)) {
+            invariant(indexKeyElem.isNumber());
+            invariant(indexKeyElem.numberInt() == 1);
+            invariant(indexIter.more());
 
-    // Extract the path from the second piece of the key.
-    const auto secondElem = iter.next();
-    invariant(!iter.more());
-    invariant(secondElem.type() == BSONType::String);
-
-    return FieldRef(secondElem.valueStringData());
+            // Extract the path from the second piece of the key.
+            const auto secondIndexElem = indexIter.next();
+            invariant(!indexIter.more());
+            invariant(secondIndexElem.type() == BSONType::String);
+            return FieldRef(secondIndexElem.valueStringData());
+        } else {
+            // This is a non-wildcard part of the index key which should be ignored and always
+            // encoded as MinKey for multikey paths.
+            invariant(indexKeyElem.type() == BSONType::MinKey);
+        }
+    }
+    MONGO_UNREACHABLE;
 }
+
+/**
+ * Given the normal keyPattern which is expected to include at least one wildcard part, inflates
+ * each wildcard part into two: one for the path, one for the value.
+ * For example: {a: 1, "$**": -1} is inflated to {a: 1, $path: 1, $value: -1}
+ */
+BSONObj inflateKeyPatternForBounds(BSONObj keyPattern) {
+    BSONObjBuilder inflated;
+    for (auto&& elem : keyPattern) {
+        if (isWildcardPart(elem)) {
+            inflated.append("$path", 1);
+            inflated.appendAs(elem, "$value");
+        } else {
+            inflated.append(elem);
+        }
+    }
+    return inflated.obj();
+}
+}  // namespace
 
 /**
  * Retrieves from the wildcard index the set of multikey path metadata keys bounded by
@@ -70,6 +107,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(const WildcardAccessM
                                                            OperationContext* opCtx,
                                                            const IndexBounds& indexBounds,
                                                            MultikeyMetadataAccessStats* stats) {
+    const auto keyPattern = wam->getKeyPattern();
     return writeConflictRetry(
         opCtx, "wildcard multikey path retrieval", "", [&]() -> std::set<FieldRef> {
             stats->numSeeks = 0;
@@ -77,8 +115,8 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(const WildcardAccessM
             auto cursor = wam->newCursor(opCtx);
 
             constexpr int kForward = 1;
-            const auto keyPattern = BSON("" << 1 << "" << 1);
-            IndexBoundsChecker checker(&indexBounds, keyPattern, kForward);
+            auto newPattern = inflateKeyPatternForBounds(keyPattern);
+            IndexBoundsChecker checker(&indexBounds, newPattern, kForward);
             IndexSeekPoint seekPoint;
             if (!checker.getStartSeekPoint(&seekPoint)) {
                 return {};
@@ -98,7 +136,7 @@ static std::set<FieldRef> getWildcardMultikeyPathSetHelper(const WildcardAccessM
 
                 switch (checker.checkKey(entry->key, &seekPoint)) {
                     case IndexBoundsChecker::VALID:
-                        multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
+                        multikeyPaths.emplace(extractMultikeyPathFromIndexKey(keyPattern, *entry));
                         entry = cursor->next();
                         break;
 
@@ -174,43 +212,70 @@ std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
     invariant(stats);
     IndexBounds indexBounds;
 
-    // Multikey metadata keys are stored with the number "1" in the first position of the index to
-    // differentiate them from user-data keys, which contain a string representing the path.
-    OrderedIntervalList multikeyPathFlagOil;
-    multikeyPathFlagOil.intervals.push_back(IndexBoundsBuilder::makePointInterval(BSON("" << 1)));
-    indexBounds.fields.push_back(std::move(multikeyPathFlagOil));
+    for (auto&& elem : wam->getKeyPattern()) {
+        if (isWildcardPart(elem)) {
+            // This is a wildcard component, so we need two bounds:
+            // Multikey metadata keys are stored with the number "1" in the first position of the
+            // index to differentiate them from user-data keys, which contain a string representing
+            // the path. Anything with a number "1" in the first position represents a path which is
+            // multikey, and the second position will be that path.
 
-    OrderedIntervalList fieldNameOil;
+            // Make the point interval for the number "1".
+            indexBounds.fields.push_back(
+                OrderedIntervalList{{IndexBoundsBuilder::makePointInterval(BSON("" << 1))}});
 
-    for (const auto& field : fieldSet) {
-        auto intervals = getMultikeyPathIndexIntervalsForField(FieldRef(field));
-        fieldNameOil.intervals.insert(fieldNameOil.intervals.end(),
-                                      std::make_move_iterator(intervals.begin()),
-                                      std::make_move_iterator(intervals.end()));
+            // Now make the range interval for any paths. Here we make a series of point intervals
+            // for each path of interest given in 'fieldSet'.
+            OrderedIntervalList fieldNameOil;
+            for (const auto& field : fieldSet) {
+                auto intervals = getMultikeyPathIndexIntervalsForField(FieldRef(field));
+                fieldNameOil.intervals.insert(fieldNameOil.intervals.end(),
+                                              std::make_move_iterator(intervals.begin()),
+                                              std::make_move_iterator(intervals.end()));
+            }
+
+            // IndexBoundsBuilder::unionize() sorts the OrderedIntervalList allowing for in order
+            // index traversal.
+            IndexBoundsBuilder::unionize(&fieldNameOil);
+            indexBounds.fields.push_back(std::move(fieldNameOil));
+        } else {
+            // This is not a wildcard path component of the index. To find the multikey metadata, we
+            // need to look in the point range for MinKey.
+            indexBounds.fields.push_back(
+                OrderedIntervalList{{IndexBoundsBuilder::makePointInterval(BSON("" << MINKEY))}});
+        }
     }
-
-    // IndexBoundsBuilder::unionize() sorts the OrderedIntervalList allowing for in order index
-    // traversal.
-    IndexBoundsBuilder::unionize(&fieldNameOil);
-    indexBounds.fields.push_back(std::move(fieldNameOil));
-
     return getWildcardMultikeyPathSetHelper(wam, opCtx, indexBounds, stats);
 }
 
+namespace {
+BSONObj makeMultiKeyIndexBound(BSONObj keyPattern, Value bound) {
+    BSONObjBuilder boundBuilder;
+    for (auto&& elem : keyPattern) {
+        if (elem.fieldNameStringData() == "$**" || elem.fieldNameStringData().endsWith(".$**")) {
+            boundBuilder.append("", 1);
+            boundBuilder << "" << bound;
+        } else {
+            boundBuilder.appendMinKey("");
+        }
+    }
+    return boundBuilder.obj();
+}
+}  // namespace
 std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
                                               OperationContext* opCtx,
                                               MultikeyMetadataAccessStats* stats) {
+    const auto keyPattern = wam->getKeyPattern();
+    // All of the keys storing multikeyness metadata are prefixed by a value of 1. Establish
+    // an index cursor which will scan this range.
+    const BSONObj metadataKeyRangeBegin = makeMultiKeyIndexBound(keyPattern, Value(MINKEY));
+    const BSONObj metadataKeyRangeEnd = makeMultiKeyIndexBound(keyPattern, Value(MAXKEY));
     return writeConflictRetry(opCtx, "wildcard multikey path retrieval", "", [&]() {
         invariant(stats);
         stats->numSeeks = 0;
         stats->keysExamined = 0;
 
         auto cursor = wam->newCursor(opCtx);
-
-        // All of the keys storing multikeyness metadata are prefixed by a value of 1. Establish
-        // an index cursor which will scan this range.
-        const BSONObj metadataKeyRangeBegin = BSON("" << 1 << "" << MINKEY);
-        const BSONObj metadataKeyRangeEnd = BSON("" << 1 << "" << MAXKEY);
 
         constexpr bool inclusive = true;
         cursor->setEndPosition(metadataKeyRangeEnd, inclusive);
@@ -228,7 +293,7 @@ std::set<FieldRef> getWildcardMultikeyPathSet(const WildcardAccessMethod* wam,
         std::set<FieldRef> multikeyPaths{};
         while (entry) {
             ++stats->keysExamined;
-            multikeyPaths.emplace(extractMultikeyPathFromIndexKey(*entry));
+            multikeyPaths.emplace(extractMultikeyPathFromIndexKey(keyPattern, *entry));
 
             entry = cursor->next();
         }
