@@ -327,7 +327,8 @@ ScopedShardVersionCriticalSection::~ScopedShardVersionCriticalSection() {
     Lock::DBLock dbLock(_opCtx, _nss.db(), MODE_IX);
     Lock::CollectionLock collLock(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    csr->exitCriticalSection(_opCtx);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+    csr->exitCriticalSection(csrLock);
 }
 
 void ScopedShardVersionCriticalSection::enterCommitPhase() {

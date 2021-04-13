@@ -165,9 +165,7 @@ void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) 
     _critSec.enterCriticalSectionCommitPhase();
 }
 
-void CollectionShardingRuntime::exitCriticalSection(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
-    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, this);
+void CollectionShardingRuntime::exitCriticalSection(const CSRLock&) {
     _critSec.exitCriticalSection();
 }
 
@@ -421,7 +419,8 @@ CollectionCriticalSection::~CollectionCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
     AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-    csr->exitCriticalSection(_opCtx);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
+    csr->exitCriticalSection(csrLock);
 }
 
 void CollectionCriticalSection::enterCommitPhase() {
