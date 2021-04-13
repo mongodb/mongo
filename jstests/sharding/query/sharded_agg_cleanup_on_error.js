@@ -8,7 +8,6 @@
  * @tags: [
  *   do_not_wrap_aggregations_in_facets,
  *   requires_sharding,
- *   sbe_incompatible,
  * ]
  */
 (function() {
@@ -25,7 +24,7 @@ const kFailpointOptions = {
 
 const st = new ShardingTest({shards: 2});
 const kDBName = "test";
-const kDivideByZeroErrCodes = [16608, ErrorCodes.BadValue];
+const kDivideByZeroErrCodes = [16608, 4848401, ErrorCodes.BadValue];
 const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
