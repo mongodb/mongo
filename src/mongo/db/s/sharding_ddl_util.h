@@ -30,6 +30,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -104,7 +105,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
  * Acquires the collection critical section in the catch-up phase (i.e. blocking writes) for the
  * specified namespace and reason. It works even if the namespace's current metadata are UNKNOWN.
  *
- * It adds a doc to config.collectionCriticalSections with local write concern.
+ * It adds a doc to config.collectionCriticalSections with with writeConcern write concern.
  *
  * Do nothing if the collection critical section is taken for that nss and reason, and will
  * invariant otherwise since it is the responsibility of the caller to ensure that only one thread
@@ -114,6 +115,7 @@ void acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
+    const WriteConcernOptions& writeConcern,
     const boost::optional<BSONObj>& additionalInfo = boost::none);
 
 /**
@@ -122,29 +124,30 @@ void acquireRecoverableCriticalSectionBlockWrites(
  * section must have been acquired first through 'acquireRecoverableCriticalSectionBlockWrites'
  * function.
  *
- * It updates a doc from config.collectionCriticalSections with local write concern.
+ * It updates a doc from config.collectionCriticalSections with writeConcern write concern.
  *
  * Do nothing if the collection critical section is already taken in commit phase.
  */
 void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
                                                  const NamespaceString& nss,
-                                                 const BSONObj& reason);
+                                                 const BSONObj& reason,
+                                                 const WriteConcernOptions& writeConcern);
 
 /**
  * Releases the recoverable critical section for the given nss and reason.
  *
- * It removes a doc from config.collectionCriticalSections with local write concern.
+ * It removes a doc from config.collectionCriticalSections with writeConcern write concern.
  *
  * Do nothing if the collection critical section is not taken for that nss and reason.
  */
 void releaseRecoverableCriticalSection(OperationContext* opCtx,
                                        const NamespaceString& nss,
-                                       const BSONObj& reason);
+                                       const BSONObj& reason,
+                                       const WriteConcernOptions& writeConcern);
 
 /**
  * Retakes the in-memory collection critical section for each recoverable critical section
- * persisted on config.collectionCriticalSections. Apart from that, it also clears the filtering
- * metadata and spawn an async task to refresh it for each collection.
+ * persisted on config.collectionCriticalSections. It also clears the filtering metadata.
  */
 void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx);
 
