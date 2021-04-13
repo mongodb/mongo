@@ -3,10 +3,9 @@
 // the legacy DBClientCursor method of executing commands on shards. We use aggregation here
 // specifically because it is one of the few query paths that still uses the legacy DBClient
 // classes in mongos.
-// @tags: [
-//   sbe_incompatible,
-// ]
 "use strict";
+
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 var st = new ShardingTest({mongos: 1, shards: 1, rs: {nodes: 3}});
 
