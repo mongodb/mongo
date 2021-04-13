@@ -143,6 +143,9 @@ private:
 
     sbe::value::SlotAccessor* _result{nullptr};
     sbe::value::SlotAccessor* _resultRecordId{nullptr};
+    sbe::value::TypeTags _tagLastRecordId{sbe::value::TypeTags::Nothing};
+    sbe::value::Value _valLastRecordId{0};
+
     sbe::value::SlotAccessor* _oplogTs{nullptr};
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 

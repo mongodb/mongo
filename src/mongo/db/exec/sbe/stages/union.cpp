@@ -65,21 +65,25 @@ void UnionStage::prepare(CompileCtx& ctx) {
 
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
         _children[childNum]->prepare(ctx);
+    }
 
-        for (auto slot : _inputVals[childNum]) {
+    for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
+        std::vector<value::SlotAccessor*> accessors;
+        accessors.reserve(_children.size());
+
+        for (size_t childNum = 0; childNum < _children.size(); childNum++) {
+            auto slot = _inputVals[childNum][idx];
             auto [it, inserted] = dupCheck.insert(slot);
             uassert(4822806, str::stream() << "duplicate field: " << slot, inserted);
 
-            _inValueAccessors[_children[childNum].get()].emplace_back(
-                _children[childNum]->getAccessor(ctx, slot));
+            accessors.emplace_back(_children[childNum]->getAccessor(ctx, slot));
         }
-    }
 
-    for (auto slot : _outputVals) {
+        auto slot = _outputVals[idx];
         auto [it, inserted] = dupCheck.insert(slot);
         uassert(4822807, str::stream() << "duplicate field: " << slot, inserted);
 
-        _outValueAccessors.emplace_back(value::ViewOfValueAccessor{});
+        _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
     }
 }
 
@@ -108,6 +112,11 @@ void UnionStage::open(bool reOpen) {
 
     _remainingBranchesToDrain.front().open();
     _currentStage = _remainingBranchesToDrain.front().stage;
+    _currentStageIndex = 0;
+
+    for (auto& outAccesor : _outValueAccessors) {
+        outAccesor.setIndex(_currentStageIndex);
+    }
 }
 
 PlanState UnionStage::getNext() {
@@ -120,6 +129,11 @@ PlanState UnionStage::getNext() {
             auto& branch = _remainingBranchesToDrain.front();
             branch.open();
             _currentStage = branch.stage;
+            ++_currentStageIndex;
+
+            for (auto& outAccesor : _outValueAccessors) {
+                outAccesor.setIndex(_currentStageIndex);
+            }
         }
         state = _currentStage->getNext();
 
@@ -127,13 +141,6 @@ PlanState UnionStage::getNext() {
             _currentStage = nullptr;
             _remainingBranchesToDrain.front().close();
             _remainingBranchesToDrain.pop();
-        } else {
-            const auto& inValueAccessors = _inValueAccessors[_currentStage];
-
-            for (size_t idx = 0; idx < inValueAccessors.size(); idx++) {
-                auto [tag, val] = inValueAccessors[idx]->getViewOfValue();
-                _outValueAccessors[idx].reset(tag, val);
-            }
         }
     }
 

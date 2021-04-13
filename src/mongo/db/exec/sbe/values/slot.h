@@ -238,8 +238,7 @@ private:
  */
 class SwitchAccessor final : public SlotAccessor {
 public:
-    SwitchAccessor(std::vector<std::unique_ptr<SlotAccessor>> accessors)
-        : _accessors(std::move(accessors)) {
+    SwitchAccessor(std::vector<SlotAccessor*> accessors) : _accessors(std::move(accessors)) {
         invariant(!_accessors.empty());
     }
 
@@ -256,7 +255,7 @@ public:
     }
 
 private:
-    std::vector<std::unique_ptr<SlotAccessor>> _accessors;
+    std::vector<SlotAccessor*> _accessors;
     size_t _index{0};
 };
 

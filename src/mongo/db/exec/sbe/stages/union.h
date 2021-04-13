@@ -76,9 +76,9 @@ private:
 
     const std::vector<value::SlotVector> _inputVals;
     const value::SlotVector _outputVals;
-    stdx::unordered_map<PlanStage*, std::vector<value::SlotAccessor*>> _inValueAccessors;
-    std::vector<value::ViewOfValueAccessor> _outValueAccessors;
+    std::vector<value::SwitchAccessor> _outValueAccessors;
     std::queue<UnionBranch> _remainingBranchesToDrain;
     PlanStage* _currentStage{nullptr};
+    size_t _currentStageIndex{0};
 };
 }  // namespace mongo::sbe

@@ -69,25 +69,31 @@ void BranchStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _children[1]->prepare(ctx);
 
-    for (auto slot : _inputThenVals) {
-        auto [it, inserted] = dupCheck.insert(slot);
-        uassert(4822829, str::stream() << "duplicate field: " << slot, inserted);
+    for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
+        std::vector<value::SlotAccessor*> accessors;
+        accessors.reserve(2);
 
-        _inputThenAccessors.emplace_back(_children[0]->getAccessor(ctx, slot));
-    }
+        {
+            auto slot = _inputThenVals[idx];
+            auto [it, inserted] = dupCheck.insert(slot);
+            uassert(4822829, str::stream() << "duplicate field: " << slot, inserted);
 
-    for (auto slot : _inputElseVals) {
-        auto [it, inserted] = dupCheck.insert(slot);
-        uassert(4822830, str::stream() << "duplicate field: " << slot, inserted);
+            accessors.emplace_back(_children[0]->getAccessor(ctx, slot));
+        }
+        {
+            auto slot = _inputElseVals[idx];
+            auto [it, inserted] = dupCheck.insert(slot);
+            uassert(4822830, str::stream() << "duplicate field: " << slot, inserted);
 
-        _inputElseAccessors.emplace_back(_children[1]->getAccessor(ctx, slot));
-    }
+            accessors.emplace_back(_children[1]->getAccessor(ctx, slot));
+        }
+        {
+            auto slot = _outputVals[idx];
+            auto [it, inserted] = dupCheck.insert(slot);
+            uassert(4822831, str::stream() << "duplicate field: " << slot, inserted);
 
-    for (auto slot : _outputVals) {
-        auto [it, inserted] = dupCheck.insert(slot);
-        uassert(4822831, str::stream() << "duplicate field: " << slot, inserted);
-
-        _outValueAccessors.emplace_back(value::ViewOfValueAccessor{});
+            _outValueAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
+        }
     }
 
     // compile filter
@@ -128,6 +134,9 @@ void BranchStage::open(bool reOpen) {
             _elseOpened = true;
             ++_specificStats.elseBranchOpens;
         }
+        for (auto& outAccessor : _outValueAccessors) {
+            outAccessor.setIndex(*_activeBranch);
+        }
     } else {
         _activeBranch = boost::none;
     }
@@ -140,25 +149,8 @@ PlanState BranchStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (*_activeBranch == 0) {
-        auto state = _children[0]->getNext();
-        if (state == PlanState::ADVANCED) {
-            for (size_t idx = 0; idx < _outValueAccessors.size(); ++idx) {
-                auto [tag, val] = _inputThenAccessors[idx]->getViewOfValue();
-                _outValueAccessors[idx].reset(tag, val);
-            }
-        }
-        return trackPlanState(state);
-    } else {
-        auto state = _children[1]->getNext();
-        if (state == PlanState::ADVANCED) {
-            for (size_t idx = 0; idx < _outValueAccessors.size(); ++idx) {
-                auto [tag, val] = _inputElseAccessors[idx]->getViewOfValue();
-                _outValueAccessors[idx].reset(tag, val);
-            }
-        }
-        return trackPlanState(state);
-    }
+    auto state = _children[*_activeBranch]->getNext();
+    return trackPlanState(state);
 }
 
 void BranchStage::close() {
