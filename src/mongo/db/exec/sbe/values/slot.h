@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include <boost/container/small_vector.hpp>
 
 #include "mongo/db/exec/sbe/values/value.h"
@@ -362,18 +364,18 @@ public:
         copy(other);
     }
 
-    MaterializedRow(MaterializedRow&& other) {
+    MaterializedRow(MaterializedRow&& other) noexcept {
         swap(*this, other);
     }
 
-    ~MaterializedRow() {
+    ~MaterializedRow() noexcept {
         if (_data) {
             release();
             delete[] _data;
         }
     }
 
-    MaterializedRow& operator=(MaterializedRow other) {
+    MaterializedRow& operator=(MaterializedRow other) noexcept {
         swap(*this, other);
         return *this;
     }
@@ -511,6 +513,10 @@ private:
     size_t _count{0};
 };
 
+// This check is needed to ensure that 'std::vector<MaterializedRow>' uses move constructor of
+// 'MaterializedRow' during reallocation. This way, values inside 'MaterializedRow' are not copied
+// during reallocation and references to them remain valid.
+static_assert(std::is_nothrow_move_constructible_v<MaterializedRow>);
 
 /**
  * Provides a view of a slot inside a single MaterializedRow.

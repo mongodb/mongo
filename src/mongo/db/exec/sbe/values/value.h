@@ -1015,6 +1015,13 @@ std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
 
 std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
 
+/**
+ * Releases memory allocated for the value. If the value does not have any memory allocated for it,
+ * does nothing.
+ *
+ * NOTE: This function is intentionally marked as 'noexcept' and must not throw. It is used in the
+ *       destructors of several classes to implement RAII concept for values.
+ */
 void releaseValue(TypeTags tag, Value val) noexcept;
 
 inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
