@@ -31,6 +31,8 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
+#include <algorithm>
+
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -43,8 +45,6 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
-#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
@@ -558,17 +558,16 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this] {
             _transitionState(RecipientStateEnum::kStrictConsistency);
 
-            bool isDonor = [this, &id = _metadata.getReshardingUUID()] {
-                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                auto instance = resharding::tryGetReshardingStateMachine<
-                    ReshardingDonorService,
-                    ReshardingDonorService::DonorStateMachine,
-                    ReshardingDonorDocument>(opCtx.get(), id);
-
-                return !!instance;
+            const bool isAlsoDonor = [&] {
+                auto myShardId = ShardingState::get(cc().getServiceContext())->shardId();
+                return std::find_if(_donorShards.begin(),
+                                    _donorShards.end(),
+                                    [&](const DonorShardFetchTimestamp& donor) {
+                                        return donor.getShardId() == myShardId;
+                                    }) != _donorShards.end();
             }();
 
-            if (!isDonor) {
+            if (!isAlsoDonor) {
                 _critSec.emplace(cc().getServiceContext(), _metadata.getSourceNss());
             }
         });
@@ -593,17 +592,28 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
         return;
     }
 
-    {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    const bool isAlsoDonor = [&] {
+        auto myShardId = ShardingState::get(cc().getServiceContext())->shardId();
+        return std::find_if(_donorShards.begin(),
+                            _donorShards.end(),
+                            [&](const DonorShardFetchTimestamp& donor) {
+                                return donor.getShardId() == myShardId;
+                            }) != _donorShards.end();
+    }();
 
+    if (!isAlsoDonor) {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
         RenameCollectionOptions options;
         options.dropTarget = true;
         uassertStatusOK(renameCollection(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
 
-        _dropOplogCollections(opCtx.get());
-
         _critSec.reset();
+    }
+
+    {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        _dropOplogCollections(opCtx.get());
     }
 
     _transitionState(RecipientStateEnum::kDone);
