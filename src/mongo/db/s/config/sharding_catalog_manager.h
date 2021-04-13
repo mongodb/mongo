@@ -404,14 +404,6 @@ public:
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
     /**
-     * Patches-up persistent metadata for 4.9.
-     *
-     * It shall be called when upgrading to 4.9 or newer versions.
-     * TODO SERVER-53283: Remove once 5.0 has been released.
-     */
-    void upgradeMetadataFor49(OperationContext* opCtx);
-
-    /**
      * Patches-up persistent metadata for 5.0.
      *
      * It shall be called when upgrading to 5.0 or newer versions.
@@ -546,15 +538,15 @@ private:
     /**
      * Removes all entries from the config server's config.collections where 'dropped' is true.
      *
-     * Before 4.9, when a collection was dropped, its entry in config.collections remained, tagged
+     * Before 5.0, when a collection was dropped, its entry in config.collections remained, tagged
      * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
      * metadata.
      *
-     * It shall be called when upgrading to 4.9 or newer versions.
+     * It shall be called when upgrading to 5.0 or newer versions.
      *
      * TODO SERVER-53283: Remove once 5.0 has becomes last-lts.
      */
-    void _removePre49LegacyMetadata(OperationContext* opCtx);
+    void _removePre50LegacyMetadata(OperationContext* opCtx);
 
     /**
      * Creates a 'version.timestamp' for each one of the entries in the config server's
@@ -562,7 +554,7 @@ private:
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _createDBTimestampsFor50(OperationContext* opCtx);
+    void _upgradeDatabasesEntriesTo50(OperationContext* opCtx);
 
     /**
      * Downgrades the config.databases entries to prior 4.9 version. More specifically, it removes
@@ -570,7 +562,7 @@ private:
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _downgradeConfigDatabasesEntriesToPre50(OperationContext* opCtx);
+    void _downgradeDatabasesEntriesToPre50(OperationContext* opCtx);
 
     /**
      * For each one of the entries in config.collections where there is no 'timestamp',
@@ -581,7 +573,7 @@ private:
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _upgradeCollectionsAndChunksMetadataFor50(OperationContext* opCtx);
+    void _upgradeCollectionsAndChunksEntriesTo50(OperationContext* opCtx);
 
     /**
      * For each one of the entries in config.collections where there is a 'timestamp',
@@ -592,7 +584,7 @@ private:
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _downgradeCollectionsAndChunksMetadataToPre50(OperationContext* opCtx);
+    void _downgradeCollectionsAndChunksEntriesToPre50(OperationContext* opCtx);
 
     // The owning service context
     ServiceContext* const _serviceContext;

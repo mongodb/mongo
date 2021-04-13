@@ -39,7 +39,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/server_options.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

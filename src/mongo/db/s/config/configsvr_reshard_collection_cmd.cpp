@@ -45,7 +45,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {

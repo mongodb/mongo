@@ -36,12 +36,12 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/shard_collection_legacy.h"
+#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 // TODO (SERVER-54879): Remove this command entirely after 5.0 branches
 namespace mongo {

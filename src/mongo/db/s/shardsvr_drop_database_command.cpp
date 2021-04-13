@@ -37,12 +37,12 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/drop_database_coordinator.h"
 #include "mongo/db/s/drop_database_legacy.h"
+#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {

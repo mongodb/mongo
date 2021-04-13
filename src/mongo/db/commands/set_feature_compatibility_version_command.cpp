@@ -58,7 +58,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -333,11 +332,6 @@ private:
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            if (requestedVersion >= FeatureCompatibility::Version::kVersion49) {
-                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor49(opCtx);
-            }
-
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
             // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
             if (requestedVersion >= FeatureCompatibility::kLatest) {

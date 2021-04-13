@@ -60,7 +60,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
