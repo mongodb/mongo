@@ -1,12 +1,16 @@
-// @tags: [
-//   assumes_superuser_permissions,
-//   requires_fastcount,
-//   requires_non_retryable_commands,
-//   # applyOps uses the oplog that require replication support
-//   requires_replication,
-//   # Uses $v: 2 update oplog entries, only available in 4.7+.
-//   requires_fcv_47,
-// ]
+/*
+ * @tags: [
+ *   assumes_superuser_permissions,
+ *   requires_fastcount,
+ *   requires_non_retryable_commands,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ *   # applyOps uses the oplog that require replication support
+ *   requires_replication,
+ *   # Uses $v: 2 update oplog entries, only available in 4.7+.
+ *   requires_fcv_47,
+ * ]
+ */
 
 (function() {
 "use strict";

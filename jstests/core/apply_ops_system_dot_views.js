@@ -1,12 +1,17 @@
-// Tests that applyOps can include operations on the system.views namespace.
-// @tags: [
-//   assumes_superuser_permissions,
-//   # Views don't support OP_QUERY
-//   requires_find_command,
-//   requires_non_retryable_commands,
-//   # applyOps uses the oplog that require replication support
-//   requires_replication,
-// ]
+/*
+ * Tests that applyOps can include operations on the system.views namespace.
+ * @tags: [
+ *   assumes_superuser_permissions,
+ *   # Views don't support OP_QUERY
+ *   requires_find_command,
+ *   requires_non_retryable_commands,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ *   # applyOps uses the oplog that require replication support
+ *   requires_replication,
+ * ]
+ */
+
 (function() {
 "use strict";
 

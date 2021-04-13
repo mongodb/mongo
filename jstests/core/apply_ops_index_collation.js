@@ -1,16 +1,19 @@
-// Tests creation of indexes using applyOps for collections with a non-simple default collation.
-// Indexes created through applyOps should be built exactly according to their index spec, without
-// inheriting the collection default collation, since this is how the oplog entries are replicated.
-
-// @tags: [
-//     # Cannot implicitly shard accessed collections because of collection existing when none
-//     # expected.
-//     assumes_no_implicit_collection_creation_after_drop,
-//     requires_non_retryable_commands,
-//
-//     # applyOps uses the oplog that require replication support
-//     requires_replication,
-// ]
+/*
+ * Tests creation of indexes using applyOps for collections with a non-simple default collation.
+ * Indexes created through applyOps should be built exactly according to their index spec, without
+ * inheriting the collection default collation, since this is how the oplog entries are replicated.
+ *
+ * @tags: [
+ *   # Cannot implicitly shard accessed collections because of
+ *   # collection existing when none expected.
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_non_retryable_commands,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ *   # applyOps uses the oplog that require replication support
+ *   requires_replication,
+ * ]
+ */
 
 (function() {
 "use strict";

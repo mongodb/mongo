@@ -8,7 +8,8 @@
  * @tags: [
  *     requires_non_retryable_commands,
  *     requires_fastcount,
- *
+ *     # applyOps is not supported on mongos
+ *     assumes_against_mongod_not_mongos,
  *     # applyOps uses the oplog which requires replication support.
  *     requires_replication,
  * ]

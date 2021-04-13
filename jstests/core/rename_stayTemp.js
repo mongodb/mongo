@@ -1,4 +1,11 @@
-// @tags: [requires_non_retryable_commands, requires_replication]
+/*
+ * @tags: [
+ *   requires_non_retryable_commands,
+ *   requires_replication,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ * ]
+ */
 
 orig = 'rename_stayTemp_orig';
 dest = 'rename_stayTemp_dest';
