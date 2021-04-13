@@ -1,7 +1,8 @@
 // Tests internal 'sbe' command.
 // @tags: [
+//   assumes_against_mongod_not_mongos,
 //   does_not_support_stepdowns,
-//   uses_testing_only_commands
+//   uses_testing_only_commands,
 // ]
 
 (function() {
