@@ -43,6 +43,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
@@ -58,7 +59,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_map.h"
@@ -533,7 +533,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
-void ShardingCatalogManager::_removePre49LegacyMetadata(OperationContext* opCtx) {
+void ShardingCatalogManager::_removePre50LegacyMetadata(OperationContext* opCtx) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     // Delete all documents which have {dropped: true} from config.collections
     uassertStatusOK(
@@ -555,26 +555,20 @@ void ShardingCatalogManager::_removePre49LegacyMetadata(OperationContext* opCtx)
                                  true /* multi */);
 }
 
-void ShardingCatalogManager::upgradeMetadataFor49(OperationContext* opCtx) {
-    LOGV2(5276704, "Starting metadata upgrade to 4.9");
+void ShardingCatalogManager::upgradeMetadataFor50(OperationContext* opCtx) {
+    LOGV2(5581200, "Starting metadata upgrade to 5.0");
 
     try {
-        _removePre49LegacyMetadata(opCtx);
+        _removePre50LegacyMetadata(opCtx);
     } catch (const DBException& e) {
         LOGV2(5276708, "Failed to upgrade sharding metadata: {error}", "error"_attr = e.toString());
         throw;
     }
 
-    LOGV2(5276705, "Successfully upgraded metadata to 4.9");
-}
-
-void ShardingCatalogManager::upgradeMetadataFor50(OperationContext* opCtx) {
-    LOGV2(5581200, "Starting metadata upgrade to 5.0");
-
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         try {
-            _createDBTimestampsFor50(opCtx);
-            _upgradeCollectionsAndChunksMetadataFor50(opCtx);
+            _upgradeDatabasesEntriesTo50(opCtx);
+            _upgradeCollectionsAndChunksEntriesTo50(opCtx);
         } catch (const DBException& e) {
             LOGV2(5581201,
                   "Failed to upgrade sharding metadata: {error}",
@@ -591,8 +585,8 @@ void ShardingCatalogManager::downgradeMetadataToPre50(OperationContext* opCtx) {
 
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         try {
-            _downgradeConfigDatabasesEntriesToPre50(opCtx);
-            _downgradeCollectionsAndChunksMetadataToPre50(opCtx);
+            _downgradeCollectionsAndChunksEntriesToPre50(opCtx);
+            _downgradeDatabasesEntriesToPre50(opCtx);
         } catch (const DBException& e) {
             LOGV2(5581204,
                   "Failed to downgrade sharding metadata: {error}",
@@ -604,7 +598,7 @@ void ShardingCatalogManager::downgradeMetadataToPre50(OperationContext* opCtx) {
     LOGV2(5581205, "Successfully downgraded metadata to pre 5.0");
 }
 
-void ShardingCatalogManager::_createDBTimestampsFor50(OperationContext* opCtx) {
+void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCtx) {
     LOGV2(5258802, "Starting upgrade of config.databases");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -659,7 +653,7 @@ void ShardingCatalogManager::_createDBTimestampsFor50(OperationContext* opCtx) {
     LOGV2(5258803, "Successfully upgraded config.databases");
 }
 
-void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre50(OperationContext* opCtx) {
+void ShardingCatalogManager::_downgradeDatabasesEntriesToPre50(OperationContext* opCtx) {
     LOGV2(5258806, "Starting downgrade of config.databases");
 
     updateConfigDocumentDBDirect(
@@ -706,7 +700,7 @@ void ShardingCatalogManager::_downgradeConfigDatabasesEntriesToPre50(OperationCo
     LOGV2(5258807, "Successfully downgraded config.databases");
 }
 
-void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor50(OperationContext* opCtx) {
+void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50(OperationContext* opCtx) {
     LOGV2(5276700, "Starting upgrade of config.collections and config.chunks");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
@@ -833,8 +827,7 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksMetadataFor50(Operation
     LOGV2(5276701, "Successfully upgraded config.collections and config.chunks");
 }
 
-void ShardingCatalogManager::_downgradeCollectionsAndChunksMetadataToPre50(
-    OperationContext* opCtx) {
+void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50(OperationContext* opCtx) {
     LOGV2(5276702, "Starting downgrade of config.collections and config.chunks");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();

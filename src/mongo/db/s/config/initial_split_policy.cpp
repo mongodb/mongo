@@ -46,7 +46,6 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {

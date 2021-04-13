@@ -40,6 +40,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/shard_collection_legacy.h"
+#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/timeseries_lookup.h"
@@ -47,16 +48,13 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
 
-void inferCollationFromLocalCollection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const ShardsvrCreateCollection& request,
-    ShardsvrShardCollectionRequest* shardsvrShardCollectionRequest) {
+BSONObj inferCollationFromLocalCollection(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const ShardsvrCreateCollection& request) {
     auto& collation = request.getCollation().value();
     auto collator = uassertStatusOK(
         CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
@@ -82,7 +80,7 @@ void inferCollationFromLocalCollection(
     auto status =
         bsonExtractTypedField(collectionOptions, "collation", BSONType::Object, &collationElement);
     if (status.isOK()) {
-        defaultCollation = collationElement.Obj().getOwned();
+        defaultCollation = collationElement.Obj();
         uassert(ErrorCodes::BadValue,
                 "Default collation in collection metadata cannot be empty.",
                 !defaultCollation.isEmpty());
@@ -90,7 +88,7 @@ void inferCollationFromLocalCollection(
         uassertStatusOK(status);
     }
 
-    shardsvrShardCollectionRequest->setCollation(defaultCollation.getOwned());
+    return defaultCollation.getOwned();
 }
 
 // TODO (SERVER-54879): Remove this path after 5.0 branches
@@ -165,7 +163,8 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
             request.getInitialSplitPoints().value());
 
     if (request.getCollation()) {
-        inferCollationFromLocalCollection(opCtx, nss, request, &shardsvrShardCollectionRequest);
+        shardsvrShardCollectionRequest.setCollation(
+            inferCollationFromLocalCollection(opCtx, nss, request));
     }
 
     return shardCollectionLegacy(

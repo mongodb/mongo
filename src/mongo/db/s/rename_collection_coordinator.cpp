@@ -49,10 +49,8 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
-
 namespace {
 
 boost::optional<CollectionType> getShardedCollection(OperationContext* opCtx,
@@ -66,6 +64,7 @@ boost::optional<CollectionType> getShardedCollection(OperationContext* opCtx,
 }
 
 }  // namespace
+
 RenameCollectionCoordinator::RenameCollectionCoordinator(const BSONObj& initialState)
     : ShardingDDLCoordinator(initialState),
       _doc(RenameCollectionCoordinatorDocument::parse(

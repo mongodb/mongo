@@ -46,12 +46,10 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
 namespace shardmetadatautil {
-
 namespace {
 
 const WriteConcernOptions kLocalWriteConcern(1,
