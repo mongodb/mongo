@@ -187,7 +187,6 @@ selector:
   - jstests/core/getmore_invalidated_cursors.js
   - jstests/core/getmore_invalidated_documents.js
   - jstests/core/kill_cursors.js
-  - jstests/core/list_collections1.js
   - jstests/core/list_indexes.js
   - jstests/core/oro.js
 

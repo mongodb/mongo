@@ -1,9 +1,12 @@
-// @tags: [
-//     requires_non_retryable_commands,
-//
-//     # applyOps uses the oplog that require replication support
-//     requires_replication,
-// ]
+/*
+ * @tags: [
+ *   requires_non_retryable_commands,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ *   # applyOps uses the oplog that require replication support
+ *   requires_replication,
+ * ]
+ */
 
 (function() {
 'use strict';

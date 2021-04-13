@@ -22,12 +22,10 @@ selector:
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
-  - jstests/core/apply_ops*.js  # applyOps, SERVER-1439.
   - jstests/core/capped_convertToCapped1.js  # cloneCollectionAsCapped.
   - jstests/core/capped_empty.js  # emptycapped.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
-  - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/dbhash.js  # dbhash.
@@ -109,12 +107,6 @@ selector:
   - jstests/core/views/views_creation.js
   - jstests/core/views/views_drop.js
   - jstests/core/disallow_system_views_user_writes.js
-
-  # The tests below use applyOps, SERVER-1439.
-  - jstests/core/list_collections1.js
-  - jstests/core/list_collections_filter.js
-  - jstests/core/rename_stayTemp.js
-  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
 
   # These tests expect listCollections to return system.bucket.* collections, which are filtered
   # out by mongos when authentication is enabled.

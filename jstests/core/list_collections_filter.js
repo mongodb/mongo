@@ -1,5 +1,13 @@
-// Test SERVER-18622 listCollections should special case filtering by name.
-// @tags: [requires_replication]
+/*
+ * Test SERVER-18622 listCollections should special case filtering by name.
+ *
+ * @tags: [
+ *   requires_replication,
+ *   # applyOps is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ * ]
+ */
+
 (function() {
 "use strict";
 var mydb = db.getSiblingDB("list_collections_filter");

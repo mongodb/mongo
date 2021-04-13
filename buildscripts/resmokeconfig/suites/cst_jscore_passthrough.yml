@@ -283,7 +283,6 @@ selector:
   - jstests/core/json_schema/bsontype.js
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/list_collections1.js
-  - jstests/core/list_collections1.js
   - jstests/core/list_collections_filter.js
   - jstests/core/list_databases.js
   - jstests/core/list_databases.js
