@@ -31,9 +31,11 @@
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 
+#include <algorithm>
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -582,8 +584,22 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
         return;
     }
 
-    {
+    const bool isAlsoRecipient = [&] {
+        auto myShardId = _externalState->myShardId(cc().getServiceContext());
+        return std::find(_recipientShardIds.begin(), _recipientShardIds.end(), myShardId) !=
+            _recipientShardIds.end();
+    }();
+
+    if (isAlsoRecipient) {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+        RenameCollectionOptions options;
+        options.dropTarget = true;
+        uassertStatusOK(renameCollection(
+            opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
+    } else {
+        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }
