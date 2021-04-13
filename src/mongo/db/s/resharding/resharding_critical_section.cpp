@@ -64,7 +64,9 @@ ReshardingCriticalSection::~ReshardingCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
     AutoGetCollection autoColl(rawOpCtx, _nss, MODE_IX);
 
-    CollectionShardingRuntime::get(rawOpCtx, _nss)->exitCriticalSection(rawOpCtx);
+    auto* const csr = CollectionShardingRuntime::get(rawOpCtx, _nss);
+    auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(rawOpCtx, csr);
+    csr->exitCriticalSection(csrLock);
 }
 
 }  // namespace mongo

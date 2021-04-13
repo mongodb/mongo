@@ -131,11 +131,11 @@ public:
 
     /**
      * Method to control the collection's critical secion. Method listed below must be called with
-     * the collection lock in IX mode and the CSRLock in exclusive mode.
+     * the CSRLock in exclusive mode.
      *
      * In this method, the CSRLock ensures concurrent access to the critical section.
      */
-    void exitCriticalSection(OperationContext* opCtx);
+    void exitCriticalSection(const CSRLock&);
 
     /**
      * If the collection is currently in a critical section, returns the critical section signal to
