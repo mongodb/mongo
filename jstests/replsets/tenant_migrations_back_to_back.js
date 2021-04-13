@@ -108,7 +108,7 @@ assert.eq(mtabStatus["rejectBeforeTimestamp"], donorDoc.blockTimestamp, mtabStat
 const kBlocking = 3;
 const res = assert.commandWorked(
     donor2Primary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
-assert.eq(bsonWoCompare(res.inprog[0].instanceID, migration2Id), 0, tojson(res.inprog));
+assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migration2Id), 0, tojson(res.inprog));
 assert.eq(res.inprog[0].lastDurableState, kBlocking, tojson(res.inprog));
 
 // Get the block timestamp for this new migration.

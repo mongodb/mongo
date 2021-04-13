@@ -116,7 +116,8 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collName);
     assert.eq(docs.length, recipientColl.find().itcount());
     assert.docEq(recipientColl.find().sort({_id: 1}).toArray(), docs);
-    tenantMigrationTest.checkTenantDBHashes(tenantId);
+    TenantMigrationUtil.checkTenantDBHashes(
+        tenantMigrationTest.getDonorRst(), tenantMigrationTest.getRecipientRst(), tenantId);
 
     tenantMigrationTest.stop();
     recipientRst.stopSet();

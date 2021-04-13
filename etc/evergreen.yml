@@ -10103,6 +10103,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
+  - name: .tenant_migration
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
     distros:
@@ -11723,6 +11724,7 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
+  - name: .tenant_migration
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
@@ -11809,6 +11811,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
+  - name: .tenant_migration
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
