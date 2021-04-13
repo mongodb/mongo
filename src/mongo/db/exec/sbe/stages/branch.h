@@ -67,9 +67,7 @@ private:
     const value::SlotVector _outputVals;
     std::unique_ptr<vm::CodeFragment> _filterCode;
 
-    std::vector<value::SlotAccessor*> _inputThenAccessors;
-    std::vector<value::SlotAccessor*> _inputElseAccessors;
-    std::vector<value::ViewOfValueAccessor> _outValueAccessors;
+    std::vector<value::SwitchAccessor> _outValueAccessors;
 
     boost::optional<int> _activeBranch;
     bool _thenOpened{false};

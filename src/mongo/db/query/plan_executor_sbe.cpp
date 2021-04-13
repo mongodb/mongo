@@ -216,17 +216,14 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
     for (;;) {
         if (_state == State::kClosed) {
             if (_resumeRecordIdSlot) {
-                invariant(_resultRecordId);
-
-                auto [tag, val] = _resultRecordId->getViewOfValue();
                 uassert(4946306,
                         "Collection scan was asked to track resume token, but found a result "
                         "without a valid RecordId",
-                        tag == sbe::value::TypeTags::RecordId ||
-                            tag == sbe::value::TypeTags::Nothing);
-                _rootData.env->resetSlot(*_resumeRecordIdSlot, tag, val, false);
+                        _tagLastRecordId == sbe::value::TypeTags::RecordId ||
+                            _tagLastRecordId == sbe::value::TypeTags::Nothing);
+                _rootData.env->resetSlot(
+                    *_resumeRecordIdSlot, _tagLastRecordId, _valLastRecordId, false);
             }
-
             _state = State::kOpened;
             _root->open(false);
         }
@@ -260,6 +257,10 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
             insert_listener::waitForInserts(_opCtx, _yieldPolicy.get(), &cappedInsertNotifierData);
             // There may be more results, keep going.
             continue;
+        } else if (_resumeRecordIdSlot) {
+            invariant(_resultRecordId);
+
+            std::tie(_tagLastRecordId, _valLastRecordId) = _resultRecordId->getViewOfValue();
         }
 
         invariant(result == sbe::PlanState::ADVANCED);
