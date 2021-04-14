@@ -10083,10 +10083,15 @@ buildvariants:
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gcm_gen
   - name: replica_sets_ese_gen
+  - name: replica_sets_initsync_static_jscore_passthrough
+  - name: replica_sets_jscore_passthrough_gen
+  - name: replica_sets_kill_secondaries_jscore_passthrough
   - name: replica_sets_large_txns_format_gen
   - name: replica_sets_max_mirroring_gen
   - name: replica_sets_multiversion_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_update_v1_oplog_gen
+  - name: replica_sets_update_v1_oplog_jscore_passthrough
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
