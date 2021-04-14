@@ -56,24 +56,6 @@ def is_primitive_scalar_type(cpp_type):
     ]
 
 
-def get_primitive_scalar_type_default_value(cpp_type):
-    # type: (str) -> str
-    """
-    Return a default value for a primitive scalar type.
-
-    Assumes the IDL generated code verifies the user sets the value before serialization.
-    """
-    # pylint: disable=invalid-name
-    assert is_primitive_scalar_type(cpp_type)
-    if cpp_type == 'bool':
-        return 'false'
-    # TODO (SERVER-50101): Remove 'FeatureCompatibility::Version' once IDL supports a command
-    # cpp_type of C++ enum.
-    if cpp_type == 'ServerGlobalParams::FeatureCompatibility::Version':
-        return 'ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault44Behavior'
-    return '-1'
-
-
 def is_primitive_type(cpp_type):
     # type: (str) -> bool
     """Return True if a cpp_type is a primitive type and should not be returned as reference."""
