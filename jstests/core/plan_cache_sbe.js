@@ -26,7 +26,10 @@ const isSBEEnabled = (() => {
     const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
     return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
 })();
-
+const isLegacyMode = db.getMongo().readMode() === "legacy";
+// For legacy reads we always use the classic engine, even when SBE is turned on as a default
+// engine.
+const isSBECompat = isSBEEnabled && !isLegacyMode;
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 // We need two indexes so that the multi-planner is executed.
@@ -41,6 +44,6 @@ const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
 assert.eq(allStats.length, 1, allStats);
 const stats = allStats[0];
 assert(stats.hasOwnProperty("cachedPlan"), stats);
-assert.eq(stats.cachedPlan.hasOwnProperty("queryPlan"), isSBEEnabled, stats);
-assert.eq(stats.cachedPlan.hasOwnProperty("slotBasedPlan"), isSBEEnabled, stats);
+assert.eq(stats.cachedPlan.hasOwnProperty("queryPlan"), isSBECompat, stats);
+assert.eq(stats.cachedPlan.hasOwnProperty("slotBasedPlan"), isSBECompat, stats);
 })();
