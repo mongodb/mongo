@@ -555,8 +555,8 @@ void ShardingCatalogManager::_removePre50LegacyMetadata(OperationContext* opCtx)
                                  true /* multi */);
 }
 
-void ShardingCatalogManager::upgradeMetadataFor50(OperationContext* opCtx) {
-    LOGV2(5581200, "Starting metadata upgrade to 5.0");
+void ShardingCatalogManager::upgradeMetadataFor50Phase1(OperationContext* opCtx) {
+    LOGV2(5581200, "Starting metadata upgrade to 5.0 (phase 1)");
 
     try {
         _removePre50LegacyMetadata(opCtx);
@@ -568,34 +568,68 @@ void ShardingCatalogManager::upgradeMetadataFor50(OperationContext* opCtx) {
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         try {
             _upgradeDatabasesEntriesTo50(opCtx);
-            _upgradeCollectionsAndChunksEntriesTo50(opCtx);
+            _upgradeCollectionsAndChunksEntriesTo50Phase1(opCtx);
         } catch (const DBException& e) {
             LOGV2(5581201,
-                  "Failed to upgrade sharding metadata: {error}",
+                  "Failed to upgrade sharding metadata (phase 1): {error}",
                   "error"_attr = e.toString());
             throw;
         }
     }
 
-    LOGV2(5581202, "Successfully upgraded metadata to 5.0");
+    LOGV2(5581202, "Successfully upgraded metadata to 5.0 (phase 1)");
 }
 
-void ShardingCatalogManager::downgradeMetadataToPre50(OperationContext* opCtx) {
-    LOGV2(5581203, "Starting metadata downgrade to pre 5.0");
+void ShardingCatalogManager::upgradeMetadataFor50Phase2(OperationContext* opCtx) {
+    LOGV2(5581206, "Starting metadata upgrade to 5.0 (phase 2)");
 
     if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
         try {
-            _downgradeCollectionsAndChunksEntriesToPre50(opCtx);
-            _downgradeDatabasesEntriesToPre50(opCtx);
+            _upgradeCollectionsAndChunksEntriesTo50Phase2(opCtx);
         } catch (const DBException& e) {
-            LOGV2(5581204,
-                  "Failed to downgrade sharding metadata: {error}",
+            LOGV2(5581207,
+                  "Failed to upgrade sharding metadata (phase 2): {error}",
                   "error"_attr = e.toString());
             throw;
         }
     }
 
-    LOGV2(5581205, "Successfully downgraded metadata to pre 5.0");
+    LOGV2(5581208, "Successfully upgraded metadata to 5.0 (phase 2)");
+}
+
+void ShardingCatalogManager::downgradeMetadataToPre50Phase1(OperationContext* opCtx) {
+    LOGV2(5581203, "Starting metadata downgrade to pre 5.0 (phase 1)");
+
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
+        try {
+            _downgradeCollectionsAndChunksEntriesToPre50Phase1(opCtx);
+            _downgradeDatabasesEntriesToPre50(opCtx);
+        } catch (const DBException& e) {
+            LOGV2(5581204,
+                  "Failed to downgrade sharding metadata (phase 1): {error}",
+                  "error"_attr = e.toString());
+            throw;
+        }
+    }
+
+    LOGV2(5581205, "Successfully downgraded metadata to pre 5.0 (phase 1)");
+}
+
+void ShardingCatalogManager::downgradeMetadataToPre50Phase2(OperationContext* opCtx) {
+    LOGV2(5581209, "Starting metadata downgrade to pre 5.0 (phase 2)");
+
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
+        try {
+            _downgradeCollectionsAndChunksEntriesToPre50Phase2(opCtx);
+        } catch (const DBException& e) {
+            LOGV2(5581210,
+                  "Failed to downgrade sharding metadata (phase 2): {error}",
+                  "error"_attr = e.toString());
+            throw;
+        }
+    }
+
+    LOGV2(5581211, "Successfully downgraded metadata to pre 5.0 (phase 2)");
 }
 
 void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCtx) {
@@ -700,8 +734,9 @@ void ShardingCatalogManager::_downgradeDatabasesEntriesToPre50(OperationContext*
     LOGV2(5258807, "Successfully downgraded config.databases");
 }
 
-void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50(OperationContext* opCtx) {
-    LOGV2(5276700, "Starting upgrade of config.collections and config.chunks");
+void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase1(
+    OperationContext* opCtx) {
+    LOGV2(5276700, "Starting upgrade of config.collections and config.chunks (phase 1)");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -810,25 +845,31 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50(OperationCo
             uassertStatusOK(getStatusFromCommandResult(info));
     }
 
-    // Unset ns for all chunks on config.chunks
-    {
-        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-        // migrations.
-        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
-
-        updateConfigDocumentDBDirect(opCtx,
-                                     ChunkType::ConfigNS,
-                                     {} /* query */,
-                                     BSON("$unset" << BSON(ChunkType::ns(""))) /* update */,
-                                     false /* upsert */,
-                                     true /* multi */);
-    }
-
-    LOGV2(5276701, "Successfully upgraded config.collections and config.chunks");
+    LOGV2(5276701, "Successfully upgraded config.collections and config.chunks (phase 1)");
 }
 
-void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50(OperationContext* opCtx) {
-    LOGV2(5276702, "Starting downgrade of config.collections and config.chunks");
+void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase2(
+    OperationContext* opCtx) {
+    LOGV2(5276706, "Starting upgrade of config.chunks (phase 2)");
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations.
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
+    // Unset ns for all chunks on config.chunks
+    updateConfigDocumentDBDirect(opCtx,
+                                 ChunkType::ConfigNS,
+                                 {} /* query */,
+                                 BSON("$unset" << BSON(ChunkType::ns(""))) /* update */,
+                                 false /* upsert */,
+                                 true /* multi */);
+
+    LOGV2(5276707, "Successfully upgraded config.chunks (phase 2)");
+}
+
+void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase1(
+    OperationContext* opCtx) {
+    LOGV2(5276702, "Starting downgrade of config.collections and config.chunks (phase 1)");
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -926,23 +967,28 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50(Operat
             uassertStatusOK(getStatusFromCommandResult(info));
     }
 
+    LOGV2(5276703, "Successfully downgraded config.collections and config.chunks (phase 1)");
+}
+
+void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase2(
+    OperationContext* opCtx) {
+    LOGV2(5276709, "Starting downgrade of config.chunks (phase 2)");
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
+    // migrations.
+    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+
     // Unset the timestamp and the uuid for all chunks on config.chunks
-    {
-        // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
-        // migrations.
-        Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    updateConfigDocumentDBDirect(
+        opCtx,
+        ChunkType::ConfigNS,
+        {} /* query */,
+        BSON("$unset" << BSON(ChunkType::timestamp.name()
+                              << "" << ChunkType::collectionUUID() << "")) /* update */,
+        false /* upsert */,
+        true /* multi */);
 
-        updateConfigDocumentDBDirect(
-            opCtx,
-            ChunkType::ConfigNS,
-            {} /* query */,
-            BSON("$unset" << BSON(ChunkType::timestamp.name()
-                                  << "" << ChunkType::collectionUUID() << "")) /* update */,
-            false /* upsert */,
-            true /* multi */);
-    }
-
-    LOGV2(5276703, "Successfully downgraded config.collections and config.chunks");
+    LOGV2(5276710, "Successfully downgraded config.chunks (phase 2)");
 }
 
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {

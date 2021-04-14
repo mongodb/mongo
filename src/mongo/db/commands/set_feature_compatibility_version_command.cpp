@@ -368,7 +368,7 @@ private:
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
             // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
             if (requestedVersion >= FeatureCompatibility::kLatest) {
-                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50(opCtx);
+                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase1(opCtx);
             }
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
@@ -377,6 +377,12 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
+            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
+            if (requestedVersion >= FeatureCompatibility::kLatest) {
+                ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase2(opCtx);
+            }
         }
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -492,7 +498,7 @@ private:
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
             // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
             if (requestedVersion < FeatureCompatibility::kLatest) {
-                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50(opCtx);
+                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase1(opCtx);
             }
 
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
@@ -501,6 +507,12 @@ private:
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+
+            // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
+            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
+            if (requestedVersion < FeatureCompatibility::kLatest) {
+                ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase2(opCtx);
+            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);
