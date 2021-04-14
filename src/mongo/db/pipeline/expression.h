@@ -814,9 +814,13 @@ public:
 class ExpressionAllElementsTrue final : public ExpressionFixedArity<ExpressionAllElementsTrue, 1> {
 public:
     explicit ExpressionAllElementsTrue(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
     ExpressionAllElementsTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionAllElementsTrue, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -856,9 +860,13 @@ public:
 class ExpressionAnyElementTrue final : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
 public:
     explicit ExpressionAnyElementTrue(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {}
+        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
     ExpressionAnyElementTrue(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionAnyElementTrue, 1>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1843,9 +1851,13 @@ public:
 class ExpressionLog final : public ExpressionFixedArity<ExpressionLog, 2> {
 public:
     explicit ExpressionLog(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {}
+        : ExpressionFixedArity<ExpressionLog, 2>(expCtx) {
+        expCtx->sbeCompatible = false;
+    }
     ExpressionLog(ExpressionContext* const expCtx, ExpressionVector&& children)
-        : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {}
+        : ExpressionFixedArity<ExpressionLog, 2>(expCtx, std::move(children)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -2913,7 +2925,9 @@ public:
                            boost::intrusive_ptr<Expression> date,
                            boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoDayOfWeek>(
-              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {}
+              expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {
+        expCtx->sbeCompatible = false;
+    }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
         return Value(timeZone.isoDayOfWeek(date));

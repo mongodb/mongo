@@ -10,7 +10,7 @@ load('jstests/libs/dateutil.js');
 coll.drop();
 
 // Seed collection so that the pipeline will execute.
-assert.commandWorked(coll.insert({}));
+assert.commandWorked(coll.insert({date: ISODate("2021-04-14T04:48:00.00Z")}));
 
 /**
  * Helper for testing that 'op' returns 'expResult'.
@@ -20,7 +20,7 @@ function testOp(op, value, expResult) {
     let pipeline = [{$project: {_id: 0, result: {}}}];
     pipeline[0].$project.result[op] = value;
     let msg = "Exptected {" + op + ": " + value + "} to equal: " + expResult;
-    let res = coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}});
+    let res = assert.commandWorked(coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}}));
 
     // in the case of $dateToString the date is on property date
     let date = value.date || value;
@@ -44,6 +44,10 @@ function testOp(op, value, expResult) {
 testOp('$dateToString', {date: new Date("1900-12-31T23:59:59Z"), format: "%V-%G"}, "01-1901");
 // This was failing, but it shouldn't as it is the same as above, only rotated.
 testOp('$dateToString', {date: new Date("1900-12-31T23:59:59Z"), format: "%G-%V"}, "1901-01");
+
+// Test an example where $isoDayOfWeek depends on stored values, and therefore is not eligible for a
+// constant folding optimization.
+testOp('$isoDayOfWeek', '$date', 3);
 
 // 1900 is special because it's devisible by 4 and by 100 but not 400 so it's not a leap year.
 // 2000 is special, because it's devisible by 4, 100, 400 and so it is a leap year.
@@ -247,5 +251,5 @@ const SUNDAY = 7;
         }
     });
 });
-assert.eq(testOpCount, 485, 'Expected 485 tests to run');
+assert.eq(testOpCount, 486, "unexpected number of calls to 'testOp()'");
 })();
