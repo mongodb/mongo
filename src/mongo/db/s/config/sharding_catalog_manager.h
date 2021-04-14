@@ -406,18 +406,38 @@ public:
     /**
      * Patches-up persistent metadata for 5.0.
      *
-     * It shall be called when upgrading to 5.0 or newer versions.
+     * It shall be called when upgrading to 5.0 or newer versions, when shards are in phase-1 of the
+     * setFCV protocol.
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void upgradeMetadataFor50(OperationContext* opCtx);
+    void upgradeMetadataFor50Phase1(OperationContext* opCtx);
+
+    /**
+     * Patches-up persistent metadata for 5.0.
+     *
+     * It shall be called when upgrading to 5.0 or newer versions, when shards are in phase-2 of the
+     * setFCV protocol.
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void upgradeMetadataFor50Phase2(OperationContext* opCtx);
 
     /**
      * Patches-up persistent metadata for downgrade from 5.0.
      *
-     * It shall be called when downgrading from 5.0  to an earlier version.
+     * It shall be called when downgrading from 5.0 to an earlier version, when shards are in
+     * phase-1 of the setFCV protocol.
      * TODO SERVER-53283: Remove once 5.0 has been released.
      */
-    void downgradeMetadataToPre50(OperationContext* opCtx);
+    void downgradeMetadataToPre50Phase1(OperationContext* opCtx);
+
+    /**
+     * Patches-up persistent metadata for downgrade from 5.0.
+     *
+     * It shall be called when downgrading from 5.0 to an earlier version, when shards are in
+     * phase-2 of the setFCV protocol.
+     * TODO SERVER-53283: Remove once 5.0 has been released.
+     */
+    void downgradeMetadataToPre50Phase2(OperationContext* opCtx);
 
     //
     // For Diagnostics
@@ -565,26 +585,39 @@ private:
     void _downgradeDatabasesEntriesToPre50(OperationContext* opCtx);
 
     /**
-     * For each one of the entries in config.collections where there is no 'timestamp',
-     * transactionally:
-     * - Patches-up the entries in config.chunks with a 'ns' matching that of the collection to add
-     * a 'collectionUuid' field matching the uuid of the collection.
+     * For each one of the entries in config.collections where there is no 'timestamp':
+     * - Patches-up the entries in config.chunks to set their 'collectionUUID' and 'timestamp'
+     * fields.
      * - Creates a 'timestamp' in its entry in config.collections.
+     * , and builds the uuid_* indexes and drops the ns_* indexes on config.chunks.
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _upgradeCollectionsAndChunksEntriesTo50(OperationContext* opCtx);
+    void _upgradeCollectionsAndChunksEntriesTo50Phase1(OperationContext* opCtx);
 
     /**
-     * For each one of the entries in config.collections where there is a 'timestamp',
-     * transactionally:
-     * - Patches-up the entries in config.chunks with a 'ns' matching that of the collection to
-     * unset the 'collectionUuid' field.
-     * - Unsets the 'timestamp' in its entry in config.collections.
+     * Unsets the 'ns' field from all documents in config.chunks
      *
      * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
      */
-    void _downgradeCollectionsAndChunksEntriesToPre50(OperationContext* opCtx);
+    void _upgradeCollectionsAndChunksEntriesTo50Phase2(OperationContext* opCtx);
+
+    /**
+     * For each one of the entries in config.collections where there is a 'timestamp':
+     * - Patches-up the entries in config.chunks to set their 'ns' field.
+     * - Unsets the 'timestamp' field from its entry in config.collections.
+     * , and builds the ns_* indexes and drops the uuid_* indexes on config.chunks.
+     *
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
+     */
+    void _downgradeCollectionsAndChunksEntriesToPre50Phase1(OperationContext* opCtx);
+
+    /**
+     * Unsets the 'collectionUUID' and 'timestamp' fields from all documents in config.chunks
+     *
+     * TODO SERVER-53283: Remove once 5.0 becomes last-lts.
+     */
+    void _downgradeCollectionsAndChunksEntriesToPre50Phase2(OperationContext* opCtx);
 
     // The owning service context
     ServiceContext* const _serviceContext;
