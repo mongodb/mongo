@@ -189,11 +189,10 @@ private:
 } fcvTransitions;
 
 /**
- * Taken in shared mode by any operations that should not run while setFeatureCompatibilityVersion
- * is running.
+ * Taken in shared mode by any operations that need to ensure that the FCV does not change during
+ * its execution.
  *
- * setFCV takes this lock in exclusive mode so that it both does not run with the shared mode
- * operations and does not run with itself.
+ * setFCV takes this lock in exclusive mode when changing the FCV value.
  */
 Lock::ResourceMutex fcvLock("featureCompatibilityVersionLock");
 

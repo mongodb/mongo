@@ -76,6 +76,11 @@ MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 
 /**
+ * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
+ */
+Lock::ResourceMutex commandMutex("setFCVCommandMutex");
+
+/**
  * Deletes the persisted default read/write concern document.
  */
 void deletePersistedDefaultRWConcernDocument(OperationContext* opCtx) {
@@ -218,7 +223,7 @@ public:
         opCtx->setAlwaysInterruptAtStepDownOrUp();
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
-        const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+        Lock::ExclusiveLock setFCVCommandLock(opCtx->lockState(), commandMutex);
 
         auto request = SetFeatureCompatibilityVersion::parse(
             IDLParserErrorContext("setFeatureCompatibilityVersion"), cmdObj);
@@ -251,17 +256,22 @@ public:
                 "'phase' field is only valid to be specified on shards",
                 !request.getPhase() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-        checkInitialSyncFinished(opCtx);
-
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
-            // Start transition to 'requestedVersion' by updating the local FCV document to a
-            // 'kUpgrading' or 'kDowngrading' state, respectively.
-            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-                opCtx,
-                actualVersion,
-                requestedVersion,
-                isFromConfigServer,
-                true /* setTargetVersion */);
+            {
+                // Start transition to 'requestedVersion' by updating the local FCV document to a
+                // 'kUpgrading' or 'kDowngrading' state, respectively.
+                const auto fcvChangeRegion(
+                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+                checkInitialSyncFinished(opCtx);
+
+                FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                    opCtx,
+                    actualVersion,
+                    requestedVersion,
+                    isFromConfigServer,
+                    true /* setTargetVersion */);
+            }
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
@@ -290,14 +300,18 @@ public:
             _runDowngrade(opCtx, request);
         }
 
-        // Complete transition by updating the local FCV document to the fully upgraded or
-        // downgraded requestedVersion.
-        FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
-            opCtx,
-            serverGlobalParams.featureCompatibility.getVersion(),
-            requestedVersion,
-            isFromConfigServer,
-            false /* setTargetVersion */);
+        {
+            // Complete transition by updating the local FCV document to the fully upgraded or
+            // downgraded requestedVersion.
+            const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+            FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                opCtx,
+                serverGlobalParams.featureCompatibility.getVersion(),
+                requestedVersion,
+                isFromConfigServer,
+                false /* setTargetVersion */);
+        }
 
         return true;
     }
