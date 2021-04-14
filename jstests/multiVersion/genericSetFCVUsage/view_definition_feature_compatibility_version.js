@@ -52,6 +52,8 @@ const testCasesLastStable = testCasesLastContinuous.concat([
         }
     }],
     [{$project: {x: {$dateTrunc: {date: new Date("2020-02-02T02:02:02"), unit: "month"}}}}],
+    [{$group: {_id: null, count: {$count: {}}}}],
+    [{$bucket: {groupBy: "$a", boundaries: [0, 1], output: {count: {$count: {}}}}}],
 ]);
 
 const testCasesLastStableWithFeatureFlags = testCasesLastContinuousWithFeatureFlags.concat([
