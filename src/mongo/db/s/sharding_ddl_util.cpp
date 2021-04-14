@@ -242,6 +242,20 @@ void checkShardedRenamePreconditions(OperationContext* opCtx,
             tags.empty());
 }
 
+void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
+                                    const NamespaceString& fromNss,
+                                    const NamespaceString& toNss) {
+    const auto fromDB =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db()));
+
+    const auto toDB = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.db()));
+
+    uassert(ErrorCodes::CommandFailed,
+            "Source and destination collections must be on same shard",
+            fromDB.primaryId() == toDB.primaryId());
+}
+
 boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     OperationContext* opCtx,
     const NamespaceString& nss,

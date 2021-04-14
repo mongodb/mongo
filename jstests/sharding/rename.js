@@ -25,37 +25,42 @@ assert.eq(db.foo.count(), 0, '2.3');
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: 'test'}));
 s.ensurePrimaryShard('test', s.shard0.shardName);
-
 assert.commandWorked(
-    s.s0.adminCommand({enablesharding: 'otherDB', primaryShard: s.shard1.shardName}));
+    s.s0.adminCommand({enablesharding: 'otherDBSamePrimary', primaryShard: s.shard0.shardName}));
+
+assert.commandWorked(s.s0.adminCommand(
+    {enablesharding: 'otherDBDifferentPrimary', primaryShard: s.shard1.shardName}));
+
+jsTest.log('Testing renaming sharded collections');
+assert.commandWorked(
+    s.s0.adminCommand({shardCollection: 'test.shardedColl', key: {_id: 'hashed'}}));
 
 const DDLFeatureFlagParam = assert.commandWorked(
     s.configRS.getPrimary().adminCommand({getParameter: 1, featureFlagShardingFullDDLSupport: 1}));
 const isDDLFeatureFlagEnabled = DDLFeatureFlagParam.featureFlagShardingFullDDLSupport.value;
+// Ensure renaming to or from a sharded collection fails in the legacy path.
 if (!isDDLFeatureFlagEnabled) {
-    // Ensure renaming to or from a sharded collection fails.
-    jsTest.log('Testing renaming sharded collections');
-    assert.commandWorked(
-        s.s0.adminCommand({shardCollection: 'test.shardedColl', key: {_id: 'hashed'}}));
-
     // Renaming from a sharded collection
     assert.commandFailed(db.shardedColl.renameCollection('somethingElse'));
-
-    // Renaming to a sharded collection
-    assert.commandFailed(db.bar.renameCollection('shardedColl'));
 
     // Renaming to a sharded collection with dropTarget=true
     const dropTarget = true;
     assert.commandFailed(db.bar.renameCollection('shardedColl', dropTarget));
 }
 
+// Renaming to a sharded collection without dropTarget=true
+assert.commandFailed(db.bar.renameCollection('shardedColl'));
+
 // Renaming unsharded collection to a different db with different primary shard.
 db.unSharded.insert({x: 1});
 assert.commandFailedWithCode(
-    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDB.foo'}),
+    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBDifferentPrimary.foo'}),
     // TODO SERVER-54879 just check for ErrorCodes.CommandFailed
     [ErrorCodes.CommandFailed, 13137],
     "Source and destination collections must be on the same database.");
+
+// Renaming unsharded collection to a different db with same primary shard.
+assert.commandWorked(db.unSharded.renameCollection('otherDBSamePrimary.unsharded'));
 
 jsTest.log("Testing that rename operations involving views are not allowed");
 {

@@ -174,7 +174,13 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // Make sure the source collection exists
                 const auto optSourceCollType = getShardedCollection(opCtx, nss());
                 const bool sourceIsSharded = (bool)optSourceCollType;
-                if (!sourceIsSharded) {
+                if (sourceIsSharded) {
+                    uassert(ErrorCodes::CommandFailed,
+                            str::stream() << "Source and destination collections must be on the "
+                                             "same database because "
+                                          << fromNss << " is sharded.",
+                            fromNss.db() == toNss.db());
+                } else {
                     Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
                     Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
                     const auto sourceCollPtr =
@@ -183,6 +189,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     uassert(ErrorCodes::NamespaceNotFound,
                             str::stream() << "Collection " << fromNss << " doesn't exist.",
                             sourceCollPtr);
+
+                    if (fromNss.db() != toNss.db()) {
+                        sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
+                    }
                 }
 
                 _doc.setOptShardedCollInfo(optSourceCollType);
@@ -191,10 +201,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 {
                     Lock::DBLock dbLock(opCtx, toNss.db(), MODE_IS);
                     const auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, toNss.db());
-                    uassert(ErrorCodes::CommandNotSupportedOnView,
-                            str::stream() << "Can't rename to target collection `" << toNss
-                                          << "` because it is a view.",
-                            !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                    if (db) {
+                        uassert(ErrorCodes::CommandNotSupportedOnView,
+                                str::stream() << "Can't rename to target collection `" << toNss
+                                              << "` because it is a view.",
+                                !ViewCatalog::get(db)->lookup(opCtx, toNss.ns()));
+                    }
                 }
 
                 const auto targetIsSharded = (bool)getShardedCollection(opCtx, toNss);
@@ -303,7 +315,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     catalog->getCollectionRoutingInfoWithRefresh(opCtx, _doc.getTo()));
                 _response = RenameCollectionResponse(cm.isSharded() ? cm.getVersion()
                                                                     : ChunkVersion::UNSHARDED());
-
 
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,
