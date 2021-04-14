@@ -90,11 +90,15 @@ const isSBEEnabled = (() => {
     const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
     return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
 })();
+const isLegacyMode = db.getMongo().readMode() === "legacy";
+// For legacy reads we always use the classic engine, even when SBE is turned on as a default
+// engine.
+const isSBECompat = isSBEEnabled && !isLegacyMode;
 
 // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN from
 // the query plan instead.
-const plan = isSBEEnabled ? cacheEntry.cachedPlan.queryPlan
-                          : cacheEntry.creationExecStats[0].executionStages;
+const plan =
+    isSBECompat ? cacheEntry.cachedPlan.queryPlan : cacheEntry.creationExecStats[0].executionStages;
 const ixScanStage = getPlanStage(plan, "IXSCAN");
 assert.neq(ixScanStage, null, () => tojson(plan));
 assert.eq(ixScanStage.keyPattern, {"$_path": 1, "b": 1}, () => tojson(plan));
