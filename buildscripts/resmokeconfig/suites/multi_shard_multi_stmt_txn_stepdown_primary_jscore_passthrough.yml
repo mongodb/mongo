@@ -19,7 +19,6 @@ selector:
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
-  - jstests/core/diagdata.js # Command not supported in mongos
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/fsync.js  # uses fsync.
   - jstests/core/geo_s2cursorlimitskip.js  # profiling.
@@ -52,7 +51,6 @@ selector:
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
   - jstests/core/no_db_created.js
-  - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
   # These tests fail because sharded clusters do not clean up correctly after failed index builds.
   # See SERVER-33207 as an example.

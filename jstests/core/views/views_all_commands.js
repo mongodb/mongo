@@ -1,4 +1,5 @@
 // @tags: [
+//   assumes_unsharded_collection,
 //   assumes_superuser_permissions,
 //   does_not_support_stepdowns,
 //   requires_emptycapped,

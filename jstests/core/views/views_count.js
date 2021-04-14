@@ -1,6 +1,7 @@
 // Test the count command with views.
 //
 // @tags: [
+//   assumes_unsharded_collection,
 //   requires_fastcount,
 // ]
 

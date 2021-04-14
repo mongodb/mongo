@@ -2,6 +2,7 @@
  * Tests the find command on views.
  *
  * @tags: [
+ *   assumes_unsharded_collection,
  *   requires_find_command,
  *   requires_getmore,
  * ]

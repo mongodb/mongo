@@ -1,4 +1,5 @@
 // @tags: [
+//   assumes_unsharded_collection,
 //   requires_non_retryable_commands,
 //   requires_fcv_49
 // ]

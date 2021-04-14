@@ -1,6 +1,7 @@
 /**
  * Tests the behavior of views when the backing view or collection is changed.
  * @tags: [
+ *   assumes_unsharded_collection,
  *   assumes_superuser_permissions,
  *   requires_find_command,
  *   requires_non_retryable_commands,

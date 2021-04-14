@@ -1,4 +1,10 @@
-// Tests basic functionality of read-only, non-materialized views.
+/**
+ * Tests basic functionality of read-only, non-materialized views.
+ *
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
+ */
 
 (function() {
 "use strict";

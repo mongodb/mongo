@@ -6,7 +6,7 @@
 //
 // @tags: [
 //     assumes_read_preference_unchanged,
-//
+//     assumes_unsharded_collection,
 //     # top command is not available on embedded
 //     incompatible_with_embedded,
 // ]

@@ -1,4 +1,11 @@
-// Test that $collStats works on a view and in view pipelines as expected.
+/**
+ * Test that $collStats works on a view and in view pipelines as expected.
+ *
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
+ */
+
 (function() {
 "use strict";
 

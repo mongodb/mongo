@@ -2,6 +2,7 @@
  * Tests aggregation on views for proper pipeline concatenation and semantics.
  *
  * @tags: [
+ *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
  *   requires_find_command,

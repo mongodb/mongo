@@ -5,6 +5,7 @@
  * embedded null character (SERVER-36859).
  *
  * @tags: [
+ *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.
  *   assumes_against_mongod_not_mongos,
  *   # applyOps is not retryable.

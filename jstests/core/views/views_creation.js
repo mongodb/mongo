@@ -2,6 +2,7 @@
  * Test the creation of views with various options.
  *
  * @tags: [
+ *   assumes_unsharded_collection,
  *   # applyOps is not available on mongos.
  *   assumes_against_mongod_not_mongos,
  *   assumes_superuser_permissions,

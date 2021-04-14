@@ -1,4 +1,11 @@
-// Test the distinct command with views.
+/**
+ * Test the distinct command with views.
+ *
+ * @tags: [
+ *   assumes_unsharded_collection,
+ * ]
+ */
+
 (function() {
 "use strict";
 
