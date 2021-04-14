@@ -10090,6 +10090,7 @@ buildvariants:
   - name: sharding_multiversion_gen
   - name: sharding_update_v1_oplog_gen
   - name: jsCore_compatibility
+  - name: ese
     distros:
     - rhel80-medium
 
