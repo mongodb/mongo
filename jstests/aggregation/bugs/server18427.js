@@ -7,7 +7,7 @@ load('jstests/aggregation/extras/utils.js');
 'use strict';
 var coll = db.log_exponential_expressions;
 coll.drop();
-assert.commandWorked(coll.insert({_id: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 8, b: 2}));
 
 var decimalE = NumberDecimal("2.718281828459045235360287471352662");
 var decimal1overE = NumberDecimal("0.3678794411714423215955237701614609");
@@ -50,6 +50,10 @@ testOp({$log: [NaN, NumberDecimal(10)]}, NaN);
 testOp({$log: [NumberDecimal(10), NaN]}, NaN);
 testOp({$log10: [NaN]}, NaN);
 testOp({$ln: [NaN]}, NaN);
+
+// Test that $log still works when the inputs are field path expressions, meaning that the
+// expression is not eligible for constant folding.
+testOp({$log: ["$a", "$b"]}, 3);
 
 // Invalid input: non-numeric/non-null, bases not positive or equal to 1, args not positive.
 
