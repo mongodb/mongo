@@ -1176,12 +1176,17 @@ inline bool isQuerySbeCompatible(OperationContext* opCtx,
             return part.fieldPath &&
                 !FieldRef(part.fieldPath->fullPath()).hasNumericPathComponents();
         });
+    // A find command with 'ntoreturn' is not supported in SBE due to the possibility of an
+    // ENSURE_SORTED stage.
+    const bool doesNotNeedEnsureSorted = !cq->getFindCommandRequest().getNtoreturn();
+
     // OP_QUERY style find commands are not currently supported by SBE.
     const bool isNotLegacy = !CurOp::get(opCtx)->isLegacyQuery();
+
     // Queries against a time-series collection are not currently supported by SBE.
     const bool isQueryNotAgainstTimeseriesCollection = !(cq->nss().isTimeseriesBucketsCollection());
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
-        isNotLegacy && isQueryNotAgainstTimeseriesCollection &&
+        isNotLegacy && doesNotNeedEnsureSorted && isQueryNotAgainstTimeseriesCollection &&
         doesNotSortOnMetaOrPathWithNumericComponents;
 }
 }  // namespace
