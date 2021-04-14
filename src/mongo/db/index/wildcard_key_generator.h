@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/wildcard_projection.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -90,6 +91,7 @@ private:
                            BSONObj obj,
                            bool objIsArray,
                            FieldRef* path,
+                           KeyStringSet* nonWildcardKeys,
                            KeyStringSet::sequence_type* keys,
                            KeyStringSet::sequence_type* multikeyPaths,
                            boost::optional<RecordId> id) const;
@@ -98,9 +100,15 @@ private:
     void _addMultiKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
                       const FieldRef& fullPath,
                       KeyStringSet::sequence_type* multikeyPaths) const;
+    void _addWildcard(KeyString::PooledBuilder& keyString,
+                      BSONElement elem,
+                      const FieldRef& fullPath,
+                      KeyStringSet::sequence_type* keys,
+                      boost::optional<RecordId> id) const;
     void _addKey(SharedBufferFragmentBuilder& pooledBufferBuilder,
                  BSONElement elem,
                  const FieldRef& fullPath,
+                 KeyStringSet* nonWildcardKeys,
                  KeyStringSet::sequence_type* keys,
                  boost::optional<RecordId> id) const;
 
@@ -109,11 +117,13 @@ private:
                                BSONElement elem,
                                const FieldRef& fullPath,
                                bool enclosingObjIsArray,
+                               KeyStringSet* nonWildcardKeys,
                                KeyStringSet::sequence_type* keys,
                                boost::optional<RecordId> id) const;
     bool _addKeyForEmptyLeaf(SharedBufferFragmentBuilder& pooledBufferBuilder,
                              BSONElement elem,
                              const FieldRef& fullPath,
+                             KeyStringSet* nonWildcardKeys,
                              KeyStringSet::sequence_type* keys,
                              boost::optional<RecordId> id) const;
 
@@ -122,5 +132,7 @@ private:
     const BSONObj _keyPattern;
     const KeyString::Version _keyStringVersion;
     const Ordering _ordering;
+
+    std::unique_ptr<BtreeKeyGenerator> _indexKeyGen;
 };
 }  // namespace mongo
