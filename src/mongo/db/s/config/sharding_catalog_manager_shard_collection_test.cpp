@@ -172,8 +172,12 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
                                                               3 /* numShards */,
                                                               false /* collectionIsEmpty */);
         ASSERT(!optimization->isOptimized());
-        return optimization->createFirstChunks(
-            opCtx.get(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        return optimization->createFirstChunks(opCtx.get(),
+                                               kShardKeyPattern,
+                                               {kNamespace,
+                                                UUID::gen(),
+                                                ShardId("shard1"),
+                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
     });
 
     expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
@@ -219,11 +223,13 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromClient_ManyChun
                                                               zones,
                                                               3 /* numShards */,
                                                               collectionIsEmpty);
-
-
         ASSERT(optimization->isOptimized());
-        return optimization->createFirstChunks(
-            opCtx.get(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        return optimization->createFirstChunks(opCtx.get(),
+                                               kShardKeyPattern,
+                                               {kNamespace,
+                                                UUID::gen(),
+                                                ShardId("shard1"),
+                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -255,12 +261,12 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {
                                                           zones,
                                                           3 /* numShards */,
                                                           collectionIsEmpty);
-
-
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        operationContext(),
+        kShardKeyPattern,
+        {kNamespace, UUID::gen(), ShardId("shard1"), ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
 
     ASSERT_EQ(1U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
@@ -301,12 +307,14 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_SplitPoints_FromClient_ManyChunksD
                                                               zones,
                                                               3 /* numShards */,
                                                               collectionIsEmpty);
-
-
         ASSERT(optimization->isOptimized());
 
-        return optimization->createFirstChunks(
-            operationContext(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        return optimization->createFirstChunks(operationContext(),
+                                               kShardKeyPattern,
+                                               {kNamespace,
+                                                UUID::gen(),
+                                                ShardId("shard1"),
+                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -351,12 +359,14 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_NoSplitPoints_OneChunkToPrimary) {
                                                               zones,
                                                               3 /* numShards */,
                                                               collectionIsEmpty);
-
-
         ASSERT(optimization->isOptimized());
 
-        return optimization->createFirstChunks(
-            operationContext(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        return optimization->createFirstChunks(operationContext(),
+                                               kShardKeyPattern,
+                                               {kNamespace,
+                                                UUID::gen(),
+                                                ShardId("shard1"),
+                                                ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
     });
 
     const auto& firstChunks = future.default_timed_get();
@@ -387,12 +397,12 @@ TEST_F(CreateFirstChunksTest, EmptyCollection_WithZones_ManyChunksOnFirstZoneSha
                                                           zones,
                                                           3 /* numShards */,
                                                           collectionIsEmpty);
-
-
     ASSERT(optimization->isOptimized());
 
     const auto firstChunks = optimization->createFirstChunks(
-        operationContext(), kShardKeyPattern, {kNamespace, boost::none, ShardId("shard1")});
+        operationContext(),
+        kShardKeyPattern,
+        {kNamespace, UUID::gen(), ShardId("shard1"), ChunkEntryFormat::kNamespaceOnlyNoTimestamps});
 
     ASSERT_EQ(2U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[0].getName(), firstChunks.chunks[0].getShard());

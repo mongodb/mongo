@@ -214,6 +214,11 @@ public:
 
     ChunkType();
     ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
+    ChunkType(NamespaceString nss,
+              CollectionUUID collectionUUID,
+              ChunkRange range,
+              ChunkVersion version,
+              ShardId shardId);
     ChunkType(CollectionUUID collectionUUID,
               ChunkRange range,
               ChunkVersion version,

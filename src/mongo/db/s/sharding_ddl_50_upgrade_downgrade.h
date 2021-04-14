@@ -43,6 +43,17 @@ struct DatabaseEntryFormat {
     static Format get(const FixedFCVRegion& fcvRegion);
 };
 
-// TODO SERVER-56065: Add the CollectionEntryFormat selector
+struct ChunkEntryFormat {
+    enum Format {
+        kNamespaceOnlyNoTimestamps,       // Chunks have ns, no timestamps in the version
+        kNamespaceAndUUIDNoTimestamps,    // Chunks have ns and UUID, no timestamps in the version
+        kNamespaceAndUUIDWithTimestamps,  // Chunks have ns and UUID, with timestamps in the version
+        kUUIDOnlyWithTimestamps,          // Chunks have UUID, with timestamps in the version
+    };
+
+    static Format get(const FixedFCVRegion& fcvRegion);
+    static Format getForVersionCallerGuaranteesFCVStability(
+        ServerGlobalParams::FeatureCompatibility::Version version);
+};
 
 }  // namespace mongo

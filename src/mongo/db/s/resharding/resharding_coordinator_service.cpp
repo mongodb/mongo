@@ -43,7 +43,6 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -716,11 +715,10 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         // shard, so just pass in a random shard.
         const SplitPolicyParams splitParams{
             tempNs,
-            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                serverGlobalParams.featureCompatibility)
-                ? boost::optional<UUID>(coordinatorDoc.getReshardingUUID())
-                : boost::none,
-            *donorShardIds.begin()};
+            coordinatorDoc.getReshardingUUID(),
+            *donorShardIds.begin(),
+            ChunkEntryFormat::getForVersionCallerGuaranteesFCVStability(
+                ServerGlobalParams::FeatureCompatibility::Version::kVersion50)};
         auto splitResult = initialSplitter.createFirstChunks(opCtx, shardKey, splitParams);
         initialChunks = std::move(splitResult.chunks);
 

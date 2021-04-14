@@ -33,7 +33,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/shard_collection_legacy.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
@@ -93,13 +92,10 @@ public:
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto createCollectionResponse = shardCollectionLegacy(
-            opCtx,
-            nss,
-            cmdObj,
-            true /* requestIsFromCSRS */,
-            feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-                serverGlobalParams.featureCompatibility) /* use50MetadataFormat */);
+        FixedFCVRegion fcvRegion(opCtx);
+
+        auto createCollectionResponse =
+            shardCollectionLegacy(opCtx, nss, cmdObj, true /* requestIsFromCSRS */, fcvRegion);
 
         createCollectionResponse.serialize(&result);
         result.append("collectionsharded", nss.toString());

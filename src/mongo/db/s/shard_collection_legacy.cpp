@@ -376,7 +376,7 @@ void writeFirstChunksToConfig(OperationContext* opCtx,
         ShardingCatalogClient::kMajorityWriteConcern);
 }
 
-void updateShardingCatalogEntryForCollection(
+void writeShardingCatalogEntryForCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardCollectionTargetState& prerequisites,
@@ -449,7 +449,7 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                          const ShardsvrShardCollectionRequest& request,
                                          const ShardId& dbPrimaryShardId,
                                          bool mustTakeDistLock,
-                                         bool use50MetadataFormat) {
+                                         const FixedFCVRegion& fcvRegion) {
     // Fast check for whether the collection is already sharded without taking any locks
     if (auto createCollectionResponseOpt =
             checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
@@ -465,12 +465,12 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
             // succeded or not, which might cause the local shard version to differ from the config
             // server, so we clear the metadata to allow another operation to refresh it.
             try {
-                updateShardingCatalogEntryForCollection(opCtx,
-                                                        nss,
-                                                        targetState,
-                                                        initialChunks,
-                                                        *request.getCollation(),
-                                                        request.getUnique());
+                writeShardingCatalogEntryForCollection(opCtx,
+                                                       nss,
+                                                       targetState,
+                                                       initialChunks,
+                                                       *request.getCollation(),
+                                                       request.getUnique());
 
             } catch (const DBException&) {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
@@ -603,13 +603,11 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
                                                               targetState->tags,
                                                               getNumShards(opCtx),
                                                               targetState->collectionIsEmpty);
-        boost::optional<CollectionUUID> optCollectionUUID;
-        if (use50MetadataFormat) {
-            optCollectionUUID = targetState->uuid;
-        }
 
         initialChunks = splitPolicy->createFirstChunks(
-            opCtx, targetState->shardKeyPattern, {nss, optCollectionUUID, dbPrimaryShardId});
+            opCtx,
+            targetState->shardKeyPattern,
+            {nss, targetState->uuid, dbPrimaryShardId, ChunkEntryFormat::get(fcvRegion)});
 
         // There must be at least one chunk.
         invariant(initialChunks.chunks.size());
@@ -664,7 +662,7 @@ CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                const BSONObj& cmdObj,
                                                bool requestFromCSRS,
-                                               bool use50MetadataFormat) {
+                                               const FixedFCVRegion& fcvRegion) {
     auto request = ShardsvrShardCollectionRequest::parse(
         IDLParserErrorContext("shardCollectionLegacy"), cmdObj);
     if (!request.getCollation())
@@ -693,7 +691,7 @@ CreateCollectionResponse shardCollectionLegacy(OperationContext* opCtx,
                                        request,
                                        ShardingState::get(opCtx)->shardId(),
                                        !requestFromCSRS,
-                                       use50MetadataFormat);
+                                       fcvRegion);
         } catch (const DBException& e) {
             scopedShardCollection.emplaceResponse(e.toStatus());
             throw;

@@ -49,4 +49,35 @@ DatabaseEntryFormat::Format DatabaseEntryFormat::get(const FixedFCVRegion& fcvRe
     }
 }
 
+ChunkEntryFormat::Format ChunkEntryFormat::get(const FixedFCVRegion& fcvRegion) {
+    return getForVersionCallerGuaranteesFCVStability(fcvRegion->getVersion());
+}
+
+ChunkEntryFormat::Format ChunkEntryFormat::getForVersionCallerGuaranteesFCVStability(
+    ServerGlobalParams::FeatureCompatibility::Version version) {
+    switch (version) {
+        case FCVersion::kUpgradingFrom44To50:
+        case FCVersion::kUpgradingFrom49To50:
+            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
+                ? Format::kNamespaceAndUUIDWithTimestamps
+                : Format::kNamespaceOnlyNoTimestamps;
+        case FCVersion::kVersion50:
+            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
+                ? Format::kUUIDOnlyWithTimestamps
+                : Format::kNamespaceOnlyNoTimestamps;
+        case FCVersion::kDowngradingFrom50To49:
+        case FCVersion::kDowngradingFrom50To44:
+            return feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()
+                ? Format::kNamespaceAndUUIDNoTimestamps
+                : Format::kNamespaceOnlyNoTimestamps;
+        case FCVersion::kVersion49:
+        case FCVersion::kVersion48:
+        case FCVersion::kVersion47:
+        case FCVersion::kFullyDowngradedTo44:
+            return Format::kNamespaceOnlyNoTimestamps;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 }  // namespace mongo

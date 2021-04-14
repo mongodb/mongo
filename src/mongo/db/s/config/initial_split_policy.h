@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/resharded_chunk_gen.h"
@@ -46,11 +47,10 @@ namespace mongo {
 
 struct SplitPolicyParams {
     NamespaceString nss;
-    // If collectionUUID is set, then only the uuid field will be persisted on the config.chunks
-    // document(s), but not the nss. If collectionUUID is not set, then only nss will be persisted
-    // on config.chunks, but not the uuid.
-    boost::optional<CollectionUUID> collectionUUID;
+    UUID collectionUUID;
     ShardId primaryShardId;
+
+    ChunkEntryFormat::Format configFormat;
 };
 
 class InitialSplitPolicy {

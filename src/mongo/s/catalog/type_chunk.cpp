@@ -214,6 +214,18 @@ ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version
       _version(std::move(version)),
       _shard(std::move(shardId)) {}
 
+ChunkType::ChunkType(NamespaceString nss,
+                     CollectionUUID collectionUUID,
+                     ChunkRange range,
+                     ChunkVersion version,
+                     ShardId shardId)
+    : _nss(std::move(nss)),
+      _collectionUUID(std::move(collectionUUID)),
+      _min(range.getMin()),
+      _max(range.getMax()),
+      _version(std::move(version)),
+      _shard(std::move(shardId)) {}
+
 ChunkType::ChunkType(CollectionUUID collectionUUID,
                      ChunkRange range,
                      ChunkVersion version,

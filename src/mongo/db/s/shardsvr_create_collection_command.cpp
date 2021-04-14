@@ -35,7 +35,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -51,6 +50,9 @@
 
 namespace mongo {
 namespace {
+
+using FeatureCompatibility = ServerGlobalParams::FeatureCompatibility;
+using FCVersion = FeatureCompatibility::Version;
 
 BSONObj inferCollationFromLocalCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
@@ -94,7 +96,8 @@ BSONObj inferCollationFromLocalCollection(OperationContext* opCtx,
 // TODO (SERVER-54879): Remove this path after 5.0 branches
 CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
                                                 const NamespaceString& nss,
-                                                const ShardsvrCreateCollection& request) {
+                                                const ShardsvrCreateCollection& request,
+                                                const FixedFCVRegion& fcvRegion) {
     const auto dbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, nss.db()));
 
@@ -167,13 +170,11 @@ CreateCollectionResponse createCollectionLegacy(OperationContext* opCtx,
             inferCollationFromLocalCollection(opCtx, nss, request));
     }
 
-    return shardCollectionLegacy(
-        opCtx,
-        nss,
-        shardsvrShardCollectionRequest.toBSON(),
-        false /* requestIsFromCSRS */,
-        feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility) /* use50MetadataFormat */);
+    return shardCollectionLegacy(opCtx,
+                                 nss,
+                                 shardsvrShardCollectionRequest.toBSON(),
+                                 false /* requestIsFromCSRS */,
+                                 fcvRegion);
 }
 
 CreateCollectionResponse createCollection(OperationContext* opCtx,
@@ -242,11 +243,12 @@ public:
                     "Create Collection path has not been implemented",
                     request().getShardKey());
 
+            FixedFCVRegion fcvRegion(opCtx);
+
             bool useNewPath = [&] {
-                return feature_flags::gShardingFullDDLSupport.isEnabled(
-                           serverGlobalParams.featureCompatibility) &&
-                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(
-                        serverGlobalParams.featureCompatibility);
+                return fcvRegion->getVersion() == FCVersion::kVersion50 &&
+                    feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion) &&
+                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(*fcvRegion);
             }();
 
             if (!useNewPath) {
@@ -254,7 +256,7 @@ public:
                             1,
                             "Running legacy create collection procedure",
                             "namespace"_attr = ns());
-                return createCollectionLegacy(opCtx, ns(), request());
+                return createCollectionLegacy(opCtx, ns(), request(), fcvRegion);
             }
 
             LOGV2_DEBUG(
