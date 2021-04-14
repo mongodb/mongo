@@ -45,6 +45,8 @@ using boost::optional;
 namespace mongo::window_function {
 
 REGISTER_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
+REGISTER_WINDOW_FUNCTION(first, ExpressionFirst::parse);
+REGISTER_WINDOW_FUNCTION(last, ExpressionLast::parse);
 
 StringMap<Expression::Parser> Expression::parserMap;
 
@@ -123,6 +125,63 @@ boost::intrusive_ptr<Expression> ExpressionExpMovingAvg::parse(
                                 << "' field or an '" << kAlphaArg << "' field");
     }
 }
+
+boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
+    BSONObj obj,
+    const boost::optional<SortPattern>& sortBy,
+    ExpressionContext* expCtx,
+    Sense sense) {
+    // Example document:
+    // {
+    //   accumulatorName: <expr>,
+    //   window: {...} // optional
+    // }
+
+    const std::string& accumulatorName = senseToAccumulatorName(sense);
+    boost::optional<WindowBounds> bounds;
+    boost::intrusive_ptr<::mongo::Expression> input;
+    for (const auto& arg : obj) {
+        auto argName = arg.fieldNameStringData();
+        if (argName == kWindowArg) {
+            uassert(ErrorCodes::FailedToParse,
+                    "'window' field must be an object",
+                    obj[kWindowArg].type() == BSONType::Object);
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "saw multiple 'window' fields in '" << accumulatorName
+                                  << "' expression",
+                    bounds == boost::none);
+            bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+        } else if (argName == StringData(accumulatorName)) {
+            input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
+
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << accumulatorName << " got unexpected argument: " << argName);
+        }
+    }
+    tassert(ErrorCodes::FailedToParse,
+            str::stream() << accumulatorName << " parser called with no " << accumulatorName
+                          << " key",
+            input);
+
+    // The default window bounds are [unbounded, unbounded].
+    if (!bounds) {
+        bounds = WindowBounds{
+            WindowBounds::DocumentBased{WindowBounds::Unbounded{}, WindowBounds::Unbounded{}}};
+    }
+
+    switch (sense) {
+        case Sense::kFirst:
+            return make_intrusive<ExpressionFirst>(expCtx, std::move(input), std::move(*bounds));
+        case Sense::kLast:
+            return make_intrusive<ExpressionLast>(expCtx, std::move(input), std::move(*bounds));
+        default:
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << accumulatorName << " is not $first or $last");
+            return nullptr;
+    }
+}
+
 
 MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers

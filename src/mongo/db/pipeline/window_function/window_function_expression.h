@@ -643,4 +643,72 @@ public:
     }
 };
 
+
+class ExpressionFirstLast : public Expression {
+public:
+    enum Sense : int {
+        kFirst,
+        kLast,
+    };
+
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx,
+                                                  Sense sense);
+    static std::string senseToAccumulatorName(Sense sense) {
+        switch (sense) {
+            case Sense::kFirst:
+                return "$first";
+            case Sense::kLast:
+                return "$last";
+            default:
+                return "unrecognized sense";
+        }
+    }
+};
+
+class ExpressionFirst : public Expression {
+public:
+    ExpressionFirst(ExpressionContext* expCtx,
+                    boost::intrusive_ptr<::mongo::Expression> input,
+                    WindowBounds bounds)
+        : Expression(expCtx, "$first", std::move(input), std::move(bounds)) {}
+
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx) {
+        return ExpressionFirstLast::parse(obj, sortBy, expCtx, ExpressionFirstLast::Sense::kFirst);
+    }
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        MONGO_UNREACHABLE_TASSERT(5490701);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        MONGO_UNREACHABLE_TASSERT(5490702);
+    }
+};
+
+class ExpressionLast : public Expression {
+public:
+    ExpressionLast(ExpressionContext* expCtx,
+                   boost::intrusive_ptr<::mongo::Expression> input,
+                   WindowBounds bounds)
+        : Expression(expCtx, "$last", std::move(input), std::move(bounds)) {}
+
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx) {
+        return ExpressionFirstLast::parse(obj, sortBy, expCtx, ExpressionFirstLast::Sense::kLast);
+    }
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final {
+        MONGO_UNREACHABLE_TASSERT(5490701);
+    }
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final {
+        MONGO_UNREACHABLE_TASSERT(5490702);
+    }
+};
+
 }  // namespace mongo::window_function

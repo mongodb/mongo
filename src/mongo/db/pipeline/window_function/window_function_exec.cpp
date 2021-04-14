@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
@@ -116,6 +117,13 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     if (auto deriv =
             dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
         return translateDerivative(iter, *deriv, sortBy);
+    } else if (auto first =
+                   dynamic_cast<window_function::ExpressionFirst*>(functionStmt.expr.get())) {
+        return std::make_unique<WindowFunctionExecFirst>(
+            iter, first->input(), first->bounds(), boost::none);
+    } else if (auto last =
+                   dynamic_cast<window_function::ExpressionLast*>(functionStmt.expr.get())) {
+        return std::make_unique<WindowFunctionExecLast>(iter, last->input(), last->bounds());
     }
 
     WindowBounds bounds = functionStmt.expr->bounds();
