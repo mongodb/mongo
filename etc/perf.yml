@@ -466,6 +466,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: query_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: query,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: views-query
     depends_on: *_compile
     commands:
@@ -502,6 +514,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: where_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: where,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: update
     depends_on: *_compile
     commands:
@@ -514,6 +538,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: update_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: update,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: insert
     depends_on: *_compile
     commands:
@@ -526,6 +562,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: insert_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: insert,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: wildcard-index-read
     depends_on: *_compile
     commands:
@@ -538,6 +586,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: wildcard-index-read_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: wildcard_read,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: wildcard-index-write
     depends_on: *_compile
     commands:
@@ -550,6 +610,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: wildcard-index-write_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: wildcard_write,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: geo
     depends_on: *_compile
     commands:
@@ -562,6 +634,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: geo_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: geo,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: misc
     depends_on: *_compile
     commands:
@@ -574,6 +658,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: misc_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: singleThreaded
     depends_on: *_compile
     commands:
@@ -586,6 +682,18 @@ tasks:
              exclude_filter: none,
              threads: "1",
              read_cmd: 'false'}
+  - name: singleThreaded_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: single_threaded,
+             include_filter_2: core regression,
+             exclude_filter: none,
+             threads: "1",
+             read_cmd: 'true'}
   - name: aggregation
     depends_on: *_compile
     commands:
@@ -598,6 +706,18 @@ tasks:
              exclude_filter: js,
              threads: "1",
              read_cmd: 'false'}
+  - name: aggregation_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: aggregation,
+             include_filter_2: regression,
+             exclude_filter: js,
+             threads: "1",
+             read_cmd: 'true'}
   - name: agg-query-comparison
     depends_on: *_compile
     commands:
@@ -610,6 +730,18 @@ tasks:
              exclude_filter: single_threaded,
              threads: "1 2 4 8",
              read_cmd: 'false'}
+  - name: agg-query-comparison_read_commands
+    depends_on: *_compile
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: microbenchmarks
+          test_control_params: |
+            {include_filter_1: agg_query_comparison,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
   - name: pipeline-updates
     depends_on: *_compile
     commands:
@@ -664,18 +796,29 @@ buildvariants:
     - name: genny_scale_InsertRemove
     - name: genny_execution_UserAcquisition
     - name: aggregation
+    - name: aggregation_read_commands
     - name: agg-query-comparison
+    - name: agg-query-comparison_read_commands
     - name: query
+    - name: query_read_commands
     - name: views-aggregation
     - name: views-query
     - name: where
+    - name: where_read_commands
     - name: update
+    - name: update_read_commands
     - name: insert
+    - name: insert_read_commands
     - name: wildcard-index-read
+    - name: wildcard-index-read_read_commands
     - name: wildcard-index-write
+    - name: wildcard-index-write_read_commands
     - name: geo
+    - name: geo_read_commands
     - name: misc
+    - name: misc_read_commands
     - name: singleThreaded
+    - name: singleThreaded_read_commands
     - name: pipeline-updates
     - name: javascript
 
@@ -697,8 +840,13 @@ buildvariants:
     tasks:
     - name: genny_scale_InsertRemove
     - name: update
+    - name: update_read_commands
     - name: insert
+    - name: insert_read_commands
     - name: misc
+    - name: misc_read_commands
     - name: singleThreaded
+    - name: singleThreaded_read_commands
     - name: wildcard-index-write
+    - name: wildcard-index-write_read_commands
     - name: pipeline-updates
