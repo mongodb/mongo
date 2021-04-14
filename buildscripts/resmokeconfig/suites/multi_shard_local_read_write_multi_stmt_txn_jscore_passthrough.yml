@@ -153,9 +153,6 @@ selector:
   - jstests/core/wildcard_index_count.js
   - jstests/core/explain_server_params.js
 
-  # $indexStats
-  - jstests/core/index_stats.js
-
   # Errors expected to happen in tests, which can cause transactions to get aborted.
   # So when the test tries to inspect the documents it can be out of sync (relative
   # to test run without multi statement transactions).

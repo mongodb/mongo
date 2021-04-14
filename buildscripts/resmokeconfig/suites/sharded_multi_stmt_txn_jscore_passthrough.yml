@@ -128,7 +128,6 @@ selector:
   - jstests/core/list_sessions.js
 
   # $indexStats
-  - jstests/core/index_stats.js
   - jstests/core/timeseries/timeseries_index_stats.js
 
   # $collStats
