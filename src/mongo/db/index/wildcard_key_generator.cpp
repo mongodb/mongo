@@ -67,12 +67,15 @@ constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
 WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                   BSONObj pathProjection) {
-    // We should never have a key pattern that contains more than a single element.
-    invariant(keyPattern.nFields() == 1);
-
     // The _keyPattern is either { "$**": ±1 } for all paths or { "path.$**": ±1 } for a single
     // subtree. If we are indexing a single subtree, then we will project just that path.
-    auto indexRoot = keyPattern.firstElement().fieldNameStringData();
+    // The folllowing change is a simple fix to obtain the single element in the keyPattern
+    // representing the wildcard component.
+    auto wcElem = std::find_if(keyPattern.begin(), keyPattern.end(), [](auto&& elem) {
+        return elem.fieldNameStringData().endsWith("$**"_sd);
+    });
+    invariant(wcElem != keyPattern.end());
+    auto indexRoot = wcElem->fieldNameStringData();
     auto suffixPos = indexRoot.find(kSubtreeSuffix);
 
     // If we're indexing a single subtree, we can't also specify a path projection.

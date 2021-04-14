@@ -87,7 +87,7 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node);
  * Return true if the intervals on the 'value' field will include subobjects, and
  * thus require the bounds on $_path to include ["path.", "path/").
  */
-bool requiresSubpathBounds(const OrderedIntervalList& intervals);
+// bool requiresSubpathBounds(const OrderedIntervalList& intervals);
 
 }  // namespace wildcard_planning
 }  // namespace mongo

@@ -536,9 +536,9 @@ FieldAvailability IndexScanNode::getFieldAvailability(const string& field) const
     size_t keyPatternFieldIndex = 0;
     for (auto&& elt : index.keyPattern) {
         // For $** indexes, the keyPattern is prefixed by a virtual field, '$_path'. We therefore
-        // skip the first keyPattern field when deciding whether we can provide the requested field.
-        if (index.type == IndexType::INDEX_WILDCARD && !keyPatternFieldIndex) {
-            invariant(elt.fieldNameStringData() == "$_path"_sd);
+        // skip this keyPattern field when deciding whether we can provide the requested field.
+        if (index.type == IndexType::INDEX_WILDCARD && !keyPatternFieldIndex &&
+            elt.fieldNameStringData() == "$_path"_sd) {
             ++keyPatternFieldIndex;
             continue;
         }
@@ -766,25 +766,27 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
     // this as a path in user-data could trigger subsequent assertions.
     if (index.type == IndexType::INDEX_WILDCARD) {
-        invariant(bounds.fields.size() == 2u);
+        // invariant(bounds.fields.size() == 2u);
 
         // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
         // happen for existence queries. For example, {a: {$exists: true}} results in bounds
         // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
-        // object are in bounds.
-        if (bounds.fields[0].intervals.size() != 1u) {
+        // object are in bounds. The '$_path' field must be the second to last field in bounds.
+        if (bounds.fields[bounds.fields.size() - 2].intervals.size() != 1u) {
             return {};
         }
 
         // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
         BSONObjIterator it{sortPatternProvidedByIndex};
-        invariant(it.more());
-        auto pathElement = it.next();
-        invariant(pathElement.fieldNameStringData() == "$_path"_sd);
-        invariant(it.more());
-        auto secondElement = it.next();
-        invariant(!it.more());
-        sortPatternProvidedByIndex = BSONObjBuilder{}.append(secondElement).obj();
+        while (it.more()) {
+            auto pathElement = it.next();
+            if (pathElement.fieldNameStringData() == "$_path"_sd) {
+                invariant(it.more());
+                it.next();
+                invariant(!it.more());
+            }
+        }
+        sortPatternProvidedByIndex = sortPatternProvidedByIndex.removeField("$_path"_sd);
     }
 
     //

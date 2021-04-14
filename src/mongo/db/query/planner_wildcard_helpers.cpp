@@ -35,6 +35,7 @@
 
 #include <vector>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/index/wildcard_key_generator.h"
@@ -44,6 +45,42 @@
 namespace mongo {
 namespace wildcard_planning {
 namespace {
+auto getElement(const BSONObj& keyPattern, int i) {
+    auto it = keyPattern.begin();
+    for (int j = 0; j < i; j++) {
+        it++;
+    }
+    return it;
+}
+
+auto getLastElement(const BSONObj& keyPattern) {
+    return getElement(keyPattern, keyPattern.nFields() - 1);
+}
+
+auto expandIndexKey(const BSONObj& keyPattern, const StringData& fieldName) {
+    BSONObjBuilder bb;
+    for (auto& elem : keyPattern) {
+        if (elem.fieldNameStringData().endsWith("$**"_sd)) {
+            bb.appendAs(elem, fieldName);
+        } else {
+            bb.append(elem);
+        }
+    }
+    return bb.obj();
+}
+
+auto insertPathPlaceHolder(const BSONObj& keyPattern) {
+    BSONObjBuilder bb;
+    for (auto it = keyPattern.begin(); it != keyPattern.end(); it++) {
+        if (std::next(it) == keyPattern.end()) {
+            // 'it' is pointing to the wildcard element, the last field in the keyPattern.
+            bb.appendAs(*it, "$_path");
+        }
+        bb.append(*it);
+    }
+    return bb.obj();
+}
+
 /**
  * Compares the path 'fieldNameOrArrayIndexPath' to 'staticComparisonPath', ignoring any array
  * indices present in the former if they are not present in the latter. The 'multikeyPathComponents'
@@ -142,16 +179,33 @@ FieldRef pathWithoutSpecifiedComponents(const FieldRef& path,
  * looking up multikeyness in 'multikeyPathSet'.
  */
 MultikeyPaths buildMultiKeyPathsForExpandedWildcardIndexEntry(
-    const FieldRef& indexedPath, const std::set<FieldRef>& multikeyPathSet) {
+    const FieldRef& indexedPath,
+    const std::set<FieldRef>& multikeyPathSet,
+    const BSONObj& keyPattern) {
     FieldRef pathToLookup;
-    MultikeyComponents multikeyPaths;
-    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
-        pathToLookup.appendPart(indexedPath.getPart(i));
-        if (fieldNameOrArrayIndexPathSetContains(multikeyPathSet, multikeyPaths, pathToLookup)) {
-            multikeyPaths.insert(i);
+    MultikeyPaths multikeyPaths = {};
+
+    // TODO: what if the non-wildcard entries do represent arrays? Then they should be multikey.
+    // For each non-wildcard index entry, indicate that they are not multikey.
+    // Note this assumes only one wildcard entry.
+    for (auto& elem : keyPattern) {
+        if (!elem.fieldNameStringData().endsWith("$**")) {
+            MultikeyComponents comps;
+            multikeyPaths.insert(multikeyPaths.end(), comps);
         }
     }
-    return {multikeyPaths};
+
+    // Check each part of the wildcard entry 'indexedPath' to determine if it's multikey.
+    MultikeyComponents comps;
+    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
+        pathToLookup.appendPart(indexedPath.getPart(i));
+        if (fieldNameOrArrayIndexPathSetContains(multikeyPathSet, comps, pathToLookup)) {
+            comps.insert(i);
+        }
+    }
+    multikeyPaths.insert(multikeyPaths.end(), comps);
+
+    return multikeyPaths;
 }
 
 std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents& multikeyPaths,
@@ -231,13 +285,10 @@ std::set<FieldRef> generateFieldNameOrArrayIndexPathSet(const MultikeyComponents
 bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
                                    const std::set<FieldRef>& includedPaths,
                                    const FieldRef& queryPath) {
-    // $** multikeyPaths always have a singleton set, since they are single-element indexes.
-    invariant(multikeyPaths.size() == 1);
-
     // Find the positions of all multikey path components in 'queryPath' that have a numerical path
     // component immediately after. For a queryPath of 'a.2.b' this will return position 0; that is,
     // 'a'. If no such multikey path was found, we are clear to proceed with planning.
-    const auto arrayIndices = findArrayIndexPathComponents(multikeyPaths.front(), queryPath);
+    const auto arrayIndices = findArrayIndexPathComponents(multikeyPaths.back(), queryPath);
     if (arrayIndices.empty()) {
         return true;
     }
@@ -349,9 +400,9 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                               std::vector<IndexEntry>* out) {
     invariant(out);
     invariant(wildcardIndex.type == INDEX_WILDCARD);
-    // Should only have one field of the form {"path.$**" : 1}.
-    invariant(wildcardIndex.keyPattern.nFields() == 1);
-    invariant(wildcardIndex.keyPattern.firstElement().fieldNameStringData().endsWith("$**"));
+
+    // Should have a wilcard key in the index.
+    invariant(getLastElement(wildcardIndex.keyPattern)->fieldNameStringData().endsWith("$**"));
 
     // $** indexes do not keep the multikey metadata inside the index catalog entry, as the amount
     // of metadata is not bounded. We do not expect IndexEntry objects for $** indexes to have a
@@ -378,7 +429,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         // which will indicate to the downstream planning code which components of 'fieldName' are
         // multikey.
         auto multikeyPaths = buildMultiKeyPathsForExpandedWildcardIndexEntry(
-            queryPath, wildcardIndex.multikeyPathSet);
+            queryPath, wildcardIndex.multikeyPathSet, wildcardIndex.keyPattern);
 
         // Check whether a query on the current fieldpath is answerable by the $** index, given any
         // numerical path components that may be present in the path string.
@@ -392,10 +443,10 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
         // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
         // marked as multikey.
-        invariant(multikeyPaths.size() == 1u);
-        const bool isMultikey = !multikeyPaths[0].empty();
+        invariant((int)multikeyPaths.size() == wildcardIndex.keyPattern.nFields());
+        const bool isMultikey = !multikeyPaths.back().empty();
 
-        IndexEntry entry(BSON(fieldName << wildcardIndex.keyPattern.firstElement()),
+        IndexEntry entry(expandIndexKey(wildcardIndex.keyPattern, fieldName),
                          IndexType::INDEX_WILDCARD,
                          IndexDescriptor::kLatestIndexVersion,
                          isMultikey,
@@ -424,8 +475,7 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
     // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
     // determine whether it will be necessary to adjust the tightness.
     invariant(index.type == IndexType::INDEX_WILDCARD);
-    invariant(index.keyPattern.nFields() == 1);
-    invariant(index.multikeyPaths.size() == 1);
+    invariant(index.keyPattern.nFields() == (int)index.multikeyPaths.size());
     invariant(oil);
 
     // If our bounds include any objects -- anything in the range ({}, []) -- then we will need to
@@ -436,14 +486,19 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
     // result set should include documents such as {a: {b: null}}; however, the wildcard index key
     // for this object will be {"": "a.b", "": null}, which means that the original bounds would
     // skip this document. We must also set the tightness to INEXACT_FETCH to avoid false positives.
-    if (boundsOverlapObjectTypeBracket(*oil) && !oil->intervals.front().isMinToMax()) {
+
+    // TODO: Not convinced that we are only checking the bounds corresponding to the $** component.
+    if (boundsOverlapObjectTypeBracket(*oil) && !oil->intervals.back().isMinToMax()) {
         oil->intervals = {IndexBoundsBuilder::allValues()};
         return BoundsTightness::INEXACT_FETCH;
     }
 
     // If the query passes through any array indices, we must always fetch and filter the documents.
-    const auto arrayIndicesTraversedByQuery = findArrayIndexPathComponents(
-        index.multikeyPaths.front(), FieldRef{index.keyPattern.firstElementFieldName()});
+    // Here we know that the last field in key pattern is the wildcard field-- after expansion, we
+    // can no longer tell just from looking at the keys.
+    auto wcElem = getLastElement(index.keyPattern);
+    const auto arrayIndicesTraversedByQuery =
+        findArrayIndexPathComponents(index.multikeyPaths.back(), FieldRef{wcElem->fieldName()});
 
     // If the list of array indices we traversed is non-empty, set the tightness to INEXACT_FETCH.
     return (arrayIndicesTraversedByQuery.empty() ? tightnessIn : BoundsTightness::INEXACT_FETCH);
@@ -455,23 +510,23 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
 
     // We should only ever reach this point when processing a $** index. Sanity check the arguments.
     invariant(index && index->type == IndexType::INDEX_WILDCARD);
-    invariant(index->keyPattern.nFields() == 1);
-    invariant(index->multikeyPaths.size() == 1);
-    invariant(bounds && bounds->fields.size() == 1);
+    invariant(index->keyPattern.nFields() == (int)index->multikeyPaths.size());
+    invariant(bounds && bounds->fields.size() == index->multikeyPaths.size());
     invariant(bounds->fields.front().name == index->keyPattern.firstElementFieldName());
 
     // For $** indexes, the IndexEntry key pattern is {'path.to.field': ±1} but the actual keys in
     // the index are of the form {'$_path': ±1, 'path.to.field': ±1}, where the value of the first
     // field in each key is 'path.to.field'. We push a new entry into the bounds vector for the
     // leading '$_path' bound here. We also push corresponding fields into the IndexScanNode's
-    // keyPattern and its multikeyPaths vector.
-    index->multikeyPaths.insert(index->multikeyPaths.begin(), MultikeyComponents{});
-    bounds->fields.insert(bounds->fields.begin(), {"$_path"});
-    index->keyPattern =
-        BSON("$_path" << index->keyPattern.firstElement() << index->keyPattern.firstElement());
+    // keyPattern and its multikeyPaths vector. Note that these key patterns may be prefixed by
+    // other fields, representing a compound index. The last field is the wildcard element, so we
+    // add the $_path placeholders right before it.
+    index->multikeyPaths.insert(std::prev(index->multikeyPaths.end()), MultikeyComponents{});
+    bounds->fields.insert(std::prev(bounds->fields.end()), {"$_path"});
+    index->keyPattern = insertPathPlaceHolder(index->keyPattern);
 
     // Create a FieldRef to perform any necessary manipulations on the query path string.
-    FieldRef queryPath{std::next(index->keyPattern.begin())->fieldNameStringData()};
+    FieldRef queryPath{getLastElement(index->keyPattern)->fieldNameStringData()};
     auto& multikeyPaths = index->multikeyPaths.back();
 
     // If the bounds overlap the object type bracket, then we must retrieve all documents which
@@ -489,7 +544,7 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
     // Add a $_path point-interval for each path that needs to be traversed in the index. If subpath
     // bounds are required, then we must add a further range interval on ["path.","path/").
     static const char subPathStart = '.', subPathEnd = static_cast<char>('.' + 1);
-    auto& pathIntervals = bounds->fields.front().intervals;
+    auto& pathIntervals = std::prev(std::prev(bounds->fields.end()))->intervals;
     for (const auto& fieldPath : paths) {
         auto path = fieldPath.dottedField().toString();
         pathIntervals.push_back(IndexBoundsBuilder::makePointInterval(path));
@@ -514,12 +569,16 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
     }
 
     // We expect consistent arguments, representing a $** index which has already been finalized.
-    invariant(node->index.keyPattern.nFields() == 2);
-    invariant(node->index.multikeyPaths.size() == 2);
-    invariant(node->bounds.fields.size() == 2);
-    invariant(node->bounds.fields.front().name == node->index.keyPattern.firstElementFieldName());
-    invariant(node->bounds.fields.back().name ==
-              std::next(node->index.keyPattern.begin())->fieldName());
+    auto numFields = node->index.keyPattern.nFields();
+    invariant((int)node->index.multikeyPaths.size() == numFields);
+    invariant((int)node->bounds.fields.size() == numFields);
+
+    // The last two elements of the vounds and keyPattern are the $_path placeholder followed by the
+    // wildcard element.
+    auto wcElem = getLastElement(node->index.keyPattern);
+    invariant(node->bounds.fields[numFields - 2].name ==
+              getElement(node->index.keyPattern, numFields - 2)->fieldName());
+    invariant(node->bounds.fields[numFields - 1].name == wcElem->fieldName());
 
     // Check the bounds on the query field for any intersections with the object type bracket.
     return boundsOverlapObjectTypeBracket(node->bounds.fields.back());

@@ -661,6 +661,9 @@ bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression*
     // store keys for nested objects, meaning that any kind of comparison to an object or array
     // cannot be answered by the index (including with a $in).
 
+    // TODO: we should confirm whether this is correct after compound wildcard indexes are
+    // supported: wildcard indexes can support object queries on the non-WC fields in the index.
+
     if (ComparisonMatchExpression::isComparisonMatchExpression(queryExpr)) {
         const ComparisonMatchExpression* cmpExpr =
             static_cast<const ComparisonMatchExpression*>(queryExpr);
