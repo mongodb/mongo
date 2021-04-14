@@ -1,6 +1,8 @@
 // Validate that generic index scan is used in SBE once max limit for statically generated intervals
 // is reached.
-
+//
+// We issue 'setParameter' command which is not compatible with stepdowns.
+// @tags: [does_not_support_stepdowns]
 (function() {
 "use strict";
 
