@@ -89,6 +89,16 @@ void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const bool dropTarget);
 
 /**
+ * Throws if the DB primary shards of the provided namespaces differs.
+ *
+ * Optimistically assume that no movePrimary is performed during the check: it's currently not
+ * possible to ensure primary shard stability for both databases.
+ */
+void checkDbPrimariesOnTheSameShard(OperationContext* opCtx,
+                                    const NamespaceString& fromNss,
+                                    const NamespaceString& toNss);
+
+/**
  * Throws an exception if the collection is already sharded with different options.
  *
  * If the collection is already sharded with the same options, returns the existing collection's

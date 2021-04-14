@@ -40,6 +40,7 @@
 #include "mongo/db/s/rename_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -67,16 +68,6 @@ RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
                                                 const ShardsvrRenameCollection& request,
                                                 const NamespaceString& fromNss) {
     const auto& toNss = request.getTo();
-
-    const auto fromDB = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, fromNss.db()));
-
-    const auto toDB = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, toNss.db()));
-
-    uassert(13137,
-            "Source and destination collections must be on same shard",
-            fromDB.primaryId() == toDB.primaryId());
 
     // Make sure that source and target collection are not sharded
     uassert(ErrorCodes::IllegalOperation,
@@ -124,6 +115,10 @@ public:
             bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
                 serverGlobalParams.featureCompatibility);
 
+            if (fromNss.db() != toNss.db()) {
+                sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
+            }
+
             if (!useNewPath) {
                 return renameCollectionLegacy(opCtx, req, fromNss);
             }
@@ -135,10 +130,6 @@ public:
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
-
-            uassert(ErrorCodes::CommandFailed,
-                    "Source and destination collections must be on the same database.",
-                    fromNss.db() == toNss.db());
 
             auto coordinatorDoc = RenameCollectionCoordinatorDocument();
             coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
