@@ -864,7 +864,7 @@ void RuntimeEnvironment::resetSlot(value::SlotId slot,
     uasserted(4946300, str::stream() << "undefined slot accessor:" << slot);
 }
 
-value::SlotAccessor* RuntimeEnvironment::getAccessor(value::SlotId slot) {
+RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotId slot) {
     if (auto it = _accessors.find(slot); it != _accessors.end()) {
         return &it->second;
     }

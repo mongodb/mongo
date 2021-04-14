@@ -63,7 +63,7 @@ using AstQuery = peg::AstBase<ParsedQueryTree>;
 
 class Parser {
 public:
-    Parser();
+    Parser(RuntimeEnvironment* env);
     std::unique_ptr<PlanStage> parse(OperationContext* opCtx,
                                      StringData defaultDb,
                                      StringData line);
@@ -84,6 +84,7 @@ private:
     value::SlotIdGenerator _slotIdGenerator;
     value::SpoolIdGenerator _spoolIdGenerator;
     FrameId _frameId{0};
+    RuntimeEnvironment* _env;
     struct FrameSymbolTable {
         FrameId id;
         SymbolTable table;

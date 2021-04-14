@@ -3,7 +3,6 @@
  * TooManyMatchingDocuments after fixing SERVER-44598.
  *
  * @tags: [
- *   sbe_incompatible,
  *   uses_change_streams,
  * ]
  */

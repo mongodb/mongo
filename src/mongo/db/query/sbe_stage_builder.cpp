@@ -259,9 +259,6 @@ std::string PlanStageData::debugString() const {
     if (auto slot = outputs.getIfExists(PlanStageSlots::kRecordId); slot) {
         builder << "$$RID=s" << *slot << " ";
     }
-    if (auto slot = outputs.getIfExists(PlanStageSlots::kOplogTs); slot) {
-        builder << "$$OPLOGTS=s" << *slot << " ";
-    }
 
     env->debugString(&builder);
 
@@ -429,13 +426,10 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     _buildHasStarted = true;
 
     // We always produce a 'resultSlot' and conditionally produce a 'recordIdSlot' based on the
-    // 'shouldProduceRecordIdSlot'. If the solution contains a CollectionScanNode with the
-    // 'shouldTrackLatestOplogTimestamp' flag set to true, then we will also produce an
-    // 'oplogTsSlot'.
+    // 'shouldProduceRecordIdSlot'.
     PlanStageReqs reqs;
     reqs.set(kResult);
     reqs.setIf(kRecordId, _shouldProduceRecordIdSlot);
-    reqs.setIf(kOplogTs, _data.shouldTrackLatestOplogTimestamp);
 
     // Build the SBE plan stage tree.
     auto [stage, outputs] = build(root, reqs);
@@ -445,7 +439,6 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     // it's needed.
     invariant(outputs.has(kResult));
     invariant(!_shouldProduceRecordIdSlot || outputs.has(kRecordId));
-    invariant(!_data.shouldTrackLatestOplogTimestamp || outputs.has(kOplogTs));
 
     _data.outputs = std::move(outputs);
 
@@ -477,9 +470,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                       sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
     }
 
-    // Assert that generateCollScan() generated an oplogTsSlot if it's needed.
-    invariant(!reqs.has(kOplogTs) || outputs.has(kOplogTs));
-
     return {std::move(stage), std::move(outputs)};
 }
 
@@ -492,9 +482,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     if (vsn->scanType == VirtualScanNode::ScanType::kCollScan) {
         invariant(!reqs.getIndexKeyBitset());
     }
-
-    // Virtual scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
-    invariant(!reqs.has(kOplogTs));
 
     auto [inputTag, inputVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard inputGuard{inputTag, inputVal};
@@ -562,9 +549,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto ixn = static_cast<const IndexScanNode*>(root);
     invariant(reqs.has(kReturnKey) || !ixn->addKeyMetadata);
-
-    // Index scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
-    invariant(!reqs.has(kOplogTs));
 
     sbe::IndexKeysInclusionSet indexKeyBitset;
 
@@ -661,6 +645,7 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
                                                 snapshotIdSlot,
                                                 indexIdSlot,
                                                 keyStringSlot,
+                                                boost::none,
                                                 std::vector<std::string>{},
                                                 sbe::makeSV(),
                                                 seekKeySlot,
@@ -685,10 +670,6 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildFetch(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto fn = static_cast<const FetchNode*>(root);
-
-    // At present, makeLoopJoinForFetch() doesn't have the necessary logic for producing an
-    // oplogTsSlot, so assert that the caller doesn't need oplogTsSlot.
-    invariant(!reqs.has(kOplogTs));
 
     // The child must produce all of the slots required by the parent of this FetchNode, except for
     // 'resultSlot' which will be produced by the call to makeLoopJoinForFetch() below. In addition
@@ -1486,7 +1467,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(5432212, "no collection object", _collection);
     tassert(5432213, "index keys requsted for text match node", !reqs.getIndexKeyBitset());
-    tassert(5432214, "oplogTs requsted for text match node", !reqs.has(kOplogTs));
     tassert(5432215,
             str::stream() << "text match node must have one child, but got "
                           << root->children.size(),

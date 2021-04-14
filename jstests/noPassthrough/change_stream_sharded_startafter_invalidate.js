@@ -4,7 +4,6 @@
 // bug described in SERVER-41196.
 // @tags: [
 //   requires_sharding,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

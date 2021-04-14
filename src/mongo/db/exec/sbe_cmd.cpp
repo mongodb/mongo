@@ -69,7 +69,8 @@ public:
         uassertStatusOK(CursorRequest::parseCommandCursorOptions(
             cmdObj, query_request_helper::kDefaultBatchSize, &batchSize));
 
-        sbe::Parser parser;
+        auto env = std::make_unique<sbe::RuntimeEnvironment>();
+        sbe::Parser parser(env.get());
         auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String());
         auto [resultSlot, recordIdSlot] = parser.getTopLevelSlots();
 
@@ -83,7 +84,7 @@ public:
             CanonicalQuery::canonicalize(opCtx, std::make_unique<FindCommandRequest>(nss));
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
+        stage_builder::PlanStageData data{std::move(env)};
 
         if (resultSlot) {
             data.outputs.set(stage_builder::PlanStageSlots::kResult, *resultSlot);

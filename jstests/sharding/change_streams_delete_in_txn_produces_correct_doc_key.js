@@ -2,7 +2,6 @@
 // but only the shard key and _id in the 'documentKey' field. Exercises the fix for SERVER-45987.
 // @tags: [
 //   multiversion_incompatible,
-//   sbe_incompatible,
 //   uses_transactions,
 // ]
 

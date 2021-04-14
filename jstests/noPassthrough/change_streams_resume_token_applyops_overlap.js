@@ -4,7 +4,6 @@
  * bug described in SERVER-40094.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  *   uses_multi_shard_transaction,
  *   uses_transactions,
  * ]

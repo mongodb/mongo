@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_journaling,
  *   requires_majority_read_concern,
- *   sbe_incompatible,
  * ]
  */
 (function() {

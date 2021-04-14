@@ -150,8 +150,8 @@ private:
     sbe::value::SlotAccessor* _resultRecordId{nullptr};
     sbe::value::TypeTags _tagLastRecordId{sbe::value::TypeTags::Nothing};
     sbe::value::Value _valLastRecordId{0};
+    sbe::RuntimeEnvironment::Accessor* _oplogTs{nullptr};
 
-    sbe::value::SlotAccessor* _oplogTs{nullptr};
     boost::optional<sbe::value::SlotId> _resumeRecordIdSlot;
 
     std::queue<std::pair<BSONObj, boost::optional<RecordId>>> _stash;

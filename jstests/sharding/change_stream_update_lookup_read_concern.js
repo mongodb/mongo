@@ -3,7 +3,6 @@
 // change that we're doing the lookup for, and that change will be majority-committed.
 // @tags: [
 //   requires_majority_read_concern,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

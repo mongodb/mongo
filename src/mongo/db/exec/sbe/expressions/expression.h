@@ -70,6 +70,39 @@ public:
     RuntimeEnvironment& operator=(const RuntimeEnvironment&&) = delete;
     ~RuntimeEnvironment();
 
+    class Accessor final : public value::SlotAccessor {
+    public:
+        Accessor(RuntimeEnvironment* env, size_t index) : _env{env}, _index{index} {}
+
+        std::pair<value::TypeTags, value::Value> getViewOfValue() const override {
+            return {_env->_state->typeTags[_index], _env->_state->vals[_index]};
+        }
+
+        std::pair<value::TypeTags, value::Value> copyOrMoveValue() override {
+            // Always make a copy.
+            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+        }
+
+        void reset(bool owned, value::TypeTags tag, value::Value val) {
+            release();
+
+            _env->_state->typeTags[_index] = tag;
+            _env->_state->vals[_index] = val;
+            _env->_state->owned[_index] = owned;
+        }
+
+    private:
+        void release() {
+            if (_env->_state->owned[_index]) {
+                releaseValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
+                _env->_state->owned[_index] = false;
+            }
+        }
+
+        RuntimeEnvironment* const _env;
+        const size_t _index;
+    };
+
     /**
      * Registers and returns a SlotId for the given slot 'name'. The 'slotIdGenerator' is used
      * to generate a new SlotId for the given slot 'name', which is then registered with this
@@ -112,7 +145,7 @@ public:
      *
      * A user exception is raised if the SlotId is not registered within this environment.
      */
-    value::SlotAccessor* getAccessor(value::SlotId slot);
+    Accessor* getAccessor(value::SlotId slot);
 
     /**
      * Make a copy of his environment. The new environment will have its own set of SlotAccessors
@@ -151,39 +184,6 @@ private:
         std::vector<bool> owned;
     };
 
-    class Accessor final : public value::SlotAccessor {
-    public:
-        Accessor(RuntimeEnvironment* env, size_t index) : _env{env}, _index{index} {}
-
-        std::pair<value::TypeTags, value::Value> getViewOfValue() const override {
-            return {_env->_state->typeTags[_index], _env->_state->vals[_index]};
-        }
-
-        std::pair<value::TypeTags, value::Value> copyOrMoveValue() override {
-            // Always make a copy.
-            return copyValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
-        }
-
-        void reset(bool owned, value::TypeTags tag, value::Value val) {
-            release();
-
-            _env->_state->typeTags[_index] = tag;
-            _env->_state->vals[_index] = val;
-            _env->_state->owned[_index] = owned;
-        }
-
-    private:
-        void release() {
-            if (_env->_state->owned[_index]) {
-                releaseValue(_env->_state->typeTags[_index], _env->_state->vals[_index]);
-                _env->_state->owned[_index] = false;
-            }
-        }
-
-        RuntimeEnvironment* const _env;
-        const size_t _index;
-    };
-
     void emplaceAccessor(value::SlotId slot, size_t index) {
         _accessors.emplace(slot, Accessor{this, index});
     }
@@ -200,6 +200,11 @@ struct CompileCtx {
     CompileCtx(std::unique_ptr<RuntimeEnvironment> env) : env{std::move(env)} {}
 
     value::SlotAccessor* getAccessor(value::SlotId slot);
+
+    RuntimeEnvironment::Accessor* getRuntimeEnvAccessor(value::SlotId slotId) {
+        return env->getAccessor(slotId);
+    }
+
     std::shared_ptr<SpoolBuffer> getSpoolBuffer(SpoolId spool);
 
     void pushCorrelated(value::SlotId slot, value::SlotAccessor* accessor);

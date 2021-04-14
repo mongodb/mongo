@@ -59,7 +59,6 @@ public:
     static constexpr StringData kResult = "result"_sd;
     static constexpr StringData kRecordId = "recordId"_sd;
     static constexpr StringData kReturnKey = "returnKey"_sd;
-    static constexpr StringData kOplogTs = "oplogTs"_sd;
     static constexpr StringData kSnapshotId = "snapshotId"_sd;
     static constexpr StringData kIndexId = "indexId"_sd;
     static constexpr StringData kIndexKey = "indexKey"_sd;
@@ -256,7 +255,6 @@ public:
     static constexpr StringData kResult = PlanStageSlots::kResult;
     static constexpr StringData kRecordId = PlanStageSlots::kRecordId;
     static constexpr StringData kReturnKey = PlanStageSlots::kReturnKey;
-    static constexpr StringData kOplogTs = PlanStageSlots::kOplogTs;
     static constexpr StringData kSnapshotId = PlanStageSlots::kSnapshotId;
     static constexpr StringData kIndexId = PlanStageSlots::kIndexId;
     static constexpr StringData kIndexKey = PlanStageSlots::kIndexKey;

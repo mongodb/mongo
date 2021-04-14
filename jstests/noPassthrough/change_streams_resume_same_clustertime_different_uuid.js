@@ -4,7 +4,6 @@
  * for the bug described in SERVER-40094.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  *   uses_change_streams,
  * ]
  */

@@ -1,7 +1,6 @@
 // Test resuming a change stream on a mongos other than the one the change stream was started on.
 // @tags: [
 //   requires_majority_read_concern,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

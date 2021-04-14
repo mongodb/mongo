@@ -3,7 +3,6 @@
  * the cluster. Exercises the fix for SERVER-42232.
  * @tags: [
  *   requires_sharding,
- *   sbe_incompatible,
  *   uses_change_streams,
  * ]
  */

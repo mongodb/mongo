@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_journaling,
  *   requires_replication,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -188,6 +188,7 @@ protected:
                                        boost::none,
                                        boost::none,
                                        boost::none,
+                                       boost::none,
                                        std::vector<std::string>{},
                                        sbe::makeSV(),
                                        boost::none,
@@ -202,6 +203,7 @@ protected:
                                        boost::none,
                                        boost::none,
                                        boost::none,
+                                       boost::none,
                                        std::vector<std::string>{},
                                        sbe::makeSV(),
                                        sbe::value::SlotId{3},
@@ -210,19 +212,21 @@ protected:
                                        planNodeId,
                                        sbe::ScanCallbacks({})),
             // SCAN with all slots present.
-            sbe::makeS<sbe::ScanStage>(fakeUuid,
-                                       sbe::value::SlotId{1},
-                                       sbe::value::SlotId{2},
-                                       sbe::value::SlotId{3},
-                                       sbe::value::SlotId{4},
-                                       sbe::value::SlotId{5},
-                                       std::vector<std::string>{},
-                                       sbe::makeSV(),
-                                       sbe::value::SlotId{6},
-                                       true /* forward */,
-                                       nullptr,
-                                       planNodeId,
-                                       sbe::ScanCallbacks({})),
+            sbe::makeS<sbe::ScanStage>(
+                fakeUuid,
+                sbe::value::SlotId{1},
+                sbe::value::SlotId{2},
+                sbe::value::SlotId{3},
+                sbe::value::SlotId{4},
+                sbe::value::SlotId{5},
+                sbe::value::SlotId{6},
+                std::vector<std::string>{repl::OpTime::kTimestampFieldName.toString()},
+                sbe::makeSV(sbe::value::SlotId{6}),
+                sbe::value::SlotId{7},
+                true /* forward */,
+                nullptr,
+                planNodeId,
+                sbe::ScanCallbacks({})),
             // PSCAN with both 'recordSlot' and 'recordIdSlot' slots present.
             sbe::makeS<sbe::ParallelScanStage>(fakeUuid,
                                                sbe::value::SlotId{1},
@@ -580,7 +584,8 @@ TEST_F(SBEParserTest, TestIdenticalDebugOutputAfterParse) {
     sbe::DebugPrinter printer;
 
     for (const auto& stage : stages) {
-        sbe::Parser parser;
+        auto env = std::make_unique<sbe::RuntimeEnvironment>();
+        sbe::Parser parser(env.get());
         const auto stageText = printer.print(*stage);
 
         const auto parsedStage = parser.parse(nullptr, "testDb", stageText);
@@ -592,7 +597,8 @@ TEST_F(SBEParserTest, TestIdenticalDebugOutputAfterParse) {
 
 TEST_F(SBEParserTest, TestPlanNodeIdIsParsed) {
     sbe::DebugPrinter printer;
-    sbe::Parser parser;
+    auto env = std::make_unique<sbe::RuntimeEnvironment>();
+    sbe::Parser parser(env.get());
 
     for (const auto& stage : stages) {
         const auto stageText = printer.print(*stage);

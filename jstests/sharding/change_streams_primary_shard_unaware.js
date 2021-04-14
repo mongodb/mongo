@@ -7,7 +7,6 @@
 //   blacklist_from_rhel_67_s390x,
 //   requires_majority_read_concern,
 //   requires_persistence,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

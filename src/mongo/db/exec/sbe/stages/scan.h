@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -59,6 +60,7 @@ public:
               boost::optional<value::SlotId> snapshotIdSlot,
               boost::optional<value::SlotId> indexIdSlot,
               boost::optional<value::SlotId> indexKeySlot,
+              boost::optional<value::SlotId> oplogTsSlot,
               std::vector<std::string> fields,
               value::SlotVector vars,
               boost::optional<value::SlotId> seekKeySlot,
@@ -94,8 +96,11 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const boost::optional<value::SlotId> _indexIdSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
+    const boost::optional<value::SlotId> _oplogTsSlot;
+
     const std::vector<std::string> _fields;
     const value::SlotVector _vars;
+
     const boost::optional<value::SlotId> _seekKeySlot;
     const bool _forward;
 
@@ -113,6 +118,7 @@ private:
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
     value::SlotAccessor* _indexIdAccessor{nullptr};
     value::SlotAccessor* _keyStringAccessor{nullptr};
+    RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
 
     value::FieldAccessorMap _fieldAccessors;
     value::SlotAccessorMap _varAccessors;

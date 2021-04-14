@@ -51,6 +51,33 @@
 
 namespace mongo::stage_builder {
 namespace {
+
+boost::optional<sbe::value::SlotId> registerOplogTs(sbe::RuntimeEnvironment* env,
+                                                    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto slotId = env->getSlotIfExists("oplogTs"_sd);
+    if (!slotId) {
+        return env->registerSlot(
+            "oplogTs"_sd, sbe::value::TypeTags::Nothing, 0, false, slotIdGenerator);
+    }
+    return slotId;
+}
+
+/**
+ * If 'shouldTrackLatestOplogTimestamp' is true, then returns a vector holding the name of the oplog
+ * 'ts' field along with another vector holding a SlotId to map this field to, as well as the
+ * standalone value of the same SlotId (the latter is returned purely for convenience purposes).
+ */
+std::tuple<std::vector<std::string>, sbe::value::SlotVector, boost::optional<sbe::value::SlotId>>
+makeOplogTimestampSlotsIfNeeded(sbe::RuntimeEnvironment* env,
+                                sbe::value::SlotIdGenerator* slotIdGenerator,
+                                bool shouldTrackLatestOplogTimestamp) {
+    if (shouldTrackLatestOplogTimestamp) {
+        auto slotId = registerOplogTs(env, slotIdGenerator);
+        return {{repl::OpTime::kTimestampFieldName.toString()}, sbe::makeSV(*slotId), slotId};
+    }
+    return {};
+}
+
 /**
  * Checks whether a callback function should be created for a ScanStage and returns it, if so. The
  * logic in the provided callback will be executed when the ScanStage is opened or reopened.
@@ -81,24 +108,6 @@ sbe::ScanOpenCallback makeOpenCallbackIfNeeded(const CollectionPtr& collection,
     }
     return {};
 }
-
-/**
- * If 'shouldTrackLatestOplogTimestamp' returns a vector holding the name of the oplog 'ts' field
- * along with another vector holding a SlotId to map this field to, as well as the standalone value
- * of the same SlotId (the latter is returned purely for convenience purposes).
- */
-std::tuple<std::vector<std::string>, sbe::value::SlotVector, boost::optional<sbe::value::SlotId>>
-makeOplogTimestampSlotsIfNeeded(const CollectionPtr& collection,
-                                sbe::value::SlotIdGenerator* slotIdGenerator,
-                                bool shouldTrackLatestOplogTimestamp) {
-    if (shouldTrackLatestOplogTimestamp) {
-        invariant(collection->ns().isOplog());
-
-        auto tsSlot = slotIdGenerator->generate();
-        return {{repl::OpTime::kTimestampFieldName.toString()}, sbe::makeSV(tsSlot), tsSlot};
-    }
-    return {};
-};
 
 /**
  * Creates a collection scan sub-tree optimized for oplog scans. We can built an optimized scan
@@ -158,8 +167,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     // of if we need to track the latest oplog timestamp.
     const auto shouldTrackLatestOplogTimestamp =
         (csn->maxRecord || csn->shouldTrackLatestOplogTimestamp);
-    auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
-        collection, slotIdGenerator, shouldTrackLatestOplogTimestamp);
+    auto&& [fields, slots, tsSlot] =
+        makeOplogTimestampSlotsIfNeeded(env, slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks(
         lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
@@ -169,6 +178,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                             boost::none /* snapshotIdSlot */,
                                             boost::none /* indexIdSlot */,
                                             boost::none /* indexKeySlot */,
+                                            tsSlot,
                                             std::move(fields),
                                             std::move(slots),
                                             seekRecordIdSlot,
@@ -204,23 +214,18 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     if (csn->assertTsHasNotFallenOffOplog && !isTailableResumeBranch) {
         invariant(csn->shouldTrackLatestOplogTimestamp);
 
-        // We will be constructing a filter that needs to see the 'ts' field. We name it 'minTsSlot'
-        // here so that it does not shadow the 'tsSlot' which we allocated earlier.
-        auto&& [fields, minTsSlots, minTsSlot] = makeOplogTimestampSlotsIfNeeded(
-            collection, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
-
-        // We should always have allocated a 'minTsSlot', and there should always be a 'tsSlot'
-        // already allocated for the existing scan that we created previously.
-        invariant(minTsSlot);
+        // There should always be a 'tsSlot' already allocated on the RuntimeEnvironment for the
+        // existing scan that we created previously.
         invariant(tsSlot);
 
-        // Our filter will also need to see the 'op' and 'o.msg' fields.
+        // We will be constructing a filter that needs to see the 'ts' field. We name it 'minTsSlot'
+        // here so that it does not shadow the 'tsSlot' which we allocated earlier. Our filter will
+        // also need to see the 'op' and 'o.msg' fields.
         auto opTypeSlot = slotIdGenerator->generate();
         auto oObjSlot = slotIdGenerator->generate();
-        minTsSlots.push_back(opTypeSlot);
-        minTsSlots.push_back(oObjSlot);
-        fields.push_back("op");
-        fields.push_back("o");
+        auto minTsSlot = slotIdGenerator->generate();
+        sbe::value::SlotVector minTsSlots = {minTsSlot, opTypeSlot, oObjSlot};
+        std::vector<std::string> fields = {repl::OpTime::kTimestampFieldName.toString(), "op", "o"};
 
         // If the first entry we see in the oplog is the replset initialization, then it doesn't
         // matter if its timestamp is later than the specified minTs; no events earlier than the
@@ -251,6 +256,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                        boost::none,
                                        boost::none,
                                        boost::none,
+                                       boost::none,
                                        std::move(fields),
                                        minTsSlots, /* don't move this */
                                        boost::none,
@@ -262,7 +268,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                 makeBinaryOp(
                     sbe::EPrimBinary::logicOr,
                     makeBinaryOp(sbe::EPrimBinary::lessEq,
-                                 makeVariable(*minTsSlot),
+                                 makeVariable(minTsSlot),
                                  makeConstant(sbe::value::TypeTags::Timestamp,
                                               csn->assertTsHasNotFallenOffOplog->asULL())),
                     makeBinaryOp(
@@ -365,9 +371,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             invariant(csn->minRecord);
             invariant(csn->direction == CollectionScanParams::FORWARD);
 
-            std::tie(fields, slots, tsSlot) = makeOplogTimestampSlotsIfNeeded(
-                collection, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
-
             seekRecordIdSlot = recordIdSlot;
             resultSlot = slotIdGenerator->generate();
             recordIdSlot = slotIdGenerator->generate();
@@ -380,8 +383,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                            boost::none,
                                            boost::none,
                                            boost::none,
-                                           std::move(fields),
-                                           std::move(slots),
+                                           boost::none,
+                                           std::vector<std::string>(),
+                                           sbe::makeSV(),
                                            seekRecordIdSlot,
                                            true /* forward */,
                                            yieldPolicy,
@@ -400,10 +404,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     PlanStageSlots outputs;
     outputs.set(PlanStageSlots::kResult, resultSlot);
     outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-
-    if (csn->shouldTrackLatestOplogTimestamp) {
-        outputs.set(PlanStageSlots::kOplogTs, *tsSlot);
-    }
 
     return {std::move(stage), std::move(outputs)};
 }
@@ -443,8 +443,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     }();
 
     // See if we need to project out an oplog latest timestamp.
-    auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
-        collection, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
+    auto&& [fields, slots, tsSlot] =
+        makeOplogTimestampSlotsIfNeeded(env, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks(
         lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
@@ -454,6 +454,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                             boost::none,
                                             boost::none,
                                             boost::none,
+                                            tsSlot,
                                             std::move(fields),
                                             std::move(slots),
                                             seekRecordIdSlot,
@@ -482,6 +483,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         auto seekBranch =
             sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
                                            sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                                                      boost::none,
                                                                       boost::none,
                                                                       boost::none,
                                                                       boost::none,
@@ -542,9 +544,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         invariant(!csn->stopApplyingFilterAfterFirstMatch);
 
         auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
-        if (tsSlot) {
-            relevantSlots.push_back(*tsSlot);
-        }
 
         std::tie(std::ignore, stage) = generateFilter(opCtx,
                                                       csn->filter.get(),
@@ -560,10 +559,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     PlanStageSlots outputs;
     outputs.set(PlanStageSlots::kResult, resultSlot);
     outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
-
-    if (tsSlot) {
-        outputs.set(PlanStageSlots::kOplogTs, *tsSlot);
-    }
 
     return {std::move(stage), std::move(outputs)};
 }

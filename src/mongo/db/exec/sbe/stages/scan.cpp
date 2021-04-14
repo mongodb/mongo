@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -44,6 +45,7 @@ ScanStage::ScanStage(CollectionUUID collectionUuid,
                      boost::optional<value::SlotId> snapshotIdSlot,
                      boost::optional<value::SlotId> indexIdSlot,
                      boost::optional<value::SlotId> indexKeySlot,
+                     boost::optional<value::SlotId> oplogTsSlot,
                      std::vector<std::string> fields,
                      value::SlotVector vars,
                      boost::optional<value::SlotId> seekKeySlot,
@@ -58,6 +60,7 @@ ScanStage::ScanStage(CollectionUUID collectionUuid,
       _snapshotIdSlot(snapshotIdSlot),
       _indexIdSlot(indexIdSlot),
       _indexKeySlot(indexKeySlot),
+      _oplogTsSlot(oplogTsSlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
       _seekKeySlot(seekKeySlot),
@@ -65,6 +68,11 @@ ScanStage::ScanStage(CollectionUUID collectionUuid,
       _scanCallbacks(std::move(scanCallbacks)) {
     invariant(_fields.size() == _vars.size());
     invariant(!_seekKeySlot || _forward);
+    tassert(5567202,
+            "The '_oplogTsSlot' cannot be set without 'ts' field in '_fields'",
+            !_oplogTsSlot ||
+                (std::find(_fields.begin(), _fields.end(), repl::OpTime::kTimestampFieldName) !=
+                 _fields.end()));
 }
 
 std::unique_ptr<PlanStage> ScanStage::clone() const {
@@ -74,6 +82,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _snapshotIdSlot,
                                        _indexIdSlot,
                                        _indexKeySlot,
+                                       _oplogTsSlot,
                                        _fields,
                                        _vars,
                                        _seekKeySlot,
@@ -116,6 +125,10 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _keyStringAccessor = ctx.getAccessor(*_indexKeySlot);
     }
 
+    if (_oplogTsSlot) {
+        _oplogTsAccessor = ctx.getRuntimeEnvAccessor(*_oplogTsSlot);
+    }
+
     std::tie(_collName, _catalogEpoch) =
         acquireCollection(_opCtx, _collUuid, _scanCallbacks.lockAcquisitionCallback, _coll);
 }
@@ -127,6 +140,10 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 
     if (_recordIdSlot && *_recordIdSlot == slot) {
         return _recordIdAccessor.get();
+    }
+
+    if (_oplogTsSlot && *_oplogTsSlot == slot) {
+        return _oplogTsAccessor;
     }
 
     if (auto it = _varAccessors.find(slot); it != _varAccessors.end()) {
@@ -289,6 +306,11 @@ PlanState ScanStage::getNext() {
                 // Found the field so convert it to Value.
                 auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
 
+                if (_oplogTsAccessor && it->first == repl::OpTime::kTimestampFieldName) {
+                    auto&& [ownedTag, ownedVal] = value::copyValue(tag, val);
+                    _oplogTsAccessor->reset(false, ownedTag, ownedVal);
+                }
+
                 it->second->reset(tag, val);
 
                 if ((--fieldsToMatch) == 0) {
@@ -412,6 +434,8 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
     ret.emplace_back("`\"");
 
     ret.emplace_back(_forward ? "true" : "false");
+
+    ret.emplace_back(_oplogTsAccessor ? "true" : "false");
 
     return ret;
 }

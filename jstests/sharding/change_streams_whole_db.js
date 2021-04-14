@@ -1,7 +1,6 @@
 // Tests the behavior of a change stream on a whole database in a sharded cluster.
 // @tags: [
 //   requires_majority_read_concern,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

@@ -40,6 +40,7 @@
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resume_token_gen.h"
 
 namespace mongo {
 // This failpoint is defined by the classic executor but is also accessed here.
@@ -78,9 +79,8 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (auto slot = _rootData.outputs.getIfExists(stage_builder::PlanStageSlots::kOplogTs); slot) {
-        _oplogTs = _root->getAccessor(_rootData.ctx, *slot);
-        uassert(4822867, "Query does not have oplogTs slot.", _oplogTs);
+    if (_rootData.shouldTrackLatestOplogTimestamp) {
+        _oplogTs = _rootData.env->getAccessor(_rootData.env->getSlot("oplogTs"_sd));
     }
 
     if (winner.data.shouldUseTailableScan) {
@@ -270,7 +270,10 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
 
 Timestamp PlanExecutorSBE::getLatestOplogTimestamp() const {
     if (_rootData.shouldTrackLatestOplogTimestamp) {
-        invariant(_oplogTs);
+        tassert(5567201,
+                "The '_oplogTs' accessor should be populated when "
+                "'shouldTrackLatestOplogTimestamp' is true",
+                _oplogTs);
 
         auto [tag, val] = _oplogTs->getViewOfValue();
         if (tag != sbe::value::TypeTags::Nothing) {
@@ -301,6 +304,11 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
             return BSON("$recordId" << sbe::value::bitcastTo<int64_t>(val));
         }
     }
+
+    if (_rootData.shouldTrackLatestOplogTimestamp) {
+        return ResumeTokenOplogTimestamp{getLatestOplogTimestamp()}.toBSON();
+    }
+
     return {};
 }
 

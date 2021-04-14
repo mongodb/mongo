@@ -1,7 +1,6 @@
 // Confirms that change streams only see committed operations for sharded transactions.
 // @tags: [
 //   requires_sharding,
-//   sbe_incompatible,
 //   uses_change_streams,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
