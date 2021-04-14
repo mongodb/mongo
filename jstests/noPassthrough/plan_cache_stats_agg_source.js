@@ -1,8 +1,5 @@
 /**
  * Tests for the $planCacheStats aggregation metadata source.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";
@@ -14,6 +11,14 @@ assert.neq(null, conn, "mongod failed to start up");
 
 const testDb = conn.getDB("test");
 const coll = testDb.plan_cache_stats_agg_source;
+
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = (() => {
+    const getParam = testDb.adminCommand({getParameter: 1, featureFlagSBE: 1});
+    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
+})();
 
 // Returns a BSON object representing the plan cache entry for the query shape {a: 1, b: 1}.
 function getSingleEntryStats() {
@@ -37,10 +42,16 @@ assert.commandWorked(coll.createIndex({b: 1}));
 // Should return an empty result set when there are no cache entries yet.
 assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount());
 
+assert.commandWorked(coll.insertMany([
+    {_id: 0, a: 1, b: 1},
+    {_id: 1, a: 1, b: 1, c: 1},
+    {_id: 2, a: 1, b: 1, c: 1, d: 1},
+]));
+
 // Run three distinct query shapes and check that there are three cache entries.
-assert.eq(0, coll.find({a: 1, b: 1}).itcount());
-assert.eq(0, coll.find({a: 1, b: 1, c: 1}).itcount());
-assert.eq(0, coll.find({a: 1, b: 1, d: 1}).itcount());
+assert.eq(3, coll.find({a: 1, b: 1}).itcount());
+assert.eq(2, coll.find({a: 1, b: 1, c: 1}).itcount());
+assert.eq(1, coll.find({a: 1, b: 1, d: 1}).itcount());
 assert.eq(3, coll.aggregate([{$planCacheStats: {}}]).itcount());
 
 // We should be able to find particular cache entries by maching on the query from which the
@@ -104,7 +115,7 @@ assert.gt(entryStats.works, 0);
 
 // Check that the cached plan is an index scan either on {a: 1} or {b: 1}.
 assert(entryStats.hasOwnProperty("cachedPlan"));
-const ixscanStage = getPlanStage(entryStats.cachedPlan, "IXSCAN");
+const ixscanStage = getPlanStage(getCachedPlan(entryStats.cachedPlan), "IXSCAN");
 assert.neq(ixscanStage, null);
 assert(bsonWoCompare(ixscanStage.keyPattern, {a: 1}) === 0 ||
        bsonWoCompare(ixscanStage.keyPattern, {b: 1}) === 0);
@@ -123,8 +134,9 @@ assert(entryStats.hasOwnProperty("creationExecStats"));
 assert.gte(entryStats.creationExecStats.length, 2);
 for (let plan of entryStats.creationExecStats) {
     assert(plan.hasOwnProperty("executionStages"));
-    const ixscanStages = getPlanStages(plan.executionStages, "IXSCAN");
-    assert.gt(ixscanStages.length, 0);
+    // If we are in SBE mode, then explain output format is different for 'creationExecStats'.
+    const stages = getPlanStages(plan.executionStages, isSBEEnabled ? "ixseek" : "IXSCAN");
+    assert.gt(stages.length, 0);
 }
 
 // Assert that the entry has an array of at least two scores, and that all scores are greater
@@ -144,7 +156,7 @@ assert.eq(false, entryStats.indexFilterSet);
 assert.commandWorked(testDb.runCommand(
     {planCacheSetFilter: coll.getName(), query: {a: 1, b: 1, c: 1}, indexes: [{a: 1}, {b: 1}]}));
 assert.eq(2, coll.aggregate([{$planCacheStats: {}}]).itcount());
-assert.eq(0, coll.find({a: 1, b: 1, c: 1}).itcount());
+assert.eq(2, coll.find({a: 1, b: 1, c: 1}).itcount());
 assert.eq(3, coll.aggregate([{$planCacheStats: {}}]).itcount());
 entryStats = getSingleEntryStats();
 assert.eq(false, entryStats.indexFilterSet);
@@ -153,7 +165,7 @@ assert.eq(false, entryStats.indexFilterSet);
 assert.commandWorked(testDb.runCommand(
     {planCacheSetFilter: coll.getName(), query: {a: 1, b: 1}, indexes: [{a: 1}, {b: 1}]}));
 assert.eq(2, coll.aggregate([{$planCacheStats: {}}]).itcount());
-assert.eq(0, coll.find({a: 1, b: 1}).itcount());
+assert.eq(3, coll.find({a: 1, b: 1}).itcount());
 assert.eq(3, coll.aggregate([{$planCacheStats: {}}]).itcount());
 entryStats = getSingleEntryStats();
 assert.eq(true, entryStats.indexFilterSet);
