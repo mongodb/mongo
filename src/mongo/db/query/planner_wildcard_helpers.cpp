@@ -558,8 +558,6 @@ void finalizeWildcardIndexScanConfiguration(IndexScanNode* scan) {
             scan->shouldDedup = true;
         }
     }
-    // Ensure that the bounds' intervals are correctly aligned.
-    IndexBoundsBuilder::alignBounds(bounds, index->keyPattern);
 }
 
 bool isWildcardObjectSubpathScan(const IndexScanNode* node) {

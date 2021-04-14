@@ -136,8 +136,6 @@ TEST_F(PlannerWildcardHelpersTest, ExpandCompoundWildcardIndexEntry) {
         BSON("a" << 1 << "$**" << 1), {}, {}, {fromjson("{wildcardProjection: {a: 0}}")});
     wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
 
-    // TODO: if we don't exclude 'a' via the wildcardProjection, then we also get {a: 1, a: 1} in
-    // the output set. Is this desirable?
     ASSERT_EQ(out.size(), 2u);
     std::vector<BSONObj> expectedKeyPatterns = {fromjson("{a: 1, b: 1}"), fromjson("{a: 1, c: 1}")};
     indexEntryKeyPatternsMatch(&expectedKeyPatterns, &out);
@@ -150,11 +148,6 @@ TEST_F(PlannerWildcardHelpersTest, ExpandCompoundWildcardIndexEntryNoMatch) {
         BSON("a" << 1 << "$**" << 1), {}, {}, {fromjson("{wildcardProjection: {a: 0}}")});
     wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
 
-    // TODO: as a result of the changes to expandWildcardIndexEntry(), we are now outputting some
-    // indexes that are not useful for the query, e.g. {a: 1, b: 1} for a query referencing only
-    // 'c' and 'b'. We should make sure we are doing some kind of filtering somewhere for this-- I
-    // assume it exists for regular indexes somewhere in the query planner. we need to make sure the
-    // query matches the prefix of the expanded index.
     ASSERT_EQ(out.size(), 2u);
     std::vector<BSONObj> expectedKeyPatterns = {fromjson("{a: 1, b: 1}"), fromjson("{a: 1, c: 1}")};
     indexEntryKeyPatternsMatch(&expectedKeyPatterns, &out);
@@ -240,9 +233,22 @@ protected:
     boost::optional<WildcardProjection> _proj;
 };
 
+// TODO: what should we output from the expander when the query is only on the first field of the
+// index? Do we need some alternative like {a: 1, dummyKey: 1}?
+// TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryOnlyOnNonWCField) {
+//     addWildcardIndex(fromjson("{a: 1, 'b.$**': 1}"), {});
+
+//     runQuery(fromjson("{a: {$eq: 5}}"));
+
+//     assertNumSolutions(1U);
+//     assertSolutionExists(
+//         "{fetch: {node: {ixscan: {pattern: {a: 1, $_path: 1, x: 1}, bounds: {'a': "
+//         "[[5, 5, true, true]], '$_path': [['x', 'x', true, true]], 'x': [['MinKey', 'MaxKey', true, "
+//         "true]]}}}}}");
+// }
+
 TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexBasic) {
-    // TODO: if wildcard projection is not used here, we fail. Same with most of the tests below.
-    addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}") /* wildcardProjection */);
+    addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
 
     runQuery(fromjson("{a: {$eq: 5}, x: {$lt: 3}}"));
 
@@ -253,17 +259,26 @@ TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexBasic) {
         "false]]}}}}}");
 }
 
-// TODO: failing because the bounds for 'x' are invalid, which causes an invariant failure. The
-// bounds look empty at the invariant. look empty, causing an invariant failure.
-// TEST_F(QueryPlannerWildcardTest, CompoundEqualsNullQueriesDontUseWildcardIndexes) {
-//     addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexIsNotUsedWhenQueryNotOnIndexPrefix) {
+    addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
 
-//     runQuery(fromjson("{a: {$lt: 2}, x: {$eq: null}}"));
-//     // It's unclear to me what solution we want to see here. Seems to me that we should be able
-//     // to do an IXSCAN followed by a filter.
-//     assertNumSolutions(1U);
-//     assertSolutionExists("{cscan: {dir: 1}}");
-// }
+    runQuery(fromjson("{x: {$lt: 3}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundEqualsNullQueryDoesUseWildcardIndexes) {
+    addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
+
+    runQuery(fromjson("{a: {$lt: 2}, x: {$eq: null}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {'x': {$eq: null}}, node: "
+        "{ixscan: {filter: null, pattern: {'a': 1, '$_path': 1, 'x': 1},"
+        "bounds: {'a': [[-Infinity, 2, true, false]], '$_path': [['x','x',true,true]], 'x': "
+        "[['MinKey','MaxKey',true,true]]}}}}}");
+}
 
 TEST_F(QueryPlannerWildcardTest, CompoundWildcardWithMultikeyField) {
     addWildcardIndex(

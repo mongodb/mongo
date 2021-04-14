@@ -766,8 +766,6 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
     // fact, $-prefixed path components are illegal in queries in most contexts, so misinterpreting
     // this as a path in user-data could trigger subsequent assertions.
     if (index.type == IndexType::INDEX_WILDCARD) {
-        // invariant(bounds.fields.size() == 2u);
-
         // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
         // happen for existence queries. For example, {a: {$exists: true}} results in bounds
         // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
