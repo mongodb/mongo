@@ -29,7 +29,7 @@ const coll = assertDropAndRecreateCollection(
 
 // Extracts the winning plan for the given query and projection from the explain output.
 const winningPlan = (query, proj) => FixtureHelpers.isMongos(db)
-    ? getWinningPlan(coll.find(query, proj).explain().queryPlanner).shards[0].winningPlan
+    ? getWinningPlan(getWinningPlan(coll.find(query, proj).explain().queryPlanner).shards[0])
     : getWinningPlan(coll.find(query, proj).explain().queryPlanner);
 
 // Runs the given query and confirms that: (1) the $** was used to answer the query, (2) the
