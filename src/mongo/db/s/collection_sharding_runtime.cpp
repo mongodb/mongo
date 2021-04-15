@@ -39,6 +39,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -317,6 +318,11 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
             optCurrentMetadata);
 
     const auto& currentMetadata = optCurrentMetadata->get();
+
+    uassert(ErrorCodes::NotImplemented,
+            "Operations on sharded time-series collections are not supported",
+            !currentMetadata.isSharded() || !currentMetadata.getTimeseriesFields());
+
     auto wantedShardVersion = currentMetadata.getShardVersion();
 
     {

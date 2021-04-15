@@ -86,6 +86,7 @@ protected:
             false,
             epoch,
             boost::none /* timestamp */,
+            boost::none /* timeseriesFields */,
             boost::none,
             true,
             {ChunkType{

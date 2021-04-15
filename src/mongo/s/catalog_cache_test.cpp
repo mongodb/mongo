@@ -38,6 +38,7 @@
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 
 namespace mongo {
 namespace {
@@ -354,7 +355,6 @@ TEST_F(CatalogCacheTest, CheckEpochWithMatch) {
     _catalogCache->checkEpochOrThrow(kNss, collVersion, kShards[0]);
 }
 
-
 TEST_F(CatalogCacheTest, GetDatabaseWithMetadataFormatChange) {
     const auto dbName = "testDB";
     const auto uuid = UUID::gen();
@@ -381,7 +381,6 @@ TEST_F(CatalogCacheTest, GetDatabaseWithMetadataFormatChange) {
     // cache returns a new DatabaseType with the new format.
     getDatabaseWithRefreshAndCheckResults(versionWithoutTimestamp);
 }
-
 
 TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
     const auto dbVersion = DatabaseVersion(UUID::gen());
@@ -421,6 +420,26 @@ TEST_F(CatalogCacheTest, GetCollectionWithMetadataFormatChange) {
     getCollectionWithRefreshAndCheckResults(collVersionWithoutTimestamp);
 }
 
+TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
+    const auto dbVersion = DatabaseVersion(UUID::gen());
+    const auto epoch = OID::gen();
+    const auto version = ChunkVersion(1, 0, epoch, Timestamp(42));
+
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    auto coll = makeCollectionType(version);
+    coll.setTimeseriesFields(TypeCollectionTimeseriesFields("fieldName"));
+
+    const auto scopedCollProv = scopedCollectionProvider(coll);
+    const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
+
+    const auto swChunkManager =
+        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+    ASSERT_OK(swChunkManager.getStatus());
+
+    const auto& chunkManager = swChunkManager.getValue();
+    ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+}
 
 }  // namespace
 }  // namespace mongo

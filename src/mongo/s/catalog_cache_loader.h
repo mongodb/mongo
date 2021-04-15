@@ -72,6 +72,7 @@ public:
             const BSONObj& collShardKeyPattern,
             const BSONObj& collDefaultCollation,
             bool collShardKeyIsUnique,
+            boost::optional<TypeCollectionTimeseriesFields> collTimeseriesFields,
             boost::optional<TypeCollectionReshardingFields> collReshardingFields,
             bool allowMigrations,
             std::vector<ChunkType> chunks);
@@ -84,6 +85,9 @@ public:
         BSONObj shardKeyPattern;
         BSONObj defaultCollation;
         bool shardKeyIsUnique;
+
+        // This information will be valid if the collection is a time-series buckets collection.
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields;
 
         // If the collection is currently undergoing a resharding operation, the optional will be
         // populated.

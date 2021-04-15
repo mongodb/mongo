@@ -13,11 +13,10 @@ load("jstests/sharding/libs/find_chunks_util.js");
 
 Random.setRandomSeed();
 
-const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+const st = new ShardingTest({shards: 2});
 
 const dbName = 'test';
 const sDB = st.s.getDB(dbName);
-const configDB = st.s0.getDB('config');
 
 if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
@@ -57,6 +56,71 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
     // Trying to shard the buckets collection -> error
     assert.commandFailed(
         st.s.adminCommand({shardCollection: 'test.system.buckets.ts', key: {meta: 1}}));
+
+    assert.commandWorked(sDB.dropDatabase());
+})();
+
+(function manuallyCraftedShardedTimeseriesCollectionCannotBeUsed() {
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+
+    assert.commandWorked(sDB.createCollection('coll'));
+
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
+    for (let i = 0; i < 20; i++) {
+        assert.commandWorked(st.shard0.getDB(dbName).coll.insert({a: i}));
+    }
+
+    assert.commandWorked(st.shard0.getDB(dbName).coll.createIndex({a: 1}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: 'test.coll', key: {a: 1}}));
+
+    // It modifies the time-series metadata on the CS and on the shards
+    let modifyTimeseriesMetadata = (opTimeseriesMetadata) => {
+        st.s.getDB('config').collections.update({_id: 'test.coll'}, opTimeseriesMetadata);
+        st.shard0.getDB('config').cache.collections.update({_id: 'test.coll'},
+                                                           opTimeseriesMetadata);
+        st.shard1.getDB('config').cache.collections.update({_id: 'test.coll'},
+                                                           opTimeseriesMetadata);
+    };
+
+    // It forces a bump of the collection version moving the {a: 0} chunk to destShardName
+    let bumpCollectionVersionThroughMoveChunk = (destShardName) => {
+        assert.commandWorked(
+            st.s.adminCommand({moveChunk: 'test.coll', find: {a: 0}, to: destShardName}));
+    };
+
+    // It forces a refresh of the routing info on the shards
+    let forceRefreshOnShards = () => {
+        assert.commandWorked(st.shard0.adminCommand(
+            {_flushRoutingTableCacheUpdates: 'test.coll', syncFromConfig: true}));
+        assert.commandWorked(st.shard1.adminCommand(
+            {_flushRoutingTableCacheUpdates: 'test.coll', syncFromConfig: true}));
+    };
+
+    // Hacky code to simulate that 'test.coll' is a sharded time-series collection
+    modifyTimeseriesMetadata({$set: {timeseriesFields: {timeField: "a"}}});
+    bumpCollectionVersionThroughMoveChunk(st.shard1.shardName);
+    forceRefreshOnShards();
+
+    let check = (cmdRes) => {
+        assert.commandFailedWithCode(cmdRes, ErrorCodes.NotImplemented);
+    };
+
+    // CRUD ops & drop collection
+    check(st.s.getDB(dbName).runCommand({find: 'coll', filter: {a: 1}}));
+    check(st.s.getDB(dbName).runCommand({find: 'coll', filter: {}}));
+    check(st.s.getDB(dbName).runCommand({insert: 'coll', documents: [{a: 21}]}));
+    check(st.s.getDB(dbName).runCommand({insert: 'coll', documents: [{a: 21}, {a: 22}]}));
+    check(st.s.getDB(dbName).runCommand(
+        {update: 'coll', updates: [{q: {a: 1}, u: {$set: {b: 10}}}]}));
+    check(st.s.getDB(dbName).runCommand({update: 'coll', updates: [{q: {}, u: {$set: {b: 10}}}]}));
+    check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {a: 1}, limit: 1}]}));
+    check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {}, limit: 0}]}));
+    // check(st.s.getDB(dbName).runCommand({drop: 'coll'}), ErrorCodes.IllegalOperation);
+
+    // Hacky code again to restore the previous environment to finish this test properly
+    modifyTimeseriesMetadata({$unset: {timeseriesFields: 1}});
+    bumpCollectionVersionThroughMoveChunk(st.shard0.shardName);
+    forceRefreshOnShards();
 
     assert.commandWorked(sDB.dropDatabase());
 })();

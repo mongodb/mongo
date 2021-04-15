@@ -189,6 +189,7 @@ public:
                                                false,
                                                epoch,
                                                boost::none /* timestamp */,
+                                               boost::none /* timeseriesFields */,
                                                boost::none,
                                                false,
                                                chunks);

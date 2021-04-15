@@ -258,6 +258,7 @@ private:
                                                false /* unique */,
                                                std::move(epoch),
                                                boost::none /* timestamp */,
+                                               boost::none /* timeseriesFields */,
                                                boost::none /* reshardingFields */,
                                                true /* allowMigrations */,
                                                chunks);

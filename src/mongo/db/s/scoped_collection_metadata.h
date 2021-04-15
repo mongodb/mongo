@@ -101,6 +101,10 @@ public:
         return _impl->get().getReshardingFields();
     }
 
+    const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
+        return _impl->get().getTimeseriesFields();
+    }
+
 protected:
     std::shared_ptr<Impl> _impl;
 };

@@ -94,6 +94,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                                                       false,
                                                       epoch,
                                                       boost::none /* timestamp */,
+                                                      boost::none /* timeseriesFields */,
                                                       std::move(reshardingFields),
                                                       true,
                                                       allChunks)),

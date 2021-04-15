@@ -101,6 +101,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                collAndChunks.shardKeyPattern,
                                collAndChunks.shardKeyIsUnique);
     update.setDefaultCollation(collAndChunks.defaultCollation);
+    update.setTimeseriesFields(collAndChunks.timeseriesFields);
     update.setReshardingFields(collAndChunks.reshardingFields);
     update.setAllowMigrations(collAndChunks.allowMigrations);
 
@@ -251,6 +252,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),
+                                      shardCollectionEntry.getTimeseriesFields(),
                                       shardCollectionEntry.getReshardingFields(),
                                       shardCollectionEntry.getAllowMigrations(),
                                       std::move(changedChunks)};

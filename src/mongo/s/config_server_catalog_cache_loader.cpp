@@ -75,6 +75,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                       coll.getKeyPattern().toBSON(),
                                       coll.getDefaultCollation(),
                                       coll.getUnique(),
+                                      coll.getTimeseriesFields(),
                                       coll.getReshardingFields(),
                                       coll.getAllowMigrations(),
                                       std::move(collAndChunks.second)};

@@ -34,6 +34,7 @@ imports:
     - "mongo/db/keypattern.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/resharding/type_collection_fields.idl"
+    - "mongo/s/type_collection_timeseries_fields.idl"
 
 structs:
     CollectionTypeBase:
@@ -138,4 +139,9 @@ structs:
 
                               It is optional for serialisation purposes, because in versions of
                               MongoDB prior to 5.0, this value would be missing."
+                optional: true
+            timeseriesFields:
+                type: TypeCollectionTimeseriesFields
+                description: "Time-series collection fields. Only set when this is a time-series
+                              buckets collection."
                 optional: true

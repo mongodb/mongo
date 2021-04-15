@@ -42,6 +42,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/read_through_cache.h"
@@ -169,6 +170,7 @@ public:
         bool unique,
         OID epoch,
         const boost::optional<Timestamp>& timestamp,
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
         const std::vector<ChunkType>& chunks);
@@ -301,6 +303,10 @@ public:
         return _uuid;
     }
 
+    const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
+        return _timeseriesFields;
+    }
+
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {
         return _reshardingFields;
     }
@@ -317,6 +323,7 @@ private:
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
+                        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
                         bool allowMigrations,
                         ChunkMap chunkMap);
@@ -337,6 +344,9 @@ private:
 
     // Whether the sharding key is unique
     bool _unique;
+
+    // This information will be valid if the collection is a time-series buckets collection.
+    boost::optional<TypeCollectionTimeseriesFields> _timeseriesFields;
 
     // The set of fields related to an ongoing resharding operation involving this collection. The
     // presence of the type inside the optional indicates that the collection is involved in a
@@ -683,6 +693,10 @@ public:
 
     boost::optional<UUID> getUUID() const {
         return _rt->optRt->getUUID();
+    }
+
+    const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
+        return _rt->optRt->getTimeseriesFields();
     }
 
     const boost::optional<TypeCollectionReshardingFields>& getReshardingFields() const {

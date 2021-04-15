@@ -58,6 +58,7 @@ public:
     using ShardCollectionTypeBase::getNss;
     using ShardCollectionTypeBase::getRefreshing;
     using ShardCollectionTypeBase::getReshardingFields;
+    using ShardCollectionTypeBase::getTimeseriesFields;
     using ShardCollectionTypeBase::getTimestamp;
     using ShardCollectionTypeBase::getUnique;
     using ShardCollectionTypeBase::getUuid;
@@ -69,6 +70,7 @@ public:
     using ShardCollectionTypeBase::setNss;
     using ShardCollectionTypeBase::setRefreshing;
     using ShardCollectionTypeBase::setReshardingFields;
+    using ShardCollectionTypeBase::setTimeseriesFields;
     using ShardCollectionTypeBase::setUnique;
     using ShardCollectionTypeBase::setUuid;
 

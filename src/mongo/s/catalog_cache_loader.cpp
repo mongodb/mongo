@@ -48,6 +48,7 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,
     bool collShardKeyIsUnique,
+    boost::optional<TypeCollectionTimeseriesFields> collTimeseriesFields,
     boost::optional<TypeCollectionReshardingFields> collReshardingFields,
     bool allowMigrations,
     std::vector<ChunkType> chunks)
@@ -57,6 +58,7 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
       shardKeyPattern(collShardKeyPattern),
       defaultCollation(collDefaultCollation),
       shardKeyIsUnique(collShardKeyIsUnique),
+      timeseriesFields(std::move(collTimeseriesFields)),
       reshardingFields(std::move(collReshardingFields)),
       allowMigrations(allowMigrations),
       changedChunks(std::move(chunks)) {}

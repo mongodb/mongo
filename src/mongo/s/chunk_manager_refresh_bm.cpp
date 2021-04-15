@@ -86,6 +86,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            true,
                                            collEpoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            chunks);
@@ -175,6 +176,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                true,
                                                collEpoch,
                                                boost::none /* timestamp */,
+                                               boost::none /* timeseriesFields */,
                                                boost::none,
                                                true,
                                                chunks);

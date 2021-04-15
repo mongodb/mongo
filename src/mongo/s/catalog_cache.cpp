@@ -670,6 +670,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                 collectionAndChunks.shardKeyIsUnique,
                                                 collectionAndChunks.epoch,
                                                 collectionAndChunks.creationTime,
+                                                collectionAndChunks.timeseriesFields,
                                                 std::move(collectionAndChunks.reshardingFields),
                                                 collectionAndChunks.allowMigrations,
                                                 collectionAndChunks.changedChunks);

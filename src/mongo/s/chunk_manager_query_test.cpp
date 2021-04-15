@@ -519,6 +519,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
                                                         false,
                                                         epoch,
                                                         boost::none /* timestamp */,
+                                                        boost::none /* timeseriesFields */,
                                                         boost::none,
                                                         true,
                                                         {chunk0, chunk1});

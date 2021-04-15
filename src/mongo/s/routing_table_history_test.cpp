@@ -167,6 +167,7 @@ public:
                                                  false,
                                                  epoch,
                                                  boost::none /* timestamp */,
+                                                 boost::none /* timeseriesFields */,
                                                  boost::none,
                                                  true,
                                                  {initChunk}));
@@ -341,6 +342,7 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            {chunkAll});
@@ -394,6 +396,7 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            initialChunks);
@@ -444,6 +447,7 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            initialChunks);
@@ -489,6 +493,7 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            initialChunks);
@@ -540,6 +545,7 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
                                            epoch,
                                            boost::none,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            true,
                                            initialChunks);
     ASSERT_EQ(rt.numChunks(), 3);
@@ -585,6 +591,7 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            initialChunks);
@@ -649,6 +656,7 @@ TEST_F(RoutingTableHistoryTest, TestFlatten) {
                                            false,
                                            epoch,
                                            boost::none /* timestamp */,
+                                           boost::none /* timeseriesFields */,
                                            boost::none,
                                            true,
                                            initialChunks);

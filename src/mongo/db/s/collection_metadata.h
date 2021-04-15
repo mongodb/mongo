@@ -261,6 +261,11 @@ public:
         return _cm->getReshardingFields();
     }
 
+    const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
+        invariant(isSharded());
+        return _cm->getTimeseriesFields();
+    }
+
 private:
     // The full routing table for the collection or boost::none if the collection is not sharded
     boost::optional<ChunkManager> _cm;

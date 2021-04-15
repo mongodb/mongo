@@ -37,6 +37,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 
 namespace mongo {
 namespace {
@@ -208,6 +209,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChu
 
     ASSERT_EQUALS(collAndChunksRes.epoch, collectionType.getEpoch());
     ASSERT_EQUALS(collAndChunksRes.changedChunks.size(), 5UL);
+    ASSERT(!collAndChunksRes.timeseriesFields.is_initialized());
     for (unsigned int i = 0; i < collAndChunksRes.changedChunks.size(); ++i) {
         ASSERT_BSONOBJ_EQ(collAndChunksRes.changedChunks[i].toShardBSON(), chunks[i].toShardBSON());
     }
@@ -504,6 +506,21 @@ TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromShardedAndFindDbMetadat
     newDbType = _shardLoader->getDatabase(dbName).get();
     ASSERT_EQUALS(dbType.getVersion().getUuid(), newDbType.getVersion().getUuid());
     ASSERT_EQUALS(dbType.getVersion().getTimestamp(), newDbType.getVersion().getTimestamp());
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, TimeseriesFieldsAreProperlyPropagatedOnSSCCL) {
+    ChunkVersion collectionVersion(1, 0, OID::gen(), boost::none /* timestamp */);
+
+    CollectionType collectionType = makeCollectionType(collectionVersion);
+    collectionType.setTimeseriesFields(TypeCollectionTimeseriesFields("fieldName"));
+
+    vector<ChunkType> chunks = makeFiveChunks(collectionVersion);
+
+    _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+    _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+
+    auto collAndChunksRes = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+    ASSERT(collAndChunksRes.timeseriesFields.is_initialized());
 }
 
 }  // namespace

@@ -34,6 +34,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 
 namespace mongo {
 namespace {
@@ -59,7 +60,8 @@ protected:
      *  time (75,25) shard0(chunk2, chunk4) shard1(chunk1, chunk3)
      *  time (25,0) - no history
      */
-    void prepareTestData() {
+    void prepareTestData(
+        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields = boost::none) {
         const OID epoch = OID::gen();
         const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
 
@@ -71,6 +73,7 @@ protected:
             false,
             epoch,
             boost::none /* timestamp */,
+            timeseriesFields,
             boost::none,
             true,
             [&] {
@@ -208,6 +211,33 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
+}
+
+TEST_F(CollectionMetadataFilteringTest, DisallowOpsOnShardedTimeseriesCollection) {
+    TypeCollectionTimeseriesFields timeseriesFields("fieldName");
+    prepareTestData(timeseriesFields);
+
+    BSONObj readConcern = BSON("readConcern" << BSON("level"
+                                                     << "snapshot"
+                                                     << "atClusterTime" << Timestamp(100, 0)));
+
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(operationContext());
+    ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
+
+    AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
+    auto* const css = CollectionShardingState::get(operationContext(), kNss);
+
+    auto check = [&](const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::NotImplemented) << ex.toString();
+        ASSERT_STRING_CONTAINS(ex.reason(),
+                               "Operations on sharded time-series collections are not supported");
+    };
+
+    ASSERT_THROWS_WITH_CHECK(
+        css->getOwnershipFilter(operationContext(),
+                                CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup),
+        AssertionException,
+        check);
 }
 
 }  // namespace
