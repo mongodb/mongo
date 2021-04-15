@@ -1,7 +1,7 @@
 // Test that when a capped collection is truncated, tailable cursors die on getMore with the error
 // code 'CappedPositionLost'.
 //
-// @tags: [requires_capped]
+// @tags: [requires_capped, sbe_incompatible]
 (function() {
 "use strict";
 
