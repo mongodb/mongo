@@ -79,7 +79,7 @@ assert.soon(function() {
     }
 }, "secondary didn't restart", 30000, 1000);
 
-assert.soon(function() {
+assert.soonNoExcept(function() {
     return 2 == secondDB.getCollection(collectionName).getIndexes().length;
 }, "Index build not resumed after restart", 30000, 50);
 replTest.stopSet();
