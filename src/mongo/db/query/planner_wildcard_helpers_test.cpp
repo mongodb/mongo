@@ -233,19 +233,47 @@ protected:
     boost::optional<WildcardProjection> _proj;
 };
 
-// TODO: what should we output from the expander when the query is only on the first field of the
-// index? Do we need some alternative like {a: 1, dummyKey: 1}?
-// TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryOnlyOnNonWCField) {
-//     addWildcardIndex(fromjson("{a: 1, 'b.$**': 1}"), {});
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryOnlyOnNonWCFieldWithProjection) {
+    addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
 
-//     runQuery(fromjson("{a: {$eq: 5}}"));
+    runQuery(fromjson("{a: {$eq: 5}}"));
 
-//     assertNumSolutions(1U);
-//     assertSolutionExists(
-//         "{fetch: {node: {ixscan: {pattern: {a: 1, $_path: 1, x: 1}, bounds: {'a': "
-//         "[[5, 5, true, true]], '$_path': [['x', 'x', true, true]], 'x': [['MinKey', 'MaxKey',
-//         true, " "true]]}}}}}");
-// }
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, '$_path': 1, '$_value': 1}, bounds: {'a': "
+        "[[5, 5, true, true]], '$_path': [['$_value', '$_value', true, true]], '$_value': "
+        "[['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryOnlyOnNonWCField) {
+    addWildcardIndex(fromjson("{a: 1, 'b.$**': 1}"), {});
+
+    runQuery(fromjson("{a: {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, '$_path': 1, 'b.$_value': 1}, bounds: {'a': "
+        "[[5, 5, true, true]], '$_path': [['b.$_value', 'b.$_value', true, true]], 'b.$_value': "
+        "[['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryOnMultipleNonWCField) {
+    addWildcardIndex(fromjson("{a: 1, x: 1, 'b.$**': 1}"), {});
+
+    runQuery(fromjson("{a: {$eq: 5}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, x: 1, '$_path': 1, 'b.$_value': 1}, bounds: {'a':"
+        "[[5, 5, true, true]], 'x': [['MinKey', 'MaxKey', true, true]], '$_path': [['b.$_value', "
+        "'b.$_value', true, true]], 'b.$_value': [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    runQuery(fromjson("{a: {$eq: 5}, x: {$lt: 2}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, x: 1, '$_path': 1, 'b.$_value': 1}, bounds: {'a':"
+        "[[5, 5, true, true]], 'x': [[-Infinity, 2, true, false]], '$_path': [['b.$_value', "
+        "'b.$_value', true, true]], 'b.$_value': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
 
 TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexBasic) {
     addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
@@ -263,6 +291,16 @@ TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexIsNotUsedWhenQueryNotOnInd
     addWildcardIndex(fromjson("{a: 1, '$**': 1}"), {}, fromjson("{a: 0}"));
 
     runQuery(fromjson("{x: {$lt: 3}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest,
+       CompoundWildcardIndexIsNotUsedWhenQueryNotOnIndexPrefixAndNotIncludedInWildcard) {
+    addWildcardIndex(fromjson("{a: 1, 'b.$**': 1}"), {});
+
+    runQuery(fromjson("{c: {$eq: 5}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists("{cscan: {dir: 1}}");

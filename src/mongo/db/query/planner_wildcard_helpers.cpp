@@ -352,6 +352,59 @@ bool validateNumericPathComponents(const MultikeyPaths& multikeyPaths,
 }
 
 /**
+ * Create a new IndexEntry representing 'wildcardIndex' after it has been expanded with 'fieldName'.
+ * Appropriately sets the multikeyPaths of the new IndexEntry and validates that any numeric path
+ * components in the query can be handled by this index.
+ */
+boost::optional<IndexEntry> expandAndValidateIndexEntry(const IndexEntry& wildcardIndex,
+                                                        const StringData& fieldName,
+                                                        const std::set<FieldRef>& includedPaths) {
+    auto queryPath = FieldRef{fieldName};
+
+    // $** indices hold multikey metadata directly in the index keys, rather than in the index
+    // catalog. In turn, the index key data is used to produce a set of multikey paths
+    // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
+    // which will indicate to the downstream planning code which components of 'fieldName' are
+    // multikey.
+    auto multikeyPaths = buildMultiKeyPathsForExpandedWildcardIndexEntry(
+        queryPath, wildcardIndex.multikeyPathSet, wildcardIndex.keyPattern);
+
+    // Check whether a query on the current fieldpath is answerable by the $** index, given any
+    // numerical path components that may be present in the path string.
+    if (!validateNumericPathComponents(multikeyPaths, includedPaths, queryPath)) {
+        return boost::none;
+    }
+
+    // The expanded IndexEntry is only considered multikey if the particular path represented by
+    // this IndexEntry has a multikey path component. For instance, suppose we have index {$**:
+    // 1} with "a" as the only multikey path. If we have a query on paths "a.b" and "c.d", then
+    // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
+    // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
+    // marked as multikey.
+    invariant((int)multikeyPaths.size() == wildcardIndex.keyPattern.nFields());
+    const bool isMultikey = !multikeyPaths.back().empty();
+
+    IndexEntry entry(expandIndexKey(wildcardIndex.keyPattern, fieldName),
+                     IndexType::INDEX_WILDCARD,
+                     IndexDescriptor::kLatestIndexVersion,
+                     isMultikey,
+                     std::move(multikeyPaths),
+                     // Expanded index entries always use the fixed-size multikey paths
+                     // representation, so we purposefully discard 'multikeyPathSet'.
+                     {},
+                     true,   // sparse
+                     false,  // unique
+                     {wildcardIndex.identifier.catalogName, fieldName.toString()},
+                     wildcardIndex.filterExpr,
+                     wildcardIndex.infoObj,
+                     wildcardIndex.collator,
+                     wildcardIndex.wildcardProjection);
+
+    invariant("$_path"_sd != fieldName);
+    return entry;
+}
+
+/**
  * Queries whose bounds overlap the Object type bracket may require special handling, since the $**
  * index does not index complete objects but instead only contains the leaves along each of its
  * subpaths. Since we ban all object-value queries except those on the empty object {}, this will
@@ -421,49 +474,21 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
         wildcardProjection->exhaustivePaths() ? *wildcardProjection->exhaustivePaths() : kEmptySet;
     out->reserve(out->size() + projectedFields.size());
     for (auto&& fieldName : projectedFields) {
-        // Convert string 'fieldName' into a FieldRef, to better facilitate the subsequent checks.
-        auto queryPath = FieldRef{fieldName};
-        // $** indices hold multikey metadata directly in the index keys, rather than in the index
-        // catalog. In turn, the index key data is used to produce a set of multikey paths
-        // in-memory. Here we convert this set of all multikey paths into a MultikeyPaths vector
-        // which will indicate to the downstream planning code which components of 'fieldName' are
-        // multikey.
-        auto multikeyPaths = buildMultiKeyPathsForExpandedWildcardIndexEntry(
-            queryPath, wildcardIndex.multikeyPathSet, wildcardIndex.keyPattern);
-
-        // Check whether a query on the current fieldpath is answerable by the $** index, given any
-        // numerical path components that may be present in the path string.
-        if (!validateNumericPathComponents(multikeyPaths, includedPaths, queryPath)) {
-            continue;
+        if (auto entry = expandAndValidateIndexEntry(wildcardIndex, fieldName, includedPaths)) {
+            out->push_back(std::move(entry.get()));
         }
+    }
 
-        // The expanded IndexEntry is only considered multikey if the particular path represented by
-        // this IndexEntry has a multikey path component. For instance, suppose we have index {$**:
-        // 1} with "a" as the only multikey path. If we have a query on paths "a.b" and "c.d", then
-        // we will generate two expanded index entries: one for "a.b" and "c.d". The "a.b" entry
-        // will be marked as multikey because "a" is multikey, whereas the "c.d" entry will not be
-        // marked as multikey.
-        invariant((int)multikeyPaths.size() == wildcardIndex.keyPattern.nFields());
-        const bool isMultikey = !multikeyPaths.back().empty();
-
-        IndexEntry entry(expandIndexKey(wildcardIndex.keyPattern, fieldName),
-                         IndexType::INDEX_WILDCARD,
-                         IndexDescriptor::kLatestIndexVersion,
-                         isMultikey,
-                         std::move(multikeyPaths),
-                         // Expanded index entries always use the fixed-size multikey paths
-                         // representation, so we purposefully discard 'multikeyPathSet'.
-                         {},
-                         true,   // sparse
-                         false,  // unique
-                         {wildcardIndex.identifier.catalogName, fieldName},
-                         wildcardIndex.filterExpr,
-                         wildcardIndex.infoObj,
-                         wildcardIndex.collator,
-                         wildcardIndex.wildcardProjection);
-
-        invariant("$_path"_sd != fieldName);
-        out->push_back(std::move(entry));
+    if (projectedFields.empty() && wildcardIndex.keyPattern.nFields() > 1) {
+        // We are querying on fields not covered by the wildcard part of the index, but we have a
+        // compound index, so we may still be able to support the query. For example, with index
+        // {a: 1, 'b.$**': 1} and query {a: {$eq: 5}}, the index does support the query. Replace the
+        // '$**' part of the wildcard element with a placeholder name, then output the index entry.
+        auto wcElemFieldName = getLastElement(wildcardIndex.keyPattern)->fieldNameStringData();
+        auto placeholder = wcElemFieldName.substr(0, wcElemFieldName.size() - 3) + "$_value";
+        if (auto entry = expandAndValidateIndexEntry(wildcardIndex, placeholder, includedPaths)) {
+            out->push_back(std::move(entry.get()));
+        }
     }
 }
 
