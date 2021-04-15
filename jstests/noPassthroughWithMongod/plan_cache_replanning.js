@@ -2,6 +2,8 @@
  * This test will attempt to create a scenario where the plan cache entry for a given query shape
  * oscillates. It achieves this by creating two indexes, A and B, on a collection, and interleaving
  * queries which are "ideal" for index A with queries that are "ideal" for index B.
+ *
+ * @tags: [sbe_incompatible]
  */
 (function() {
 "use strict";
@@ -60,7 +62,7 @@ assert.eq(1, coll.find(bIndexQuery).itcount());
 let entry = getPlansForCacheEntry({"createdFromQuery.query": bIndexQuery});
 let entryWorks = entry.works;
 assert.eq(entry.isActive, false);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), true, entry);
 
 // Get the hash of the query shape so that we keep looking up entries associated with the same shape
 // going forward.
@@ -71,7 +73,7 @@ assert.eq(1, coll.find(bIndexQuery).itcount());
 entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
 assert.eq(entry.works, entryWorks);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), true, entry);
 
 // Now we will attempt to oscillate the cache entry by interleaving queries which should use
 // the {a:1} and {b:1} index. When the plan using the {b: 1} index is in the cache, running a
@@ -84,20 +86,20 @@ assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
 assert.eq(1, coll.find(aIndexQuery).itcount());
 entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {a: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {a: 1}), true, entry);
 
 // Run the query which should use the {b: 1} index.
 assert.eq(1, coll.find(bIndexQuery).itcount());
 entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), true, entry);
 
 // The {b: 1} plan is again in the cache. Run the query which should use the {a: 1}
 // index.
 assert.eq(1, coll.find(aIndexQuery).itcount());
 entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {a: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {a: 1}), true, entry);
 
 // The {a: 1} plan is back in the cache. Run the query which would perform better on the plan
 // using the {b: 1} index, and ensure that plan gets written to the cache.
@@ -105,7 +107,7 @@ assert.eq(1, coll.find(bIndexQuery).itcount());
 entry = getPlansForCacheEntry({queryHash: queryHash});
 entryWorks = entry.works;
 assert.eq(entry.isActive, true);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), true, entry);
 
 // Now run a plan that will perform poorly with both indices (it will be required to scan 500
 // documents). This will result in replanning (and the cache entry being deactivated). However,
@@ -119,7 +121,7 @@ assert.eq(500, coll.find({a: 3, b: 3}).itcount());
 // The cache entry should have been deactivated.
 entry = getPlansForCacheEntry({queryHash: queryHash});
 assert.eq(entry.isActive, false);
-assert.eq(planHasIxScanStageForKey(entry.cachedPlan, {b: 1}), true, entry);
+assert.eq(planHasIxScanStageForKey(getCachedPlan(entry.cachedPlan), {b: 1}), true, entry);
 
 // The works value should have doubled.
 assert.eq(entry.works, entryWorks * 2);

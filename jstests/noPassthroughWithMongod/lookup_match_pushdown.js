@@ -5,6 +5,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+load('jstests/libs/analyze_plan.js');         // For getWinningPlan().
 
 const coll = db.lookup_match_pushdown;
 coll.drop();
@@ -23,8 +24,9 @@ function checkPipelineAndResults(pipeline, expectedPipeline, expectedResults) {
     // Check pipeline is as expected.
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
     if (expectedPipeline.length > 0) {
-        assert.eq(
-            explain.stages[0].$cursor.queryPlanner.winningPlan.stage, expectedPipeline[0], explain);
+        assert.eq(getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage,
+                  expectedPipeline[0],
+                  explain);
     }
     assert.eq(explain.stages.length, expectedPipeline.length, explain);
     for (let i = 1; i < expectedPipeline.length; i++) {

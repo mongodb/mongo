@@ -4,6 +4,8 @@
 (function() {
 "use strict";
 
+load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
+
 const coll = db.lookup_with_limit;
 const other = db.lookup_with_limit_other;
 coll.drop();
@@ -18,7 +20,8 @@ function checkResults(pipeline, isOptimized, expected) {
     }));
     const explain = coll.explain().aggregate(pipeline);
     if (expected.length > 0) {
-        assert.eq(explain.stages[0].$cursor.queryPlanner.winningPlan.stage, expected[0], explain);
+        assert.eq(
+            getWinningPlan(explain.stages[0].$cursor.queryPlanner).stage, expected[0], explain);
     }
     for (let i = 1; i < expected.length; i++) {
         assert.eq(Object.keys(explain.stages[i]), expected[i], explain);
