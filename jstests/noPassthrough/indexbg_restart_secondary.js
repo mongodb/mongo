@@ -141,7 +141,7 @@ try {
     IndexBuildTest.resumeIndexBuilds(primaryDB);
 }
 
-assert.soon(function() {
+assert.soonNoExcept(function() {
     return 4 == secondDB.getCollection(collectionName).getIndexes().length;
 }, "Index build not resumed after restart", 30000, 50);
 replTest.stopSet();
