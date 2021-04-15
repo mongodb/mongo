@@ -627,11 +627,13 @@ public:
             postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
             curOp->debug().setPlanSummaryMetrics(postExecutionStats);
 
-            // We do not report 'execStats' for aggregations, both in the original request and
-            // subsequent getMores. It would be useful to have this info for an aggregation, but
-            // the source PlanExecutor could be destroyed before we know if we need 'execStats' and
-            // we do not want to generate the stats eagerly for all operations due to cost.
-            if (dynamic_cast<PlanExecutorPipeline*>(cursorPin->getExecutor()) == nullptr &&
+            // We do not report 'execStats' for aggregation or other cursors with the
+            // 'kLocksInternally' policy, both in the original request and subsequent getMore. It
+            // would be useful to have this info for an aggregation, but the source PlanExecutor
+            // could be destroyed before we know if we need 'execStats' and we do not want to
+            // generate the stats eagerly for all operations due to cost.
+            if (cursorPin->getExecutor()->lockPolicy() !=
+                    PlanExecutor::LockPolicy::kLocksInternally &&
                 curOp->shouldDBProfile(opCtx)) {
                 auto&& explainer = exec->getPlanExplainer();
                 auto&& [stats, _] =
