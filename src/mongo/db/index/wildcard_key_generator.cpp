@@ -34,6 +34,7 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/projection_parser.h"
 
@@ -61,6 +62,41 @@ void popPathComponent(BSONElement elem, bool enclosingObjIsArray, FieldRef* path
         pathToElem->removeLastPart();
     }
 }
+
+void validateWildcardIndexKeys(const std::vector<StringData>& nonWildcardFields,
+                               const StringData& wildcardField,
+                               const std::vector<StringData>& projectionInclusionSet,
+                               const std::set<StringData>& projectionExclusionSet) {
+    for (const auto& nonWildcardField : nonWildcardFields) {
+        if (wildcardField == "$**") {
+            if (projectionInclusionSet.size()) {
+                for (const auto& projInc : projectionInclusionSet) {
+                    uassert(
+                        9999901,
+                        "Compound wildcard index fields overlaps with the projected wildcard field",
+                        !(projInc == nonWildcardField ||
+                          expression::isPathPrefixOf(projInc, nonWildcardField) ||
+                          expression::isPathPrefixOf(nonWildcardField, projInc)));
+                }
+            } else {
+                uassert(9999902,
+                        "Wildcard index does not allow compound key fields with the toplevel "
+                        "wildcard field without exclusion projection on them",
+                        std::find_if(projectionExclusionSet.begin(),
+                                     projectionExclusionSet.end(),
+                                     [&](const auto& exclude) {
+                                         return exclude == nonWildcardField ||
+                                             expression::isPathPrefixOf(exclude, nonWildcardField);
+                                     }) != projectionExclusionSet.end());
+            }
+        }
+        uassert(9999903,
+                "Compound wildcard index does not allow fields overlapping with the wildcard field",
+                !(wildcardField == nonWildcardField ||
+                  expression::isPathPrefixOf(wildcardField, nonWildcardField) ||
+                  expression::isPathPrefixOf(nonWildcardField, wildcardField)));
+    }
+}
 }  // namespace
 
 constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
@@ -68,14 +104,18 @@ constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                   BSONObj pathProjection) {
     WildcardProjection* proj = nullptr;
+    std::vector<StringData> nonWildcardFields;
+    StringData wildcardField;
     for (const auto& elem : keyPattern) {
         if (auto keyStr = elem.fieldNameStringData();
             (keyStr == "$**") || keyStr.endsWith(".$**")) {
-            uassert(99999, "Wildcard index does not allow multiple wildcard compound keys", !proj);
+            uassert(
+                9999900, "Wildcard index does not allow multiple wildcard compound keys", !proj);
             // The _keyPattern is either { "$**": 1 } for all paths or { "path.$**": 1 } for a
             // single subtree. If we are indexing a single subtree, then we will project just that
             // path.
             auto suffixPos = keyStr.find(kSubtreeSuffix);
+            wildcardField = keyStr.substr(0, suffixPos);
 
             // If we're indexing a single subtree, we can't also specify a path projection.
             invariant(suffixPos == std::string::npos || pathProjection.isEmpty());
@@ -85,7 +125,7 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
             // projection is empty we default to {_id: 0}, since empty projections are illegal and
             // will be rejected when parsed.
             auto projSpec = (suffixPos != std::string::npos
-                                 ? BSON(keyStr.substr(0, suffixPos) << 1)
+                                 ? BSON(wildcardField << 1)
                                  : pathProjection.isEmpty() ? kDefaultProjection : pathProjection);
 
             // Construct a dummy ExpressionContext for ProjectionExecutor. It's OK to set the
@@ -97,8 +137,23 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
             auto projection = projection_ast::parse(expCtx, projSpec, policies);
             proj = new WildcardProjection{projection_executor::buildProjectionExecutor(
                 expCtx, &projection, policies, projection_executor::kDefaultBuilderParams)};
+        } else {
+            nonWildcardFields.push_back(elem.fieldNameStringData());
         }
     }
+    // The projections on wildcard are only used when wildcardField is "$**" and are mutually
+    // exclusive.
+    std::vector<StringData> projectionInclusionSet;
+    std::set<StringData> projectionExclusionSet;
+    for (const auto& proj : pathProjection) {
+        if (proj.numberInt() == 1) {
+            projectionInclusionSet.push_back(proj.fieldNameStringData());
+        } else {
+            projectionExclusionSet.insert(proj.fieldNameStringData());
+        }
+    }
+    validateWildcardIndexKeys(
+        nonWildcardFields, wildcardField, projectionInclusionSet, projectionExclusionSet);
     return std::move(*proj);
 }
 

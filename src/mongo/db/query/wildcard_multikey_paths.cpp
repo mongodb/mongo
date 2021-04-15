@@ -68,7 +68,6 @@ static FieldRef extractMultikeyPathFromIndexKey(BSONObj keyPattern, const IndexK
 
             // Extract the path from the second piece of the key.
             const auto secondIndexElem = indexIter.next();
-            invariant(!indexIter.more());
             invariant(secondIndexElem.type() == BSONType::String);
             return FieldRef(secondIndexElem.valueStringData());
         } else {
