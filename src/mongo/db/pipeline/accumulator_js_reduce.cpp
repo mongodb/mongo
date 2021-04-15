@@ -165,7 +165,7 @@ Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     if (toBeMerged) {
         MutableDocument output;
         output.addField("k", _key);
-        output.addField("v", result);
+        output.addField("v", std::move(result));
         return Value(output.freeze());
     } else {
         return result;

@@ -180,7 +180,7 @@ Value applyFindSliceProjectionHelper(const Document& input,
     }
 
     MutableDocument output(input);
-    output.setField(fieldName, val);
+    output.setField(fieldName, std::move(val));
     return Value{output.freeze()};
 }
 }  // namespace

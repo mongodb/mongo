@@ -311,7 +311,8 @@ public:
     /**
      * Returns a document that owns the underlying BSONObj.
      */
-    Document getOwned() const;
+    Document getOwned() const&;
+    Document getOwned() &&;
 
     /**
      * Returns true if the underlying BSONObj is owned.
@@ -515,6 +516,10 @@ public:
         storage().appendField(fieldName, ValueElement::Kind::kInserted) = val;
     }
 
+    void addField(StringData fieldName, Value&& val) {
+        storage().appendField(fieldName, ValueElement::Kind::kInserted) = std::move(val);
+    }
+
     /** Update field by key. If there is no field with that key, add one.
      *
      *  If the new value is missing(), the field is logically removed.
@@ -524,6 +529,9 @@ public:
     }
     void setField(StringData key, const Value& val) {
         getField(key) = val;
+    }
+    void setField(StringData key, Value&& val) {
+        getField(key) = std::move(val);
     }
     MutableValue getField(StringData key) {
         return MutableValue(storage().getField(key, DocumentStorage::LookupPolicy::kCacheOnly));
@@ -538,6 +546,9 @@ public:
     }
     void setField(Position pos, const Value& val) {
         getField(pos) = val;
+    }
+    void setField(Position pos, Value&& val) {
+        getField(pos) = std::move(val);
     }
     MutableValue getField(Position pos) {
         return MutableValue(storage().getField(pos).val);
@@ -561,11 +572,17 @@ public:
     void setNestedField(const FieldPath& dottedField, const Value& val) {
         getNestedField(dottedField) = val;
     }
+    void setNestedField(const FieldPath& dottedField, Value&& val) {
+        getNestedField(dottedField) = std::move(val);
+    }
 
     /// Takes positions vector from Document::getNestedField. All fields in path must exist.
     MutableValue getNestedField(const std::vector<Position>& positions);
     void setNestedField(const std::vector<Position>& positions, const Value& val) {
         getNestedField(positions) = val;
+    }
+    void setNestedField(const std::vector<Position>& positions, Value&& val) {
+        getNestedField(positions) = std::move(val);
     }
 
     /**

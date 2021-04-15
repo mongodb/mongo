@@ -80,7 +80,7 @@ void AccumulatorMergeObjects::processInternal(const Value& input, bool merging) 
         if (pair.second.missing())
             continue;
 
-        _output.setField(pair.first, pair.second);
+        _output.setField(pair.first, std::move(pair.second));
     }
     _memUsageBytes = sizeof(*this) + _output.getApproximateSize();
 }

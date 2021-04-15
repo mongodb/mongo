@@ -372,6 +372,23 @@ public:
         Document final = md.freeze();
         ASSERT_EQUALS(3ULL, final.computeSize());
         assertRoundTrips(final);
+
+        // Add field to the document as an lvalue.
+        MutableDocument md1;
+        Value v1(1);
+        md1.addField("a", v1);
+        ASSERT_VALUE_EQ(md1.peek().getField("a"), v1);
+
+        // Set field to the document as an lvalue.
+        Value v2(2);
+        md1.setField("a", v2);
+        ASSERT_VALUE_EQ(md1.peek().getField("a"), v2);
+
+        // Set nested field to the document as an lvalue.
+        FieldPath xxyyzz("xx.yy.zz");
+        Value v3("nested"_sd);
+        md1.setNestedField(xxyyzz, v3);
+        ASSERT_VALUE_EQ(md1.peek().getNestedField(xxyyzz), v3);
     }
 };
 
@@ -1157,6 +1174,17 @@ public:
         ASSERT_EQUALS(-.3, document["banana"].getDouble());
         ASSERT_EQUALS(Object, value.getType());
         assertRoundTrips(value);
+
+        MutableDocument md1;
+        Value v(1);
+        md1.addField("a", v);
+
+        MutableDocument md2;
+        // Construct Value from an rvalue.
+        md2.addField("nested", Value(md1.freeze()));
+
+        ASSERT_VALUE_EQ(md2.peek().getNestedField("nested.a"), v);
+        ASSERT_DOCUMENT_EQ(md1.freeze(), mongo::Document());
     }
 };
 

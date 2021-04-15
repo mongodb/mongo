@@ -123,6 +123,11 @@ public:
         type = t;
         putDocument(d);
     }
+    ValueStorage(BSONType t, Document&& d) {
+        zero();
+        type = t;
+        putDocument(std::move(d));
+    }
     ValueStorage(BSONType t, boost::intrusive_ptr<RCVector>&& a) {
         zero();
         type = t;
@@ -228,6 +233,7 @@ public:
     void putString(StringData s);
     void putVector(boost::intrusive_ptr<RCVector>&& v);
     void putDocument(const Document& d);
+    void putDocument(Document&& d);
     void putRegEx(const BSONRegEx& re);
     void putBinData(const BSONBinData& bd) {
         putRefCountable(RCString::create(StringData(static_cast<const char*>(bd.data), bd.length)));

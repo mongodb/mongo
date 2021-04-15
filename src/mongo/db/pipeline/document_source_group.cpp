@@ -749,7 +749,7 @@ Document DocumentSourceGroup::makeDocument(const Value& id,
             // we return null in this case so return objects are predictable
             out.addField(_accumulatedFields[i].fieldName, Value(BSONNULL));
         } else {
-            out.addField(_accumulatedFields[i].fieldName, val);
+            out.addField(_accumulatedFields[i].fieldName, std::move(val));
         }
     }
 

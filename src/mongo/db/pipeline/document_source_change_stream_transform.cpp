@@ -361,21 +361,22 @@ Document DocumentSourceChangeStreamTransform::applyTransformation(const Document
     }
 
     // Add the post-image, pre-image, namespace, documentKey and other fields as appropriate.
-    doc.addField(DocumentSourceChangeStream::kFullDocumentField, fullDocument);
+    doc.addField(DocumentSourceChangeStream::kFullDocumentField, std::move(fullDocument));
     if (_includePreImageOptime) {
         // Set 'kFullDocumentBeforeChangeField' to the pre-image optime. The DSCSLookupPreImage
         // stage will replace this optime with the actual pre-image taken from the oplog.
-        doc.addField(DocumentSourceChangeStream::kFullDocumentBeforeChangeField, preImageOpTime);
+        doc.addField(DocumentSourceChangeStream::kFullDocumentBeforeChangeField,
+                     std::move(preImageOpTime));
     }
     doc.addField(DocumentSourceChangeStream::kNamespaceField,
                  operationType == DocumentSourceChangeStream::kDropDatabaseOpType
                      ? Value(Document{{"db", nss.db()}})
                      : Value(Document{{"db", nss.db()}, {"coll", nss.coll()}}));
-    doc.addField(DocumentSourceChangeStream::kDocumentKeyField, documentKey);
+    doc.addField(DocumentSourceChangeStream::kDocumentKeyField, std::move(documentKey));
 
     // Note that 'updateDescription' might be the 'missing' value, in which case it will not be
     // serialized.
-    doc.addField("updateDescription", updateDescription);
+    doc.addField("updateDescription", std::move(updateDescription));
     return doc.freeze();
 }
 

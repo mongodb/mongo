@@ -150,9 +150,9 @@ boost::optional<Document> DocumentSourceRedact::redactObject(const Document& roo
             const Document::FieldPair field(fields.next());
 
             // This changes CURRENT so don't read from variables after this
-            const Value val = redactValue(field.second, root);
+            Value val = redactValue(field.second, root);
             if (!val.missing()) {
-                out.addField(field.first, val);
+                out.addField(field.first, std::move(val));
             }
         }
         return out.freeze();

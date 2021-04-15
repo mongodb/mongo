@@ -518,11 +518,21 @@ Document Document::fromBsonWithMetaData(const BSONObj& bson) {
     return md.freeze();
 }
 
-Document Document::getOwned() const {
+Document Document::getOwned() const& {
     if (isOwned()) {
         return *this;
     } else {
         MutableDocument md(*this);
+        md.makeOwned();
+        return md.freeze();
+    }
+}
+
+Document Document::getOwned() && {
+    if (isOwned()) {
+        return std::move(*this);
+    } else {
+        MutableDocument md(std::move(*this));
         md.makeOwned();
         return md.freeze();
     }

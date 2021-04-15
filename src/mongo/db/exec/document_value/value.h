@@ -32,6 +32,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value_internal.h"
+#include "mongo/util/concepts.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -102,6 +103,7 @@ public:
     explicit Value(StringData value) : _storage(String, value) {}
     explicit Value(const std::string& value) : _storage(String, StringData(value)) {}
     explicit Value(const Document& doc);
+    explicit Value(Document&& doc);
     explicit Value(const BSONObj& obj);
     explicit Value(const BSONArray& arr);
     explicit Value(const std::vector<BSONObj>& vec);
@@ -127,6 +129,11 @@ public:
      *  Force the use of StringData to prevent accidental NUL-termination.
      */
     explicit Value(const char*) = delete;
+
+    Value(const Value&) = default;
+    Value(Value&&) = default;
+    Value& operator=(const Value&) = default;
+    Value& operator=(Value&&) = default;
 
     /**
      *  Prevent implicit conversions to the accepted argument types.
@@ -397,14 +404,22 @@ inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);
 }
 
+MONGO_MAKE_BOOL_TRAIT(CanConstructValueFrom,
+                      (typename T),
+                      (T),
+                      (T val),
+                      //
+                      Value(std::forward<T>(val)));
+
 /**
  * This class is identical to Value, but supports implicit creation from any of the types explicitly
  * supported by Value.
  */
 class ImplicitValue : public Value {
 public:
-    template <typename T>
-    ImplicitValue(T arg) : Value(std::move(arg)) {}
+    TEMPLATE(typename T)
+    REQUIRES(CanConstructValueFrom<T>)
+    ImplicitValue(T&& arg) : Value(std::forward<T>(arg)) {}
 
     ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
 
@@ -412,6 +427,7 @@ public:
 
     static std::vector<Value> convertToValues(const std::vector<int>& vec) {
         std::vector<Value> values;
+        values.reserve(vec.size());
         for_each(vec.begin(), vec.end(), ([&](const int& val) { values.emplace_back(val); }));
         return values;
     }
@@ -421,6 +437,7 @@ public:
      */
     static Value convertToValue(const std::vector<ImplicitValue>& vec) {
         std::vector<Value> values;
+        values.reserve(vec.size());
         for_each(
             vec.begin(), vec.end(), ([&](const ImplicitValue& val) { values.push_back(val); }));
         return Value(values);
@@ -431,6 +448,7 @@ public:
      */
     static std::vector<Value> convertToValues(const std::vector<ImplicitValue>& list) {
         std::vector<Value> values;
+        values.reserve(list.size());
         for (const ImplicitValue& val : list) {
             values.push_back(val);
         }

@@ -655,7 +655,7 @@ Value ExpressionObjectToArray::evaluate(const Document& root, Variables* variabl
         Document::FieldPair pair = iter.next();
         MutableDocument keyvalue;
         keyvalue.addField("k", Value(pair.first));
-        keyvalue.addField("v", pair.second);
+        keyvalue.addField("v", std::move(pair.second));
         output.push_back(keyvalue.freezeToValue());
     }
 
