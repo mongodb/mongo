@@ -243,8 +243,8 @@ protected:
 //     assertNumSolutions(1U);
 //     assertSolutionExists(
 //         "{fetch: {node: {ixscan: {pattern: {a: 1, $_path: 1, x: 1}, bounds: {'a': "
-//         "[[5, 5, true, true]], '$_path': [['x', 'x', true, true]], 'x': [['MinKey', 'MaxKey', true, "
-//         "true]]}}}}}");
+//         "[[5, 5, true, true]], '$_path': [['x', 'x', true, true]], 'x': [['MinKey', 'MaxKey',
+//         true, " "true]]}}}}}");
 // }
 
 TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexBasic) {
@@ -297,18 +297,20 @@ TEST_F(QueryPlannerWildcardTest,
     addWildcardIndex(fromjson("{x: 1, '$**': 1}"), {"a"}, fromjson("{x: 0}"));
     runQuery(fromjson("{x: {$lt: 2}, 'a.b': {$gt: 0, $lt: 9}}"));
 
-    // TODO: in query_planner_wildcard_index_test.cpp, the original test gave 2 solutions, not one.
-    // Feels like a bug...
-    // I have to admit I'm confused about the bounds in the original test too -- For example, in the
-    // solution here, we can't we use the bounds for 'a.b': [[0, 20, false false]]?
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {'a.b': {$gt: 0}}, node: "
         "{ixscan: {filter: null, pattern: {'x': 1, '$_path': 1, 'a.b': 1},"
         "bounds: {'x': [[-Infinity, 2, true, false]], '$_path': [['a.b','a.b',true,true]], 'a.b': "
         "[[-Infinity,9,true,false]]}}}}}");
+    // TODO SERVER-56118 This solution should be generated.
+    // assertSolutionExists(
+    //     "{fetch: {filter: {'a.b': {$gt: 0}}, node: "
+    //     "{ixscan: {filter: null, pattern: {'x': 1, '$_path': 1, 'a.b': 1},"
+    //     "bounds: {'x': [[-Infinity, 2, true, false]], '$_path': [['a.b','a.b',true,true]], 'a.b':
+    //     "
+    //     "[[0,Infinity,false,true]]}}}}}");
 }
-
 
 TEST_F(QueryPlannerWildcardTest,
        CompoundWildcardAllPredsEligibleForIndexUseGenerateCandidatePlans) {
@@ -317,7 +319,8 @@ TEST_F(QueryPlannerWildcardTest,
         fromjson("{x: {$eq: 2}, 'a.b': {$gt: 0, $lt: 9}, 'a.c': {$gt: 11, $lt: 20}, d: {$gt: 31, "
                  "$lt: 40}}"));
 
-    // TODO: Same as above: the original test gave 4 solutions, not two.
+    // TODO SERVER-56118: Should generate 4 plans here. Missing the plans where $gts are bounded
+    // instead of $lts.
     assertNumSolutions(2U);
     assertSolutionExists(
         "{fetch: {filter: {'a.b':{$gt:0,$lt: 9},'a.c':{$gt:11},d:{$gt:31,$lt:40}}, node: "

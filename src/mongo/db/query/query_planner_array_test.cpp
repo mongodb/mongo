@@ -1276,6 +1276,19 @@ TEST_F(QueryPlannerTest, CannotIntersectBoundsWhenSecondFieldIsMultikey) {
     assertSolutionExists(
         "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
         "bounds: {a: [[2, 2, true, true]], b: [[-Infinity, 10, true, false]]}}}}}");
+    // TODO SERVER-56118 expect to see another plan with (0, Infinity] also.
+}
+
+TEST_F(QueryPlannerTest, CanBuildGtBoundsOnSecondFieldIfFirstIsMultikey) {
+    MultikeyPaths multikeyPaths{MultikeyComponents{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQuery(fromjson("{a: 2, b: {$gte: 0}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {a: 2, b: {$gte: 0}}}}");
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, "
+        "bounds: {a: [[2, 2, true, true]], b: [[0, Infinity, true, true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, CanIntersectBoundsWhenSecondFieldIsMultikeyButHasElemMatch) {
