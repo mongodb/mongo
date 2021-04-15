@@ -13,7 +13,6 @@
  * engine does not support them.
  * @tags: [
  *   requires_majority_read_concern,
- *   sbe_incompatible,
  * ]
  */
 
@@ -78,7 +77,7 @@ function testReadConcernLevel(level) {
 
     function getExplainPlan(query) {
         var res = db.runCommand({explain: {find: t.getName(), filter: query}});
-        return assert.commandWorked(res).queryPlanner.winningPlan;
+        return getWinningPlan(assert.commandWorked(res).queryPlanner);
     }
 
     //
