@@ -12,11 +12,9 @@ t.drop();
 // Include helpers for analyzing explain output.
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_explain_helpers.js");
+load("jstests/libs/sbe_util.js");
 
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 assert.commandWorked(t.insert({_id: {x: 1}, z: 1}));
 assert.commandWorked(t.insert({_id: {x: 2}, z: 2}));

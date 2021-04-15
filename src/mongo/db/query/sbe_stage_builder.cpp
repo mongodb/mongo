@@ -1807,29 +1807,89 @@ SlotBasedStageBuilder::buildShardFilterCovered(const ShardingFilterNode* filterN
 
     // Determine the set of fields from the index required to obtain the shard key and union those
     // with the set of fields from the index required by the parent stage.
-    auto [shardKeyIndexReqs, projectFields] =
-        makeIndexKeyInclusionSet(indexKeyPattern, shardKeyFields);
-    childReqs.getIndexKeyBitset() =
+    auto [shardKeyIndexReqs, _] = makeIndexKeyInclusionSet(indexKeyPattern, shardKeyFields);
+    const auto ixKeyBitset =
         parentIndexKeyReqs.value_or(sbe::IndexKeysInclusionSet{}) | shardKeyIndexReqs;
+    childReqs.getIndexKeyBitset() = ixKeyBitset;
 
     auto [stage, outputs] = build(child, childReqs);
+    tassert(5562302, "Expected child to produce index key slots", outputs.getIndexKeySlots());
 
-    invariant(outputs.getIndexKeySlots());
-    auto indexKeySlotsForShardKeyFields =
-        makeIndexKeyOutputSlotsMatchingParentReqs(indexKeyPattern,
-                                                  shardKeyIndexReqs,
-                                                  *childReqs.getIndexKeyBitset(),
-                                                  *outputs.getIndexKeySlots());
+    // Maps from key name -> (index in outputs.getIndexKeySlots(), is hashed).
+    auto ixKeyPatternFieldToSlotIdx = [&, childOutputs = std::ref(outputs)]() {
+        StringDataMap<std::pair<sbe::value::SlotId, bool>> ret;
+
+        // Keeps track of which component we're reading in the index key pattern.
+        size_t i = 0;
+        // Keeps track of the index we are in the slot vector produced by the ix scan. The slot
+        // vector produced by the ix scan may be a subset of the key pattern.
+        size_t slotIdx = 0;
+        for (auto&& ixPatternElt : indexKeyPattern) {
+            if (shardKeyFields.count(ixPatternElt.fieldNameStringData())) {
+                const bool isHashed = ixPatternElt.valueStringData() == IndexNames::HASHED;
+                const auto slotId = (*childOutputs.get().getIndexKeySlots())[slotIdx];
+                ret.emplace(ixPatternElt.fieldNameStringData(), std::make_pair(slotId, isHashed));
+            }
+
+            if (ixKeyBitset[i]) {
+                ++slotIdx;
+            }
+            ++i;
+        }
+        return ret;
+    }();
+
+    // Build a project stage to deal with hashed shard keys. This step *could* be skipped if we're
+    // dealing with non-hashed sharding, but it's done this way for sake of simplicity.
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
+    sbe::value::SlotVector fieldSlots;
+    std::vector<std::string> projectFields;
+    for (auto&& shardKeyPatternElt : shardKeyPattern) {
+        auto it = ixKeyPatternFieldToSlotIdx.find(shardKeyPatternElt.fieldNameStringData());
+        tassert(5562303, "Could not find element", it != ixKeyPatternFieldToSlotIdx.end());
+        auto [slotId, ixKeyEltHashed] = it->second;
+
+        // Get the value stored in the index for this component of the shard key. We may have to
+        // hash it.
+        auto elem = makeVariable(slotId);
+
+        const bool shardKeyEltHashed = ShardKeyPattern::isHashedPatternEl(shardKeyPatternElt);
+
+        if (shardKeyEltHashed) {
+            if (ixKeyEltHashed) {
+                // (1) The index stores hashed data and the shard key field is hashed.
+                // Nothing to do here. We can apply shard filtering with no other changes.
+            } else {
+                // (2) The shard key field is hashed but the index stores unhashed data. We must
+                // apply the hash function before passing this off to the shard filter.
+                elem = makeFunction("shardHash"_sd, std::move(elem));
+            }
+        } else {
+            if (ixKeyEltHashed) {
+                // (3) The index stores hashed data but the shard key is not hashed. This is a bug.
+                MONGO_UNREACHABLE_TASSERT(5562300);
+            } else {
+                // (4) The shard key field is not hashed, and the index does not store hashed data.
+                // Again, we do nothing here.
+            }
+        }
+
+        fieldSlots.push_back(_slotIdGenerator.generate());
+        projectFields.push_back(shardKeyPatternElt.fieldName());
+        projections.emplace(fieldSlots.back(), std::move(elem));
+    }
+
+    auto projectStage = sbe::makeS<sbe::ProjectStage>(
+        std::move(stage), std::move(projections), filterNode->nodeId());
 
     auto shardKeySlot = _slotIdGenerator.generate();
-
-    auto mkObjStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage),
+    auto mkObjStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(projectStage),
                                                         shardKeySlot,
                                                         boost::none,
                                                         boost::none,
                                                         std::vector<std::string>{},
                                                         std::move(projectFields),
-                                                        indexKeySlotsForShardKeyFields,
+                                                        fieldSlots,
                                                         true,
                                                         false,
                                                         filterNode->nodeId());

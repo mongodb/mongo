@@ -10075,6 +10075,7 @@ buildvariants:
   - name: cwrwc_rc_majority_passthrough_gen
   - name: cwrwc_wc_majority_passthrough
   - name: initial_sync_fuzzer_gen
+  - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: read_concern_linearizable_passthrough
