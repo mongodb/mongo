@@ -85,7 +85,7 @@ assert.commandWorked(secondary.adminCommand(
 // Let index build complete on primary, which replicates a commitIndexBuild to the secondary.
 IndexBuildTest.resumeIndexBuilds(primaryDB);
 
-assert.soon(function() {
+assert.soonNoExcept(function() {
     return 4 === secondaryDB.getCollection(collectionName).getIndexes().length;
 }, "Index build did not complete after restart");
 
