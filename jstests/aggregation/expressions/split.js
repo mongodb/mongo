@@ -42,6 +42,7 @@ testExpression(coll, {$split: [null, "abc"]}, null);
 // Ensure that $split produces null when given missing fields as input.
 testExpression(coll, {$split: ["$a", "a"]}, null);
 testExpression(coll, {$split: ["a", "$a"]}, null);
+testExpression(coll, {$split: ["$missing", {$toLower: "$missing"}]}, null);
 
 //
 // Error Code tests with constant-folding optimization.
