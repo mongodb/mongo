@@ -75,6 +75,42 @@ structs:
                 description: "Latest version of the collection"
                 optional: false
 
+    CreateCollectionRequest:
+        description: "All the parameters sent by the router."
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            shardKey:
+                type: object_owned
+                description: "The index specification document to use as the shard key."
+                optional: true
+            unique:
+                type: bool
+                description: "Whether the shard key index should enforce a unique constraint."
+                optional: true
+            numInitialChunks:
+                type: safeInt64
+                description: >-
+                    The number of chunks to create initially when sharding an empty collection with
+                    a hashed shard key.
+                optional: true
+            presplitHashedZones:
+                type: bool
+                description: >-
+                    True if the chunks should be pre-split based on the existing zones when
+                    sharding a collection with hashed shard key.
+                optional: true
+            initialSplitPoints:
+                type: array<object_owned>
+                description: >-
+                    A specific set of points to create initial splits at, currently used only by
+                    mapReduce.
+                optional: true
+            collation:
+                type: object_owned
+                description: "The collation to use for the shard key index."
+                optional: true
+
     CreateCollectionResponse:
         description: "Response of the create collection command"
         strict: false
@@ -97,31 +133,8 @@ commands:
         strict: false
         namespace: concatenate_with_db
         api_version: ""
-        fields:
-            shardKey:
-                type: object
-                description: "The index specification document to use as the shard key."
-                optional: true
-            unique:
-                type: bool
-                description: "Whether the shard key index should enforce a unique constraint"
-                optional: true
-            numInitialChunks:
-                type: safeInt64
-                description: "The number of chunks to create initially when sharding an empty collection with a hashed shard key."
-                optional: true
-            presplitHashedZones:
-                type: bool
-                description: "True if the chunks should be pre-split based on the existing zones when sharding a collection with hashed shard key"
-                optional: true
-            initialSplitPoints:
-                type: array<object>
-                description: "A specific set of points to create initial splits at, currently used only by mapReduce"
-                optional: true
-            collation:
-                type: object
-                description: "The collation to use for the shard key index."
-                optional: true
+        chained_structs:
+            CreateCollectionRequest: CreateCollectionRequest
 
     _shardsvrCreateCollectionParticipant:
         command_name: _shardsvrCreateCollectionParticipant

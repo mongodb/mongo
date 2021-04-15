@@ -105,6 +105,10 @@ private:
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
 
+    // TODO SERVER-56040: remove once we have critical section handling and replication on
+    // secondaries.
+    virtual void _interrupt(Status status) noexcept {}
+
     void interrupt(Status status) override final;
 
     void _removeDocument(OperationContext* opCtx);

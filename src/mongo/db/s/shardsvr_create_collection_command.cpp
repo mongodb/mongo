@@ -189,17 +189,7 @@ CreateCollectionResponse createCollection(OperationContext* opCtx,
     auto coordinatorDoc = CreateCollectionCoordinatorDocument();
     coordinatorDoc.setShardingDDLCoordinatorMetadata(
         {{nss, DDLCoordinatorTypeEnum::kCreateCollection}});
-    coordinatorDoc.setShardKey(request.getShardKey());
-    if (request.getCollation())
-        coordinatorDoc.setCollation(request.getCollation());
-    if (request.getInitialSplitPoints())
-        coordinatorDoc.setInitialSplitPoints(request.getInitialSplitPoints());
-    if (request.getNumInitialChunks())
-        coordinatorDoc.setNumInitialChunks(request.getNumInitialChunks());
-    if (request.getPresplitHashedZones())
-        coordinatorDoc.setPresplitHashedZones(request.getPresplitHashedZones());
-    if (request.getUnique())
-        coordinatorDoc.setUnique(request.getUnique());
+    coordinatorDoc.setCreateCollectionRequest(request.getCreateCollectionRequest());
 
     auto service = ShardingDDLCoordinatorService::getService(opCtx);
     auto createCollectionCoordinator = checked_pointer_cast<CreateCollectionCoordinator>(

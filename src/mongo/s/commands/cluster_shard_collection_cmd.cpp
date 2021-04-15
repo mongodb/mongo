@@ -91,11 +91,13 @@ public:
             ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
 
         ShardsvrCreateCollection shardsvrCollRequest(nss);
-        shardsvrCollRequest.setShardKey(shardCollRequest.getKey());
-        shardsvrCollRequest.setUnique(shardCollRequest.getUnique());
-        shardsvrCollRequest.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
-        shardsvrCollRequest.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
-        shardsvrCollRequest.setCollation(shardCollRequest.getCollation());
+        CreateCollectionRequest requestParamsObj;
+        requestParamsObj.setShardKey(shardCollRequest.getKey());
+        requestParamsObj.setUnique(shardCollRequest.getUnique());
+        requestParamsObj.setNumInitialChunks(shardCollRequest.getNumInitialChunks());
+        requestParamsObj.setPresplitHashedZones(shardCollRequest.getPresplitHashedZones());
+        requestParamsObj.setCollation(shardCollRequest.getCollation());
+        shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
         shardsvrCollRequest.setDbName(nss.db());
 
         cluster::createCollection(opCtx, shardsvrCollRequest);
