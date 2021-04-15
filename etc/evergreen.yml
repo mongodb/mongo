@@ -9290,12 +9290,13 @@ buildvariants:
 #  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
 #    - rhel80-medium
+  - name: .aggfuzzer
   - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
-  - name: .aggfuzzer !.multiversion
   - name: .change_streams
   - name: .concurrency !.large !.ubsan !.debug_only
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
+  - name: .query_fuzzer
   - name: .read_write_concern
   - name: .replica_sets
   - name: .rollbackfuzzer
