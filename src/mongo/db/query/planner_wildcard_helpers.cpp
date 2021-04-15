@@ -175,35 +175,30 @@ FieldRef pathWithoutSpecifiedComponents(const FieldRef& path,
 }
 
 /**
- * Returns a MultikeyPaths which indicates which components of 'indexedPath' are multikey, by
- * looking up multikeyness in 'multikeyPathSet'.
+ * Returns a MultikeyPaths which indicates which components of of the index key pattern are
+ * multikey, by looking up multikeyness in 'multikeyPathSet'. 'indexedPath' is used as the new key
+ * for the wildcard element.
  */
 MultikeyPaths buildMultiKeyPathsForExpandedWildcardIndexEntry(
     const FieldRef& indexedPath,
     const std::set<FieldRef>& multikeyPathSet,
     const BSONObj& keyPattern) {
-    FieldRef pathToLookup;
     MultikeyPaths multikeyPaths = {};
 
-    // TODO: what if the non-wildcard entries do represent arrays? Then they should be multikey.
-    // For each non-wildcard index entry, indicate that they are not multikey.
-    // Note this assumes only one wildcard entry.
+    // For each key in the index key pattern, determine which components are multikey.
     for (auto& elem : keyPattern) {
-        if (!elem.fieldNameStringData().endsWith("$**")) {
-            MultikeyComponents comps;
-            multikeyPaths.insert(multikeyPaths.end(), comps);
+        const FieldRef& currField =
+            elem.fieldNameStringData().endsWith("$**") ? indexedPath : FieldRef(elem.fieldName());
+        FieldRef pathToLookup;
+        MultikeyComponents comps;
+        for (size_t i = 0; i < currField.numParts(); ++i) {
+            pathToLookup.appendPart(currField.getPart(i));
+            if (fieldNameOrArrayIndexPathSetContains(multikeyPathSet, comps, pathToLookup)) {
+                comps.insert(i);
+            }
         }
+        multikeyPaths.insert(multikeyPaths.end(), comps);
     }
-
-    // Check each part of the wildcard entry 'indexedPath' to determine if it's multikey.
-    MultikeyComponents comps;
-    for (size_t i = 0; i < indexedPath.numParts(); ++i) {
-        pathToLookup.appendPart(indexedPath.getPart(i));
-        if (fieldNameOrArrayIndexPathSetContains(multikeyPathSet, comps, pathToLookup)) {
-            comps.insert(i);
-        }
-    }
-    multikeyPaths.insert(multikeyPaths.end(), comps);
 
     return multikeyPaths;
 }

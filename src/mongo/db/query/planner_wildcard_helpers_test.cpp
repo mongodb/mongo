@@ -153,6 +153,41 @@ TEST_F(PlannerWildcardHelpersTest, ExpandCompoundWildcardIndexEntryNoMatch) {
     indexEntryKeyPatternsMatch(&expectedKeyPatterns, &out);
 }
 
+TEST_F(PlannerWildcardHelpersTest, ExpandEnsureMultikeySetForAllCompoundFields) {
+    std::vector<IndexEntry> out;
+    stdx::unordered_set<std::string> fields{"a", "b"};
+    const auto indexEntry = makeIndexEntry(BSON("a" << 1 << "$**" << 1),
+                                           {},
+                                           {FieldRef("a"), FieldRef("b"), FieldRef("c")},
+                                           {fromjson("{wildcardProjection: {a: 0}}")});
+    wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
+
+    ASSERT_EQ(out.size(), 1u);
+    ASSERT_TRUE(out[0].multikey);
+    ASSERT_EQ(out[0].multikeyPaths.size(), 2);
+    ASSERT(out[0].multikeyPaths[0] == MultikeyComponents{0u});  // a is a multikey path
+    ASSERT(out[0].multikeyPaths[1] == MultikeyComponents{0u});  // and so is b
+    ASSERT_BSONOBJ_EQ(out[0].keyPattern, {fromjson("{a: 1, b: 1}")});
+}
+
+TEST_F(PlannerWildcardHelpersTest, ExpandEnsureMultikeySetForAllCompoundFieldsDotted) {
+    std::vector<IndexEntry> out;
+    stdx::unordered_set<std::string> fields{"a.b", "c.d.e"};
+    const auto indexEntry = makeIndexEntry(
+        BSON("a.b" << 1 << "$**" << 1),
+        {},
+        {FieldRef("a"), FieldRef("a.b"), FieldRef("b"), FieldRef("c"), FieldRef("c.d.e")},
+        {fromjson("{wildcardProjection: {a: 0}}")});
+    wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
+
+    ASSERT_EQ(out.size(), 1u);
+    ASSERT_TRUE(out[0].multikey);
+    ASSERT_EQ(out[0].multikeyPaths.size(), 2);
+    ASSERT((out[0].multikeyPaths[0] == MultikeyComponents{0u, 1u}));  // a and a.b are multikey
+    ASSERT((out[0].multikeyPaths[1] == MultikeyComponents{0u, 2u}));  // c and c.d.e are multikey
+    ASSERT_BSONOBJ_EQ(out[0].keyPattern, {fromjson("{'a.b': 1, 'c.d.e': 1}")});
+}
+
 /*************************************** end section ***************************************/
 
 // translateWildcardIndexBoundsAndTightness
