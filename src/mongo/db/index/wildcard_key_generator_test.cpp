@@ -1226,7 +1226,33 @@ TEST_F(WildcardKeyGeneratorCompoundTest, TopLevelKeyMultiInclusionCompound) {
                                     fromjson("{'': undefined, '': 'd', '': []}"),
                                     fromjson("{'': undefined, '': 'd.e', '': undefined}")});
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'b.c'}"),
+        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'b.c'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'd'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'd.e'}")},
+                   RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
+
+    auto outputKeys = makeKeySet();
+    auto multikeyMetadataKeys = makeKeySet();
+    keyGen.generateKeys(allocator, inputDoc, &outputKeys, &multikeyMetadataKeys);
+
+    ASSERT(assertKeysetsEqual(expectedKeys, outputKeys));
+    ASSERT(assertKeysetsEqual(expectedMultikeyPaths, multikeyMetadataKeys));
+}
+
+TEST_F(WildcardKeyGeneratorCompoundTest, MultikeyCompoundField) {
+    WildcardKeyGenerator keyGen{fromjson("{'d.e': 1, '$**': 1}"),
+                                fromjson("{d: 0}"),
+                                nullptr,
+                                KeyString::Version::kLatestVersion,
+                                Ordering::make(BSONObj())};
+    auto inputDoc = fromjson("{ a: [], b: {c: []}, d: [[], {e: []}]}");
+
+    auto expectedKeys = makeKeySet({fromjson("{'': undefined, '': 'a', '': undefined}"),
+                                    fromjson("{'': undefined, '': 'b.c', '': undefined}")});
+    auto expectedMultikeyPaths =
+        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'b.c'}"),
                     fromjson("{'': {$minKey: 1}, '': 1, '': 'd'}"),
                     fromjson("{'': {$minKey: 1}, '': 1, '': 'd.e'}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
@@ -1292,7 +1318,8 @@ TEST_F(WildcardKeyGeneratorCompoundTest, ExtractMultikeyPathWithArrayField) {
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
-                    fromjson("{'': {$minKey: 1}, '': 1, '': 'a.c.d'}")},
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'a.c.d'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'e'}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
@@ -1319,7 +1346,8 @@ TEST_F(WildcardKeyGeneratorCompoundTest, ExtractMultikeyPathWithArrayElemField) 
                                     fromjson("{'': 2, '': 'f', '': 1}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'e'}")},
+        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'e'}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
@@ -1344,7 +1372,8 @@ TEST_F(WildcardKeyGeneratorCompoundTest, MultipleCompoundField) {
                                     fromjson("{'': 2, '': 'e', '': 5, '': 1}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'e', '': {$minKey: 1}}")},
+        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a', '': {$minKey: 1}}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'e', '': {$minKey: 1}}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
@@ -1356,12 +1385,12 @@ TEST_F(WildcardKeyGeneratorCompoundTest, MultipleCompoundField) {
 }
 
 TEST_F(WildcardKeyGeneratorCompoundTest, ExtractMultikeyPathAndDedupKeysCompound) {
-    WildcardKeyGenerator keyGen{fromjson("{'b.d': 1, 'a.$**': 1}"),
+    WildcardKeyGenerator keyGen{fromjson("{'f.d': 1, 'a.$**': 1}"),
                                 {},
                                 nullptr,
                                 KeyString::Version::kLatestVersion,
                                 Ordering::make(BSONObj())};
-    auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2}], b: [{d: 3, e: 4}, {d: 3}]}");
+    auto inputDoc = fromjson("{a: [1, 2, {b: 'one', c: 2}, {c: 2}], f: [{d: 3, e: 4}, {d: 3}]}");
 
     auto expectedKeys = makeKeySet({fromjson("{'': 3, '': 'a', '': 1}"),
                                     fromjson("{'': 3, '': 'a', '': 2}"),
@@ -1369,7 +1398,8 @@ TEST_F(WildcardKeyGeneratorCompoundTest, ExtractMultikeyPathAndDedupKeysCompound
                                     fromjson("{'': 3, '': 'a.c', '': 2}")});
 
     auto expectedMultikeyPaths =
-        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}")},
+        makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'f'}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();
@@ -1401,7 +1431,8 @@ TEST_F(WildcardKeyGeneratorCompoundTest, ExtractSubtreeWithArrayElemField) {
 
     auto expectedMultikeyPaths =
         makeKeySet({fromjson("{'': {$minKey: 1}, '': 1, '': 'a'}"),
-                    fromjson("{'': {$minKey: 1}, '': 1, '': 'a.c.d'}")},
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'a.c.d'}"),
+                    fromjson("{'': {$minKey: 1}, '': 1, '': 'e'}")},
                    RecordIdReservations::reservedIdFor(ReservationId::kWildcardMultikeyMetadataId));
 
     auto outputKeys = makeKeySet();

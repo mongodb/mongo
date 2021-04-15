@@ -186,10 +186,27 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         boost::optional<RecordId> id) const {
     KeyStringSet nonWildcardKeys;
     SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
-    MultikeyPaths* nonWildcardMultikeyPaths = nullptr;
+    MultikeyPaths nonWildcardMultikeyPaths;
     const auto skipMultikey = false;
     _indexKeyGen->getKeys(
-        allocator, inputDoc, skipMultikey, &nonWildcardKeys, nonWildcardMultikeyPaths);
+        allocator, inputDoc, skipMultikey, &nonWildcardKeys, &nonWildcardMultikeyPaths);
+
+    // multikeyPaths is allowed to be nullptr
+    KeyStringSet::sequence_type multikeyPathsSequence;
+    if (multikeyPaths)
+        multikeyPathsSequence = multikeyPaths->extract_sequence();
+    BSONObjIterator keyPatternItr(_keyPattern);
+    for (const auto& component : nonWildcardMultikeyPaths) {
+        auto keyStr = (*keyPatternItr).fieldNameStringData();
+        if ((keyStr != "$**") && !keyStr.endsWith(".$**")) {
+            for (const auto& depth : component) {
+                _addMultiKey(pooledBufferBuilder,
+                             FieldRef(FieldRef(keyStr).dottedSubstring(0, depth + 1)),
+                             &multikeyPathsSequence);
+            }
+        }
+        ++keyPatternItr;
+    }
 
     auto projected = _proj.exec()->applyTransformation(Document{inputDoc}).toBson();
     if (projected.isEmpty()) {
@@ -198,10 +215,6 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
     }
     FieldRef rootPath;
     auto keysSequence = keys->extract_sequence();
-    // multikeyPaths is allowed to be nullptr
-    KeyStringSet::sequence_type multikeyPathsSequence;
-    if (multikeyPaths)
-        multikeyPathsSequence = multikeyPaths->extract_sequence();
     _traverseWildcard(pooledBufferBuilder,
                       projected,
                       false,
