@@ -12435,7 +12435,7 @@ buildvariants:
   display_name: "~ Shared Library RHEL 8.0 (visibility test)"
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --experimental-visibility-support=on --cache-signature-mode=validate
 
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
