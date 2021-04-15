@@ -104,30 +104,11 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
      *  of the currentOp().op field.
      *  - 'testObj.skipMongosLocalOps' - True if this test should not be run against a mongos with
      *  localOps=true.
-     *  - 'testObj.prohibitSbe' - True if this test is illegal to run in SBE passthroughs.
      */
     function confirmCurrentOpContents(testObj) {
         const skipMongosLocalOps = testObj.skipMongosLocalOps || false;
-        const prohibitSbe = testObj.prohibitSbe || false;
 
         if (isLocalMongosCurOp && skipMongosLocalOps) {
-            return;
-        }
-
-        // TODO SERVER-53942: All of the test cases in this file should pass with SBE. Once the
-        // failing test cases with SBE are diagnosed, fixed, and enabled, we should be able to
-        // delete the 'prohibitSbe' flag as well as the following early return statements.
-        //
-        // We consider SBE enabled if it is enabled on any primary node.
-        const isSbeEnabled =
-            FixtureHelpers
-                .runCommandOnEachPrimary(
-                    {db: conn.getDB("admin"), cmdObj: {getParameter: 1, featureFlagSBE: 1}})
-                .reduce((acc, curVal) => acc || curVal.featureFlagSBE.value);
-        if (isSbeEnabled && prohibitSbe) {
-            return;
-        }
-        if (isSbeEnabled && FixtureHelpers.isMongos(conn.getDB("admin"))) {
             return;
         }
 
@@ -240,7 +221,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                     "hint": {_id: 1}
                 },
                                                              isRemoteShardCurOp),
-                prohibitSbe: true,
             },
             {
                 test: function(db) {
@@ -321,7 +301,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                                               "command.query.$comment": "currentop_query_mr",
                                               "ns": /^currentop_query.*currentop_query/
                                           }),
-                prohibitSbe: true,
             },
             {
                 test: function(db) {
@@ -409,7 +388,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 "comment": "currentop_query",
             },
                                                          isRemoteShardCurOp),
-            prohibitSbe: true
         });
 
         //
@@ -457,7 +435,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 command: "getMore",
                 planSummary: "COLLSCAN",
                 currentOpFilter: filter,
-                prohibitSbe: true,
             });
 
             delete TestData.commandResult;
@@ -626,7 +603,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             },
             planSummary: "COLLSCAN",
             currentOpFilter: currentOpFilter,
-            prohibitSbe: true
         });
 
         delete TestData.commandResult;
@@ -653,7 +629,6 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
             },
             planSummary: "COLLSCAN",
             currentOpFilter: currentOpFilter,
-            prohibitSbe: true,
         });
 
         delete TestData.queryFilter;

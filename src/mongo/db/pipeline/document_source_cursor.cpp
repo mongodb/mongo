@@ -138,11 +138,12 @@ void DocumentSourceCursor::loadBatch() {
     Document resultObj;
 
     boost::optional<AutoGetCollectionForReadMaybeLockFree> autoColl;
-    if (_exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
-        autoColl.emplace(pExpCtx->opCtx, _exec->nss());
-        uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
-                            ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
-    }
+    tassert(5565800,
+            "Expected PlanExecutor to use an external lock policy",
+            _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
+    autoColl.emplace(pExpCtx->opCtx, _exec->nss());
+    uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
+                        ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
 
     _exec->restoreState(autoColl ? &autoColl->getCollection() : nullptr);
 
