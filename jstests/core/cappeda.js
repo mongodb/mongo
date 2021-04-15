@@ -1,4 +1,11 @@
-// @tags: [requires_capped]
+/**
+ * @tags: [
+ *   requires_capped,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
+ * ]
+ */
+
 t = db.scan_capped_id;
 t.drop();
 

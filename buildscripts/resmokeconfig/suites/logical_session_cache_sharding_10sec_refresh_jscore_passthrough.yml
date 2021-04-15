@@ -11,7 +11,6 @@ selector:
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
   - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
   - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
-  - jstests/core/capped*.js  # capped collections.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
   - jstests/core/compact_keeps_indexes.js  # compact.

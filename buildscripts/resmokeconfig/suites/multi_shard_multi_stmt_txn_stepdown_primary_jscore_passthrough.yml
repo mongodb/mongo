@@ -12,7 +12,6 @@ selector:
   - jstests/core/apitest_db.js  # serverStatus output doesn't have storageEngine.
   - jstests/core/awaitdata_getmore_cmd.js  # capped collections.
   - jstests/core/bypass_doc_validation.js  # sharded $out output not permitted
-  - jstests/core/capped*.js  # capped collections.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
   - jstests/core/compact_keeps_indexes.js  # compact.
@@ -79,7 +78,6 @@ selector:
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
-  - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
@@ -166,7 +164,6 @@ selector:
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
-  - jstests/core/cappeda.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_options.js
   - jstests/core/field_name_validation.js
@@ -203,15 +200,6 @@ selector:
   - jstests/core/getmore_cmd_maxtimems.js
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
-
-  # SERVER-34918 The "max" option of a capped collection can be exceeded until the next insert.
-  # The reason is that we don't update the count of a collection until a transaction commits,
-  # by which point it is too late to complain that "max" has been exceeded.
-  - jstests/core/capped_max1.js
-
-  # The "max" option of a capped collection can be temporarily exceeded before a
-  # txn is committed.
-  - jstests/core/bulk_insert_capped.js
 
   # Wrong count for top info (WriteLock)
   - jstests/core/top.js

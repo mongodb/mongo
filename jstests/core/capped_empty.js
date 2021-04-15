@@ -1,10 +1,16 @@
-// @tags: [
-//   requires_capped,
-//   requires_fastcount,
-//   requires_non_retryable_commands,
-//   uses_testing_only_commands,
-//   requires_emptycapped,
-// ]
+/**
+ * @tags: [
+ *   requires_capped,
+ *   requires_fastcount,
+ *   requires_non_retryable_commands,
+ *   uses_testing_only_commands,
+ *   requires_emptycapped,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
+ *   # emptycapped command is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ * ]
+ */
 
 t = db.capped_empty;
 t.drop();

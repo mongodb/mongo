@@ -48,8 +48,6 @@ selector:
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
   - jstests/core/invalidated_legacy_cursors.js
-  # TODO (SERVER-52727): Synchronize cloneCollectionAsCapped with tenant migrations.
-  - jstests/core/capped_convertToCapped1.js
   # TODO (SERVER-52866): Synchronize getLastError with tenant migrations.
   - jstests/core/bulk_legacy_enforce_gle.js
   # This test contains assertions for the hostname that operations run on.
@@ -59,8 +57,6 @@ selector:
   # require a collection scan and return an error.
   - jstests/core/notablescan.js
   - jstests/core/notablescan_capped.js
-  # captrunc command is not blocked during tenant migration.
-  - jstests/core/capped6.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

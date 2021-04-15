@@ -1,12 +1,19 @@
-// @tags: [
-//   # Cannot implicitly shard accessed collections because of collection existing when none
-//   # expected.
-//   assumes_no_implicit_collection_creation_after_drop,
-//   requires_capped,
-// ]
+/**
+ * SERVER-21488 Test that multi inserts into capped collections don't cause corruption.
+ *
+ * Note: this file must have a name that starts with "bulk" so it gets run by bulk_gle_passthrough.
+ *
+ * @tags: [
+ *   # Cannot implicitly shard accessed collections because of
+ *   # collection existing when none expected.
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   requires_capped,
+ *   # The "max" option of a capped collection can be temporarily exceeded
+ *   # before a txn is committed.
+ *   does_not_support_transactions,
+ * ]
+ */
 
-// SERVER-21488 Test that multi inserts into capped collections don't cause corruption.
-// Note: this file must have a name that starts with "bulk" so it gets run by bulk_gle_passthrough.
 (function() {
 "use strict";
 var t = db.capped_multi_insert;

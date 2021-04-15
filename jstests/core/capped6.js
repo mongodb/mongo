@@ -1,15 +1,24 @@
-// Test NamespaceDetails::cappedTruncateAfter via "captrunc" command
-//
-// @tags: [
-//   # This test attempts to perform read operations on a capped collection after truncating
-//   # documents using the captrunc command. The former operations may be routed to a secondary in
-//   # the replica set, whereas the latter must be routed to the primary.
-//   assumes_read_preference_unchanged,
-//   requires_capped,
-//   requires_fastcount,
-//   requires_non_retryable_commands,
-//   uses_testing_only_commands,
-// ]
+/**
+ * Test NamespaceDetails::cappedTruncateAfter via "captrunc" command
+ *
+ * @tags: [
+ *   # This test attempts to perform read operations on a capped collection after truncating
+ *   # documents using the captrunc command. The former operations may be routed to a secondary in
+ *   # the replica set, whereas the latter must be routed to the primary.
+ *   assumes_read_preference_unchanged,
+ *   requires_capped,
+ *   requires_fastcount,
+ *   requires_non_retryable_commands,
+ *   uses_testing_only_commands,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
+ *   # captrunc command is not supported on mongos
+ *   assumes_against_mongod_not_mongos,
+ *   # captrunc command is not blocked during tenant migration.
+ *   tenant_migration_incompatible,
+ * ]
+ */
+
 (function() {
 var coll = db.capped6;
 

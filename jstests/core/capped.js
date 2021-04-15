@@ -1,4 +1,11 @@
-// @tags: [requires_capped]
+/**
+ * @tags: [
+ *   requires_capped,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
+ * ]
+ */
+
 db.jstests_capped.drop();
 db.createCollection("jstests_capped", {capped: true, size: 30000});
 

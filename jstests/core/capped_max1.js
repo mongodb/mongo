@@ -1,6 +1,19 @@
-// Test max docs in capped collection
-//
-// @tags: [requires_fastcount, requires_collstats, requires_capped]
+/**
+ * Test max docs in capped collection
+ *
+ * @tags: [
+ *   requires_fastcount,
+ *   requires_collstats,
+ *   requires_capped,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
+ *   # SERVER-34918 The "max" option of a capped collection can be exceeded until the next insert.
+ *   # The reason is that we don't update the count of a collection until a transaction commits,
+ *   # by which point it is too late to complain that "max" has been exceeded.
+ *   does_not_support_transactions,
+ *   does_not_support_causal_consistency,
+ * ]
+ */
 
 var t = db.capped_max1;
 t.drop();

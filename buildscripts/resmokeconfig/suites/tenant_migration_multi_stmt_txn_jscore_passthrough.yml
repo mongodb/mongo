@@ -57,8 +57,6 @@ selector:
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
   - jstests/core/invalidated_legacy_cursors.js
-  # TODO (SERVER-52727): Synchronize cloneCollectionAsCapped with tenant migrations.
-  - jstests/core/capped_convertToCapped1.js
   # TODO (SERVER-52866): Synchronize getLastError with tenant migrations.
   - jstests/core/bulk_legacy_enforce_gle.js
   # This test contains assertions for the hostname that operations run on.
@@ -68,8 +66,6 @@ selector:
   # require a collection scan and return an error.
   - jstests/core/notablescan.js
   - jstests/core/notablescan_capped.js
-  # captrunc command is not blocked during tenant migration.
-  - jstests/core/capped6.js
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
   - jstests/core/batch_write_collation_estsize.js
   - jstests/core/bulk_api_ordered.js
@@ -105,7 +101,6 @@ selector:
   ##
 
   # These tests expects some statements to error, which will cause txns to abort entirely.
-  - jstests/core/capped5.js
   - jstests/core/commands_with_uuid.js
   - jstests/core/dbcase.js
   - jstests/core/dbcase2.js
@@ -193,7 +188,6 @@ selector:
   # Errors expected to happen in tests, which can cause transactions to get aborted.
   # So when the test tries to inspect the documents it can be out of sync (relative
   # to test run without multi statement transactions).
-  - jstests/core/cappeda.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_options.js
   - jstests/core/field_name_validation.js
@@ -233,15 +227,6 @@ selector:
   - jstests/core/getmore_cmd_maxtimems.js
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
-
-  # SERVER-34918 The "max" option of a capped collection can be exceeded until the next insert.
-  # The reason is that we don't update the count of a collection until a transaction commits,
-  # by which point it is too late to complain that "max" has been exceeded.
-  - jstests/core/capped_max1.js
-
-  # The "max" option of a capped collection can be temporarily exceeded before a
-  # txn is committed.
-  - jstests/core/bulk_insert_capped.js
 
   # Expects collection to not have been created
   - jstests/core/insert_id_undefined.js

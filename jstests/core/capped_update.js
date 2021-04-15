@@ -7,8 +7,11 @@
  *   uses_testing_only_commands,
  *   # godinsert and can't run under replication
  *   assumes_standalone_mongod,
+ *   # capped collections connot be sharded
+ *   assumes_unsharded_collection,
  * ]
  */
+
 (function() {
 'use strict';
 var t = db.getSiblingDB("local").cannot_change_capped_size;
