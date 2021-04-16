@@ -193,6 +193,7 @@ inline constexpr bool isCollatableType(TypeTags tag) noexcept {
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
+bool isShallowType(TypeTags tag) noexcept;
 
 /**
  * This function takes an SBE TypeTag, looks up the corresponding BSONType t, and then returns a

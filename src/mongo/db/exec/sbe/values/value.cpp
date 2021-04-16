@@ -686,6 +686,44 @@ BSONType tagToType(TypeTags tag) noexcept {
     }
 }
 
+bool isShallowType(TypeTags tag) noexcept {
+    switch (tag) {
+        case TypeTags::Nothing:
+        case TypeTags::Null:
+        case TypeTags::NumberInt32:
+        case TypeTags::NumberInt64:
+        case TypeTags::NumberDouble:
+        case TypeTags::Date:
+        case TypeTags::Timestamp:
+        case TypeTags::Boolean:
+        case TypeTags::StringSmall:
+        case TypeTags::RecordId:
+        case TypeTags::MinKey:
+        case TypeTags::MaxKey:
+        case TypeTags::bsonUndefined:
+            return true;
+        case TypeTags::NumberDecimal:
+        case TypeTags::StringBig:
+        case TypeTags::bsonString:
+        case TypeTags::bsonSymbol:
+        case TypeTags::Array:
+        case TypeTags::ArraySet:
+        case TypeTags::Object:
+        case TypeTags::ObjectId:
+        case TypeTags::bsonObjectId:
+        case TypeTags::bsonObject:
+        case TypeTags::bsonArray:
+        case TypeTags::bsonBinData:
+        case TypeTags::ksValue:
+        case TypeTags::bsonRegex:
+        case TypeTags::bsonJavascript:
+        case TypeTags::bsonDBPointer:
+            return false;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 inline std::size_t hashObjectId(const uint8_t* objId) noexcept {
     return abslHash(readFromMemory<uint64_t>(objId)) ^
         abslHash(readFromMemory<uint32_t>(objId + 8));

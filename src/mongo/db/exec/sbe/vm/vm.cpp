@@ -3230,16 +3230,24 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(1);
 
-                    // Swap values only if they are not physically same.
-                    // Note - this has huge consequences for the memory management, it allows to
-                    // return owned values from the let expressions.
+                    // Swap values only if they are not physically same. This is necessary for the
+                    // "swap and pop" idiom for returning a value from the top of the stack (used
+                    // by ELocalBind). For example, consider the case where a series of swap, pop,
+                    // swap, pop... instructions are executed and the value at stack[0] and
+                    // stack[1] are physically identical, but stack[1] is owned and stack[0] is
+                    // not. After swapping them, the 'pop' instruction would free the owned one and
+                    // leave the unowned value dangling. The only exception to this is shallow
+                    // values (values which fit directly inside a 64 bit Value and don't need
+                    // to be freed explicitly).
                     if (!(rhsTag == lhsTag && rhsVal == lhsVal)) {
                         setStack(0, lhsOwned, lhsTag, lhsVal);
                         setStack(1, rhsOwned, rhsTag, rhsVal);
                     } else {
-                        // The values are physically same then the top of the stack must never ever
-                        // be owned.
-                        invariant(!rhsOwned);
+                        // See explanation above.
+                        tassert(
+                            56123,
+                            "Attempting to swap two identical values when top of stack is owned",
+                            !rhsOwned || isShallowType(rhsTag));
                     }
 
                     break;
