@@ -769,21 +769,13 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
         // happen for existence queries. For example, {a: {$exists: true}} results in bounds
         // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
-        // object are in bounds. The '$_path' field must be the second to last field in bounds.
-        if (bounds.fields[bounds.fields.size() - 2].intervals.size() != 1u) {
+        // object are in bounds. The '$_path' field must be immediately before the wildcard field.
+        if (bounds.fields[index.wildcardFieldIndex - 1].intervals.size() != 1u) {
             return {};
         }
 
         // Strip '$_path' out of 'sortPattern' and then proceed with regular sort analysis.
-        BSONObjIterator it{sortPatternProvidedByIndex};
-        while (it.more()) {
-            auto pathElement = it.next();
-            if (pathElement.fieldNameStringData() == "$_path"_sd) {
-                invariant(it.more());
-                it.next();
-                invariant(!it.more());
-            }
-        }
+        invariant(sortPatternProvidedByIndex.hasField("$_path"));
         sortPatternProvidedByIndex = sortPatternProvidedByIndex.removeField("$_path"_sd);
     }
 

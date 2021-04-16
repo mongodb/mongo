@@ -250,6 +250,11 @@ struct IndexEntry : CoreIndexInfo {
 
     bool unique;
 
+    // After index expansion, we can't tell which field is the wildcard field in a compound index.
+    // We use this field to track the index into the keyPattern, multikeyPaths, and bounds of the
+    // wildcard field, if one exists.
+    size_t wildcardFieldIndex;
+
     // Geo indices have extra parameters.  We need those available to plan correctly.
     BSONObj infoObj;
 };

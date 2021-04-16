@@ -45,14 +45,6 @@ namespace mongo {
 
 using PlannerWildcardHelpersTest = AggregationContextFixture;
 
-auto getLastElement(const BSONObj& keyPattern) {
-    auto it = keyPattern.begin();
-    while (std::next(it) != keyPattern.end()) {
-        it++;
-    }
-    return it;
-}
-
 /**************** The following section can be moved to planner_ixselect_test.cpp ****************/
 /*
  * Will compare 'keyPatterns' with 'entries'. As part of comparing, it will sort both of them.
@@ -86,8 +78,10 @@ auto makeIndexEntry(BSONObj keyPattern,
                     MultikeyPaths multiKeyPaths,
                     std::set<FieldRef> multiKeyPathSet = {},
                     BSONObj infoObj = BSONObj()) {
-    auto wcElem = getLastElement(keyPattern);
-    auto wcProj = wcElem->fieldNameStringData().endsWith("$**"_sd)
+    auto wcElem = std::find_if(keyPattern.begin(), keyPattern.end(), [](auto&& elem) {
+        return elem.fieldNameStringData().endsWith("$**"_sd);
+    });
+    auto wcProj = wcElem != keyPattern.end() && wcElem->fieldNameStringData().endsWith("$**"_sd)
         ? std::make_unique<WildcardProjection>(WildcardKeyGenerator::createProjectionExecutor(
               keyPattern, infoObj.getObjectField("wildcardProjection")))
         : std::unique_ptr<WildcardProjection>(nullptr);
@@ -188,6 +182,24 @@ TEST_F(PlannerWildcardHelpersTest, ExpandEnsureMultikeySetForAllCompoundFieldsDo
     ASSERT_BSONOBJ_EQ(out[0].keyPattern, {fromjson("{'a.b': 1, 'c.d.e': 1}")});
 }
 
+TEST_F(PlannerWildcardHelpersTest, ExpandEnsureMultikeySetForAllCompoundFieldsWithFlippedKeyOrder) {
+    std::vector<IndexEntry> out;
+    stdx::unordered_set<std::string> fields{"a.b", "c.d.e"};
+    const auto indexEntry = makeIndexEntry(
+        BSON("$**" << 1 << "a.b" << 1),
+        {},
+        {FieldRef("a"), FieldRef("a.b"), FieldRef("b"), FieldRef("c"), FieldRef("c.d.e")},
+        {fromjson("{wildcardProjection: {a: 0}}")});
+    wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
+
+    ASSERT_EQ(out.size(), 1u);
+    ASSERT_TRUE(out[0].multikey);
+    ASSERT_EQ(out[0].multikeyPaths.size(), 2);
+    ASSERT((out[0].multikeyPaths[0] == MultikeyComponents{0u, 2u}));  // c and c.d.e are multikey
+    ASSERT((out[0].multikeyPaths[1] == MultikeyComponents{0u, 1u}));  // a and a.b are multikey
+    ASSERT_BSONOBJ_EQ(out[0].keyPattern, {fromjson("{'c.d.e': 1, 'a.b': 1}")});
+}
+
 /*************************************** end section ***************************************/
 
 // translateWildcardIndexBoundsAndTightness
@@ -215,6 +227,31 @@ TEST_F(PlannerWildcardHelpersTest, TranslateBoundsWithWildcard) {
         oil.intervals[0].compare(Interval(fromjson("{'': -Infinity, '': 1}"), true, true)));
     ASSERT(tightness == IndexBoundsBuilder::EXACT);
 }
+
+TEST_F(PlannerWildcardHelpersTest, TranslateBoundsWithWildcardFlippedIndexKeys) {
+    // expand first
+    std::vector<IndexEntry> out;
+    stdx::unordered_set<std::string> fields{"a", "b"};
+    const auto indexEntry = makeIndexEntry(
+        BSON("$**" << 1 << "a" << 1), {}, {}, {fromjson("{wildcardProjection: {a: 0}}")});
+    wildcard_planning::expandWildcardIndexEntry(indexEntry.first, fields, &out);
+
+    // This expression can only be over one field. WTS that given a query on field b and a compound
+    // index on a wildcard including b (followed by another field) that we translate properly.
+    BSONObj obj = fromjson("{b: {$lte: 1}}");
+    auto expr = parseMatchExpression(obj);
+    BSONElement elt = obj.firstElement();
+    OrderedIntervalList oil;
+    IndexBoundsBuilder::BoundsTightness tightness;
+    IndexBoundsBuilder::translate(expr.get(), elt, out[0], &oil, &tightness);
+    ASSERT_EQUALS(oil.name, "b");
+    ASSERT_EQUALS(oil.intervals.size(), 1U);
+    ASSERT_EQUALS(
+        Interval::INTERVAL_EQUALS,
+        oil.intervals[0].compare(Interval(fromjson("{'': -Infinity, '': 1}"), true, true)));
+    ASSERT(tightness == IndexBoundsBuilder::EXACT);
+}
+
 
 // How to test?
 // finalizeWildcardIndexScanConfiguration(IndexScanNode* scan);
@@ -405,5 +442,97 @@ TEST_F(QueryPlannerWildcardTest,
         "{ixscan: {filter: null, pattern: {'x': 1, '$_path': 1, 'a.b': 1},"
         "bounds: {'x': [[2, 2, true, true]], '$_path': [['a.b','a.b',true,true]], 'a.b': "
         "[[-Infinity,9,true,false]]}}}}}");
+}
+
+
+// The following tests create compound wildcard indexes where the wildcard component is not last.
+
+TEST_F(QueryPlannerWildcardTest,
+       CompoundWildcardIndexQueryOnlyOnNonWCFieldWithProjectionFlippedOrder) {
+    addWildcardIndex(fromjson("{'$**': 1, a: 1}"), {}, fromjson("{a: 0}"));
+
+    runQuery(fromjson("{c: {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {'$_path': 1, 'c': 1, a: 1}, bounds: {'$_path': "
+        "[['c', 'c', true, true]], 'c': [[5, 5, true, true]],"
+        "'a': [['MinKey', 'MaxKey', true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexQueryWCFieldInMiddleOfKey) {
+    addWildcardIndex(fromjson("{a: 1, 'b.$**': 1, x: 1}"), {});
+
+    runQuery(fromjson("{a: {$eq: 5}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, '$_path': 1, 'b.$_value': 1, x: 1}, bounds: {'a':"
+        "[[5, 5, true, true]], '$_path': [['b.$_value', 'b.$_value', true, true]], 'b.$_value': "
+        "[['MinKey', 'MaxKey', true, true]], 'x': [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    runQuery(fromjson("{a: {$eq: 5}, 'b.c': {$lt: 2}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, '$_path': 1, 'b.c': 1, x: 1}, bounds: {'a':"
+        "[[5, 5, true, true]], '$_path': [['b.c', 'b.c', true, true]], 'b.c': "
+        "[[-Infinity, 2, true, false]], 'x': [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+    runQuery(fromjson("{a: {$eq: 5}, 'b.c': {$lt: 2}, 'x': {$eq: 4}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {a: 1, '$_path': 1, 'b.c': 1, x: 1}, bounds: {'a':"
+        "[[5, 5, true, true]], '$_path': [['b.c', 'b.c', true, true]], 'b.c': "
+        "[[-Infinity, 2, true, false]], 'x': [[4, 4, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexBasicWithFlippedIndexKeys) {
+    addWildcardIndex(fromjson("{'$**': 1, a: 1}"), {}, fromjson("{a: 0}"));
+
+    runQuery(fromjson("{x: {$lt: 3}, a: {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {$_path: 1, x: 1, a: 1}, bounds: {'$_path': "
+        "[['x', 'x', true, true]], 'x': [[-Infinity, 3, true, false]],"
+        "'a': [[5, 5, true, true]]}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardIndexIsNotUsedWhenQueryNotOnPrefixFlippedKeys) {
+    addWildcardIndex(fromjson("{'$**': 1, a: 1}"), {}, fromjson("{a: 0}"));
+
+    runQuery(fromjson("{a: {$lt: 3}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}");
+}
+
+TEST_F(QueryPlannerWildcardTest, CompoundWildcardWithMultikeyFieldFlippedKeys) {
+    addWildcardIndex(
+        fromjson("{'$**': 1, a: 1}"), {"b"} /* 'b' marked as multikey field */, fromjson("{a: 0}"));
+    runQuery(fromjson("{b: {$gt: 0}, a: {$eq: 5}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {node: {ixscan: {pattern: {$_path: 1, b: 1, a: 1}, bounds: {'$_path': "
+        "[['b','b',true,true]], b: [[0,Infinity,false,true]], "
+        "'a': [[5, 5, true, true]]}}}}}}");
+}
+
+TEST_F(QueryPlannerWildcardTest,
+       CompoundWildcardMultiplePredicatesOverNestedFieldWithFirstComponentMultikeyFlippedKeys) {
+    addWildcardIndex(fromjson("{'$**': 1, x: 1}"), {"a"}, fromjson("{x: 0}"));
+    runQuery(fromjson("{'a.b': {$gt: 0, $lt: 9}, x: {$lt: 2}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b': {$gt: 0}}, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1, 'x': 1},"
+        "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[-Infinity,9,true,false]],"
+        "'x': [[-Infinity, 2, true, false]]}}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {'a.b': {$lt: 9}}, node: "
+        "{ixscan: {filter: null, pattern: {'$_path': 1, 'a.b': 1, 'x': 1},"
+        "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[0,Infinity,false,true]],"
+        "'x': [[-Infinity, 2, true, false]]}}}}}");
 }
 }  // namespace mongo
