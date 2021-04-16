@@ -128,7 +128,6 @@ PlanState BSONScanStage::getNext() {
         return trackPlanState(PlanState::ADVANCED);
     }
 
-    _commonStats.isEOF = true;
     return trackPlanState(PlanState::IS_EOF);
 }
 

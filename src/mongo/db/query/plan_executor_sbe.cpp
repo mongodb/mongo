@@ -311,11 +311,15 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
                          RecordId* dlOut,
                          bool returnOwnedBson) {
     invariant(out);
-
     auto state = root->getNext();
+
     if (state == sbe::PlanState::IS_EOF) {
+        tassert(5609900,
+                "Root stage returned EOF but root stage's CommonStats 'isEOF' field is false",
+                root->getCommonStats()->isEOF);
         return state;
     }
+
     invariant(state == sbe::PlanState::ADVANCED);
 
     if (resultSlot) {

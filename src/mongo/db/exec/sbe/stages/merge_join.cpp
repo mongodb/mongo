@@ -240,7 +240,7 @@ PlanState MergeJoinStage::getNext() {
                     _currentInnerKey = materializeCopyOfRow(_innerKeyAccessors);
                     _currentInnerProject = materializeCopyOfRow(_innerProjectAccessors);
 
-                    return PlanState::ADVANCED;
+                    return trackPlanState(PlanState::ADVANCED);
                 } else {
                     // Since iterated over all of the elements in the buffer and are currently
                     // pointing to the end of the buffer, need to reset the buffer to the beginning

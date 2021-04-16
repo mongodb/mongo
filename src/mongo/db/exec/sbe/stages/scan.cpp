@@ -638,8 +638,7 @@ PlanState ParallelScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
     if (!_cursor) {
-        _commonStats.isEOF = true;
-        return PlanState::IS_EOF;
+        return trackPlanState(PlanState::IS_EOF);
     }
 
     checkForInterrupt(_opCtx);
@@ -650,8 +649,7 @@ PlanState ParallelScanStage::getNext() {
     do {
         nextRecord = needsRange() ? nextRange() : _cursor->next();
         if (!nextRecord) {
-            _commonStats.isEOF = true;
-            return PlanState::IS_EOF;
+            return trackPlanState(PlanState::IS_EOF);
         }
 
         if (!_range.end.isNull() && nextRecord->id == _range.end) {
@@ -705,7 +703,7 @@ PlanState ParallelScanStage::getNext() {
         }
     }
 
-    return PlanState::ADVANCED;
+    return trackPlanState(PlanState::ADVANCED);
 }
 
 void ParallelScanStage::close() {

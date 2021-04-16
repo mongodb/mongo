@@ -56,8 +56,7 @@ PlanState CoScanStage::getNext() {
     checkForInterrupt(_opCtx);
 
     // Run forever.
-    _commonStats.advances++;
-    return PlanState::ADVANCED;
+    return trackPlanState(PlanState::ADVANCED);
 }
 
 std::unique_ptr<PlanStageStats> CoScanStage::getStats(bool includeDebugInfo) const {

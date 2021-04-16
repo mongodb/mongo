@@ -77,14 +77,14 @@ PlanState UniqueStage::getNext() {
         auto [it, inserted] = _seen.emplace(std::move(key));
         if (inserted) {
             const_cast<value::MaterializedRow&>(*it).makeOwned();
-            return PlanState::ADVANCED;
+            return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
             ++_specificStats.dupsDropped;
         }
     }
 
-    return PlanState::IS_EOF;
+    return trackPlanState(PlanState::IS_EOF);
 }
 
 void UniqueStage::close() {

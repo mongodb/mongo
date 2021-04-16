@@ -131,7 +131,7 @@ void SortedMergeStage::open(bool reOpen) {
 }
 
 PlanState SortedMergeStage::getNext() {
-    return _merger->getNext();
+    return trackPlanState(_merger->getNext());
 }
 
 void SortedMergeStage::close() {
