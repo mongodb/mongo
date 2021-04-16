@@ -76,24 +76,34 @@ static constexpr auto kSyntax = R"(
 
                 SCAN <- 'scan' IDENT? # optional variable name of the root object (record) delivered by the scan
                                IDENT? # optional variable name of the record id delivered by the scan
+                               IDENT? # optional variable name of the snapshot id read by the scan
+                               IDENT? # optional variable name of the index name read by the scan
+                               IDENT? # optional variable name of the index key read by the scan
                                IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                IDENT # collection name to scan
                                FORWARD_FLAG # forward scan or not
 
                 PSCAN <- 'pscan' IDENT? # optional variable name of the root object (record) delivered by the scan
                                  IDENT? # optional variable name of the record id delivered by the scan
+                                 IDENT? # optional variable name of the snapshot id read by the scan
+                                 IDENT? # optional variable name of the index name read by the scan
+                                 IDENT? # optional variable name of the index key read by the scan
                                  IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                  IDENT # collection name to scan
 
                 SEEK <- 'seek' IDENT # variable name of the key
                                IDENT? # optional variable name of the root object (record) delivered by the scan
                                IDENT? # optional variable name of the record id delivered by the scan
+                               IDENT? # optional variable name of the snapshot id delivered by the scan
+                               IDENT? # optional variable name of the index name read by the scan
+                               IDENT? # optional variable name of the index key read by the scan
                                IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                IDENT # collection name to scan
                                FORWARD_FLAG # forward scan or not
 
                 IXSCAN <- 'ixscan' IDENT? # optional variable name of the root object (record) delivered by the scan
                                    IDENT? # optional variable name of the record id delivered by the scan
+                                   IDENT? # optional variable name of the snapshot id delivered by the scan
                                    IX_KEY_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                    IDENT # collection name
                                    IDENT # index name to scan
@@ -103,6 +113,7 @@ static constexpr auto kSyntax = R"(
                                    IDENT # variable name of the high key
                                    IDENT? # optional variable name of the root object (record) delivered by the scan
                                    IDENT? # optional variable name of the record id delivered by the scan
+                                   IDENT? # optional variable name of the snapshot id delivered by the scan
                                    IX_KEY_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                    IDENT # collection name
                                    IDENT # index name to scan
@@ -139,12 +150,12 @@ static constexpr auto kSyntax = R"(
                                    MKOBJ_FLAG # Return old object
                                    OPERATOR # child
 
-                GROUP <- 'group' IDENT_LIST 
-                                 PROJECT_LIST 
+                GROUP <- 'group' IDENT_LIST
+                                 PROJECT_LIST
                                  IDENT? # optional collator slot
                                  OPERATOR
                 HJOIN <- 'hj' IDENT? # optional collator slot
-                              LEFT 
+                              LEFT
                               RIGHT
                 LEFT <- 'left' IDENT_LIST IDENT_LIST OPERATOR
                 RIGHT <- 'right' IDENT_LIST IDENT_LIST OPERATOR
@@ -166,11 +177,11 @@ static constexpr auto kSyntax = R"(
                                        'from' OPERATOR
                                        'in' OPERATOR
                 EXCHANGE <- 'exchange' IDENT_LIST NUMBER IDENT OPERATOR
-                SORT <- 'sort' IDENT_LIST 
+                SORT <- 'sort' IDENT_LIST
                                SORT_DIR_LIST # sort directions
                                IDENT_LIST
                                NUMBER? # optional 'limit'
-                               OPERATOR 
+                               OPERATOR
                 UNWIND <- 'unwind' IDENT IDENT IDENT UNWIND_FLAG OPERATOR
                 UNWIND_FLAG <- <'true'> / <'false'>
                 UNION <- 'union' IDENT_LIST UNION_BRANCH_LIST
@@ -608,11 +619,23 @@ void Parser::walkScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
+    std::string snapshotIdName;
+    std::string indexIdName;
+    std::string indexKeyName;
     std::string collName;
     int projectsPos;
     int forwardPos;
 
-    if (ast.nodes.size() == 5) {
+    if (ast.nodes.size() == 8) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        snapshotIdName = std::move(ast.nodes[2]->identifier);
+        indexIdName = std::move(ast.nodes[3]->identifier);
+        indexKeyName = std::move(ast.nodes[4]->identifier);
+        projectsPos = 5;
+        collName = std::move(ast.nodes[6]->identifier);
+        forwardPos = 7;
+    } else if (ast.nodes.size() == 5) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
         projectsPos = 2;
@@ -628,7 +651,7 @@ void Parser::walkScan(AstQuery& ast) {
         collName = std::move(ast.nodes[1]->identifier);
         forwardPos = 2;
     } else {
-        MONGO_UNREACHABLE;
+        uasserted(5290715, "Wrong number of arguments for SCAN");
     }
 
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
@@ -636,13 +659,16 @@ void Parser::walkScan(AstQuery& ast) {
     ast.stage = makeS<ScanStage>(getCollectionUuid(collName),
                                  lookupSlot(recordName),
                                  lookupSlot(recordIdName),
+                                 lookupSlot(snapshotIdName),
+                                 lookupSlot(indexIdName),
+                                 lookupSlot(indexKeyName),
                                  ast.nodes[projectsPos]->identifiers,
                                  lookupSlots(ast.nodes[projectsPos]->renames),
                                  boost::none,
                                  forward,
                                  nullptr,
                                  getCurrentPlanNodeId(),
-                                 LockAcquisitionCallback{});
+                                 ScanCallbacks({}));
 }
 
 void Parser::walkParallelScan(AstQuery& ast) {
@@ -650,10 +676,21 @@ void Parser::walkParallelScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
+    std::string snapshotIdName;
+    std::string indexIdName;
+    std::string indexKeyName;
     std::string collName;
     int projectsPos;
 
-    if (ast.nodes.size() == 4) {
+    if (ast.nodes.size() == 7) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        snapshotIdName = std::move(ast.nodes[2]->identifier);
+        indexIdName = std::move(ast.nodes[3]->identifier);
+        indexKeyName = std::move(ast.nodes[4]->identifier);
+        projectsPos = 5;
+        collName = std::move(ast.nodes[6]->identifier);
+    } else if (ast.nodes.size() == 4) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
         projectsPos = 2;
@@ -666,16 +703,20 @@ void Parser::walkParallelScan(AstQuery& ast) {
         projectsPos = 0;
         collName = std::move(ast.nodes[1]->identifier);
     } else {
-        MONGO_UNREACHABLE;
+        uasserted(5290716, "Wrong number of arguments for PSCAN");
     }
 
     ast.stage = makeS<ParallelScanStage>(getCollectionUuid(collName),
                                          lookupSlot(recordName),
                                          lookupSlot(recordIdName),
+                                         lookupSlot(snapshotIdName),
+                                         lookupSlot(indexIdName),
+                                         lookupSlot(indexKeyName),
                                          ast.nodes[projectsPos]->identifiers,
                                          lookupSlots(ast.nodes[projectsPos]->renames),
                                          nullptr,
-                                         getCurrentPlanNodeId());
+                                         getCurrentPlanNodeId(),
+                                         ScanCallbacks({}));
 }
 
 void Parser::walkSeek(AstQuery& ast) {
@@ -683,35 +724,56 @@ void Parser::walkSeek(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
+    std::string snapshotIdName;
+    std::string indexIdName;
+    std::string indexKeyName;
     std::string collName;
     int projectsPos;
+    int forwardPos;
 
-    if (ast.nodes.size() == 5) {
+    if (ast.nodes.size() == 9) {
+        recordName = std::move(ast.nodes[1]->identifier);
+        recordIdName = std::move(ast.nodes[2]->identifier);
+        snapshotIdName = std::move(ast.nodes[3]->identifier);
+        indexIdName = std::move(ast.nodes[4]->identifier);
+        indexKeyName = std::move(ast.nodes[5]->identifier);
+        projectsPos = 6;
+        collName = std::move(ast.nodes[7]->identifier);
+        forwardPos = 8;
+    } else if (ast.nodes.size() == 6) {
         recordName = std::move(ast.nodes[1]->identifier);
         recordIdName = std::move(ast.nodes[2]->identifier);
         projectsPos = 3;
         collName = std::move(ast.nodes[4]->identifier);
-    } else if (ast.nodes.size() == 4) {
+        forwardPos = 5;
+    } else if (ast.nodes.size() == 5) {
         recordName = std::move(ast.nodes[1]->identifier);
         projectsPos = 2;
         collName = std::move(ast.nodes[3]->identifier);
-    } else if (ast.nodes.size() == 3) {
+        forwardPos = 4;
+    } else if (ast.nodes.size() == 4) {
         projectsPos = 1;
         collName = std::move(ast.nodes[2]->identifier);
+        forwardPos = 3;
     } else {
-        MONGO_UNREACHABLE;
+        uasserted(5290717, "Wrong number of arguments for SEEk");
     }
+
+    const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
     ast.stage = makeS<ScanStage>(getCollectionUuid(collName),
                                  lookupSlot(recordName),
                                  lookupSlot(recordIdName),
+                                 lookupSlot(snapshotIdName),
+                                 lookupSlot(indexIdName),
+                                 lookupSlot(indexKeyName),
                                  ast.nodes[projectsPos]->identifiers,
                                  lookupSlots(ast.nodes[projectsPos]->renames),
                                  lookupSlot(ast.nodes[0]->identifier),
-                                 true /* forward */,
+                                 forward,
                                  nullptr,
                                  getCurrentPlanNodeId(),
-                                 LockAcquisitionCallback{});
+                                 ScanCallbacks({}));
 }
 
 void Parser::walkIndexScan(AstQuery& ast) {
@@ -719,12 +781,21 @@ void Parser::walkIndexScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
+    std::string snapshotIdName;
     std::string collName;
     std::string indexName;
     int projectsPos;
     int forwardPos;
 
-    if (ast.nodes.size() == 6) {
+    if (ast.nodes.size() == 7) {
+        recordName = std::move(ast.nodes[0]->identifier);
+        recordIdName = std::move(ast.nodes[1]->identifier);
+        snapshotIdName = std::move(ast.nodes[2]->identifier);
+        projectsPos = 3;
+        collName = std::move(ast.nodes[4]->identifier);
+        indexName = std::move(ast.nodes[5]->identifier);
+        forwardPos = 6;
+    } else if (ast.nodes.size() == 6) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
         projectsPos = 2;
@@ -743,7 +814,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
         indexName = std::move(ast.nodes[2]->identifier);
         forwardPos = 3;
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE
     }
 
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
@@ -756,6 +827,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       forward,
                                       lookupSlot(recordName),
                                       lookupSlot(recordIdName),
+                                      lookupSlot(snapshotIdName),
                                       indexKeysInclusion,
                                       vars,
                                       boost::none,
@@ -770,12 +842,21 @@ void Parser::walkIndexSeek(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
+    std::string snapshotIdName;
     std::string collName;
     std::string indexName;
     int projectsPos;
     int forwardPos;
 
-    if (ast.nodes.size() == 8) {
+    if (ast.nodes.size() == 9) {
+        recordName = std::move(ast.nodes[2]->identifier);
+        recordIdName = std::move(ast.nodes[3]->identifier);
+        snapshotIdName = std::move(ast.nodes[4]->identifier);
+        projectsPos = 5;
+        collName = std::move(ast.nodes[6]->identifier);
+        indexName = std::move(ast.nodes[7]->identifier);
+        forwardPos = 8;
+    } else if (ast.nodes.size() == 8) {
         recordName = std::move(ast.nodes[2]->identifier);
         recordIdName = std::move(ast.nodes[3]->identifier);
         projectsPos = 4;
@@ -794,7 +875,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
         indexName = std::move(ast.nodes[4]->identifier);
         forwardPos = 5;
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE
     }
 
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
@@ -807,6 +888,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       forward,
                                       lookupSlot(recordName),
                                       lookupSlot(recordIdName),
+                                      lookupSlot(snapshotIdName),
                                       indexKeysInclusion,
                                       vars,
                                       lookupSlot(ast.nodes[0]->identifier),

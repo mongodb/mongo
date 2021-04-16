@@ -5,7 +5,6 @@
 //   assumes_unsharded_collection,
 //   requires_getmore,
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Tests for invalidation during a getmore. This behavior is storage-engine dependent.

@@ -161,17 +161,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
+    sbe::ScanCallbacks callbacks(
+        lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
+                                            boost::none /* snapshotIdSlot */,
+                                            boost::none /* indexIdSlot */,
+                                            boost::none /* indexKeySlot */,
                                             std::move(fields),
                                             std::move(slots),
                                             seekRecordIdSlot,
                                             true /* forward */,
                                             yieldPolicy,
                                             csn->nodeId(),
-                                            lockAcquisitionCallback,
-                                            makeOpenCallbackIfNeeded(collection, csn));
+                                            std::move(callbacks));
 
     // Start the scan from the seekRecordId.
     if (seekRecordId) {
@@ -239,8 +243,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         // the expression does match, then it returns 'false', which causes the filter (and as a
         // result, the branch) to EOF immediately. Note that the resultSlot and recordIdSlot
         // arguments to the ScanStage are boost::none, as we do not need them.
+        sbe::ScanCallbacks branchCallbacks(lockAcquisitionCallback);
         auto minTsBranch = sbe::makeS<sbe::FilterStage<false, true>>(
             sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                       boost::none,
+                                       boost::none,
+                                       boost::none,
                                        boost::none,
                                        boost::none,
                                        std::move(fields),
@@ -249,7 +257,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                        true /* forward */,
                                        yieldPolicy,
                                        csn->nodeId(),
-                                       lockAcquisitionCallback),
+                                       branchCallbacks),
             sbe::makeE<sbe::EIf>(
                 makeBinaryOp(
                     sbe::EPrimBinary::logicOr,
@@ -259,8 +267,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                               csn->assertTsHasNotFallenOffOplog->asULL())),
                     makeBinaryOp(
                         sbe::EPrimBinary::logicAnd,
-                        makeBinaryOp(
-                            sbe::EPrimBinary::eq, makeVariable(opTypeSlot), makeConstant("n")),
+                        makeBinaryOp(sbe::EPrimBinary::eq,
+                                     makeVariable(opTypeSlot),
+                                     makeConstant("n")),
                         makeBinaryOp(sbe::EPrimBinary::logicAnd,
                                      makeFunction("isObject", makeVariable(oObjSlot)),
                                      makeBinaryOp(sbe::EPrimBinary::eq,
@@ -368,6 +377,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                 sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                            resultSlot,
                                            recordIdSlot,
+                                           boost::none,
+                                           boost::none,
+                                           boost::none,
                                            std::move(fields),
                                            std::move(slots),
                                            seekRecordIdSlot,
@@ -434,17 +446,21 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
+    sbe::ScanCallbacks callbacks(
+        lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
+                                            boost::none,
+                                            boost::none,
+                                            boost::none,
                                             std::move(fields),
                                             std::move(slots),
                                             seekRecordIdSlot,
                                             forward,
                                             yieldPolicy,
                                             csn->nodeId(),
-                                            lockAcquisitionCallback,
-                                            makeOpenCallbackIfNeeded(collection, csn));
+                                            std::move(callbacks));
 
     // Check if the scan should be started after the provided resume RecordId and construct a nested
     // loop join sub-tree to project out the resume RecordId as a seekRecordIdSlot and feed it to
@@ -466,6 +482,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         auto seekBranch =
             sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
                                            sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                                                      boost::none,
+                                                                      boost::none,
+                                                                      boost::none,
                                                                       boost::none,
                                                                       boost::none,
                                                                       std::vector<std::string>{},

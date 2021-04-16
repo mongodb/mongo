@@ -123,7 +123,7 @@ private:
         return boost::none;
     }
     boost::optional<value::SlotId> lookupSlot(const std::string& name) {
-        if (name.empty()) {
+        if (name.empty() || name == DebugPrinter::kNoneKeyword) {
             return boost::none;
         } else if (_symbolsLookupTable.find(name) == _symbolsLookupTable.end()) {
             _symbolsLookupTable[name] = _slotIdGenerator.generate();

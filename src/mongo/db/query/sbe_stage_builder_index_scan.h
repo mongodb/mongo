@@ -42,7 +42,7 @@ class PlanStageSlots;
 
 /**
  * This method generates an SBE plan stage tree implementing an index scan. It returns a tuple
- * containing: (1) a slot procued by the index scan that holds the record ID ('recordIdSlot');
+ * containing: (1) a slot produced by the index scan that holds the record ID ('recordIdSlot');
  * (2) a slot vector produced by the index scan which hold parts of the index key ('indexKeySlots');
  * and (3) the SBE plan stage tree. 'indexKeySlots' will only contain slots for the parts of the
  * index key specified by the 'indexKeysToInclude' bitset.
@@ -60,15 +60,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     sbe::value::SpoolIdGenerator* spoolIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
-    sbe::LockAcquisitionCallback lockAcquisitionCallback);
+    sbe::LockAcquisitionCallback lockAcquisitionCallback,
+    StringMap<const IndexAccessMethod*>* iamMap);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds. The
  * generated subtree will have the following form:
  *
- *         nlj [] [lowKeySlot, highKeySlot]
+ *         nlj [indexIdSlot] [lowKeySlot, highKeySlot]
  *              left
- *                  project [lowKeySlot = KS(...), highKeySlot = KS(...)]
+ *                  project [indexIdSlot = <indexName>, lowKeySlot = KS(...), highKeySlot = KS(...)]
  *                  limit 1
  *                  coscan
  *               right
@@ -89,6 +90,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     sbe::IndexKeysInclusionSet indexKeysToInclude,
     sbe::value::SlotVector vars,
     boost::optional<sbe::value::SlotId> recordSlot,
+    boost::optional<sbe::value::SlotId> snapshotIdSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId,

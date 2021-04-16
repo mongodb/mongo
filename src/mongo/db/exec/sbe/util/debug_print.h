@@ -42,6 +42,9 @@ class PlanStage;
 
 class DebugPrinter {
 public:
+    // Keyword to identify optional slots that are missing.
+    static constexpr StringData kNoneKeyword = "none"_sd;
+
     struct Block {
         enum Command {
             cmdIncIndent,

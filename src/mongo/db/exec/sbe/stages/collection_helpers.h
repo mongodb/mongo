@@ -32,6 +32,7 @@
 #include <functional>
 
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo::sbe {
@@ -41,6 +42,16 @@ namespace mongo::sbe {
  */
 using LockAcquisitionCallback =
     std::function<void(OperationContext*, const AutoGetCollectionForReadMaybeLockFree&)>;
+
+
+/**
+ * A callback which gets called whenever a SCAN stage asks an underlying index scan for a result.
+ */
+using IndexKeyConsistencyCheckCallback = std::function<bool(OperationContext* opCtx,
+                                                            value::SlotAccessor* snapshotIdAccessor,
+                                                            value::SlotAccessor* indexIdAccessor,
+                                                            value::SlotAccessor* indexKeyAccessor,
+                                                            const Record& nextRecord)>;
 
 /**
  * Given a collection UUID, acquires 'coll', invokes the provided 'lockAcquisiionCallback', and

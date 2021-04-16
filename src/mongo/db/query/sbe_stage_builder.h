@@ -60,6 +60,9 @@ public:
     static constexpr StringData kRecordId = "recordId"_sd;
     static constexpr StringData kReturnKey = "returnKey"_sd;
     static constexpr StringData kOplogTs = "oplogTs"_sd;
+    static constexpr StringData kSnapshotId = "snapshotId"_sd;
+    static constexpr StringData kIndexId = "indexId"_sd;
+    static constexpr StringData kIndexKey = "indexKey"_sd;
 
     PlanStageSlots() = default;
 
@@ -228,6 +231,9 @@ struct PlanStageData {
     // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
     PlanStageSlots outputs;
 
+    // Map from index name to IAM.
+    StringMap<const IndexAccessMethod*> iamMap;
+
     // The CompileCtx object owns the RuntimeEnvironment. The RuntimeEnvironment owns various
     // SlotAccessors which are accessed when the SBE plan is executed.
     sbe::RuntimeEnvironment* env{nullptr};
@@ -251,6 +257,9 @@ public:
     static constexpr StringData kRecordId = PlanStageSlots::kRecordId;
     static constexpr StringData kReturnKey = PlanStageSlots::kReturnKey;
     static constexpr StringData kOplogTs = PlanStageSlots::kOplogTs;
+    static constexpr StringData kSnapshotId = PlanStageSlots::kSnapshotId;
+    static constexpr StringData kIndexId = PlanStageSlots::kIndexId;
+    static constexpr StringData kIndexKey = PlanStageSlots::kIndexKey;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const CollectionPtr& collection,
@@ -326,6 +335,10 @@ private:
     std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
     makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
                          sbe::value::SlotId recordIdSlot,
+                         sbe::value::SlotId snapshotIdSlot,
+                         sbe::value::SlotId indexIdSlot,
+                         sbe::value::SlotId keyStringSlot,
+                         StringMap<const IndexAccessMethod*> iamMap,
                          PlanNodeId planNodeId,
                          sbe::value::SlotVector slotsToForward = {});
 

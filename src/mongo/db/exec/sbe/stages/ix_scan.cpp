@@ -43,6 +43,7 @@ IndexScanStage::IndexScanStage(CollectionUUID collUuid,
                                bool forward,
                                boost::optional<value::SlotId> recordSlot,
                                boost::optional<value::SlotId> recordIdSlot,
+                               boost::optional<value::SlotId> snapshotIdSlot,
                                IndexKeysInclusionSet indexKeysToInclude,
                                value::SlotVector vars,
                                boost::optional<value::SlotId> seekKeySlotLow,
@@ -56,6 +57,7 @@ IndexScanStage::IndexScanStage(CollectionUUID collUuid,
       _forward(forward),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
+      _snapshotIdSlot(snapshotIdSlot),
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
@@ -74,6 +76,7 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _forward,
                                             _recordSlot,
                                             _recordIdSlot,
+                                            _snapshotIdSlot,
                                             _indexKeysToInclude,
                                             _vars,
                                             _seekKeySlotLow,
@@ -90,6 +93,10 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
 
     if (_recordIdSlot) {
         _recordIdAccessor = std::make_unique<value::ViewOfValueAccessor>();
+    }
+
+    if (_snapshotIdSlot) {
+        _snapshotIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     _accessors.resize(_vars.size());
@@ -120,6 +127,12 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
             static_cast<bool>(entry));
     _ordering = entry->ordering();
+
+    if (_snapshotIdAccessor) {
+        _snapshotIdAccessor->reset(
+            value::TypeTags::NumberInt64,
+            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+    }
 }
 
 value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -129,6 +142,10 @@ value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId 
 
     if (_recordIdSlot && *_recordIdSlot == slot) {
         return _recordIdAccessor.get();
+    }
+
+    if (_snapshotIdSlot && *_snapshotIdSlot == slot) {
+        return _snapshotIdAccessor.get();
     }
 
     if (auto it = _accessorMap.find(slot); it != _accessorMap.end()) {
@@ -342,6 +359,9 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
         if (_recordIdSlot) {
             bob.appendNumber("recordIdSlot", static_cast<long long>(*_recordIdSlot));
         }
+        if (_snapshotIdSlot) {
+            bob.appendNumber("snapshotIdSlot", static_cast<long long>(*_snapshotIdSlot));
+        }
         if (_seekKeySlotLow) {
             bob.appendNumber("seekKeySlotLow", static_cast<long long>(*_seekKeySlotLow));
         }
@@ -364,18 +384,30 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     if (_seekKeySlotLow) {
-
         DebugPrinter::addIdentifier(ret, _seekKeySlotLow.get());
         if (_seekKeySlotHigh) {
             DebugPrinter::addIdentifier(ret, _seekKeySlotHigh.get());
+        } else {
+            DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
         }
     }
+
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_recordIdSlot) {
         DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_snapshotIdSlot) {
+        DebugPrinter::addIdentifier(ret, _snapshotIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));

@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -40,24 +41,28 @@ namespace sbe {
 ScanStage::ScanStage(CollectionUUID collectionUuid,
                      boost::optional<value::SlotId> recordSlot,
                      boost::optional<value::SlotId> recordIdSlot,
+                     boost::optional<value::SlotId> snapshotIdSlot,
+                     boost::optional<value::SlotId> indexIdSlot,
+                     boost::optional<value::SlotId> indexKeySlot,
                      std::vector<std::string> fields,
                      value::SlotVector vars,
                      boost::optional<value::SlotId> seekKeySlot,
                      bool forward,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
-                     LockAcquisitionCallback lockAcquisitionCallback,
-                     ScanOpenCallback openCallback)
+                     ScanCallbacks scanCallbacks)
     : PlanStage(seekKeySlot ? "seek"_sd : "scan"_sd, yieldPolicy, nodeId),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
+      _snapshotIdSlot(snapshotIdSlot),
+      _indexIdSlot(indexIdSlot),
+      _indexKeySlot(indexKeySlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
       _seekKeySlot(seekKeySlot),
       _forward(forward),
-      _lockAcquisitionCallback(std::move(lockAcquisitionCallback)),
-      _openCallback(openCallback) {
+      _scanCallbacks(std::move(scanCallbacks)) {
     invariant(_fields.size() == _vars.size());
     invariant(!_seekKeySlot || _forward);
 }
@@ -66,14 +71,16 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
     return std::make_unique<ScanStage>(_collUuid,
                                        _recordSlot,
                                        _recordIdSlot,
+                                       _snapshotIdSlot,
+                                       _indexIdSlot,
+                                       _indexKeySlot,
                                        _fields,
                                        _vars,
                                        _seekKeySlot,
                                        _forward,
                                        _yieldPolicy,
                                        _commonStats.nodeId,
-                                       _lockAcquisitionCallback,
-                                       _openCallback);
+                                       _scanCallbacks);
 }
 
 void ScanStage::prepare(CompileCtx& ctx) {
@@ -97,8 +104,20 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _seekKeyAccessor = ctx.getAccessor(*_seekKeySlot);
     }
 
+    if (_snapshotIdSlot) {
+        _snapshotIdAccessor = ctx.getAccessor(*_snapshotIdSlot);
+    }
+
+    if (_indexIdSlot) {
+        _indexIdAccessor = ctx.getAccessor(*_indexIdSlot);
+    }
+
+    if (_indexKeySlot) {
+        _keyStringAccessor = ctx.getAccessor(*_indexKeySlot);
+    }
+
     std::tie(_collName, _catalogEpoch) =
-        acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
+        acquireCollection(_opCtx, _collUuid, _scanCallbacks.lockAcquisitionCallback, _coll);
 }
 
 value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -134,7 +153,8 @@ void ScanStage::doRestoreState() {
         return;
     }
 
-    restoreCollection(_opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
+    restoreCollection(
+        _opCtx, _collName, _collUuid, _catalogEpoch, _scanCallbacks.lockAcquisitionCallback, _coll);
 
     if (_cursor) {
         const bool couldRestore = _cursor->restore();
@@ -181,13 +201,17 @@ void ScanStage::open(bool reOpen) {
             // We're being opened after 'close()'. We need to re-acquire '_coll' in this case and
             // make some validity checks (the collection has not been dropped, renamed, etc.).
             tassert(5071005, "ScanStage is not open but have _cursor", !_cursor);
-            restoreCollection(
-                _opCtx, _collName, _collUuid, _catalogEpoch, _lockAcquisitionCallback, _coll);
+            restoreCollection(_opCtx,
+                              _collName,
+                              _collUuid,
+                              _catalogEpoch,
+                              _scanCallbacks.lockAcquisitionCallback,
+                              _coll);
         }
     }
 
-    if (_openCallback) {
-        _openCallback(_opCtx, _coll->getCollection(), reOpen);
+    if (_scanCallbacks.scanOpenCallback) {
+        _scanCallbacks.scanOpenCallback(_opCtx, _coll->getCollection(), reOpen);
     }
 
     if (const auto& collection = _coll->getCollection()) {
@@ -221,12 +245,24 @@ PlanState ScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
-    auto nextRecord =
-        (_firstGetNext && _seekKeyAccessor) ? _cursor->seekExact(_key) : _cursor->next();
-    _firstGetNext = false;
+    // Loop until we have a valid result or we return EOF.
+    boost::optional<Record> nextRecord;
+    while (true) {
+        nextRecord =
+            (_firstGetNext && _seekKeyAccessor) ? _cursor->seekExact(_key) : _cursor->next();
+        _firstGetNext = false;
 
-    if (!nextRecord) {
-        return trackPlanState(PlanState::IS_EOF);
+        if (!nextRecord) {
+            return trackPlanState(PlanState::IS_EOF);
+        }
+
+        if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
+            !_scanCallbacks.indexKeyConsistencyCheckCallBack(
+                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _keyStringAccessor, *nextRecord)) {
+            continue;
+        } else {
+            break;
+        }
     }
 
     if (_recordAccessor) {
@@ -301,6 +337,16 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
         if (_seekKeySlot) {
             bob.appendNumber("seekKeySlot", static_cast<long long>(*_seekKeySlot));
         }
+        if (_snapshotIdSlot) {
+            bob.appendNumber("snapshotIdSlot", static_cast<long long>(*_snapshotIdSlot));
+        }
+        if (_indexIdSlot) {
+            bob.appendNumber("indexIdSlot", static_cast<long long>(*_indexIdSlot));
+        }
+        if (_indexKeySlot) {
+            bob.appendNumber("indexKeySlot", static_cast<long long>(*_indexKeySlot));
+        }
+
         bob.append("fields", _fields);
         bob.append("outputSlots", _vars);
         ret->debugInfo = bob.obj();
@@ -321,10 +367,32 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_recordIdSlot) {
         DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_snapshotIdSlot) {
+        DebugPrinter::addIdentifier(ret, _snapshotIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexIdSlot) {
+        DebugPrinter::addIdentifier(ret, _indexIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexKeySlot) {
+        DebugPrinter::addIdentifier(ret, _indexKeySlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));
@@ -351,16 +419,24 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
+                                     boost::optional<value::SlotId> snapshotIdSlot,
+                                     boost::optional<value::SlotId> indexIdSlot,
+                                     boost::optional<value::SlotId> indexKeySlot,
                                      std::vector<std::string> fields,
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
-                                     PlanNodeId nodeId)
+                                     PlanNodeId nodeId,
+                                     ScanCallbacks callbacks)
     : PlanStage("pscan"_sd, yieldPolicy, nodeId),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
+      _snapshotIdSlot(snapshotIdSlot),
+      _indexIdSlot(indexIdSlot),
+      _indexKeySlot(indexKeySlot),
       _fields(std::move(fields)),
-      _vars(std::move(vars)) {
+      _vars(std::move(vars)),
+      _scanCallbacks(std::move(callbacks)) {
     invariant(_fields.size() == _vars.size());
 
     _state = std::make_shared<ParallelState>();
@@ -370,17 +446,25 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
                                      CollectionUUID collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
+                                     boost::optional<value::SlotId> snapshotIdSlot,
+                                     boost::optional<value::SlotId> indexIdSlot,
+                                     boost::optional<value::SlotId> indexKeySlot,
                                      std::vector<std::string> fields,
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
-                                     PlanNodeId nodeId)
+                                     PlanNodeId nodeId,
+                                     ScanCallbacks callbacks)
     : PlanStage("pscan"_sd, yieldPolicy, nodeId),
       _collUuid(collectionUuid),
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
+      _snapshotIdSlot(snapshotIdSlot),
+      _indexIdSlot(indexIdSlot),
+      _indexKeySlot(indexKeySlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
-      _state(state) {
+      _state(state),
+      _scanCallbacks(std::move(callbacks)) {
     invariant(_fields.size() == _vars.size());
 }
 
@@ -389,10 +473,14 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _collUuid,
                                                _recordSlot,
                                                _recordIdSlot,
+                                               _snapshotIdSlot,
+                                               _indexIdSlot,
+                                               _indexKeySlot,
                                                _fields,
                                                _vars,
                                                _yieldPolicy,
-                                               _commonStats.nodeId);
+                                               _commonStats.nodeId,
+                                               _scanCallbacks);
 }
 
 void ParallelScanStage::prepare(CompileCtx& ctx) {
@@ -410,6 +498,18 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
         uassert(4822816, str::stream() << "duplicate field: " << _fields[idx], inserted);
         auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
         uassert(4822817, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
+    }
+
+    if (_snapshotIdSlot) {
+        _snapshotIdAccessor = ctx.getAccessor(*_snapshotIdSlot);
+    }
+
+    if (_indexIdSlot) {
+        _indexIdAccessor = ctx.getAccessor(*_indexIdSlot);
+    }
+
+    if (_indexKeySlot) {
+        _keyStringAccessor = ctx.getAccessor(*_indexKeySlot);
     }
 
     std::tie(_collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid, nullptr, _coll);
@@ -546,6 +646,7 @@ PlanState ParallelScanStage::getNext() {
 
     boost::optional<Record> nextRecord;
 
+    // Loop until we have a valid result or we return EOF.
     do {
         nextRecord = needsRange() ? nextRange() : _cursor->next();
         if (!nextRecord) {
@@ -556,6 +657,14 @@ PlanState ParallelScanStage::getNext() {
         if (!_range.end.isNull() && nextRecord->id == _range.end) {
             setNeedsRange();
             nextRecord = boost::none;
+            continue;
+        }
+
+        if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
+            !_scanCallbacks.indexKeyConsistencyCheckCallBack(
+                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _keyStringAccessor, *nextRecord)) {
+            nextRecord = boost::none;
+            continue;
         }
     } while (!nextRecord);
 
@@ -621,10 +730,32 @@ std::vector<DebugPrinter::Block> ParallelScanStage::debugPrint() const {
 
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_recordIdSlot) {
         DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_snapshotIdSlot) {
+        DebugPrinter::addIdentifier(ret, _snapshotIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexIdSlot) {
+        DebugPrinter::addIdentifier(ret, _indexIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexKeySlot) {
+        DebugPrinter::addIdentifier(ret, _indexKeySlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));
