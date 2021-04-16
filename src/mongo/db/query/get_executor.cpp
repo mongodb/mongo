@@ -221,12 +221,8 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                       indexKeys.end(),
                                       std::inserter(projectedFields, projectedFields.begin()));
 
-<<<<<<< HEAD
                 multikeyPathSet =
                     getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
-=======
-                multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, fields, &mkAccessStats);
->>>>>>> f37dc54f9f5b2e44aaeecb42f18ce990d680501f
             } else {
                 multikeyPathSet = getWildcardMultikeyPathSet(wam, opCtx, &mkAccessStats);
             }
