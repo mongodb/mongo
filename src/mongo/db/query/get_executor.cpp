@@ -214,12 +214,13 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
                 // For a compound wildcard index, we also want to get the multikey information
                 // for (non-wildcard) fields in the index which are being queried.
-                auto indexKeys = wam->getKeyPattern().getFieldNames<std::set<std::string>>();
-                std::set_intersection(fields.begin(),
-                                      fields.end(),
-                                      indexKeys.begin(),
-                                      indexKeys.end(),
-                                      std::inserter(projectedFields, projectedFields.begin()));
+                for (auto& indexElem : wam->getKeyPattern()) {
+                    auto indexKey = indexElem.fieldNameStringData();
+                    if (fields.contains(indexKey.toString()) && indexKey != "$**" &&
+                        !indexKey.endsWith(".$**")) {
+                        projectedFields.insert(projectedFields.begin(), indexKey.toString());
+                    }
+                }
 
                 multikeyPathSet =
                     getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
