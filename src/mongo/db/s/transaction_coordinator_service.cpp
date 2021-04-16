@@ -34,8 +34,8 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
+#include "mongo/db/s/transaction_coordinator_params_gen.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/write_concern.h"
