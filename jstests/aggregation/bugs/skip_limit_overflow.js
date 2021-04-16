@@ -62,22 +62,6 @@ function testPipeline(pipeline, expectedResult, optimizedAwayStages) {
     assert.eq(coll.aggregate(pipeline).toArray(), []);
 }
 
-// Case where overflow of limit + skip prevents limit stage from being absorbed. Values are
-// specified as integrals > MAX_LONG. Note that we cannot specify this huge value as a NumberLong,
-// as we get a number conversion error (even if it's passed as a string).
-testPipeline([{$sort: {x: -1}}, {$skip: 18446744073709552000}, {$limit: 6}],
-             {
-                 $limit: {path: "$limit", expectedValue: [NumberLong(6)]},
-                 SKIP: {path: "skipAmount", expectedValue: [NumberLong("9223372036854775807")]}
-             },
-             ["$skip"]);
-testPipeline([{$sort: {x: -1}}, {$skip: 6}, {$limit: 18446744073709552000}],
-             {
-                 $limit: {path: "$limit", expectedValue: [NumberLong("9223372036854775807")]},
-                 SKIP: {path: "skipAmount", expectedValue: [6]}
-             },
-             ["$skip"]);
-
 // Case where overflow of limit + skip prevents limit stage from being absorbed. One of the
 // values == MAX_LONG, another one is 1.
 testPipeline([{$sort: {x: -1}}, {$skip: NumberLong("9223372036854775807")}, {$limit: 1}],

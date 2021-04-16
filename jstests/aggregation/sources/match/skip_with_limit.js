@@ -124,4 +124,27 @@ count = coll.aggregate([
             ])
             .itcount();
 assert.eq(count, 3);
+
+function assertAggregateCommandFailed(pipeline, expectedErrorCode) {
+    const err = assert.throws(() => coll.aggregate(pipeline));
+    assert.commandFailedWithCode(err, expectedErrorCode);
+}
+
+// Verifies that command fails executing when $skip argument is greater than MAX_LONG.
+assertAggregateCommandFailed([{$skip: 18446744073709552000}], 5107200);
+
+// Verifies that command fails executing when $limit argument is greater than MAX_LONG.
+assertAggregateCommandFailed([{$limit: 18446744073709552000}], 5107201);
+
+// Verifies that command fails executing when $skip argument is negative.
+assertAggregateCommandFailed([{$skip: -1}], 5107200);
+
+// Verifies that command fails executing when $limit argument is negative.
+assertAggregateCommandFailed([{$limit: -1}], 5107201);
+
+// Verifies that command succeeds when $skip argument is zero.
+assert.eq(coll.aggregate([{$skip: 0}]).itcount(), 20);
+
+// Verifies that command fails executing when $limit argument is zero.
+assertAggregateCommandFailed([{$limit: 0}], 15958);
 }());

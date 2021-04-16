@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -108,11 +109,10 @@ intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    uassert(15972,
-            str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
-            elem.isNumber());
-    auto nToSkip = elem.safeNumberLong();
-
-    return DocumentSourceSkip::create(pExpCtx, nToSkip);
+    const auto nToSkip = elem.parseIntegerElementToNonNegativeLong();
+    uassert(5107200,
+            str::stream() << "invalid argument to $skip stage: " << nToSkip.getStatus().reason(),
+            nToSkip.isOK());
+    return DocumentSourceSkip::create(pExpCtx, nToSkip.getValue());
 }
 }  // namespace mongo
