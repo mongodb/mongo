@@ -10097,6 +10097,7 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_update_v1_oplog_gen
   - name: replica_sets_update_v1_oplog_jscore_passthrough
+  - name: retryable_writes_jscore_stepdown_passthrough
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
