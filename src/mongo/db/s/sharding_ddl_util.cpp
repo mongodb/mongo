@@ -511,7 +511,12 @@ void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
             AutoGetCollection cCollLock(opCtx, nss, MODE_S);
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
-            csr->enterCriticalSectionCatchUpPhase(csrLock);
+            // It may happen that the ReplWriterWorker enters the critical section before drain mode
+            // upon committing a recoverable critical section oplog entry (SERVER-56104)
+            if (!csr->getCriticalSectionSignal(
+                    opCtx, ShardingMigrationCriticalSection::Operation::kWrite)) {
+                csr->enterCriticalSectionCatchUpPhase(csrLock);
+            }
         }
 
         if (doc.getBlockReads()) {
@@ -519,7 +524,12 @@ void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
             AutoGetCollection cCollLock(opCtx, nss, MODE_X);
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
-            csr->enterCriticalSectionCommitPhase(csrLock);
+            // It may happen that the ReplWriterWorker enters the critical section before drain mode
+            // upon committing a recoverable critical section oplog entry (SERVER-56104)
+            if (!csr->getCriticalSectionSignal(
+                    opCtx, ShardingMigrationCriticalSection::Operation::kRead)) {
+                csr->enterCriticalSectionCommitPhase(csrLock);
+            }
 
             CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
         }
