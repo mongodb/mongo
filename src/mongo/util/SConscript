@@ -210,6 +210,15 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='fail_point_bm',
+    source=[
+        'fail_point_bm.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
 env.Library(
     target="testing_options",
     source=[
