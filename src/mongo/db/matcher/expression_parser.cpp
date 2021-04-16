@@ -90,14 +90,19 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
     return false;
 }
 
+// TODO SERVER-49852: Currently SBE cannot handle match expressions with numeric path
+// components due to some of the complexity around how arrays are handled.
+void disableSBEForNumericPathComponent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       const FieldRef* fieldRef) {
+    if (fieldRef && fieldRef->hasNumericPathComponents()) {
+        expCtx->sbeCompatible = false;
+    }
+}
+
 void addExpressionToRoot(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                          AndMatchExpression* root,
                          std::unique_ptr<MatchExpression> newNode) {
-    if (newNode->fieldRef() && newNode->fieldRef()->hasNumericPathComponents()) {
-        // TODO SERVER-49852: Currently SBE cannot handle match expressions with numeric path
-        // components due to some of the complexity around how arrays are handled.
-        expCtx->sbeCompatible = false;
-    }
+    disableSBEForNumericPathComponent(expCtx, newNode->fieldRef());
     root->add(std::move(newNode));
 }
 }  // namespace
@@ -1569,6 +1574,11 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                 e,
                 expCtx,
                 allowedFeatures);
+
+            // The NotMatchExpression below does not have a path, so 's' must be checked for a
+            // numeric path component instead.
+            disableSBEForNumericPathComponent(expCtx, s.getValue()->fieldRef());
+
             return {std::make_unique<NotMatchExpression>(
                 s.getValue().release(),
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend))};
