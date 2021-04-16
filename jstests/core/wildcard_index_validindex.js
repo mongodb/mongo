@@ -59,6 +59,10 @@ createIndexAndVerifyWithDrop({"$**": 1},
 createIndexAndVerifyWithDrop({"$**": 1},
                              {wildcardProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
 
+// Can create compound wildcard indexes.
+createIndexAndVerifyWithDrop({"$**": 1, "a": 1}, {wildcardProjection: {a: 0}, name: kIndexName});
+createIndexAndVerifyWithDrop({"a": 1, "$**": 1, }, {wildcardProjection: {a: 0}, name: kIndexName});
+
 // Cannot create a wildcard index with a non-positive numeric key value.
 coll.dropIndexes();
 assert.commandFailedWithCode(coll.createIndex({"$**": 0}), ErrorCodes.CannotCreateIndex);
@@ -94,10 +98,6 @@ assert.commandFailedWithCode(coll.createIndex({"a.$**": "text"}), ErrorCodes.Can
 // Cannot specify plugin by string.
 assert.commandFailedWithCode(coll.createIndex({"a": "wildcard"}), ErrorCodes.CannotCreateIndex);
 assert.commandFailedWithCode(coll.createIndex({"$**": "wildcard"}), ErrorCodes.CannotCreateIndex);
-
-// Cannot create a compound wildcard index.
-assert.commandFailedWithCode(coll.createIndex({"$**": 1, "a": 1}), ErrorCodes.CannotCreateIndex);
-assert.commandFailedWithCode(coll.createIndex({"a": 1, "$**": 1}), ErrorCodes.CannotCreateIndex);
 
 // Cannot create an wildcard index with an invalid spec.
 assert.commandFailedWithCode(coll.createIndex({"a.$**.$**": 1}), ErrorCodes.CannotCreateIndex);
