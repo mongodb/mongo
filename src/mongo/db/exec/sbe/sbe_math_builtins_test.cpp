@@ -500,6 +500,43 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
     }
 }
 
+TEST_F(SBEMathBuiltinTest, DoubleDoubleSummation) {
+    {
+        value::OwnedValueAccessor inputAccessor;
+        auto inputSlot = bindAccessor(&inputAccessor);
+
+        auto callExpr = makeE<EFunction>("doubleDoubleSum", makeEs(makeE<EVariable>(inputSlot)));
+        auto compiledExpr = compileExpression(*callExpr);
+
+        auto [inputTag, inputVal] = value::makeCopyDecimal(Decimal128{"-1.0"});
+        inputAccessor.reset(inputTag, inputVal);
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(resultTag, resultVal);
+
+        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT(value::bitcastTo<Decimal128>(resultVal).isEqual(Decimal128{"-1.0"}));
+    }
+
+    {
+        constexpr auto arity = 3;
+        std::vector<Decimal128> vals = {Decimal128("1.0"), Decimal128("2.0"), Decimal128("3.0")};
+        std::vector<std::unique_ptr<EExpression>> args;
+
+        for (size_t i = 0; i < arity; ++i) {
+            auto [tag, val] = value::makeCopyDecimal(vals[i]);
+            args.push_back(makeE<EConstant>(tag, val));
+        }
+
+        auto callExpr = makeE<EFunction>("doubleDoubleSum", std::move(args));
+        auto compiledExpr = compileExpression(*callExpr);
+
+        auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+        value::ValueGuard guard(resultTag, resultVal);
+
+        ASSERT_EQ(value::TypeTags::NumberDecimal, resultTag);
+        ASSERT(value::bitcastTo<Decimal128>(resultVal).isEqual(Decimal128{"6.0"}));
+    }
+}
 }  // namespace
 
 }  // namespace mongo::sbe

@@ -1214,9 +1214,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
         for (ArityType idx = 0; idx < arity; ++idx) {
             auto [own, tag, val] = getFromStack(idx);
             if (tag == value::TypeTags::Date) {
-                sum.add(Decimal128(value::bitcastTo<int64_t>(val)));
+                sum = sum.add(Decimal128(value::bitcastTo<int64_t>(val)));
             } else {
-                sum.add(value::numericCast<Decimal128>(tag, val));
+                sum = sum.add(value::numericCast<Decimal128>(tag, val));
             }
         }
         if (haveDate) {
