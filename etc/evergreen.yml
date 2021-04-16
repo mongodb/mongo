@@ -10080,6 +10080,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
+  - name: read_concern_linearizable_passthrough
   - name: replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gcm_gen
