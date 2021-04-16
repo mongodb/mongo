@@ -209,8 +209,17 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             if (canonicalQuery) {
                 stdx::unordered_set<std::string> fields;
                 QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fields);
-                const auto projectedFields = projection_executor_utils::applyProjectionToFields(
+                auto projectedFields = projection_executor_utils::applyProjectionToFields(
                     wildcardProjection->exec(), fields);
+
+                // For a compound wildcard index, we also want to get the multikey information
+                // for (non-wildcard) fields in the index which are being queried.
+                auto indexKeys = wam->getKeyPattern().getFieldNames<std::set<std::string>>();
+                std::set_intersection(fields.begin(),
+                                      fields.end(),
+                                      indexKeys.begin(),
+                                      indexKeys.end(),
+                                      std::inserter(projectedFields, projectedFields.begin()));
 
                 multikeyPathSet =
                     getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);
