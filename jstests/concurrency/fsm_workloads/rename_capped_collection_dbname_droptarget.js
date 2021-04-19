@@ -9,7 +9,6 @@
  *
  * @tags: [
  *   requires_capped,
- *   sbe_incompatible,
  * ]
  */
 
