@@ -237,8 +237,7 @@ public:
 
             bool useNewPath = [&] {
                 return fcvRegion->getVersion() == FCVersion::kVersion50 &&
-                    feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion) &&
-                    !feature_flags::gDisableIncompleteShardingDDLSupport.isEnabled(*fcvRegion);
+                    feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
             }();
 
             if (!useNewPath) {
