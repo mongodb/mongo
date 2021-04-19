@@ -96,7 +96,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                 opCtx->getServiceContext(), recipientStateDoc.getTenantId());
 
             if (recipientStateDoc.getExpireAt() && mtab) {
-                if (mtab->getState() == TenantMigrationRecipientAccessBlocker::State::kReject) {
+                if (mtab->inStateReject()) {
                     // The TenantMigrationRecipientAccessBlocker entry needs to be removed to
                     // re-allow reads and future migrations with the same tenantId as this migration
                     // has already been aborted and forgotten.

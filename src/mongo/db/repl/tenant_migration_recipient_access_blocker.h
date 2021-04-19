@@ -72,11 +72,6 @@ class TenantMigrationRecipientAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationRecipientAccessBlocker>,
       public TenantMigrationAccessBlocker {
 public:
-    /**
-     * The access states of an mtab.
-     */
-    enum class State { kReject, kRejectBefore };
-
     TenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
                                           UUID migrationId,
                                           std::string tenantId,
@@ -126,12 +121,35 @@ public:
     //
     void startRejectingReadsBefore(const Timestamp& timestamp);
 
-    State getState() const {
-        return _state;
+    bool inStateReject() const {
+        return _state.isReject();
     }
 
 private:
-    std::string _stateToString(State state) const;
+    /**
+     * The access states of an mtab.
+     */
+    class BlockerState {
+    public:
+        void transitionToRejectBefore() {
+            _state = State::kRejectBefore;
+        }
+
+        bool isReject() const {
+            return _state == State::kReject;
+        }
+
+        bool isRejectBefore() const {
+            return _state == State::kRejectBefore;
+        }
+
+        std::string toString() const;
+
+    private:
+        enum class State { kReject, kRejectBefore };
+
+        State _state = State::kReject;
+    };
 
     ServiceContext* _serviceContext;
     const UUID _migrationId;
@@ -141,7 +159,7 @@ private:
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientAccessBlocker::_mutex");
 
-    State _state{State::kReject};
+    BlockerState _state;
 
     boost::optional<Timestamp> _rejectBeforeTimestamp;
 
