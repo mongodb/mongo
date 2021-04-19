@@ -834,9 +834,12 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             // but not with the specified (duplicate) name. User must specify another index name.
             if (indexComparison == IndexDescriptor::Comparison::kDifferent) {
                 return Status(ErrorCodes::IndexKeySpecsConflict,
-                              str::stream() << "An existing index has the same name as the "
-                                               "requested index. Requested index: "
-                                            << spec << ", existing index: " << desc->infoObj());
+                              str::stream()
+                                  << "An existing index has the same name as the "
+                                     "requested index. When index names are not specified, they "
+                                     "are auto generated and can cause conflicts. Please refer to "
+                                     "our documentation. Requested index: "
+                                  << spec << ", existing index: " << desc->infoObj());
             }
 
             // The candidate's key and uniquely-identifying options are equivalent to an existing
