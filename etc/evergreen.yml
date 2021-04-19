@@ -10077,6 +10077,9 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.debug_only !.sharded
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
+  - name: causally_consistent_hedged_reads_jscore_passthrough_gen
+  - name: causally_consistent_jscore_passthrough_auth_gen
+  - name: causally_consistent_jscore_passthrough_gen
   - name: cwrwc_passthrough
   - name: cwrwc_rc_majority_passthrough_gen
   - name: cwrwc_wc_majority_passthrough
