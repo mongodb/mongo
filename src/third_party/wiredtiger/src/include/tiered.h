@@ -55,7 +55,7 @@ struct __wt_cursor_tiered {
 struct __wt_tiered {
     WT_DATA_HANDLE iface;
 
-    const char *name, *config, *filename;
+    const char *config, *filename;
     const char *key_format, *value_format;
 
     WT_DATA_HANDLE **tiers;

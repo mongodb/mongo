@@ -33,7 +33,7 @@
  * Default schema for tracking operations on collections (key_format: Collection name / Key /
  * Timestamp, value_format: Operation type / Value)
  */
-#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(Sii)
+#define OPERATION_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SSQ)
 #define OPERATION_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(iS)
 #define OPERATION_TRACKING_TABLE_CONFIG \
     "key_format=" OPERATION_TRACKING_KEY_FORMAT ",value_format=" OPERATION_TRACKING_VALUE_FORMAT
@@ -42,7 +42,7 @@
  * Default schema for tracking schema operations on collections (key_format: Collection name /
  * Timestamp, value_format: Operation type)
  */
-#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(Si)
+#define SCHEMA_TRACKING_KEY_FORMAT WT_UNCHECKED_STRING(SQ)
 #define SCHEMA_TRACKING_VALUE_FORMAT WT_UNCHECKED_STRING(i)
 #define SCHEMA_TRACKING_TABLE_CONFIG \
     "key_format=" SCHEMA_TRACKING_KEY_FORMAT ",value_format=" SCHEMA_TRACKING_VALUE_FORMAT

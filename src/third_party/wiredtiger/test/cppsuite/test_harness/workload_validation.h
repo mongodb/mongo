@@ -35,112 +35,114 @@ extern "C" {
 #include "wiredtiger.h"
 }
 
+#include "database_model.h"
+
 namespace test_harness {
+
 /*
  * Class that can validate database state and collection data.
  */
 class workload_validation {
     public:
     /*
-     * Validate the on disk data against what has been tracked during the test. The first step is to
-     * replay the tracked operations so a representation in memory of the collections is created.
-     * This representation is then compared to what is on disk. The second step is to go through
-     * what has been saved on disk and make sure the memory representation has the same data.
+     * Validate the on disk data against what has been tracked during the test.
+     * - The first step is to replay the tracked operations so a representation in memory of the
+     * collections is created. This representation is then compared to what is on disk.
+     * - The second step is to go through what has been saved on disk and make sure the memory
+     * representation has the same data.
      * operation_table_name is the collection that contains all the operations about the key/value
      * pairs in the different collections used during the test. schema_table_name is the collection
      * that contains all the operations about the creation or deletion of collections during the
      * test.
      */
     bool
-    validate(const std::string &operation_table_name, const std::string &schema_table_name)
+    validate(const std::string &operation_table_name, const std::string &schema_table_name,
+      database &database)
     {
         WT_SESSION *session;
         std::string collection_name;
-        /*
-         * Representation in memory of the collections at the end of the test. The first level is a
-         * map that contains collection names as keys. The second level is another map that contains
-         * the different key/value pairs within a given collection. If a collection yields to a null
-         * map of key/value pairs, this means the collection should not be present on disk. If a
-         * value from a key/value pair is null, this means the key should not be present in the
-         * collection on disk.
-         */
-        std::map<std::string, std::map<int, std::string *> *> collections;
         /* Existing collections after the test. */
-        std::vector<std::string> created_collections;
-        bool is_valid;
+        std::vector<std::string> created_collections, deleted_collections;
+        bool is_valid = true;
 
         session = connection_manager::instance().create_session();
 
-        /* Retrieve the created collections that need to be checked. */
+        /* Retrieve the collections that were created and deleted during the test. */
         collection_name = schema_table_name;
-        created_collections = parse_schema_tracking_table(session, collection_name);
+        parse_schema_tracking_table(
+          session, collection_name, created_collections, deleted_collections);
 
-        /* Allocate memory to the operations performed on the created collections. */
+        /* Make sure they exist in memory. */
         for (auto const &it : created_collections) {
-            std::map<int, std::string *> *map = new std::map<int, std::string *>();
-            collections[it] = map;
+            if (database.collections.count(it) == 0) {
+                debug_print("Collection missing in memory: " + it, DEBUG_ERROR);
+                is_valid = false;
+                break;
+            }
         }
 
-        /*
-         * Build in memory the final state of each created collection according to the tracked
-         * operations.
-         */
-        collection_name = operation_table_name;
-        for (auto const &active_collection : created_collections)
-            parse_operation_tracking_table(
-              session, collection_name, active_collection, collections);
+        if (!is_valid)
+            return (is_valid);
 
-        /* Check all tracked operations in memory against the database on disk. */
-        is_valid = check_reference(session, collections);
-
-        /* Check what has been saved on disk against what has been tracked. */
-        if (is_valid) {
-            for (auto const &collection : created_collections) {
-                is_valid = check_disk_state(session, collection, collections);
-                if (!is_valid) {
-                    debug_print(
-                      "check_disk_state failed for collection " + collection, DEBUG_ERROR);
-                    break;
-                }
+        /* Make sure they don't exist in memory nor on disk. */
+        for (auto const &it : deleted_collections) {
+            if (database.collections.count(it) > 0) {
+                debug_print(
+                  "Collection present in memory while it has been tracked as deleted: " + it,
+                  DEBUG_ERROR);
+                is_valid = false;
+                break;
             }
+            if (!verify_collection_state(session, it, false)) {
+                debug_print(
+                  "Collection present on disk while it has been tracked as deleted: " + it,
+                  DEBUG_ERROR);
+                is_valid = false;
+                break;
+            }
+        }
 
-        } else
-            debug_print("check_reference failed!", DEBUG_ERROR);
+        for (auto const &collection_name : database.get_collection_names()) {
+            if (!is_valid)
+                break;
 
-        /* Clean the allocated memory. */
-        clean_memory(collections);
+            /* Get the values associated to the different keys in the current collection. */
+            parse_operation_tracking_table(
+              session, operation_table_name, collection_name, database);
+            /* Check all tracked operations in memory against the database on disk. */
+            if (!check_reference(session, collection_name, database)) {
+                debug_print(
+                  "check_reference failed for collection " + collection_name, DEBUG_ERROR);
+                is_valid = false;
+            }
+            /* Check what has been saved on disk against what has been tracked. */
+            else if (!check_disk_state(session, collection_name, database)) {
+                debug_print(
+                  "check_disk_state failed for collection " + collection_name, DEBUG_ERROR);
+                is_valid = false;
+            }
+            /* Clear memory. */
+            delete database.collections[collection_name].values;
+            database.collections[collection_name].values = nullptr;
+        }
 
         return (is_valid);
     }
 
-    /* Clean the memory used to represent the collections after the test. */
-    void
-    clean_memory(std::map<std::string, std::map<int, std::string *> *> &collections)
-    {
-        for (auto &it_collections : collections) {
-            if (it_collections.second == nullptr)
-                continue;
-
-            for (auto &it_operations : *it_collections.second) {
-                delete it_operations.second;
-                it_operations.second = nullptr;
-            }
-            delete it_collections.second;
-            it_collections.second = nullptr;
-        }
-    }
-
+    private:
     /*
+     * Read the tracking table to retrieve the created and deleted collections during the test.
      * collection_name is the collection that contains the operations on the different collections
      * during the test.
      */
-    const std::vector<std::string>
-    parse_schema_tracking_table(WT_SESSION *session, const std::string &collection_name)
+    void
+    parse_schema_tracking_table(WT_SESSION *session, const std::string &collection_name,
+      std::vector<std::string> &created_collections, std::vector<std::string> &deleted_collections)
     {
         WT_CURSOR *cursor;
+        wt_timestamp_t key_timestamp;
         const char *key_collection_name;
-        int key_timestamp, value_operation_type;
-        std::vector<std::string> created_collections;
+        int value_operation_type;
 
         testutil_check(session->open_cursor(session, collection_name.c_str(), NULL, NULL, &cursor));
 
@@ -154,16 +156,18 @@ class workload_validation {
 
             if (static_cast<tracking_operation>(value_operation_type) ==
               tracking_operation::CREATE) {
+                deleted_collections.erase(std::remove(deleted_collections.begin(),
+                                            deleted_collections.end(), key_collection_name),
+                  deleted_collections.end());
                 created_collections.push_back(key_collection_name);
             } else if (static_cast<tracking_operation>(value_operation_type) ==
               tracking_operation::DELETE_COLLECTION) {
                 created_collections.erase(std::remove(created_collections.begin(),
                                             created_collections.end(), key_collection_name),
                   created_collections.end());
+                deleted_collections.push_back(key_collection_name);
             }
         }
-
-        return (created_collections);
     }
 
     /*
@@ -174,32 +178,42 @@ class workload_validation {
      */
     void
     parse_operation_tracking_table(WT_SESSION *session, const std::string &tracking_collection_name,
-      const std::string &collection_name,
-      std::map<std::string, std::map<int, std::string *> *> &collections)
+      const std::string &collection_name, database &database)
     {
         WT_CURSOR *cursor;
-        int error_code, exact, key, key_timestamp, value_operation_type;
-        const char *key_collection_name, *value;
+        wt_timestamp_t key_timestamp;
+        int exact, value_operation_type;
+        const char *key, *key_collection_name, *value;
+        std::vector<key_value_t> collection_keys;
+        std::string key_str;
+
+        /* Retrieve all keys from the given collection. */
+        for (auto const &it : database.collections.at(collection_name).keys)
+            collection_keys.push_back(it.first);
+        /* There must be at least a key. */
+        testutil_assert(!collection_keys.empty());
+        /* Sort keys. */
+        std::sort(collection_keys.begin(), collection_keys.end());
+        /* Use the first key as a parameter for search_near. */
+        key_str = collection_keys[0];
 
         testutil_check(
           session->open_cursor(session, tracking_collection_name.c_str(), NULL, NULL, &cursor));
 
-        /* Our keys start at 0. */
-        cursor->set_key(cursor, collection_name.c_str(), 0);
-        error_code = cursor->search_near(cursor, &exact);
-
+        cursor->set_key(cursor, collection_name.c_str(), key_str.c_str());
+        testutil_check(cursor->search_near(cursor, &exact));
         /*
-         * As we don't support deletion, the searched collection is expected to be found. Since the
-         * timestamp which is part of the key is not provided, exact is expected to be > 0.
+         * Since the timestamp which is part of the key is not provided, exact is expected to be
+         * greater than 0.
          */
-        testutil_check(exact < 1);
+        testutil_assert(exact >= 0);
 
-        while (error_code == 0) {
+        do {
             testutil_check(cursor->get_key(cursor, &key_collection_name, &key, &key_timestamp));
             testutil_check(cursor->get_value(cursor, &value_operation_type, &value));
 
             debug_print("Collection name is " + std::string(key_collection_name), DEBUG_TRACE);
-            debug_print("Key is " + std::to_string(key), DEBUG_TRACE);
+            debug_print("Key is " + std::string(key), DEBUG_TRACE);
             debug_print("Timestamp is " + std::to_string(key_timestamp), DEBUG_TRACE);
             debug_print("Operation type is " + std::to_string(value_operation_type), DEBUG_TRACE);
             debug_print("Value is " + std::string(value), DEBUG_TRACE);
@@ -217,141 +231,138 @@ class workload_validation {
                 /*
                  * Operations are parsed from the oldest to the most recent one. It is safe to
                  * assume the key has been inserted previously in an existing collection and can be
-                 * deleted safely.
+                 * safely deleted.
                  */
-                delete collections.at(key_collection_name)->at(key);
-                collections.at(key_collection_name)->at(key) = nullptr;
+                database.collections.at(key_collection_name).keys.at(std::string(key)).exists =
+                  false;
+                delete database.collections.at(key_collection_name).values;
+                database.collections.at(key_collection_name).values = nullptr;
                 break;
             case tracking_operation::INSERT: {
                 /* Keys are unique, it is safe to assume the key has not been encountered before. */
-                std::pair<int, std::string *> pair(key, new std::string(value));
-                collections.at(key_collection_name)->insert(pair);
+                database.collections[key_collection_name].keys[std::string(key)].exists = true;
+                if (database.collections[key_collection_name].values == nullptr) {
+                    database.collections[key_collection_name].values =
+                      new std::map<key_value_t, value_t>();
+                }
+                value_t v;
+                v.value = key_value_t(value);
+                std::pair<key_value_t, value_t> pair(key_value_t(key), v);
+                database.collections[key_collection_name].values->insert(pair);
                 break;
             }
-            case tracking_operation::CREATE:
-            case tracking_operation::DELETE_COLLECTION:
-                testutil_die(DEBUG_ABORT, "Unexpected operation in the tracking table: %d",
-                  static_cast<tracking_operation>(value_operation_type));
+            case tracking_operation::UPDATE:
+                database.collections[key_collection_name].values->at(key).value =
+                  key_value_t(value);
+                break;
             default:
-                testutil_die(
-                  DEBUG_ABORT, "tracking operation is unknown : %d", value_operation_type);
+                testutil_die(DEBUG_ABORT, "Unexpected operation in the tracking table: %d",
+                  value_operation_type);
                 break;
             }
 
-            error_code = cursor->next(cursor);
-        }
+        } while (cursor->next(cursor) == 0);
 
         if (cursor->reset(cursor) != 0)
             debug_print("Cursor could not be reset !", DEBUG_ERROR);
     }
 
     /*
-     * Compare the tracked operations against what has been saved on disk. collections is the
+     * Compare the tracked operations against what has been saved on disk. database is the
      * representation in memory of the collections after the test according to the tracking table.
      */
     bool
     check_reference(
-      WT_SESSION *session, std::map<std::string, std::map<int, std::string *> *> &collections)
+      WT_SESSION *session, const std::string &collection_name, const database &database)
     {
+        bool is_valid;
+        collection_t collection;
+        key_t key;
+        key_value_t key_str;
 
-        bool collection_exists, is_valid = true;
-        std::map<int, std::string *> *collection;
-        workload_validation wv;
-        std::string *value;
+        /* Check the collection exists on disk. */
+        is_valid = verify_collection_state(session, collection_name, true);
 
-        for (const auto &it_collections : collections) {
-            /* Check the collection is in the correct state. */
-            collection_exists = (it_collections.second != nullptr);
-            is_valid = wv.verify_database_state(session, it_collections.first, collection_exists);
+        if (is_valid) {
+            collection = database.collections.at(collection_name);
+            /* Walk through each key/value pair of the current collection. */
+            for (const auto &keys : collection.keys) {
+                key_str = keys.first;
+                key = keys.second;
+                /* The key/value pair exists. */
+                if (key.exists)
+                    is_valid = (is_key_present(session, collection_name, key_str.c_str()) == true);
+                /* The key has been deleted. */
+                else
+                    is_valid = (is_key_present(session, collection_name, key_str.c_str()) == false);
 
-            if (is_valid && collection_exists) {
-                collection = it_collections.second;
-                for (const auto &it_operations : *collection) {
-                    value = (*collection)[it_operations.first];
-                    /* The key/value pair exists. */
-                    if (value != nullptr)
-                        is_valid = (wv.is_key_present(
-                                      session, it_collections.first, it_operations.first) == true);
-                    /* The key has been deleted. */
-                    else
-                        is_valid = (wv.is_key_present(
-                                      session, it_collections.first, it_operations.first) == false);
+                /* Check the associated value is valid. */
+                if (is_valid && key.exists) {
+                    testutil_assert(collection.values != nullptr);
+                    is_valid = verify_value(session, collection_name, key_str.c_str(),
+                      collection.values->at(key_str).value);
+                }
 
-                    /* Check the associated value is valid. */
-                    if (is_valid && (value != nullptr)) {
-                        is_valid = (wv.verify_value(
-                          session, it_collections.first, it_operations.first, *value));
-                    }
-
-                    if (!is_valid) {
-                        debug_print(
-                          "check_reference failed for key " + std::to_string(it_operations.first),
-                          DEBUG_ERROR);
-                        break;
-                    }
+                if (!is_valid) {
+                    debug_print("check_reference failed for key " + key_str, DEBUG_ERROR);
+                    break;
                 }
             }
-
-            if (!is_valid) {
-                debug_print(
-                  "check_reference failed for collection " + it_collections.first, DEBUG_ERROR);
-                break;
-            }
         }
+
+        if (!is_valid)
+            debug_print("check_reference failed for collection " + collection_name, DEBUG_ERROR);
 
         return (is_valid);
     }
 
     /* Check what is present on disk against what has been tracked. */
     bool
-    check_disk_state(WT_SESSION *session, const std::string &collection_name,
-      std::map<std::string, std::map<int, std::string *> *> &collections)
+    check_disk_state(
+      WT_SESSION *session, const std::string &collection_name, const database &database)
     {
         WT_CURSOR *cursor;
-        int key;
-        const char *value;
-        bool is_valid;
-        std::string *value_str;
-        std::map<int, std::string *> *collection;
+        collection_t collection;
+        bool is_valid = true;
+        /* Key/value pairs on disk. */
+        const char *key_on_disk, *value_on_disk;
+        key_value_t key_str, value_str;
 
         testutil_check(session->open_cursor(session, collection_name.c_str(), NULL, NULL, &cursor));
 
-        /* Check the collection has been tracked and contains data. */
-        is_valid =
-          ((collections.count(collection_name) > 0) && (collections[collection_name] != nullptr));
-
-        if (!is_valid)
-            debug_print(
-              "Collection " + collection_name + " has not been tracked or has been deleted",
-              DEBUG_ERROR);
-        else
-            collection = collections[collection_name];
+        collection = database.collections.at(collection_name);
 
         /* Read the collection on disk. */
         while (is_valid && (cursor->next(cursor) == 0)) {
-            testutil_check(cursor->get_key(cursor, &key));
-            testutil_check(cursor->get_value(cursor, &value));
+            testutil_check(cursor->get_key(cursor, &key_on_disk));
+            testutil_check(cursor->get_value(cursor, &value_on_disk));
 
-            debug_print("Key is " + std::to_string(key), DEBUG_TRACE);
-            debug_print("Value is " + std::string(value), DEBUG_TRACE);
+            key_str = std::string(key_on_disk);
 
-            if (collection->count(key) > 0) {
-                value_str = collection->at(key);
+            debug_print("Key on disk is " + key_str, DEBUG_TRACE);
+            debug_print("Value on disk is " + std::string(value_on_disk), DEBUG_TRACE);
+
+            /* Check the key on disk has been saved in memory too. */
+            if ((collection.keys.count(key_str) > 0) && collection.keys.at(key_str).exists) {
+                /* Memory should be allocated for values. */
+                testutil_assert(collection.values != nullptr);
+                value_str = collection.values->at(key_str).value;
                 /*
                  * Check the key/value pair on disk matches the one in memory from the tracked
                  * operations.
                  */
-                is_valid = (value_str != nullptr) && (*value_str == std::string(value));
+                is_valid = (value_str == key_value_t(value_on_disk));
                 if (!is_valid)
-                    debug_print(" Key/Value pair mismatch.\n Disk key: " + std::to_string(key) +
-                        "\n Disk value: " + std ::string(value) +
-                        "\n Tracking table key: " + std::to_string(key) +
-                        "\n Tracking table value: " + (value_str == nullptr ? "NULL" : *value_str),
+                    debug_print(" Key/Value pair mismatch.\n Disk key: " + key_str +
+                        "\n Disk value: " + std ::string(value_on_disk) +
+                        "\n Tracking table key: " + key_str + "\n Tracking table value exists: " +
+                        std::to_string(collection.keys.at(key_str).exists) +
+                        "\n Tracking table value: " + value_str,
                       DEBUG_ERROR);
             } else {
                 is_valid = false;
                 debug_print(
-                  "The key " + std::to_string(key) + " present on disk has not been tracked",
+                  "The key " + std::string(key_on_disk) + " present on disk has not been tracked",
                   DEBUG_ERROR);
             }
         }
@@ -364,7 +375,7 @@ class workload_validation {
      * needs to be set to true if the collection is expected to be existing, false otherwise.
      */
     bool
-    verify_database_state(
+    verify_collection_state(
       WT_SESSION *session, const std::string &collection_name, bool exists) const
     {
         WT_CURSOR *cursor;
@@ -396,10 +407,8 @@ class workload_validation {
         testutil_check(cursor->search(cursor));
         testutil_check(cursor->get_value(cursor, &value));
 
-        return (value == expected_value);
+        return (key_value_t(value) == expected_value);
     }
-
-    private:
 };
 } // namespace test_harness
 

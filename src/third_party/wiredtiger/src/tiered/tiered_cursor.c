@@ -1142,7 +1142,7 @@ __wt_curtiered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
     cursor = (WT_CURSOR *)curtiered;
     *cursor = iface;
     cursor->session = (WT_SESSION *)session;
-    WT_ERR(__wt_strdup(session, tiered->name, &cursor->uri));
+    WT_ERR(__wt_strdup(session, tiered->iface.name, &cursor->uri));
     cursor->key_format = tiered->key_format;
     cursor->value_format = tiered->value_format;
 

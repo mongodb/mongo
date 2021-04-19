@@ -52,9 +52,11 @@ namespace test_harness {
 /*
  * The base class for a test, the standard usage pattern is to just call run().
  */
-class test {
+class test : public database_operation {
     public:
     test(const std::string &config, const std::string &name)
+        : _runtime_monitor(nullptr), _thread_manager(nullptr), _timestamp_manager(nullptr),
+          _workload_generator(nullptr), _workload_tracking(nullptr)
     {
         _configuration = new configuration(name, config);
         _runtime_monitor = new runtime_monitor(_configuration->get_subconfig(RUNTIME_MONITOR));
@@ -64,7 +66,7 @@ class test {
           OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
           TABLE_SCHEMA_TRACKING);
         _workload_generator =
-          new workload_generator(_configuration->get_subconfig(WORKLOAD_GENERATOR),
+          new workload_generator(_configuration->get_subconfig(WORKLOAD_GENERATOR), this,
             _timestamp_manager, _workload_tracking);
         _thread_manager = new thread_manager();
         /*
@@ -139,7 +141,7 @@ class test {
         if (_workload_tracking->is_enabled()) {
             workload_validation wv;
             is_success = wv.validate(_workload_tracking->get_operation_table_name(),
-              _workload_tracking->get_schema_table_name());
+              _workload_tracking->get_schema_table_name(), _workload_generator->get_database());
         }
 
         debug_print(is_success ? "SUCCESS" : "FAILED", DEBUG_INFO);

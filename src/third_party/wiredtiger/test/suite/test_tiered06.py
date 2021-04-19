@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-StorageSource = wiredtiger.StorageSource  # easy access to constants
+FileSystem = wiredtiger.FileSystem  # easy access to constants
 
 # test_tiered06.py
 #    Test the local storage source.
@@ -64,58 +64,58 @@ class test_tiered06(wttest.WiredTigerTestCase):
         local = self.get_local_storage_source()
 
         os.mkdir("objects")
-        location = local.ss_location_handle(session,
-            'cluster="cluster1",bucket="./objects",auth_token="Secret"')
+        fs = local.ss_customize_file_system(session, "./objects", "cluster1-", "Secret", None)
 
         # The object doesn't exist yet.
-        self.assertFalse(local.ss_exist(session, location, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
-        fh = local.ss_open_object(session, location, 'foobar', StorageSource.open_create)
+        fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_create)
 
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
         fh.fh_write(session, 0, outbytes)
 
         # The object doesn't even exist now.
-        self.assertFalse(local.ss_exist(session, location, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         # The object exists after close
         fh.close(session)
-        self.assertTrue(local.ss_exist(session, location, 'foobar'))
+        self.assertTrue(fs.fs_exist(session, 'foobar'))
 
-        fh = local.ss_open_object(session, location, 'foobar', StorageSource.open_readonly)
+        fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
         inbytes = bytes(1000000)         # An empty buffer with a million zero bytes.
         fh.fh_read(session, 0, inbytes)  # read into the buffer
         self.assertEquals(outbytes[0:1000000], inbytes)
-        self.assertEquals(local.ss_size(session, location, 'foobar'), len(outbytes))
+        self.assertEquals(fs.fs_size(session, 'foobar'), len(outbytes))
         self.assertEquals(fh.fh_size(session), len(outbytes))
         fh.close(session)
 
         # The fh_lock call doesn't do anything in the local store implementation.
-        fh = local.ss_open_object(session, location, 'foobar', StorageSource.open_readonly)
+        fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_readonly)
         fh.fh_lock(session, True)
         fh.fh_lock(session, False)
         fh.close(session)
 
-        self.assertEquals(local.ss_location_list(session, location, '', 0), ['foobar'])
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         # Make sure any new object is not in the list until it is closed.
-        fh = local.ss_open_object(session, location, 'zzz', StorageSource.open_create)
-        self.assertEquals(local.ss_location_list(session, location, '', 0), ['foobar'])
+        fh = fs.fs_open_file(session, 'zzz', FileSystem.open_file_type_data, FileSystem.open_create)
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
         # Sync merely syncs to the local disk.
         fh.fh_sync(session)
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
         fh.close(session)    # zero length
-        self.assertEquals(sorted(local.ss_location_list(session, location, '', 0)),
+        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')),
           ['foobar', 'zzz'])
 
         # See that we can remove objects.
-        local.ss_remove(session, location, 'zzz', 0)
-        self.assertEquals(local.ss_location_list(session, location, '', 0), ['foobar'])
+        fs.fs_remove(session, 'zzz', 0)
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         # Flushing doesn't do anything that's visible.
-        local.ss_flush(session, location, None, '')
-        self.assertEquals(local.ss_location_list(session, location, '', 0), ['foobar'])
+        local.ss_flush(session, fs, None, '')
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
-        location.close(session)
+        fs.terminate(session)
 
     def test_local_write_read(self):
         # Write and read to a file non-sequentially.
@@ -124,14 +124,13 @@ class test_tiered06(wttest.WiredTigerTestCase):
         local = self.get_local_storage_source()
 
         os.mkdir("objects")
-        location = local.ss_location_handle(session,
-            'cluster="cluster1",bucket="./objects",auth_token="Secret"')
+        fs = local.ss_customize_file_system(session, "./objects", "cluster1-", "Secret", None)
 
         # We call these 4K chunks of data "blocks" for this test, but that doesn't
         # necessarily relate to WT block sizing.
         nblocks = 1000
         block_size = 4096
-        fh = local.ss_open_object(session, location, 'abc', StorageSource.open_create)
+        fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_create)
 
         # blocks filled with 'a', etc.
         a_block = ('a' * block_size).encode()
@@ -153,7 +152,7 @@ class test_tiered06(wttest.WiredTigerTestCase):
         fh.close(session)
 
         in_block = bytes(block_size)
-        fh = local.ss_open_object(session, location, 'abc', StorageSource.open_readonly)
+        fh = fs.fs_open_file(session, 'abc', FileSystem.open_file_type_data, FileSystem.open_readonly)
 
         # Do some spot checks, reading non-sequentially
         fh.fh_read(session, 500 * block_size, in_block)  # divisible by 2, not 3
@@ -176,21 +175,21 @@ class test_tiered06(wttest.WiredTigerTestCase):
                 self.assertEquals(in_block, a_block)
         fh.close(session)
 
-    def create_in_loc(self, loc, objname):
+    def create_with_fs(self, fs, fname):
         session = self.session
-        fh = self.local.ss_open_object(session, loc, objname, StorageSource.open_create)
+        fh = fs.fs_open_file(session, fname, FileSystem.open_file_type_data, FileSystem.open_create)
         fh.fh_write(session, 0, 'some stuff'.encode())
         fh.close(session)
 
-    def check(self, loc, prefix, limit, expect):
+    def check(self, fs, prefix, expect):
         # We don't require any sorted output for location lists,
         # so we'll sort before comparing.'
-        got = sorted(self.local.ss_location_list(self.session, loc, prefix, limit))
+        got = sorted(fs.fs_directory_list(self.session, '', prefix))
         expect = sorted(expect)
         self.assertEquals(got, expect)
 
     def test_local_locations(self):
-        # Test using various buckets, clusters
+        # Test using various buckets, hosts
 
         session = self.session
         local = self.conn.get_storage_source('local_store')
@@ -200,64 +199,60 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         # Any of the activity that happens in the various locations
         # should be independent.
-        location1 = local.ss_location_handle(session,
-            'cluster="cluster1",bucket="./objects1",auth_token="k1"')
-        location2 = local.ss_location_handle(session,
-            'cluster="cluster1",bucket="./objects2",auth_token="k2"')
-        location3 = local.ss_location_handle(session,
-            'cluster="cluster2",bucket="./objects1",auth_token="k3"')
-        location4 = local.ss_location_handle(session,
-            'cluster="cluster2",bucket="./objects2",auth_token="k4"')
+        fs1 = local.ss_customize_file_system(session, "./objects1", "cluster1-", "k1", None)
+        fs2 = local.ss_customize_file_system(session, "./objects2", "cluster1-", "k2", None)
+        fs3 = local.ss_customize_file_system(session, "./objects1", "cluster2-", "k3", None)
+        fs4 = local.ss_customize_file_system(session, "./objects2", "cluster2-", "k4", None)
 
         # Create files in the locations with some name overlap
-        self.create_in_loc(location1, 'alpaca')
-        self.create_in_loc(location2, 'bear')
-        self.create_in_loc(location3, 'crab')
-        self.create_in_loc(location4, 'deer')
+        self.create_with_fs(fs1, 'alpaca')
+        self.create_with_fs(fs2, 'bear')
+        self.create_with_fs(fs3, 'crab')
+        self.create_with_fs(fs4, 'deer')
         for a in ['beagle', 'bird', 'bison', 'bat']:
-            self.create_in_loc(location1, a)
+            self.create_with_fs(fs1, a)
         for a in ['bird', 'bison', 'bat', 'badger']:
-            self.create_in_loc(location2, a)
+            self.create_with_fs(fs2, a)
         for a in ['bison', 'bat', 'badger', 'baboon']:
-            self.create_in_loc(location3, a)
+            self.create_with_fs(fs3, a)
         for a in ['bat', 'badger', 'baboon', 'beagle']:
-            self.create_in_loc(location4, a)
+            self.create_with_fs(fs4, a)
 
         # Make sure we see the expected file names
-        self.check(location1, '', 0, ['alpaca', 'beagle', 'bird', 'bison', 'bat'])
-        self.check(location1, 'a', 0, ['alpaca'])
-        self.check(location1, 'b', 0, ['beagle', 'bird', 'bison', 'bat'])
-        self.check(location1, 'c', 0, [])
-        self.check(location1, 'd', 0, [])
+        self.check(fs1, '', ['alpaca', 'beagle', 'bird', 'bison', 'bat'])
+        self.check(fs1, 'a', ['alpaca'])
+        self.check(fs1, 'b', ['beagle', 'bird', 'bison', 'bat'])
+        self.check(fs1, 'c', [])
+        self.check(fs1, 'd', [])
 
-        self.check(location2, '', 0, ['bear', 'bird', 'bison', 'bat', 'badger'])
-        self.check(location2, 'a', 0, [])
-        self.check(location2, 'b', 0, ['bear', 'bird', 'bison', 'bat', 'badger'])
-        self.check(location2, 'c', 0, [])
-        self.check(location2, 'd', 0, [])
+        self.check(fs2, '', ['bear', 'bird', 'bison', 'bat', 'badger'])
+        self.check(fs2, 'a', [])
+        self.check(fs2, 'b', ['bear', 'bird', 'bison', 'bat', 'badger'])
+        self.check(fs2, 'c', [])
+        self.check(fs2, 'd', [])
 
-        self.check(location3, '', 0, ['crab', 'bison', 'bat', 'badger', 'baboon'])
-        self.check(location3, 'a', 0, [])
-        self.check(location3, 'b', 0, ['bison', 'bat', 'badger', 'baboon'])
-        self.check(location3, 'c', 0, ['crab'])
-        self.check(location3, 'd', 0, [])
+        self.check(fs3, '', ['crab', 'bison', 'bat', 'badger', 'baboon'])
+        self.check(fs3, 'a', [])
+        self.check(fs3, 'b', ['bison', 'bat', 'badger', 'baboon'])
+        self.check(fs3, 'c', ['crab'])
+        self.check(fs3, 'd', [])
 
-        self.check(location4, '', 0, ['deer', 'bat', 'badger', 'baboon', 'beagle'])
-        self.check(location4, 'a', 0, [])
-        self.check(location4, 'b', 0, ['bat', 'badger', 'baboon', 'beagle'])
-        self.check(location4, 'c', 0, [])
-        self.check(location4, 'd', 0, ['deer'])
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle'])
+        self.check(fs4, 'a', [])
+        self.check(fs4, 'b', ['bat', 'badger', 'baboon', 'beagle'])
+        self.check(fs4, 'c', [])
+        self.check(fs4, 'd', ['deer'])
 
         # Flushing doesn't do anything that's visible, but calling it still exercises code paths.
         # At some point, we'll have statistics we can check.
         #
         # For now, we can turn on the verbose config option for the local_store extension to verify.
-        local.ss_flush(session, location4, None, '')
-        local.ss_flush(session, location3, 'badger', '')
-        local.ss_flush(session, location3, 'c', '')     # make sure we don't flush prefixes
-        local.ss_flush(session, location3, 'b', '')     # or suffixes
-        local.ss_flush(session, location3, 'crab', '')
-        local.ss_flush(session, location3, 'crab', '')  # should do nothing
+        local.ss_flush(session, fs4, None, '')
+        local.ss_flush(session, fs3, 'badger', '')
+        local.ss_flush(session, fs3, 'c', '')     # make sure we don't flush prefixes
+        local.ss_flush(session, fs3, 'b', '')     # or suffixes
+        local.ss_flush(session, fs3, 'crab', '')
+        local.ss_flush(session, fs3, 'crab', '')  # should do nothing
         local.ss_flush(session, None, None, '')         # flush everything else
         local.ss_flush(session, None, None, '')         # should do nothing
 

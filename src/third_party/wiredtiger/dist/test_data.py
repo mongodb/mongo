@@ -48,12 +48,8 @@ class Config:
 record_config = [
     Config('key_size', 0, r'''
         The size of the keys created''', min=0, max=10000),
-    Config('key_format', 'i', r'''
-        The format of the keys in the database'''),
     Config('value_size', 0, r'''
         The size of the values created''', min=0, max=1000000000),
-    Config('value_format', 'S', r'''
-        The format of the values stored in the database.''')
 ]
 
 #
@@ -175,5 +171,6 @@ test_config = [
 ]
 
 methods = {
+    'example_test' : Method(test_config),
     'poc_test' : Method(test_config),
 }

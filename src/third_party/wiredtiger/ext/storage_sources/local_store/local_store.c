@@ -91,6 +91,15 @@ typedef struct {
 
 } LOCAL_STORAGE;
 
+typedef struct {
+    WT_FILE_SYSTEM file_system; /* Must come first */
+    LOCAL_STORAGE *local_storage;
+
+    char *auth_token; /* Identifier for key management system */
+    char *bucket;     /* Actually a directory path for local implementation */
+    char *fs_prefix;  /* File system prefix, allowing for a "directory" within a bucket */
+} LOCAL_FILE_SYSTEM;
+
 /*
  * Indicates a object that has not yet been flushed.
  */
@@ -119,51 +128,43 @@ typedef struct local_file_handle {
     TAILQ_ENTRY(local_file_handle) q; /* Queue of handles */
 } LOCAL_FILE_HANDLE;
 
-typedef struct local_location {
-    WT_LOCATION_HANDLE iface; /* Must come first */
-
-    char *cluster_prefix; /* Cluster prefix */
-    char *auth_token;     /* Identifier for key management system */
-    char *bucket;         /* Actually a directory path for local implementation */
-} LOCAL_LOCATION;
-
 /*
  * Forward function declarations for internal functions
  */
-static int local_config_dup(
-  LOCAL_STORAGE *, WT_SESSION *, WT_CONFIG_ITEM *, const char *, const char *, char **);
 static int local_configure(LOCAL_STORAGE *, WT_CONFIG_ARG *);
 static int local_configure_int(LOCAL_STORAGE *, WT_CONFIG_ARG *, const char *, uint32_t *);
 static int local_delay(LOCAL_STORAGE *);
 static int local_err(LOCAL_STORAGE *, WT_SESSION *, int, const char *, ...);
 static void local_flush_free(LOCAL_FLUSH_ITEM *);
-static int local_location_decode(LOCAL_STORAGE *, WT_LOCATION_HANDLE *, char **, char **, char **);
-static int local_location_path(
-  LOCAL_STORAGE *, WT_LOCATION_HANDLE *, const char *, const char *, char **);
+static int local_location_path(WT_FILE_SYSTEM *, const char *, const char *, char **);
 
 /*
  * Forward function declarations for storage source API implementation
  */
-static int local_exist(
-  WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, bool *);
+static int local_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
+static int local_customize_file_system(WT_STORAGE_SOURCE *, WT_SESSION *, const char *,
+  const char *, const char *, const char *, WT_FILE_SYSTEM **);
 static int local_flush(
-  WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, const char *);
+  WT_STORAGE_SOURCE *, WT_SESSION *, WT_FILE_SYSTEM *, const char *, const char *);
 static int local_flush_one(LOCAL_STORAGE *, WT_SESSION *, LOCAL_FLUSH_ITEM *);
-static int local_location_handle(
-  WT_STORAGE_SOURCE *, WT_SESSION *, const char *, WT_LOCATION_HANDLE **);
-static int local_location_handle_close(WT_LOCATION_HANDLE *, WT_SESSION *);
-static int local_location_list(WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *,
-  const char *, uint32_t, char ***, uint32_t *);
-static int local_location_list_free(WT_STORAGE_SOURCE *, WT_SESSION *, char **, uint32_t);
-static int local_location_list_internal(WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *,
-  const char *, const char *, uint32_t, char ***, uint32_t *);
-static int local_open(WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *,
-  uint32_t, WT_FILE_HANDLE **);
-static int local_remove(
-  WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, uint32_t);
-static int local_size(
-  WT_STORAGE_SOURCE *, WT_SESSION *, WT_LOCATION_HANDLE *, const char *, wt_off_t *);
 static int local_terminate(WT_STORAGE_SOURCE *, WT_SESSION *);
+
+/*
+ * Forward function declarations for file system API implementation
+ */
+static int local_directory_list(
+  WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
+static int local_directory_list_internal(
+  WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t, char ***, uint32_t *);
+static int local_directory_list_single(
+  WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
+static int local_directory_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static int local_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
+static int local_open(WT_FILE_SYSTEM *, WT_SESSION *, const char *, WT_FS_OPEN_FILE_TYPE file_type,
+  uint32_t, WT_FILE_HANDLE **);
+static int local_remove(WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t);
+static int local_rename(WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t);
+static int local_size(WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
 
 /*
  * Forward function declarations for file handle API implementation
@@ -180,6 +181,7 @@ static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, co
  * Report an error for a file operation. Note that local_err returns its third argument, and this
  * macro will too.
  */
+#define FS2LOCAL(fs) (((LOCAL_FILE_SYSTEM *)(fs))->local_storage)
 #define local_file_err(fh, session, ret, str) \
     local_err((fh)->local, session, ret, "\"%s\": %s", fh->iface.name, str)
 
@@ -205,40 +207,6 @@ static int local_file_write(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, co
  */
 static const char *MARKER_NEED_FLUSH = "FLUSH_";
 static const char *MARKER_TEMPORARY = "TEMP_";
-
-/*
- * local_config_dup --
- *     Make a copy of a configuration string as an allocated C string.
- */
-static int
-local_config_dup(LOCAL_STORAGE *local, WT_SESSION *session, WT_CONFIG_ITEM *v, const char *suffix,
-  const char *disallowed, char **result)
-{
-    size_t len;
-    int ret;
-    char *p;
-
-    if (suffix == NULL)
-        suffix = "";
-    len = v->len + strlen(suffix) + 1;
-    if ((p = malloc(len)) == NULL)
-        return (local_err(local, session, ENOMEM, "configuration parsing"));
-    (void)snprintf(p, len, "%.*s", (int)v->len, v->str);
-
-    /*
-     * Check for illegal characters before adding the suffix, as the suffix may contain such
-     * characters.
-     */
-    if (disallowed != NULL && strstr(p, disallowed) != NULL) {
-        ret = local_err(local, session, EINVAL,
-          "characters \"%s\" disallowed in configuration string \"%s\"", disallowed, p);
-        free(p);
-        return (ret);
-    }
-    (void)strcat(p, suffix);
-    *result = p;
-    return (0);
-}
 
 /*
  * local_configure
@@ -353,62 +321,85 @@ local_flush_free(LOCAL_FLUSH_ITEM *flush)
 }
 
 /*
- * local_location_decode --
- *     Break down a location into component parts.
- */
-static int
-local_location_decode(LOCAL_STORAGE *local, WT_LOCATION_HANDLE *location_handle, char **bucket_name,
-  char **cluster_prefix, char **auth_token)
-{
-    LOCAL_LOCATION *location;
-    char *p;
-
-    location = (LOCAL_LOCATION *)location_handle;
-
-    if (bucket_name != NULL) {
-        if ((p = strdup(location->bucket)) == NULL)
-            return (local_err(local, NULL, ENOMEM, "local_location_decode"));
-        *bucket_name = p;
-    }
-    if (cluster_prefix != NULL) {
-        if ((p = strdup(location->cluster_prefix)) == NULL)
-            return (local_err(local, NULL, ENOMEM, "local_location_decode"));
-        *cluster_prefix = p;
-    }
-    if (auth_token != NULL) {
-        if ((p = strdup(location->auth_token)) == NULL)
-            return (local_err(local, NULL, ENOMEM, "local_location_decode"));
-        *auth_token = p;
-    }
-
-    return (0);
-}
-
-/*
  * local_location_path --
- *     Construct a pathname from the location and local name.
+ *     Construct a pathname from the file system and local name.
  */
 int
-local_location_path(LOCAL_STORAGE *local, WT_LOCATION_HANDLE *location_handle, const char *name,
-  const char *marker, char **pathp)
+local_location_path(WT_FILE_SYSTEM *file_system, const char *name, const char *marker, char **pathp)
 {
-    LOCAL_LOCATION *location;
+    LOCAL_FILE_SYSTEM *local_fs;
     size_t len;
     int ret;
     char *p;
 
     ret = 0;
-    location = (LOCAL_LOCATION *)location_handle;
+    local_fs = (LOCAL_FILE_SYSTEM *)file_system;
 
     /* If this is a marker file, it will be hidden from all namespaces. */
     if (marker == NULL)
         marker = "";
-    len = strlen(location->bucket) + strlen(marker) + strlen(location->cluster_prefix) +
-      strlen(name) + 2;
+    len =
+      strlen(local_fs->bucket) + strlen(marker) + strlen(local_fs->fs_prefix) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
-        return (local_err(local, NULL, ENOMEM, "local_location_path"));
-    snprintf(p, len, "%s/%s%s%s", location->bucket, marker, location->cluster_prefix, name);
+        return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_location_path"));
+    snprintf(p, len, "%s/%s%s%s", local_fs->bucket, marker, local_fs->fs_prefix, name);
     *pathp = p;
+    return (ret);
+}
+
+/*
+ * local_customize_file_system --
+ *     Return a customized file system to access the local storage source objects.
+ */
+static int
+local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
+  const char *bucket_name, const char *prefix, const char *auth_token, const char *config,
+  WT_FILE_SYSTEM **file_systemp)
+{
+    LOCAL_STORAGE *local;
+    LOCAL_FILE_SYSTEM *fs;
+    int ret;
+
+    local = (LOCAL_STORAGE *)storage_source;
+
+    fs = NULL;
+    ret = 0;
+    if (config != NULL)
+        return local_err(local, session, EINVAL, "customize file system: config must be NULL");
+
+    if ((fs = calloc(1, sizeof(LOCAL_FILE_SYSTEM))) == NULL) {
+        ret = local_err(local, session, ENOMEM, "local_file_system");
+        goto err;
+    }
+    fs->local_storage = local;
+
+    if ((fs->auth_token = strdup(auth_token)) == NULL) {
+        ret = local_err(local, session, ENOMEM, "local_file_system.auth_token");
+        goto err;
+    }
+    if ((fs->bucket = strdup(bucket_name)) == NULL) {
+        ret = local_err(local, session, ENOMEM, "local_file_system.bucket_name");
+        goto err;
+    }
+    if ((fs->fs_prefix = strdup(prefix)) == NULL) {
+        ret = local_err(local, session, ENOMEM, "local_file_system.prefix");
+        goto err;
+    }
+    fs->file_system.fs_directory_list = local_directory_list;
+    fs->file_system.fs_directory_list_single = local_directory_list_single;
+    fs->file_system.fs_directory_list_free = local_directory_list_free;
+    fs->file_system.fs_exist = local_exist;
+    fs->file_system.fs_open_file = local_open;
+    fs->file_system.fs_remove = local_remove;
+    fs->file_system.fs_rename = local_rename;
+    fs->file_system.fs_size = local_size;
+    fs->file_system.terminate = local_fs_terminate;
+
+err:
+    if (ret != 0)
+        free(fs);
+    else
+        *file_systemp = &fs->file_system;
     return (ret);
 }
 
@@ -417,19 +408,18 @@ local_location_path(LOCAL_STORAGE *local, WT_LOCATION_HANDLE *location_handle, c
  *     Return if the file exists.
  */
 static int
-local_exist(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *name, bool *existp)
+local_exist(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, bool *existp)
 {
     struct stat sb;
     LOCAL_STORAGE *local;
     int ret;
     char *path;
 
-    local = (LOCAL_STORAGE *)storage_source;
+    local = FS2LOCAL(file_system);
     path = NULL;
 
     local->op_count++;
-    if ((ret = local_location_path(local, location_handle, name, NULL, &path)) != 0)
+    if ((ret = local_location_path(file_system, name, NULL, &path)) != 0)
         goto err;
 
     ret = stat(path, &sb);
@@ -451,8 +441,8 @@ err:
  *     Return when the files have been flushed.
  */
 static int
-local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *name, const char *config)
+local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM *file_system,
+  const char *name, const char *config)
 {
     LOCAL_STORAGE *local;
     LOCAL_FLUSH_ITEM *flush, *safe_flush;
@@ -469,13 +459,12 @@ local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     local = (LOCAL_STORAGE *)storage_source;
     match = NULL;
 
-    if (location_handle == NULL && name != NULL)
-        return local_err(local, session, EINVAL, "flush: cannot specify name without location");
+    if (file_system == NULL && name != NULL)
+        return local_err(local, session, EINVAL, "flush: cannot specify name without file system");
 
     local->op_count++;
-    if (location_handle != NULL) {
-        if ((ret = local_location_path(
-               local, location_handle, name == NULL ? "" : name, NULL, &match)) != 0)
+    if (file_system != NULL) {
+        if ((ret = local_location_path(file_system, name == NULL ? "" : name, NULL, &match)) != 0)
             goto err;
     }
     VERBOSE(local, "Flush: match=%s\n", SHOW_STRING(match));
@@ -496,7 +485,7 @@ local_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
             /*
              * We must match against the bucket and the name if given.
              * Our match string is of the form:
-             *   <bucket_name>/<cluster_prefix><name>
+             *   <bucket_name>/<fs_prefix><name>
              *
              * If name is given, we must match the entire path.
              * If name is not given, we must match up to the beginning
@@ -564,117 +553,29 @@ local_flush_one(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FLUSH_ITEM *flu
 }
 
 /*
- * local_location_handle --
- *     Return a location handle from a location string.
- */
-static int
-local_location_handle(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  const char *location_info, WT_LOCATION_HANDLE **location_handlep)
-{
-    LOCAL_LOCATION *location;
-    LOCAL_STORAGE *local;
-    WT_CONFIG_ITEM value;
-    WT_CONFIG_PARSER *parser;
-    WT_EXTENSION_API *wt_api;
-    int ret, t_ret;
-
-    ret = 0;
-    location = NULL;
-    local = (LOCAL_STORAGE *)storage_source;
-    wt_api = local->wt_api;
-    parser = NULL;
-
-    local->op_count++;
-    if ((ret = wt_api->config_parser_open(
-           wt_api, session, location_info, strlen(location_info), &parser)) != 0)
-        return (ret);
-
-    if ((location = calloc(1, sizeof(*location))) == NULL) {
-        ret = ENOMEM;
-        goto err;
-    }
-
-    if ((ret = parser->get(parser, "bucket", &value)) != 0) {
-        if (ret == WT_NOTFOUND)
-            ret = local_err(local, session, EINVAL, "ss_location_handle: missing bucket parameter");
-        goto err;
-    }
-    if (value.len == 0) {
-        ret =
-          local_err(local, session, EINVAL, "ss_location_handle: bucket_name must be non-empty");
-        goto err;
-    }
-    if ((ret = local_config_dup(local, session, &value, NULL, NULL, &location->bucket)) != 0)
-        goto err;
-
-    if ((ret = parser->get(parser, "cluster", &value)) != 0) {
-        if (ret == WT_NOTFOUND)
-            ret =
-              local_err(local, session, EINVAL, "ss_location_handle: missing cluster parameter");
-        goto err;
-    }
-    if ((ret = local_config_dup(local, session, &value, "_", "_/", &location->cluster_prefix)) != 0)
-        goto err;
-
-    if ((ret = parser->get(parser, "auth_token", &value)) != 0) {
-        if (ret == WT_NOTFOUND)
-            ret =
-              local_err(local, session, EINVAL, "ss_location_handle: missing auth_token parameter");
-        goto err;
-    }
-    if ((ret = local_config_dup(local, session, &value, NULL, NULL, &location->auth_token)) != 0)
-        goto err;
-
-    VERBOSE(local, "Location: (bucket=%s,cluster=%s,auth_token=%s)\n",
-      SHOW_STRING(location->bucket), SHOW_STRING(location->cluster_prefix),
-      SHOW_STRING(location->auth_token));
-
-    location->iface.close = local_location_handle_close;
-    *location_handlep = &location->iface;
-
-    if (0) {
-err:
-        (void)local_location_handle_close(&location->iface, session);
-    }
-
-    if (parser != NULL)
-        if ((t_ret = parser->close(parser)) != 0 && ret == 0)
-            ret = t_ret;
-
-    return (ret);
-}
-
-/*
- * local_location_handle_close --
- *     Free a location handle created by ss_location_handle.
- */
-static int
-local_location_handle_close(WT_LOCATION_HANDLE *location_handle, WT_SESSION *session)
-{
-    LOCAL_LOCATION *location;
-
-    (void)session; /* Unused */
-
-    location = (LOCAL_LOCATION *)location_handle;
-    free(location->auth_token);
-    free(location->bucket);
-    free(location->cluster_prefix);
-    free(location);
-    return (0);
-}
-
-/*
- * local_location_list --
+ * local_directory_list --
  *     Return a list of object names for the given location.
  */
 static int
-local_location_list(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *prefix, uint32_t limit, char ***dirlistp,
-  uint32_t *countp)
+local_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
+  const char *prefix, char ***dirlistp, uint32_t *countp)
 {
-    ((LOCAL_STORAGE *)storage_source)->op_count++;
-    return (local_location_list_internal(
-      storage_source, session, location_handle, NULL, prefix, limit, dirlistp, countp));
+    FS2LOCAL(file_system)->op_count++;
+    return (
+      local_directory_list_internal(file_system, session, directory, prefix, 0, dirlistp, countp));
+}
+
+/*
+ * local_directory_list_single --
+ *     Return a single file name for the given ....
+ */
+static int
+local_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
+  const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+    FS2LOCAL(file_system)->op_count++;
+    return (
+      local_directory_list_internal(file_system, session, directory, prefix, 1, dirlistp, countp));
 }
 
 /*
@@ -682,12 +583,12 @@ local_location_list(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
  *     Free memory allocated by local_location_list.
  */
 static int
-local_location_list_free(
-  WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, char **dirlist, uint32_t count)
+local_directory_list_free(
+  WT_FILE_SYSTEM *file_system, WT_SESSION *session, char **dirlist, uint32_t count)
 {
     (void)session;
 
-    ((LOCAL_STORAGE *)storage_source)->op_count++;
+    FS2LOCAL(file_system)->op_count++;
     if (dirlist != NULL) {
         while (count > 0)
             free(dirlist[--count]);
@@ -701,37 +602,36 @@ local_location_list_free(
  *     Return a list of object names for the given location, matching the given marker if needed.
  */
 static int
-local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *marker, const char *prefix, uint32_t limit,
-  char ***dirlistp, uint32_t *countp)
+local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
+  const char *directory, const char *prefix, uint32_t limit, char ***dirlistp, uint32_t *countp)
 {
     struct dirent *dp;
     DIR *dirp;
-    LOCAL_LOCATION *location;
+    LOCAL_FILE_SYSTEM *local_fs;
     LOCAL_STORAGE *local;
-    size_t alloc_sz, cluster_len, marker_len, prefix_len;
+    size_t alloc_sz, fs_prefix_len, dir_len, prefix_len;
     uint32_t allocated, count;
     int ret, t_ret;
     char **entries, **new_entries;
     const char *basename;
 
-    local = (LOCAL_STORAGE *)storage_source;
-    location = (LOCAL_LOCATION *)location_handle;
+    local_fs = (LOCAL_FILE_SYSTEM *)file_system;
+    local = local_fs->local_storage;
     entries = NULL;
     allocated = count = 0;
-    cluster_len = strlen(location->cluster_prefix);
-    marker_len = (marker == NULL ? 0 : strlen(marker));
+    fs_prefix_len = strlen(local_fs->fs_prefix);
+    dir_len = (directory == NULL ? 0 : strlen(directory));
     prefix_len = (prefix == NULL ? 0 : strlen(prefix));
     ret = 0;
 
     *dirlistp = NULL;
     *countp = 0;
 
-    if ((dirp = opendir(location->bucket)) == NULL) {
+    if ((dirp = opendir(local_fs->bucket)) == NULL) {
         ret = errno;
         if (ret == 0)
             ret = EINVAL;
-        return (local_err(local, session, ret, "%s: ss_location_list: opendir", location->bucket));
+        return (local_err(local, session, ret, "%s: ss_directory_list: opendir", local_fs->bucket));
     }
 
     for (count = 0; (dp = readdir(dirp)) != NULL && (limit == 0 || count < limit);) {
@@ -739,23 +639,22 @@ local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sess
         basename = dp->d_name;
         if (strcmp(basename, ".") == 0 || strcmp(basename, "..") == 0)
             continue;
-        if (marker_len == 0) {
-            /* Skip over any marker files. */
-            if (strncmp(basename, MARKER_TEMPORARY, strlen(MARKER_TEMPORARY)) == 0 ||
-              strncmp(basename, MARKER_NEED_FLUSH, strlen(MARKER_NEED_FLUSH)) == 0)
-                continue;
-        } else {
-            /* Match only the indicated marker files. */
-            if (strncmp(basename, marker, marker_len) != 0)
-                continue;
-            basename += marker_len;
-        }
 
-        /* Skip files not associated with our cluster. */
-        if (strncmp(basename, location->cluster_prefix, cluster_len) != 0)
+        /* Skip over any marker files. */
+        if (strncmp(basename, MARKER_TEMPORARY, strlen(MARKER_TEMPORARY)) == 0 ||
+          strncmp(basename, MARKER_NEED_FLUSH, strlen(MARKER_NEED_FLUSH)) == 0)
             continue;
 
-        basename += cluster_len;
+        /* Match only the indicated directory files. */
+        if (directory != NULL && strncmp(basename, directory, dir_len) != 0)
+            continue;
+        basename += dir_len;
+
+        /* Skip files not associated with our file system prefix. */
+        if (strncmp(basename, local_fs->fs_prefix, fs_prefix_len) != 0)
+            continue;
+
+        basename += fs_prefix_len;
         /* The list of files is optionally filtered by a prefix. */
         if (prefix != NULL && strncmp(basename, prefix, prefix_len) != 0)
             continue;
@@ -782,7 +681,7 @@ local_location_list_internal(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sess
 err:
     if (closedir(dirp) != 0) {
         t_ret =
-          local_err(local, session, errno, "%s: ss_location_list: closedir", location->bucket);
+          local_err(local, session, errno, "%s: ss_directory_list: closedir", local_fs->bucket);
         if (ret == 0)
             ret = t_ret;
     }
@@ -798,15 +697,36 @@ err:
 }
 
 /*
+ * local_fs_terminate --
+ *     Discard any resources on termination of the file system
+ */
+static int
+local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
+{
+    LOCAL_FILE_SYSTEM *local_fs;
+
+    (void)session; /* unused */
+
+    local_fs = (LOCAL_FILE_SYSTEM *)file_system;
+    FS2LOCAL(file_system)->op_count++;
+    free(local_fs->auth_token);
+    free(local_fs->bucket);
+    free(local_fs->fs_prefix);
+    free(file_system);
+
+    return (0);
+}
+
+/*
  * local_open --
  *     fopen for our local storage source
  */
 static int
-local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *name, uint32_t flags,
-  WT_FILE_HANDLE **file_handlep)
+local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
+  WT_FS_OPEN_FILE_TYPE file_type, uint32_t flags, WT_FILE_HANDLE **file_handlep)
 {
     LOCAL_FILE_HANDLE *local_fh;
+    LOCAL_FILE_SYSTEM *local_fs;
     LOCAL_FLUSH_ITEM *flush;
     LOCAL_STORAGE *local;
     WT_FILE_HANDLE *file_handle;
@@ -818,26 +738,29 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     fd = oflags = ret = 0;
     *file_handlep = NULL;
     local_fh = NULL;
-    local = (LOCAL_STORAGE *)storage_source;
+    local_fs = (LOCAL_FILE_SYSTEM *)file_system;
+    local = local_fs->local_storage;
+
+    if (file_type != WT_FS_OPEN_FILE_TYPE_DATA)
+        return (
+          local_err(local, session, EINVAL, "%s: open: only data file types supported", name));
 
     local->op_count++;
-    if (flags == WT_SS_OPEN_CREATE)
+    if (flags == WT_FS_OPEN_CREATE)
         oflags = O_WRONLY | O_CREAT;
-    else if (flags == WT_SS_OPEN_READONLY)
+    else if (flags == WT_FS_OPEN_READONLY)
         oflags = O_RDONLY;
-    else {
-        ret = local_err(local, session, EINVAL, "open: invalid flags: 0x%x", flags);
-        goto err;
-    }
+    else
+        return (local_err(local, session, EINVAL, "open: invalid flags: 0x%x", flags));
 
     /* Create a new handle. */
     if ((local_fh = calloc(1, sizeof(LOCAL_FILE_HANDLE))) == NULL) {
         ret = ENOMEM;
         goto err;
     }
-    if ((ret = local_location_path(local, location_handle, name, NULL, &local_fh->path)) != 0)
+    if ((ret = local_location_path(file_system, name, NULL, &local_fh->path)) != 0)
         goto err;
-    if (flags == WT_SS_OPEN_CREATE) {
+    if (flags == WT_FS_OPEN_CREATE) {
         if ((flush = calloc(1, sizeof(LOCAL_FLUSH_ITEM))) == NULL) {
             ret = ENOMEM;
             goto err;
@@ -848,7 +771,7 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
          * Create a marker file that indicates that the file will need to be flushed.
          */
         if ((ret = local_location_path(
-               local, location_handle, name, MARKER_NEED_FLUSH, &flush->marker_path)) != 0)
+               file_system, name, MARKER_NEED_FLUSH, &flush->marker_path)) != 0)
             goto err;
         if ((fd = open(flush->marker_path, O_WRONLY | O_CREAT, 0666)) < 0) {
             ret = local_err(local, session, errno, "ss_open_object: open: %s", flush->marker_path);
@@ -858,16 +781,21 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
             ret = local_err(local, session, errno, "ss_open_object: close: %s", flush->marker_path);
             goto err;
         }
-        if ((ret = local_location_decode(
-               local, location_handle, &flush->bucket, NULL, &flush->auth_token)) != 0)
+        if ((flush->auth_token = strdup(local_fs->auth_token)) == NULL) {
+            ret = local_err(local, session, ENOMEM, "open.auth_token");
             goto err;
+        }
+        if ((flush->bucket = strdup(local_fs->bucket)) == NULL) {
+            ret = local_err(local, session, ENOMEM, "open.bucket");
+            goto err;
+        }
 
         /*
          * For the file handle, we will be writing into a file marked as temporary. When the handle
          * is closed, we'll move it to its final name.
          */
         if ((ret = local_location_path(
-               local, location_handle, name, MARKER_TEMPORARY, &local_fh->temp_path)) != 0)
+               file_system, name, MARKER_TEMPORARY, &local_fh->temp_path)) != 0)
             goto err;
 
         open_name = local_fh->temp_path;
@@ -924,8 +852,8 @@ local_open(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
     VERBOSE(local, "File opened: %s final path=%s, temp path=%s\n", SHOW_STRING(name),
       SHOW_STRING(local_fh->path), SHOW_STRING(local_fh->temp_path));
 
-    if (0) {
 err:
+    if (ret != 0) {
         if (local_fh != NULL)
             local_file_close_internal(local, session, local_fh, true);
     }
@@ -933,12 +861,27 @@ err:
 }
 
 /*
+ * local_rename --
+ *     POSIX rename. Currently not implemented, as cloud implementations may not support it.
+ */
+static int
+local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from, const char *to,
+  uint32_t flags)
+{
+
+    (void)from;  /* Unused */
+    (void)to;    /* Unused */
+    (void)flags; /* Unused */
+
+    return (local_err(FS2LOCAL(file_system), session, ENOTSUP, "local remove not supported"));
+}
+
+/*
  * local_remove --
  *     POSIX remove.
  */
 static int
-local_remove(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *name, uint32_t flags)
+local_remove(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, uint32_t flags)
 {
     LOCAL_STORAGE *local;
     int ret;
@@ -946,11 +889,11 @@ local_remove(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
 
     (void)flags; /* Unused */
 
-    local = (LOCAL_STORAGE *)storage_source;
+    local = FS2LOCAL(file_system);
     path = NULL;
 
     local->op_count++;
-    if ((ret = local_location_path(local, location_handle, name, NULL, &path)) != 0)
+    if ((ret = local_location_path(file_system, name, NULL, &path)) != 0)
         goto err;
 
     ret = unlink(path);
@@ -969,19 +912,18 @@ err:
  *     Get the size of a file in bytes, by file name.
  */
 static int
-local_size(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,
-  WT_LOCATION_HANDLE *location_handle, const char *name, wt_off_t *sizep)
+local_size(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name, wt_off_t *sizep)
 {
     struct stat sb;
     LOCAL_STORAGE *local;
     int ret;
     char *path;
 
-    local = (LOCAL_STORAGE *)storage_source;
+    local = FS2LOCAL(file_system);
     path = NULL;
 
     local->op_count++;
-    if ((ret = local_location_path(local, location_handle, name, NULL, &path)) != 0)
+    if ((ret = local_location_path(file_system, name, NULL, &path)) != 0)
         goto err;
 
     ret = stat(path, &sb);
@@ -1013,7 +955,7 @@ local_terminate(WT_STORAGE_SOURCE *storage, WT_SESSION *session)
 
     /*
      * We should be single threaded at this point, so it is safe to destroy the lock and access the
-     * file handle list without it.
+     * file handle list without locking it.
      */
     if ((ret = pthread_rwlock_destroy(&local->file_handle_lock)) != 0)
         (void)local_err(local, session, ret, "terminate: pthread_rwlock_destroy");
@@ -1255,14 +1197,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * Allocate a local storage structure, with a WT_STORAGE structure as the first field, allowing
      * us to treat references to either type of structure as a reference to the other type.
      */
-    local->storage_source.ss_exist = local_exist;
+    local->storage_source.ss_customize_file_system = local_customize_file_system;
     local->storage_source.ss_flush = local_flush;
-    local->storage_source.ss_location_handle = local_location_handle;
-    local->storage_source.ss_location_list = local_location_list;
-    local->storage_source.ss_location_list_free = local_location_list_free;
-    local->storage_source.ss_open_object = local_open;
-    local->storage_source.ss_remove = local_remove;
-    local->storage_source.ss_size = local_size;
     local->storage_source.terminate = local_terminate;
 
     if ((ret = local_configure(local, config)) != 0) {
