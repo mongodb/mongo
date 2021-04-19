@@ -48,7 +48,6 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
-#include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_state.h"
@@ -613,7 +612,8 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        _dropOplogCollections(opCtx.get());
+        resharding::data_copy::ensureOplogCollectionsDropped(
+            opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
     }
 
     _transitionState(RecipientStateEnum::kDone);
@@ -831,41 +831,6 @@ void ReshardingRecipientService::RecipientStateMachine::_removeRecipientDocument
                  BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
                       << _metadata.getReshardingUUID()),
                  kNoWaitWriteConcern);
-}
-
-void ReshardingRecipientService::RecipientStateMachine::_dropOplogCollections(
-    OperationContext* opCtx) {
-    for (const auto& donor : _donorShards) {
-        auto reshardingSourceId =
-            ReshardingSourceId{_metadata.getReshardingUUID(), donor.getShardId()};
-
-        // Remove the oplog applier progress doc for this donor.
-        PersistentTaskStore<ReshardingOplogApplierProgress> oplogApplierProgressStore(
-            NamespaceString::kReshardingApplierProgressNamespace);
-        oplogApplierProgressStore.remove(
-            opCtx,
-            QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName
-                  << reshardingSourceId.toBSON()),
-            WriteConcernOptions());
-
-        // Remove the txn cloner progress doc for this donor.
-        PersistentTaskStore<ReshardingTxnClonerProgress> txnClonerProgressStore(
-            NamespaceString::kReshardingTxnClonerProgressNamespace);
-        txnClonerProgressStore.remove(
-            opCtx,
-            QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << reshardingSourceId.toBSON()),
-            WriteConcernOptions());
-
-        // Drop the conflict stash collection for this donor.
-        auto stashNss =
-            getLocalConflictStashNamespace(_metadata.getSourceUUID(), donor.getShardId());
-        resharding::data_copy::ensureCollectionDropped(opCtx, stashNss);
-
-        // Drop the oplog buffer collection for this donor.
-        auto oplogBufferNss =
-            getLocalOplogBufferNamespace(_metadata.getSourceUUID(), donor.getShardId());
-        resharding::data_copy::ensureCollectionDropped(opCtx, oplogBufferNss);
-    }
 }
 
 ReshardingMetrics* ReshardingRecipientService::RecipientStateMachine::_metrics() const {

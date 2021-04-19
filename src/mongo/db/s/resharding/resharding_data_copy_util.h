@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
 
 namespace mongo {
@@ -66,6 +67,16 @@ void ensureCollectionExists(OperationContext* opCtx,
 void ensureCollectionDropped(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<CollectionUUID>& uuid = boost::none);
+/**
+ * Removes documents from the oplog applier progress and transaction applier progress collections
+ * that are associated with an in-progress resharding operation. Also drops all oplog buffer
+ * collections and conflict stash collections that are associated with the in-progress resharding
+ * operation.
+ */
+void ensureOplogCollectionsDropped(OperationContext* opCtx,
+                                   const UUID& reshardingUUID,
+                                   const UUID& sourceUUID,
+                                   const std::vector<DonorShardFetchTimestamp>& donorShards);
 
 /**
  * Returns the largest _id value in the collection.

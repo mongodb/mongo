@@ -175,11 +175,6 @@ private:
     // Removes the local recipient document from disk.
     void _removeRecipientDocument();
 
-    // Removes any docs from the oplog applier progress and txn applier progress collections that
-    // are associated with the in-progress operation. Also drops all oplog buffer collections and
-    // all conflict stash collections that are associated with the in-progress operation.
-    void _dropOplogCollections(OperationContext* opCtx);
-
     std::unique_ptr<ReshardingDataReplicationInterface> _makeDataReplication(
         OperationContext* opCtx, bool cloningDone);
 
