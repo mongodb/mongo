@@ -245,8 +245,47 @@ private:
     /**
      * The access states of an mtab.
      */
-    enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
-    std::string _stateToString(State state) const;
+    class BlockerState {
+    public:
+        enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
+
+        void transitionTo(State newState);
+
+        State getState() const {
+            return _state;
+        }
+
+        bool isAllow() const {
+            return _state == State::kAllow;
+        }
+
+        bool isBlockWrites() const {
+            return _state == State::kBlockWrites;
+        }
+
+        bool isBlockWritesAndReads() const {
+            return _state == State::kBlockWritesAndReads;
+        }
+
+        bool isReject() const {
+            return _state == State::kReject;
+        }
+
+        bool isAborted() const {
+            return _state == State::kAborted;
+        }
+
+        std::string toString() const {
+            return toString(_state);
+        }
+
+        static std::string toString(State state);
+
+    private:
+        static bool _isLegalTransition(State oldState, State newState);
+
+        State _state = State::kAllow;
+    };
 
     /**
      * Encapsulates runtime statistics on blocked reads and writes, and tenant migration errors
@@ -279,7 +318,7 @@ private:
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorAccessBlocker::_mutex");
 
-    State _state{State::kAllow};
+    BlockerState _state;
 
     boost::optional<Timestamp> _blockTimestamp;
     boost::optional<repl::OpTime> _commitOpTime;
