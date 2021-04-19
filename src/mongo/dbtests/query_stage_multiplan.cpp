@@ -52,6 +52,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_test_lib.h"
@@ -549,6 +550,13 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 //
 // This is a regression test for SERVER-20111.
 TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
+    // Bail out and do not run the tests if using the SBE engine.
+    // TODO: SERVER-55163 once the feature flag is removed we should use the query configuration
+    // knob to force the use of classic engine.
+    if (feature_flags::gSBE.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
     const int N = 5000;
     for (int i = 0; i < N; ++i) {
         insert(BSON("foo" << (i % 10)));
