@@ -116,10 +116,6 @@ private:
     ClockSourceMock* _clockSource;
 };
 
-DEATH_TEST_F(ReshardingMetricsTest, UpdateMetricsBeforeOnStart, "No operation is in progress") {
-    getMetrics()->onWriteDuringCriticalSection(1);
-}
-
 DEATH_TEST_F(ReshardingMetricsTest, RunOnCompletionBeforeOnStart, "No operation is in progress") {
     getMetrics()->onCompletion(ReshardingOperationStatusEnum::kSuccess);
 }

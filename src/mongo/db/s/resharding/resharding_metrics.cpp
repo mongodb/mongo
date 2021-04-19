@@ -201,9 +201,10 @@ void ReshardingMetrics::setDocumentsToCopy(int64_t documents, int64_t bytes) noe
 
 void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp)
+        return;
 
-    invariant(_currentOp &&
-              checkState(_currentOp->recipientState,
+    invariant(checkState(_currentOp->recipientState,
                          {RecipientStateEnum::kCloning, RecipientStateEnum::kError}));
 
     _currentOp->documentsCopied += documents;
@@ -214,9 +215,10 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp)
+        return;
 
-    invariant(_currentOp &&
-              checkState(_currentOp->recipientState,
+    invariant(checkState(_currentOp->recipientState,
                          {RecipientStateEnum::kCloning,
                           RecipientStateEnum::kApplying,
                           RecipientStateEnum::kSteadyState,
@@ -228,9 +230,10 @@ void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp)
+        return;
 
-    invariant(_currentOp &&
-              checkState(_currentOp->recipientState,
+    invariant(checkState(_currentOp->recipientState,
                          {RecipientStateEnum::kApplying,
                           RecipientStateEnum::kSteadyState,
                           RecipientStateEnum::kError}));
@@ -241,11 +244,10 @@ void ReshardingMetrics::onOplogEntriesApplied(int64_t entries) noexcept {
 
 void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
+    if (!_currentOp)
+        return;
 
-    invariant(_currentOp.has_value(), kNoOperationInProgress);
-
-    invariant(_currentOp &&
-              checkState(_currentOp->donorState,
+    invariant(checkState(_currentOp->donorState,
                          {DonorStateEnum::kDonatingOplogEntries,
                           DonorStateEnum::kPreparingToBlockWrites,
                           DonorStateEnum::kBlockingWrites,
