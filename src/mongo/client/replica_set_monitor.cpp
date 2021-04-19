@@ -595,7 +595,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
 
     // Handle various failure cases
     if (!reply.ok) {
-        failedHost(from, {ErrorCodes::CommandFailed, "Failed to execute 'ismaster' command"});
+        failedHost(from, {ErrorCodes::CommandFailed, "Failed to execute 'ismaster' command"}, verbose);
         return;
     }
 
@@ -618,14 +618,14 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
                    {ErrorCodes::InconsistentReplicaSetNames,
                     str::stream() << "Target replica set name " << reply.setName
                                   << " does not match the monitored set name "
-                                  << _set->name});
+                                  << _set->name}, verbose);
         return;
     }
 
     if (reply.isMaster) {
         Status status = receivedIsMasterFromMaster(from, reply, verbose);
         if (!status.isOK()) {
-            failedHost(from, status);
+            failedHost(from, status, verbose);
             return;
         }
     }
@@ -648,7 +648,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     DEV _set->checkInvariants();
 }
 
-void Refresher::failedHost(const HostAndPort& host, const Status& status) {
+void Refresher::failedHost(const HostAndPort& host, const Status& status, bool verbose) {
     _scan->waitingFor.erase(host);
 
     // Failed hosts can't pass criteria, so the only way they'd effect the _refreshUntilMatches
@@ -861,6 +861,9 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                 return criteria ? _set->getMatchingHost(*criteria) : HostAndPort();
 
             case NextStep::WAIT:  // TODO consider treating as DONE for refreshAll
+                if (verbose) {
+                    log() << "RSM for " << _set->name << " starts waiting for condition change";
+                }
                 _set->cv.wait(lk);
                 continue;
 
@@ -903,7 +906,7 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
                 if (isMasterReplyStatus.isOK())
                     receivedIsMaster(ns.host, pingMicros, isMasterReplyStatus.getValue(), verbose);
                 else
-                    failedHost(ns.host, isMasterReplyStatus.getStatus());
+                    failedHost(ns.host, isMasterReplyStatus.getStatus(), verbose);
             }
         }
 

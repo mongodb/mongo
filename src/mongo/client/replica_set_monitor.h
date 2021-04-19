@@ -378,7 +378,7 @@ public:
     /**
      * Call this if a host returned from getNextStep failed to reply to an isMaster call.
      */
-    void failedHost(const HostAndPort& host, const Status& status);
+    void failedHost(const HostAndPort& host, const Status& status, bool verbose);
 
     /**
      * Starts a new scan over the hosts in set.
