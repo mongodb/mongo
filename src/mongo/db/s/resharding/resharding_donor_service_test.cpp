@@ -368,6 +368,9 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
                                  << cursor->nextSafe();
 }
 
+// TODO SERVER-56174: Re-enable this test once the issue with PauseDuringStateTransitions is
+// resolved.
+/**
 TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     const std::vector<DonorStateEnum> _donorStates{DonorStateEnum::kDonatingInitialData,
                                                    DonorStateEnum::kDonatingOplogEntries,
@@ -436,6 +439,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
     }
 }
+*/
 
 TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     auto doc = makeStateDocument();
