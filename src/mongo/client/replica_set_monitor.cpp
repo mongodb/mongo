@@ -92,6 +92,11 @@ const double socketTimeoutSecs = 5;
 // Intentionally chosen to compare worse than all known latencies.
 const int64_t unknownLatency = numeric_limits<int64_t>::max();
 
+// After this period of time, RSM logging becomes more verbose.
+static constexpr int kRsmVerbosityThresholdTimeoutSec = 20;
+// When 'is master' reply latency is over 2 sec, it will be logged.
+static constexpr int kSlowIsMasterThresholdMicros = 2L * 1000 * 1000;
+
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly, TagSet());
 const Milliseconds kFindHostMaxBackOffTime(500);
 AtomicBool areRefreshRetriesDisabledForTest{false};  // Only true in tests.
@@ -540,7 +545,7 @@ Refresher::NextStep Refresher::getNextStep() {
             for (UnconfirmedReplies::iterator it = _scan->unconfirmedReplies.begin();
                  it != _scan->unconfirmedReplies.end();
                  ++it) {
-                _set->findOrCreateNode(it->host)->update(*it);
+                _set->findOrCreateNode(it->host)->update(*it, false);
             }
 
             const string newAddr = _set->getUnconfirmedServerAddress();
@@ -581,7 +586,8 @@ Refresher::NextStep Refresher::getNextStep() {
 
 void Refresher::receivedIsMaster(const HostAndPort& from,
                                  int64_t latencyMicros,
-                                 const BSONObj& replyObj) {
+                                 const BSONObj& replyObj,
+                                 bool verbose) {
     // Be careful: all return paths must call either failedHost or cv.notify_all!
     _scan->waitingFor.erase(from);
 
@@ -617,7 +623,7 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
     }
 
     if (reply.isMaster) {
-        Status status = receivedIsMasterFromMaster(from, reply);
+        Status status = receivedIsMasterFromMaster(from, reply, verbose);
         if (!status.isOK()) {
             failedHost(from, status);
             return;
@@ -626,9 +632,9 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
 
     if (_scan->foundUpMaster) {
         // We only update a Node if a master has confirmed it is in the set.
-        _set->updateNodeIfInNodes(reply);
+        _set->updateNodeIfInNodes(reply, verbose);
     } else {
-        receivedIsMasterBeforeFoundMaster(reply);
+        receivedIsMasterBeforeFoundMaster(reply, verbose);
         _scan->unconfirmedReplies.push_back(reply);
     }
 
@@ -651,8 +657,11 @@ void Refresher::failedHost(const HostAndPort& host, const Status& status) {
         _set->cv.notify_all();
 
     Node* node = _set->findNode(host);
-    if (node)
+    if (node) {
         node->markFailed(status);
+    } else {
+        log() << "Node for " << host << " is no longer part of ReplicaSet " << _set->name;
+    }
 }
 
 ScanStatePtr Refresher::startNewScan(const SetState* set) {
@@ -690,7 +699,9 @@ ScanStatePtr Refresher::startNewScan(const SetState* set) {
     return scan;
 }
 
-Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMasterReply& reply) {
+Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from,
+                                             const IsMasterReply& reply,
+                                             bool verbose) {
     invariant(reply.isMaster);
 
     // Reject if config version is older. This is for backwards compatibility with nodes in pv0
@@ -791,22 +802,31 @@ Status Refresher::receivedIsMasterFromMaster(const HostAndPort& from, const IsMa
          it != _scan->unconfirmedReplies.end();
          ++it) {
         // this ignores replies from hosts not in _set->nodes (as modified above)
-        _set->updateNodeIfInNodes(*it);
+        _set->updateNodeIfInNodes(*it, verbose);
     }
     _scan->unconfirmedReplies.clear();
 
     _scan->foundUpMaster = true;
+    if (_set->lastSeenMaster != reply.host) {
+        log() << reply.host << " detected as new replica set primary for " << _set->name
+              << "; Old primary was " << _set->lastSeenMaster;
+    }
     _set->lastSeenMaster = reply.host;
 
     return Status::OK();
 }
 
-void Refresher::receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply) {
+void Refresher::receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply, bool verbose) {
     invariant(!reply.isMaster);
     // This function doesn't alter _set at all. It only modifies the work queue in _scan.
 
     // Add everyone this host claims is in the set to possibleNodes.
+    const auto existingSize = _scan->possibleNodes.size();
     _scan->possibleNodes.insert(reply.normalHosts.begin(), reply.normalHosts.end());
+    if (verbose && _scan->possibleNodes.size() > existingSize) {
+        log() << "Monitor for ReplicaSet " << _set->name << " discovered nodes based on reply "
+              << reply.raw;
+    }
 
     // If this node thinks the primary is someone we haven't tried, make that the next
     // hostToScan.
@@ -822,6 +842,8 @@ void Refresher::receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply) {
 }
 
 HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteria) {
+    Timer loopTimer;
+    bool verbose = false;
     stdx::unique_lock<stdx::mutex> lk(_set->mutex);
     while (true) {
         if (criteria) {
@@ -874,14 +896,21 @@ HostAndPort Refresher::_refreshUntilMatches(const ReadPreferenceSetting* criteri
 
                 // Ignore the reply and return if we are no longer the current scan. This might
                 // happen if it was decided that the host we were contacting isn't part of the set.
-                if (_scan != _set->currentScan)
+                if (_scan != _set->currentScan) {
                     return criteria ? _set->getMatchingHost(*criteria) : HostAndPort();
+                }
 
                 if (isMasterReplyStatus.isOK())
-                    receivedIsMaster(ns.host, pingMicros, isMasterReplyStatus.getValue());
+                    receivedIsMaster(ns.host, pingMicros, isMasterReplyStatus.getValue(), verbose);
                 else
                     failedHost(ns.host, isMasterReplyStatus.getStatus());
             }
+        }
+
+        if (!verbose && loopTimer.seconds() > kRsmVerbosityThresholdTimeoutSec) {
+            log() << "Monitor for ReplicaSet " << _set->name
+                  << " is unable to find the primary after " << loopTimer.seconds() << " seconds";
+            verbose = true;
         }
     }
 }
@@ -940,13 +969,21 @@ void IsMasterReply::parse(const BSONObj& obj) {
 Node::Node(const HostAndPort& host) : host(host), latencyMicros(unknownLatency) {}
 
 void Node::markFailed(const Status& status) {
+    bool logged = false;
     if (isUp) {
         log() << "Marking host " << host << " as failed" << causedBy(redact(status));
-
         isUp = false;
+        logged = true;
     }
 
-    isMaster = false;
+    if (isMaster) {
+        log() << "Marking host " << host << " as no longer a primary" << causedBy(redact(status));
+        isMaster = false;
+        logged = true;
+    }
+    if (!logged) {
+        log() << "Received another failure for host " << host << causedBy(redact(status));
+    }
 }
 
 bool Node::matches(const ReadPreference pref) const {
@@ -976,11 +1013,20 @@ bool Node::matches(const BSONObj& tag) const {
     return true;
 }
 
-void Node::update(const IsMasterReply& reply) {
+void Node::update(const IsMasterReply& reply, bool verbose) {
     invariant(host == reply.host);
     invariant(reply.ok);
 
-    LOG(3) << "Updating host " << host << " based on ismaster reply: " << reply.raw;
+    verbose |= isMaster != reply.isMaster || opTime != reply.opTime ||
+        lastWriteDate != reply.lastWriteDate;
+    if (verbose) {
+        log() << "Updating host " << host << " state based on ismaster reply from ReplicaSet "
+              << reply.setName << ". Self is primary: " << reply.isMaster
+              << ", primary is: " << reply.primary << ", election ID: " << reply.electionId
+              << ", ReplicaSet version: " << reply.configVersion;
+    } else {
+        LOG(3) << "Refreshing host " << host << " based on ismaster reply: " << reply.raw;
+    }
 
     // Nodes that are hidden or neither master or secondary are considered down since we can't
     // send any operations to them.
@@ -1000,6 +1046,10 @@ void Node::update(const IsMasterReply& reply) {
         } else {
             // update latency with smoothed moving average (1/4th the delta)
             latencyMicros += (reply.latencyMicros - latencyMicros) / 4;
+        }
+        if (reply.latencyMicros > kSlowIsMasterThresholdMicros) {  // > 2 seconds.
+            log() << "ReplicaSet Monitor received reply with latency above 2 seconds: "
+                  << reply.raw;
         }
     }
 
@@ -1210,15 +1260,18 @@ Node* SetState::findOrCreateNode(const HostAndPort& host) {
     return &(*it);
 }
 
-void SetState::updateNodeIfInNodes(const IsMasterReply& reply) {
+void SetState::updateNodeIfInNodes(const IsMasterReply& reply, bool verbose) {
     Node* node = findNode(reply.host);
     if (!node) {
-        LOG(2) << "Skipping application of ismaster reply from " << reply.host
-               << " since it isn't a confirmed member of set " << name;
+        auto level = verbose ? -1 : 2;
+        LOG(level) << "Skipping application of ismaster reply from " << reply.host
+                   << " since it isn't a confirmed member of set " << name;
         return;
     }
 
-    node->update(reply);
+    node->update(reply,
+                 verbose || maxElectionId != reply.electionId ||
+                     configVersion != reply.configVersion);
 }
 
 std::string SetState::getConfirmedServerAddress() const {

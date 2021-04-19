@@ -123,7 +123,7 @@ public:
         /**
          * Updates this Node based on information in reply. The reply must be from this host.
          */
-        void update(const IsMasterReply& reply);
+        void update(const IsMasterReply& reply, bool verbose);
 
         HostAndPort host;
         bool isUp{false};
@@ -167,7 +167,7 @@ public:
      */
     Node* findOrCreateNode(const HostAndPort& host);
 
-    void updateNodeIfInNodes(const IsMasterReply& reply);
+    void updateNodeIfInNodes(const IsMasterReply& reply, bool verbose);
 
     /**
      * Returns the connection string of the nodes that are known the be in the set because we've

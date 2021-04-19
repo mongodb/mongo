@@ -373,7 +373,8 @@ TEST(ReplicaSetMonitor, CheckAllSeedsSerial) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     NextStep ns = refresher.getNextStep();
@@ -429,7 +430,8 @@ TEST(ReplicaSetMonitor, CheckAllSeedsParallel) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     // Now all hosts have returned data
@@ -476,7 +478,8 @@ TEST(ReplicaSetMonitor, NoMasterInitAllUp) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     NextStep ns = refresher.getNextStep();
@@ -523,7 +526,8 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                                       << "c"
                                                       << "d")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     // Only look at "d" after exhausting all other hosts
@@ -544,7 +548,8 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_NoPrimaryInIsMaster) {
                                                   << "c"
                                                   << "d")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
 
     ns = refresher.getNextStep();
@@ -606,7 +611,8 @@ TEST(ReplicaSetMonitor, MasterNotInSeeds_PrimaryInIsMaster) {
                                                       << "c"
                                                       << "d")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     NextStep ns = refresher.getNextStep();
@@ -659,7 +665,8 @@ TEST(ReplicaSetMonitor, SlavesUsableEvenIfNoMaster) {
                                     << "hosts"
                                     << BSON_ARRAY("a")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     // Check intended conditions for entry to refreshUntilMatches.
     ASSERT(state->currentScan->hostsToScan.empty());
@@ -713,7 +720,8 @@ TEST(ReplicaSetMonitor, MultipleMasterLastNodeWins) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -764,7 +772,8 @@ TEST(ReplicaSetMonitor, MasterIsSourceOfTruth) {
                                         << "hosts"
                                         << (primary ? primaryHosts : secondaryHosts)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         ns = refresher.getNextStep();
     }
@@ -818,7 +827,8 @@ TEST(ReplicaSetMonitor, MultipleMastersDisagree) {
                                         << "hosts"
                                         << hostsForSeed[i % 2]
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         // Ensure the primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -854,7 +864,8 @@ TEST(ReplicaSetMonitor, MultipleMastersDisagree) {
                                     << "hosts"
                                     << hostsForSeed[0]
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     // scan should be complete
     ns = refresher.getNextStep();
@@ -910,7 +921,8 @@ TEST(ReplicaSetMonitor, GetMatchingDuringScan) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         bool hasPrimary = !(state->getMatchingHost(primaryOnly).empty());
         bool hasSecondary = !(state->getMatchingHost(secondaryOnly).empty());
@@ -956,7 +968,8 @@ TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         if (i >= 1) {
             HostAndPort a("a");
@@ -1015,7 +1028,8 @@ TEST(ReplicaSetMonitorTests, NewPrimaryWithMaxElectionId) {
                                        << "electionId"
                                        << OID::fromTerm(i)  // electionId must increase every cycle.
                                        << "ok"
-                                       << true));
+                                       << true),
+                                   false);
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
@@ -1073,7 +1087,8 @@ TEST(ReplicaSetMonitorTests, IgnoreElectionIdFromSecondaries) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
     }
 
     // check that the SetState's maxElectionId == primary's electionId
@@ -1120,7 +1135,8 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -1151,7 +1167,8 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -1182,7 +1199,8 @@ TEST(ReplicaSetMonitorTests, StalePrimaryWithObsoleteElectionId) {
                                                       << "b"
                                                       << "c")
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         Node* node = state->findNode(ns.host);
         ASSERT(node);
@@ -1238,7 +1256,8 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasNewerConfigVersion) {
                                                   << "b"
                                                   << "c")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     // check that the SetState's maxElectionId == primary's electionId
     ASSERT_EQUALS(state->maxElectionId, OID("7fffffff0000000000000001"));
@@ -1264,7 +1283,8 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasNewerConfigVersion) {
                                                   << "b"
                                                   << "c")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1299,7 +1319,8 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
                                                   << "b"
                                                   << "c")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1322,7 +1343,8 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
                                                   << "b"
                                                   << "c")
                                     << "ok"
-                                    << true));
+                                    << true),
+                               false);
 
     ASSERT_EQUALS(state->maxElectionId, primaryElectionId);
     ASSERT_EQUALS(state->configVersion, 2);
@@ -1365,7 +1387,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
                                                                 << "opTime"
                                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1415,7 +1438,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoMatch) {
                                                                 << "opTime"
                                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         ns = refresher.getNextStep();
     }
@@ -1467,7 +1491,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoPrimaryMatch) {
                                                 << "opTime"
                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         ns = refresher.getNextStep();
     }
@@ -1521,7 +1546,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
                                                 << "opTime"
                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
 
         ns = refresher.getNextStep();
     }
@@ -1573,7 +1599,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
                                                                 << "opTime"
                                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1625,7 +1652,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
                                                                 << "opTime"
                                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1678,7 +1706,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleSecondaryMatched) {
                                                 << "opTime"
                                                 << opTime)
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1720,7 +1749,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNoLastWrite) {
                                         << "hosts"
                                         << hosts
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1761,7 +1791,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSZeroNoLastWrite) {
                                         << "hosts"
                                         << hosts
                                         << "ok"
-                                        << true));
+                                        << true),
+                                   false);
         ns = refresher.getNextStep();
     }
 
@@ -1810,7 +1841,7 @@ TEST(ReplicaSetMonitor, MinOpTimeMatched) {
                                                             : opTimeStale.toBSON()))
                             << "ok"
                             << true);
-        refresher.receivedIsMaster(ns.host, -1, bson);
+        refresher.receivedIsMaster(ns.host, -1, bson, false);
         ns = refresher.getNextStep();
     }
 
@@ -1855,7 +1886,7 @@ TEST(ReplicaSetMonitor, MinOpTimeNotMatched) {
                                                             : opTimeStale.toBSON()))
                             << "ok"
                             << true);
-        refresher.receivedIsMaster(ns.host, -1, bson);
+        refresher.receivedIsMaster(ns.host, -1, bson, false);
         ns = refresher.getNextStep();
     }
 
@@ -1905,7 +1936,7 @@ TEST(ReplicaSetMonitor, MinOpTimeIgnored) {
                                     << opTimeStale.toBSON())
                             << "ok"
                             << true);
-        refresher.receivedIsMaster(ns.host, -1, bson);
+        refresher.receivedIsMaster(ns.host, -1, bson, false);
         ns = refresher.getNextStep();
     }
 

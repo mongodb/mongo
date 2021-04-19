@@ -370,7 +370,10 @@ public:
      * Call this if a host returned from getNextStep successfully replied to an isMaster call.
      * Negative latencyMicros are ignored.
      */
-    void receivedIsMaster(const HostAndPort& from, int64_t latencyMicros, const BSONObj& reply);
+    void receivedIsMaster(const HostAndPort& from,
+                          int64_t latencyMicros,
+                          const BSONObj& reply,
+                          bool verbose);
 
     /**
      * Call this if a host returned from getNextStep failed to reply to an isMaster call.
@@ -394,14 +397,16 @@ private:
      * Applies _scan->unconfirmedReplies to confirmed nodes.
      * Does not update this host's node in _set->nodes.
      */
-    Status receivedIsMasterFromMaster(const HostAndPort& from, const IsMasterReply& reply);
+    Status receivedIsMasterFromMaster(const HostAndPort& from,
+                                      const IsMasterReply& reply,
+                                      bool verbose);
 
     /**
      * Adjusts the _scan work queue based on information from this host.
      * This should only be called with replies from non-masters.
      * Does not update _set at all.
      */
-    void receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply);
+    void receivedIsMasterBeforeFoundMaster(const IsMasterReply& reply, bool verbose);
 
     /**
      * Shared implementation of refreshUntilMatches and refreshAll.
