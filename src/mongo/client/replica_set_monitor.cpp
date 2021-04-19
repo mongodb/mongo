@@ -595,7 +595,8 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
 
     // Handle various failure cases
     if (!reply.ok) {
-        failedHost(from, {ErrorCodes::CommandFailed, "Failed to execute 'ismaster' command"}, verbose);
+        failedHost(
+            from, {ErrorCodes::CommandFailed, "Failed to execute 'ismaster' command"}, verbose);
         return;
     }
 
@@ -618,7 +619,8 @@ void Refresher::receivedIsMaster(const HostAndPort& from,
                    {ErrorCodes::InconsistentReplicaSetNames,
                     str::stream() << "Target replica set name " << reply.setName
                                   << " does not match the monitored set name "
-                                  << _set->name}, verbose);
+                                  << _set->name},
+                   verbose);
         return;
     }
 
