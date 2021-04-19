@@ -273,8 +273,10 @@ class EvergreenFileChangeDetector(FileChangeDetector):
 class GenerateBurnInExecutor(BurnInExecutor):
     """A burn-in executor that generates tasks."""
 
+    # pylint: disable=too-many-arguments
     def __init__(self, generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                 evg_api: EvergreenApi, generate_tasks_file: Optional[str] = None) -> None:
+                 evg_api: EvergreenApi, generate_tasks_file: Optional[str] = None,
+                 history_end_date: Optional[datetime] = None) -> None:
         """
         Create a new generate burn-in executor.
 
@@ -282,11 +284,14 @@ class GenerateBurnInExecutor(BurnInExecutor):
         :param repeat_config: Configuration for how tests should be repeated.
         :param evg_api: Evergreen API client.
         :param generate_tasks_file: File to write generated task configuration to.
+        :param history_end_date: End date of range to query for historic test data.
         """
         self.generate_config = generate_config
         self.repeat_config = repeat_config
         self.evg_api = evg_api
         self.generate_tasks_file = generate_tasks_file
+        self.history_end_date = history_end_date if history_end_date else datetime.utcnow()\
+            .replace(microsecond=0)
 
     def get_task_runtime_history(self, task: str) -> List[TestRuntime]:
         """
@@ -298,7 +303,7 @@ class GenerateBurnInExecutor(BurnInExecutor):
         try:
             project = self.generate_config.project
             variant = self.generate_config.build_variant
-            end_date = datetime.utcnow().replace(microsecond=0)
+            end_date = self.history_end_date
             start_date = end_date - timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
             test_stats = HistoricTaskData.from_evg(self.evg_api, project, start_date=start_date,
                                                    end_date=end_date, task=task, variant=variant)

@@ -263,7 +263,8 @@ class TestGetTaskRuntimeHistory(unittest.TestCase):
         start_date = end_date - timedelta(days=analysis_duration)
         mock_gen_config = MagicMock(project="project1", build_variant="variant1")
 
-        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock(), mock_evg_api)
+        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock(), mock_evg_api,
+                                                     history_end_date=end_date)
         result = executor.get_task_runtime_history("task1")
 
         self.assertEqual(result, [("dir/test2.js", 10.1)])
