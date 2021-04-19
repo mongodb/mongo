@@ -82,7 +82,7 @@ private:
     const std::vector<value::SlotVector> _inputVals;
     const value::SlotVector _outputVals;
 
-    std::vector<value::ViewOfValueAccessor> _outAccessors;
+    std::vector<value::SwitchAccessor> _outAccessors;
 
     // Maintains state about merging the results in order. Initialized during prepare().
     boost::optional<SortedStreamMerger<PlanStage>> _merger;

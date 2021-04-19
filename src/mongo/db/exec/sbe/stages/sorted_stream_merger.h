@@ -50,31 +50,18 @@ template <class SortedStream>
 class SortedStreamMerger final {
 public:
     SortedStreamMerger(std::vector<std::vector<value::SlotAccessor*>> inputKeyAccessors,
-                       std::vector<std::vector<value::SlotAccessor*>> inputValAccessors,
                        std::vector<SortedStream*> streams,
                        std::vector<value::SortDirection> dirs,
-                       std::vector<value::ViewOfValueAccessor*> outAccessors)
-        : _dirs(convertDirs(dirs)), _outAccessors(std::move(outAccessors)), _heap(&_dirs) {
-        invariant(std::all_of(
-            _branches.begin(),
-            _branches.end(),
-            [dirSize = _dirs.size(), outValSize = _outAccessors.size()](const auto& branch) {
-                return branch.inputKeyAccessors.size() == dirSize &&
-                    branch.inputValAccessors.size() == outValSize;
-            }));
-
-        invariant(inputKeyAccessors.size() == inputValAccessors.size());
+                       std::vector<value::SwitchAccessor>& outAccessors)
+        : _dirs(convertDirs(dirs)), _outAccessors(outAccessors), _heap(&_dirs) {
         invariant(inputKeyAccessors.size() == streams.size());
         invariant(!streams.empty());
         const auto keySize = inputKeyAccessors.front().size();
-        const auto valSize = inputValAccessors.front().size();
 
         for (size_t i = 0; i < streams.size(); ++i) {
             invariant(keySize == inputKeyAccessors[i].size());
-            invariant(valSize == inputValAccessors[i].size());
 
-            _branches.push_back(Branch{
-                streams[i], std::move(inputKeyAccessors[i]), std::move(inputValAccessors[i])});
+            _branches.push_back(Branch{streams[i], std::move(inputKeyAccessors[i]), i});
         }
     }
 
@@ -106,8 +93,7 @@ public:
         _lastBranchPopped = top;
 
         for (size_t i = 0; i < _outAccessors.size(); ++i) {
-            auto [tag, val] = top->inputValAccessors[i]->getViewOfValue();
-            _outAccessors[i]->reset(tag, val);
+            _outAccessors[i].setIndex(top->branchSwitchId);
         }
 
         return PlanState::ADVANCED;
@@ -118,7 +104,7 @@ private:
         SortedStream* stream = nullptr;
 
         std::vector<value::SlotAccessor*> inputKeyAccessors;
-        std::vector<value::SlotAccessor*> inputValAccessors;
+        size_t branchSwitchId{0};
     };
 
     class BranchComparator {
@@ -142,8 +128,8 @@ private:
 
     const std::vector<int> _dirs;
 
-    // Same size as size of each element of _inputVals.
-    std::vector<value::ViewOfValueAccessor*> _outAccessors;
+    // Switched output.
+    std::vector<value::SwitchAccessor>& _outAccessors;
 
     // Branches are owned here.
     std::vector<Branch> _branches;

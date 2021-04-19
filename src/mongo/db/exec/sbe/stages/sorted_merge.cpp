@@ -74,7 +74,6 @@ std::unique_ptr<PlanStage> SortedMergeStage::clone() const {
 
 void SortedMergeStage::prepare(CompileCtx& ctx) {
     std::vector<std::vector<value::SlotAccessor*>> inputKeyAccessors;
-    std::vector<std::vector<value::SlotAccessor*>> inputValAccessors;
     std::vector<PlanStage*> streams;
 
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
@@ -84,30 +83,26 @@ void SortedMergeStage::prepare(CompileCtx& ctx) {
         streams.emplace_back(child.get());
 
         inputKeyAccessors.emplace_back();
-        inputValAccessors.emplace_back();
 
         for (auto slot : _inputKeys[childNum]) {
             inputKeyAccessors.back().push_back(child->getAccessor(ctx, slot));
         }
-        for (auto slot : _inputVals[childNum]) {
-            inputValAccessors.back().push_back(child->getAccessor(ctx, slot));
+    }
+
+    for (size_t idx = 0; idx < _outputVals.size(); ++idx) {
+        std::vector<value::SlotAccessor*> accessors;
+        accessors.reserve(_children.size());
+
+        for (size_t childNum = 0; childNum < _children.size(); childNum++) {
+            auto slot = _inputVals[childNum][idx];
+
+            accessors.emplace_back(_children[childNum]->getAccessor(ctx, slot));
         }
+
+        _outAccessors.emplace_back(value::SwitchAccessor{std::move(accessors)});
     }
 
-    for (size_t i = 0; i < _outputVals.size(); ++i) {
-        _outAccessors.emplace_back(value::ViewOfValueAccessor{});
-    }
-
-    std::vector<value::ViewOfValueAccessor*> outAccessorPtrs;
-    for (auto&& outAccessor : _outAccessors) {
-        outAccessorPtrs.push_back(&outAccessor);
-    }
-
-    _merger.emplace(std::move(inputKeyAccessors),
-                    std::move(inputValAccessors),
-                    std::move(streams),
-                    _dirs,
-                    std::move(outAccessorPtrs));
+    _merger.emplace(std::move(inputKeyAccessors), std::move(streams), _dirs, _outAccessors);
 }
 
 value::SlotAccessor* SortedMergeStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
