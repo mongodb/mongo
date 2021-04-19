@@ -652,19 +652,27 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (supportsWriteConcern && !clientSuppliedWriteConcern &&
         (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
-        !opCtx->getClient()->isInDirectClient() && !isInternalClient) {
-        // This command is not from a DBDirectClient or internal client, and supports WC, but
-        // wasn't given one - so apply the default, if there is one.
-        if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
-                                       .getDefaultWriteConcern(opCtx)) {
-            _parc->_wc = *wcDefault;
-            customDefaultWriteConcernWasApplied = true;
-            LOGV2_DEBUG(22766,
-                        2,
-                        "Applying default writeConcern on {command} of {writeConcern}",
-                        "Applying default writeConcern on command",
-                        "command"_attr = request.getCommandName(),
-                        "writeConcern"_attr = *wcDefault);
+        !opCtx->getClient()->isInDirectClient()) {
+        if (isInternalClient) {
+            tassert(
+                5569901,
+                "received command without explicit writeConcern on an internalClient connection {}"_format(
+                    redact(request.body.toString())),
+                request.body.hasField(WriteConcernOptions::kWriteConcernField));
+        } else {
+            // This command is not from a DBDirectClient or internal client, and supports WC, but
+            // wasn't given one - so apply the default, if there is one.
+            if (const auto wcDefault = ReadWriteConcernDefaults::get(opCtx->getServiceContext())
+                                           .getDefaultWriteConcern(opCtx)) {
+                _parc->_wc = *wcDefault;
+                customDefaultWriteConcernWasApplied = true;
+                LOGV2_DEBUG(22766,
+                            2,
+                            "Applying default writeConcern on {command} of {writeConcern}",
+                            "Applying default writeConcern on command",
+                            "command"_attr = request.getCommandName(),
+                            "writeConcern"_attr = *wcDefault);
+            }
         }
     }
 

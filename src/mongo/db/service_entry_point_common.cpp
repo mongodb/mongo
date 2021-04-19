@@ -1214,8 +1214,8 @@ void RunCommandAndWaitForWriteConcern::_setup() {
                 // WriteConcern should always be explicitly specified by operations received
                 // from internal clients (ie. from a mongos or mongod), even if it is empty
                 // (ie. writeConcern: {}, which is equivalent to { w: 1, wtimeout: 0 }).
-                uassert(
-                    4569201,
+                tassert(
+                    5569900,
                     "received command without explicit writeConcern on an internalClient connection {}"_format(
                         redact(request.body.toString())),
                     request.body.hasField(WriteConcernOptions::kWriteConcernField));
