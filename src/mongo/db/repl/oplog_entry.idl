@@ -34,7 +34,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
-    - "mongo/db/repl/optime_and_wall_time_base.idl"
+    - "mongo/db/repl/optime_base.idl"
     - "mongo/db/repl/replication_types.idl"
 
 enums:
@@ -94,9 +94,9 @@ structs:
         description: A document in which the server stores an oplog entry.
         inline_chained_structs: true
         chained_structs:
-            OperationSessionInfo : OperationSessionInfo
+            OperationSessionInfo: OperationSessionInfo
             DurableReplOperation: DurableReplOperation
-            OpTimeAndWallTimeBase: OpTimeAndWallTimeBase
+            OpTimeBase: OpTimeBase
         fields:
             h:
                 cpp_name: hash
@@ -108,6 +108,10 @@ structs:
                 type: safeInt64
                 default: 2
                 description: "The version of the oplog"
+            wall:
+                cpp_name: wallClockTime
+                type: date
+                description: "A wallclock time with MS resolution"
             fromMigrate:
                 type: bool
                 optional: true

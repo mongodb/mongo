@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/assert_util.h"
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 #include "mongo/platform/basic.h"
@@ -126,7 +127,7 @@ boost::optional<Document> DocumentSourceLookupChangePreImage::lookupPreImage(
 
     // If we had an optime to look up, and we found an oplog entry with that timestamp, then we
     // should always have a valid no-op entry containing a valid, non-empty pre-image document.
-    auto opLogEntry = invariantStatusOK(repl::OplogEntry::parse(lookedUpDoc->toBson()));
+    auto opLogEntry = uassertStatusOK(repl::OplogEntry::parse(lookedUpDoc->toBson()));
     invariant(opLogEntry.getOpType() == repl::OpTypeEnum::kNoop);
     invariant(!opLogEntry.getObject().isEmpty());
 

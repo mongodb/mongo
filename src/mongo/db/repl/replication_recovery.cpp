@@ -690,14 +690,15 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
     }
 
     // Parse the response.
-    auto truncateAfterOplogEntry =
-        fassert(51766, repl::OplogEntry::parse(truncateAfterOplogEntryBSON.get()));
-    auto truncateAfterRecordId = RecordId(truncateAfterOplogEntry.getTimestamp().asULL());
+    auto truncateAfterOpTime =
+        fassert(51766, repl::OpTime::parseFromOplogEntry(truncateAfterOplogEntryBSON.get()));
+    auto truncateAfterOplogEntryTs = truncateAfterOpTime.getTimestamp();
+    auto truncateAfterRecordId = RecordId(truncateAfterOplogEntryTs.asULL());
 
     invariant(truncateAfterRecordId <= RecordId(truncateAfterTimestamp.asULL()),
               str::stream() << "Should have found a oplog entry timestamp lte to "
                             << truncateAfterTimestamp.toString() << ", but instead found "
-                            << truncateAfterOplogEntry.toString() << " with timestamp "
+                            << redact(truncateAfterOplogEntryBSON.get()) << " with timestamp "
                             << Timestamp(truncateAfterRecordId.repr()).toString());
 
     // Truncate the oplog AFTER the oplog entry found to be <= truncateAfterTimestamp.
@@ -705,7 +706,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
           "Truncating oplog from {truncateAfterOplogEntryTimestamp} (non-inclusive). Truncate "
           "after point is {oplogTruncateAfterPoint}",
           "Truncating oplog from truncateAfterOplogEntryTimestamp (non-inclusive)",
-          "truncateAfterOplogEntryTimestamp"_attr = truncateAfterOplogEntry.getTimestamp(),
+          "truncateAfterOplogEntryTimestamp"_attr = truncateAfterOplogEntryTs,
           "oplogTruncateAfterPoint"_attr = truncateAfterTimestamp);
 
     oplogCollection->cappedTruncateAfter(opCtx, truncateAfterRecordId, /*inclusive*/ false);

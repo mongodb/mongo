@@ -157,15 +157,11 @@ public:
     }
 
     void setTimestamp(Timestamp value) & {
-        getOpTimeAndWallTimeBase().setTimestamp(std::move(value));
+        getOpTimeBase().setTimestamp(std::move(value));
     }
 
     void setTerm(boost::optional<std::int64_t> value) & {
-        getOpTimeAndWallTimeBase().setTerm(std::move(value));
-    }
-
-    void setWallClockTime(Date_t value) & {
-        getOpTimeAndWallTimeBase().setWallClockTime(std::move(value));
+        getOpTimeBase().setTerm(std::move(value));
     }
 
     /**

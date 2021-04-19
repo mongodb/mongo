@@ -490,22 +490,22 @@ env.Library(
         'oplog_entry.idl',
     ],
     LIBDEPS=[
-        'optime',
-        'optime_and_wall_time_base',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'optime',
+        'optime_base',
     ],
-   LIBDEPS_PRIVATE=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/namespace_string',
     ],
 )
 
 env.Library(
-    target='optime_and_wall_time_base',
+    target='optime_base',
     source=[
-        'optime_and_wall_time_base.idl',
+        'optime_base.idl'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -985,16 +985,17 @@ env.Library(
     ],
 )
 
-env.Library(target='optime',
-            source=[
-                'bson_extract_optime.cpp',
-                'optime.cpp',
-            ],
-            LIBDEPS=[
-                'optime_and_wall_time_base',
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/bson/util/bson_extract',
-            ],
+env.Library(
+    target='optime',
+    source=[
+        'bson_extract_optime.cpp',
+        'optime.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        'optime_base',
+    ],
 )
 
 env.Library(

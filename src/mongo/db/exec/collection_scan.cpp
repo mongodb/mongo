@@ -30,6 +30,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/util/assert_util.h"
 
 #include <memory>
 
@@ -246,7 +247,7 @@ void CollectionScan::assertMinTsHasNotFallenOffOplog(const Record& record) {
     // if its timestamp is later than the specified minTs; no events earlier than the minTs can have
     // fallen off this oplog. Otherwise, verify that the timestamp of the first observed oplog entry
     // is earlier than or equal to the minTs time.
-    auto oplogEntry = invariantStatusOK(repl::OplogEntry::parse(record.data.toBson()));
+    auto oplogEntry = uassertStatusOK(repl::OplogEntry::parse(record.data.toBson()));
     invariant(_specificStats.docsTested == 0);
     const bool isNewRS =
         oplogEntry.getObject().binaryEqual(BSON("msg" << repl::kInitiatingSetMsg)) &&
