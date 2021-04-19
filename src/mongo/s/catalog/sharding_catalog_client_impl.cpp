@@ -138,7 +138,7 @@ void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const ChunkVersion& sinceVersion) {
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss);
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, CollectionType::ConfigNS);
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[CollectionType::ConfigNS.coll()] = {CollectionType::ConfigNS,
                                                            std::vector<BSONObj>()};
