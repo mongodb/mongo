@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/rename_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
@@ -68,6 +69,15 @@ RenameCollectionResponse renameCollectionLegacy(OperationContext* opCtx,
                                                 const ShardsvrRenameCollection& request,
                                                 const NamespaceString& fromNss) {
     const auto& toNss = request.getTo();
+
+    auto fromDbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx, fromNss.db(), "renameCollection", DistLockManager::kDefaultLockTimeout));
+
+    auto fromCollDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx, fromNss.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
+
+    auto toCollDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
+        opCtx, toNss.ns(), "renameCollection", DistLockManager::kDefaultLockTimeout));
 
     // Make sure that source and target collection are not sharded
     uassert(ErrorCodes::IllegalOperation,
