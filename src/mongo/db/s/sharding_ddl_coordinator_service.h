@@ -69,6 +69,7 @@ private:
                                          const CancellationToken& token) override;
 
     void _afterStepDown() override;
+    size_t _countCoordinatorDocs(OperationContext* opCtx);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinatorService::_mutex");
 

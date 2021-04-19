@@ -35,6 +35,8 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/document_source_count.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
@@ -103,14 +105,40 @@ void ShardingDDLCoordinatorService::_afterStepDown() {
     _numCoordinatorsToWait = 0;
 }
 
+size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* opCtx) {
+    constexpr auto kNumCoordLabel = "numCoordinators"_sd;
+
+    auto aggRequest = [&]() -> AggregateCommandRequest {
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, getStateDocumentsNS());
+        const auto countSpec = BSON("$count" << kNumCoordLabel);
+        auto stages = DocumentSourceCount::createFromBson(countSpec.firstElement(), expCtx);
+        auto pipeline = Pipeline::create(std::move(stages), expCtx);
+        return {getStateDocumentsNS(), pipeline->serializeToBson()};
+    }();
+
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOKWithContext(
+        DBClientCursor::fromAggregationRequest(
+            &client, std::move(aggRequest), false /* secondaryOk */, true /* useExhaust */),
+        "Failed to establish a cursor for aggregation");
+
+    if (!cursor->more()) {
+        return 0;
+    }
+
+    auto res = cursor->nextSafe();
+    auto numCoordField = res.getField(kNumCoordLabel);
+    invariant(numCoordField);
+    return numCoordField.Long();
+}
+
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return ExecutorFuture<void>(**executor)
         .then([this] {
             AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
             auto opCtx = cc().makeOperationContext();
-            DBDirectClient client(opCtx.get());
-            const auto numCoordinators = client.count(getStateDocumentsNS());
+            const auto numCoordinators = _countCoordinatorDocs(opCtx.get());
             stdx::lock_guard lg(_mutex);
             if (numCoordinators > 0) {
                 _state = State::kRecovering;
