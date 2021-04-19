@@ -1,6 +1,9 @@
 /**
  * If a user attempts to downgrade the server while there are time-series collections present, the
  * downgrade request should be rejected.
+ *
+ * TODO (SERVER-56171): Remove this test once 5.0 is last-lts.
+ *
  * @tags: [
  *     requires_fcv_49,
  *     requires_find_command,
