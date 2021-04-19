@@ -1526,7 +1526,7 @@ SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(Operation
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                           StringData ident) {
-    invariant(!_readOnly);
+    invariant(!_readOnly || !recoverToOplogTimestamp.empty());
 
     _ensureIdentPath(ident);
     WiredTigerSession wtSession(_conn);
