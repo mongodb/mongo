@@ -1,10 +1,12 @@
 command_type: system
 stepback: false
 
+
 ## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
 parameters:
   - key: patch_compile_flags
     description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+
 
 variables:
   ###
@@ -12,13 +14,13 @@ variables:
   _real_compile_amazon2: &_compile_amazon2
       - name: compile
         variant: compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_compile_rhel70: &_compile_rhel70
       - name: compile
         variant: compile-rhel70
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_expansions: &_expansion_updates
     []
   ###
@@ -26,11 +28,11 @@ variables:
 ###
 # **Or**: Leave this section uncommented to bypass/skip compile.
 #  _skip_compile_amazon2: &_compile_amazon2
-#      - name: genny_generate_all_tasks
-#        variant: compile-amazon2
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
 #  _skip_compile_rhel70: &_compile_rhel70
-#      - name: genny_generate_all_tasks
-#        variant: compile-amazon2
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
 #  _skip_expansions: &_expansion_updates
 #      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd
 #      - key: mdb_binary_for_client
@@ -43,6 +45,7 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
+    # - mongo
     - dsi
     - genny
     - signal-processing
@@ -54,93 +57,97 @@ variables:
     - benchmarks
     - py-tpcc
 
-modules:
-###
-# Same in every DSI project
-- name: dsi
-  repo: git@github.com:10gen/dsi.git
-  prefix: ../../src
-  branch: master
-- name: genny
-  repo: git@github.com:10gen/genny.git
-  prefix: ../../src
-  branch: master
-- name: signal-processing
-  repo: git@github.com:10gen/signal-processing.git
-  prefix: ../../src
-  branch: master
-- name: workloads
-  repo: git@github.com:10gen/workloads.git
-  prefix: ../../src
-  branch: master
-- name: linkbench
-  repo: git@github.com:10gen/linkbench.git
-  prefix: ../../src
-  branch: master
-- name: linkbench2
-  repo: git@github.com:10gen/linkbench2.git
-  prefix: ../../src
-  branch: master
-- name: mongo-perf
-  repo: git@github.com:mongodb/mongo-perf.git
-  prefix: ../../src
-  branch: master
-- name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
-  prefix: ../../src
-  branch: master
-  ref: 4e7287880c04514cad2df5761b9511c940a33059
-- name: benchmarks
-  repo: git@github.com:mongodb-labs/benchmarks.git
-  prefix: ../../src
-  branch: master
-- name: py-tpcc
-  repo: git@github.com:mongodb-labs/py-tpcc.git
-  prefix: ../../src
-  branch: master
-  ref: 2d19705337a40e24831a904266a648b85df5be84
 
-###
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-- name: mongo-tools
-  repo: git@github.com:mongodb/mongo-tools.git
-  prefix: mongo-tools/src/github.com/mongodb
-  branch: master
+modules:
+  ###
+  # Same in every DSI project. Ensure that this block is synchronized with
+  # evergreen-dsitest.yml, atlas/system_perf_atlas.yml, and src/dsi/onboarding.py
+  # (search update-repos-here) in this repo, and etc/system_perf.yml and
+  # etc/perf.yml in mongodb/mongo
+  - name: dsi
+    repo: git@github.com:10gen/dsi.git
+    prefix: ../../src
+    branch: master
+  - name: genny
+    repo: git@github.com:10gen/genny.git
+    prefix: ../../src
+    branch: master
+  - name: signal-processing
+    repo: git@github.com:10gen/signal-processing.git
+    prefix: ../../src
+    branch: master
+  - name: workloads
+    repo: git@github.com:10gen/workloads.git
+    prefix: ../../src
+    branch: master
+  - name: linkbench
+    repo: git@github.com:10gen/linkbench.git
+    prefix: ../../src
+    branch: master
+  - name: linkbench2
+    repo: git@github.com:10gen/linkbench2.git
+    prefix: ../../src
+    branch: master
+  - name: mongo-perf
+    repo: git@github.com:mongodb/mongo-perf.git
+    prefix: ../../src
+    branch: master
+  - name: YCSB
+    repo: git@github.com:mongodb-labs/YCSB.git
+    prefix: ../../src
+    branch: master
+    ref: 4e7287880c04514cad2df5761b9511c940a33059
+  - name: benchmarks
+    repo: git@github.com:mongodb-labs/benchmarks.git
+    prefix: ../../src
+    branch: master
+  - name: py-tpcc
+    repo: git@github.com:mongodb-labs/py-tpcc.git
+    prefix: ../../src
+    branch: master
+    ref: 2d19705337a40e24831a904266a648b85df5be84
+#  - name: mongo
+#    repo: git@github.com:mongodb/mongo.git
+#    prefix: ../../src
+#    branch: master
+  ###
+  - name: enterprise
+    repo: git@github.com:10gen/mongo-enterprise-modules.git
+    prefix: src/mongo/db/modules
+    branch: master
+  - name: mongo-tools
+    repo: git@github.com:mongodb/mongo-tools.git
+    prefix: mongo-tools/src/github.com/mongodb
+    branch: master
 
 
 ###
 # Same in every DSI project
 pre:
-    - func: "f_other_pre_ops"
-    - func: "f_dsi_pre_run"
+  - func: f_other_pre_ops
+  - func: f_dsi_pre_run
 post:
-    - func: "f_dsi_post_run"
-    - func: "f_other_post_ops"
+  - func: f_dsi_post_run
+  - func: f_other_post_ops
+timeout:
+  - func: f_dsi_timeout
+  - func: f_other_timeout
 ###
 
 
 functions:
   ###
   # Same in every DSI project
-  "f_dsi_pre_run":
+  f_dsi_pre_run:
     - command: manifest.load
     - command: expansions.update
       params:
         updates: *_expansion_updates
-  "f_run_dsi_workload":
-    - command: shell.exec
-      params:
-        script: |
-          rm -rf ./*
-          mkdir src
-    - command: manifest.load
+  f_run_dsi_workload:
     - command: git.get_project
       params:
         directory: *src_dir
-        revisions: &revisions_list
+        revisions:
           dsi: ${dsi_rev}
           genny: ${genny_rev}
           signal-processing: ${signal-processing_rev}
@@ -151,12 +158,12 @@ functions:
           YCSB: ${YCSB_rev}
           benchmarks: ${benchmarks_rev}
           py-tpcc: ${py-tpcc_rev}
+          # mongo: ${mongo_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        continue_on_err: true
         script: ./src/dsi/run-dsi run_workload
     - command: shell.exec
       type: system
@@ -170,89 +177,44 @@ functions:
       type: test
       params:
         script: ./src/dsi/run-dsi determine_failure -m TEST
+  f_dsi_post_run:
     - command: shell.exec
-      type: test
       params:
-        script: |
-          ./src/dsi/run-dsi analysis
-          # detect outliers needs to run, so defer the post_run_check exit status to later
-          echo $? > post_run_check.status
+        script: ./src/dsi/run-dsi post_run
+    - command: attach.results
+      params:
+        file_location: ./build/EvergreenResultsJson/results.json
     - command: json.send
       params:
-        name: "perf"
-        file: "./build/LegacyPerfJson/perf.json"
+        name: perf
+        file: ./build/LegacyPerfJson/perf.json
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: ./build/Artifacts/DSIArtifacts.tgz
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/x-gzip
+        display_name: DSI Artifacts - Execution ${execution}
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: ./build/Documentation/index.html
+        remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-index.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: Documentation
+  f_dsi_timeout:
     - command: shell.exec
       params:
-        script: |
-          set -o errexit
-          is_patch=${is_patch}
-          task_id=${task_id}
-          perf_jira_user=${perf_jira_user}
-          perf_jira_pw=${perf_jira_pw}
-          analysis_user=${dsi_analysis_atlas_user}
-          analysis_password=${dsi_analysis_atlas_pw}
-          evergreen_api_key=${evergreen_api_key}
-          evergreen_api_user=${evergreen_api_user}
-          source ./src/dsi/src/signal_processing_setup.sh
-    - command: shell.exec
-      params:
-        script: |
-          set -o verbose
-          source ./signal_processing_venv/bin/activate
-          detect-changes --config .signal-processing.yml --mongo-repo=./src/mongo
-    - command: shell.exec
-      type: test
-      params:
-        script: |
-          set -o verbose
-          exit $(cat post_run_check.status)
-  "f_dsi_post_run":
-      - command: shell.exec
-        params:
-          script: ./src/dsi/run-dsi infrastructure_teardown
-      - command: shell.exec
-        params:
-          script: ./src/dsi/run-dsi ./src/dsi/src/dsi/make_artifact.sh
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: dsi-artifacts.tgz
-          remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/dsi-artifacts-${task_name}-${build_id}-${execution}.${ext|tgz}
-          bucket: mciuploads
-          permissions: public-read
-          content_type: ${content_type|application/x-gzip}
-          display_name: Dsi Artifacts - Execution ${execution}
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: src/mongo/workloads/workloads/jsdoc/jsdocs-redirect.html
-          remote_file: ${project_dir}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
-          bucket: mciuploads
-          permissions: public-read
-          content_type: text/html
-          display_name: workloads documentation
-      - command: attach.results
-        params:
-          file_location: report.json
-      - command: json.send
-        params:
-          name: "perf"
-          file: "./build/LegacyPerfJson/perf.json"
-      - command: s3.put
-        params:
-          aws_key: ${aws_key}
-          aws_secret: ${aws_secret}
-          local_file: pip-requirements.txt
-          remote_file: ${project}/${build_variant}/${revision}/pip-requirements-${task_id}-${execution}.txt
-          bucket: mciuploads
-          permissions: public-read
-          content_type: atext-plain
-          display_name: Pip Requirements
+        script: ./src/dsi/run-dsi on_timeout
   ###
 
-  "f_other_post_ops":
+  f_other_post_ops:
       - command: shell.exec
         params:
           working_dir: src
@@ -264,7 +226,7 @@ functions:
             if [ -d "${scons_cache_path}" ]; then
                 /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
             fi
-  "f_other_pre_ops":
+  f_other_pre_ops:
     - &f_other_pre_ops
       command: shell.exec
       params:
@@ -273,10 +235,14 @@ functions:
           for PS in mongo{,d,s,import,export,dump,restore,stat,files,top,bridge} resmoke.py python{,2} lldb _test; do
               pkill -9 "$PS"
           done
+  f_other_timeout:
+    # Can't be empty so just `echo`.
+    - command: shell.exec
+      params: {script: "echo"}
 
   ###
   # Compile
-  "compile mongodb":
+  compile mongodb:
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
     - command: shell.exec
@@ -378,77 +344,99 @@ functions:
         display_name: mongodb${compile-variant|}.tar.gz
   ###
 
+  ## Schedule Tasks ##
+  f_schedule_tasks:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          workloads: ${workloads_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks}
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+
+
 tasks:
 ###
 # Same in every DSI project
-- name: genny_generate_all_tasks
+- name: schedule_global_auto_tasks
+  priority: 5
   commands:
-    - command: git.get_project
-      params:
-        directory: *src_dir
-        revisions: *revisions_list
-    - command: expansions.write
-      params:
-        file: ./expansions.yml
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi schedule_tasks --tasks all_tasks
-    - command: generate.tasks
-      params:
-        files:
-          - build/TaskJSON/Tasks.json
-- name: genny_auto_tasks
+    - func: f_schedule_tasks
+      vars:
+        tasks: all_tasks
+- name: schedule_variant_auto_tasks
+  priority: 5
   commands:
-    - command: git.get_project
-      params:
-        directory: *src_dir
-        revisions: *revisions_list
-    - command: expansions.write
-      params:
-        file: ./expansions.yml
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi schedule_tasks --tasks variant_tasks
-    - command: generate.tasks
-      params:
-        files:
-          - build/TaskJSON/Tasks.json
-- name: genny_patch_tasks
+    - func: f_schedule_tasks
+      vars:
+        tasks: variant_tasks
+- name: schedule_patch_auto_tasks
+  priority: 5
   commands:
-    - command: git.get_project
-      params:
-        directory: *src_dir
-        revisions: *revisions_list
-    - command: expansions.write
-      params:
-        file: ./expansions.yml
-    - command: shell.exec
-      params:
-        script: ./src/dsi/run-dsi schedule_tasks --tasks patch_tasks
-    - command: generate.tasks
-      params:
-        files:
-          - build/TaskJSON/Tasks.json
+    - func: f_schedule_tasks
+      vars:
+        tasks: patch_tasks
 - name: smoke_test
   priority: 5
   commands:
     - func: f_run_dsi_workload
       vars:
-        test_control: "short"
+        test_control: short
 - name: smoke_test_ssl
   priority: 5
   commands:
     - func: f_run_dsi_workload
       vars:
-          test_control: short
-          mongodb_setup: replica-ssl
-          infrastructure_provisioning: replica
+        test_control: short
+        mongodb_setup: replica-ssl
+        infrastructure_provisioning: replica
+- name: smoke_test_standalone_auth
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: short
+        mongodb_setup: standalone-auth
+        infrastructure_provisioning: single
+- name: smoke_test_replset_auth
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: short
+        mongodb_setup: replica-auth
+        infrastructure_provisioning: replica
+- name: smoke_test_shard_lite_auth
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: short
+        mongodb_setup: shard-lite-auth
+        infrastructure_provisioning: shard-lite
 - name: dsi_integ_test_run_command_simple
   priority: 5
   commands:
     - func: f_run_dsi_workload
       vars:
-        test_control: "run_command_simple"
+        test_control: run_command_simple
 ###
 
 - name: compile
@@ -883,6 +871,17 @@ tasks:
 
 
 buildvariants:
+- name: task_generation
+  display_name: Task Generation
+  modules: *modules
+  expansions:
+    platform: linux
+    project_dir: dsi
+  run_on:
+      - amazon2-build
+  tasks:
+    - name: schedule_global_auto_tasks
+
 - &compile-amazon2
   name: compile-amazon2
   display_name: Compile
@@ -905,7 +904,6 @@ buildvariants:
       - "amazon2-build"
   tasks:
     - name: compile
-    - name: genny_generate_all_tasks
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -922,8 +920,8 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks: &standalonetasks
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: dsi_integ_test_run_command_simple
     - name: smoke_test
     - name: industry_benchmarks
@@ -975,6 +973,8 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks: &1nodetasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: ycsb_60GB
     - name: crud_workloads
@@ -995,8 +995,6 @@ buildvariants:
     - name: linkbench
     - name: linkbench2
     - name: tpcc
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
     - name: industry_benchmarks_wmajority
     - name: sb_large_scale
     - name: sb_timeseries
@@ -1016,11 +1014,11 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: crud_workloads
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-fle
   display_name: Linux 1-Node ReplSet FLE
@@ -1038,10 +1036,10 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: linkbench
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-cwrwc
   display_name: Linux 1-Node ReplSet CWRWC
@@ -1058,10 +1056,10 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: linkbench
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-1-node-replSet-ese-cbc
   display_name: Linux 1-Node ReplSet ESE CBC
@@ -1078,10 +1076,10 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
     - name: ycsb_60GB
 
 - name: linux-1-node-replSet-ese-gcm
@@ -1099,10 +1097,10 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
     - name: ycsb_60GB
 
 - name: linux-1-node-15gbwtcache
@@ -1120,10 +1118,10 @@ buildvariants:
       - "rhel70-perf-single"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-3-node-1dayhistory-15gbwtcache
   display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
@@ -1140,11 +1138,11 @@ buildvariants:
     - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: crud_workloads
     - name: crud_workloads_majority
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-3-shard
   display_name: Linux 3-Shard Cluster
@@ -1161,6 +1159,8 @@ buildvariants:
       - "rhel70-perf-shard"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: crud_workloads
     - name: mixed_workloads
@@ -1173,8 +1173,6 @@ buildvariants:
     - name: change_streams_throughput
     - name: change_streams_latency
     - name: change_streams_multi_mongos
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-shard-lite-audit
   display_name: Linux Shard Lite Cluster Audit
@@ -1208,6 +1206,8 @@ buildvariants:
       - "rhel70-perf-shard-lite"
   depends_on: *_compile_amazon2
   tasks: &shardlitetasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: bestbuy_agg
     - name: bestbuy_agg_merge_different_db
     - name: bestbuy_agg_merge_same_db
@@ -1227,8 +1227,6 @@ buildvariants:
     - name: move_chunk_waiting_workloads
     - name: retryable_writes_workloads
     - name: smoke_test
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-shard-lite-cwrwc
   display_name: Linux Shard Lite Cluster CWRWC
@@ -1245,10 +1243,10 @@ buildvariants:
       - "rhel70-perf-shard-lite"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: linkbench
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-shard-lite-all-feature-flags
   display_name: Linux Shard Lite (all feature flags)
@@ -1265,8 +1263,8 @@ buildvariants:
     - "rhel70-perf-shard-lite"
   depends_on: *_compile_amazon2
   tasks:
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
 
 - name: linux-shard-single
   display_name: Linux Shard Single
@@ -1283,8 +1281,8 @@ buildvariants:
       - "rhel70-perf-shard-lite"
   depends_on: *_compile_amazon2
   tasks:
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -1301,6 +1299,8 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks: &3nodetasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
@@ -1309,7 +1309,6 @@ buildvariants:
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
-#    Disable the workload until TIG-2695 is done
     - name: refine_shard_key_transaction_stress
     - name: smoke_test
     - name: retryable_writes_workloads
@@ -1328,8 +1327,6 @@ buildvariants:
     - name: tpcc
     - name: linkbench
     - name: linkbench2
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
     - name: sb_large_scale
     - name: sb_timeseries
 
@@ -1346,11 +1343,7 @@ buildvariants:
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-replset"
-  depends_on:
-      - name: compile
-        variant: compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
+  depends_on: *_compile_amazon2
   tasks: *3nodetasks
 
 - name: linux-3-node-replSet-last-lts-fcv
@@ -1366,11 +1359,7 @@ buildvariants:
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-replset"
-  depends_on:
-      - name: compile
-        variant: compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
+  depends_on: *_compile_amazon2
   tasks: *3nodetasks
 
 # Note that the "disabled-feature-flags" part of the name is kept to avoid breaking
@@ -1388,11 +1377,7 @@ buildvariants:
     storageEngine: wiredTiger
   run_on:
       - "rhel70-perf-replset"
-  depends_on:
-      - name: compile
-        variant: compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
+  depends_on: *_compile_amazon2
   tasks: *3nodetasks
 
 - name: linux-3-node-replSet-noflowcontrol
@@ -1410,6 +1395,8 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: industry_benchmarks_secondary_reads
     - name: crud_workloads
@@ -1422,8 +1409,6 @@ buildvariants:
     - name: tpcc
     - name: linkbench
     - name: linkbench2
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet-ssl
   display_name: Linux 3-Node ReplSet (SSL)
@@ -1440,10 +1425,10 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: mixed_workloads
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-3-node-replSet-maintenance-events
   display_name: Linux 3-Node ReplSet (Maintenance Events)
@@ -1460,6 +1445,8 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks_stepdowns
     - name: industry_benchmarks_rolling_restarts
     - name: industry_benchmarks_non_retryable_writes_stepdowns
@@ -1486,11 +1473,11 @@ buildvariants:
   run_on:
       - "rhel70-perf-replset"
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: initialsync
     - name: initialsync-logkeeper-short
     - name: initialsync-large
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: linux-replSet-initialsync-logkeeper
   display_name: Linux ReplSet Initial Sync LogKeeper
@@ -1509,9 +1496,9 @@ buildvariants:
       - "rhel70-perf-initialsync-logkeeper"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: initialsync-logkeeper
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
 # patch builds.
@@ -1532,6 +1519,8 @@ buildvariants:
 #    - "rhel70-perf-initialsync-logkeeper"
 #  depends_on: *_compile_amazon2
 #  tasks:
+#    - name: schedule_patch_auto_tasks
+#    - name: schedule_variant_auto_tasks
 #    - name: initialsync-logkeeper-snapshot-update
 #    - name: initialsync-logkeeper-short-s3-update
 
@@ -1550,6 +1539,8 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
 
 - name: linux-replSet-auth-delay
@@ -1567,7 +1558,8 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_amazon2
   tasks:
-    - name: genny_auto_tasks
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
 
 - name: atlas-like-M60
   display_name: M60-Like 3-Node ReplSet
@@ -1585,6 +1577,8 @@ buildvariants:
       - "rhel70-perf-M60-like"
   depends_on: *_compile_rhel70
   tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+    - name: schedule_patch_auto_tasks
+    - name: schedule_variant_auto_tasks
     - name: industry_benchmarks
     - name: ycsb_60GB
     - name: industry_benchmarks_secondary_reads
@@ -1607,8 +1601,6 @@ buildvariants:
     - name: snapshot_reads
     - name: secondary_reads
     - name: linkbench
-    - name: genny_patch_tasks
-    - name: genny_auto_tasks
 
 - name: renew-ssl-cert
   display_name: Renew SSL Cert
