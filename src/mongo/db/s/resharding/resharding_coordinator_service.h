@@ -76,7 +76,8 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc);
+                                             const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             boost::optional<Status> abortReason = boost::none);
 
 }  // namespace resharding
 
@@ -192,7 +193,8 @@ public:
     /**
      * Replace in-memory representation of the CoordinatorDoc
      */
-    void installCoordinatorDoc(OperationContext* opCtx, const ReshardingCoordinatorDocument& doc);
+    void installCoordinatorDoc(OperationContext* opCtx,
+                               const ReshardingCoordinatorDocument& doc) noexcept;
 
     /**
      * Returns a Future that will be resolved when all work associated with this Instance has
@@ -241,10 +243,23 @@ private:
         const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept;
 
     /**
-     * Runs cleanup logic that only applies to abort.
+     * Runs abort cleanup logic when only the coordinator is aware of the resharding operation.
+     *
+     * Only safe to call if an unrecoverable error is encountered before the coordinator completes
+     * its transition to kPreparingToDonate.
      */
-    void _onAbort(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                  const Status& status);
+    void _onAbortCoordinatorOnly(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                 const Status& status);
+
+    /*
+     * Runs abort cleanup logic when both the coordinator and participants are aware of the
+     * resharding operation.
+     *
+     * Only safe to call if the coordinator progressed past kInitializing before encountering an
+     * unrecoverable error.
+     */
+    void _onAbortCoordinatorAndParticipants(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const Status& status);
 
     /**
      * Does the following writes:

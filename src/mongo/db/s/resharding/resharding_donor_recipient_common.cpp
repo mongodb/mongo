@@ -94,76 +94,6 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
     }
 }
 
-/**
- * Acknowledges to the coordinator that all abort work is done on the donor. Since the
- * ReshardingDonorService doesn't exist, there isn't any work to do.
- *
- * TODO SERVER-54704: Remove this method, it should no longer be needed after SERVER-54513 is
- * completed.
- */
-void processAbortReasonNoDonorMachine(OperationContext* opCtx,
-                                      const ReshardingFields& reshardingFields,
-                                      const NamespaceString& nss) {
-    {
-        Lock::ResourceLock rstl(
-            opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
-        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
-            // no-op when node is not primary.
-            return;
-        }
-    }
-
-    auto abortReason = reshardingFields.getAbortReason();
-    auto shardId = ShardingState::get(opCtx)->shardId();
-    BSONObjBuilder updateBuilder;
-    updateBuilder.append("donorShards.$.state", DonorState_serializer(DonorStateEnum::kDone));
-    updateBuilder.append("donorShards.$.abortReason", *abortReason);
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        NamespaceString::kConfigReshardingOperationsNamespace,
-        BSON("_id" << reshardingFields.getReshardingUUID() << "donorShards.id" << shardId),
-        BSON("$set" << updateBuilder.done()),
-        false /* upsert */,
-        ShardingCatalogClient::kMajorityWriteConcern));
-}
-
-/**
- * Acknowledges to the coordinator that all abort work is done on the recipient. Since the
- * ReshardingRecipientService doesn't exist, there isn't any work to do.
- *
- * TODO SERVER-54704: Remove this method, it should no longer be needed after SERVER-54513 is
- * completed.
- */
-void processAbortReasonNoRecipientMachine(OperationContext* opCtx,
-                                          const ReshardingFields& reshardingFields,
-                                          const NamespaceString& nss) {
-
-    {
-        Lock::ResourceLock rstl(
-            opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_IX);
-        auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (!replCoord->canAcceptWritesFor(opCtx, nss)) {
-            // no-op when node is not primary.
-            return;
-        }
-    }
-
-    auto abortReason = reshardingFields.getAbortReason();
-    auto shardId = ShardingState::get(opCtx)->shardId();
-    BSONObjBuilder updateBuilder;
-    updateBuilder.append("recipientShards.$.state",
-                         RecipientState_serializer(RecipientStateEnum::kDone));
-    updateBuilder.append("recipientShards.$.abortReason", *abortReason);
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        NamespaceString::kConfigReshardingOperationsNamespace,
-        BSON("_id" << reshardingFields.getReshardingUUID() << "recipientShards.id" << shardId),
-        BSON("$set" << updateBuilder.done()),
-        false /* upsert */,
-        ShardingCatalogClient::kMajorityWriteConcern));
-}
-
 /*
  * Either constructs a new ReshardingDonorStateMachine with 'reshardingFields' or passes
  * 'reshardingFields' to an already-existing ReshardingDonorStateMachine.
@@ -177,11 +107,6 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
                                                               ReshardingDonorDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
         donorStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
-        return;
-    }
-
-    if (reshardingFields.getAbortReason()) {
-        processAbortReasonNoDonorMachine(opCtx, reshardingFields, nss);
         return;
     }
 
@@ -228,11 +153,6 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
                                                                   ReshardingRecipientDocument>(
             opCtx, reshardingFields.getReshardingUUID())) {
         recipientStateMachine->get()->onReshardingFieldsChanges(opCtx, reshardingFields);
-        return;
-    }
-
-    if (reshardingFields.getAbortReason()) {
-        processAbortReasonNoRecipientMachine(opCtx, reshardingFields, nss);
         return;
     }
 
