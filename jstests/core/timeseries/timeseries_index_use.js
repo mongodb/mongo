@@ -130,9 +130,6 @@ testQueryUsesIndex({'meta.a': {$eq: "1"}, 'time': {$gt: timeDate}}, 1, {'time': 
 // Test wildcard indexes with metaField.
 testQueryUsesIndex({'meta.a': {$lt: 3}}, 1, {'meta.$**': 1});
 testQueryUsesIndex({'meta.b': {$gt: 3}}, 1, {'meta.$**': 1});
-// TODO SERVER-55233: reenable these tests.
-// testQueryUsesIndex({'meta.a': {$lt: 3}}, 1, {'$**': 1}, {'wildcardProjection': {'meta': 1}});
-// testQueryUsesIndex({'meta.a': {$lt: 3}}, 1, {'$**': 1}, {'wildcardProjection': {'meta.a': 1}});
 
 // Test hashed indexes on metaField.
 testQueryUsesIndex({'meta': {$eq: {a: 1}}}, 1, {'meta': "hashed"});
