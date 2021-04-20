@@ -6273,16 +6273,6 @@ tasks:
       resmoke_jobs_max: 1
       fallback_num_sub_suites: 3
 
-# TODO (SERVER-54850): Remove once SERVER-54850 is completed.
-- <<: *task_template
-  name: concurrency_sharded_ddl_operations
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: "--suites=concurrency_sharded_ddl_operations --storageEngine=wiredTiger --mongodSetParameters='{logComponentVerbosity: {command: 2, sharding: 2}}'"
-      resmoke_jobs_max: 1
-
 - name: concurrency_simultaneous_gen
   tags: ["concurrency", "common"]
   commands:
@@ -9968,7 +9958,6 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-  - name: concurrency_sharded_ddl_operations
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:

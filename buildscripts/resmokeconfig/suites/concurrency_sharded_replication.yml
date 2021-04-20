@@ -110,9 +110,6 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-  # TODO SERVER-54905: DDL/CRUD is tested on its own suite for now.
-  - jstests/concurrency/fsm_workloads/random_DDL_CRUD_operations.js
-
   exclude_with_any_tags:
   - requires_replication
   - assumes_balancer_on
