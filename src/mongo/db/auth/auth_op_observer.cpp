@@ -192,6 +192,18 @@ void AuthOpObserver::onRenameCollection(OperationContext* const opCtx,
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 
+void AuthOpObserver::onImportCollection(OperationContext* opCtx,
+                                        const UUID& importUUID,
+                                        const NamespaceString& nss,
+                                        long long numRecords,
+                                        long long dataSize,
+                                        const BSONObj& catalogEntry,
+                                        const BSONObj& storageMetadata,
+                                        bool isDryRun) {
+    AuthorizationManager::get(opCtx->getServiceContext())
+        ->logOp(opCtx, "m", nss, catalogEntry, &storageMetadata);
+}
+
 void AuthOpObserver::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
