@@ -6,6 +6,7 @@ import Tab from "@material-ui/core/Tab";
 
 import NodeList from "./NodeList";
 import InfoExpander from "./InfoExpander";
+import AlgorithmExpander from "./AlgorithmExpander";
 
 function a11yProps(index) {
   return {
@@ -46,6 +47,7 @@ export default function GraphInfoTabs({ nodes, width }) {
           <Tab label="Selected Info" {...a11yProps(0)} />
           <Tab label="Node List" {...a11yProps(1)} />
           <Tab label="Edge List" {...a11yProps(2)} />
+          <Tab label="Algorithms" {...a11yProps(3)} />
         </Tabs>
       </AppBar>
       <div style={{ height: "100%" }} hidden={value != 0}>
@@ -53,6 +55,10 @@ export default function GraphInfoTabs({ nodes, width }) {
       </div>
       <div style={{ height: "100%" }} hidden={value != 1}>
         <NodeList nodes={nodes}></NodeList>
+      </div>
+      <div style={{ height: "100%" }} hidden={value != 2}></div>
+      <div style={{ height: "100%" }} hidden={value != 3}>
+        <AlgorithmExpander width={width}></AlgorithmExpander>
       </div>
     </div>
   );

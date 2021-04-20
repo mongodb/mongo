@@ -56,6 +56,7 @@ class BackendServer:
         self.app.add_url_rule("/graph_files", "return_graph_files", self.return_graph_files)
         self.socketio.on_event('git_hash_selected', self.git_hash_selected)
         self.socketio.on_event('row_selected', self.row_selected)
+        self.socketio.on_event('receive_graph_paths', self.receive_graph_paths)
 
         self.loaded_graphs = {}
         self.current_selected_rows = {}
@@ -65,10 +66,12 @@ class BackendServer:
         self.graph_file_tuple = namedtuple('GraphFile', ['version', 'git_hash', 'graph_file'])
         self.graph_files = self.get_graphml_files()
 
+        self._dependents_graph = None
+        self._dependency_graph = None
+
         try:
             default_selected_graph = list(self.graph_files.items())[0][1].graph_file
             self.load_graph_from_file(default_selected_graph)
-            self._dependents_graph = networkx.reverse_view(self._dependency_graph)
         except (IndexError, AttributeError) as ex:
             print(ex)
             print(
@@ -164,40 +167,43 @@ class BackendServer:
 
             self.socketio.emit("node_infos", nodeinfo_data)
 
-    def send_graph_data(self):
+    def send_graph_data(self, extra_nodes=None):
         """Convert the current selected rows into a format for D3."""
 
         with self.app.test_request_context():
 
-            nodes = set()
-            links = set()
+            nodes = {}
+            links = {}
+
+            def add_node_to_graph_data(node):
+                nodes[str(node)] = {
+                    'id': str(node), 'name': Path(node).name,
+                    'type': self._dependents_graph.nodes()[str(node)]['bin_type']
+                }
+
+            def add_link_to_graph_data(source, target):
+                links[str(source) + str(target)] = {'source': str(source), 'target': str(target)}
 
             for node, _ in self.current_selected_rows.items():
-                nodes.add(
-                    tuple({
-                        'id': str(node), 'name': node.name, 'type': self._dependents_graph.nodes()
-                                                                    [str(node)]['bin_type']
-                    }.items()))
+                add_node_to_graph_data(node)
 
-                for depender in self._dependency_graph[str(node)]:
+                for libdep in self._dependency_graph[str(node)]:
+                    if self._dependents_graph[libdep][str(node)].get('direct'):
+                        add_node_to_graph_data(libdep)
+                        add_link_to_graph_data(node, libdep)
 
-                    depender_path = Path(depender)
-                    if self._dependents_graph[depender][str(node)].get('direct'):
-                        nodes.add(
-                            tuple({
-                                'id':
-                                    str(depender_path), 'name':
-                                        depender_path.name, 'type':
-                                            self._dependents_graph.nodes()[str(depender_path)]
-                                            ['bin_type']
-                            }.items()))
-                        links.add(
-                            tuple({'source': str(node), 'target': str(depender_path)}.items()))
+            if extra_nodes is not None:
+                for node in extra_nodes:
+                    add_node_to_graph_data(node)
+
+                    for libdep in self._dependency_graph.get_direct_nonprivate_graph()[str(node)]:
+                        add_node_to_graph_data(libdep)
+                        add_link_to_graph_data(node, libdep)
 
             node_data = {
                 'graphData': {
-                    'nodes': [dict(node) for node in nodes],
-                    'links': [dict(link) for link in links],
+                    'nodes': [data for node, data in nodes.items()],
+                    'links': [data for link, data in links.items()],
                 }, 'selectedNodes': [str(node) for node in list(self.current_selected_rows.keys())]
             }
             self.socketio.emit("graph_data", node_data)
@@ -205,18 +211,16 @@ class BackendServer:
     def row_selected(self, message):
         """Construct the new graphData nodeInfo when a cell is selected."""
 
-        print(f"Got row {message}!")
-
         if message['isSelected'] == 'flip':
             if message['data']['node'] in self.current_selected_rows:
-                self.current_selected_rows.pop(message['data']['node'])
+                self.current_selected_rows.pop(Path(message['data']['node']))
             else:
                 self.current_selected_rows[Path(message['data']['node'])] = message['data']
         else:
             if message['isSelected'] and message:
                 self.current_selected_rows[Path(message['data']['node'])] = message['data']
             else:
-                self.current_selected_rows.pop(message['data']['node'])
+                self.current_selected_rows.pop(Path(message['data']['node']))
 
         self.socketio.start_background_task(self.send_graph_data)
         self.socketio.start_background_task(self.send_node_infos)
@@ -227,7 +231,7 @@ class BackendServer:
         with self.app.test_request_context():
 
             analysis = libdeps.analyzer.counter_factory(
-                self._dependents_graph,
+                self._dependency_graph,
                 [name[0] for name in libdeps.analyzer.CountTypes.__members__.items()])
             ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
             results = ga.get_results()
@@ -236,6 +240,37 @@ class BackendServer:
             for i, data in enumerate(results):
                 graph_data.append({'id': i, 'type': data, 'value': results[data]})
             self.socketio.emit("graph_results", graph_data)
+
+    def receive_graph_paths(self, message):
+        """Receive the reqest message and kick it off to another thread."""
+
+        self.socketio.start_background_task(self.send_paths, message)
+
+    def send_paths(self, message):
+        """Gather all the nodes in the graph for the node list."""
+
+        with self.app.test_request_context():
+
+            analysis = [
+                libdeps.analyzer.GraphPaths(self._dependency_graph, message['fromNode'],
+                                            message['toNode'])
+            ]
+            ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis=analysis)
+            results = ga.get_results()
+
+            paths = results[libdeps.analyzer.DependsReportTypes.GRAPH_PATHS.name][(
+                message['fromNode'], message['toNode'])]
+            paths.sort(key=len)
+            nodes = set()
+            for path in paths:
+                for node in path:
+                    nodes.add(node)
+
+            self.send_graph_data(extra_nodes=list(nodes))
+
+            self.socketio.emit(
+                "graph_path_results",
+                {'fromNode': message['fromNode'], 'toNode': message['toNode'], 'paths': paths})
 
     def send_node_list(self):
         """Gather all the nodes in the graph for the node list."""
@@ -246,7 +281,7 @@ class BackendServer:
                 "selectedNodes": [str(node) for node in list(self.current_selected_rows.keys())]
             }
 
-            for node in self._dependents_graph.nodes():
+            for node in sorted(self._dependents_graph.nodes()):
                 node_path = Path(node)
                 node_data['graphData']['nodes'].append(
                     {'id': str(node_path), 'name': node_path.name})
@@ -262,7 +297,7 @@ class BackendServer:
                 self.current_selected_rows = {}
                 if message['hash'] in self.loaded_graphs:
                     self._dependents_graph = self.loaded_graphs[message['hash']]
-                    self._dependents_graph = networkx.reverse_view(self._dependency_graph)
+                    self._dependency_graph = networkx.reverse_view(self._dependents_graph)
                 else:
                     print(
                         f'loading new graph {current_hash} because different than {message["hash"]}'
@@ -277,8 +312,6 @@ class BackendServer:
 
     def git_hash_selected(self, message):
         """Load the new graph and perform queries on it."""
-
-        print(f"Got requests2 {message}!")
 
         emit("other_hash_selected", message, broadcast=True)
 

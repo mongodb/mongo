@@ -11,7 +11,7 @@ import MuiAccordionDetails from "@material-ui/core/AccordionDetails";
 import { getSelected } from "./redux/store";
 
 import GraphInfo from "./GraphInfo";
-import NodeInfo from "./NodeInfo";
+import GraphPaths from "./GraphPaths";
 import LoadingBar from "./LoadingBar";
 
 const useStyles = makeStyles((theme) => ({
@@ -65,31 +65,41 @@ const AccordionDetails = withStyles((theme) => ({
   },
 }))(MuiAccordionDetails);
 
-const InfoExpander = ({ selectedNodes, selectedEdges, loading, width }) => {
+const AlgorithmExpander = ({ loading, width }) => {
   const classes = useStyles();
 
   return (
     <div className={classes.root}>
       <LoadingBar loading={loading} height={"100%"}>
         <Paper style={{ maxHeight: "82vh", overflow: "auto" }}>
-          {selectedNodes.map((node) => (
-            <Accordion key={node.node}>
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon />}
-                aria-controls="panel1a-content"
-                id="panel1a-header"
-              >
-                <Typography className={classes.heading}>{node.name}</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <NodeInfo node={node} width={width} />
-              </AccordionDetails>
-            </Accordion>
-          ))}
+          <Accordion>
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon />}
+              aria-controls="panel1a-content"
+              id="panel1a-header"
+            >
+              <Typography className={classes.heading}>Counts</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <GraphInfo datawidth={width} />
+            </AccordionDetails>
+          </Accordion>
+          <Accordion>
+            <AccordionSummary
+              expandIcon={<ExpandMoreIcon />}
+              aria-controls="panel1a-content"
+              id="panel1a-header"
+            >
+              <Typography className={classes.heading}>Graph Paths</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <GraphPaths datawidth={width} />
+            </AccordionDetails>
+          </Accordion>
         </Paper>
       </LoadingBar>
     </div>
   );
 };
 
-export default connect(getSelected)(InfoExpander);
+export default connect(getSelected)(AlgorithmExpander);

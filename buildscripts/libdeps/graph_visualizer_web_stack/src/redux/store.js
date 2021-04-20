@@ -7,6 +7,7 @@ import { loading } from "./loading";
 import { links } from "./links";
 import { graphData } from "./graphData";
 import { findNode } from "./findNode";
+import { graphPaths } from "./graphPaths";
 
 export const initialState = {
   loading: false,
@@ -38,6 +39,15 @@ export const initialState = {
     links: [
       // {source: 'test/test1.so', target: 'test/test2.so'}
     ],
+  },
+  graphPaths: {
+    fromNode: "test",
+    toNode: "test",
+    paths: [
+      ["test1", "test2"],
+      ["test1", "test3", "test2"],
+    ],
+    selectedPath: -1,
   },
   counts: [{ id: 0, type: "node2", value: 0 }],
   findNode: "",
@@ -91,6 +101,7 @@ export const getSelected = (state) => {
     selectedNodes: state.nodes.filter((node) => node.selected),
     selectedEdges: [],
     loading: state.loading,
+    graphPaths: state.graphPaths,
   };
 };
 
@@ -107,6 +118,7 @@ export const getGraphData = (state) => {
     graphData: state.graphData,
     loading: state.loading,
     findNode: state.findNode,
+    graphPaths: state.graphPaths,
   };
 };
 
@@ -124,6 +136,7 @@ const store = createStore(
     links,
     graphData,
     findNode,
+    graphPaths,
   }),
   initialState
 );

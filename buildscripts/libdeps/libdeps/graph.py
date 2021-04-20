@@ -120,11 +120,6 @@ class LibdepsGraph(networkx.DiGraph):
 
         return self._deptypes[deptype]
 
-    def _strip_build_dir(self, node):
-        """Small util function for making args match the graph paths."""
-
-        return str(Path(node).resolve().relative_to(Path(self.graph['build_dir']).resolve()))
-
     def get_direct_nonprivate_graph(self):
         """Get a graph view of direct nonprivate edges."""
 

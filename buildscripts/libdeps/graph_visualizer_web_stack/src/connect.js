@@ -9,6 +9,7 @@ import { setGraphFiles, selectGraphFile } from "./redux/graphFiles";
 import { setLoading } from "./redux/loading";
 import { addLinks } from "./redux/links";
 import { setGraphData } from "./redux/graphData";
+import { selectedGraphPaths } from "./redux/graphPaths";
 
 const { REACT_APP_API_URL } = process.env;
 
@@ -27,6 +28,7 @@ const SocketConnection = ({
   addLinks,
   setGraphData,
   setNodeInfos,
+  selectedGraphPaths,
 }) => {
   React.useEffect(() => {
     fetch(REACT_APP_API_URL + "/graph_files")
@@ -82,6 +84,10 @@ const SocketConnection = ({
     socket.on("node_infos", (incomingData) => {
       setNodeInfos(incomingData.nodeInfos);
     });
+
+    socket.on("graph_path_results", (incomingData) => {
+      selectedGraphPaths(incomingData);
+    });
   }, []);
 
   return null;
@@ -97,4 +103,5 @@ export default reduxConnect(null, {
   selectGraphFile,
   addLinks,
   setGraphData,
+  selectedGraphPaths,
 })(SocketConnection);
