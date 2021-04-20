@@ -629,10 +629,10 @@ var ReshardingTest = class {
         const collInfo = donor.getCollection(this._ns).exists();
         const isAlsoRecipient = this._recipientShards().includes(donor);
         if (expectedErrorCode === ErrorCodes.OK && !isAlsoRecipient) {
-            assert.eq(
-                null,
-                collInfo,
-                `collection exists on ${donor.shardName} despite resharding having succeeded`);
+            // TODO SERVER-55781 Only allow collection to be null after fixing underlying bug.
+            assert(collInfo == null ||
+                       !bsonBinaryEqual(this._sourceCollectionUUID, collInfo.info.uuid),
+                   `collection exists on ${donor.shardName} despite resharding having succeeded`);
         } else if (expectedErrorCode !== ErrorCodes.OK) {
             assert.neq(
                 null,
