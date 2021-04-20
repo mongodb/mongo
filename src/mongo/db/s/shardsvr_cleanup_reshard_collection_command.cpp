@@ -58,9 +58,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrCleanupReshardCollection can only be run on shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_shardsvrCleanupReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);

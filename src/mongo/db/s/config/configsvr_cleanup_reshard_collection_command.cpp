@@ -31,8 +31,11 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
@@ -40,6 +43,28 @@
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
+
+auto constructFinalMetadataRemovalUpdateOperation(OperationContext* opCtx,
+                                                  const NamespaceString& nss) {
+    auto query = BSON(CollectionType::kNssFieldName << nss.toString());
+
+    auto collEntryFieldsToUnset = BSON(CollectionType::kReshardingFieldsFieldName
+                                       << 1 << CollectionType::kAllowMigrationsFieldName << 1);
+    auto collEntryFieldsToUpdate =
+        BSON(CollectionType::kUpdatedAtFieldName
+             << opCtx->getServiceContext()->getPreciseClockSource()->now());
+
+    auto update = BSON("$unset" << collEntryFieldsToUnset << "$set" << collEntryFieldsToUpdate);
+
+    return BatchedCommandRequest::buildUpdateOp(CollectionType::ConfigNS,
+                                                query,
+                                                update,
+                                                false,  // upsert
+                                                false   // multi
+    );
+}
 
 class ConfigsvrCleanupReshardCollectionCommand final
     : public TypedCommand<ConfigsvrCleanupReshardCollectionCommand> {
@@ -59,15 +84,12 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrCleanupReshardCollection can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-            uassert(ErrorCodes::InvalidOptions,
-                    "_configsvrCleanupReshardCollection must be called with majority writeConcern",
-                    opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto collEntry = catalogClient->getCollection(opCtx, ns());
+            auto collEntry = catalogClient->getCollection(opCtx, ns());
             if (!collEntry.getReshardingFields()) {
                 // If the collection entry doesn't have resharding fields, we assume that the
                 // resharding operation has already been cleaned up.
@@ -78,8 +100,20 @@ public:
                 ns(), collEntry.getReshardingFields()->getReshardingUUID());
             cleaner.clean(opCtx);
 
-            // TODO SERVER-54035 Implement post-cleanup removal of reshardingFields to indicate
-            // complete cleanup.
+            ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+                opCtx, ns(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+                    auto update = constructFinalMetadataRemovalUpdateOperation(opCtx, ns());
+                    auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+                        opCtx, CollectionType::ConfigNS, update, txnNumber);
+                });
+
+            collEntry = catalogClient->getCollection(opCtx, ns());
+
+            uassert(5403504,
+                    "Expected collection entry for {} to no longer have resharding metadata, but "
+                    "metadata documents still exist; please rerun the cleanupReshardCollection "
+                    "command"_format(ns().toString()),
+                    !collEntry.getReshardingFields());
         }
 
     private:

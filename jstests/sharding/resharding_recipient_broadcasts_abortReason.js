@@ -58,7 +58,7 @@ reshardingTest.withReshardingInBackground(
     () => {},
     {
         expectedErrorCode: ErrorCodes.InternalError,
-        postAbortDecisionPersistedFn: () => {
+        postDecisionPersistedFn: () => {
             ReshardingTestUtil.assertDonorAbortsLocally(donor0,
                                                         donorShardNames[0],
                                                         inputCollection.getFullName(),

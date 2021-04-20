@@ -54,6 +54,8 @@ public:
 protected:
     virtual void _doClean(OperationContext* opCtx, const ReshardingDocument& doc) = 0;
 
+    virtual void _abortMachine(StateMachine& machine) = 0;
+
     boost::optional<ReshardingDocument> _fetchReshardingDocumentFromDisk(OperationContext* opCtx);
 
     void _waitOnMachineCompletionIfExists(OperationContext* opCtx);
@@ -78,10 +80,16 @@ public:
 private:
     void _doClean(OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) override;
 
+    void _abortMachine(ReshardingCoordinatorService::ReshardingCoordinator& machine) override;
+
     void _cleanOnParticipantShards(OperationContext* opCtx,
                                    const ReshardingCoordinatorDocument& doc);
 
-    void _dropTemporaryReshardingCollection(OperationContext* opCtx);
+    bool _checkExistsTempReshardingCollection(OperationContext* opCtx,
+                                              const NamespaceString& tempReshardingNss);
+
+    void _dropTemporaryReshardingCollection(OperationContext* opCtx,
+                                            const NamespaceString& tempReshardingNss);
 };
 
 class ReshardingDonorCleaner : public ReshardingCleaner<ReshardingDonorService,
@@ -91,7 +99,13 @@ public:
     ReshardingDonorCleaner(NamespaceString nss, UUID reshardingUUID);
 
 private:
-    void _doClean(OperationContext* opCtx, const ReshardingDonorDocument& doc) override{};
+    void _doClean(OperationContext* opCtx, const ReshardingDonorDocument& doc) override {}
+
+    /**
+     * The donor receives the abort signal through observing changes on the collection entry, so
+     * there's no need for a direct abort.
+     */
+    void _abortMachine(ReshardingDonorService::DonorStateMachine& machine) override {}
 };
 
 class ReshardingRecipientCleaner
@@ -103,6 +117,12 @@ public:
 
 private:
     void _doClean(OperationContext* opCtx, const ReshardingRecipientDocument& doc) override;
+
+    /**
+     * The recipient receives the abort signal through observing changes on the collection entry,
+     * so there's no need for a direct abort.
+     */
+    void _abortMachine(ReshardingRecipientService::RecipientStateMachine& machine) override {}
 };
 
 }  // namespace mongo

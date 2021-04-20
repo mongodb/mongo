@@ -31,9 +31,59 @@
 
 #include "mongo/db/s/resharding/resharding_manual_cleanup.h"
 
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/request_types/cleanup_reshard_collection_gen.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
+
+namespace {
+
+std::vector<ShardId> getAllParticipantsFromCoordDoc(const ReshardingCoordinatorDocument& doc) {
+    std::vector<ShardId> participants;
+
+    auto donorShards = extractShardIdsFromParticipantEntriesAsSet(doc.getDonorShards());
+    auto recipientShards = extractShardIdsFromParticipantEntriesAsSet(doc.getRecipientShards());
+    std::set_union(donorShards.begin(),
+                   donorShards.end(),
+                   recipientShards.begin(),
+                   recipientShards.end(),
+                   std::back_inserter(participants));
+
+    return participants;
+}
+
+std::vector<AsyncRequestsSender::Request> createShardCleanupRequests(
+    const NamespaceString& nss, UUID reshardingUUID, const ReshardingCoordinatorDocument& doc) {
+
+    auto participants = getAllParticipantsFromCoordDoc(doc);
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (auto participant : participants) {
+        requests.emplace_back(participant,
+                              ShardsvrCleanupReshardCollection(nss, reshardingUUID).toBSON({}));
+    }
+    return requests;
+}
+
+void assertResponseOK(const NamespaceString& nss,
+                      StatusWith<executor::RemoteCommandResponse> response,
+                      ShardId shardId) {
+    auto errorContext = "Unable to cleanup reshard collection for namespace {} on shard {}"_format(
+        nss.ns(), shardId.toString());
+    auto shardResponse = uassertStatusOKWithContext(std::move(response), errorContext);
+
+    auto status = getStatusFromCommandResult(shardResponse.data);
+    uassertStatusOKWithContext(status, errorContext);
+
+    auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
+    uassertStatusOKWithContext(wcStatus, errorContext);
+}
+
+}  // anonymous namespace
 
 template <class Service, class StateMachine, class ReshardingDocument>
 ReshardingCleaner<Service, StateMachine, ReshardingDocument>::ReshardingCleaner(
@@ -63,21 +113,53 @@ void ReshardingCleaner<Service, StateMachine, ReshardingDocument>::clean(Operati
 
     _waitOnMachineCompletionIfExists(opCtx);
 
+    // Do another fetch of the document in case metadata has changed as a result of the machine
+    // completion. If the document does not exist now, keep the member variable as-is to retain
+    // access to metadata information.
+    if (auto attemptRetrieveFinalReshardingDocument = _fetchReshardingDocumentFromDisk(opCtx)) {
+        reshardingDocument = attemptRetrieveFinalReshardingDocument;
+    }
+
     _doClean(opCtx, *reshardingDocument);
 
-    // TODO SERVER-54035 Remove resharding document on local disk.
+    // Remove resharding document on disk.
+    _store.remove(opCtx, BSON(ReshardingDocument::kReshardingUUIDFieldName << _reshardingUUID));
 }
 
 template <class Service, class StateMachine, class ReshardingDocument>
 boost::optional<ReshardingDocument>
 ReshardingCleaner<Service, StateMachine, ReshardingDocument>::_fetchReshardingDocumentFromDisk(
     OperationContext* opCtx) {
-    return boost::none;
+    boost::optional<ReshardingDocument> docOptional;
+    _store.forEach(opCtx,
+                   QUERY(ReshardingDocument::kReshardingUUIDFieldName << _reshardingUUID),
+                   [&](const ReshardingDocument& doc) {
+                       docOptional.emplace(doc);
+                       return false;
+                   });
+    return docOptional;
 }
 
 template <class Service, class StateMachine, class ReshardingDocument>
 void ReshardingCleaner<Service, StateMachine, ReshardingDocument>::_waitOnMachineCompletionIfExists(
-    OperationContext* opCtx) {}
+    OperationContext* opCtx) {
+    auto machine =
+        resharding::tryGetReshardingStateMachine<Service, StateMachine, ReshardingDocument>(
+            opCtx, _reshardingUUID);
+
+    if (machine) {
+        auto completionFuture = machine->get()->getCompletionFuture();
+        _abortMachine(**machine);
+        auto completionStatus = completionFuture.waitNoThrow(opCtx);
+        if (!completionStatus.isOK()) {
+            LOGV2_INFO(
+                5403505,
+                "While cleaning up resharding operation, discovered that the original operation "
+                "failed; no action required",
+                "originalError"_attr = redact(completionStatus));
+        }
+    }
+}
 
 template class ReshardingCleaner<ReshardingCoordinatorService,
                                  ReshardingCoordinatorService::ReshardingCoordinator,
@@ -101,13 +183,77 @@ ReshardingCoordinatorCleaner::ReshardingCoordinatorCleaner(NamespaceString nss, 
 void ReshardingCoordinatorCleaner::_doClean(OperationContext* opCtx,
                                             const ReshardingCoordinatorDocument& doc) {
     _cleanOnParticipantShards(opCtx, doc);
-    _dropTemporaryReshardingCollection(opCtx);
+
+    if (!_checkExistsTempReshardingCollection(opCtx, doc.getTempReshardingNss())) {
+        return;
+    }
+
+    // Only drop the temporary resharding collection if the coordinator's state indicates that the
+    // resharding operation exited before persisting its decision to commit.
+    uassert(
+        ErrorCodes::ManualInterventionRequired,
+        "Can't drop temporary resharding collection if resharding operation has already persisted "
+        "a decision",
+        doc.getState() != CoordinatorStateEnum::kDecisionPersisted);
+
+    _dropTemporaryReshardingCollection(opCtx, doc.getTempReshardingNss());
+}
+
+void ReshardingCoordinatorCleaner::_abortMachine(
+    ReshardingCoordinatorService::ReshardingCoordinator& machine) {
+    machine.abort();
 }
 
 void ReshardingCoordinatorCleaner::_cleanOnParticipantShards(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) {}
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& doc) {
+    AsyncRequestsSender ars(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        NamespaceString::kAdminDb,
+        createShardCleanupRequests(_originalCollectionNss, _reshardingUUID, doc),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
 
-void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(OperationContext* opCtx) {}
+    while (!ars.done()) {
+        auto arsResponse = ars.next();
+        assertResponseOK(_originalCollectionNss,
+                         std::move(arsResponse.swResponse),
+                         std::move(arsResponse.shardId));
+    }
+}
+
+bool ReshardingCoordinatorCleaner::_checkExistsTempReshardingCollection(
+    OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
+    try {
+        Grid::get(opCtx)->catalogClient()->getCollection(
+            opCtx, tempReshardingNss, repl::ReadConcernLevel::kMajorityReadConcern);
+        return true;
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // If the temporary resharding collection has already been dropped, exit early.
+        return false;
+    }
+}
+
+void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
+    OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
+    ShardsvrDropCollection dropCollectionCommand(tempReshardingNss);
+    dropCollectionCommand.setDbName(tempReshardingNss.db());
+
+    const auto dbInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.db()));
+
+    auto cmdResponse = executeCommandAgainstDatabasePrimary(
+        opCtx,
+        tempReshardingNss.db(),
+        dbInfo,
+        CommandHelpers::appendMajorityWriteConcern(dropCollectionCommand.toBSON({}),
+                                                   opCtx->getWriteConcern()),
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        Shard::RetryPolicy::kIdempotent);
+
+    assertResponseOK(
+        _originalCollectionNss, std::move(cmdResponse.swResponse), std::move(cmdResponse.shardId));
+}
 
 ReshardingDonorCleaner::ReshardingDonorCleaner(NamespaceString nss, UUID reshardingUUID)
     : ReshardingCleaner(NamespaceString::kDonorReshardingOperationsNamespace,
@@ -125,7 +271,8 @@ ReshardingRecipientCleaner::ReshardingRecipientCleaner(NamespaceString nss, UUID
 
 void ReshardingRecipientCleaner::_doClean(OperationContext* opCtx,
                                           const ReshardingRecipientDocument& doc) {
-    // TODO SERVER-54035 Call into shared recipient metadata cleanup function.
+    resharding::data_copy::ensureOplogCollectionsDropped(
+        opCtx, doc.getReshardingUUID(), doc.getSourceUUID(), doc.getDonorShards());
 }
 
 }  // namespace mongo

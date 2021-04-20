@@ -461,9 +461,15 @@ var ReshardingTest = class {
             expectedErrorCode: expectedErrorCode
         });
 
-        // TODO SERVER-52838: Call _checkPostState() when donor and recipient shards clean up their
-        // local metadata on error.
+        // TODO SERVER-52838: Call _checkPostState() without calling cleanupReshardCollection once
+        // donor and recipient shards clean up their local metadata on error.
         if (expectedErrorCode === ErrorCodes.OK) {
+            this._checkPostState(expectedErrorCode);
+        } else {
+            const res = this._st.s.adminCommand({
+                cleanupReshardCollection: this._ns,
+            });
+            assert.commandWorked(res);
             this._checkPostState(expectedErrorCode);
         }
     }
