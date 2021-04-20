@@ -10066,6 +10066,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.debug_only !.sharded
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
+  - name: .rollbackfuzzer
   - name: causally_consistent_hedged_reads_jscore_passthrough_gen
   - name: causally_consistent_jscore_passthrough_auth_gen
   - name: causally_consistent_jscore_passthrough_gen
