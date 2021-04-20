@@ -1329,7 +1329,8 @@ StatusWithMatchExpression parseAll(StringData name,
                 return inner;
             doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx,
                                                                       inner.getValue().get());
-            myAnd->add(std::move(inner.getValue()));
+
+            addExpressionToRoot(expCtx, myAnd.get(), std::move(inner.getValue()));
         }
 
         return {std::move(myAnd)};
@@ -1341,7 +1342,7 @@ StatusWithMatchExpression parseAll(StringData name,
         if (e.type() == BSONType::RegEx) {
             auto expr = std::make_unique<RegexMatchExpression>(
                 name, e, doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
-            myAnd->add(std::move(expr));
+            addExpressionToRoot(expCtx, myAnd.get(), std::move(expr));
         } else if (e.type() == BSONType::Object &&
                    MatchExpressionParser::parsePathAcceptingKeyword(e.Obj().firstElement())) {
             return {Status(ErrorCodes::BadValue, "no $ expressions in $all")};
@@ -1349,7 +1350,7 @@ StatusWithMatchExpression parseAll(StringData name,
             auto expr = std::make_unique<EqualityMatchExpression>(
                 name, e, doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
             expr->setCollator(expCtx->getCollator());
-            myAnd->add(std::move(expr));
+            addExpressionToRoot(expCtx, myAnd.get(), std::move(expr));
         }
     }
 
@@ -1622,6 +1623,10 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             if (!parseStatus.isOK()) {
                 return parseStatus;
             }
+
+            // The NotMatchExpression below does not have a path, so 's' must be checked for a
+            // numeric path component instead.
+            disableSBEForNumericPathComponent(expCtx, temp->fieldRef());
             return {std::make_unique<NotMatchExpression>(
                 temp.release(),
                 doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend))};
