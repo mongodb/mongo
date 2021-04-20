@@ -18,7 +18,4 @@ export MYPY="$(
 )"
 echo "Found mypy executable at '$MYPY'"
 export extra_flags=""
-if [[ ${is_patch} == "true" ]]; then
-  extra_flags="--lint-scope=changed"
-fi
 eval ${compile_env} python3 ./buildscripts/scons.py ${compile_flags} $extra_flags --stack-size=1024 GITDIFFFLAGS="${revision}" REVISION="${revision}" ENTERPRISE_REV="${enterprise_rev}" ${targets}
