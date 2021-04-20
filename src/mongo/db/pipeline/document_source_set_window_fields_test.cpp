@@ -113,13 +113,13 @@ TEST_F(DocumentSourceSetWindowFieldsTest, SuccessfullyParsesAndReserializes) {
     ASSERT_BSONOBJ_EQ(serializedArray[0].getDocument().toBson(), spec);
 }
 
-TEST_F(DocumentSourceSetWindowFieldsTest, FailsToParseIfFeatureFlagDisabled) {
+TEST_F(DocumentSourceSetWindowFieldsTest, SuccessfullyParsesOnceFeatureFlagEnabled) {
     auto spec = fromjson(R"(
         {$_internalSetWindowFields: {partitionBy: '$state', sortBy: {city: 1}, output: {mySum:
         {$sum: '$pop', window: {documents: [-10, 0]}}}}})");
-    // By default, the unit test will have the feature flag disabled.
-    ASSERT_THROWS_CODE(
-        Pipeline::parse(std::vector<BSONObj>({spec}), getExpCtx()), AssertionException, 16436);
+    // By default, the unit test will have the feature flag enabled.
+    auto pipeline = Pipeline::parse(std::vector<BSONObj>({spec}), getExpCtx());
+    ASSERT_BSONOBJ_EQ(pipeline->serializeToBson()[0], spec);
 }
 
 TEST_F(DocumentSourceSetWindowFieldsTest, HandlesEmptyInputCorrectly) {

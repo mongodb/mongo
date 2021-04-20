@@ -30,10 +30,12 @@ global:
   cpp_namespace: "mongo::feature_flags"
 
 feature_flags:
+    # TODO SERVER-56197: Remove feature flag.
     featureFlagWindowFunctions:
       description: "Feature flag for aggregation window function stage"
       cpp_varname: gFeatureFlagWindowFunctions
-      default: false
+      default: true
+      version: 5.0
 
     featureFlagSBE:
         description: >-
