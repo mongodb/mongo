@@ -6,22 +6,22 @@ load('jstests/concurrency/fsm_libs/runner.js');
 var workloadDir = 'jstests/concurrency/fsm_workloads';
 
 var workloadList = TestData.workloadFiles || ls(workloadDir);
-var workloadBlacklist = TestData.workloadBlacklistFiles || [];
+var workloadDenylist = TestData.workloadDenylistFiles || [];
 var dbNamePrefix = TestData.dbNamePrefix || '';
-var fsmDbBlacklist = TestData.fsmDbBlacklist || [];
+var fsmDbDenylist = TestData.fsmDbDenylist || [];
 var validateCollectionsOnCleanup = TestData.validateCollections;
 
-var blacklist = workloadBlacklist.map(function(file) {
+var denylist = workloadDenylist.map(function(file) {
     return workloadDir + '/' + file;
 });
 
 runWorkloadsSerially(workloadList.filter(function(file) {
-    return !Array.contains(blacklist, file);
+    return !Array.contains(denylist, file);
 }),
                      {},
                      {dbNamePrefix: dbNamePrefix},
                      {
                          keepExistingDatabases: true,
-                         dropDatabaseBlacklist: fsmDbBlacklist,
+                         dropDatabaseDenylist: fsmDbDenylist,
                          validateCollections: validateCollectionsOnCleanup
                      });

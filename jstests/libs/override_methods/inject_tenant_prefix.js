@@ -14,10 +14,10 @@ load("jstests/libs/transactions_util.js");
 let originalRunCommand = Mongo.prototype.runCommand;
 let originalRunCommandWithMetadata = Mongo.prototype.runCommandWithMetadata;
 
-const blacklistedDbNames = ["config", "admin", "local"];
+const denylistedDbNames = ["config", "admin", "local"];
 
-function isBlacklistedDb(dbName) {
-    return blacklistedDbNames.includes(dbName);
+function isDenylistedDb(dbName) {
+    return denylistedDbNames.includes(dbName);
 }
 
 /**
@@ -31,7 +31,7 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
         return dbName;
     }
     const prefix = TestData.tenantId + "_";
-    return isBlacklistedDb(dbName) || dbName.startsWith(prefix) ? dbName : prefix + dbName;
+    return isDenylistedDb(dbName) || dbName.startsWith(prefix) ? dbName : prefix + dbName;
 }
 
 /**

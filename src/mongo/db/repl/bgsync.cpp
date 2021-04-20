@@ -586,14 +586,14 @@ void BackgroundSync::_produce() {
         return;
     }
 
-    Milliseconds blacklistDuration(60000);
+    Milliseconds denylistDuration(60000);
     if (fetcherReturnStatus.code() == ErrorCodes::OplogOutOfOrder) {
         // This is bad because it means that our source
         // has not returned oplog entries in ascending ts order, and they need to be.
 
         LOGV2_WARNING(
             21120, "Oplog fetcher returned error", "error"_attr = redact(fetcherReturnStatus));
-        // Do not blacklist the server here, it will be blacklisted when we try to reuse it,
+        // Do not denylist the server here, it will be denylisted when we try to reuse it,
         // if it can't return a matching oplog start from the last fetch oplog ts field.
         return;
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing) {
@@ -609,31 +609,31 @@ void BackgroundSync::_produce() {
         }
     } else if (fetcherReturnStatus.code() == ErrorCodes::TooStaleToSyncFromSource) {
         LOGV2_WARNING(
-            2806800,
-            "Oplog fetcher discovered we are too stale to sync from sync source. Blacklisting "
+            5579700,
+            "Oplog fetcher discovered we are too stale to sync from sync source. Denylisting "
             "sync source",
             "syncSource"_attr = source,
-            "blacklistDuration"_attr = blacklistDuration);
-        _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
+            "denylistDuration"_attr = denylistDuration);
+        _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         LOGV2_WARNING(
-            21121,
-            "Oplog fetcher got invalid BSON while querying oplog. Blacklisting sync source "
-            "{syncSource} for {blacklistDuration}.",
-            "Oplog fetcher got invalid BSON while querying oplog. Blacklisting sync source",
+            5579701,
+            "Oplog fetcher got invalid BSON while querying oplog. Denylisting sync source "
+            "{syncSource} for {denylistDuration}.",
+            "Oplog fetcher got invalid BSON while querying oplog. Denylisting sync source",
             "syncSource"_attr = source,
-            "blacklistDuration"_attr = blacklistDuration);
-        _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
+            "denylistDuration"_attr = denylistDuration);
+        _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
     } else if (fetcherReturnStatus.code() == ErrorCodes::ShutdownInProgress) {
         if (auto quiesceInfo = fetcherReturnStatus.extraInfo<ShutdownInProgressQuiesceInfo>()) {
-            blacklistDuration = Milliseconds(quiesceInfo->getRemainingQuiesceTimeMillis());
+            denylistDuration = Milliseconds(quiesceInfo->getRemainingQuiesceTimeMillis());
             LOGV2_WARNING(
-                4696201,
-                "Sync source was in quiesce mode while we were querying its oplog. Blacklisting "
+                5579702,
+                "Sync source was in quiesce mode while we were querying its oplog. Denylisting "
                 "sync source",
                 "syncSource"_attr = source,
-                "blacklistDuration"_attr = blacklistDuration);
-            _replCoord->blacklistSyncSource(source, Date_t::now() + blacklistDuration);
+                "denylistDuration"_attr = denylistDuration);
+            _replCoord->denylistSyncSource(source, Date_t::now() + denylistDuration);
         }
     } else if (!fetcherReturnStatus.isOK()) {
         LOGV2_WARNING(21122,

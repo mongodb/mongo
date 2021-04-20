@@ -427,9 +427,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, Timestamp(200, 2));
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kTooStaleBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kTooStaleDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -492,9 +492,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, candidate2);
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -515,9 +515,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     ASSERT_EQUALS(HostAndPort(), unittest::assertGet(_response.syncSourceStatus));
 }
@@ -538,9 +538,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, candidate2);
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _response.syncSourceStatus);
 }
@@ -557,9 +557,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, std::vector<BSONObj>());
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kOplogEmptyBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kOplogEmptyDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -581,9 +581,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, {BSONObj()});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFirstOplogEntryEmptyBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFirstOplogEntryEmptyDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -605,10 +605,10 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, {BSON("t" << 1LL)});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() +
-                      SyncSourceResolver::kFirstOplogEntryNullTimestampBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+                      SyncSourceResolver::kFirstOplogEntryNullTimestampDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -630,10 +630,10 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, Timestamp(0, 0));
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() +
-                      SyncSourceResolver::kFirstOplogEntryNullTimestampBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+                      SyncSourceResolver::kFirstOplogEntryNullTimestampDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -754,9 +754,9 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
         {_makeOplogEntry(requiredOpTime.getTimestamp(), OpTime::kUninitializedTerm)});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -790,9 +790,9 @@ TEST_F(
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate1, requiredOpTime);
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -823,9 +823,9 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
         getNet(), _selector.get(), candidate1, requiredOpTime, {});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -859,9 +859,9 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
         {_makeOplogEntry(requiredOpTime.getTimestamp(), requiredOpTime.getTerm() + 1)});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -978,9 +978,9 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -1006,9 +1006,9 @@ TEST_F(SyncSourceResolverRequiredOpTimeTest,
                                     << "I'm sorry Dave, I'm afraid I can't do that."));
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -1030,9 +1030,9 @@ TEST_F(
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
-    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->getLastBlacklistExpiration_forTest());
+    ASSERT_EQUALS(candidate1, _selector->getLastDenylistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorDenylistDuration,
+                  _selector->getLastDenylistExpiration_forTest());
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());

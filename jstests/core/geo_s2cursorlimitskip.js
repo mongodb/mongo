@@ -53,7 +53,7 @@ assert.eq(cursor.count(), totalPointCount);
 
 // Disable profiling in order to drop the system.profile collection.
 // Then enable profiling for all operations. This is acceptable because
-// our test is blacklisted from the parallel suite.
+// our test is denylisted from the parallel suite.
 testDB.setProfilingLevel(0);
 testDB.system.profile.drop();
 // Create 4MB system.profile collection to prevent the 'getmore' operations from overwriting the

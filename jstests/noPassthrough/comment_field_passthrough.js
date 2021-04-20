@@ -18,7 +18,7 @@ load("jstests/auth/lib/commands_lib.js");  // Provides an exhaustive list of com
 const tests = authCommandsLib.tests;
 
 // The following commands require additional start up configuration and hence need to be skipped.
-const blacklistedTests =
+const denylistedTests =
     ["startRecordingTraffic", "stopRecordingTraffic", "addShardToZone", "removeShardFromZone"];
 
 function runTests(tests, conn, impls) {
@@ -26,7 +26,7 @@ function runTests(tests, conn, impls) {
     const secondDb = conn.getDB(secondDbName);
     const isMongos = authCommandsLib.isMongos(conn);
     for (const test of tests) {
-        if (!blacklistedTests.includes(test.testname)) {
+        if (!denylistedTests.includes(test.testname)) {
             authCommandsLib.runOneTest(conn, test, impls, isMongos);
         }
     }

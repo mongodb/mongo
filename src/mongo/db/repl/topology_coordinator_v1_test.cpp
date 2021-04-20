@@ -759,7 +759,7 @@ TEST_F(TopoCoordTest, ChooseRequestedSyncSourceOnlyTheFirstTimeAfterTheSyncSourc
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotChooseBlacklistedSyncSourceUntilBlacklistingExpires) {
+TEST_F(TopoCoordTest, NodeDoesNotChooseDenylistedSyncSourceUntilDenylistingExpires) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "members"
@@ -799,9 +799,9 @@ TEST_F(TopoCoordTest, NodeDoesNotChooseBlacklistedSyncSourceUntilBlacklistingExp
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    getTopoCoord().blacklistSyncSource(HostAndPort("h3"), expireTime);
+    getTopoCoord().denylistSyncSource(HostAndPort("h3"), expireTime);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
-    // Should choose second best choice now that h3 is blacklisted.
+    // Should choose second best choice now that h3 is denylisted.
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     // After time has passed, should go back to original sync source
@@ -809,7 +809,7 @@ TEST_F(TopoCoordTest, NodeDoesNotChooseBlacklistedSyncSourceUntilBlacklistingExp
     ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 }
 
-TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsBlacklistedAndReadPrefPrimaryOnly) {
+TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsDenylistedAndReadPrefPrimaryOnly) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "members"
@@ -850,7 +850,7 @@ TEST_F(TopoCoordTest, ChooseNoSyncSourceWhenPrimaryIsBlacklistedAndReadPrefPrima
     ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    getTopoCoord().blacklistSyncSource(HostAndPort("h2"), expireTime);
+    getTopoCoord().denylistSyncSource(HostAndPort("h2"), expireTime);
     getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::PrimaryOnly);
     // Can't choose any sync source now.
     ASSERT(getTopoCoord().getSyncSourceAddress().empty());
@@ -3836,11 +3836,11 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown
                                                        now()));
 }
 
-TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBlackListed) {
+TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsDenyListed) {
     // In this test, the TopologyCoordinator should not tell us to change sync sources away from
     // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
-    // "host3", since "host3" is blacklisted
-    // Then, confirm that unblacklisting only works if time has passed the blacklist time.
+    // "host3", since "host3" is denylisted
+    // Then, confirm that undenylisting only works if time has passed the denylist time.
     OpTime election = OpTime();
     // Our last op time fetched must be behind host2, or we'll hit the case where we change
     // sync sources due to the sync source being behind, without a sync source, and not primary.
@@ -3852,7 +3852,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, fresherSyncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
-    getTopoCoord().blacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
+    getTopoCoord().denylistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
 
     // set up complete, time for actual check
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
@@ -3861,16 +3861,16 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
                                                        lastOpTimeFetched,
                                                        now()));
 
-    // unblacklist with too early a time (node should remained blacklisted)
-    getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(90));
+    // undenylist with too early a time (node should remained denylisted)
+    getTopoCoord().undenylistSyncSource(HostAndPort("host3"), now() + Milliseconds(90));
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                                        makeReplSetMetadata(),
                                                        makeOplogQueryMetadata(syncSourceOpTime),
                                                        lastOpTimeFetched,
                                                        now()));
 
-    // unblacklist and it should succeed
-    getTopoCoord().unblacklistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
+    // undenylist and it should succeed
+    getTopoCoord().undenylistSyncSource(HostAndPort("host3"), now() + Milliseconds(100));
     startCapturingLogMessages();
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"),
                                                       makeReplSetMetadata(),
@@ -4196,9 +4196,9 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSignificantlyCloserNodeButIsNotEligible
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
-    // Blacklist "host3" to make it not eligible to be our sync source.
+    // Denylist "host3" to make it not eligible to be our sync source.
     Date_t expireTime = Date_t::fromMillisSinceEpoch(1000);
-    getTopoCoord().blacklistSyncSource(HostAndPort("host3"), expireTime);
+    getTopoCoord().denylistSyncSource(HostAndPort("host3"), expireTime);
 
     // We should not change sync sources since there are no other eligible sync sources.
     ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),

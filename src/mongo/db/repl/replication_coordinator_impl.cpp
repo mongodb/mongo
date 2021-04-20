@@ -1055,9 +1055,9 @@ Seconds ReplicationCoordinatorImpl::getSecondaryDelaySecs() const {
     return _rsConfig.getMemberAt(_selfIndex).getSecondaryDelay();
 }
 
-void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
+void ReplicationCoordinatorImpl::clearSyncSourceDenylist() {
     stdx::lock_guard<Latch> lk(_mutex);
-    _topCoord->clearSyncSourceBlacklist();
+    _topCoord->clearSyncSourceDenylist();
 }
 
 Status ReplicationCoordinatorImpl::setFollowerModeRollback(OperationContext* opCtx) {
@@ -4838,20 +4838,20 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     return newSyncSource;
 }
 
-void ReplicationCoordinatorImpl::_unblacklistSyncSource(
+void ReplicationCoordinatorImpl::_undenylistSyncSource(
     const executor::TaskExecutor::CallbackArgs& cbData, const HostAndPort& host) {
     if (cbData.status == ErrorCodes::CallbackCanceled)
         return;
 
     stdx::lock_guard<Latch> lock(_mutex);
-    _topCoord->unblacklistSyncSource(host, _replExecutor->now());
+    _topCoord->undenylistSyncSource(host, _replExecutor->now());
 }
 
-void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+void ReplicationCoordinatorImpl::denylistSyncSource(const HostAndPort& host, Date_t until) {
     stdx::lock_guard<Latch> lock(_mutex);
-    _topCoord->blacklistSyncSource(host, until);
+    _topCoord->denylistSyncSource(host, until);
     _scheduleWorkAt(until, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-        _unblacklistSyncSource(cbData, host);
+        _undenylistSyncSource(cbData, host);
     });
 }
 

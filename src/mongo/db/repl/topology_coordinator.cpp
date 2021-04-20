@@ -515,11 +515,11 @@ bool TopologyCoordinator::_isEligibleSyncSource(int candidateIndex,
                     "lastOpTimeFetched"_attr = lastOpTimeFetched.toBSON());
         return false;
     }
-    // Candidate cannot be blacklisted.
-    if (_memberIsBlacklisted(memberConfig, now)) {
+    // Candidate cannot be denylisted.
+    if (_memberIsDenylisted(memberConfig, now)) {
         LOGV2_DEBUG(3873115,
                     1,
-                    "Cannot select sync source which is blacklisted",
+                    "Cannot select sync source which is denylisted",
                     "syncSourceCandidate"_attr = syncSourceCandidate);
         return false;
     }
@@ -575,9 +575,9 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks
             fassertFailed(50836);
         }
 
-        if (_memberIsBlacklisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
+        if (_memberIsDenylisted(_rsConfig.getMemberAt(syncSourceIndex), now)) {
             LOGV2(3873119,
-                  "Cannot select a sync source because forced candidate is blacklisted.",
+                  "Cannot select a sync source because forced candidate is denylisted.",
                   "syncSourceCandidate"_attr = hostAndPort.toString());
             return HostAndPort();
         }
@@ -616,11 +616,11 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
                     "Cannot select the primary as sync source because"
                     " the primary is unknown/down.");
         return HostAndPort();
-    } else if (_memberIsBlacklisted(*getCurrentPrimaryMember(), now)) {
+    } else if (_memberIsDenylisted(*getCurrentPrimaryMember(), now)) {
         LOGV2_DEBUG(
             3873116,
             1,
-            "Cannot select the primary as sync source because the primary member is blacklisted",
+            "Cannot select the primary as sync source because the primary member is denylisted",
             "primary"_attr = getCurrentPrimaryMember()->getHostAndPort());
         return HostAndPort();
     } else if (_currentPrimaryIndex == _selfIndex) {
@@ -646,41 +646,41 @@ HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
     }
 }
 
-bool TopologyCoordinator::_memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now) const {
-    std::map<HostAndPort, Date_t>::const_iterator blacklisted =
-        _syncSourceBlacklist.find(memberConfig.getHostAndPort());
-    if (blacklisted != _syncSourceBlacklist.end()) {
-        if (blacklisted->second > now) {
+bool TopologyCoordinator::_memberIsDenylisted(const MemberConfig& memberConfig, Date_t now) const {
+    std::map<HostAndPort, Date_t>::const_iterator denylisted =
+        _syncSourceDenylist.find(memberConfig.getHostAndPort());
+    if (denylisted != _syncSourceDenylist.end()) {
+        if (denylisted->second > now) {
             return true;
         }
     }
     return false;
 }
 
-void TopologyCoordinator::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+void TopologyCoordinator::denylistSyncSource(const HostAndPort& host, Date_t until) {
     LOGV2_DEBUG(21800,
                 2,
-                "blacklisting {syncSource} until {until}",
-                "Blacklisting sync source",
+                "denylisting {syncSource} until {until}",
+                "Denylisting sync source",
                 "syncSource"_attr = host,
                 "until"_attr = until.toString());
-    _syncSourceBlacklist[host] = until;
+    _syncSourceDenylist[host] = until;
 }
 
-void TopologyCoordinator::unblacklistSyncSource(const HostAndPort& host, Date_t now) {
-    std::map<HostAndPort, Date_t>::iterator hostItr = _syncSourceBlacklist.find(host);
-    if (hostItr != _syncSourceBlacklist.end() && now >= hostItr->second) {
+void TopologyCoordinator::undenylistSyncSource(const HostAndPort& host, Date_t now) {
+    std::map<HostAndPort, Date_t>::iterator hostItr = _syncSourceDenylist.find(host);
+    if (hostItr != _syncSourceDenylist.end() && now >= hostItr->second) {
         LOGV2_DEBUG(21801,
                     2,
-                    "unblacklisting {syncSource}",
-                    "Unblacklisting sync source",
+                    "undenylisting {syncSource}",
+                    "Undenylisting sync source",
                     "syncSource"_attr = host);
-        _syncSourceBlacklist.erase(hostItr);
+        _syncSourceDenylist.erase(hostItr);
     }
 }
 
-void TopologyCoordinator::clearSyncSourceBlacklist() {
-    _syncSourceBlacklist.clear();
+void TopologyCoordinator::clearSyncSourceDenylist() {
+    _syncSourceDenylist.clear();
 }
 
 void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
@@ -3057,7 +3057,7 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
             const MemberConfig& candidateConfig = _rsConfig.getMemberAt(itIndex);
             if (it->up() && (candidateConfig.isVoter() || !_selfConfig().isVoter()) &&
                 (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
-                it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
+                it->getState().readable() && !_memberIsDenylisted(candidateConfig, now) &&
                 goalSecs < it->getHeartbeatAppliedOpTime().getSecs()) {
                 LOGV2(21834,
                       "Choosing new sync source because the most recent OpTime of our sync "

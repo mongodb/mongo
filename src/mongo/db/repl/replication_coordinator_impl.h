@@ -133,7 +133,7 @@ public:
 
     virtual Seconds getSecondaryDelaySecs() const override;
 
-    virtual void clearSyncSourceBlacklist() override;
+    virtual void clearSyncSourceDenylist() override;
 
     virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern);
@@ -283,7 +283,7 @@ public:
 
     virtual HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched) override;
 
-    virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
+    virtual void denylistSyncSource(const HostAndPort& host, Date_t until) override;
 
     virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
 
@@ -1173,13 +1173,13 @@ private:
     void _onFollowerModeStateChange();
 
     /**
-     * Removes 'host' from the sync source blacklist. If 'host' isn't found, it's simply
+     * Removes 'host' from the sync source denylist. If 'host' isn't found, it's simply
      * ignored and no error is thrown.
      *
      * Must be scheduled as a callback.
      */
-    void _unblacklistSyncSource(const executor::TaskExecutor::CallbackArgs& cbData,
-                                const HostAndPort& host);
+    void _undenylistSyncSource(const executor::TaskExecutor::CallbackArgs& cbData,
+                               const HostAndPort& host);
 
     /**
      * Schedules stepdown to run with the global exclusive lock.

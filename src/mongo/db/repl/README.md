@@ -103,7 +103,7 @@ should always return at least 1 document due to the greater than or equal predic
 not, that means that A’s oplog is behind B's and thus A should not be B’s sync source. If it does
 return a non-empty batch, but the first document returned does not match the last entry in B’s
 oplog, there are two possibilities. If the oldest entry in A's oplog is newer than B's latest
-entry, that means that B is too stale to sync from A. As a result, B blacklists A as a sync source
+entry, that means that B is too stale to sync from A. As a result, B denylists A as a sync source
 candidate. Otherwise, B's oplog has diverged from A's and it should go into
 [**ROLLBACK**](https://docs.mongodb.com/manual/core/replica-set-rollbacks/).
 
@@ -188,10 +188,10 @@ Otherwise, it iterates through all of the nodes and sees which one is the best.
 After choosing a sync source candidate, the `SyncSourceResolver` probes the sync source candidate to
 make sure it actually is able to fetch from the sync source candidate’s oplog.
 
-* If the sync source candidate has no oplog or there is an error, the secondary blacklists that sync
+* If the sync source candidate has no oplog or there is an error, the secondary denylists that sync
   source for some time and then tries to find a new sync source candidate.
 * If the oldest entry in the sync source candidate's oplog is newer than the node's newest entry,
-  then the node blacklists that sync source candidate as well because the candidate is too far
+  then the node denylists that sync source candidate as well because the candidate is too far
   ahead.
 * During initial sync, rollback, or recovery from unclean shutdown, nodes will set a specific
   OpTime, [**`minValid`**](#replication-timestamp-glossary), that they must reach before it is safe

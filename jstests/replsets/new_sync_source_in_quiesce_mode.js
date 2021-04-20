@@ -24,7 +24,7 @@ const syncSource = rst.nodes[1];
 const syncingNode = rst.nodes[2];
 
 // Make sure the syncSource syncs only from the new primary. This is so that we prevent
-// syncingNode from blacklisting syncSource because it isn't syncing from anyone.
+// syncingNode from denylisting syncSource because it isn't syncing from anyone.
 assert.commandWorked(syncSource.adminCommand({
     configureFailPoint: "forceSyncSourceCandidate",
     mode: "alwaysOn",
@@ -55,7 +55,7 @@ jsTestLog("Ensure syncingNode tries to sync from syncSource.");
 // Use the replSetSyncFrom command to try and connect to the syncSource in quiesce mode.
 assert.commandWorked(syncingNode.adminCommand({replSetSyncFrom: syncSource.name}));
 restartServerReplication(syncingNode);
-// We will have blacklisted syncSource since it is shutting down, so we should re-enter
+// We will have denylisted syncSource since it is shutting down, so we should re-enter
 // sync source selection and eventually choose the primary as our sync source.
 rst.awaitSyncSource(syncingNode, primary);
 

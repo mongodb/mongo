@@ -99,12 +99,12 @@ class SyncSourceResolver {
 public:
     static const NamespaceString kLocalOplogNss;
     static const Seconds kFetcherTimeout;
-    static const Seconds kFetcherErrorBlacklistDuration;
-    static const Seconds kOplogEmptyBlacklistDuration;
-    static const Seconds kFirstOplogEntryEmptyBlacklistDuration;
-    static const Seconds kFirstOplogEntryNullTimestampBlacklistDuration;
-    static const Minutes kTooStaleBlacklistDuration;
-    static const Seconds kNoRequiredOpTimeBlacklistDuration;
+    static const Seconds kFetcherErrorDenylistDuration;
+    static const Seconds kOplogEmptyDenylistDuration;
+    static const Seconds kFirstOplogEntryEmptyDenylistDuration;
+    static const Seconds kFirstOplogEntryNullTimestampDenylistDuration;
+    static const Minutes kTooStaleDenylistDuration;
+    static const Seconds kNoRequiredOpTimeDenylistDuration;
 
     /**
      * Callback function to report final status of resolving sync source.
@@ -219,7 +219,7 @@ private:
     // Executor used to send remote commands to sync source candidates.
     executor::TaskExecutor* const _taskExecutor;
 
-    // Sync source selector used to obtain sync source candidates and for us to blacklist non-viable
+    // Sync source selector used to obtain sync source candidates and for us to denylist non-viable
     // candidates.
     SyncSourceSelector* const _syncSourceSelector;
 

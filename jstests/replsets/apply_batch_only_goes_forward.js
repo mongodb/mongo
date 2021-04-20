@@ -6,7 +6,7 @@
  * -- Set minvalid manually on primary (node0) way ahead (5 minutes)
  * -- Restart primary (node0)
  * -- Ensure restarted primary (node0) comes up in recovering
- * -- Ensure node0 blacklists new primary as a sync source and keeps the old minvalid
+ * -- Ensure node0 denylists new primary as a sync source and keeps the old minvalid
  * -- Success!
  *
  * This test requires persistence to test that a restarted primary will stay in the RECOVERING state

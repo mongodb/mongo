@@ -5,7 +5,7 @@
  * The DB.prototype.getCollection() function is called whenever an undefined property is accessed
  * on the db object.
  *
- * DBCollection.prototype.drop() function will re-shard any non-blacklisted collection that is
+ * DBCollection.prototype.drop() function will re-shard any non-denylisted collection that is
  * dropped in a sharded cluster.
  */
 
@@ -47,8 +47,8 @@ var originalRunCommand = Mongo.prototype.runCommand;
 
 var testMayRunDropInParallel = false;
 
-// Blacklisted namespaces that should not be sharded.
-var blacklistedNamespaces = [
+// Denylisted namespaces that should not be sharded.
+var denylistedNamespaces = [
     /\$cmd/,
     /^admin\./,
     /^config\./,
@@ -62,7 +62,7 @@ function shardCollection(collection) {
     var dbName = db.getName();
     var fullName = collection.getFullName();
 
-    for (var ns of blacklistedNamespaces) {
+    for (var ns of denylistedNamespaces) {
         if (fullName.match(ns)) {
             return;
         }

@@ -242,18 +242,18 @@ public:
     /**
      * Suppresses selecting "host" as sync source until "until".
      */
-    void blacklistSyncSource(const HostAndPort& host, Date_t until);
+    void denylistSyncSource(const HostAndPort& host, Date_t until);
 
     /**
      * Removes a single entry "host" from the list of potential sync sources which we
-     * have blacklisted, if it is supposed to be unblacklisted by "now".
+     * have denylisted, if it is supposed to be undenylisted by "now".
      */
-    void unblacklistSyncSource(const HostAndPort& host, Date_t now);
+    void undenylistSyncSource(const HostAndPort& host, Date_t now);
 
     /**
-     * Clears the list of potential sync sources we have blacklisted.
+     * Clears the list of potential sync sources we have denylisted.
      */
-    void clearSyncSourceBlacklist();
+    void clearSyncSourceDenylist();
 
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
@@ -263,7 +263,7 @@ public:
      * running in ProtocolVersion 1, our current sync source is not primary, has no sync source
      * ("syncSourceHasSyncSource" is false), and only has data up to "myLastOpTime", returns true.
      *
-     * "now" is used to skip over currently blacklisted sync sources.
+     * "now" is used to skip over currently denylisted sync sources.
      */
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& replMetadata,
@@ -1013,12 +1013,12 @@ private:
     void _stepDownSelfAndReplaceWith(int newPrimary);
 
     /**
-     * Looks up the provided member in the blacklist and returns true if the member's blacklist
+     * Looks up the provided member in the denylist and returns true if the member's denylist
      * expire time is after 'now'.  If the member is found but the expire time is before 'now',
-     * the function returns false.  If the member is not found in the blacklist, the function
+     * the function returns false.  If the member is not found in the denylist, the function
      * returns false.
      **/
-    bool _memberIsBlacklisted(const MemberConfig& memberConfig, Date_t now) const;
+    bool _memberIsDenylisted(const MemberConfig& memberConfig, Date_t now) const;
 
     // Returns a string representation of the current replica set status for logging purposes.
     std::string _getReplSetStatusString();
@@ -1047,7 +1047,7 @@ private:
     HostAndPort _syncSource;
     // These members are not chosen as sync sources for a period of time, due to connection
     // issues with them
-    std::map<HostAndPort, Date_t> _syncSourceBlacklist;
+    std::map<HostAndPort, Date_t> _syncSourceDenylist;
     // The next sync source to be chosen, requested via a replSetSyncFrom command
     int _forceSyncSourceIndex;
     // Whether the current sync source has been set via a replSetSyncFrom command

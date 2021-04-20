@@ -2331,10 +2331,10 @@ var ReplSetTest = function(opts) {
         var collectionPrinted = new Set();
 
         function checkDBHashesForReplSet(
-            rst, dbBlacklist = [], secondaries, msgPrefix, ignoreUUIDs) {
+            rst, dbDenylist = [], secondaries, msgPrefix, ignoreUUIDs) {
             // We don't expect the local database to match because some of its
             // collections are not replicated.
-            dbBlacklist.push('local');
+            dbDenylist.push('local');
             secondaries = secondaries || rst._secondaries;
 
             let success = true;
@@ -2364,7 +2364,7 @@ var ReplSetTest = function(opts) {
             });
 
             for (const dbName of combinedDBs) {
-                if (Array.contains(dbBlacklist, dbName)) {
+                if (Array.contains(dbDenylist, dbName)) {
                     continue;
                 }
 

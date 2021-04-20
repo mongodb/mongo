@@ -123,7 +123,7 @@ var runner = (function() {
     }
 
     function validateCleanupOptions(options) {
-        var allowedKeys = ['dropDatabaseBlacklist', 'keepExistingDatabases', 'validateCollections'];
+        var allowedKeys = ['dropDatabaseDenylist', 'keepExistingDatabases', 'validateCollections'];
 
         Object.keys(options).forEach(function(option) {
             assert.contains(option,
@@ -132,9 +132,9 @@ var runner = (function() {
                                 '; valid options are: ' + tojson(allowedKeys));
         });
 
-        if (typeof options.dropDatabaseBlacklist !== 'undefined') {
-            assert(Array.isArray(options.dropDatabaseBlacklist),
-                   'expected dropDatabaseBlacklist to be an array');
+        if (typeof options.dropDatabaseDenylist !== 'undefined') {
+            assert(Array.isArray(options.dropDatabaseDenylist),
+                   'expected dropDatabaseDenylist to be an array');
         }
 
         if (typeof options.keepExistingDatabases !== 'undefined') {
@@ -245,12 +245,12 @@ var runner = (function() {
         });
     }
 
-    function dropAllDatabases(db, blacklist) {
+    function dropAllDatabases(db, denylist) {
         var res = db.adminCommand('listDatabases');
         assert.commandWorked(res);
 
         res.databases.forEach(function(dbInfo) {
-            if (!Array.contains(blacklist, dbInfo.name)) {
+            if (!Array.contains(denylist, dbInfo.name)) {
                 assert.commandWorked(db.getSiblingDB(dbInfo.name).dropDatabase());
             }
         });
@@ -425,7 +425,7 @@ var runner = (function() {
     }
 
     function cleanupWorkload(
-        workload, context, cluster, errors, header, dbHashBlacklist, cleanupOptions) {
+        workload, context, cluster, errors, header, dbHashDenylist, cleanupOptions) {
         // Returns true if the workload's teardown succeeds and false if the workload's
         // teardown fails.
 
@@ -434,7 +434,7 @@ var runner = (function() {
         try {
             // Ensure that all data has replicated correctly to the secondaries before calling the
             // workload's teardown method.
-            cluster.checkReplicationConsistency(dbHashBlacklist, phase);
+            cluster.checkReplicationConsistency(dbHashDenylist, phase);
         } catch (e) {
             errors.push(new WorkloadFailure(
                 e.toString(), e.stack, 'main', header + ' checking consistency on secondaries'));
@@ -494,7 +494,7 @@ var runner = (function() {
                               executionOptions,
                               errors,
                               maxAllowedThreads,
-                              dbHashBlacklist,
+                              dbHashDenylist,
                               configServerData,
                               cleanupOptions) {
         var cleanup = [];
@@ -568,7 +568,7 @@ var runner = (function() {
                                                                          cluster,
                                                                          errors,
                                                                          'Foreground',
-                                                                         dbHashBlacklist,
+                                                                         dbHashDenylist,
                                                                          cleanupOptions));
             teardownFailed = cleanupResults.some(success => (success === false));
 
@@ -587,7 +587,7 @@ var runner = (function() {
         throwError(errors);
 
         // Ensure that all operations replicated correctly to the secondaries.
-        cluster.checkReplicationConsistency(dbHashBlacklist,
+        cluster.checkReplicationConsistency(dbHashDenylist,
                                             'after workload-group teardown and data clean-up');
     }
 
@@ -635,17 +635,17 @@ var runner = (function() {
         // to avoid having too many open files.
 
         // List of DBs that will not be dropped.
-        var dbBlacklist = ['admin', 'config', 'local', '$external'];
+        var dbDenylist = ['admin', 'config', 'local', '$external'];
 
         // List of DBs that dbHash is not run on.
-        var dbHashBlacklist = ['local'];
+        var dbHashDenylist = ['local'];
 
-        if (cleanupOptions.dropDatabaseBlacklist) {
-            dbBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
-            dbHashBlacklist.push(...cleanupOptions.dropDatabaseBlacklist);
+        if (cleanupOptions.dropDatabaseDenylist) {
+            dbDenylist.push(...cleanupOptions.dropDatabaseDenylist);
+            dbHashDenylist.push(...cleanupOptions.dropDatabaseDenylist);
         }
         if (!cleanupOptions.keepExistingDatabases) {
-            dropAllDatabases(cluster.getDB('test'), dbBlacklist);
+            dropAllDatabases(cluster.getDB('test'), dbDenylist);
         }
 
         var maxAllowedThreads = 100 * executionOptions.threadMultiplier;
@@ -678,7 +678,7 @@ var runner = (function() {
                                  executionOptions,
                                  errors,
                                  maxAllowedThreads,
-                                 dbHashBlacklist,
+                                 dbHashDenylist,
                                  configServerData,
                                  cleanupOptions);
             });

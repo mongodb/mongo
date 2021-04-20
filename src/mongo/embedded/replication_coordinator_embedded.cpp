@@ -178,7 +178,7 @@ Seconds ReplicationCoordinatorEmbedded::getSecondaryDelaySecs() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::clearSyncSourceBlacklist() {
+void ReplicationCoordinatorEmbedded::clearSyncSourceDenylist() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
@@ -417,7 +417,7 @@ HostAndPort ReplicationCoordinatorEmbedded::chooseNewSyncSource(const OpTime&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-void ReplicationCoordinatorEmbedded::blacklistSyncSource(const HostAndPort&, Date_t) {
+void ReplicationCoordinatorEmbedded::denylistSyncSource(const HostAndPort&, Date_t) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

@@ -15,7 +15,7 @@ db.setProfilingLevel(2);
 const coll = db[testName];
 
 assert.commandWorked(coll.insert({x: 1}));
-/* TODO(SERVER-47835) unblacklist
+/* TODO(SERVER-47835) undenylist
 let commands = db.system.profile.find().toArray();
 // Check that the insert is not visible because the txn has not committed.
 assert.eq(commands.length, 0);

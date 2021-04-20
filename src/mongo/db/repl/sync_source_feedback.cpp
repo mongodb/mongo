@@ -138,7 +138,7 @@ Status SyncSourceFeedback::_updateUpstream(Reporter* reporter) {
               "error"_attr = status);
     }
 
-    // Sync source blacklisting will be done in BackgroundSync and SyncSourceResolver.
+    // Sync source denylisting will be done in BackgroundSync and SyncSourceResolver.
 
     return status;
 }

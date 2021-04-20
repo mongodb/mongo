@@ -7,7 +7,7 @@
  * Add it back as secondary
  * Make sure both nodes are either primary or secondary
  *
- * This test assumes 'newlyAdded' fields are enabled, so blacklist from multiversion tests
+ * This test assumes 'newlyAdded' fields are enabled, so denylist from multiversion tests
  * against 4.4.
  *
  * SERVER-49428: Disable for ephemeralForTest, writeConcernMajorityJournalDefault is not off

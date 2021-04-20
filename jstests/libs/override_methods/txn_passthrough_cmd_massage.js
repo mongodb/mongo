@@ -40,7 +40,7 @@ function runCommandInMultiStmtTxnPassthrough(
             if (massagedCmd.hasOwnProperty('writeConcern')) {
                 if (massagedCmd.writeConcern.w !== 'majority') {
                     throw new Error('Running mapReduce with non majority write concern: ' +
-                                    tojson(commandObj) + '. Consider blacklisting the test ' +
+                                    tojson(commandObj) + '. Consider denylisting the test ' +
                                     'since the 2 phase drop can interfere with lock acquisitions.');
                 }
             } else {
@@ -51,7 +51,7 @@ function runCommandInMultiStmtTxnPassthrough(
         if (massagedCmd.hasOwnProperty('writeConcern')) {
             if (massagedCmd.writeConcern.w !== 'majority') {
                 throw new Error('Running drop with non majority write concern: ' +
-                                tojson(commandObj) + '. Consider blacklisting the test ' +
+                                tojson(commandObj) + '. Consider denylisting the test ' +
                                 'since the 2 phase drop can interfere with lock acquisitions.');
             }
         } else {

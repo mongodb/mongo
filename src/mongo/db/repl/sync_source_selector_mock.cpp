@@ -38,7 +38,7 @@ SyncSourceSelectorMock::SyncSourceSelectorMock() {}
 
 SyncSourceSelectorMock::~SyncSourceSelectorMock() {}
 
-void SyncSourceSelectorMock::clearSyncSourceBlacklist() {}
+void SyncSourceSelectorMock::clearSyncSourceDenylist() {}
 
 HostAndPort SyncSourceSelectorMock::chooseNewSyncSource(const OpTime& ot) {
     _chooseNewSyncSourceHook();
@@ -46,9 +46,9 @@ HostAndPort SyncSourceSelectorMock::chooseNewSyncSource(const OpTime& ot) {
     return _chooseNewSyncSourceResult;
 }
 
-void SyncSourceSelectorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {
-    _lastBlacklistedSyncSource = host;
-    _lastBlacklistExpiration = until;
+void SyncSourceSelectorMock::denylistSyncSource(const HostAndPort& host, Date_t until) {
+    _lastDenylistedSyncSource = host;
+    _lastDenylistExpiration = until;
 }
 
 void SyncSourceSelectorMock::setChooseNewSyncSourceHook_forTest(
@@ -73,12 +73,12 @@ OpTime SyncSourceSelectorMock::getChooseNewSyncSourceOpTime_forTest() const {
     return _chooseNewSyncSourceOpTime;
 }
 
-HostAndPort SyncSourceSelectorMock::getLastBlacklistedSyncSource_forTest() const {
-    return _lastBlacklistedSyncSource;
+HostAndPort SyncSourceSelectorMock::getLastDenylistedSyncSource_forTest() const {
+    return _lastDenylistedSyncSource;
 }
 
-Date_t SyncSourceSelectorMock::getLastBlacklistExpiration_forTest() const {
-    return _lastBlacklistExpiration;
+Date_t SyncSourceSelectorMock::getLastDenylistExpiration_forTest() const {
+    return _lastDenylistExpiration;
 }
 
 }  // namespace repl

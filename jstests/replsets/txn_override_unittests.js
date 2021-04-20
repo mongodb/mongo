@@ -33,7 +33,7 @@ load("jstests/libs/transactions_util.js");
 load('jstests/libs/write_concern_util.js');
 
 // Commands not to override since they can log excessively.
-const runCommandOverrideBlacklistedCommands =
+const runCommandOverrideDenylistedCommands =
     ["getCmdLineOpts", "serverStatus", "configureFailPoint"];
 
 // cmdResponseOverrides is a map from commands to responses that should be provided in lieu of
@@ -53,7 +53,7 @@ let postCommandFuncs = {};
  * Deletes the command override from the given command.
  */
 function clearCommandOverride(cmdName) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     delete cmdResponseOverrides[cmdName];
 }
@@ -62,7 +62,7 @@ function clearCommandOverride(cmdName) {
  * Deletes the post-command function for the given command.
  */
 function clearPostCommandFunc(cmdName) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     delete postCommandFuncs[cmdName];
 }
@@ -79,7 +79,7 @@ function clearAllCommandOverrides() {
  * Sets the provided function as the post-command function for the given command.
  */
 function attachPostCmdFunction(cmdName, func) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     postCommandFuncs[cmdName] = func;
 }
@@ -89,7 +89,7 @@ function attachPostCmdFunction(cmdName, func) {
  * be run.
  */
 function setCommandMockResponse(cmdName, mockResponse) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     cmdResponseOverrides[cmdName] = {responseObj: mockResponse};
 }
@@ -99,7 +99,7 @@ function setCommandMockResponse(cmdName, mockResponse) {
  * The command will not actually be run.
  */
 function failCommandWithWCENoRun(cmdName, writeConcernErrorCode, writeConcernErrorCodeName) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     cmdResponseOverrides[cmdName] = {
         responseObj: {
@@ -115,7 +115,7 @@ function failCommandWithWCENoRun(cmdName, writeConcernErrorCode, writeConcernErr
  */
 function failCommandWithErrorAndWCENoRun(
     cmdName, errorCode, errorCodeName, writeConcernErrorCode, writeConcernErrorCodeName) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     cmdResponseOverrides[cmdName] = {
         responseObj: {
@@ -132,7 +132,7 @@ function failCommandWithErrorAndWCENoRun(
  * used.
  */
 function runPostCommandFunc(cmdName) {
-    assert(!runCommandOverrideBlacklistedCommands.includes(cmdName));
+    assert(!runCommandOverrideDenylistedCommands.includes(cmdName));
 
     if (postCommandFuncs[cmdName]) {
         jsTestLog("Running post-command function for " + cmdName);
@@ -146,7 +146,7 @@ function runPostCommandFunc(cmdName) {
 
 /**
  * Overrides 'runCommand' to provide a specific pre-set response to the given command. If the
- * command is in the blacklist, it is not overridden. Otherwise, if a command response has been
+ * command is in the denylist, it is not overridden. Otherwise, if a command response has been
  * specified, returns that without running the function. If a post-command function is specified
  * for the command, runs that after the command is run. The post-command function is run
  * regardless of whether the command response was overridden or not.
@@ -154,7 +154,7 @@ function runPostCommandFunc(cmdName) {
 const mongoRunCommandOriginal = Mongo.prototype.runCommand;
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const cmdName = Object.keys(cmdObj)[0];
-    if (runCommandOverrideBlacklistedCommands.includes(cmdName)) {
+    if (runCommandOverrideDenylistedCommands.includes(cmdName)) {
         return mongoRunCommandOriginal.apply(this, arguments);
     }
 

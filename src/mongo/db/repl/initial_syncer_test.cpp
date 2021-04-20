@@ -163,14 +163,14 @@ public:
     }
 
     // SyncSourceSelector
-    void clearSyncSourceBlacklist() override {
-        _syncSourceSelector->clearSyncSourceBlacklist();
+    void clearSyncSourceDenylist() override {
+        _syncSourceSelector->clearSyncSourceDenylist();
     }
     HostAndPort chooseNewSyncSource(const OpTime& ot) override {
         return _syncSourceSelector->chooseNewSyncSource(ot);
     }
-    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
-        _syncSourceSelector->blacklistSyncSource(host, until);
+    void denylistSyncSource(const HostAndPort& host, Date_t until) override {
+        _syncSourceSelector->denylistSyncSource(host, until);
     }
     ChangeSyncSourceAction shouldChangeSyncSource(const HostAndPort& currentSource,
                                                   const rpc::ReplSetMetadata& replMetadata,

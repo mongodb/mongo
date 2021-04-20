@@ -1103,7 +1103,7 @@ function runCommandOverride(conn, dbName, cmdName, cmdObj, clientFunction, makeF
         // Many tests run queries that are expected to fail. In this case, when we wrap CRUD ops
         // in transactions, the transaction including the failed query will not be able to
         // commit. This override expects transactions to be able to commit. Rather than
-        // blacklisting all tests containing queries that are expected to fail, we clear the ops
+        // denylisting all tests containing queries that are expected to fail, we clear the ops
         // list when we return an error to the test so we do not retry the failed query.
         if (configuredForTxnOverride() && !isNested() && hasError(res) && (ops.length > 0)) {
             logMsgFull("Clearing ops on failed command",
