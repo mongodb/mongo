@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
+#include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
@@ -57,7 +58,6 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/stale_shard_version_helpers.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -320,7 +320,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
 
     auto chainCtx = std::make_shared<ChainContext>();
 
-    return AsyncTry([this, chainCtx, factory] {
+    return resharding::WithAutomaticRetry([this, chainCtx, factory] {
                if (!chainCtx->pipeline) {
                    auto opCtx = factory.makeOperationContext(&cc());
                    chainCtx->pipeline = _restartPipeline(opCtx.get());
@@ -329,57 +329,37 @@ SemiFuture<void> ReshardingCollectionCloner::run(
                auto opCtx = factory.makeOperationContext(&cc());
                chainCtx->moreToCome = doOneBatch(opCtx.get(), *chainCtx->pipeline);
            })
-        .until([this, chainCtx, cancelToken, factory](Status status) {
-            if (status.isOK() && chainCtx->moreToCome) {
-                return false;
-            }
-
-            if (chainCtx->pipeline) {
+        .onTransientError([this](const Status& status) {
+            LOGV2(5269300,
+                  "Transient error while cloning sharded collection",
+                  "sourceNamespace"_attr = _sourceNss,
+                  "outputNamespace"_attr = _outputNss,
+                  "readTimestamp"_attr = _atClusterTime,
+                  "error"_attr = redact(status));
+        })
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2_ERROR(5352400,
+                        "Operation-fatal error for resharding while cloning sharded collection",
+                        "sourceNamespace"_attr = _sourceNss,
+                        "outputNamespace"_attr = _outputNss,
+                        "readTimestamp"_attr = _atClusterTime,
+                        "error"_attr = redact(status));
+        })
+        .until([chainCtx, factory](const Status& status) {
+            if (!status.isOK() && chainCtx->pipeline) {
                 auto opCtx = factory.makeOperationContext(&cc());
-
                 chainCtx->pipeline->dispose(opCtx.get());
                 chainCtx->pipeline.reset();
             }
 
-            if (status.isA<ErrorCategory::CancellationError>() ||
-                status.isA<ErrorCategory::NotPrimaryError>()) {
-                // Cancellation and NotPrimary errors indicate the primary-only service Instance
-                // will be shut down or is shutting down now - provided the cancelToken is also
-                // canceled. Otherwise, the errors may have originated from a remote response rather
-                // than the shard itself.
-                //
-                // Don't retry when primary-only service Instance is shutting down.
-                return cancelToken.isCanceled();
-            }
-
-            if (status.isA<ErrorCategory::RetriableError>() ||
-                status.isA<ErrorCategory::CursorInvalidatedError>() ||
-                status == ErrorCodes::Interrupted) {
-                // Do retry on any other types of retryable errors though. Also retry on errors from
-                // stray killCursors and killOp commands being run.
-                LOGV2(5269300,
-                      "Transient error while cloning sharded collection",
-                      "sourceNamespace"_attr = _sourceNss,
-                      "outputNamespace"_attr = _outputNss,
-                      "readTimestamp"_attr = _atClusterTime,
-                      "error"_attr = redact(status));
-                return false;
-            }
-
-            if (!status.isOK()) {
-                LOGV2(5352400,
-                      "Operation-fatal error for resharding while cloning sharded collection",
-                      "sourceNamespace"_attr = _sourceNss,
-                      "outputNamespace"_attr = _outputNss,
-                      "readTimestamp"_attr = _atClusterTime,
-                      "error"_attr = redact(status));
-            }
-
-            return true;
+            return status.isOK() && !chainCtx->moreToCome;
         })
-        .on(executor, cancelToken)
-        .thenRunOn(cleanupExecutor)
-        .onCompletion([this, chainCtx](Status status) {
+        .on(std::move(executor), std::move(cancelToken))
+        .thenRunOn(std::move(cleanupExecutor))
+        // It is unsafe to capture `this` once the task is running on the cleanupExecutor because
+        // RecipientStateMachine, along with its ReshardingCollectionCloner member, may have already
+        // been destructed.
+        .onCompletion([chainCtx](Status status) {
             if (chainCtx->pipeline) {
                 auto client =
                     cc().getServiceContext()->makeClient("ReshardingCollectionClonerCleanupClient");

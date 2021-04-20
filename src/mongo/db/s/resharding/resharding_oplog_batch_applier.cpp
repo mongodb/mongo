@@ -27,15 +27,18 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
 
 #include <memory>
 
+#include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
-#include "mongo/util/future_util.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 
@@ -57,7 +60,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     auto chainCtx = std::make_shared<ChainContext>();
     chainCtx->batch = std::move(batch);
 
-    return AsyncTry([this, factory, chainCtx] {
+    return resharding::WithAutomaticRetry([this, chainCtx, factory] {
                // Writing `auto& i = chainCtx->nextToApply` takes care of incrementing
                // chainCtx->nextToApply on each loop iteration.
                for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
@@ -77,8 +80,19 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                }
                return makeReadyFutureWith([] {}).share();
            })
-        .until([chainCtx](Status status) {
-            return !status.isOK() || chainCtx->nextToApply >= chainCtx->batch.size();
+        .onTransientError([](const Status& status) {
+            LOGV2(5615800,
+                  "Transient error while applying oplog entry from donor shard",
+                  "error"_attr = redact(status));
+        })
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2_ERROR(
+                5615801,
+                "Operation-fatal error for resharding while applying oplog entry from donor shard",
+                "error"_attr = redact(status));
+        })
+        .until([chainCtx](const Status& status) {
+            return status.isOK() && chainCtx->nextToApply >= chainCtx->batch.size();
         })
         .on(std::move(executor), std::move(cancelToken))
         .semi();

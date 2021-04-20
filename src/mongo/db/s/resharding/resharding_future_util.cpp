@@ -31,8 +31,6 @@
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
 
-#include "mongo/util/future_util.h"
-
 namespace mongo::resharding {
 
 std::vector<ExecutorFuture<void>> thenRunAllOn(const std::vector<SharedSemiFuture<void>>& futures,
