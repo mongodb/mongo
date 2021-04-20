@@ -677,14 +677,10 @@ DocumentSourceInternalUnpackBucket::splitMatchOnMetaAndRename(
 std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPushDown(
     DocumentSource* src) const {
     if (auto nextProject = dynamic_cast<DocumentSourceSingleDocumentTransformation*>(src);
-        nextProject && _bucketUnpacker.bucketSpec().metaField) {
-        // If we have an exclusion project, we can push down just the parts on the metaField.
-        if (nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
-            return nextProject->extractProjectOnFieldAndRename(
-                _bucketUnpacker.bucketSpec().metaField.get(), timeseries::kBucketMetaFieldName);
-        }
-
-        // TODO: SERVER-55727
+        _bucketUnpacker.bucketSpec().metaField && nextProject &&
+        nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
+        return nextProject->extractProjectOnFieldAndRename(
+            _bucketUnpacker.bucketSpec().metaField.get(), timeseries::kBucketMetaFieldName);
     }
 
     return {BSONObj{}, false};

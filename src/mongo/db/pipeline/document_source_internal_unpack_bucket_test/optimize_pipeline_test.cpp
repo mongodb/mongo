@@ -522,28 +522,70 @@ TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {myMeta: 1}}"), serialized[2]);
 }
 
-// TODO: SERVER-55727 re-enable after inclusion project pushdown on meta can happen.
-// TEST_F(OptimizePipeline, ProjectThenProjectPushDown) {
-//     auto pipeline = Pipeline::parse(
-//         makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',
-//         metaField: "
-//                             "'myMeta', bucketMaxSpanSeconds: 3600}}"),
-//                    fromjson("{$project: {myMeta: 1, _id: 0}}"),
-//                    fromjson("{$project: {myMeta: 0}}")),
-//         getExpCtx());
-//     ASSERT_EQ(3u, pipeline->getSources().size());
+TEST_F(OptimizePipeline, ExclusionProjectThenMatchPushDown) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
+                            "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$project: {'myMeta.a': 0}}"),
+                   fromjson("{$match: {'myMeta.b': {$lt: 10}}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
 
-//     pipeline->optimizePipeline();
+    pipeline->optimizePipeline();
 
-//     // We should internalize one project and leave the remaining project in the pipeline. This
-//     // guarantees accurate behavior for fields beyond myMeta (they are excluded).
-//     auto serialized = pipeline->serializeToBson();
-//     ASSERT_EQ(2u, serialized.size());
-//     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: [], timeField: 'time', "
-//                                "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-//                       serialized[0]);
-//     ASSERT_BSONOBJ_EQ(fromjson("{$project: {myMeta: false, _id: true}}"), serialized[1]);
-// }
+    // We should push down the exclusion project on the metaField then push down the $match.
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(3u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$match: {'meta.b': {$lt: 10}}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {meta: {a: false}, _id: true}}"), serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
+                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                      serialized[2]);
+}
+
+TEST_F(OptimizePipeline, ExclusionProjectThenProjectPushDown) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
+                            "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$project: {myMeta: 0}}"),
+                   fromjson("{$project: {myMeta: 1, a: 1, _id: 0}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+
+    // We should push down the exclusion project on the metaField then internalize the remaining
+    // project.
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {meta: false, _id: true}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['a', 'myMeta'], timeField: 'time', "
+                 "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[1]);
+}
+
+TEST_F(OptimizePipeline, ProjectThenExclusionProjectPushDown) {
+    auto pipeline = Pipeline::parse(
+        makeVector(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time',"
+                            "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                   fromjson("{$project: {myMeta: 1, _id: 0}}"),
+                   fromjson("{$project: {myMeta: 0}}")),
+        getExpCtx());
+    ASSERT_EQ(3u, pipeline->getSources().size());
+
+    pipeline->optimizePipeline();
+
+    // We should internalize one project then push down the remaining project on the metaField. Note
+    // that we can push down an exclusion project on meta even after internalizing either kind of
+    // project; swapping the order of simple projects does not affect the result.
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2u, serialized.size());
+    ASSERT_BSONOBJ_EQ(fromjson("{$project: {meta: false, _id: true}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['myMeta'], timeField: 'time', "
+                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                      serialized[1]);
+}
 
 TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
     auto pipeline = Pipeline::parse(
