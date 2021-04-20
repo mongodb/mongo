@@ -9831,6 +9831,9 @@ buildvariants:
   - name: causally_consistent_read_concern_snapshot_passthrough_gen
   - name: initial_sync_fuzzer_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_kill_primary_jscore_passthrough_gen
+  - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
   - name: replica_sets
@@ -9849,12 +9852,18 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: session_jscore_passthrough
+  - name: sharded_causally_consistent_jscore_passthrough_gen
+  - name: sharded_collections_jscore_passthrough
   - name: sharding_auth_gen
   - name: sharding_auth_audit_gen
   - name: sharding_csrs_continuous_config_stepdown_gen
   - name: sharding_ese_gcm_gen
   - name: sharding_ese_gen
   - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_passthrough_wire_ops_gen
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_update_v1_oplog_jscore_passthrough
   - name: sharding_last_lts_mongos_and_mixed_shards_gen
   - name: sharding_max_mirroring_gen
   - name: sharding_multiversion_gen

@@ -84,11 +84,7 @@ assert.eq(cacheEntry.isActive, true);
 // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
 assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-const isSBEEnabled = checkSBEEnabled(db);
-const isLegacyMode = db.getMongo().readMode() === "legacy";
-// For legacy reads we always use the classic engine, even when SBE is turned on as a default
-// engine.
-const isSBECompat = isSBEEnabled && !isLegacyMode;
+const isSBECompat = checkSBECompatible(db);
 
 // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN from
 // the query plan instead.

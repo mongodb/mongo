@@ -21,11 +21,7 @@ load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 const coll = db.plan_cache_sbe;
 coll.drop();
 
-const isSBEEnabled = checkSBEEnabled(db);
-const isLegacyMode = db.getMongo().readMode() === "legacy";
-// For legacy reads we always use the classic engine, even when SBE is turned on as a default
-// engine.
-const isSBECompat = isSBEEnabled && !isLegacyMode;
+const isSBECompat = checkSBECompatible(db);
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 // We need two indexes so that the multi-planner is executed.
