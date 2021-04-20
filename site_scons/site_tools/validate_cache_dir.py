@@ -133,6 +133,9 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             self.print_cache_issue(node, str(ex))
             return False
 
+    def CacheDebug(self, fmt, target, cachefile):
+        super().CacheDebug(fmt, target, cachefile + self.get_ext())
+
     def print_cache_issue(self, node, msg):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
