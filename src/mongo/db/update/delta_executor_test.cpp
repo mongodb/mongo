@@ -197,6 +197,66 @@ TEST(DeltaExecutorTest, Insert) {
     }
 }
 
+TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
+    BSONObj preImage;
+    UpdateIndexData indexData;
+    indexData.addPath(FieldRef{"1"});
+    FieldRefSet fieldRefSet;
+
+    // Insert numeric fields at the top level, which means they are guaranteed to be object key
+    // names (rather than possibly being indices of an array).
+    {
+        auto doc = mutablebson::Document(preImage);
+        UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
+        params.indexData = &indexData;
+        DeltaExecutor test(fromjson("{i: {'0': false, '1': false, '2': false}}"));
+        auto result = test.applyUpdate(params);
+        ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
+                                 fromjson("{'0': false, '1': false, '2': false}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        auto doc = mutablebson::Document(preImage);
+        UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
+        params.indexData = &indexData;
+        DeltaExecutor test(fromjson("{i: {'0': false, '2': false}}"));
+        auto result = test.applyUpdate(params);
+        ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
+                                 fromjson("{'0': false, '2': false}"));
+        ASSERT(!result.indexesAffected);
+    }
+}
+
+TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
+    BSONObj preImage{fromjson("{a: {}}")};
+    UpdateIndexData indexData;
+    indexData.addPath(FieldRef{"a.1"});
+    FieldRefSet fieldRefSet;
+
+    // Insert numeric fields not at the top level, which means they may possibly be indices of an
+    // array.
+    {
+        auto doc = mutablebson::Document(preImage);
+        UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
+        params.indexData = &indexData;
+        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '1': false, '2': false}}}"));
+        auto result = test.applyUpdate(params);
+        ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
+                                 fromjson("{a: {'0': false, '1': false, '2': false}}"));
+        ASSERT(result.indexesAffected);
+    }
+    {
+        auto doc = mutablebson::Document(preImage);
+        UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
+        params.indexData = &indexData;
+        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '2': false}}}"));
+        auto result = test.applyUpdate(params);
+        ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
+                                 fromjson("{a: {'0': false, '2': false}}"));
+        ASSERT(result.indexesAffected);
+    }
+}
+
 TEST(DeltaExecutorTest, ArraysInIndexPath) {
     BSONObj preImage(fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1]}"));
     UpdateIndexData indexData;

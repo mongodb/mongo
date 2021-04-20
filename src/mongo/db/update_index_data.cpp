@@ -112,4 +112,8 @@ FieldRef UpdateIndexData::getCanonicalIndexField(const FieldRef& path) {
 
     return buf;
 }
+
+bool UpdateIndexData::isComponentPartOfCanonicalizedIndexPath(StringData pathComponent) {
+    return pathComponent != "$"_sd && !FieldRef::isNumericPathComponentLenient(pathComponent);
+}
 }  // namespace mongo

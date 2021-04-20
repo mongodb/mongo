@@ -175,12 +175,36 @@ public:
                 it->second);
         }
 
+        // Whether we have already determined whether indexes are affected for the base path; that
+        // is, the path without any of the fields to insert below. This is useful for when multiple
+        // of the fields to insert are not canonical index field components.
+        bool alreadyDidUpdateIndexAffectedForBasePath = false;
+
         // Insert remaining fields to the end.
         for (auto&& elt : tables.fieldsToInsert) {
             if (!fieldsToSkipInserting.count(elt.fieldNameStringData())) {
                 builder->append(elt);
-                FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
-                updateIndexesAffected(path);
+
+                bool isComponentPartOfCanonicalizedIndexPath =
+                    UpdateIndexData::isComponentPartOfCanonicalizedIndexPath(
+                        elt.fieldNameStringData());
+                // If the path is empty, then the field names are being appended at the top level.
+                // This means that they cannot represent indices of an array, so the 'canonical'
+                // path check does not apply.
+                if (isComponentPartOfCanonicalizedIndexPath ||
+                    !alreadyDidUpdateIndexAffectedForBasePath || path->empty()) {
+                    FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
+                    updateIndexesAffected(path);
+
+                    // If we checked whether the update affects indexes for a path where the tail
+                    // element is not considered part of the 'canonicalized' path (as defined by
+                    // UpdateIndexData) then we've effectively checked whether updating the base
+                    // path affects indexes. This means we can skip future checks for paths that end
+                    // with a component that's not considered part of the canonicalized path.
+                    alreadyDidUpdateIndexAffectedForBasePath =
+                        alreadyDidUpdateIndexAffectedForBasePath ||
+                        !isComponentPartOfCanonicalizedIndexPath;
+                }
             }
         }
     }

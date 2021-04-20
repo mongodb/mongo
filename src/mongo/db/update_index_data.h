@@ -51,6 +51,12 @@ public:
     static FieldRef getCanonicalIndexField(const FieldRef& path);
 
     /**
+     * Returns whether the provided path component can be included in the canonicalized index form
+     * of a path.
+     */
+    static bool isComponentPartOfCanonicalizedIndexPath(StringData pathComponent);
+
+    /**
      * Register a path.  Any update targeting this path (or a parent of this path) will
      * trigger a recomputation of the document's index keys.
      */
