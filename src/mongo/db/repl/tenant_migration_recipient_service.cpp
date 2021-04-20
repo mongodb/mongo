@@ -343,6 +343,10 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
             (stats.approxTotalBytesCopied + 1);
 
         bob.append("remainingReceiveEstimatedMillis", timeRemainingMillis);
+
+        BSONObjBuilder dbsBuilder(bob.subobjStart("databases"));
+        _tenantAllDatabaseCloner->getStats().append(&dbsBuilder);
+        dbsBuilder.doneFast();
     }
 
     if (_stateDoc.getStartFetchingDonorOpTime())
@@ -368,12 +372,6 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     if (_tenantOplogApplier) {
         bob.appendNumber("numOpsApplied",
                          static_cast<long long>(_tenantOplogApplier->getNumOpsApplied()));
-    }
-
-    if (_tenantAllDatabaseCloner) {
-        BSONObjBuilder dbsBuilder(bob.subobjStart("databases"));
-        _tenantAllDatabaseCloner->getStats().append(&dbsBuilder);
-        dbsBuilder.doneFast();
     }
 
     return bob.obj();

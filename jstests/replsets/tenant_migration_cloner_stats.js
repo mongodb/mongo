@@ -1,6 +1,6 @@
 /**
- * Tests cloner stats such as 'approxTotalDataSize', 'approxTotalBytesCopied' across multiple
- * databases and collections in the absence of failovers.
+ * Tests tenant migration cloner stats such as 'approxTotalDataSize', 'approxTotalBytesCopied'
+ * across multiple databases and collections in the absence of failovers.
  *
  * @tags: [requires_fcv_49, requires_majority_read_concern, requires_persistence,
  * incompatible_with_eft, incompatible_with_windows_tls]
@@ -47,6 +47,16 @@ tenantMigrationTest.insertDonorDB(dbName1, collName1, dataForEachCollection);
 tenantMigrationTest.insertDonorDB(dbName1, collName2, dataForEachCollection);
 tenantMigrationTest.insertDonorDB(dbName2, collNameDb2, dataForEachCollection);
 
+// Assert that the number of databases and collections cloned before failover is 0, as no failovers
+// occur during this test.
+function assertNothingClonedBeforeFailover(currOpResult) {
+    const currOp = currOpResult.inprog[0];
+    const dbInfo = currOp.databases;
+    assert.eq(dbInfo.databasesClonedBeforeFailover, 0, currOpResult);
+    assert.eq(dbInfo[dbName1].clonedCollectionsBeforeFailover, 0, currOpResult);
+    assert.eq(dbInfo[dbName2].clonedCollectionsBeforeFailover, 0, currOpResult);
+}
+
 jsTestLog("Set up fail points on recipient.");
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const fpAfterPersistingStateDoc =
@@ -87,6 +97,7 @@ assert(!currOp.hasOwnProperty("approxTotalDataSize"), res);
 assert(!currOp.hasOwnProperty("approxTotalBytesCopied"), res);
 assert(!currOp.hasOwnProperty("totalReceiveElapsedMillis"), res);
 assert(!currOp.hasOwnProperty("remainingReceiveEstimatedMillis"), res);
+assert(!currOp.hasOwnProperty("databases"), res);
 fpAfterPersistingStateDoc.off();
 
 // At this point, the total data size stat will have been obtained. However, nothing has been
@@ -99,6 +110,7 @@ assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
 assert.eq(currOp.approxTotalBytesCopied, 0, res);
 assert.gt(currOp.totalReceiveElapsedMillis, 0, res);
 assert.gt(currOp.remainingReceiveEstimatedMillis, 0, res);
+assertNothingClonedBeforeFailover(res);
 
 // Before proceeding, set the failpoint to pause after cloning a single batch.
 jsTestLog("Setting failpoint to pause after cloning single batch.");
@@ -125,6 +137,7 @@ assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
 assert.gt(currOp.approxTotalBytesCopied, 0, res);
 assert.lt(currOp.approxTotalBytesCopied, db1Collection1Size, res);
 assert.gt(currOp.totalReceiveElapsedMillis, 0, res);
+assertNothingClonedBeforeFailover(res);
 // At this point, most of the data is un-cloned.
 assert.gt(currOp.remainingReceiveEstimatedMillis, currOp.totalReceiveElapsedMillis, res);
 
@@ -142,6 +155,7 @@ assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
 assert.eq(currOp.approxTotalBytesCopied, db1Collection1Size, res);
 assert.gt(currOp.totalReceiveElapsedMillis, 0, res);
 assert.gt(currOp.remainingReceiveEstimatedMillis, currOp.totalReceiveElapsedMillis, res);
+assertNothingClonedBeforeFailover(res);
 let prevTotalElapsedMillis = currOp.totalReceiveElapsedMillis;
 const prevRemainingMillis = currOp.remainingReceiveEstimatedMillis;
 
@@ -157,6 +171,7 @@ currOp = res.inprog[0];
 assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
 assert.eq(currOp.approxTotalBytesCopied, db1Size, res);
 assert.gt(currOp.totalReceiveElapsedMillis, prevTotalElapsedMillis, res);
+assertNothingClonedBeforeFailover(res);
 // We have copied most of the data.
 assert.lt(currOp.remainingReceiveEstimatedMillis, currOp.totalReceiveElapsedMillis, res);
 assert.lt(currOp.remainingReceiveEstimatedMillis, prevRemainingMillis);
@@ -171,6 +186,7 @@ currOp = res.inprog[0];
 assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
 assert.eq(currOp.approxTotalBytesCopied, db1Size + db2Size, res);
 assert.gt(currOp.totalReceiveElapsedMillis, prevTotalElapsedMillis, res);
+assertNothingClonedBeforeFailover(res);
 // We have finished cloning, therefore time remaining is zero.
 assert.eq(currOp.remainingReceiveEstimatedMillis, 0, res);
 

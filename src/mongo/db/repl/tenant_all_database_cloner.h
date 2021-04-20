@@ -102,6 +102,11 @@ private:
     AfterStageBehavior listExistingDatabasesStage();
 
     /**
+     * Stage function that initializes several stats before carrying on to the 'postStage'.
+     */
+    AfterStageBehavior initializeStatsStage();
+
+    /**
      * The preStage sets the start time in _stats.
      */
     void preStage() final;
@@ -130,6 +135,7 @@ private:
 
     TenantAllDatabaseClonerStage _listDatabasesStage;          // (R)
     TenantAllDatabaseClonerStage _listExistingDatabasesStage;  // (R)
+    TenantAllDatabaseClonerStage _initializeStatsStage;        // (R)
 
     // The operationTime returned with the listDatabases result.
     Timestamp _operationTime;  // (X)
