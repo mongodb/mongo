@@ -40,8 +40,3 @@ feature_flags:
     description: "Ensures extra guarantees on DDL operations under a sharded cluster."
     cpp_varname: gShardingFullDDLSupport
     default: false
-
-  featureFlagDisableIncompleteShardingDDLSupport:
-    description: "Disable incomplete sharding DDL features."
-    cpp_varname: gDisableIncompleteShardingDDLSupport
-    default: false

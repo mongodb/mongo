@@ -5898,7 +5898,7 @@ tasks:
     vars:
       depends_on: jsCore
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{featureFlagDisableIncompleteShardingDDLSupport: true}'"
+      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 48
 
 - name: multi_shard_multi_stmt_txn_stepdown_primary_jscore_passthrough_gen
@@ -5908,7 +5908,7 @@ tasks:
     vars:
       depends_on: jsCore
       use_large_distro: "true"
-      resmoke_args: "--storageEngine=wiredTiger --mongodSetParameters='{featureFlagDisableIncompleteShardingDDLSupport: true}'"
+      resmoke_args: --storageEngine=wiredTiger
       fallback_num_sub_suites: 37
 
 - name: tenant_migration_jscore_passthrough_gen
