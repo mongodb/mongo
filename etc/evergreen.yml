@@ -10063,7 +10063,7 @@ buildvariants:
 #    distros:
 #    - rhel80-medium
   - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
-  - name: .concurrency !.large !.ubsan !.debug_only !.sharded
+  - name: .concurrency !.large !.ubsan !.debug_only
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
   - name: .rollbackfuzzer
