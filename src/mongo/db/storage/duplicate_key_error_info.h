@@ -45,8 +45,12 @@ public:
 
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-    explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern, const BSONObj& keyValue)
-        : _keyPattern(keyPattern.getOwned()), _keyValue(keyValue.getOwned()) {}
+    explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern,
+                                   const BSONObj& keyValue,
+                                   const BSONObj& collation)
+        : _keyPattern(keyPattern.getOwned()),
+          _keyValue(keyValue.getOwned()),
+          _collation(collation.getOwned()) {}
 
     void serialize(BSONObjBuilder* bob) const override;
 
@@ -67,6 +71,10 @@ public:
 private:
     BSONObj _keyPattern;
     BSONObj _keyValue;
+
+    // An empty object if the index which resulted in the duplicate key error has the simple
+    // collation, otherwise gives the index's collation.
+    BSONObj _collation;
 };
 
 }  // namespace mongo
