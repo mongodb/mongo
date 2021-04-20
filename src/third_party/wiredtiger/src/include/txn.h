@@ -133,8 +133,6 @@ struct __wt_txn_global {
     bool oldest_is_pinned;
     bool stable_is_pinned;
 
-    WT_SPINLOCK id_lock;
-
     /* Protects the active transaction states. */
     WT_RWLOCK rwlock;
 

@@ -208,6 +208,7 @@ src/support/scratch.c
 src/support/stat.c
 src/support/thread_group.c
 src/support/timestamp.c
+src/support/update_vector.c
 src/tiered/tiered_cursor.c
 src/tiered/tiered_handle.c
 src/txn/txn.c

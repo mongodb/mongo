@@ -21,6 +21,7 @@ Ailamaki
 Alakuijala
 Alexandrescu's
 Alloc
+Async
 AsyncOp
 Athanassoulis
 Athlon
@@ -739,6 +740,7 @@ dup
 eee
 eg
 egrep
+el
 emp
 encodings
 encryptor
@@ -1044,6 +1046,7 @@ metadata's
 metafile
 mfence
 minorp
+mips
 mkdir
 mmap
 mmrand

@@ -796,6 +796,7 @@ __curtiered_put(WT_CURSOR_TIERED *curtiered, const WT_ITEM *key, const WT_ITEM *
 {
     WT_CURSOR *primary;
     WT_TIERED *tiered;
+    int (*func)(WT_CURSOR *);
 
     tiered = curtiered->tiered;
 
@@ -811,14 +812,15 @@ __curtiered_put(WT_CURSOR_TIERED *curtiered, const WT_ITEM *key, const WT_ITEM *
         curtiered->current = primary;
 
     primary->set_key(primary, key);
-    if (reserve) {
-        WT_RET(primary->reserve(primary));
-    } else {
-        primary->set_value(primary, value);
-        WT_RET(primary->insert(primary));
-    }
 
-    return (0);
+    /* Our API always leaves the cursor positioned after a reserve call. */
+    WT_ASSERT(CUR2S(curtiered), !reserve || position);
+    func = primary->insert;
+    if (position)
+        func = reserve ? primary->reserve : primary->update;
+    if (!reserve)
+        primary->set_value(primary, value);
+    return (func(primary));
 }
 
 /*
@@ -1010,21 +1012,6 @@ err:
 }
 
 /*
- * __curtiered_random_tier --
- *     Pick a tier at random, weighted by the size of all tiers. Weighting proportional to documents
- *     avoids biasing towards small tiers. Then return the cursor on the tier we have picked.
- */
-static void
-__curtiered_random_tier(WT_SESSION_IMPL *session, WT_CURSOR_TIERED *curtiered, WT_CURSOR **cursor)
-{
-    u_int i;
-
-    /* TODO: make randomness respect tree size. */
-    i = __wt_random(&session->rnd) % curtiered->tiered->ntiers;
-    *cursor = curtiered->cursors[i];
-}
-
-/*
  * __curtiered_next_random --
  *     WT_CURSOR->next method for the tiered cursor type when configured with next_random.
  */
@@ -1035,6 +1022,7 @@ __curtiered_next_random(WT_CURSOR *cursor)
     WT_CURSOR_TIERED *curtiered;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    u_int i, ntiers, tier;
     int exact;
 
     c = NULL;
@@ -1044,29 +1032,34 @@ __curtiered_next_random(WT_CURSOR *cursor)
     __cursor_novalue(cursor);
     WT_ERR(__curtiered_enter(curtiered, false));
 
-    for (;;) {
-        __curtiered_random_tier(session, curtiered, &c);
-        /*
-         * This call to next_random on the tier can potentially end in WT_NOTFOUND if the tier we
-         * picked is empty. We want to retry in that case.
-         */
+    /*
+     * Select a random tier. If it is empty, try the next tier and so on, wrapping around until we
+     * find something or run out of tiers.
+     */
+    ntiers = curtiered->tiered->ntiers;
+    tier = __wt_random(&session->rnd) % ntiers;
+    for (i = 0; i < ntiers; i++) {
+        c = curtiered->cursors[tier];
         WT_ERR_NOTFOUND_OK(__wt_curfile_next_random(c), true);
-        if (ret == WT_NOTFOUND)
+        if (ret == WT_NOTFOUND) {
+            if (++tier == ntiers)
+                tier = 0;
             continue;
+        }
 
         F_SET(cursor, WT_CURSTD_KEY_INT);
         WT_ERR(c->get_key(c, &cursor->key));
         /*
-         * Search near the current key to resolve any tombstones and position to a valid document.
-         * If we see a WT_NOTFOUND here that is valid, as the tree has no documents visible to us.
+         * Search near the current key to resolve any tombstones and position to a valid record. If
+         * we see a WT_NOTFOUND here that is valid, as the tree has no documents visible to us.
          */
         WT_ERR(__curtiered_search_near(cursor, &exact));
         break;
     }
 
-    /* We have found a valid doc. Set that we are now positioned */
-    if (0) {
 err:
+    if (ret != 0) {
+        /* We didn't find a valid record. Don't leave cursor positioned */
         F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
     }
     __curtiered_leave(curtiered);
