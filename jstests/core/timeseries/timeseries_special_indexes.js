@@ -1,9 +1,7 @@
 /**
- * Tests sparse, multikey, 2d and 2dsphere indexes on time-series collections
+ * Tests sparse, multikey, wildcard, 2d and 2dsphere indexes on time-series collections
  *
  * Tests index creation, index drops, list indexes, hide/unhide index on a time-series collection.
- *
- * TODO (SERVER-55243): test drop, list, hide/unhide
  *
  * @tags: [
  *     assumes_no_implicit_collection_creation_after_drop,
