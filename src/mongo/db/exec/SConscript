@@ -154,7 +154,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/record_id_helpers",
-        "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/clock_source_mock",

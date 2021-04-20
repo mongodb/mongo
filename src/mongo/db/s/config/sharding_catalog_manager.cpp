@@ -280,6 +280,23 @@ Status createUuidIndexesForConfigChunks(OperationContext* opCtx) {
     return Status::OK();
 }
 
+/**
+ * This step runs on FCV switch between 4.4 <-> 5.0, right after the shards have been told to enter
+ * Phase 1 and after all the local chunks' format has been changed to contain both UUID and
+ * Namespace.
+ *
+ * If isOnUpgrade is true, it will remove any config.chunks entries, which do not have UUID and if
+ * it is false, it will remove those which do not have Namespace.
+ */
+void removeIncompleteChunks(OperationContext* opCtx, bool isOnUpgrade) {
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+
+    auto query = isOnUpgrade ? BSON(ChunkType::collectionUUID << BSON("$exists" << false))
+                             : BSON(ChunkType::ns << BSON("$exists" << false));
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, ChunkType::ConfigNS, query, ShardingCatalogClient::kLocalWriteConcern));
+}
+
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -795,6 +812,8 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase1(
             true /* multi */);
     }
 
+    removeIncompleteChunks(opCtx, true /* isOnUpgrade */);
+
     // Create uuid_* indexes for config.chunks
     uassertStatusOK(createUuidIndexesForConfigChunks(opCtx));
 
@@ -937,6 +956,8 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase1(
                                      false /* upsert */,
                                      true /* multi */);
     }
+
+    removeIncompleteChunks(opCtx, false /* isOnUpgrade */);
 
     // Create ns_* indexes for config.chunks
     uassertStatusOK(createNsIndexesForConfigChunks(opCtx));
