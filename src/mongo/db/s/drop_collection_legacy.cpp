@@ -197,7 +197,9 @@ void ensureDropCollectionCompleted(OperationContext* opCtx, const NamespaceStrin
 
 }  // namespace
 
-void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss) {
+void dropCollectionLegacy(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const FixedFCVRegion& fcvRegion) {
     auto dbDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
         opCtx, nss.db(), "dropCollection", DistLockManager::kDefaultLockTimeout));
     auto collDistLock = uassertStatusOK(DistLockManager::get(opCtx)->lock(
@@ -209,7 +211,6 @@ void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss) {
 
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    CollectionType collection;
     try {
         catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
         dropCollectionNoDistLock(opCtx, nss);
@@ -270,7 +271,6 @@ void dropCollectionNoDistLock(OperationContext* opCtx, const NamespaceString& ns
     auto allShards = uassertStatusOK(catalogClient->getAllShards(
                                          opCtx, repl::ReadConcernLevel::kMajorityReadConcern))
                          .value;
-
     sendDropCollectionToAllShards(opCtx, nss, allShards);
 
     LOGV2_DEBUG(21925,
@@ -281,13 +281,14 @@ void dropCollectionNoDistLock(OperationContext* opCtx, const NamespaceString& ns
 
     try {
         auto collType = catalogClient->getCollection(opCtx, nss);
-        const auto nssOrUUID = [&]() {
+        const auto nssOrUUID = [&] {
             if (collType.getTimestamp()) {
-                return NamespaceStringOrUUID(std::string(), collType.getUuid());
+                return NamespaceStringOrUUID(collType.getNss().db().toString(), collType.getUuid());
             } else {
                 return NamespaceStringOrUUID(collType.getNss());
             }
         }();
+
         removeChunksForDroppedCollection(opCtx, nssOrUUID);
         removeTagsForDroppedCollection(opCtx, nss);
 

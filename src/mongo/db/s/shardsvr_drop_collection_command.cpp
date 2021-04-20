@@ -76,15 +76,15 @@ public:
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-            bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            FixedFCVRegion fcvRegion(opCtx);
 
+            bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(*fcvRegion);
             if (!useNewPath) {
                 LOGV2_DEBUG(5280951,
                             1,
                             "Running legacy drop collection procedure",
                             "namespace"_attr = ns());
-                dropCollectionLegacy(opCtx, ns());
+                dropCollectionLegacy(opCtx, ns(), fcvRegion);
                 return;
             }
 

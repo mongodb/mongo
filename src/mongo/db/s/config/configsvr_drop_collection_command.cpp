@@ -118,8 +118,7 @@ public:
                 "compatibility version 4.4",
                 fcvRegion == FCVersion::kFullyDowngradedTo44);
 
-        dropCollectionLegacy(opCtx, nss);
-
+        dropCollectionLegacy(opCtx, nss, fcvRegion);
         return true;
     }
 } configsvrDropCollectionCmd;

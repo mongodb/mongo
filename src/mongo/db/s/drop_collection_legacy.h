@@ -29,12 +29,15 @@
 
 #pragma once
 
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
 
-void dropCollectionLegacy(OperationContext* opCtx, const NamespaceString& nss);
+void dropCollectionLegacy(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const FixedFCVRegion& fcvRegion);
 
 /**
  * Contains the underlying logic for drop collection, assuming that the caller calls it in isolation

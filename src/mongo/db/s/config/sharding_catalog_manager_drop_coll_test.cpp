@@ -176,7 +176,9 @@ public:
     void doDrop() {
         ThreadClient tc("Test", getServiceContext());
         auto opCtx = tc->makeOperationContext();
-        dropCollectionLegacy(opCtx.get(), dropNS());
+
+        FixedFCVRegion fcvRegion(opCtx.get());
+        dropCollectionLegacy(opCtx.get(), dropNS(), fcvRegion);
     }
 
     const NamespaceString& dropNS() const {
