@@ -199,7 +199,7 @@ class Tests(unittest.TestCase):
         """Check results of analysis generically."""
 
         analysis = [algo(graph, *args)]
-        ga = libdeps.analyzer.LibdepsGraphAnalysis(graph, analysis)
+        ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
         printer = libdeps.analyzer.GaJsonPrinter(ga)
         result = json.loads(printer.get_json())
         self.assertEqual(result, expected)
@@ -210,7 +210,7 @@ class Tests(unittest.TestCase):
         analysis = libdeps.analyzer.counter_factory(
             graph,
             [name[0] for name in CountTypes.__members__.items() if name[0] != CountTypes.ALL.name])
-        ga = libdeps.analyzer.LibdepsGraphAnalysis(graph, analysis)
+        ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
         printer = libdeps.analyzer.GaJsonPrinter(ga)
         result = json.loads(printer.get_json())
         self.assertEqual(result, expected)

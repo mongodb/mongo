@@ -229,8 +229,7 @@ class BackendServer:
             analysis = libdeps.analyzer.counter_factory(
                 self._dependents_graph,
                 [name[0] for name in libdeps.analyzer.CountTypes.__members__.items()])
-            ga = libdeps.analyzer.LibdepsGraphAnalysis(libdeps_graph=self._dependents_graph,
-                                                       analysis=analysis)
+            ga = libdeps.analyzer.LibdepsGraphAnalysis(analysis)
             results = ga.get_results()
 
             graph_data = []

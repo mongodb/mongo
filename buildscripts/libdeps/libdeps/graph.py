@@ -176,3 +176,10 @@ class LibdepsGraph(networkx.DiGraph):
             self._progressbar = null_progressbar
 
         return self._progressbar
+
+
+def load_libdeps_graph(graph_file):
+    """Load a graphml file and create a LibdepGraph."""
+
+    graph = networkx.read_graphml(graph_file)
+    return LibdepsGraph(graph=graph)

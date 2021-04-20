@@ -694,10 +694,8 @@ class BuildDataReport(Analyzer):
 class LibdepsGraphAnalysis:
     """Runs the given analysis on the input graph."""
 
-    def __init__(self, libdeps_graph, analysis):
+    def __init__(self, analysis):
         """Perform analysis based off input args."""
-
-        self._libdeps_graph = libdeps_graph
 
         self._results = {}
         for analyzer in analysis:

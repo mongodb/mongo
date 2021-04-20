@@ -217,7 +217,7 @@ def main():
     if args.build_data:
         analysis.append(libdeps_analyzer.BuildDataReport(libdeps_graph))
 
-    ga = libdeps_analyzer.LibdepsGraphAnalysis(libdeps_graph=libdeps_graph, analysis=analysis)
+    ga = libdeps_analyzer.LibdepsGraphAnalysis(analysis)
 
     if args.format == 'pretty':
         ga_printer = libdeps_analyzer.GaPrettyPrinter(ga)
