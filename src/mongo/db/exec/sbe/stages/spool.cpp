@@ -117,8 +117,9 @@ PlanState SpoolEagerProducerStage::getNext() {
 
 void SpoolEagerProducerStage::close() {
     auto optTimer(getOptTimer(_opCtx));
-
     _commonStats.closes++;
+
+    _buffer->clear();
 }
 
 std::unique_ptr<PlanStageStats> SpoolEagerProducerStage::getStats(bool includeDebugInfo) const {
@@ -264,8 +265,10 @@ PlanState SpoolLazyProducerStage::getNext() {
 
 void SpoolLazyProducerStage::close() {
     auto optTimer(getOptTimer(_opCtx));
-
     _commonStats.closes++;
+
+    _buffer->clear();
+    _children[0]->close();
 }
 
 std::unique_ptr<PlanStageStats> SpoolLazyProducerStage::getStats(bool includeDebugInfo) const {
