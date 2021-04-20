@@ -615,6 +615,9 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 
     LogicalSessionIdMap<std::vector<OplogEntry*>> partialTxnOps;
     CachedCollectionProperties collPropertiesCache;
+
+    // Used to serialize writes to the tenant migrations donor and recipient namespaces.
+    boost::optional<uint32_t> tenantMigrationsWriterId;
     for (auto&& op : *ops) {
         // If the operation's optime is before or the same as the beginApplyingOpTime we don't want
         // to apply it, so don't include it in writerVectors.
@@ -696,6 +699,19 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             continue;
         }
 
+        // Writes to the tenant migration namespaces must be serialized to preserve the order of
+        // migration and access blocker states.
+        if (op.getNss() == NamespaceString::kTenantMigrationDonorsNamespace ||
+            op.getNss() == NamespaceString::kTenantMigrationRecipientsNamespace) {
+            auto writerId = OplogApplierUtils::addToWriterVector(
+                opCtx, &op, writerVectors, &collPropertiesCache, tenantMigrationsWriterId);
+            if (!tenantMigrationsWriterId) {
+                tenantMigrationsWriterId.emplace(writerId);
+            } else {
+                invariant(writerId == *tenantMigrationsWriterId);
+            }
+            continue;
+        }
         OplogApplierUtils::addToWriterVector(opCtx, &op, writerVectors, &collPropertiesCache);
     }
 }
