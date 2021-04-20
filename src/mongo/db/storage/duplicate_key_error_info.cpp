@@ -34,6 +34,8 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 namespace {
@@ -44,11 +46,77 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 
 void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("keyPattern", _keyPattern);
-    bob->append("keyValue", _keyValue);
+
+    // Keep track of which components of the key pattern are hex encoded.
+    std::vector<bool> hexEncodedComponents;
+    bool atLeastOneComponentIsHexEncoded = false;
+
+    BSONObjBuilder keyValueBuilder{bob->subobjStart("keyValue")};
+    for (const auto& keyValueElem : _keyValue) {
+        const bool shouldHexEncode = keyValueElem.type() == BSONType::String &&
+            (!_collation.isEmpty() || !isValidUTF8(keyValueElem.valueStringData()));
+
+        hexEncodedComponents.push_back(shouldHexEncode);
+        if (shouldHexEncode) {
+            atLeastOneComponentIsHexEncoded = true;
+            auto elem = keyValueElem.valueStringData();
+            keyValueBuilder.append(keyValueElem.fieldName(),
+                                   toHexLower(elem.rawData(), elem.size()));
+        } else {
+            keyValueBuilder.append(keyValueElem);
+        }
+    }
+    keyValueBuilder.doneFast();
+
+    // Append a vector of booleans describing which components of the key pattern are hex encoded.
+    if (atLeastOneComponentIsHexEncoded) {
+        BSONArrayBuilder hexEncodedBuilder{bob->subarrayStart("hexEncoded")};
+        for (auto&& isHex : hexEncodedComponents) {
+            hexEncodedBuilder.appendBool(isHex);
+        }
+        hexEncodedBuilder.doneFast();
+    }
+
+    if (!_collation.isEmpty()) {
+        bob->append("collation", _collation);
+    }
 }
 
 std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj& obj) {
-    return std::make_shared<DuplicateKeyErrorInfo>(obj["keyPattern"].Obj(), obj["keyValue"].Obj());
+    auto keyPattern = obj["keyPattern"].Obj();
+    BSONObj keyValue;
+
+    // Determine which components of 'keyValue' are hex encoded that need to be decoded.
+    // If the "hexEncoded" field does not exist, then assume that no decoding is necessary.
+    if (auto hexEncodedElt = obj["hexEncoded"]) {
+        BSONObjIterator isHexEncodedIt(hexEncodedElt.Obj());
+        BSONObjIterator keyValueElemIt(obj["keyValue"].Obj());
+        BSONObjBuilder keyValueBuilder;
+        while (isHexEncodedIt.more()) {
+            const auto& keyValueElem = keyValueElemIt.next();
+
+            if (isHexEncodedIt.next().Bool()) {
+                StringBuilder out;
+                const StringData value = keyValueElem.checkAndGetStringData();
+                for (size_t i = 0; i < value.size(); i += 2) {
+                    out << uassertStatusOK(fromHex(StringData(&value.rawData()[i], 2)));
+                }
+                keyValueBuilder.append(keyValueElem.fieldName(), out.str());
+            } else {
+                keyValueBuilder.append(keyValueElem);
+            }
+        }
+        keyValue = keyValueBuilder.obj();
+    } else {
+        keyValue = obj["keyValue"].Obj();
+    }
+
+    BSONObj collation;
+    if (auto collationElt = obj["collation"]) {
+        collation = collationElt.Obj();
+    }
+
+    return std::make_shared<DuplicateKeyErrorInfo>(keyPattern, keyValue, collation);
 }
 
 }  // namespace mongo

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/unittest/unittest.h"
@@ -60,6 +61,62 @@ TEST(IndexEntryComparison, BuildDupKeyErrorStatusProducesExpectedErrorObject) {
     extraInfo->serialize(&objBuilder);
     ASSERT_BSONOBJ_EQ(objBuilder.obj(),
                       BSON("keyPattern" << keyPattern << "keyValue" << keyValueWithFieldName));
+}
+
+void duplicateKeyErrorSerializationAndParseReturnTheSameObject(
+    BSONObj keyPattern,
+    BSONObj keyValue,
+    BSONObj collation,
+    BSONObj keyValueWithFieldName,
+    BSONObj expectedEncodedKeyValueField) {
+    NamespaceString collNss("test.foo");
+    std::string indexName("a_1_b_1");
+
+    auto dupKeyStatus = buildDupKeyErrorStatus(keyValue, collNss, indexName, keyPattern, collation);
+    auto extraInfo = dupKeyStatus.extraInfo<DuplicateKeyErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT_BSONOBJ_EQ(extraInfo->getDuplicatedKeyValue(), keyValueWithFieldName);
+
+    // Build a serialized representation of the 'DuplicateKeyErrorInfo'.
+    BSONObjBuilder objBuilder;
+    extraInfo->serialize(&objBuilder);
+    auto duplicateKeyErrorDoc = objBuilder.obj();
+    ASSERT_BSONOBJ_EQ(duplicateKeyErrorDoc.getField("keyValue").Obj(),
+                      expectedEncodedKeyValueField);
+
+    // Verify that parsing of the serialized representation of the 'DuplicateKeyErrorInfo' object
+    // results in an identical 'DuplicateKeyErrorInfo' object.
+    auto parsedDuplicatedErrorInfo = std::dynamic_pointer_cast<const DuplicateKeyErrorInfo>(
+        DuplicateKeyErrorInfo::parse(duplicateKeyErrorDoc));
+
+    ASSERT(parsedDuplicatedErrorInfo.get());
+    ASSERT_BSONOBJ_EQ(parsedDuplicatedErrorInfo->getKeyPattern(), keyPattern);
+    ASSERT_BSONOBJ_EQ(parsedDuplicatedErrorInfo->getDuplicatedKeyValue(), keyValueWithFieldName);
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectWithCollation) {
+    auto keyPattern = BSON("a" << 1 << "b" << 1);
+    StringData str("abc");
+    auto keyValue = BSON("" << 10 << "" << str);
+    auto collation = BSON("x"
+                          << "y");
+    auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
+    auto expectedEncodedKeyValueField =
+        BSON("a" << 10 << "b" << StringData(toHexLower(str.rawData(), str.size())));
+    duplicateKeyErrorSerializationAndParseReturnTheSameObject(
+        keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
+}
+
+TEST(IndexEntryComparison, BuildDupKeyErrorSerializeAndParseReturnTheSameObjectForInvalidUtf8) {
+    auto keyPattern = BSON("a" << 1 << "b" << 1);
+    StringData str("\xc3\x28");
+    auto keyValue = BSON("" << 10 << "" << str);
+    auto collation = BSONObj();
+    auto keyValueWithFieldName = BSON("a" << 10 << "b" << str);
+    auto expectedEncodedKeyValueField =
+        BSON("a" << 10 << "b" << StringData(toHexLower(str.rawData(), str.size())));
+    duplicateKeyErrorSerializationAndParseReturnTheSameObject(
+        keyPattern, keyValue, collation, keyValueWithFieldName, expectedEncodedKeyValueField);
 }
 
 TEST(IndexEntryComparison, BuildDupKeyErrorMessageIncludesCollationAndHexEncodedCollationKey) {

@@ -240,7 +240,8 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
 
     sb << builderForErrmsg.obj();
 
-    return Status(DuplicateKeyErrorInfo(keyPattern, builderForErrorExtraInfo.obj()), sb.str());
+    return Status(DuplicateKeyErrorInfo(keyPattern, builderForErrorExtraInfo.obj(), indexCollation),
+                  sb.str());
 }
 
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,

@@ -437,8 +437,8 @@ TEST_F(DistLockCatalogTest, GrabLockDupKeyError) {
     });
 
     onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
-        return Status(
-            {DuplicateKeyErrorInfo(BSON("x" << 1), BSON("" << 1)), "Mock duplicate key error"});
+        return Status({DuplicateKeyErrorInfo(BSON("x" << 1), BSON("" << 1), BSONObj{}),
+                       "Mock duplicate key error"});
     });
 
     future.default_timed_get();

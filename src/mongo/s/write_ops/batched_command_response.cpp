@@ -137,7 +137,7 @@ BSONObj BatchedCommandResponse::toBSON() const {
             builder.append(WriteErrorDetail::errCode(), status.code());
             builder.append(WriteErrorDetail::errCodeName(), status.codeString());
             builder.append(WriteErrorDetail::errMessage(), errorMessage(status.reason()));
-            if (auto extra = _status.extraInfo())
+            if (auto extra = status.extraInfo())
                 extra->serialize(&builder);  // TODO consider extra info size for truncation.
 
             if (writeError->isErrInfoSet())
