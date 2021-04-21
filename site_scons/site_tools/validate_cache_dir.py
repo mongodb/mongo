@@ -134,7 +134,14 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             return False
 
     def CacheDebug(self, fmt, target, cachefile):
-        super().CacheDebug(fmt, target, cachefile + self.get_ext())
+        # The target cachefile will live in a directory with the special
+        # extension for this cachedir class. Check if this cachefile is
+        # in a directory like that and customize the debug logs.
+        cksum_cachefile = str(pathlib.Path(cachefile).parent)
+        if cksum_cachefile.endswith(self.get_ext()):
+            super().CacheDebug(fmt, target, cksum_cachefile)
+        else:
+            super().CacheDebug(fmt, target, cachefile)
 
     def print_cache_issue(self, node, msg):
 
