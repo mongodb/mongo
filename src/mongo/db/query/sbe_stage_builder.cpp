@@ -1751,7 +1751,7 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     //      seen last.
     //
     // The 'makeStage' parameter is used to build a PlanStage tree which is served as a root stage
-    // for each of the union branches. The same machanism is used to build each union branch, and
+    // for each of the union branches. The same mechanism is used to build each union branch, and
     // the special logic which needs to be triggered depending on which branch we build is
     // controlled by setting the isTailableCollScanResumeBranch flag in PlanStageReqs.
     auto makeUnionBranch = [&](bool isTailableCollScanResumeBranch)
