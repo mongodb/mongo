@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/window_function/window_function_exec_non_removable_range.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_document.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_range.h"
+#include "mongo/db/pipeline/window_function/window_function_shift.h"
 
 namespace mongo {
 
@@ -89,22 +90,23 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
         bounds.lower);
 }
 
-std::unique_ptr<WindowFunctionExec> translateDerivative(
+std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
+    window_function::ExpressionDerivative* expr,
     PartitionIterator* iter,
-    const window_function::ExpressionDerivative& deriv,
     const boost::optional<SortPattern>& sortBy) {
-    auto expCtx = deriv.expCtx();
-
     tassert(5490703,
             "$derivative requires a 1-field ascending sortBy",
             sortBy && sortBy->size() == 1 && !sortBy->begin()->expression &&
                 sortBy->begin()->isAscending);
-    auto sortExpr = ExpressionFieldPath::createPathFromString(
-        expCtx, sortBy->begin()->fieldPath->fullPath(), expCtx->variablesParseState);
+    auto sortExpr =
+        ExpressionFieldPath::createPathFromString(expr->expCtx(),
+                                                  sortBy->begin()->fieldPath->fullPath(),
+                                                  expr->expCtx()->variablesParseState);
 
     return std::make_unique<WindowFunctionExecDerivative>(
-        iter, deriv.input(), sortExpr, deriv.bounds(), deriv.outputUnit());
+        iter, expr->input(), sortExpr, expr->bounds(), expr->outputUnit());
 }
+
 
 }  // namespace
 
@@ -114,16 +116,18 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     const WindowFunctionStatement& functionStmt,
     const boost::optional<SortPattern>& sortBy) {
 
-    if (auto deriv =
-            dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
-        return translateDerivative(iter, *deriv, sortBy);
-    } else if (auto first =
+    if (auto expr = dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
+        return translateDerivative(expr, iter, sortBy);
+    } else if (auto expr =
                    dynamic_cast<window_function::ExpressionFirst*>(functionStmt.expr.get())) {
-        return std::make_unique<WindowFunctionExecFirst>(
-            iter, first->input(), first->bounds(), boost::none);
-    } else if (auto last =
+        return std::make_unique<WindowFunctionExecFirst>(iter, expr->input(), expr->bounds());
+    } else if (auto expr =
                    dynamic_cast<window_function::ExpressionLast*>(functionStmt.expr.get())) {
-        return std::make_unique<WindowFunctionExecLast>(iter, last->input(), last->bounds());
+        return std::make_unique<WindowFunctionExecLast>(iter, expr->input(), expr->bounds());
+    } else if (auto expr =
+                   dynamic_cast<window_function::ExpressionShift*>(functionStmt.expr.get())) {
+        return std::make_unique<WindowFunctionExecFirst>(
+            iter, expr->input(), expr->bounds(), expr->defaultVal());
     }
 
     WindowBounds bounds = functionStmt.expr->bounds();

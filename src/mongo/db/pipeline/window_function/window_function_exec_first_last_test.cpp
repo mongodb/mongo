@@ -48,10 +48,11 @@ public:
     std::pair<WindowFunctionExecFirst, WindowFunctionExecLast> createExecs(
         std::deque<DocumentSource::GetNextResult> docs,
         WindowBounds bounds,
-        boost::optional<BSONElement> defaultValue = boost::none,
+        boost::optional<Value> defaultVal = boost::none,
         boost::optional<std::string> keyPath = boost::none) {
         // 'defaultValue' is an internal functionality of $first needed for $shift desugaring.
         using optExp = boost::optional<boost::intrusive_ptr<Expression>>;
+        using optVal = boost::optional<Value>;
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
         auto expCtx = getExpCtx().get();
         auto vps = expCtx->variablesParseState;
@@ -63,10 +64,8 @@ public:
                                                     boost::none,
                                                     100 * 1024 * 1024 /* default memory limit */);
         auto inputField = ExpressionFieldPath::parse(expCtx, "$val", vps);
-        auto defaultExp = defaultValue
-            ? optExp(ExpressionConstant::parse(expCtx, *defaultValue, vps))
-            : boost::none;
-        return {WindowFunctionExecFirst(_iter.get(), inputField, bounds, defaultExp),
+
+        return {WindowFunctionExecFirst(_iter.get(), inputField, bounds, defaultVal),
                 WindowFunctionExecLast(_iter.get(), inputField, bounds)};
     }
 
@@ -222,9 +221,7 @@ TEST_F(WindowFunctionExecFirstLastTest, DefaultValueForEmptyWindow1) {
 
     // WindowFunctionExecLast does not accept a default value because it is an internal
     // functionality meant for $shift desugaring.
-    auto [fst, _] = createExecs(std::move(docs),
-                                {WindowBounds::DocumentBased{-3, -2}},
-                                BSON("IGNORED_FIELD_NAME" << -99).firstElement());
+    auto [fst, _] = createExecs(std::move(docs), {WindowBounds::DocumentBased{-3, -2}}, Value(-99));
     ASSERT_VALUE_EQ(Value(-99), fst.getNext());
     advanceIterator();
     ASSERT_VALUE_EQ(Value(-99), fst.getNext());
@@ -242,9 +239,7 @@ TEST_F(WindowFunctionExecFirstLastTest, DefaultValueForEmptyWindow2) {
         Document{{"val", 1}},
     };
 
-    BSONObj defaultValue = BSON("IGNORED_FIELD_NAME" << -99);
-    auto [fst, _] = createExecs(
-        std::move(docs), {WindowBounds::DocumentBased{3, 4}}, defaultValue.firstElement());
+    auto [fst, _] = createExecs(std::move(docs), {WindowBounds::DocumentBased{3, 4}}, Value(-99));
     ASSERT_VALUE_EQ(Value(-99), fst.getNext());
     advanceIterator();
     ASSERT_VALUE_EQ(Value(-99), fst.getNext());

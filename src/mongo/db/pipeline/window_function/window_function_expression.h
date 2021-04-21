@@ -40,6 +40,11 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/sort_pattern.h"
 
+namespace mongo {
+class WindowFunctionExec;
+class PartitionIterator;
+}  // namespace mongo
+
 #define REGISTER_WINDOW_FUNCTION(name, parser)                                       \
     MONGO_INITIALIZER_GENERAL(                                                       \
         addToWindowFunctionMap_##name, ("default"), ("windowFunctionExpressionMap")) \
@@ -54,7 +59,10 @@
         ::mongo::window_function::Expression::registerParser(                                      \
             "$" #name, ::mongo::window_function::ExpressionRemovable<accumClass, wfClass>::parse); \
     }
+
+
 namespace mongo::window_function {
+
 /**
  * A window-function expression describes how to compute a single output value in a
  * $setWindowFields stage. For example, in
@@ -158,6 +166,7 @@ public:
         args[kWindowArg] = windowField.freezeToValue();
         return args.freezeToValue();
     }
+
 
 protected:
     ExpressionContext* _expCtx;

@@ -86,6 +86,10 @@ struct WindowBounds {
         return WindowBounds{DocumentBased{Unbounded{}, Unbounded{}}};
     }
 
+    static WindowBounds documentBounds(int lower, int upper) {
+        return WindowBounds{DocumentBased{lower, upper}};
+    }
+
     /**
      * Checks whether these bounds are unbounded on both ends.
      * This case is special because it means you don't need a sortBy to interpret the bounds:

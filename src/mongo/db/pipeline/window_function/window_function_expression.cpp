@@ -37,6 +37,10 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
+#include "mongo/db/pipeline/window_function/partition_iterator.h"
+#include "mongo/db/pipeline/window_function/window_function_exec.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
+#include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 
 using boost::intrusive_ptr;
@@ -184,7 +188,6 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
             return nullptr;
     }
 }
-
 
 MONGO_INITIALIZER(windowFunctionExpressionMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers

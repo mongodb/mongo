@@ -137,6 +137,7 @@ env.Library(
         'window_function/window_function_count.cpp',
         'window_function/window_function_expression.cpp',
         'window_function/window_function_integral.cpp',
+        'window_function/window_function_shift.cpp',
         'window_function/window_function_sum.cpp',
         ],
     LIBDEPS=[
