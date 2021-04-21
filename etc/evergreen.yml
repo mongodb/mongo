@@ -9526,6 +9526,7 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
     push_path: osx
     push_bucket: downloads.mongodb.org
     push_name: macos
@@ -9578,6 +9579,7 @@ buildvariants:
   run_on:
   - macos-1014
   expansions:
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
     push_path: osx
     push_bucket: downloads.10gen.com
@@ -9615,7 +9617,7 @@ buildvariants:
   - macos-1014
   batchtime: 10080 # 7 days
   expansions:
-    test_flags: --excludeWithAnyTags=uses_transactions
+    test_flags: --excludeWithAnyTags=uses_transactions,incompatible_with_macos
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
     compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
     compile_flags: >-

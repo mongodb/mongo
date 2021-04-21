@@ -2,7 +2,7 @@
  * Tests tenant migration timeout scenarios.
  *
  * @tags: [requires_fcv_47, incompatible_with_eft, requires_majority_read_concern,
- * incompatible_with_windows_tls]
+ * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
  */
 
 (function() {
