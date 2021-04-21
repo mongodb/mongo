@@ -157,13 +157,11 @@ ExpressionContext::ExpressionContext(
         variables.seedVariablesWithLetParameters(this, *letParameters);
 }
 
-void ExpressionContext::checkForInterrupt() {
+void ExpressionContext::checkForInterruptSlow() {
     // This check could be expensive, at least in relative terms, so don't check every time.
-    if (--_interruptCounter == 0) {
-        invariant(opCtx);
-        _interruptCounter = kInterruptCheckPeriod;
-        opCtx->checkForInterrupt();
-    }
+    invariant(opCtx);
+    _interruptCounter = kInterruptCheckPeriod;
+    opCtx->checkForInterrupt();
 }
 
 ExpressionContext::CollatorStash::CollatorStash(ExpressionContext* const expCtx,

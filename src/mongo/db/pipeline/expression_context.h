@@ -150,7 +150,11 @@ public:
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
      */
-    void checkForInterrupt();
+    void checkForInterrupt() {
+        if (--_interruptCounter == 0) {
+            checkForInterruptSlow();
+        }
+    }
 
     /**
      * Returns true if this is a collectionless aggregation on the specified database.
@@ -378,6 +382,10 @@ protected:
     static const int kInterruptCheckPeriod = 128;
 
     friend class CollatorStash;
+
+    // Performs the heavy work of checking whether an interrupt has occurred. Should only be called
+    // when _interruptCounter has been decremented to zero.
+    void checkForInterruptSlow();
 
     // Collator used for comparisons.
     std::unique_ptr<CollatorInterface> _collator;
