@@ -20,6 +20,7 @@
 load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const coll = db.wildcard_cached_plans;
 coll.drop();
@@ -83,13 +84,7 @@ assert.eq(cacheEntry.isActive, true);
 // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
 assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-// Note that the "getParameter" command is expected to fail in versions of mongod that do not
-// yet include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
-// correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 const isLegacyMode = db.getMongo().readMode() === "legacy";
 // For legacy reads we always use the classic engine, even when SBE is turned on as a default
 // engine.

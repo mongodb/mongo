@@ -19,6 +19,7 @@ TestData.disableImplicitSessions = true;
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 load("jstests/libs/log.js");              // For findMatchingLogLine.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -99,10 +100,7 @@ function runLoggingTests({db, readWriteMode, slowMs, logLevel, sampleRate}) {
     assert.commandWorked(db.setLogLevel(logLevel, "command"));
     assert.commandWorked(db.setLogLevel(logLevel, "write"));
 
-    const isSBEEnabled = (() => {
-        const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-        return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-    })();
+    const isSBEEnabled = checkSBEEnabled(db);
 
     // Certain fields in the log lines on mongoD are not applicable in their counterparts on
     // mongoS, and vice-versa. Ignore these fields when examining the logs of an instance on

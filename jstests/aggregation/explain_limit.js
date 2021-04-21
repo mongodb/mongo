@@ -10,19 +10,13 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
 let coll = db.explain_limit;
 
 const kCollSize = 105;
 const kLimit = 10;
-
-// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
-// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
-// correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 // Return whether or explain() was successful and contained the appropriate fields given the
 // requested verbosity. Checks that the number of documents examined and returned are correct given

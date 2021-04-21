@@ -2,14 +2,13 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 const testDB = conn.getDB("jstests_plan_cache_list_failed_plans");
 const coll = testDB.test;
-const isSBEEnabled = (() => {
-    const getParam = testDB.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(testDB);
 
 coll.drop();
 

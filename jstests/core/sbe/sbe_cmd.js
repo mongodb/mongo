@@ -9,11 +9,9 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because the SBE feature flag is disabled");
     return;

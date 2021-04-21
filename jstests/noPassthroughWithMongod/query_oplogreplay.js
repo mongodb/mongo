@@ -6,16 +6,11 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/storage_engine_utils.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const t = db.getSiblingDB("local").oplog.jstests_query_oplogreplay;
 
-// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
-// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
-// correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 function dropOplogAndCreateNew(oplog, newCollectionSpec) {
     if (storageEngineIsWiredTigerOrInMemory()) {

@@ -5,6 +5,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start up");
@@ -15,10 +16,7 @@ const coll = testDb.plan_cache_stats_agg_source;
 // Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
 // include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
 // correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = testDb.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(testDb);
 
 // Returns a BSON object representing the plan cache entry for the query shape {a: 1, b: 1}.
 function getSingleEntryStats() {

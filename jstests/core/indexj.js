@@ -8,13 +8,12 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
 const t = db[jsTestName()];
 t.drop();
 
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 function keysExamined(query, hint, sort) {
     if (!hint) {

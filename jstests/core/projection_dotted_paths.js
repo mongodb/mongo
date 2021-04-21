@@ -12,11 +12,9 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 let coll = db["projection_dotted_paths"];
 coll.drop();

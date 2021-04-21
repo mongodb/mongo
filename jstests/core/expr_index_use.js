@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const coll = db.expr_index_use;
 coll.drop();
@@ -51,13 +52,7 @@ assert.commandWorked(coll.insert({w: {z: 2}}));
 assert.commandWorked(coll.createIndex({w: 1}));
 assert.commandWorked(coll.createIndex({"w.z": 1}));
 
-// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
-// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
-// correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 /**
  * Executes the expression 'expr' as both a find and an aggregate. Then confirms

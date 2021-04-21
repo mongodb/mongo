@@ -11,14 +11,9 @@
 "use strict";
 
 load("jstests/libs/assert_schema_match.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
-// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
-// correctly evaluates to false.
-const isSBEEnabled = (() => {
-    const getParam = db.adminCommand({getParameter: 1, featureFlagSBE: 1});
-    return getParam.hasOwnProperty("featureFlagSBE") && getParam.featureFlagSBE.value;
-})();
+const isSBEEnabled = checkSBEEnabled(db);
 
 let coll = db.jstests_json_schema;
 coll.drop();
