@@ -47,7 +47,9 @@ for (let i = 0; i < 100; i++) {
 function checkRecordId(documents) {
     for (const document of documents) {
         assert(document.hasOwnProperty("$recordId"));
-        assert(isString(document["$recordId"]));
+        if (TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
+            assert(isString(document["$recordId"]));
+        }
     }
 }
 

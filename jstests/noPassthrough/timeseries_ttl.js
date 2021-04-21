@@ -163,8 +163,15 @@ testCase((coll, bucketsColl) => {
 
     // Make the collection TTL and expect the data to be deleted because the bucket minimum is past
     // the expiry plus the maximum bucket range.
-    assert.commandWorked(testDB.runCommand(
-        {collMod: 'system.buckets.ts', clusteredIndex: {expireAfterSeconds: expireAfterSeconds}}));
+    if (TimeseriesTest.supportsClusteredIndexes(conn)) {
+        assert.commandWorked(testDB.runCommand({
+            collMod: 'system.buckets.ts',
+            clusteredIndex: {expireAfterSeconds: expireAfterSeconds}
+        }));
+    } else {
+        assert.commandWorked(bucketsColl.createIndex({['control.min.' + timeFieldName]: 1},
+                                                     {expireAfterSeconds: expireAfterSeconds}));
+    }
 
     waitForTTL();
     assert.eq(0, coll.find().itcount());

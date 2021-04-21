@@ -67,7 +67,14 @@ const testQueryUsesIndex = function(filter, numMatches, indexSpec, indexOpts = {
     const explain = query.explain();
     const ixscan = getAggPlanStage(explain, "IXSCAN");
     assert.neq(null, ixscan, tojson(explain));
-    assert.eq("testIndexName", ixscan.indexName, tojson(ixscan));
+    // TODO (SERVER-56238): Remove conditional once queries always use the 'testIndexName' index.
+    assert.eq(TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ||
+                      !filter.hasOwnProperty(timeFieldName) ||
+                      !indexSpec.hasOwnProperty(timeFieldName)
+                  ? "testIndexName"
+                  : "_id_",
+              ixscan.indexName,
+              tojson(ixscan));
 
     assert.commandWorked(coll.dropIndex("testIndexName"));
 };

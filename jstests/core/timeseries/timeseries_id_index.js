@@ -21,6 +21,12 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
+// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring that
+// the parallel suite runs this test only on WT configurations.
+if (!TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
+    return;
+}
+
 const coll = db.timeseries_id_index;
 coll.drop();
 

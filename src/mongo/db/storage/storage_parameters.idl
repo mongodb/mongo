@@ -88,4 +88,5 @@ feature_flags:
     featureFlagTimeseriesCollection:
         description: "When enabled, support for time-series collections"
         cpp_varname: feature_flags::gTimeseriesCollection
-        default: false
+        default: true
+        version: 5.0

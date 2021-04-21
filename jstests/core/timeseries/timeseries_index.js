@@ -220,31 +220,38 @@ assert.commandFailedWithCode(coll.hideIndex({not_metadata: 1}), ErrorCodes.Index
 // which in this case does not possess the index by that name.
 assert.commandFailedWithCode(coll.dropIndex('mm_1'), ErrorCodes.IndexNotFound);
 
-// Partial indexes are not supported on time-series bucket collections.
-assert.commandFailedWithCode(
-    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}}),
-    ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(
-    coll.createIndex({[metaFieldName]: 1}, {partialFilterExpression: {[metaFieldName]: {$gt: 5}}}),
-    ErrorCodes.InvalidOptions);
+// TODO (SERVER-56235): Evaluate uses of this function.
+const testCreateIndex = function(spec, options = {}) {
+    const indexName = 'testCreateIndex';
+    const res = coll.createIndex(spec, Object.extend({name: indexName}, options));
+    if (TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
+        assert.commandFailedWithCode(res, ErrorCodes.InvalidOptions);
+    } else {
+        assert.commandWorked(res);
+        assert.commandWorked(coll.dropIndex(indexName));
+    }
+};
 
-// Unique indexes are not supported on time-series bucket collections.
-assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {unique: true}),
-                             ErrorCodes.InvalidOptions);
+// Partial indexes are not supported on clustered time-series bucket collections.
+testCreateIndex({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}});
+testCreateIndex({[metaFieldName]: 1}, {partialFilterExpression: {[metaFieldName]: {$gt: 5}}});
 
-// TTL indexes are not supported on a time-series buckets collection.
-assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 1}, {expireAfterSeconds: 3600}),
-                             ErrorCodes.InvalidOptions);
+// Unique indexes are not supported on clustered time-series bucket collections.
+testCreateIndex({[metaFieldName]: 1}, {unique: true});
 
-// Text indexes are not supported on a time-series buckets collection.
-assert.commandFailedWithCode(coll.createIndex({[metaFieldName]: 'text'}),
-                             ErrorCodes.InvalidOptions);
+// TTL indexes are not supported on a clustered time-series buckets collection.
+testCreateIndex({[metaFieldName]: 1}, {expireAfterSeconds: 3600});
+
+// Text indexes are not supported on a clustered time-series buckets collection.
+testCreateIndex({[metaFieldName]: 'text'});
 
 // If listIndexes fails to convert a non-conforming index on the bucket collection, it should omit
 // that index from the results.
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}),
                      'failed to create index: ' + tojson({not_metadata: 1}));
-assert.eq(1, bucketsColl.getIndexes().length, tojson(bucketsColl.getIndexes()));
+assert.eq(TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? 1 : 2,
+          bucketsColl.getIndexes().length,
+          tojson(bucketsColl.getIndexes()));
 assert.eq(0, coll.getIndexes().length, tojson(coll.getIndexes()));
 })();

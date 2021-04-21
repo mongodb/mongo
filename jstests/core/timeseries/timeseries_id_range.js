@@ -22,6 +22,12 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     return;
 }
 
+// Although this test is tagged with 'requires_wiredtiger', this is not sufficient for ensuring that
+// the parallel suite runs this test only on WT configurations.
+if (!TimeseriesTest.supportsClusteredIndexes(db.getMongo())) {
+    return;
+}
+
 const now = new Date();
 const dates = [];
 for (let i = 0; i < 10; i++) {

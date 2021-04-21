@@ -86,8 +86,10 @@ for (let i = 0; i < indexStatsDocs.length; ++i) {
 // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
 // $indexStats on the buckets collection.
 const bucketIndexStatsDocs = bucketsColl.aggregate([{$indexStats: {}}]).toArray();
-assert.eq(
-    Object.keys(indexKeys).length + 1, bucketIndexStatsDocs.length, tojson(bucketIndexStatsDocs));
+assert.eq(Object.keys(indexKeys).length +
+              (TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? 1 : 2),
+          bucketIndexStatsDocs.length,
+          tojson(bucketIndexStatsDocs));
 
 // Check that $indexStats is not limited to being the only stage in an aggregation pipeline on a
 // time-series collection.

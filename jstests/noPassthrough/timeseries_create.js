@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   requires_fcv_49,
- *   requires_wiredtiger,
  * ]
  */
 (function() {
@@ -55,11 +54,22 @@ const testOptions = function(allowed,
         const bucketsColl = collections.find(coll => coll.name == bucketsCollName);
         assert(bucketsColl, collections);
         assert.eq(bucketsColl.type, "collection", bucketsColl);
-        assert(bucketsColl.options.hasOwnProperty('clusteredIndex'), bucketsColl);
+        if (TimeseriesTest.supportsClusteredIndexes(conn)) {
+            assert(bucketsColl.options.hasOwnProperty('clusteredIndex'), bucketsColl);
+        }
         if (timeseriesOptions.expireAfterSeconds) {
-            assert.eq(bucketsColl.options.clusteredIndex.expireAfterSeconds,
-                      timeseriesOptions.expireAfterSeconds,
-                      bucketsColl);
+            if (TimeseriesTest.supportsClusteredIndexes(conn)) {
+                assert.eq(bucketsColl.options.clusteredIndex.expireAfterSeconds,
+                          timeseriesOptions.expireAfterSeconds,
+                          bucketsColl);
+            } else {
+                assert.docEq(testDB[collName].getIndexes(), [{
+                                 v: 2,
+                                 key: {time: 1},
+                                 name: 'control.min.time_1',
+                                 expireAfterSeconds: timeseriesOptions.expireAfterSeconds.valueOf(),
+                             }]);
+            }
         }
 
         assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
@@ -111,11 +121,16 @@ testInvalidTimeseriesOptions("", ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
+
+const errorCodeForInvalidExpireAfterSecondsValue = TimeseriesTest.supportsClusteredIndexes(conn)
+    ? ErrorCodes.InvalidOptions
+    : ErrorCodes.CannotCreateIndex;
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(-10)},
-                             ErrorCodes.InvalidOptions);
+                             errorCodeForInvalidExpireAfterSecondsValue);
 testInvalidTimeseriesOptions(
     {timeField: "time", expireAfterSeconds: NumberLong("4611686018427387904")},
-    ErrorCodes.InvalidOptions);
+    errorCodeForInvalidExpireAfterSecondsValue);
+
 testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
 testInvalidTimeseriesOptions({timeField: "sub.time"}, ErrorCodes.InvalidOptions);
 testInvalidTimeseriesOptions({timeField: "time", metaField: "sub.meta"}, ErrorCodes.InvalidOptions);
@@ -179,30 +194,6 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandFailedWithCode(bucketsColl.insert({invalid_bucket_field: 1}),
                                  ErrorCodes.DocumentValidationFailure);
     assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
-}
-
-// Tests that the indexOptionDefaults collection creation option is applied when creating indexes
-// on a time-series collection.
-// This test case uses wiredtiger collection/index creation options, which should already be
-// enforced by the use of the 'requires_wiredtiger' test tag at the top of this file.
-{
-    const testDB = conn.getDB(dbName);
-    const coll = testDB.getCollection('timeseries_' + collCount++);
-    coll.drop();
-    assert.commandFailedWithCode(testDB.createCollection(coll.getName(), {
-        timeseries: {timeField: 'tt', metaField: 'mm'},
-        indexOptionDefaults: {storageEngine: {wiredTiger: {configString: 'invalid_option=xxx,'}}}
-    }),
-                                 ErrorCodes.BadValue);
-    // Sample wiredtiger configuration option from wt_index_option_defaults.js.
-    assert.commandWorked(testDB.createCollection(coll.getName(), {
-        timeseries: {timeField: 'tt', metaField: 'mm'},
-        indexOptionDefaults: {storageEngine: {wiredTiger: {configString: 'split_pct=88,'}}}
-    }));
-    assert.commandWorked(coll.insert({tt: ISODate(), mm: 'aaa'}));
-    assert.commandWorked(coll.createIndex({mm: 1}));
-    const indexCreationString = coll.stats({indexDetails: true}).indexDetails.mm_1.creationString;
-    assert.neq(-1, indexCreationString.indexOf(',split_pct=88,'), indexCreationString);
 }
 
 MongoRunner.stopMongod(conn);
