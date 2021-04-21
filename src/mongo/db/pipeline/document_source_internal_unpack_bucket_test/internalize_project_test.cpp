@@ -157,8 +157,8 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest,
 
     std::vector<Value> serializedArray;
     unpack->serializeToArray(serializedArray);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id'], timeField: 'time', "
-                               "metaField: 'meta', bucketMaxSpanSeconds: 3600}}"),
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'meta'], timeField: "
+                               "'time', metaField: 'meta', bucketMaxSpanSeconds: 3600}}"),
                       serializedArray[0].getDocument().toBson());
     ASSERT_TRUE(unpack->includeMetaField());
     ASSERT_FALSE(unpack->includeTimeField());
@@ -177,7 +177,7 @@ TEST_F(InternalUnpackBucketInternalizeProjectTest,
 
     std::vector<Value> serializedArray;
     unpack->serializeToArray(serializedArray);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: ['myMeta'], timeField: 'time', "
                                "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serializedArray[0].getDocument().toBson());
     ASSERT_FALSE(unpack->includeMetaField());

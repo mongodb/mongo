@@ -30,6 +30,7 @@
 #pragma once
 
 #include <set>
+#include <vector>
 
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/pipeline/document_source.h"

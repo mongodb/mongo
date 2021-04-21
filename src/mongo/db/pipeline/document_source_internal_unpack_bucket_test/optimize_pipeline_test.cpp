@@ -346,9 +346,10 @@ TEST_F(OptimizePipeline, ProjectThenMixedMatchPushedDown) {
         fromjson(
             "{$match: {$and: [{meta: {$eq: 'abc'}}, {'control.min.a': {$_internalExprLte: 4}}]}}"),
         stages[0].getDocument().toBson());
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'x'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      stages[1].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'a', 'x', 'myMeta'], timeField: "
+                 "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        stages[1].getDocument().toBson());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {a: {$lte: 4}}}"), stages[2].getDocument().toBson());
     const UnorderedFieldsBSONObjComparator kComparator;
     ASSERT_EQ(
@@ -401,9 +402,10 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchPushedDown) {
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {meta: {$gte: 'abc'}}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {y: '$meta'}}"), serialized[1]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'y'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[2]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'y'], timeField: 'time', metaField: "
+                 "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['y']}}"),
+        serialized[2]);
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchNotPushedDown) {
@@ -423,11 +425,13 @@ TEST_F(OptimizePipeline, ComputedProjectThenMetaMatchNotPushedDown) {
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {myMeta: {$sum: ['$meta.a', '$meta.b']}}}"),
                       serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            "{$_internalUnpackBucket: { include: ['_id', 'myMeta'], timeField: 'time', metaField: "
+            "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['myMeta']}}"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {myMeta: {$gte: 'abc'}}}"), serialized[2]);
-}
+}  // namespace
 
 TEST_F(OptimizePipeline, ComputedProjectThenMatchNotPushedDown) {
     auto pipeline = Pipeline::parse(
@@ -445,9 +449,10 @@ TEST_F(OptimizePipeline, ComputedProjectThenMatchNotPushedDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {y: {$sum: ['$meta.a', '$meta.b']}}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'y'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'y'], timeField: 'time', metaField: "
+                 "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['y']}}"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {y: {$gt: 'abc'}}}"), serialized[2]);
 }
 
@@ -466,9 +471,10 @@ TEST_F(OptimizePipeline, MetaSortThenProjectPushedDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'x'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'myMeta'], timeField: 'time', "
+                 "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[1]);
 }
 
 TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
@@ -486,9 +492,10 @@ TEST_F(OptimizePipeline, ProjectThenMetaSortPushedDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'x'], timeField: "
-                               "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'x', 'myMeta'], timeField: 'time', "
+                 "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[1]);
 }
 
 TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
@@ -507,9 +514,11 @@ TEST_F(OptimizePipeline, ComputedProjectThenSortPushedDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {myMeta: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id'], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            "{$_internalUnpackBucket: { include: ['_id', 'myMeta'], timeField: 'time', metaField: "
+            "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['myMeta']}}"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {myMeta: 1}}"), serialized[2]);
 }
 
@@ -552,9 +561,11 @@ TEST_F(OptimizePipeline, ComputedProjectThenProjectPushDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {myMeta: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id'], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            "{$_internalUnpackBucket: { include: ['_id', 'myMeta'], timeField: 'time', metaField: "
+            "'myMeta', bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['myMeta']}}"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$project: {myMeta: false, _id: true}}"), serialized[2]);
 }
 
@@ -573,9 +584,10 @@ TEST_F(OptimizePipeline, AddFieldsThenSortPushedDown) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {myMeta: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[1]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['myMeta']}}"),
+        serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {myMeta: 1}}"), serialized[2]);
 }
 
@@ -595,10 +607,10 @@ TEST_F(OptimizePipeline, PushDownAddFieldsAndInternalizeProjection) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'device', 'x'], "
-                 "timeField: 'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-        serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'device', 'x'], "
+                               "timeField: 'time', metaField: 'myMeta', bucketMaxSpanSeconds: "
+                               "3600, computedMetaProjFields: ['device']}}"),
+                      serialized[1]);
 }
 
 TEST_F(OptimizePipeline, PushDownAddFieldsDoNotInternalizeProjection) {
@@ -619,8 +631,8 @@ TEST_F(OptimizePipeline, PushDownAddFieldsDoNotInternalizeProjection) {
     ASSERT_EQ(4u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a'}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'device', 'x', 'y', "
-                               "'z'], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                               "'z'], timeField: 'time', metaField: 'myMeta', "
+                               "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['device']}}"),
                       serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {z: {$add : ['$x', '$y']}}}"), serialized[2]);
     const UnorderedFieldsBSONObjComparator kComparator;
@@ -646,10 +658,10 @@ TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFields) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(
-        fromjson("{$_internalUnpackBucket: { include: ['_id', 'newMeta', 'x', 'y'], "
-                 "timeField: 'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-        serialized[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'newMeta', 'x', 'y', "
+                               "'myMeta'], timeField: 'time', metaField: 'myMeta', "
+                               "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
+                      serialized[1]);
 }
 
 TEST_F(OptimizePipeline, PushdownSortAndAddFields) {
@@ -667,9 +679,10 @@ TEST_F(OptimizePipeline, PushdownSortAndAddFields) {
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$meta.a'}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$sort: {meta: -1}}"), serialized[1]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[2]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
+        serialized[2]);
 }
 
 TEST_F(OptimizePipeline, PushdownMatchAndAddFields) {
@@ -689,9 +702,10 @@ TEST_F(OptimizePipeline, PushdownMatchAndAddFields) {
     ASSERT_EQ(4u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$match: {'meta.a': {$eq: 'abc'}}}"), serialized[0]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$meta.b'}}"), serialized[1]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
-                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[2]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+                 "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['newMeta']}}"),
+        serialized[2]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {z: {$add : ['$x', '$y']}}}"), serialized[3]);
 }
 }  // namespace

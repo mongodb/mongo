@@ -71,9 +71,10 @@ TEST_F(InternalUnpackBucketSampleReorderTest, SampleThenComputedProject) {
     auto serialized = pipeline->serializeToBson();
 
     ASSERT_EQ(3, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp'], timeField: "
-                               "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[0]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp', 'myMeta'], "
+                 "timeField: 'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
     const UnorderedFieldsBSONObjComparator kComparator;
     ASSERT_EQ(kComparator.compare(projectSpec, serialized[2]), 0);
@@ -114,9 +115,10 @@ TEST_F(InternalUnpackBucketSampleReorderTest, ComputedProjectThenSample) {
     auto serialized = pipeline->serializeToBson();
 
     ASSERT_EQ(3, serialized.size());
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp'], timeField: "
-                               "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
-                      serialized[0]);
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{$_internalUnpackBucket: { include: ['_id', 'temp', 'myMeta'], timeField: "
+                 "'foo', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+        serialized[0]);
     ASSERT_BSONOBJ_EQ(sampleSpec, serialized[1]);
     const UnorderedFieldsBSONObjComparator kComparator;
     ASSERT_EQ(kComparator.compare(projectSpec, serialized[2]), 0);

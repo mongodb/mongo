@@ -824,5 +824,38 @@ TEST_F(InternalUnpackBucketExecTest, ParserRejectsBothIncludeAndExcludeParameter
         AssertionException,
         5408000);
 }
+
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsIncludeMeta) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {include: ['steve', 'meta'], timeField: 'time', metaField: "
+        "'meta', bucketMaxSpanSeconds: 3600}}");
+    auto array = std::vector<Value>{};
+    DocumentSourceInternalUnpackBucket::createFromBson(bson.firstElement(), getExpCtx())
+        ->serializeToArray(array);
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+}
+
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFields) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+    auto array = std::vector<Value>{};
+    DocumentSourceInternalUnpackBucket::createFromBson(bson.firstElement(), getExpCtx())
+        ->serializeToArray(array);
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+}
+
+TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldOverridingMeta) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {exclude: [], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['meta']}}");
+    auto unpackBucket =
+        DocumentSourceInternalUnpackBucket::createFromBson(bson.firstElement(), getExpCtx());
+    ASSERT_FALSE(
+        static_cast<DocumentSourceInternalUnpackBucket&>(*unpackBucket).includeMetaField());
+    auto array = std::vector<Value>{};
+    unpackBucket->serializeToArray(array);
+    ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
+}
 }  // namespace
 }  // namespace mongo

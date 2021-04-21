@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
@@ -182,7 +183,10 @@ private:
  */
 inline bool eraseMetaFromFieldSetAndDetermineIncludeMeta(BucketUnpacker::Behavior unpackerBehavior,
                                                          BucketSpec* bucketSpec) {
-    if (!bucketSpec->metaField) {
+    if (!bucketSpec->metaField ||
+        std::find(bucketSpec->computedMetaProjFields.cbegin(),
+                  bucketSpec->computedMetaProjFields.cend(),
+                  *bucketSpec->metaField) != bucketSpec->computedMetaProjFields.cend()) {
         return false;
     } else if (auto itr = bucketSpec->fieldSet.find(*bucketSpec->metaField);
                itr != bucketSpec->fieldSet.end()) {

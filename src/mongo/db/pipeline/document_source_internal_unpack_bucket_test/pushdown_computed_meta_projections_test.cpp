@@ -59,7 +59,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: {$toUpper: ['$meta']}}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    auto extraField = fromjson("{computedMetaProjFields: ['newMeta']}");
+    ASSERT_BSONOBJ_EQ(BSON("$_internalUnpackBucket" << unpackSpecObj.firstElement().Obj().addField(
+                               extraField.firstElement())),
+                      serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaProjectionDocument) {
@@ -79,7 +82,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWithMetaPro
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: {$concat: ['$meta.a', '$meta.b']}}}"),
                       serialized[0]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    auto extraField = fromjson("{computedMetaProjFields: ['newMeta']}");
+    ASSERT_BSONOBJ_EQ(BSON("$_internalUnpackBucket" << unpackSpecObj.firstElement().Obj().addField(
+                               extraField.firstElement())),
+                      serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaProjections) {
@@ -99,7 +105,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, OptimizeAddFieldsWith2MetaPr
     ASSERT_EQ(2u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a', deviceType: '$meta.b'}}"),
                       serialized[0]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    auto extraField = fromjson("{computedMetaProjFields: ['device', 'deviceType']}");
+    ASSERT_BSONOBJ_EQ(BSON("$_internalUnpackBucket" << unpackSpecObj.firstElement().Obj().addField(
+                               extraField.firstElement())),
+                      serialized[1]);
 }
 
 TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProjectionFields) {
@@ -118,7 +127,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest, SplitAddFieldsWithMixedProje
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[1]);
+    auto extraField = fromjson("{computedMetaProjFields: ['device']}");
+    ASSERT_BSONOBJ_EQ(BSON("$_internalUnpackBucket" << unpackSpecObj.firstElement().Obj().addField(
+                               extraField.firstElement())),
+                      serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {temp: {$add: ['$temperature', '$offset']}}}"),
                       serialized[2]);
 }
@@ -234,6 +246,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: { device: '$meta.a'}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
+                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600, "
+                               "computedMetaProjFields: ['device']}}"),
+                      serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$project: {_id: true, device: true}}"), serialized[2]);
 }
 
@@ -255,6 +271,10 @@ TEST_F(InternalUnpackBucketPushdownProjectionsTest,
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(3u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: { device: '$meta.a'}}"), serialized[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { exclude: [], timeField: 'time', "
+                               "metaField: 'myMeta', bucketMaxSpanSeconds: 3600, "
+                               "computedMetaProjFields: ['device']}}"),
+                      serialized[1]);
     ASSERT_BSONOBJ_EQ(
         fromjson("{$project: {_id: true, x: true, y : {z: true}, device: '$device'}}"),
         serialized[2]);

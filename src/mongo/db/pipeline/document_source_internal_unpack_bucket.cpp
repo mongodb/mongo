@@ -31,6 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+#include <iterator>
+
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
 #include <string>
@@ -287,6 +290,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     auto hasIncludeExclude = false;
     std::vector<std::string> fields;
     auto bucketMaxSpanSeconds = 0;
+    std::vector<std::string> computedMetaProjFields;
     for (auto&& elem : specElem.embeddedObject()) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == "include" || fieldName == "exclude") {
@@ -325,13 +329,28 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
                     metaField.find('.') == std::string::npos);
             bucketSpec.metaField = std::move(metaField);
         } else if (fieldName == "bucketMaxSpanSeconds") {
-            uassert(5509900,
+            uassert(5510600,
                     "bucketMaxSpanSeconds field must be an integer",
                     elem.type() == BSONType::NumberInt);
-            uassert(5509901,
+            uassert(5510601,
                     "bucketMaxSpanSeconds field must be greater than zero",
                     elem._numberInt() > 0);
             bucketMaxSpanSeconds = elem._numberInt();
+        } else if (fieldName == "computedMetaProjFields") {
+            uassert(5509900,
+                    "computedMetaProjFields field must be an array",
+                    elem.type() == BSONType::Array);
+
+            for (auto&& elt : elem.embeddedObject()) {
+                uassert(5509901,
+                        "computedMetaProjFields field element must be a string",
+                        elt.type() == BSONType::String);
+                auto field = elt.valueStringData();
+                uassert(5509902,
+                        "computedMetaProjFields field element must be a single-element field path",
+                        field.find('.') == std::string::npos);
+                bucketSpec.computedMetaProjFields.emplace_back(field);
+            }
         } else {
             uasserted(5346506,
                       str::stream()
@@ -343,7 +362,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
             "The $_internalUnpackBucket stage requires a timeField parameter",
             specElem[timeseries::kTimeFieldName].ok());
 
-    uassert(5509902,
+    uassert(5510602,
             "The $_internalUnpackBucket stage requires a bucketMaxSpanSeconds parameter",
             specElem["bucketMaxSpanSeconds"].ok());
 
@@ -361,12 +380,31 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     for (auto&& field : spec.fieldSet) {
         fields.emplace_back(field);
     }
-    out.addField(behavior, Value{fields});
+    if (((_bucketUnpacker.includeMetaField() &&
+          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kInclude) ||
+         (!_bucketUnpacker.includeMetaField() &&
+          _bucketUnpacker.behavior() == BucketUnpacker::Behavior::kExclude && spec.metaField)) &&
+        std::find(spec.computedMetaProjFields.cbegin(),
+                  spec.computedMetaProjFields.cend(),
+                  *spec.metaField) == spec.computedMetaProjFields.cend())
+        fields.emplace_back(*spec.metaField);
+
+    out.addField(behavior, Value{std::move(fields)});
     out.addField(timeseries::kTimeFieldName, Value{spec.timeField});
     if (spec.metaField) {
         out.addField(timeseries::kMetaFieldName, Value{*spec.metaField});
     }
     out.addField("bucketMaxSpanSeconds", Value{_bucketMaxSpanSeconds});
+
+    if (!spec.computedMetaProjFields.empty())
+        out.addField("computedMetaProjFields", Value{[&] {
+                         std::vector<Value> compFields;
+                         std::transform(spec.computedMetaProjFields.cbegin(),
+                                        spec.computedMetaProjFields.cend(),
+                                        std::back_inserter(compFields),
+                                        [](auto&& projString) { return Value{projString}; });
+                         return compFields;
+                     }()});
 
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
