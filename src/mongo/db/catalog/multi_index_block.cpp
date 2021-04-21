@@ -602,6 +602,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(OperationContext* opCtx) {
 
 Status MultiIndexBlock::dumpInsertsFromBulk(
     OperationContext* opCtx, const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
+    opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
     for (size_t i = 0; i < _indexes.size(); i++) {
