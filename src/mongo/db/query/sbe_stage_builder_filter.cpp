@@ -848,9 +848,9 @@ void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
  */
 void generateBitTest(MatchExpressionVisitorContext* context,
                      const BitTestMatchExpression* expr,
-                     const sbe::BitTestBehavior& bitTestBehavior) {
-    auto makePredicate = [expr, bitTestBehavior](sbe::value::SlotId inputSlot,
-                                                 EvalStage inputStage) -> EvalExprStagePair {
+                     const sbe::BitTestBehavior& bitOp) {
+    auto makePredicate = [expr, bitOp](sbe::value::SlotId inputSlot,
+                                       EvalStage inputStage) -> EvalExprStagePair {
         auto bitPositions = expr->getBitPositions();
 
         // Build an array set of bit positions for the bitmask, and remove duplicates in the
@@ -872,49 +872,53 @@ void generateBitTest(MatchExpressionVisitorContext* context,
         // An EExpression for the BinData and position list for the binary case of
         // BitTestMatchExpressions. This function will be applied to values carrying BinData
         // elements.
-        auto binaryBitTestEExpr = sbe::makeE<sbe::EFunction>(
-            "bitTestPosition",
-            sbe::makeEs(sbe::makeE<sbe::EConstant>(bitPosTag, bitPosVal),
-                        sbe::makeE<sbe::EVariable>(inputSlot),
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                   sbe::value::bitcastFrom<int32_t>(
-                                                       static_cast<int32_t>(bitTestBehavior)))));
+        auto binaryBitTestExpr = makeFunction(
+            "bitTestPosition"_sd,
+            sbe::makeE<sbe::EConstant>(bitPosTag, bitPosVal),
+            makeVariable(inputSlot),
+            makeConstant(sbe::value::TypeTags::NumberInt32, static_cast<int32_t>(bitOp)));
 
         // Build An EExpression for the numeric bitmask case. The AllSet case tests if (mask &
-        // value) == mask, and AllClear case tests if (mask & value) == 0. The AnyClear and the
-        // AnySet case is the negation of the AllSet and AllClear cases, respectively.
-        auto numericBitTestEExpr =
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                       sbe::value::bitcastFrom<int64_t>(expr->getBitMask()));
-        if (bitTestBehavior == sbe::BitTestBehavior::AllSet ||
-            bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
-            numericBitTestEExpr = sbe::makeE<sbe::EFunction>(
-                "bitTestMask",
-                sbe::makeEs(std::move(numericBitTestEExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
-
-            // The AnyClear case is the negation of the AllSet case.
-            if (bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
-                numericBitTestEExpr = makeNot(std::move(numericBitTestEExpr));
+        // value) == mask, and AllClear case tests if (mask & value) == 0. The AnyClear and
+        // AnySet cases are the negation of the AllSet and AllClear cases, respectively.
+        auto numericBitTestFnName = [&]() {
+            if (bitOp == sbe::BitTestBehavior::AllSet || bitOp == sbe::BitTestBehavior::AnyClear) {
+                return "bitTestMask"_sd;
             }
-        } else if (bitTestBehavior == sbe::BitTestBehavior::AllClear ||
-                   bitTestBehavior == sbe::BitTestBehavior::AnySet) {
-            numericBitTestEExpr = sbe::makeE<sbe::EFunction>(
-                "bitTestZero",
-                sbe::makeEs(std::move(numericBitTestEExpr), sbe::makeE<sbe::EVariable>(inputSlot)));
-
-            // The AnySet case is the negation of the AllClear case.
-            if (bitTestBehavior == sbe::BitTestBehavior::AnySet) {
-                numericBitTestEExpr = makeNot(std::move(numericBitTestEExpr));
+            if (bitOp == sbe::BitTestBehavior::AllClear || bitOp == sbe::BitTestBehavior::AnySet) {
+                return "bitTestZero"_sd;
             }
-        } else {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(5610200);
+        }();
+
+        // We round NumberDecimal values to the nearest integer to match the classic execution
+        // engine's behavior for now. Note that this behavior is _not_ consistent with MongoDB's
+        // documentation. At some point, we should consider removing this call to round() to make
+        // SBE's behavior consistent with MongoDB's documentation.
+        auto numericBitTestInputExpr = sbe::makeE<sbe::EIf>(
+            sbe::makeE<sbe::ETypeMatch>(makeVariable(inputSlot),
+                                        getBSONTypeMask(sbe::value::TypeTags::NumberDecimal)),
+            makeFunction("round"_sd, makeVariable(inputSlot)),
+            makeVariable(inputSlot));
+
+        // Convert the value to a 64-bit integer, and then pass the converted value along with the
+        // mask to the appropriate bit-test function. If the value cannot be losslessly converted
+        // to a 64-bit integer, this expression will return Nothing.
+        auto numericBitTestExpr =
+            makeFunction(numericBitTestFnName,
+                         makeConstant(sbe::value::TypeTags::NumberInt64, expr->getBitMask()),
+                         sbe::makeE<sbe::ENumericConvert>(std::move(numericBitTestInputExpr),
+                                                          sbe::value::TypeTags::NumberInt64));
+
+        // For the AnyClear and AnySet cases, negate the output of the bit-test function.
+        if (bitOp == sbe::BitTestBehavior::AnyClear || bitOp == sbe::BitTestBehavior::AnySet) {
+            numericBitTestExpr = makeNot(std::move(numericBitTestExpr));
         }
 
-        return {sbe::makeE<sbe::EIf>(
-                    sbe::makeE<sbe::EFunction>("isBinData",
-                                               sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
-                    std::move(binaryBitTestEExpr),
-                    std::move(numericBitTestEExpr)),
+        // numericBitTestExpr might produce Nothing, so we wrap it with makeFillEmptyFalse().
+        return {sbe::makeE<sbe::EIf>(makeFunction("isBinData"_sd, makeVariable(inputSlot)),
+                                     std::move(binaryBitTestExpr),
+                                     makeFillEmptyFalse(std::move(numericBitTestExpr))),
                 std::move(inputStage)};
     };
 

@@ -315,6 +315,7 @@ enum class Builtin : uint8_t {
     sinh,
     tan,
     tanh,
+    round,
     isMember,
     collIsMember,
     indexOfBytes,
@@ -559,8 +560,6 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
                                                                       value::Value lhsValue,
                                                                       value::TypeTags rhsTag);
-    std::pair<value::TypeTags, value::Value> genericNumConvertToPreciseInt64(value::TypeTags lhsTag,
-                                                                             value::Value lhsValue);
 
     std::pair<value::TypeTags, value::Value> compare3way(
         value::TypeTags lhsTag,
@@ -625,10 +624,6 @@ private:
                                                                value::TypeTags fieldTag,
                                                                value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> convertBitTestValue(value::TypeTags maskTag,
-                                                                        value::Value maskValue,
-                                                                        value::TypeTags valueTag,
-                                                                        value::Value value);
     std::tuple<bool, value::TypeTags, value::Value> genericAcos(value::TypeTags operandTag,
                                                                 value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericAcosh(value::TypeTags operandTag,
@@ -731,6 +726,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSinh(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTan(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);

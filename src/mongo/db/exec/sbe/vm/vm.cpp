@@ -1642,54 +1642,35 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition
                                      bitTestBehavior == BitTestBehavior::AllClear)};
 }
 
-
-// Converts the value to a NumberInt64 tag/value and checks if the mask tab/value pair is a number.
-// If the inputs aren't numbers or the value can't be converted to a 64-bit integer, or if it's
-// outside of the range where the `lhsTag` type can represent consecutive integers precisely Nothing
-// is returned.
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::convertBitTestValue(
-    value::TypeTags maskTag, value::Value maskVal, value::TypeTags valueTag, value::Value value) {
-    if (!value::isNumber(maskTag) || !value::isNumber(valueTag)) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    // Bail out if the input can't be converted to a 64-bit integer, or if it's outside of the range
-    // where the `lhsTag` type can represent consecutive integers precisely.
-    auto [numTag, numVal] = genericNumConvertToPreciseInt64(valueTag, value);
-    if (numTag != value::TypeTags::NumberInt64) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-    return {false, numTag, numVal};
-}
-
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestZero(ArityType arity) {
     invariant(arity == 2);
+    auto [maskOwned, maskTag, maskValue] = getFromStack(0);
+    auto [inputOwned, inputTag, inputValue] = getFromStack(1);
 
-    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
-    auto [ownedInput, valueTag, value] = getFromStack(1);
-
-    auto [ownedNum, numTag, numVal] = convertBitTestValue(maskTag, maskValue, valueTag, value);
-    if (numTag == value::TypeTags::Nothing) {
+    if ((maskTag != value::TypeTags::NumberInt32 && maskTag != value::TypeTags::NumberInt64) ||
+        (inputTag != value::TypeTags::NumberInt32 && inputTag != value::TypeTags::NumberInt64)) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    auto result =
-        (value::numericCast<int64_t>(maskTag, maskValue) & value::bitcastTo<int64_t>(numVal)) == 0;
+
+    auto maskNum = value::numericCast<int64_t>(maskTag, maskValue);
+    auto inputNum = value::numericCast<int64_t>(inputTag, inputValue);
+    auto result = (maskNum & inputNum) == 0;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(ArityType arity) {
     invariant(arity == 2);
+    auto [maskOwned, maskTag, maskValue] = getFromStack(0);
+    auto [inputOwned, inputTag, inputValue] = getFromStack(1);
 
-    auto [ownedMask, maskTag, maskValue] = getFromStack(0);
-    auto [ownedInput, valueTag, value] = getFromStack(1);
-
-    auto [ownedNum, numTag, numVal] = convertBitTestValue(maskTag, maskValue, valueTag, value);
-    if (numTag == value::TypeTags::Nothing) {
+    if ((maskTag != value::TypeTags::NumberInt32 && maskTag != value::TypeTags::NumberInt64) ||
+        (inputTag != value::TypeTags::NumberInt32 && inputTag != value::TypeTags::NumberInt64)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto numMask = value::numericCast<int64_t>(maskTag, maskValue);
-    auto result = (numMask & value::bitcastTo<int64_t>(numVal)) == numMask;
+    auto maskNum = value::numericCast<int64_t>(maskTag, maskValue);
+    auto inputNum = value::numericCast<int64_t>(inputTag, inputValue);
+    auto result = (maskNum & inputNum) == maskNum;
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
@@ -1868,6 +1849,45 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTan(ArityType a
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(ArityType arity) {
     auto [_, operandTag, operandValue] = getFromStack(0);
     return genericTanh(operandTag, operandValue);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
+    invariant(arity == 1);
+    auto [owned, tag, val] = getFromStack(0);
+
+    // Round 'val' to the closest integer, with ties rounding to the closest even integer.
+    // If 'val' is +Inf, -Inf, or NaN, this function will simply return 'val' as-is.
+    switch (tag) {
+        case value::TypeTags::NumberInt32:
+        case value::TypeTags::NumberInt64:
+            // The value is already an integer, so just return it as-is.
+            return {false, tag, val};
+        case value::TypeTags::NumberDouble: {
+            // std::nearbyint()'s behavior relies on a thread-local "rounding mode", so
+            // we use boost::numeric::RoundEven<double>::nearbyint() instead. We should
+            // switch over to roundeven() once it becomes available in the standard library.
+            // (See https://en.cppreference.com/w/c/experimental/fpext1 for details.)
+            auto operand = value::bitcastTo<double>(val);
+            auto rounded = boost::numeric::RoundEven<double>::nearbyint(operand);
+            return {false, tag, value::bitcastFrom<double>(rounded)};
+        }
+        case value::TypeTags::NumberDecimal: {
+            auto operand = value::bitcastTo<Decimal128>(val);
+            auto rounded = operand.round(Decimal128::RoundingMode::kRoundTiesToEven);
+            if (operand.isEqual(rounded)) {
+                // If the output of rounding is equal to the input, then we can just take
+                // ownership of 'operand' and return it. (This is more efficient than calling
+                // makeCopyDecimal(), which would allocate memory on the heap.)
+                topStack(false, value::TypeTags::Nothing, 0);
+                return {owned, tag, val};
+            }
+
+            auto [tag, val] = value::makeCopyDecimal(rounded);
+            return {true, tag, val};
+        }
+        default:
+            return {false, value::TypeTags::Nothing, 0};
+    }
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType arity) {
@@ -3123,6 +3143,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinTan(arity);
         case Builtin::tanh:
             return builtinTanh(arity);
+        case Builtin::round:
+            return builtinRound(arity);
         case Builtin::concat:
             return builtinConcat(arity);
         case Builtin::isMember:

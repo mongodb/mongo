@@ -24,49 +24,50 @@ assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.insert({a: 54}));
 assert.commandWorked(coll.insert({a: 88}));
 assert.commandWorked(coll.insert({a: 255}));
+assert.commandWorked(coll.insert({a: 1e18}));
 assert.commandWorked(coll.createIndex({a: 1}));
 
 // Tests with bitmask.
-assertQueryCorrect({a: {$bitsAllSet: 0}}, 5);
+assertQueryCorrect({a: {$bitsAllSet: 0}}, 6);
 assertQueryCorrect({a: {$bitsAllSet: 1}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: 16}}, 3);
 assertQueryCorrect({a: {$bitsAllSet: 54}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: 55}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: 88}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: 255}}, 1);
-assertQueryCorrect({a: {$bitsAllClear: 0}}, 5);
-assertQueryCorrect({a: {$bitsAllClear: 1}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: 16}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: 129}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: 255}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: 0}}, 6);
+assertQueryCorrect({a: {$bitsAllClear: 1}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: 16}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: 129}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: 255}}, 2);
 assertQueryCorrect({a: {$bitsAnySet: 0}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: 9}}, 3);
 assertQueryCorrect({a: {$bitsAnySet: 255}}, 4);
 assertQueryCorrect({a: {$bitsAnyClear: 0}}, 0);
-assertQueryCorrect({a: {$bitsAnyClear: 18}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: 24}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: 255}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: 18}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: 24}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: 255}}, 5);
 
 // Tests with array of bit positions.
-assertQueryCorrect({a: {$bitsAllSet: []}}, 5);
+assertQueryCorrect({a: {$bitsAllSet: []}}, 6);
 assertQueryCorrect({a: {$bitsAllSet: [0]}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: [4]}}, 3);
 assertQueryCorrect({a: {$bitsAllSet: [1, 2, 4, 5]}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: [0, 1, 2, 4, 5]}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: [3, 4, 6]}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: [0, 1, 2, 3, 4, 5, 6, 7]}}, 1);
-assertQueryCorrect({a: {$bitsAllClear: []}}, 5);
-assertQueryCorrect({a: {$bitsAllClear: [0]}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: [4]}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: [1, 7]}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: [0, 1, 2, 3, 4, 5, 6, 7]}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: []}}, 6);
+assertQueryCorrect({a: {$bitsAllClear: [0]}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: [4]}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: [1, 7]}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: [0, 1, 2, 3, 4, 5, 6, 7]}}, 2);
 assertQueryCorrect({a: {$bitsAnySet: []}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: [1, 3]}}, 3);
 assertQueryCorrect({a: {$bitsAnySet: [0, 1, 2, 3, 4, 5, 6, 7]}}, 4);
 assertQueryCorrect({a: {$bitsAnyClear: []}}, 0);
-assertQueryCorrect({a: {$bitsAnyClear: [1, 4]}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: [3, 4]}}, 3);
-assertQueryCorrect({a: {$bitsAnyClear: [0, 1, 2, 3, 4, 5, 6, 7]}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: [1, 4]}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: [3, 4]}}, 4);
+assertQueryCorrect({a: {$bitsAnyClear: [0, 1, 2, 3, 4, 5, 6, 7]}}, 5);
 
 // Tests with multiple predicates.
 assertQueryCorrect({a: {$bitsAllSet: 54, $bitsAllClear: 201}}, 1);
@@ -77,40 +78,41 @@ coll.drop();
 assert.commandWorked(coll.insert({a: -0}));
 assert.commandWorked(coll.insert({a: -1}));
 assert.commandWorked(coll.insert({a: -54}));
+assert.commandWorked(coll.insert({a: -1e18}));
 
 // Tests with bitmask.
-assertQueryCorrect({a: {$bitsAllSet: 0}}, 3);
+assertQueryCorrect({a: {$bitsAllSet: 0}}, 4);
 assertQueryCorrect({a: {$bitsAllSet: 2}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: 127}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: 74}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: 0}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: 53}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: 127}}, 1);
+assertQueryCorrect({a: {$bitsAllClear: 0}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: 53}}, 3);
+assertQueryCorrect({a: {$bitsAllClear: 127}}, 2);
 assertQueryCorrect({a: {$bitsAnySet: 0}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: 2}}, 2);
 assertQueryCorrect({a: {$bitsAnySet: 127}}, 2);
 assertQueryCorrect({a: {$bitsAnyClear: 0}}, 0);
-assertQueryCorrect({a: {$bitsAnyClear: 53}}, 2);
-assertQueryCorrect({a: {$bitsAnyClear: 127}}, 2);
+assertQueryCorrect({a: {$bitsAnyClear: 53}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: 127}}, 3);
 
 // Tests with array of bit positions.
 var allPositions = [];
 for (var i = 0; i < 64; i++) {
     allPositions.push(i);
 }
-assertQueryCorrect({a: {$bitsAllSet: []}}, 3);
+assertQueryCorrect({a: {$bitsAllSet: []}}, 4);
 assertQueryCorrect({a: {$bitsAllSet: [1]}}, 2);
 assertQueryCorrect({a: {$bitsAllSet: allPositions}}, 1);
 assertQueryCorrect({a: {$bitsAllSet: [1, 7, 6, 3, 100]}}, 2);
-assertQueryCorrect({a: {$bitsAllClear: []}}, 3);
-assertQueryCorrect({a: {$bitsAllClear: [5, 4, 2, 0]}}, 2);
+assertQueryCorrect({a: {$bitsAllClear: []}}, 4);
+assertQueryCorrect({a: {$bitsAllClear: [5, 4, 2, 0]}}, 3);
 assertQueryCorrect({a: {$bitsAllClear: allPositions}}, 1);
 assertQueryCorrect({a: {$bitsAnySet: []}}, 0);
 assertQueryCorrect({a: {$bitsAnySet: [1]}}, 2);
-assertQueryCorrect({a: {$bitsAnySet: allPositions}}, 2);
+assertQueryCorrect({a: {$bitsAnySet: allPositions}}, 3);
 assertQueryCorrect({a: {$bitsAnyClear: []}}, 0);
-assertQueryCorrect({a: {$bitsAnyClear: [0, 2, 4, 5, 100]}}, 2);
-assertQueryCorrect({a: {$bitsAnyClear: allPositions}}, 2);
+assertQueryCorrect({a: {$bitsAnyClear: [0, 2, 4, 5, 100]}}, 3);
+assertQueryCorrect({a: {$bitsAnyClear: allPositions}}, 3);
 
 // Tests with multiple predicates.
 assertQueryCorrect({a: {$bitsAllSet: 74, $bitsAllClear: 53}}, 1);
@@ -156,7 +158,7 @@ coll.drop();
 // Test that NaNs and non-integral ints are filtered out.
 assert.commandWorked(coll.insert({a: 0}));
 assert.commandWorked(coll.insert({a: 1}));
-assert.commandWorked(coll.insert({a: 54}));
+assert.commandWorked(coll.insert({a: [1.1, 54]}));
 assert.commandWorked(coll.insert({a: 88}));
 assert.commandWorked(coll.insert({a: 255}));
 assert.commandWorked(coll.insert({a: NaN}));
