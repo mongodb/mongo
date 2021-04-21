@@ -2125,7 +2125,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
         }
 
         s = NULL;
-        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, &s));
+        WT_TRET(__wt_open_internal_session(conn, "close_ckpt", true, 0, 0, &s));
         if (s != NULL) {
             const char *checkpoint_cfg[] = {
               WT_CONFIG_BASE(session, WT_SESSION_checkpoint), ckpt_cfg, NULL};

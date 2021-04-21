@@ -388,8 +388,8 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
      * manager. Sweep should not block due to the cache being full.
      */
     session_flags = WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE;
-    WT_RET(
-      __wt_open_internal_session(conn, "sweep-server", true, session_flags, &conn->sweep_session));
+    WT_RET(__wt_open_internal_session(
+      conn, "sweep-server", true, session_flags, 0, &conn->sweep_session));
     session = conn->sweep_session;
 
     WT_RET(__wt_cond_alloc(session, "handle sweep server", &conn->sweep_cond));

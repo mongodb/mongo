@@ -103,7 +103,7 @@ __log_slot_close(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *releasep, boo
 
     *releasep = false;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     conn = S2C(session);
     log = conn->log;
     if (slot == NULL)
@@ -235,7 +235,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
     int count;
 #endif
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     conn = S2C(session);
     log = conn->log;
 #ifdef HAVE_DIAGNOSTIC
@@ -318,7 +318,7 @@ __log_slot_switch_internal(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, bool for
     release = false;
     slot = myslot->slot;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
 
     /*
      * If someone else raced us to closing this specific slot, we're done here.
@@ -526,7 +526,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize, uint32_t flags, WT
     log = conn->log;
     time_start = time_stop = 0;
 
-    WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
+    WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));
     WT_ASSERT(session, mysize != 0);
 
     /*

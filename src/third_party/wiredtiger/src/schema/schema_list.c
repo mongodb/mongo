@@ -165,7 +165,8 @@ __wt_schema_close_table(WT_SESSION_IMPL *session, WT_TABLE *table)
     table->idx_alloc = 0;
 
     WT_ASSERT(session,
-      F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE) || F_ISSET(S2C(session), WT_CONN_CLOSING));
+      FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE) ||
+        F_ISSET(S2C(session), WT_CONN_CLOSING));
     table->cg_complete = table->idx_complete = false;
 
     return (ret);

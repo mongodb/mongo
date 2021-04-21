@@ -241,7 +241,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
      */
     session_flags = WT_SESSION_NO_DATA_HANDLES;
     if ((ret = __wt_open_internal_session(
-           conn, "cache-pool", false, session_flags, &cache->cp_session)) != 0)
+           conn, "cache-pool", false, session_flags, 0, &cache->cp_session)) != 0)
         WT_RET_MSG(NULL, ret, "Failed to create session for cache pool");
 
     /*

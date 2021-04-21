@@ -42,7 +42,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
     u_int i;
     char *cgconfig;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
 
     if (table->cg_complete)
         return (0);
@@ -406,7 +406,7 @@ __schema_open_table(WT_SESSION_IMPL *session)
     table_cfg = table->iface.cfg;
     tablename = table->iface.name;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE));
 
     WT_RET(__wt_config_gets(session, table_cfg, "columns", &cval));
     WT_RET(__wt_config_gets(session, table_cfg, "key_format", &cval));

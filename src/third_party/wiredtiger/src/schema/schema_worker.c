@@ -142,7 +142,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
          * checkpoints, do not. Opening indexes requires the handle write lock, so check whether
          * that lock is held when deciding what to do.
          */
-        if (F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE))
+        if (FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE))
             WT_ERR(__wt_schema_open_indices(session, table));
 
         for (i = 0; i < table->nindices; i++) {

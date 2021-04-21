@@ -795,7 +795,8 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
     was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP);
 
     /* We need a real session for recovery. */
-    WT_RET(__wt_open_internal_session(conn, "txn-recover", false, WT_SESSION_NO_LOGGING, &session));
+    WT_RET(
+      __wt_open_internal_session(conn, "txn-recover", false, WT_SESSION_NO_LOGGING, 0, &session));
     r.session = session;
     WT_MAX_LSN(&r.max_ckpt_lsn);
     WT_MAX_LSN(&r.max_rec_lsn);

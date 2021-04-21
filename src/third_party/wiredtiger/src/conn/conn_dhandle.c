@@ -234,7 +234,7 @@ __wt_conn_dhandle_find(WT_SESSION_IMPL *session, const char *uri, const char *ch
     conn = S2C(session);
 
     /* We must be holding the handle list lock at a higher level. */
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST));
 
     bucket = __wt_hash_city64(uri, strlen(uri)) & (conn->dh_hash_size - 1);
     if (checkpoint == NULL) {
@@ -301,9 +301,9 @@ __wt_conn_dhandle_close(WT_SESSION_IMPL *session, bool final, bool mark_dead)
      * schema lock we might deadlock with a thread that has the schema lock and wants a handle lock.
      */
     no_schema_lock = false;
-    if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
+    if (!FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA)) {
         no_schema_lock = true;
-        F_SET(session, WT_SESSION_NO_SCHEMA_LOCK);
+        FLD_SET(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
     }
 
     /*
@@ -415,7 +415,7 @@ err:
     __wt_spin_unlock(session, &dhandle->close_lock);
 
     if (no_schema_lock)
-        F_CLR(session, WT_SESSION_NO_SCHEMA_LOCK);
+        FLD_CLR(session->lock_flags, WT_SESSION_NO_SCHEMA_LOCK);
 
     if (is_btree)
         __wt_evict_file_exclusive_off(session);
@@ -756,7 +756,7 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *uri, bool remo
 
     conn = S2C(session);
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
     WT_ASSERT(session, session->dhandle == NULL);
 
     /*
@@ -795,7 +795,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
     dhandle = session->dhandle;
     bucket = dhandle->name_hash & (conn->dh_hash_size - 1);
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
     WT_ASSERT(session, dhandle != conn->cache->walk_tree);
 
     /* Check if the handle was reacquired by a session while we waited. */
@@ -833,7 +833,7 @@ __wt_conn_dhandle_discard_single(WT_SESSION_IMPL *session, bool final, bool mark
      * Kludge: interrupt the eviction server in case it is holding the handle list lock.
      */
     set_pass_intr = false;
-    if (!F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
+    if (!FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST)) {
         set_pass_intr = true;
         (void)__wt_atomic_addv32(&S2C(session)->cache->pass_intr, 1);
     }

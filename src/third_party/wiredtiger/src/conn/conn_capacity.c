@@ -134,7 +134,8 @@ __capacity_server_start(WT_CONNECTION_IMPL *conn)
     /*
      * The capacity server gets its own session.
      */
-    WT_RET(__wt_open_internal_session(conn, "capacity-server", false, 0, &conn->capacity_session));
+    WT_RET(
+      __wt_open_internal_session(conn, "capacity-server", false, 0, 0, &conn->capacity_session));
     session = conn->capacity_session;
 
     WT_RET(__wt_cond_alloc(session, "capacity server", &conn->capacity_cond));

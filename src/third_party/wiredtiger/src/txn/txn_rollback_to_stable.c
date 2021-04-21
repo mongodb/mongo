@@ -1383,7 +1383,7 @@ __rollback_to_stable_btree_apply(WT_SESSION_IMPL *session)
       __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
       __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]));
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_SCHEMA));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SCHEMA));
     WT_RET(__wt_metadata_cursor(session, &cursor));
 
     if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
@@ -1585,7 +1585,7 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
      * rollback to stable doesn't generate log records.
      */
     WT_RET(__wt_open_internal_session(S2C(session), "txn rollback_to_stable", true,
-      F_MASK(session, WT_SESSION_NO_LOGGING), &session));
+      F_MASK(session, WT_SESSION_NO_LOGGING), 0, &session));
 
     /*
      * Rollback to stable should ignore tombstones in the history store since it needs to scan the

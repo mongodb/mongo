@@ -1870,8 +1870,9 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
     /* We must hold the metadata lock if checkpointing the metadata. */
-    WT_ASSERT(
-      session, !WT_IS_METADATA(session->dhandle) || F_ISSET(session, WT_SESSION_LOCKED_METADATA));
+    WT_ASSERT(session,
+      !WT_IS_METADATA(session->dhandle) ||
+        FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_METADATA));
 
     WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
     force = cval.val != 0;

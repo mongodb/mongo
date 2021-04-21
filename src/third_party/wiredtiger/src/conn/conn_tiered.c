@@ -316,7 +316,7 @@ __wt_tiered_storage_create(WT_SESSION_IMPL *session, const char *cfg[], bool rec
     /* Set first, the thread might run before we finish up. */
     FLD_SET(conn->server_flags, WT_CONN_SERVER_TIERED);
 
-    WT_ERR(__wt_open_internal_session(conn, "storage-server", true, 0, &conn->tiered_session));
+    WT_ERR(__wt_open_internal_session(conn, "storage-server", true, 0, 0, &conn->tiered_session));
     session = conn->tiered_session;
 
     WT_ERR(__wt_cond_alloc(session, "storage server", &conn->tiered_cond));

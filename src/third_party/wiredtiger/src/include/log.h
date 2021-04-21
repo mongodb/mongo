@@ -216,7 +216,7 @@ struct __wt_logslot {
 
 #define WT_WITH_SLOT_LOCK(session, log, op)                                            \
     do {                                                                               \
-        WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));                 \
+        WT_ASSERT(session, !FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_SLOT));   \
         WT_WITH_LOCK_WAIT(session, &(log)->log_slot_lock, WT_SESSION_LOCKED_SLOT, op); \
     } while (0)
 

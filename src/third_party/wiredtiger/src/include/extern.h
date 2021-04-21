@@ -1132,8 +1132,8 @@ extern int __wt_open(WT_SESSION_IMPL *session, const char *name, WT_FS_OPEN_FILE
 extern int __wt_open_cursor(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
   const char *cfg[], WT_CURSOR **cursorp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_open_internal_session(WT_CONNECTION_IMPL *conn, const char *name,
-  bool open_metadata, uint32_t session_flags, WT_SESSION_IMPL **sessionp)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool open_metadata, uint32_t session_flags, uint32_t session_lock_flags,
+  WT_SESSION_IMPL **sessionp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler,
   const char *config, bool open_metadata, WT_SESSION_IMPL **sessionp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

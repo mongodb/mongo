@@ -156,22 +156,22 @@ struct __wt_name_flag {
  * Macros to ensure the dhandle is inserted or removed from both the main queue and the hashed
  * queue.
  */
-#define WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket)                              \
-    do {                                                                           \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
-        TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);                              \
-        TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);                \
-        ++(conn)->dh_bucket_count[bucket];                                         \
-        ++(conn)->dhandle_count;                                                   \
+#define WT_CONN_DHANDLE_INSERT(conn, dhandle, bucket)                                            \
+    do {                                                                                         \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
+        TAILQ_INSERT_HEAD(&(conn)->dhqh, dhandle, q);                                            \
+        TAILQ_INSERT_HEAD(&(conn)->dhhash[bucket], dhandle, hashq);                              \
+        ++(conn)->dh_bucket_count[bucket];                                                       \
+        ++(conn)->dhandle_count;                                                                 \
     } while (0)
 
-#define WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket)                              \
-    do {                                                                           \
-        WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
-        TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);                                   \
-        TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);                     \
-        --(conn)->dh_bucket_count[bucket];                                         \
-        --(conn)->dhandle_count;                                                   \
+#define WT_CONN_DHANDLE_REMOVE(conn, dhandle, bucket)                                            \
+    do {                                                                                         \
+        WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_HANDLE_LIST_WRITE)); \
+        TAILQ_REMOVE(&(conn)->dhqh, dhandle, q);                                                 \
+        TAILQ_REMOVE(&(conn)->dhhash[bucket], dhandle, hashq);                                   \
+        --(conn)->dh_bucket_count[bucket];                                                       \
+        --(conn)->dhandle_count;                                                                 \
     } while (0)
 
 /*

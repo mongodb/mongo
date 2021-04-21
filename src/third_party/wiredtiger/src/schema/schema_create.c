@@ -676,7 +676,7 @@ __create_table(
     cgname = filename = NULL;
     table = NULL;
 
-    WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
+    WT_ASSERT(session, FLD_ISSET(session->lock_flags, WT_SESSION_LOCKED_TABLE_WRITE));
 
     tablename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");

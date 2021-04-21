@@ -39,43 +39,16 @@
 std::string
 parse_configuration_from_file(const std::string &filename)
 {
-    std::string cfg, line, prev_line, error;
+    std::string cfg, line, error;
     std::ifstream cFile(filename);
 
     if (cFile.is_open()) {
         while (getline(cFile, line)) {
-
-            if (line[0] == '#' || line.empty())
-                continue;
-
             /* Whitespaces are only for readability, they can be removed safely. */
             line.erase(std::remove_if(line.begin(), line.end(), isspace), line.end());
-
-            if (prev_line == line && line != "}") {
-                error =
-                  "Error when parsing configuration. Two consecutive lines are equal to " + line;
-                testutil_die(EINVAL, error.c_str());
-                break;
-            }
-
-            /* Start of a sub config. */
-            if (line == "{")
-                cfg += "(";
-            /* End of a sub config. */
-            else if (line == "}")
-                cfg += ")";
-            else {
-                /* First line. */
-                if (cfg.empty())
-                    cfg += line;
-                /* No comma needed at the start of a subconfig. */
-                else if (prev_line == "{")
-                    cfg += line;
-                else
-                    cfg += "," + line;
-            }
-
-            prev_line = line;
+            if (line[0] == '#' || line.empty())
+                continue;
+            cfg += line;
         }
 
     } else {
