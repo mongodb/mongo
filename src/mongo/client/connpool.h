@@ -373,12 +373,15 @@ private:
     DBClientBase* _finishCreate(const std::string& ident, double socketTimeout, DBClientBase* conn);
 
     struct PoolKey {
-        PoolKey(const std::string& i, double t)
-            : ident(i), timeoutTenthSecond(static_cast<int64_t>(t * 10.)) {}
+        PoolKey(const std::string& i, double socketTimeoutSec)
+            : ident(i),
+              // Rounds up with presision 0.001, e.g. value between 0.99991 and 1.0008 to 1000.
+              socketTimeoutMs(static_cast<int64_t>(socketTimeoutSec * 10.001) * 100) {}
         std::string ident;
         // To make the key to have a descrete value the double timeout
-        // is rounded up to 100 ms.
-        int64_t timeoutTenthSecond;
+        // is rounded up to 100 ms. This prevents from creating a potentially
+        // unlimited number of pools.
+        int64_t socketTimeoutMs;
     };
 
     struct poolKeyCompare {
