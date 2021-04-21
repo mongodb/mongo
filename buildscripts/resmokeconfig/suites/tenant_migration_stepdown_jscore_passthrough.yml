@@ -116,9 +116,6 @@ selector:
   # Blacklists specific to this suite
   #
 
-  # TODO (SERVER-55359): Docs in tenant migration oplog buffer collection might not be ordered by
-  # timestamp.
-  - jstests/core/*find_and_modify*.js
   - jstests/core/api_version_parameters.js
   - jstests/core/benchrun_pipeline_updates.js
   - jstests/core/bypass_doc_validation.js
