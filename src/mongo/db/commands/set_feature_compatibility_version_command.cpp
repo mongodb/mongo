@@ -461,6 +461,10 @@ private:
                 NamespaceStringOrUUID collName(
                     collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
                 AutoGetCollectionForRead coll(opCtx, collName);
+                if (!coll) {
+                    continue;
+                }
+
                 auto idxCatalog = coll->getIndexCatalog();
                 std::vector<const IndexDescriptor*> haystackIndexes;
                 idxCatalog->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, haystackIndexes);
