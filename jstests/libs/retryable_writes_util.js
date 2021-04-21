@@ -73,6 +73,24 @@ var RetryableWritesUtil = (function() {
                       tojson(secondaryRecord) + " to be the same for lsid: " + tojson(lsid));
     }
 
+    /**
+     * Runs the provided retriable command nTimes. This assumes that the the provided conn
+     * was started with `retryWrites: false` to mimic the retry functionality manually.
+     */
+    function runRetryableWrite(conn, command, expectedErrorCode = ErrorCodes.OK, nTimes = 2) {
+        var res;
+        for (var i = 0; i < nTimes; i++) {
+            jsTestLog("Executing command: " + tojson(command) + "\nIteration: " + i +
+                      "\nExpected Code: " + expectedErrorCode);
+            res = conn.runCommand(command);
+        }
+        if (expectedErrorCode === ErrorCodes.OK) {
+            assert.commandWorked(res);
+        } else {
+            assert.commandFailedWithCode(res, expectedErrorCode);
+        }
+    }
+
     return {
         isRetryableCode,
         errmsgContainsRetryableCodeName,
@@ -80,5 +98,6 @@ var RetryableWritesUtil = (function() {
         storageEngineSupportsRetryableWrites,
         checkTransactionTable,
         assertSameRecordOnBothConnections,
+        runRetryableWrite,
     };
 })();
