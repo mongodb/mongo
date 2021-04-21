@@ -73,7 +73,7 @@ public:
 class ReshardingDonorService::DonorStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
-    explicit DonorStateMachine(const BSONObj& donorDoc,
+    explicit DonorStateMachine(const ReshardingDonorDocument& donorDoc,
                                std::unique_ptr<DonorStateMachineExternalState> externalState);
 
     ~DonorStateMachine();
@@ -104,9 +104,6 @@ public:
                                     const ReshardingDonorDocument& donorDoc);
 
 private:
-    DonorStateMachine(const ReshardingDonorDocument& donorDoc,
-                      std::unique_ptr<DonorStateMachineExternalState> externalState);
-
     /**
      * Runs up until the donor is either in state kBlockingWrites or encountered an error.
      */

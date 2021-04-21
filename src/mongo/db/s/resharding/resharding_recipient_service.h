@@ -39,23 +39,7 @@
 
 namespace mongo {
 
-namespace resharding {
-
-/**
- * Creates the temporary resharding collection locally by loading the collection options and
- * collection indexes from the original collection's primary and MinKey owning chunk shards,
- * respectively.
- */
-void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
-                                                const NamespaceString& originalNss,
-                                                const NamespaceString& reshardingNss,
-                                                const UUID& reshardingUUID,
-                                                const UUID& existingUUID,
-                                                Timestamp fetchTimestamp);
-
-}  // namespace resharding
-
-class ReshardingRecipientService final : public repl::PrimaryOnlyService {
+class ReshardingRecipientService : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ReshardingRecipientService"_sd;
 
@@ -64,6 +48,8 @@ public:
     ~ReshardingRecipientService() = default;
 
     class RecipientStateMachine;
+
+    class RecipientStateMachineExternalState;
 
     StringData getServiceName() const override {
         return kServiceName;
@@ -107,9 +93,11 @@ public:
         }
     };
 
-    explicit RecipientStateMachine(const ReshardingRecipientService* recipientService,
-                                   const BSONObj& recipientDoc,
-                                   ReshardingDataReplicationFactory dataReplicationFactory);
+    explicit RecipientStateMachine(
+        const ReshardingRecipientService* recipientService,
+        const ReshardingRecipientDocument& recipientDoc,
+        std::unique_ptr<RecipientStateMachineExternalState> externalState,
+        ReshardingDataReplicationFactory dataReplicationFactory);
 
     ~RecipientStateMachine();
 
@@ -137,10 +125,6 @@ public:
                                     const ReshardingRecipientDocument& recipientDoc);
 
 private:
-    RecipientStateMachine(const ReshardingRecipientService* recipientService,
-                          const ReshardingRecipientDocument& recipientDoc,
-                          ReshardingDataReplicationFactory dataReplicationFactory);
-
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
@@ -220,6 +204,8 @@ private:
     RecipientShardContext _recipientCtx;
     std::vector<DonorShardFetchTimestamp> _donorShards;
     boost::optional<Timestamp> _cloneTimestamp;
+
+    const std::unique_ptr<RecipientStateMachineExternalState> _externalState;
 
     // ThreadPool used by CancelableOperationContext.
     // CancelableOperationContext must have a thread that is always available to it to mark its

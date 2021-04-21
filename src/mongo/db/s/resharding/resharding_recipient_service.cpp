@@ -47,6 +47,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
+#include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
@@ -93,82 +94,19 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
 
 }  // namespace
 
-namespace resharding {
-
-void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
-                                                const NamespaceString& originalNss,
-                                                const NamespaceString& reshardingNss,
-                                                const UUID& reshardingUUID,
-                                                const UUID& existingUUID,
-                                                Timestamp fetchTimestamp) {
-    LOGV2_DEBUG(
-        5002300, 1, "Creating temporary resharding collection", "originalNss"_attr = originalNss);
-
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
-
-    // Load the original collection's options from the database's primary shard.
-    auto [collOptions, uuid] = shardVersionRetry(
-        opCtx,
-        catalogCache,
-        reshardingNss,
-        "loading collection options to create temporary resharding collection"_sd,
-        [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
-            auto originalCm = uassertStatusOK(
-                catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, originalNss));
-            return MigrationDestinationManager::getCollectionOptions(
-                opCtx,
-                NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
-                originalCm.dbPrimary(),
-                originalCm,
-                fetchTimestamp);
-        });
-
-    // Load the original collection's indexes from the shard that owns the global minimum chunk.
-    auto [indexes, idIndex] =
-        shardVersionRetry(opCtx,
-                          catalogCache,
-                          reshardingNss,
-                          "loading indexes to create temporary resharding collection"_sd,
-                          [&]() -> MigrationDestinationManager::IndexesAndIdIndex {
-                              auto originalCm =
-                                  catalogCache->getShardedCollectionRoutingInfo(opCtx, originalNss);
-                              auto indexShardId = originalCm.getMinKeyShardIdWithSimpleCollation();
-                              return MigrationDestinationManager::getCollectionIndexes(
-                                  opCtx,
-                                  NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
-                                  indexShardId,
-                                  originalCm,
-                                  fetchTimestamp);
-                          });
-
-    // Set the temporary resharding collection's UUID to the resharding UUID. Note that
-    // BSONObj::addFields() replaces any fields that already exist.
-    collOptions = collOptions.addFields(BSON("uuid" << reshardingUUID));
-    CollectionOptionsAndIndexes optionsAndIndexes = {reshardingUUID, indexes, idIndex, collOptions};
-    MigrationDestinationManager::cloneCollectionIndexesAndOptions(
-        opCtx, reshardingNss, optionsAndIndexes);
-}
-
-}  // namespace resharding
-
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<RecipientStateMachine>(
-        this, std::move(initialState), ReshardingDataReplication::make);
+        this,
+        ReshardingRecipientDocument::parse({"RecipientStateMachine"}, initialState),
+        std::make_unique<RecipientStateMachineExternalStateImpl>(),
+        ReshardingDataReplication::make);
 }
-
-ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
-    const ReshardingRecipientService* recipientService,
-    const BSONObj& recipientDoc,
-    ReshardingDataReplicationFactory dataReplicationFactory)
-    : RecipientStateMachine(
-          recipientService,
-          ReshardingRecipientDocument::parse({"RecipientStateMachine"}, recipientDoc),
-          std::move(dataReplicationFactory)) {}
 
 ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
     const ReshardingRecipientService* recipientService,
     const ReshardingRecipientDocument& recipientDoc,
+    std::unique_ptr<RecipientStateMachineExternalState> externalState,
     ReshardingDataReplicationFactory dataReplicationFactory)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _recipientService{recipientService},
@@ -177,6 +115,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _recipientCtx{recipientDoc.getMutableState()},
       _donorShards{recipientDoc.getDonorShards()},
       _cloneTimestamp{recipientDoc.getCloneTimestamp()},
+      _externalState{std::move(externalState)},
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "RecipientStateMachineCancelableOpCtxPool";
@@ -184,7 +123,9 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
           options.maxThreads = 1;
           return options;
       }())),
-      _dataReplicationFactory{std::move(dataReplicationFactory)} {}
+      _dataReplicationFactory{std::move(dataReplicationFactory)} {
+    invariant(_externalState);
+}
 
 ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
@@ -388,29 +329,22 @@ void ReshardingRecipientService::RecipientStateMachine::
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
-        resharding::createTemporaryReshardingCollectionLocally(opCtx.get(),
-                                                               _metadata.getSourceNss(),
-                                                               _metadata.getTempReshardingNss(),
-                                                               _metadata.getReshardingUUID(),
-                                                               _metadata.getSourceUUID(),
-                                                               *_cloneTimestamp);
+        _externalState->ensureTempReshardingCollectionExistsWithIndexes(
+            opCtx.get(), _metadata, *_cloneTimestamp);
 
-        ShardKeyPattern shardKeyPattern{_metadata.getReshardingKey()};
-
-        auto catalogCache = Grid::get(opCtx.get())->catalogCache();
-        shardVersionRetry(opCtx.get(),
-                          catalogCache,
-                          _metadata.getTempReshardingNss(),
-                          "validating shard key index for reshardCollection"_sd,
-                          [&] {
-                              shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                                  opCtx.get(),
-                                  _metadata.getTempReshardingNss(),
-                                  shardKeyPattern,
-                                  CollationSpec::kSimpleSpec,
-                                  false,
-                                  shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
-                          });
+        _externalState->withShardVersionRetry(
+            opCtx.get(),
+            _metadata.getTempReshardingNss(),
+            "validating shard key index for reshardCollection"_sd,
+            [&] {
+                shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                    opCtx.get(),
+                    _metadata.getTempReshardingNss(),
+                    ShardKeyPattern{_metadata.getReshardingKey()},
+                    CollationSpec::kSimpleSpec,
+                    false /* unique */,
+                    shardkeyutil::ValidationBehaviorsShardCollection(opCtx.get()));
+            });
     }
 
     _transitionState(RecipientStateEnum::kCloning);
@@ -421,10 +355,9 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                                                                         bool cloningDone) {
     invariant(_cloneTimestamp);
 
-    auto myShardId = ShardingState::get(opCtx->getServiceContext())->shardId();
-    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
     auto sourceChunkMgr =
-        catalogCache->getShardedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
+        _externalState->getShardedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
 
     return _dataReplicationFactory(opCtx,
                                    _metrics(),
@@ -562,7 +495,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             _transitionState(RecipientStateEnum::kStrictConsistency);
 
             const bool isAlsoDonor = [&] {
-                auto myShardId = ShardingState::get(cc().getServiceContext())->shardId();
+                auto myShardId = _externalState->myShardId(cc().getServiceContext());
                 return std::find_if(_donorShards.begin(),
                                     _donorShards.end(),
                                     [&](const DonorShardFetchTimestamp& donor) {
@@ -596,7 +529,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
     }
 
     const bool isAlsoDonor = [&] {
-        auto myShardId = ShardingState::get(cc().getServiceContext())->shardId();
+        auto myShardId = _externalState->myShardId(cc().getServiceContext());
         return std::find_if(_donorShards.begin(),
                             _donorShards.end(),
                             [&](const DonorShardFetchTimestamp& donor) {
@@ -750,8 +683,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
         .thenRunOn(**executor)
         .then([this] {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-            auto shardId = ShardingState::get(opCtx.get())->shardId();
+            auto shardId = _externalState->myShardId(opCtx->getServiceContext());
 
             BSONObjBuilder updateBuilder;
             {
@@ -763,16 +695,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_updateC
                 }
             }
 
-            uassertStatusOK(
-                Grid::get(opCtx.get())
-                    ->catalogClient()
-                    ->updateConfigDocument(
-                        opCtx.get(),
-                        NamespaceString::kConfigReshardingOperationsNamespace,
-                        _makeQueryForCoordinatorUpdate(shardId, _recipientCtx.getState()),
-                        updateBuilder.done(),
-                        false /* upsert */,
-                        ShardingCatalogClient::kMajorityWriteConcern));
+            _externalState->updateCoordinatorDocument(
+                opCtx.get(),
+                _makeQueryForCoordinatorUpdate(shardId, _recipientCtx.getState()),
+                updateBuilder.done());
         });
 }
 

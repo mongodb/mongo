@@ -185,14 +185,10 @@ public:
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
     BSONObj initialState) {
-    return std::make_shared<DonorStateMachine>(std::move(initialState),
-                                               std::make_unique<ExternalStateImpl>());
+    return std::make_shared<DonorStateMachine>(
+        ReshardingDonorDocument::parse({"DonorStateMachine"}, initialState),
+        std::make_unique<ExternalStateImpl>());
 }
-
-ReshardingDonorService::DonorStateMachine::DonorStateMachine(
-    const BSONObj& donorDoc, std::unique_ptr<DonorStateMachineExternalState> externalState)
-    : DonorStateMachine(ReshardingDonorDocument::parse({"DonorStateMachine"}, donorDoc),
-                        std::move(externalState)) {}
 
 ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     const ReshardingDonorDocument& donorDoc,

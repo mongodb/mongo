@@ -39,9 +39,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
-#include "mongo/db/s/resharding/resharding_recipient_service.h"
+#include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -53,8 +52,8 @@
 namespace mongo {
 namespace {
 
-class ReshardingRecipientServiceTest : public CatalogCacheTestFixture,
-                                       public ServiceContextMongoDTest {
+class RecipientServiceExternalStateTest : public CatalogCacheTestFixture,
+                                          public ServiceContextMongoDTest {
 public:
     const ShardKeyPattern kShardKey = ShardKeyPattern(BSON("oldKey" << 1));
     const OID kOrigEpoch = OID::gen();
@@ -66,6 +65,8 @@ public:
     const NamespaceString kReshardingNss = NamespaceString(
         str::stream() << "db." << NamespaceString::kTemporaryReshardingCollectionPrefix
                       << kOrigUUID);
+    const CommonReshardingMetadata kMetadata{
+        kReshardingUUID, kOrigNss, kOrigUUID, kReshardingNss, kReshardingKey.getKeyPattern()};
     const Timestamp kDefaultFetchTimestamp = Timestamp(200, 1);
 
     void setUp() override {
@@ -244,7 +245,7 @@ public:
     }
 };
 
-TEST_F(ReshardingRecipientServiceTest, CreateLocalReshardingCollectionBasic) {
+TEST_F(RecipientServiceExternalStateTest, CreateLocalReshardingCollectionBasic) {
     auto shards = setupNShards(2);
 
     // Shard kOrigNss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1"
@@ -282,19 +283,16 @@ TEST_F(ReshardingRecipientServiceTest, CreateLocalReshardingCollectionBasic) {
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
-                                                           kOrigNss,
-                                                           kReshardingNss,
-                                                           kReshardingUUID,
-                                                           kOrigUUID,
-                                                           kDefaultFetchTimestamp);
+    RecipientStateMachineExternalStateImpl externalState;
+    externalState.ensureTempReshardingCollectionExistsWithIndexes(
+        operationContext(), kMetadata, kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
 }
 
-TEST_F(ReshardingRecipientServiceTest,
+TEST_F(RecipientServiceExternalStateTest,
        CreatingLocalReshardingCollectionRetriesOnStaleVersionErrors) {
     auto shards = setupNShards(2);
 
@@ -324,7 +322,6 @@ TEST_F(ReshardingRecipientServiceTest,
         expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
         expectStaleDbVersionError(kOrigNss, "listCollections");
         expectGetDatabase(kOrigNss, shards[1].getHost());
-        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
         expectListCollections(
             kOrigNss,
             kOrigUUID,
@@ -335,22 +332,20 @@ TEST_F(ReshardingRecipientServiceTest,
             HostAndPort(shards[1].getHost()));
 
         expectStaleEpochError(kOrigNss, "listIndexes");
+        expectRefreshReturnForOriginalColl(kOrigNss, kShardKey, kOrigUUID, kOrigEpoch);
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
-                                                           kOrigNss,
-                                                           kReshardingNss,
-                                                           kReshardingUUID,
-                                                           kOrigUUID,
-                                                           kDefaultFetchTimestamp);
+    RecipientStateMachineExternalStateImpl externalState;
+    externalState.ensureTempReshardingCollectionExistsWithIndexes(
+        operationContext(), kMetadata, kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
 }
 
-TEST_F(ReshardingRecipientServiceTest,
+TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithNoIndexes) {
     auto shards = setupNShards(2);
 
@@ -404,19 +399,16 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
-                                                           kOrigNss,
-                                                           kReshardingNss,
-                                                           kReshardingUUID,
-                                                           kOrigUUID,
-                                                           kDefaultFetchTimestamp);
+    RecipientStateMachineExternalStateImpl externalState;
+    externalState.ensureTempReshardingCollectionExistsWithIndexes(
+        operationContext(), kMetadata, kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
 }
 
-TEST_F(ReshardingRecipientServiceTest,
+TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithSomeIndexes) {
     auto shards = setupNShards(2);
 
@@ -472,19 +464,16 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
-                                                           kOrigNss,
-                                                           kReshardingNss,
-                                                           kReshardingUUID,
-                                                           kOrigUUID,
-                                                           kDefaultFetchTimestamp);
+    RecipientStateMachineExternalStateImpl externalState;
+    externalState.ensureTempReshardingCollectionExistsWithIndexes(
+        operationContext(), kMetadata, kDefaultFetchTimestamp);
 
     future.default_timed_get();
 
     verifyCollectionAndIndexes(kReshardingNss, kReshardingUUID, indexes);
 }
 
-TEST_F(ReshardingRecipientServiceTest,
+TEST_F(RecipientServiceExternalStateTest,
        CreateLocalReshardingCollectionCollectionAlreadyExistsWithAllIndexes) {
     auto shards = setupNShards(2);
 
@@ -530,12 +519,9 @@ TEST_F(ReshardingRecipientServiceTest,
         expectListIndexes(kOrigNss, kOrigUUID, indexes, HostAndPort(shards[0].getHost()));
     });
 
-    resharding::createTemporaryReshardingCollectionLocally(operationContext(),
-                                                           kOrigNss,
-                                                           kReshardingNss,
-                                                           kReshardingUUID,
-                                                           kOrigUUID,
-                                                           kDefaultFetchTimestamp);
+    RecipientStateMachineExternalStateImpl externalState;
+    externalState.ensureTempReshardingCollectionExistsWithIndexes(
+        operationContext(), kMetadata, kDefaultFetchTimestamp);
 
     future.default_timed_get();
 

@@ -167,8 +167,9 @@ public:
         : ReshardingDonorService(serviceContext) {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
-        return std::make_shared<DonorStateMachine>(std::move(initialState),
-                                                   std::make_unique<ExternalStateForTest>());
+        return std::make_shared<DonorStateMachine>(
+            ReshardingDonorDocument::parse({"ReshardingDonorServiceForTest"}, initialState),
+            std::make_unique<ExternalStateForTest>());
     }
 };
 
