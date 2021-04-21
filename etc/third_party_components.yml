@@ -309,9 +309,8 @@ components:
     homepage_url: https://valgrind.org/
     open_hub_url: https://www.openhub.net/p/valgrind
     release_monitoring_id: 13639
-    local_directory_path: src/third_party/valgrind-3.14.0
+    local_directory_path: src/third_party/valgrind
     team_owner: "Decision Automation Group"
-    upgrade_suppression: TODO SERVER-51479
 
   testtools:
     homepage_url: https://launchpad.net/testtools

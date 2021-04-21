@@ -108,7 +108,7 @@ if not use_system_version_of_library('snappy'):
 # Valgrind is a header only include as valgrind.h includes everything we need
 if not use_system_version_of_library('valgrind'):
     thirdPartyEnvironmentModifications['valgrind'] = {
-        'CPPPATH' : ['#/src/third_party/valgrind-3.14.0/include'],
+        'CPPPATH' : ['#/src/third_party/valgrind/include'],
     }
 
 if not use_system_version_of_library('zlib'):
