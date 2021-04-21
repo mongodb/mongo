@@ -645,6 +645,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexAccessMethod::RecordIdHandlerFn& onDuplicateRecord) {
+    opCtx->checkForInterrupt();
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
