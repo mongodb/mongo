@@ -29,6 +29,7 @@ assert.commandWorked(
 
 session.startTransaction();
 const coll = testDB.getCollection(collForCreate.getName());
-assert.commandWorked(coll.insert({_id: 0, [timeFieldName]: ISODate()}));
-assert.commandWorked(session.abortTransaction_forTesting());
+assert.commandFailedWithCode(coll.insert({_id: 0, [timeFieldName]: ISODate()}),
+                             ErrorCodes.OperationNotSupportedInTransaction);
+assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 })();

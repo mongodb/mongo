@@ -822,6 +822,13 @@ public:
                             curOp.getReadWriteType());
             });
 
+            uassert(
+                ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot insert into a time-series collection in a multi-document "
+                                 "transaction: "
+                              << ns(),
+                !opCtx->inMultiDocumentTransaction());
+
             std::vector<BSONObj> errors;
             boost::optional<repl::OpTime> opTime;
             boost::optional<OID> electionId;
