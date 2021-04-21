@@ -2,5 +2,5 @@
     "vendor": "wiredtiger",
     "github": "wiredtiger/wiredtiger.git",
     "branch": "vendor_temp",
-    "commit": "a7004cb2d00b6f0b593ac9637ff783a5a2c15a8d"
+    "commit": "3bc45b797a1b257a4c559344be1608874f502229"
 }
