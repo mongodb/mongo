@@ -2,13 +2,10 @@
 'use strict';
 
 // Include helpers for analyzing explain output.
-// @tags: [
-//   sbe_incompatible,
-// ]
 load("jstests/libs/analyze_plan.js");
 
-var s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
-var s2 = s.s1;
+const s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
+const s2 = s.s1;
 
 assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 s.ensurePrimaryShard('test', s.shard1.shardName);
@@ -30,11 +27,11 @@ assert(!s.getBalancerState(), "A4");
 
 s.config.databases.find().forEach(printjson);
 
-var a = s.getDB("test").foo;
-var b = s2.getDB("test").foo;
+const a = s.getDB("test").foo;
+const b = s2.getDB("test").foo;
 
-var primary = s.getPrimaryShard("test").getDB("test").foo;
-var secondary = s.getOther(primary.name).getDB("test").foo;
+const primary = s.getPrimaryShard("test").getDB("test").foo;
+const secondary = s.getOther(primary.name).getDB("test").foo;
 
 a.save({num: 1});
 a.save({num: 2});
@@ -77,25 +74,22 @@ function doCounts(name, total, onlyItCounts) {
     return total;
 }
 
-var total = doCounts("before wrong save");
+const total = doCounts("before wrong save");
 assert.commandWorked(secondary.insert({_id: 111, num: -3}));
 doCounts("after wrong save", total, true);
 
-var e = a.find().explain("executionStats").executionStats;
-assert.eq(3, e.nReturned, "ex1");
-assert.eq(0, e.totalKeysExamined, "ex2");
-assert.eq(4, e.totalDocsExamined, "ex3");
+const explainResult = a.find().explain("executionStats");
+const stats = explainResult.executionStats;
+assert.eq(3, stats.nReturned, "ex1");
+assert.eq(0, stats.totalKeysExamined, "ex2");
+assert.eq(4, stats.totalDocsExamined, "ex3");
 
-var chunkSkips = 0;
-for (var shard in e.executionStages.shards) {
-    var theShard = e.executionStages.shards[shard];
-    chunkSkips += getChunkSkips(theShard.executionStages);
-}
+const chunkSkips = getChunkSkipsFromAllShards(explainResult);
 assert.eq(1, chunkSkips, "ex4");
 
 // SERVER-4612
 // make sure idhack obeys chunks
-var x = a.findOne({_id: 111});
+const x = a.findOne({_id: 111});
 assert(!x, "idhack didn't obey chunk boundaries " + tojson(x));
 
 // --- move all to 1 ---
@@ -111,7 +105,7 @@ print("GOING TO MOVE");
 assert(a.findOne({num: 1}), "pre move 1");
 s.printCollectionInfo("test.foo");
 
-var myto = s.getOther(s.getPrimaryShard("test")).name;
+const myto = s.getOther(s.getPrimaryShard("test")).name;
 print("counts before move: " + tojson(s.shardCounts("test,", "foo")));
 assert.commandWorked(
     s.s0.adminCommand({movechunk: "test.foo", find: {num: 1}, to: myto, _waitForDelete: true}));
@@ -141,8 +135,8 @@ assert.commandWorked(s.s0.adminCommand({enablesharding: "test2"}));
 s.ensurePrimaryShard('test2', s.shard0.shardName);
 assert.commandWorked(s.s0.adminCommand({shardcollection: "test2.foo", key: {num: 1}}));
 
-var dba = s.getDB("test2");
-var dbb = s2.getDB("test2");
+const dba = s.getDB("test2");
+const dbb = s2.getDB("test2");
 dba.foo.save({num: 1});
 dba.foo.save({num: 2});
 dba.foo.save({num: 3});

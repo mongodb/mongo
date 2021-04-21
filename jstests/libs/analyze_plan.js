@@ -396,22 +396,47 @@ function isQueryPlan(root) {
 }
 
 /**
- * Get the number of chunk skips for the BSON exec stats tree rooted at 'root'.
+ * Get the "chunk skips" for a single shard. Here, "chunk skips" refer to documents excluded by the
+ * shard filter.
  */
-function getChunkSkips(root) {
-    if (root.stage === "SHARDING_FILTER") {
-        return root.chunkSkips;
-    } else if ("inputStage" in root) {
-        return getChunkSkips(root.inputStage);
-    } else if ("inputStages" in root) {
-        var skips = 0;
-        for (var i = 0; i < root.inputStages.length; i++) {
-            skips += getChunkSkips(root.inputStages[0]);
-        }
-        return skips;
+function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
+    const shardFilterPlanStage = getPlanStage(getWinningPlan(shardPlan), "SHARDING_FILTER");
+    if (!shardFilterPlanStage) {
+        return 0;
     }
 
-    return 0;
+    if (shardFilterPlanStage.hasOwnProperty("planNodeId")) {
+        const shardFilterNodeId = shardFilterPlanStage.planNodeId;
+
+        // If the query plan's shard filter has a 'planNodeId' value, we search for the
+        // corresponding SBE filter stage and use its stats to determine how many documents were
+        // excluded.
+        const filters = getPlanStages(shardExecutionStages.executionStages, "filter")
+                            .filter(stage => (stage.planNodeId === shardFilterNodeId));
+        return filters.reduce((numSkips, stage) => (numSkips + (stage.numTested - stage.advances)),
+                              0);
+    } else {
+        // Otherwise, we assume that execution used a "classic" SHARDING_FILTER stage, which
+        // explicitly reports a "chunkSkips" value.
+        const filters = getPlanStages(shardExecutionStages.executionStages, "SHARDING_FILTER");
+        return filters.reduce((numSkips, stage) => (numSkips + stage.chunkSkips), 0);
+    }
+}
+
+/**
+ * Get the sum of "chunk skips" from all shards. Here, "chunk skips" refer to documents excluded by
+ * the shard filter.
+ */
+function getChunkSkipsFromAllShards(explainResult) {
+    const shardPlanArray = explainResult.queryPlanner.winningPlan.shards;
+    const shardExecutionStagesArray = explainResult.executionStats.executionStages.shards;
+    assert.eq(shardPlanArray.length, shardExecutionStagesArray.length, explainResult);
+
+    let totalChunkSkips = 0;
+    for (let i = 0; i < shardPlanArray.length; i++) {
+        totalChunkSkips += getChunkSkipsFromShard(shardPlanArray[i], shardExecutionStagesArray[i]);
+    }
+    return totalChunkSkips;
 }
 
 /**

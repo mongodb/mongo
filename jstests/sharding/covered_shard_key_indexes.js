@@ -8,8 +8,8 @@ load("jstests/libs/analyze_plan.js");
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: 1});
-var coll = st.s0.getCollection("foo.bar");
+const st = new ShardingTest({shards: 1});
+const coll = st.s0.getCollection("foo.bar");
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: coll.getDB() + ""}));
 
@@ -128,20 +128,24 @@ assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad 
 
 // Index without shard key query - not covered but succeeds
 assert.commandWorked(coll.createIndex({c: 1}));
-var explain = coll.find({c: true}).explain(true).executionStats;
-assert.eq(1, explain.nReturned);
-assert.eq(1, explain.totalDocsExamined);
-assert.eq(0, getChunkSkips(explain.executionStages.shards[0].executionStages));
+let explain = coll.find({c: true}).explain(true);
+assert.eq(1, explain.executionStats.nReturned);
+assert.eq(1, explain.executionStats.totalDocsExamined);
+assert.eq(0,
+          getChunkSkipsFromShard(explain.queryPlanner.winningPlan.shards[0],
+                                 explain.executionStats.executionStages.shards[0]));
 
 // Index with shard key query - covered and succeeds and returns result
 //
 // NOTE: This is weird and only a result of the fact that we don't have a dedicated "does not
 // exist" value for indexes
 assert.commandWorked(coll.createIndex({c: 1, a: 1}));
-var explain = coll.find({c: true}, {_id: 0, a: 1, c: 1}).explain(true).executionStats;
-assert.eq(1, explain.nReturned);
-assert.eq(0, explain.totalDocsExamined);
-assert.eq(0, getChunkSkips(explain.executionStages.shards[0].executionStages));
+explain = coll.find({c: true}, {_id: 0, a: 1, c: 1}).explain(true);
+assert.eq(1, explain.executionStats.nReturned);
+assert.eq(0, explain.executionStats.totalDocsExamined);
+assert.eq(0,
+          getChunkSkipsFromShard(explain.queryPlanner.winningPlan.shards[0],
+                                 explain.executionStats.executionStages.shards[0]));
 
 st.stop();
 })();
