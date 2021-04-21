@@ -156,7 +156,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     // Check if we need to project out an oplog 'ts' field as part of the collection scan. We will
     // need it either when 'maxRecord' bound has been provided, so that we can apply an EOF filter,
     // of if we need to track the latest oplog timestamp.
-    const auto shouldTrackLatestOplogTimestamp = !csn->stopApplyingFilterAfterFirstMatch &&
+    const auto shouldTrackLatestOplogTimestamp =
         (csn->maxRecord || csn->shouldTrackLatestOplogTimestamp);
     auto&& [fields, slots, tsSlot] = makeOplogTimestampSlotsIfNeeded(
         collection, slotIdGenerator, shouldTrackLatestOplogTimestamp);
