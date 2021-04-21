@@ -4,6 +4,7 @@
  *
  * @tags: [
  *     assumes_unsharded_collection,
+ *     does_not_support_transactions,
  *     requires_timeseries,
  *     requires_fcv_49,
  *     requires_non_retryable_commands,
