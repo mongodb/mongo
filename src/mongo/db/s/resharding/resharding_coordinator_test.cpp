@@ -546,10 +546,14 @@ protected:
                 true));
         }
 
-        resharding::insertCoordDocAndChangeOrigCollEntry(opCtx, expectedCoordinatorDoc);
+        auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+
+        reshardingCoordinatorExternalState.insertCoordDocAndChangeOrigCollEntry(
+            opCtx, expectedCoordinatorDoc);
 
         auto shardsAndChunks =
-            resharding::calculateParticipantShardsAndChunks(opCtx, expectedCoordinatorDoc);
+            reshardingCoordinatorExternalState.calculateParticipantShardsAndChunks(
+                opCtx, expectedCoordinatorDoc);
 
         expectedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
         expectedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
@@ -563,7 +567,7 @@ protected:
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);
 
-        resharding::writeParticipantShardsAndTempCollInfo(
+        reshardingCoordinatorExternalState.writeParticipantShardsAndTempCollInfo(
             opCtx, expectedCoordinatorDoc, initialChunks, zones);
 
         // Check that config.reshardingOperations and config.collections entries are updated
@@ -577,8 +581,10 @@ protected:
 
     void writeStateTransitionUpdateExpectSuccess(
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
-        resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-            opCtx, expectedCoordinatorDoc);
+        auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+        reshardingCoordinatorExternalState
+            .writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx,
+                                                                        expectedCoordinatorDoc);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -615,7 +621,9 @@ protected:
 
     void removeCoordinatorDocAndReshardingFieldsExpectSuccess(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-        resharding::removeCoordinatorDocAndReshardingFields(opCtx, coordinatorDoc);
+        auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+        reshardingCoordinatorExternalState.removeCoordinatorDocAndReshardingFields(opCtx,
+                                                                                   coordinatorDoc);
 
         auto expectedCoordinatorDoc = coordinatorDoc;
         expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -845,8 +853,10 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionWhenCoordinatorDocDo
     // Do not insert initial entry into config.reshardingOperations. Attempt to update coordinator
     // state documents.
     auto coordinatorDoc = makeCoordinatorDoc(CoordinatorStateEnum::kCloning, Timestamp(1, 1));
-    ASSERT_THROWS_CODE(resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-                           operationContext(), coordinatorDoc),
+    auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+    ASSERT_THROWS_CODE(reshardingCoordinatorExternalState
+                           .writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+                               operationContext(), coordinatorDoc),
                        AssertionException,
                        5514600);
 }
@@ -859,10 +869,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     // Do not create the config.collections entry for the original collection
-    ASSERT_THROWS_CODE(
-        resharding::insertCoordDocAndChangeOrigCollEntry(operationContext(), coordinatorDoc),
-        AssertionException,
-        ErrorCodes::NamespaceNotFound);
+    auto reshardingCoordinatorExternalState = ReshardingCoordinatorExternalStateImpl();
+    ASSERT_THROWS_CODE(reshardingCoordinatorExternalState.insertCoordDocAndChangeOrigCollEntry(
+                           operationContext(), coordinatorDoc),
+                       AssertionException,
+                       ErrorCodes::NamespaceNotFound);
 }
 
 }  // namespace

@@ -581,37 +581,34 @@ CollectionType createTempReshardingCollectionType(
     return collType;
 }
 
-void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc) {
-    auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, coordinatorDoc.getSourceNss(), repl::ReadConcernLevel::kMajorityReadConcern);
-    const auto collation = originalCollType.getDefaultCollation();
+void writeDecisionPersistedState(OperationContext* opCtx,
+                                 const ReshardingCoordinatorDocument& coordinatorDoc,
+                                 OID newCollectionEpoch,
+                                 boost::optional<Timestamp> newCollectionTimestamp) {
+    // No need to bump originalNss version because its epoch will be changed.
+    executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
+        // Update the config.reshardingOperations entry
+        writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
-    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
-        opCtx, coordinatorDoc.getSourceNss(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Insert the coordinator document to config.reshardingOperations.
-            invariant(coordinatorDoc.getActive());
-            try {
-                writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
-            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-                auto extraInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
-                if (extraInfo->getKeyPattern().woCompare(BSON("active" << 1)) == 0) {
-                    uasserted(ErrorCodes::ReshardCollectionInProgress,
-                              str::stream()
-                                  << "Only one resharding operation is allowed to be active at a "
-                                     "time, aborting resharding op for "
-                                  << coordinatorDoc.getSourceNss());
-                }
+        // Remove the config.collections entry for the temporary collection
+        writeToConfigCollectionsForTempNss(
+            opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
-                throw;
-            }
+        // Update the config.collections entry for the original namespace to reflect the new
+        // shard key, new epoch, and new UUID
+        updateConfigCollectionsForOriginalNss(
+            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
 
-            // Update the config.collections entry for the original collection to include
-            // 'reshardingFields'
-            updateConfigCollectionsForOriginalNss(
-                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
-        });
+        // Remove all chunk and tag documents associated with the original collection, then
+        // update the chunk and tag docs currently associated with the temp nss to be associated
+        // with the original nss
+        removeChunkAndTagsDocsForOriginalNss(
+            opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
+        updateChunkAndTagsDocsForTempNss(
+            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
+    });
 }
+}  // namespace resharding
 
 ChunkVersion calculateChunkVersionForInitialChunks(OperationContext* opCtx) {
     boost::optional<Timestamp> timestamp;
@@ -651,7 +648,40 @@ std::vector<RecipientShardEntry> constructRecipientShardEntries(
     return recipientShards;
 }
 
-ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
+void ReshardingCoordinatorExternalStateImpl::insertCoordDocAndChangeOrigCollEntry(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+    auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, coordinatorDoc.getSourceNss(), repl::ReadConcernLevel::kMajorityReadConcern);
+    const auto collation = originalCollType.getDefaultCollation();
+
+    ShardingCatalogManager::get(opCtx)->bumpCollectionVersionAndChangeMetadataInTxn(
+        opCtx, coordinatorDoc.getSourceNss(), [&](OperationContext* opCtx, TxnNumber txnNumber) {
+            // Insert the coordinator document to config.reshardingOperations.
+            invariant(coordinatorDoc.getActive());
+            try {
+                writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
+            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                auto extraInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
+                if (extraInfo->getKeyPattern().woCompare(BSON("active" << 1)) == 0) {
+                    uasserted(ErrorCodes::ReshardCollectionInProgress,
+                              str::stream()
+                                  << "Only one resharding operation is allowed to be active at a "
+                                     "time, aborting resharding op for "
+                                  << coordinatorDoc.getSourceNss());
+                }
+
+                throw;
+            }
+
+            // Update the config.collections entry for the original collection to include
+            // 'reshardingFields'
+            updateConfigCollectionsForOriginalNss(
+                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
+        });
+}
+
+ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
+ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
@@ -739,7 +769,7 @@ ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
             initialChunks};
 }
 
-void writeParticipantShardsAndTempCollInfo(
+void ReshardingCoordinatorExternalStateImpl::writeParticipantShardsAndTempCollInfo(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc,
     std::vector<ChunkType> initialChunks,
@@ -763,36 +793,9 @@ void writeParticipantShardsAndTempCollInfo(
         });
 }
 
-void writeDecisionPersistedState(OperationContext* opCtx,
-                                 const ReshardingCoordinatorDocument& coordinatorDoc,
-                                 OID newCollectionEpoch,
-                                 boost::optional<Timestamp> newCollectionTimestamp) {
-    // No need to bump originalNss version because its epoch will be changed.
-    executeMetadataChangesInTxn(opCtx, [&](OperationContext* opCtx, TxnNumber txnNumber) {
-        // Update the config.reshardingOperations entry
-        writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
-
-        // Remove the config.collections entry for the temporary collection
-        writeToConfigCollectionsForTempNss(
-            opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
-
-        // Update the config.collections entry for the original namespace to reflect the new
-        // shard key, new epoch, and new UUID
-        updateConfigCollectionsForOriginalNss(
-            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
-
-        // Remove all chunk and tag documents associated with the original collection, then
-        // update the chunk and tag docs currently associated with the temp nss to be associated
-        // with the original nss
-        removeChunkAndTagsDocsForOriginalNss(
-            opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
-        updateChunkAndTagsDocsForTempNss(
-            opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
-    });
-}
-
-void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
+void ReshardingCoordinatorExternalStateImpl::
+    writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     // Run updates to config.reshardingOperations and config.collections in a transaction
     auto nextState = coordinatorDoc.getState();
 
@@ -823,9 +826,10 @@ void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
         });
 }
 
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc,
-                                             boost::optional<Status> abortReason) {
+void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFields(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<Status> abortReason) {
     // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
@@ -849,12 +853,10 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
-
-}  // namespace resharding
-
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
     BSONObj initialState) {
-    return std::make_shared<ReshardingCoordinator>(this, std::move(initialState));
+    return std::make_shared<ReshardingCoordinator>(
+        this, std::move(initialState), std::make_shared<ReshardingCoordinatorExternalStateImpl>());
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
@@ -883,7 +885,9 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
 }
 
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
-    const ReshardingCoordinatorService* coordinatorService, const BSONObj& state)
+    const ReshardingCoordinatorService* coordinatorService,
+    const BSONObj& state,
+    std::shared_ptr<ReshardingCoordinatorExternalState> externalState)
     : PrimaryOnlyService::TypedInstance<ReshardingCoordinator>(),
       _id(state["_id"].wrap().getOwned()),
       _coordinatorService(coordinatorService),
@@ -895,7 +899,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
           options.minThreads = 1;
           options.maxThreads = 1;
           return options;
-      }())) {
+      }())),
+      _reshardingCoordinatorExternalState(externalState) {
     _reshardingCoordinatorObserver = std::make_shared<ReshardingCoordinatorObserver>();
 }
 
@@ -1151,7 +1156,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorOnl
 
     // The temporary collection and its corresponding entries were never created. Only the
     // coordinator document and reshardingFields require cleanup.
-    resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(), _coordinatorDoc, status);
+    _reshardingCoordinatorExternalState->removeCoordinatorDocAndReshardingFields(
+        opCtx.get(), _coordinatorDoc, status);
     return;
 }
 
@@ -1214,8 +1220,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_insertCoordDocAndChan
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitializing);
-
-    resharding::insertCoordDocAndChangeOrigCollEntry(opCtx.get(), updatedCoordinatorDoc);
+    _reshardingCoordinatorExternalState->insertCoordDocAndChangeOrigCollEntry(
+        opCtx.get(), updatedCoordinatorDoc);
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 
     // TODO SERVER-53914 to accommodate loading metrics for the coordinator.
@@ -1231,8 +1237,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
 
-    auto shardsAndChunks =
-        resharding::calculateParticipantShardsAndChunks(opCtx.get(), updatedCoordinatorDoc);
+    auto shardsAndChunks = _reshardingCoordinatorExternalState->calculateParticipantShardsAndChunks(
+        opCtx.get(), updatedCoordinatorDoc);
 
     updatedCoordinatorDoc.setDonorShards(std::move(shardsAndChunks.donorShards));
     updatedCoordinatorDoc.setRecipientShards(std::move(shardsAndChunks.recipientShards));
@@ -1247,10 +1253,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
     updatedCoordinatorDoc.setZones(boost::none);
 
-    resharding::writeParticipantShardsAndTempCollInfo(opCtx.get(),
-                                                      updatedCoordinatorDoc,
-                                                      std::move(shardsAndChunks.initialChunks),
-                                                      std::move(zones));
+    _reshardingCoordinatorExternalState->writeParticipantShardsAndTempCollInfo(
+        opCtx.get(),
+        updatedCoordinatorDoc,
+        std::move(shardsAndChunks.initialChunks),
+        std::move(zones));
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
 }
 
@@ -1466,8 +1473,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
         .thenRunOn(**executor)
         .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-            resharding::removeCoordinatorDocAndReshardingFields(opCtx.get(),
-                                                                coordinatorDocsChangedOnDisk[1]);
+            _reshardingCoordinatorExternalState->removeCoordinatorDocAndReshardingFields(
+                opCtx.get(), coordinatorDocsChangedOnDisk[1]);
         });
 }
 
@@ -1486,8 +1493,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::
     emplaceAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-    resharding::writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(opCtx.get(),
-                                                                           updatedCoordinatorDoc);
+    _reshardingCoordinatorExternalState->writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+        opCtx.get(), updatedCoordinatorDoc);
 
     // Update in-memory coordinator doc
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);

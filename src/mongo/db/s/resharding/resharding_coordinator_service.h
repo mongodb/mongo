@@ -43,43 +43,68 @@
 
 namespace mongo {
 namespace resharding {
-
-struct ParticipantShardsAndChunks {
-    std::vector<DonorShardEntry> donorShards;
-    std::vector<RecipientShardEntry> recipientShards;
-    std::vector<ChunkType> initialChunks;
-};
-
 CollectionType createTempReshardingCollectionType(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation);
 
-void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc);
-
-ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
-
-void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
-                                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                                           std::vector<ChunkType> initialChunks,
-                                           std::vector<BSONObj> zones);
-
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  boost::optional<Timestamp> newCollectionTimestamp);
 
-void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
-
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc,
-                                             boost::optional<Status> abortReason = boost::none);
-
 }  // namespace resharding
+
+class ReshardingCoordinatorExternalState {
+public:
+    struct ParticipantShardsAndChunks {
+        std::vector<DonorShardEntry> donorShards;
+        std::vector<RecipientShardEntry> recipientShards;
+        std::vector<ChunkType> initialChunks;
+    };
+
+    virtual ~ReshardingCoordinatorExternalState() = default;
+    virtual void insertCoordDocAndChangeOrigCollEntry(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+    virtual ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+
+    virtual void writeParticipantShardsAndTempCollInfo(
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        std::vector<ChunkType> initialChunks,
+        std::vector<BSONObj> zones) = 0;
+
+    virtual void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) = 0;
+
+    virtual void removeCoordinatorDocAndReshardingFields(
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        boost::optional<Status> abortReason = boost::none) = 0;
+};
+
+class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
+public:
+    void insertCoordDocAndChangeOrigCollEntry(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+    ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    void writeParticipantShardsAndTempCollInfo(OperationContext* opCtx,
+                                               const ReshardingCoordinatorDocument& coordinatorDoc,
+                                               std::vector<ChunkType> initialChunks,
+                                               std::vector<BSONObj> zones) override;
+
+    void writeStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+        OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
+
+    void removeCoordinatorDocAndReshardingFields(
+        OperationContext* opCtx,
+        const ReshardingCoordinatorDocument& coordinatorDoc,
+        boost::optional<Status> abortReason = boost::none) override;
+};
 
 /**
  * Construct to encapsulate cancellation tokens and related semantics on the ReshardingCoordinator.
@@ -176,8 +201,10 @@ private:
 class ReshardingCoordinatorService::ReshardingCoordinator final
     : public PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
 public:
-    explicit ReshardingCoordinator(const ReshardingCoordinatorService* coordinatorService,
-                                   const BSONObj& state);
+    explicit ReshardingCoordinator(
+        const ReshardingCoordinatorService* coordinatorService,
+        const BSONObj& state,
+        std::shared_ptr<ReshardingCoordinatorExternalState> externalState);
     ~ReshardingCoordinator();
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -418,6 +445,8 @@ private:
 
     // Provides the means to cancel the commit monitor (e.g., due to receiving the commit command).
     CancellationSource _commitMonitorCancellationSource;
+
+    std::shared_ptr<ReshardingCoordinatorExternalState> _reshardingCoordinatorExternalState;
 };
 
 }  // namespace mongo
