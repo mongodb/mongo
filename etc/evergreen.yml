@@ -10041,23 +10041,20 @@ buildvariants:
 #  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
 #    - rhel80-medium
-  - name: .aggregation !.no_async !.secondary_reads !.read_write_concern !.sharded !.unwind !aggregation_disabled_optimization
+  - name: .aggregation !.no_async !.secondary_reads !.sharded !.unwind !aggregation_disabled_optimization
   - name: .concurrency !.large !.ubsan !.debug_only
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
+  - name: .read_write_concern
   - name: .rollbackfuzzer
   - name: causally_consistent_hedged_reads_jscore_passthrough_gen
   - name: causally_consistent_jscore_passthrough_auth_gen
   - name: causally_consistent_jscore_passthrough_gen
   - name: causally_consistent_read_concern_snapshot_passthrough_gen
-  - name: cwrwc_passthrough
-  - name: cwrwc_rc_majority_passthrough_gen
-  - name: cwrwc_wc_majority_passthrough
   - name: initial_sync_fuzzer_gen
   - name: multi_shard_multi_stmt_txn_jscore_passthrough_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: read_concern_linearizable_passthrough
   - name: replica_sets
   - name: replica_sets_auth_gen
   - name: replica_sets_ese_gcm_gen
