@@ -247,7 +247,7 @@ checkLog = (function() {
             return Array.isArray(value) ? "[]" : "{}";
         }
         let serialized = [];
-        escapeStrings = toDecimal = true;
+        escapeStrings = true;
         for (let fieldName in value) {
             const valueStr = formatAsJsonLogLine(value[fieldName], escapeStrings, toDecimal);
             serialized.push(Array.isArray(value) ? valueStr : `"${fieldName}":${valueStr}`);

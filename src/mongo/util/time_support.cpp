@@ -175,9 +175,7 @@ DateStringBuffer& DateStringBuffer::iso8601(Date_t date, bool local) {
     }
 
     {
-        static const auto& fmt_str_millis = *new auto(fmt::compile<int32_t>(".{:03}"));
-        auto res = fmt::format_to_n(
-            cur, end - cur, fmt_str_millis, static_cast<int32_t>(date.asInt64() % 1000));
+        auto res = fmt::format_to_n(cur, end - cur, FMT_COMPILE(".{:03}"), date.asInt64() % 1000);
         cur = res.out;
         dassert(cur < end && res.size > 0);
     }
@@ -201,10 +199,9 @@ DateStringBuffer& DateStringBuffer::iso8601(Date_t date, bool local) {
         const long tzOffsetMinutesPart = (tzOffsetSeconds / 60) % 60;
 
         // "+hh:mm"
-        static const auto& fmtStrTime = *new auto(fmt::compile<char, long, long>("{}{:02}:{:02}"));
         cur = fmt::format_to_n(cur,
                                localTzSubstrLen + 1,
-                               fmtStrTime,
+                               FMT_COMPILE("{}{:02}:{:02}"),
                                tzIsWestOfUTC ? '-' : '+',
                                tzOffsetHoursPart,
                                tzOffsetMinutesPart)

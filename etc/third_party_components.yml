@@ -111,7 +111,6 @@ components:
     release_monitoring_id: 11526
     local_directory_path: src/third_party/fmt
     team_owner: "Security"
-    upgrade_suppression: TODO SERVER-45445
 
   google/s2geometry:
     homepage_url: https://github.com/google/s2geometry

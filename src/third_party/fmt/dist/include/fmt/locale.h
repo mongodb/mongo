@@ -9,67 +9,54 @@
 #define FMT_LOCALE_H_
 
 #include <locale>
+
 #include "format.h"
 
 FMT_BEGIN_NAMESPACE
 
-namespace internal {
+namespace detail {
 template <typename Char>
-typename buffer_context<Char>::iterator vformat_to(
-    const std::locale& loc, buffer<Char>& buf,
-    basic_string_view<Char> format_str,
-    basic_format_args<buffer_context<Char>> args) {
-  using range = buffer_range<Char>;
-  return vformat_to<arg_formatter<range>>(buf, to_string_view(format_str), args,
-                                          internal::locale_ref(loc));
-}
-
-template <typename Char>
-std::basic_string<Char> vformat(const std::locale& loc,
-                                basic_string_view<Char> format_str,
-                                basic_format_args<buffer_context<Char>> args) {
+std::basic_string<Char> vformat(
+    const std::locale& loc, basic_string_view<Char> format_str,
+    basic_format_args<buffer_context<type_identity_t<Char>>> args) {
   basic_memory_buffer<Char> buffer;
-  internal::vformat_to(loc, buffer, format_str, args);
+  detail::vformat_to(buffer, format_str, args, detail::locale_ref(loc));
   return fmt::to_string(buffer);
 }
-}  // namespace internal
+}  // namespace detail
 
 template <typename S, typename Char = char_t<S>>
 inline std::basic_string<Char> vformat(
     const std::locale& loc, const S& format_str,
-    basic_format_args<buffer_context<Char>> args) {
-  return internal::vformat(loc, to_string_view(format_str), args);
+    basic_format_args<buffer_context<type_identity_t<Char>>> args) {
+  return detail::vformat(loc, to_string_view(format_str), args);
 }
 
 template <typename S, typename... Args, typename Char = char_t<S>>
 inline std::basic_string<Char> format(const std::locale& loc,
                                       const S& format_str, Args&&... args) {
-  return internal::vformat(
-      loc, to_string_view(format_str),
-      {internal::make_args_checked<Args...>(format_str, args...)});
+  return detail::vformat(loc, to_string_view(format_str),
+                         fmt::make_args_checked<Args...>(format_str, args...));
 }
 
 template <typename S, typename OutputIt, typename... Args,
-          typename Char = enable_if_t<
-              internal::is_output_iterator<OutputIt>::value, char_t<S>>>
-inline OutputIt vformat_to(OutputIt out, const std::locale& loc,
-                           const S& format_str,
-                           format_args_t<OutputIt, Char> args) {
-  using range = internal::output_range<OutputIt, Char>;
-  return vformat_to<arg_formatter<range>>(
-      range(out), to_string_view(format_str), args, internal::locale_ref(loc));
+          typename Char = char_t<S>,
+          FMT_ENABLE_IF(detail::is_output_iterator<OutputIt, Char>::value)>
+inline OutputIt vformat_to(
+    OutputIt out, const std::locale& loc, const S& format_str,
+    basic_format_args<buffer_context<type_identity_t<Char>>> args) {
+  decltype(detail::get_buffer<Char>(out)) buf(detail::get_buffer_init(out));
+  vformat_to(buf, to_string_view(format_str), args, detail::locale_ref(loc));
+  return detail::get_iterator(buf);
 }
 
 template <typename OutputIt, typename S, typename... Args,
-          FMT_ENABLE_IF(internal::is_output_iterator<OutputIt>::value&&
-                            internal::is_string<S>::value)>
-inline OutputIt format_to(OutputIt out, const std::locale& loc,
-                          const S& format_str, Args&&... args) {
-  internal::check_format_string<Args...>(format_str);
-  using context = format_context_t<OutputIt, char_t<S>>;
-  format_arg_store<context, Args...> as{args...};
-  return vformat_to(out, loc, to_string_view(format_str),
-                    basic_format_args<context>(as));
+          bool enable = detail::is_output_iterator<OutputIt, char_t<S>>::value>
+inline auto format_to(OutputIt out, const std::locale& loc,
+                      const S& format_str, Args&&... args) ->
+    typename std::enable_if<enable, OutputIt>::type {
+  const auto& vargs = fmt::make_args_checked<Args...>(format_str, args...);
+  return vformat_to(out, loc, to_string_view(format_str), vargs);
 }
 
 FMT_END_NAMESPACE

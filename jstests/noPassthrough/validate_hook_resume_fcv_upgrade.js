@@ -45,7 +45,7 @@ function makePatternForSetFCV(targetVersion) {
 function makePatternForSetParameter(paramName) {
     if (isJsonLogNoConn()) {
         return new RegExp(
-            `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1\\.0,"${paramName}":`,
+            `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1,"${paramName}":`,
             "g");
     }
     return new RegExp("COMMAND.*command.*appName: \"MongoDB Shell\" command: setParameter" +

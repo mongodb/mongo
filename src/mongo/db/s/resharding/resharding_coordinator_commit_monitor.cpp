@@ -147,7 +147,7 @@ Milliseconds CoordinatorCommitMonitor::_queryMaxRemainingOperationTimeForRecipie
 
         auto response = ars.next();
         const auto errorContext =
-            "Failed command: {} on {}"_format(cmdObj.toString(), response.shardId);
+            "Failed command: {} on {}"_format(cmdObj.toString(), response.shardId.toString());
 
         const auto shardResponse =
             uassertStatusOKWithContext(std::move(response.swResponse), errorContext);

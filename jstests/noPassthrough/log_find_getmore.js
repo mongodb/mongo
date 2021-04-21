@@ -66,7 +66,7 @@ let logLine =
     ' { a: 1.0 }, hint: { a: 1.0 }';
 if (isJsonLog(conn)) {
     logLine =
-        '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1.0,"batchSize":5.0,"limit":10.0,"singleBatch":false,"sort":{"a":1.0},"hint":{"a":1.0}';
+        '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}';
 }
 
 // Check the logs to verify that find appears as above.
@@ -99,8 +99,8 @@ logLine = [
 if (isJsonLog(conn)) {
     logLine = [
         `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
-            cursorIdToString(cursorid)},"collection":"test","batchSize":5.0,`,
-        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1.0,"batchSize":5.0,"limit":10.0,"singleBatch":false,"sort":{"a":1.0},"hint":{"a":1.0}'
+            cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
+        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}'
     ];
 }
 
@@ -123,7 +123,7 @@ if (isJsonLog(conn)) {
     logLine = [
         `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
             cursorIdToString(cursorid)},"collection":"test"`,
-        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0.0}}}],"cursor":{"batchSize":0.0},"hint":{"a":1.0}'
+        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
     ];
 }
 
@@ -146,7 +146,7 @@ logLine = 'query log_getmore.test appName: "MongoDB Shell" command: { find: "tes
 
 if (isJsonLog(conn)) {
     logLine =
-        '"msg":"Slow query","attr":{"type":"query","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1,"ntoreturn":5,"sort":{"a":1.0},"hint":{"a":1.0}}';
+        '"msg":"Slow query","attr":{"type":"query","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"ntoreturn":5,"sort":{"a":1},"hint":{"a":1}}';
 }
 
 assertLogLineContains(conn, logLine);
@@ -179,7 +179,7 @@ logLine = 'getmore log_getmore.test appName: "MongoDB Shell" command: { getMore:
     ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 }';
 
 if (isJsonLog(conn)) {
-    logLine = `"msg":"Slow query","attr":{"type":"getmore","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5},"originatingCommand":{"find":"test","filter":{"a":{"$gt":0.0}},"skip":1,"ntoreturn":5,"sort":{"a":1.0},"hint":{"a":1.0}}`;
+    logLine = `"msg":"Slow query","attr":{"type":"getmore","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${cursorIdToString(cursorid)},"collection":"test","batchSize":5},"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"ntoreturn":5,"sort":{"a":1},"hint":{"a":1}}`;
 }
 
 assertLogLineContains(conn, logLine);
@@ -203,7 +203,7 @@ if (isJsonLog(conn)) {
     logLine = [
         `"msg":"Slow query","attr":{"type":"getmore","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
             cursorIdToString(cursorid)},"collection":"test","batchSize":0}`,
-        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0.0}}}],"cursor":{"batchSize":0.0},"hint":{"a":1.0}'
+        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
     ];
 }
 

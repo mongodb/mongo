@@ -59,16 +59,25 @@ function assertMatchingLogLineExists(fields) {
             const fieldValue = fields[fieldName];
             let regex;
             if (isJsonLogNoConn()) {
-                regex = "\"" + escapeRegex(fieldName) + "\":? ?(" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue)) + "|" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true)) + ")";
+                const regexDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, true)) + "|" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, true)) + ")";
+
+                const regexNoDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, false)) + "|" +
+                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, false)) + ")";
+
+                const matchDecimal = line.match(regexDecimal);
+                const matchNoDecimal = line.match(regexNoDecimal);
+                return (matchDecimal && matchDecimal[0]) || (matchNoDecimal && matchNoDecimal[0]);
             } else {
-                regex = escapeRegex(fieldName) + ":? ?(" +
+                const regex = escapeRegex(fieldName) + ":? ?(" +
                     escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
                     escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
+
+                const match = line.match(regex);
+                return match && match[0];
             }
-            const match = line.match(regex);
-            return match && match[0];
         });
     }
 
