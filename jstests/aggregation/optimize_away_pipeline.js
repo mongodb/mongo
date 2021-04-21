@@ -13,7 +13,6 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";
@@ -469,7 +468,15 @@ assertPipelineUsesAggregation({
 explain = coll.explain().aggregate(pipeline);
 let projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
-assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+
+function assertTransformByShape(expected, actual, message) {
+    assert.eq(Object.keys(expected).sort(), Object.keys(actual).sort(), message);
+    for (let key in expected) {
+        assert.eq(expected[key], actual[key]);
+    }
+}
+
+assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
 // Similar as above, but with $addFields stage at the front of the pipeline.
 pipeline = [{$addFields: {z: "abc"}}, {$group: {_id: "$a", b: {$sum: "$b"}}}];
@@ -480,7 +487,7 @@ assertPipelineUsesAggregation({
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
-assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.
@@ -492,7 +499,7 @@ assertPipelineUsesAggregation({
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
-assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
 // Similar as above, but with a field 'a' presented both in the finite dependency set, and in the
 // exclusion projection at the front of the pipeline.
@@ -504,7 +511,7 @@ assertPipelineUsesAggregation({
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
-assert.eq({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
 
 // Test that an exclusion projection at the front of the pipeline is not pushed down, if there no
 // finite dependency set.

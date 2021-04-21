@@ -959,8 +959,6 @@ std::unique_ptr<sbe::EExpression> generateArrayCheckForSort(
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSort(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
-    invariant(!reqs.getIndexKeyBitset());
-
     const auto sn = static_cast<const SortNode*>(root);
     auto sortPattern = SortPattern{sn->pattern, _cq.getExpCtx()};
 
@@ -968,15 +966,37 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             "QueryPlannerAnalysis should not produce a SortNode with an empty sort pattern",
             sortPattern.size() > 0);
 
-    // The child must produce all of the slots required by the parent of this SortNode. In addition
-    // to that, the child must always produce a 'resultSlot' because it's needed by the sort logic
-    // below.
-    auto childReqs = reqs.copy().set(kResult);
-    auto [inputStage, outputs] = build(sn->children[0], childReqs);
+    // The child must produce all of the slots required by the parent of this SortNode.
+    auto childReqs = reqs.copy();
+    auto child = sn->children[0];
+
+    const auto isCoveredQuery = reqs.getIndexKeyBitset().has_value();
+    BSONObj indexKeyPattern;
+    sbe::IndexKeysInclusionSet sortPatternKeyBitSet;
+    if (isCoveredQuery) {
+        // If query is covered, we need to request index key for each part of the sort pattern.
+        auto indexScan = static_cast<const IndexScanNode*>(getNodeByType(child, STAGE_IXSCAN));
+        tassert(5601701, "Expected index scan below sort for covered query", indexScan);
+        indexKeyPattern = indexScan->index.keyPattern;
+
+        StringDataSet sortPaths;
+        for (const auto& part : sortPattern) {
+            sortPaths.insert(part.fieldPath->fullPath());
+        }
+
+        std::vector<std::string> foundPaths;
+        std::tie(sortPatternKeyBitSet, foundPaths) =
+            makeIndexKeyInclusionSet(indexKeyPattern, sortPaths);
+        *childReqs.getIndexKeyBitset() |= sortPatternKeyBitSet;
+    } else {
+        // If query is not covered, child is required to produce whole document for sorting.
+        childReqs.set(kResult);
+    }
+
+    auto [inputStage, outputs] = build(child, childReqs);
 
     auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
 
-    sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
     StringDataSet prefixSet;
     bool hasPartsWithCommonPrefix = false;
@@ -996,7 +1016,42 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                              : sbe::value::SortDirection::Descending);
     }
 
-    if (!hasPartsWithCommonPrefix) {
+    sbe::value::SlotVector orderBy;
+    orderBy.reserve(sortPattern.size());
+
+    // Slots for sort stage to forward to parent stage. Values in these slots are not used during
+    // sorting.
+    auto forwardedSlots = sbe::makeSV();
+
+    // We do not support covered queries on array fields for multikey indexes. This means that if
+    // the query is covered, index keys cannot contain arrays. Since traversal logic and
+    // 'generateSortKey' call below is needed only for arrays, we can omit it for covered queries.
+    if (isCoveredQuery) {
+        auto indexKeySlots = *outputs.extractIndexKeySlots();
+
+        // Currently, 'indexKeySlots' contains slots for two kinds of index keys:
+        //  1. Keys requested for sort pattern
+        //  2. Keys requested by parent
+        // We need to filter first category of slots into 'orderBy' vector, since sort stage will
+        // use them for sorting. Second category of slots goes into 'outputs' to be used by parent.
+        auto& parentIndexKeyBitset = *reqs.getIndexKeyBitset();
+        auto& childIndexKeyBitset = *childReqs.getIndexKeyBitset();
+
+        orderBy = makeIndexKeyOutputSlotsMatchingParentReqs(
+            indexKeyPattern, sortPatternKeyBitSet, childIndexKeyBitset, indexKeySlots);
+
+        auto indexKeySlotsForParent = makeIndexKeyOutputSlotsMatchingParentReqs(
+            indexKeyPattern, parentIndexKeyBitset, childIndexKeyBitset, indexKeySlots);
+        outputs.setIndexKeySlots(std::move(indexKeySlotsForParent));
+
+        // In forwarded slots we need to include all slots requested by parent excluding slots from
+        // 'orderBy' vector.
+        auto forwardedIndexKeyBitset = parentIndexKeyBitset & (~sortPatternKeyBitSet);
+        forwardedSlots = makeIndexKeyOutputSlotsMatchingParentReqs(indexKeyPattern,
+                                                                   forwardedIndexKeyBitset,
+                                                                   childIndexKeyBitset,
+                                                                   std::move(indexKeySlots));
+    } else if (!hasPartsWithCommonPrefix) {
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
 
         for (const auto& part : sortPattern) {
@@ -1114,14 +1169,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                         makeVariable(outputs.get(kResult))));
     }
 
-    auto values = sbe::makeSV();
-    outputs.forEachSlot(childReqs, [&](auto&& slot) { values.push_back(slot); });
+    outputs.forEachSlot(childReqs, [&](auto&& slot) { forwardedSlots.push_back(slot); });
 
     inputStage =
         sbe::makeS<sbe::SortStage>(std::move(inputStage),
                                    std::move(orderBy),
                                    std::move(direction),
-                                   std::move(values),
+                                   std::move(forwardedSlots),
                                    sn->limit ? sn->limit : std::numeric_limits<std::size_t>::max(),
                                    sn->maxMemoryUsageBytes,
                                    _cq.getExpCtx()->allowDiskUse,
