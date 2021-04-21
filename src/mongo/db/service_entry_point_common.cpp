@@ -218,8 +218,8 @@ struct HandleRequest {
 
     std::unique_ptr<OpRunner> makeOpRunner();
 
-    Future<void> startOperation();
-    Future<void> completeOperation();
+    void startOperation();
+    void completeOperation(DbResponse&);
 
     std::shared_ptr<ExecutionContext> executionContext;
 };
@@ -2300,7 +2300,7 @@ DbResponse FireAndForgetOpRunner::runSync() {
     return {};
 }
 
-Future<void> HandleRequest::startOperation() try {
+void HandleRequest::startOperation() {
     auto opCtx = executionContext->getOpCtx();
     auto& client = executionContext->client();
     auto& currentOp = executionContext->currentOp();
@@ -2324,23 +2324,19 @@ Future<void> HandleRequest::startOperation() try {
         currentOp.setNetworkOp_inlock(executionContext->op());
         currentOp.setLogicalOp_inlock(networkOpToLogicalOp(executionContext->op()));
     }
-    return {};
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
-Future<void> HandleRequest::completeOperation() try {
+void HandleRequest::completeOperation(DbResponse& response) {
     auto opCtx = executionContext->getOpCtx();
     auto& currentOp = executionContext->currentOp();
 
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.
-    const bool shouldProfile =
-        currentOp.completeAndLogOperation(opCtx,
-                                          MONGO_LOGV2_DEFAULT_COMPONENT,
-                                          executionContext->getResponse().response.size(),
-                                          executionContext->slowMsOverride,
-                                          executionContext->forceLog);
+    const bool shouldProfile = currentOp.completeAndLogOperation(opCtx,
+                                                                 MONGO_LOGV2_DEFAULT_COMPONENT,
+                                                                 response.response.size(),
+                                                                 executionContext->slowMsOverride,
+                                                                 executionContext->forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(
@@ -2367,9 +2363,6 @@ Future<void> HandleRequest::completeOperation() try {
     }
 
     recordCurOpMetrics(opCtx);
-    return {};
-} catch (const DBException& ex) {
-    return ex.toStatus();
 }
 
 }  // namespace
@@ -2383,48 +2376,42 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
     return bob.obj();
 }
 
+void onHandleRequestException(const Status& status) {
+    LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
+}
+
 Future<DbResponse> ServiceEntryPointCommon::handleRequest(
     OperationContext* opCtx,
     const Message& m,
     std::unique_ptr<const Hooks> behaviors) noexcept try {
-    auto hr = std::make_shared<HandleRequest>(opCtx, m, std::move(behaviors));
+    HandleRequest hr(opCtx, m, std::move(behaviors));
+    hr.startOperation();
 
-    return hr->startOperation()
-        .then([hr]() -> Future<void> {
-            auto opRunner = hr->makeOpRunner();
-            invariant(opRunner);
-            return opRunner->run().then(
-                [execContext = hr->executionContext](DbResponse response) -> void {
-                    // Set the response upon successful execution
-                    execContext->setResponse(std::move(response));
+    auto opRunner = hr.makeOpRunner();
+    invariant(opRunner);
 
-                    auto opCtx = execContext->getOpCtx();
+    return opRunner->run()
+        .then([hr = std::move(hr)](DbResponse response) mutable {
+            hr.completeOperation(response);
 
-                    auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient());
-                    if (!seCtx) {
-                        // We were run by a background worker.
-                        return;
-                    }
-
-                    if (auto invocation = CommandInvocation::get(opCtx);
-                        invocation && !invocation->isSafeForBorrowedThreads()) {
-                        // If the last command wasn't safe for a borrowed thread, then let's move
-                        // off of it.
-                        seCtx->setThreadingModel(
-                            transport::ServiceExecutor::ThreadingModel::kDedicated);
-                    }
-                });
-        })
-        .then([hr] { return hr->completeOperation(); })
-        .onCompletion([hr](Status status) -> Future<DbResponse> {
-            if (!status.isOK()) {
-                LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
-                return status;
+            auto opCtx = hr.executionContext->getOpCtx();
+            if (auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient())) {
+                if (auto invocation = CommandInvocation::get(opCtx);
+                    invocation && !invocation->isSafeForBorrowedThreads()) {
+                    // If the last command wasn't safe for a borrowed thread, then let's move
+                    // off of it.
+                    seCtx->setThreadingModel(
+                        transport::ServiceExecutor::ThreadingModel::kDedicated);
+                }
             }
-            return hr->executionContext->getResponse();
-        });
+
+            return response;
+        })
+        .tapError([](Status status) { onHandleRequestException(status); });
 } catch (const DBException& ex) {
-    return ex.toStatus();
+    auto status = ex.toStatus();
+    onHandleRequestException(status);
+    return status;
 }
 
 ServiceEntryPointCommon::Hooks::~Hooks() = default;
