@@ -293,7 +293,7 @@ private:
 
     private:
         BSONObj _metadata;
-        const StringData::ComparatorInterface* _comparator;
+        const StringData::ComparatorInterface* _comparator = nullptr;
 
         // This stores the _metadata object with all fields sorted to allow for binary comparisons.
         BSONObj _sorted;
