@@ -3,7 +3,7 @@
 
 /*-----------------------------------------------------------------------------------------------------------
 SafeInt.hpp
-Version 3.0.23p
+Version 3.0.26p
 
 This header implements an integer handling class designed to catch
 unsafe integer operations
@@ -127,11 +127,23 @@ Please read the leading comments before using the class.
 #error "Unexpected value of CPLUSPLUS_STD"
 #endif
 
+// Determine whether exceptions are enabled by the compiler
+// Also, allow the user to force this, in case the compiler
+// doesn't support the __cpp_exceptions feature
+#if !defined SAFE_INT_HAS_EXCEPTIONS
+    #if __cpp_exceptions >= 199711L
+        #define SAFE_INT_HAS_EXCEPTIONS 1
+    #else
+        #define SAFE_INT_HAS_EXCEPTIONS 0
+    #endif
+#endif
+
 // Enable compiling with /Wall under VC
 #if SAFEINT_COMPILER == VISUAL_STUDIO_COMPILER
 // Off by default - unreferenced inline function has been removed
 // Note - this intentionally leaks from the header, doesn't quench the warnings otherwise
-#pragma warning( disable: 4514 )
+// Also disable Spectre mitigation warning
+#pragma warning( disable: 4514 5045 )
 
 #pragma warning( push )
 // Disable warnings coming from headers
@@ -167,15 +179,51 @@ Please read the leading comments before using the class.
 #include <cstddef>
 #include <cmath> // Needed for floating point implementation
 
+// Figure out if we should use intrinsics
+// If the user has already decided, let that override
 // Note - intrinsics and constexpr are mutually exclusive
 // If it is important to get constexpr for multiplication, then define SAFEINT_USE_INTRINSICS 0
 // However, intrinsics will result in much smaller code, and should have better perf
-#if SAFEINT_COMPILER == VISUAL_STUDIO_COMPILER && defined _M_AMD64 && !defined SAFEINT_USE_INTRINSICS
-    #include <intrin.h>
-    #define SAFEINT_USE_INTRINSICS 1
+
+// We might have 128-bit int support, check for that, as it should work best
+#if !defined SAFEINT_HAS_INT128
+
+#if defined __SIZEOF_INT128__ && __SIZEOF_INT128__ == 16
+#define SAFEINT_HAS_INT128 1
+#else
+#define SAFEINT_HAS_INT128 0
+#endif
+
+#endif
+
+#if SAFEINT_HAS_INT128
+#define SAFEINT_USE_INTRINSICS 0
+#endif
+
+#if !defined SAFEINT_USE_INTRINSICS
+// If it is the Visual Studio compiler, then it has to be 64-bit, and not ARM64EC
+#if SAFEINT_COMPILER == VISUAL_STUDIO_COMPILER
+    #if defined _M_AMD64 && !defined _M_ARM64EC
+        #include <intrin.h>
+        #define SAFEINT_USE_INTRINSICS 1
+    #else
+        #define SAFEINT_USE_INTRINSICS 0
+    #endif
+#else
+    // Else for gcc and clang, we can use builtin functions
+    #if SAFEINT_COMPILER == CLANG_COMPILER || SAFEINT_COMPILER == GCC_COMPILER
+        #define SAFEINT_USE_INTRINSICS 1
+    #else
+        #define SAFEINT_USE_INTRINSICS 0
+    #endif
+#endif
+
+#endif
+
+// The gcc and clang builtin functions are constexpr, but not the Microsoft intrinsics
+#if SAFEINT_USE_INTRINSICS && SAFEINT_COMPILER == VISUAL_STUDIO_COMPILER
     #define _CONSTEXPR14_MULTIPLY 
 #else
-    #define SAFEINT_USE_INTRINSICS 0
     #define _CONSTEXPR14_MULTIPLY _CONSTEXPR14
 #endif
 
@@ -209,16 +257,35 @@ SafeInt supports several compile-time options that can change the behavior of th
 Compiler options:
 SAFEINT_ASSERT_ON_EXCEPTION        - it is often easier to stop on an assert and figure out a problem than to try and figure out
                                      how you landed in the catch block.
+
 SafeIntDefaultExceptionHandler     - if you'd like to replace the exception handlers SafeInt provides, define your replacement and
-                                     define this. Note - two built in (Windows-specific) options exist:
-                                     - SAFEINT_FAILFAST - bypasses all exception handlers, exits the app with an exception
-                                     - SAFEINT_RAISE_EXCEPTION - throws Win32 exceptions, which can be caught
+                                     define this. There are three current options:
+
+                                     SAFEINT_RAISE_EXCEPTION - Windows specific, throws a structured exception. This is legacy.
+                                     SAFEINT_FAILFAST        - On Windows, calls __failfast, else calls abort()
+                                     Default                 - Uses the SafeIntExceptionHandler class, throws a SafeIntException.
+
+                                     If you do replace the exception handler, then make sure you define:
+                                     
+                                     SafeIntOnOverflow
+                                     SafeIntOnDivZero
+
 SAFEINT_DISALLOW_UNSIGNED_NEGATION - Invoking the unary negation operator may create warnings, but if you'd like it to completely fail
                                      to compile, define this.
+
 SAFEINT_DISABLE_BINARY_ASSERT      - binary AND, OR or XOR operations on mixed size types can produce unexpected results. If you do
                                      this, the default is to assert. Set this if you prefer not to assert under these conditions.
+
 SIZE_T_CAST_NEEDED                 - some compilers complain if there is not a cast to size_t, others complain if there is one.
-                                     This lets you not have your compiler complain.
+                                     This lets you not have your compiler complain. Default is not to have an overload, and it 
+                                     appears that no recent compilers need this.
+
+SAFEINT_DISABLE_ADDRESS_OPERATOR   - Disables the overload of the & operator, which results in a raw pointer to the underlying type. This has
+                                     been a debated feature for the entire life of the project - the benefit is that it makes it easier to just
+                                     change a declaration from uint32_t to SafeInt<uint32_t>, and the downstream code is less likely to need
+                                     modification, which is especially handy in legacy code bases. The drawback is that it breaks good C++
+                                     practice, and breaks some libraries that auto-generate code. In the future, I expect to make disabling this the 
+                                     default.
 
 ************************************************************************************************************************************/
 
@@ -578,7 +645,7 @@ namespace utilities
 // Currently implemented code values:
 // ERROR_ARITHMETIC_OVERFLOW
 // EXCEPTION_INT_DIVIDE_BY_ZERO
-enum SafeIntError
+enum class SafeIntError
 {
     SafeIntNoError = 0,
     SafeIntArithmeticOverflow,
@@ -679,7 +746,7 @@ namespace utilities
 class SAFEINT_VISIBLE SafeIntException
 {
 public:
-    _CONSTEXPR11 SafeIntException( SafeIntError code = SafeIntNoError) SAFEINT_NOTHROW  : m_code(code)
+    _CONSTEXPR11 SafeIntException( SafeIntError code = SafeIntError::SafeIntNoError) SAFEINT_NOTHROW  : m_code(code)
     {
     }
     SafeIntError m_code;
@@ -694,6 +761,13 @@ namespace SafeIntInternal
     //                                       exits the app with a crash
     template < typename E > class SafeIntExceptionHandler;
 
+#if SAFE_INT_HAS_EXCEPTIONS
+
+    // Some users may have applications that do not use C++ exceptions
+    // and cannot compile the following class. If that is the case,
+    // either SafeInt_InvalidParameter must be defined as the default,
+    // or a custom, user-supplied exception handler must be provided.
+
     template <> class SafeIntExceptionHandler < SafeIntException >
     {
     public:
@@ -701,15 +775,17 @@ namespace SafeIntInternal
         static SAFEINT_NORETURN void SAFEINT_STDCALL SafeIntOnOverflow()
         {
             SafeIntExceptionAssert();
-            throw SafeIntException( SafeIntArithmeticOverflow );
+            throw SafeIntException( SafeIntError::SafeIntArithmeticOverflow );
         }
 
         static SAFEINT_NORETURN void SAFEINT_STDCALL SafeIntOnDivZero()
         {
             SafeIntExceptionAssert();
-            throw SafeIntException( SafeIntDivideByZero );
+            throw SafeIntException( SafeIntError::SafeIntDivideByZero );
         }
     };
+
+#endif
 
    class SafeInt_InvalidParameter
    {
@@ -750,7 +826,10 @@ namespace SafeIntInternal
 } // namespace SafeIntInternal
 
 // both of these have cross-platform support
+#if SAFE_INT_HAS_EXCEPTIONS
 typedef SafeIntInternal::SafeIntExceptionHandler < SafeIntException > CPlusPlusExceptionHandler;
+#endif
+
 typedef SafeIntInternal::SafeInt_InvalidParameter InvalidParameterExceptionHandler;
 
 // This exception handler is no longer recommended, but is left here in order not to break existing users
@@ -779,7 +858,12 @@ typedef SafeIntInternal::SafeIntWin32ExceptionHandler Win32ExceptionHandler;
     #elif defined SAFEINT_FAILFAST
         #define SafeIntDefaultExceptionHandler InvalidParameterExceptionHandler
     #else
-        #define SafeIntDefaultExceptionHandler CPlusPlusExceptionHandler
+        #if SAFE_INT_HAS_EXCEPTIONS
+            #define SafeIntDefaultExceptionHandler CPlusPlusExceptionHandler
+        #else
+            #define SafeIntDefaultExceptionHandler InvalidParameterExceptionHandler
+        #endif
+
         #if !defined SAFEINT_EXCEPTION_HANDLER_CPP
         #define SAFEINT_EXCEPTION_HANDLER_CPP 1
         #endif
@@ -1051,7 +1135,7 @@ public:
         return (T)SignedNegation<std::int64_t>::Value(t);
     }
 
-    _CONSTEXPR14 static bool Negative(T t, T& /*out*/)
+    _CONSTEXPR14 static bool Negative(T , T& /*out*/)
     {
         // This will only be used by the SafeNegation function
         return false;
@@ -1572,17 +1656,17 @@ public:
     _CONSTEXPR14 static SafeIntError Modulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if(u == 0)
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         //trap corner case
         if(mod_corner_case<U, std::numeric_limits< U >::is_signed >::is_undefined(u))
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         result = (T)(t % u);
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -1608,17 +1692,17 @@ public:
     _CONSTEXPR14 static SafeIntError Modulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if(u == 0)
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         //trap corner case
         if (mod_corner_case<U, std::numeric_limits< U >::is_signed >::is_undefined(u))
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         result = (T)(t % u);
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -1644,17 +1728,17 @@ public:
     _CONSTEXPR14 static SafeIntError Modulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if(u == 0)
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         //trap corner case
         if (mod_corner_case<U, std::numeric_limits< U >::is_signed >::is_undefined(u))
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         result = (T)((std::int64_t)t % (std::int64_t)u);
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -1680,7 +1764,7 @@ public:
     _CONSTEXPR14 static SafeIntError Modulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if(u == 0)
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         // u could be negative - if so, need to convert to positive
         // casts below are always safe due to the way modulus works
@@ -1689,7 +1773,7 @@ public:
         else
             result = (T)(t % u);
 
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -1713,7 +1797,7 @@ public:
     _CONSTEXPR14 static SafeIntError Modulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if(u == 0)
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         //t could be negative - if so, need to convert to positive
         if(t < 0)
@@ -1721,7 +1805,7 @@ public:
         else
             result = (T)((T)t % u);
 
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -1913,9 +1997,54 @@ public:
 // U = right arg
 template < typename T, typename U > class LargeIntRegMultiply;
 
+#if SAFEINT_HAS_INT128
+
+_CONSTEXPR14 inline bool MultiplyUint64(std::uint64_t a, std::uint64_t b, std::uint64_t* pRet) SAFEINT_NOTHROW
+{
+    unsigned __int128 tmp = (unsigned __int128)a * (unsigned __int128)b;
+
+    if ((tmp >> 64) == 0)
+    {
+        *pRet = (std::uint64_t)tmp;
+        return true;
+    }
+
+    return false;
+}
+
+_CONSTEXPR14 inline bool MultiplyInt64(std::int64_t a, std::int64_t b, std::int64_t* pRet) SAFEINT_NOTHROW
+{
+    __int128 tmp = (__int128)a * (__int128)b;
+    *pRet = (std::int64_t)tmp;
+    std::int64_t tmp_high = (std::int64_t)((unsigned __int128)tmp >> 64);
+
+    // If only one input is negative, result must be negative, or zero
+    if( (a ^ b) < 0 )
+    {
+        if( (tmp_high == -1 && *pRet < 0) ||
+            (tmp_high == 0 && *pRet == 0))
+        {
+            return true;            
+        } 
+    }
+    else
+    {
+        if (tmp_high == 0)
+        {
+            return (std::uint64_t)*pRet <= (std::uint64_t)std::numeric_limits<std::int64_t>::max();
+        }
+    }
+
+    return false;
+}
+
+#endif
+
 #if SAFEINT_USE_INTRINSICS
+
+#if SAFEINT_COMPILER == VISUAL_STUDIO_COMPILER
 // As usual, unsigned is easy
-inline bool IntrinsicMultiplyUint64( const std::uint64_t& a, const std::uint64_t& b, std::uint64_t* pRet ) SAFEINT_NOTHROW
+inline bool MultiplyUint64( std::uint64_t a, std::uint64_t b, std::uint64_t* pRet ) SAFEINT_NOTHROW
 {
     std::uint64_t ulHigh = 0;
     *pRet = _umul128(a , b, &ulHigh);
@@ -1923,7 +2052,7 @@ inline bool IntrinsicMultiplyUint64( const std::uint64_t& a, const std::uint64_t
 }
 
 // Signed, is not so easy
-inline bool IntrinsicMultiplyInt64( const std::int64_t& a, const std::int64_t& b, std::int64_t* pRet ) SAFEINT_NOTHROW
+inline bool MultiplyInt64( std::int64_t a, std::int64_t b, std::int64_t* pRet ) SAFEINT_NOTHROW
 {
     std::int64_t llHigh = 0;
     *pRet = _mul128(a , b, &llHigh);
@@ -1951,6 +2080,22 @@ inline bool IntrinsicMultiplyInt64( const std::int64_t& a, const std::int64_t& b
     }
     return false;
 }
+#elif SAFEINT_COMPILER == GCC_COMPILER || SAFEINT_COMPILER == CLANG_COMPILER
+
+_CONSTEXPR14 inline bool MultiplyUint64(std::uint64_t a, std::uint64_t b, std::uint64_t* pRet) SAFEINT_NOTHROW
+{
+    return !__builtin_umulll_overflow(a, b, (unsigned long long*)pRet);
+}
+
+_CONSTEXPR14 inline bool MultiplyInt64(std::int64_t a, std::int64_t b, std::int64_t* pRet) SAFEINT_NOTHROW
+{
+    return !__builtin_smulll_overflow(a, b, (long long*)pRet);
+}
+
+#else
+// If you are aware of intrinsics for some other platform, please file an issue
+# error Intrinsics enabled, no available intrinics defined
+#endif
 
 #endif
 
@@ -1959,8 +2104,8 @@ template<> class LargeIntRegMultiply< std::uint64_t, std::uint64_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( const std::uint64_t& a, const std::uint64_t& b, std::uint64_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyUint64( a, b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyUint64( a, b, pRet );
 #else
         std::uint32_t aHigh = 0, aLow = 0, bHigh = 0, bLow = 0;
 
@@ -2020,8 +2165,8 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( const std::uint64_t& a, const std::uint64_t& b, std::uint64_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyUint64( a, b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyUint64( a, b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         std::uint32_t aHigh = 0, aLow = 0, bHigh = 0, bLow = 0;
@@ -2084,8 +2229,8 @@ template<> class LargeIntRegMultiply< std::uint64_t, std::uint32_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( const std::uint64_t& a, std::uint32_t b, std::uint64_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyUint64( a, (std::uint64_t)b, pRet );
 #else
         std::uint32_t aHigh = 0, aLow = 0;
 
@@ -2125,8 +2270,8 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( const std::uint64_t& a, std::uint32_t b, std::uint64_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyUint64( a, (std::uint64_t)b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         std::uint32_t aHigh = 0, aLow = 0;
@@ -2174,8 +2319,8 @@ public:
         if( b < 0 && a != 0 )
             return false;
 
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyUint64( a, (std::uint64_t)b, pRet );
 #else
         return LargeIntRegMultiply< std::uint64_t, std::uint32_t >::RegMultiply(a, (std::uint32_t)b, pRet);
 #endif
@@ -2187,8 +2332,8 @@ public:
         if( b < 0 && a != 0 )
             E::SafeIntOnOverflow();
 
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyUint64( a, (std::uint64_t)b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         LargeIntRegMultiply< std::uint64_t, std::uint32_t >::template RegMultiplyThrow< E >( a, (std::uint32_t)b, pRet );
@@ -2204,8 +2349,8 @@ public:
         if( b < 0 && a != 0 )
             return false;
 
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyUint64( a, (std::uint64_t)b, pRet );
 #else
         return LargeIntRegMultiply< std::uint64_t, std::uint64_t >::RegMultiply(a, (std::uint64_t)b, pRet);
 #endif
@@ -2217,8 +2362,8 @@ public:
         if( b < 0 && a != 0 )
             E::SafeIntOnOverflow();
 
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyUint64( a, (std::uint64_t)b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyUint64( a, (std::uint64_t)b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         LargeIntRegMultiply< std::uint64_t, std::uint64_t >::template RegMultiplyThrow< E >( a, (std::uint64_t)b, pRet );
@@ -2390,8 +2535,8 @@ template<> class LargeIntRegMultiply< std::int64_t, std::int64_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( const std::int64_t& a, const std::int64_t& b, std::int64_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyInt64( a, b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyInt64( a, b, pRet );
 #else
         bool aNegative = false;
         bool bNegative = false;
@@ -2442,8 +2587,8 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( const std::int64_t& a, const std::int64_t& b, std::int64_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyInt64( a, b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyInt64( a, b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         bool aNegative = false;
@@ -2497,8 +2642,8 @@ template<> class LargeIntRegMultiply< std::int64_t, std::uint32_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( const std::int64_t& a, std::uint32_t b, std::int64_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyInt64( a, (std::int64_t)b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyInt64( a, (std::int64_t)b, pRet );
 #else
         bool aNegative = false;
         std::uint64_t tmp = 0;
@@ -2540,8 +2685,8 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( const std::int64_t& a, std::uint32_t b, std::int64_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyInt64( a, (std::int64_t)b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyInt64( a, (std::int64_t)b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         bool aNegative = false;
@@ -2586,8 +2731,8 @@ template<> class LargeIntRegMultiply< std::int64_t, std::int32_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( const std::int64_t& a, std::int32_t b, std::int64_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
-        return IntrinsicMultiplyInt64( a, (std::int64_t)b, pRet );
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        return MultiplyInt64( a, (std::int64_t)b, pRet );
 #else
         bool aNegative = false;
         bool bNegative = false;
@@ -2638,8 +2783,8 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( std::int64_t a, std::int32_t b, std::int64_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        if( !IntrinsicMultiplyInt64( a, (std::int64_t)b, pRet ) )
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        if( !MultiplyInt64( a, (std::int64_t)b, pRet ) )
             E::SafeIntOnOverflow();
 #else
         bool aNegative = false;
@@ -2691,10 +2836,10 @@ template<> class LargeIntRegMultiply< std::int32_t, std::int64_t >
 public:
     _CONSTEXPR14_MULTIPLY static bool RegMultiply( std::int32_t a, const std::int64_t& b, std::int32_t* pRet ) SAFEINT_NOTHROW
     {
-#if SAFEINT_USE_INTRINSICS
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
         std::int64_t tmp = 0;
 
-        if( IntrinsicMultiplyInt64( a, b, &tmp ) )
+        if( MultiplyInt64( a, b, &tmp ) )
         {
             if( tmp > std::numeric_limits< std::int32_t >::max() ||
                 tmp < std::numeric_limits< std::int32_t >::min() )
@@ -2755,10 +2900,10 @@ public:
     template < typename E >
     _CONSTEXPR14_MULTIPLY static void RegMultiplyThrow( std::int32_t a, const std::int64_t& b, std::int32_t* pRet ) SAFEINT_CPP_THROW
     {
-#if SAFEINT_USE_INTRINSICS
-        std::int64_t tmp;
+#if SAFEINT_USE_INTRINSICS || SAFEINT_HAS_INT128
+        std::int64_t tmp = 0;
 
-        if( IntrinsicMultiplyInt64( a, b, &tmp ) )
+        if( MultiplyInt64( a, b, &tmp ) )
         {
             if( tmp > std::numeric_limits< std::int32_t >::max() ||
                 tmp < std::numeric_limits< std::int32_t >::min() )
@@ -3281,16 +3426,16 @@ public:
     _CONSTEXPR14 static SafeIntError Divide( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if( u == 0 )
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         result = (T)( t/u );
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -3316,18 +3461,18 @@ public:
     {
 
         if( u == 0 )
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         if( u > 0 )
         {
             result = (T)( t/u );
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         // it is always an error to try and divide an unsigned number by a negative signed number
@@ -3335,10 +3480,10 @@ public:
         if( AbsValueHelper< U, GetAbsMethod< U >::method >::Abs( u ) > t )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
-        return SafeIntArithmeticOverflow;
+        return SafeIntError::SafeIntArithmeticOverflow;
     }
 
     template < typename E >
@@ -3378,12 +3523,12 @@ public:
     _CONSTEXPR14 static SafeIntError Divide( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
     {
         if( u == 0 )
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         // Test for t > 0
@@ -3395,7 +3540,7 @@ public:
         else
             result = (T)( (std::int64_t)t/(std::int64_t)u );
 
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -3445,13 +3590,13 @@ public:
 
         if( u == 0 )
         {
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
         }
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         if( u <= (std::uint64_t)std::numeric_limits<T>::max() )
@@ -3468,7 +3613,7 @@ public:
         {
             result = 0;
         }
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -3513,17 +3658,17 @@ public:
     {
         if( u == 0 )
         {
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
         }
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         result = (T)( t/u );
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -3551,21 +3696,21 @@ public:
     {
         if( u == 0 )
         {
-            return SafeIntDivideByZero;
+            return SafeIntError::SafeIntDivideByZero;
         }
 
         if( t == 0 )
         {
             result = 0;
-            return SafeIntNoError;
+            return SafeIntError::SafeIntNoError;
         }
 
         // Must test for corner case
         if( t == std::numeric_limits<T>::min() && u == (U)-1 )
-            return SafeIntArithmeticOverflow;
+            return SafeIntError::SafeIntArithmeticOverflow;
 
         result = (T)( t/u );
-        return SafeIntNoError;
+        return SafeIntError::SafeIntNoError;
     }
 
     template < typename E >
@@ -5587,7 +5732,7 @@ _CONSTEXPR11 inline bool SafeLessThanEquals( const T t, const U u ) SAFEINT_NOTH
 template < typename T, typename U >
 _CONSTEXPR11 inline bool SafeModulus( const T& t, const U& u, T& result ) SAFEINT_NOTHROW
 {
-    return ( ModulusHelper< T, U, ValidComparison< T, U >::method >::Modulus( t, u, result ) == SafeIntNoError );
+    return ( ModulusHelper< T, U, ValidComparison< T, U >::method >::Modulus( t, u, result ) == SafeIntError::SafeIntNoError );
 }
 
 template < typename T, typename U >
@@ -5599,7 +5744,7 @@ _CONSTEXPR14_MULTIPLY inline bool SafeMultiply( T t, U u, T& result ) SAFEINT_NO
 template < typename T, typename U >
 _CONSTEXPR11 inline bool SafeDivide( T t, U u, T& result ) SAFEINT_NOTHROW
 {
-    return ( DivisionHelper< T, U, DivisionMethod< T, U >::method >::Divide( t, u, result ) == SafeIntNoError );
+    return ( DivisionHelper< T, U, DivisionMethod< T, U >::method >::Divide( t, u, result ) == SafeIntError::SafeIntNoError );
 }
 
 template < typename T, typename U >
@@ -5836,7 +5981,20 @@ public:
     // also see overloaded address-of operator below
     T* Ptr() SAFEINT_NOTHROW { return &m_int; }
     const T* Ptr() const SAFEINT_NOTHROW { return &m_int; }
+
+    // The above are not modern naming conventions, introducing these
+    // to move forward with:
+    T* data_ptr() SAFEINT_NOTHROW { return &m_int; }
+    const T* data_ptr() const SAFEINT_NOTHROW { return &m_int; }
+
+    // This method is antiquated, and really only makes sense with 
+    // 64-bit values on a 32-bit processor. Leaving it for now, in case
+    // someone is using it. A better approach is to just unbox it by casting
+    // it back to the base type as static_cast<T>( my_safeint )
     _CONSTEXPR14 const T& Ref() const SAFEINT_NOTHROW { return m_int; }
+
+#if !defined SAFEINT_DISABLE_ADDRESS_OPERATOR
+    // Note - in the future, this is slated for deprecation
 
     // Or if SafeInt< T, E >::Ptr() is inconvenient, use the overload
     // operator &
@@ -5845,6 +6003,7 @@ public:
     // pass a SafeInt into things like ReadFile
     T* operator &() SAFEINT_NOTHROW { return &m_int; }
     const T* operator &() const SAFEINT_NOTHROW { return &m_int; }
+#endif
 
     // Unary operators
     _CONSTEXPR11 bool operator !() const SAFEINT_NOTHROW { return (!m_int) ? true : false; }

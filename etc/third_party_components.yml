@@ -94,7 +94,6 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/SafeInt
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-49213
 
   discover-python:
     homepage_url: https://pypi.org/project/discover/

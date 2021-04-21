@@ -41,7 +41,7 @@ a notice will be included in
 | [peglib]                   | MIT               | 0.1.12           | 0.1.12            |                      |                ✗                |
 | [Pcre]                     | BSD-3-Clause      | 8.44             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
-| [SafeInt]                  | MIT               | 3.24             | 3.23              |                      |                                 |
+| [SafeInt]                  | MIT               | 3.0.26           | 3.0.26            |                      |                                 |
 | [schemastore.org]          | Apache-2.0        |                  | 6847cfc3a1        |                      |                                 |
 | [scons]                    | MIT               | 3.1.2            | 3.1.2             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.8            | 1.1.7             |          ✗           |                ✗                |
