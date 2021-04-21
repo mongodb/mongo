@@ -249,31 +249,51 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
     // 5. Remove `lastOps` in favor of `lastOp`.
     stages.emplace_back(DocumentSourceProject::createUnset(FieldPath("lastOps"), expCtx));
 
-    // 6. Fetch preImage oplog entry for `findAndModify` from the oplog view. `preImageOps` is not
-    //    expected to contain exactly one element if the `preImageOpTime` field is not null.
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(
-        Doc{{"$lookup",
-             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "system.tenantMigration.oplogView"_sd}}},
-                 {"localField", "lastOp.preImageOpTime.ts"_sd},
-                 {"foreignField", "ts"_sd},
-                 {"as", "preImageOps"_sd}}}}
-            .toBson()
-            .firstElement(),
-        expCtx));
+    // 6. Fetch preImage oplog entry for `findAndModify` from the oplog view. `preImageOps` is
+    //    expected to contain exactly one element if the `preImageOpTime` field is not null and is
+    //    earlier than `startFetchingTimestamp`.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(fromjson("{\
+                    $lookup: {\
+                        from: {db: 'local', coll: 'system.tenantMigration.oplogView'},\
+                        let: { preimage_ts: '$lastOp.preImageOpTime.ts'},\
+                        pipeline: [{\
+                            $match: {\
+                                $expr: {\
+                                    $and: [\
+                                        {$eq: ['$ts', '$$preimage_ts']},\
+                                        {$lt: ['$ts', " + startFetchingTimestamp.toString() +
+                                                                      "]}\
+                                    ]\
+                                }\
+                            }\
+                        }],\
+                        as: 'preImageOps'\
+                    }}")
+                                                                 .firstElement(),
+                                                             expCtx));
 
-
-    // 7. Fetch postImage oplog entry for `findAndModify` from the oplog view. `postImageOps` is not
-    //    expected to contain exactly one element if the `postImageOpTime` field is not null.
-    stages.emplace_back(DocumentSourceLookUp::createFromBson(
-        Doc{{"$lookup",
-             Doc{{"from", Doc{{"db", "local"_sd}, {"coll", "system.tenantMigration.oplogView"_sd}}},
-                 {"localField", "lastOp.postImageOpTime.ts"_sd},
-                 {"foreignField", "ts"_sd},
-                 {"as", "postImageOps"_sd}}}}
-            .toBson()
-            .firstElement(),
-        expCtx));
-
+    // 7. Fetch postImage oplog entry for `findAndModify` from the oplog view. `postImageOps` is
+    //    expected to contain exactly one element if the `postImageOpTime` field is not null and is
+    //    earlier than `startFetchingTimestamp`.
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(fromjson("{\
+                    $lookup: {\
+                        from: {db: 'local', coll: 'system.tenantMigration.oplogView'},\
+                        let: { postimage_ts: '$lastOp.postImageOpTime.ts'},\
+                        pipeline: [{\
+                            $match: {\
+                                $expr: {\
+                                    $and: [\
+                                        {$eq: ['$ts', '$$postimage_ts']},\
+                                        {$lt: ['$ts', " + startFetchingTimestamp.toString() +
+                                                                      "]}\
+                                    ]\
+                                }\
+                            }\
+                        }],\
+                        as: 'postImageOps'\
+                    }}")
+                                                                 .firstElement(),
+                                                             expCtx));
 
     // 8. Fetch oplog entries in each chain from the oplog view.
     stages.emplace_back(DocumentSourceGraphLookUp::createFromBson(
@@ -288,7 +308,7 @@ createRetryableWritesOplogFetchingPipelineForTenantMigrations(
             .firstElement(),
         expCtx));
 
-    // 9. Filter out all oplog entries from the `history` arrary that occur after
+    // 9. Filter out all oplog entries from the `history` array that occur after
     //    `startFetchingTimestamp`. Since the oplog fetching and application stages will already
     //    capture entries after `startFetchingTimestamp`, we only need the earlier part of the oplog
     //    chain.

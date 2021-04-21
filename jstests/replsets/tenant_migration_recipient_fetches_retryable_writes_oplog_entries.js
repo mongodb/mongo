@@ -139,7 +139,21 @@ batchInsertWorker.join();
 // `lastWriteOpTime` is after `startFetchingDonorOpTime`. The corresponding oplog entries should
 // not be added to the oplog buffer.
 assert.commandWorked(
-    tenantCollection3.insert({_id: "retryableWrite4"}, {writeConcern: {w: "majority"}}));
+    tenantCollection3.insert({_id: "retryableWrite4", count: 0}, {writeConcern: {w: "majority"}}));
+
+// Test that when a post image op's `postImageOpTime` is after `startFetchingDonorOpTime`, it gets
+// filtered out.
+tenantCollection3.findAndModify({
+    query: {_id: "retryableWrite4"},
+    update: {$inc: {count: 1}},
+    new: true,
+    writeConcern: {w: "majority"}
+});
+
+// Test that when a pre image op's `preImageOpTime` is after `startFetchingDonorOpTime`, it gets
+// filtered out.
+tenantCollection3.findAndModify(
+    {query: {_id: "retryableWrite4"}, remove: true, writeConcern: {w: "majority"}});
 
 fpAfterRetrievingStartOpTime.off();
 fpAfterRetrievingRetryableWrites.wait();
@@ -160,6 +174,7 @@ assert.eq(1, recipientOplogBuffer.find({"entry.o._id": "bulkRetryableWrite0"}).i
 // Ensure the retryable write oplog entries that should not be in `kOplogBufferNS` are in fact not.
 assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "retryableWrite1"}).itcount());
 assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "retryableWrite4"}).itcount());
+assert.eq(0, recipientOplogBuffer.find({"entry.o2._id": "retryableWrite4"}).itcount());
 assert.eq(0, recipientOplogBuffer.find({"entry.o._id": "bulkRetryableWrite1"}).itcount());
 
 fpAfterRetrievingRetryableWrites.off();

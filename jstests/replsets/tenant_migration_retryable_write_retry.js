@@ -224,6 +224,20 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
     writeConcern: {w: "majority"}
 }));
 
+const lsid8 = {
+    id: UUID()
+};
+const sessionTag8 = "retryable findAndModify update after migration";
+assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
+    findAndModify: kCollName,
+    query: {x: 7},
+    update: {$set: {tag: sessionTag8}},
+    new: true,
+    txnNumber: NumberLong(0),
+    lsid: lsid8,
+    writeConcern: {w: "majority"}
+}));
+
 // The aggregation pipeline will return an array of retryable writes oplog entries (pre-image/
 // post-image oplog entries included) with "ts" < "startFetchingTimestamp" and sorted in ascending
 // order of "ts".
@@ -261,20 +275,40 @@ const aggRes = donorPrimary.getDB("config").runCommand({
         // single-element 'lastOps' array field with a single 'lastOp' field.
         {$addFields: {lastOp: {$first: "$lastOps"}}},
         {$unset: "lastOps"},
-        // Fetch preImage oplog entry for findAndModify from the oplog view.
+        // Fetch the preImage oplog entry for findAndModify from the oplog view only if it occurred
+        // before `startFetchingTimestamp`.
         {$lookup: {
             from: {db: "local", coll: "system.tenantMigration.oplogView"},
-            localField: "lastOp.preImageOpTime.ts",
-            foreignField: "ts",
+            let: { preimage_ts: "$lastOp.preImageOpTime.ts"},
+            pipeline: [{
+                $match: {
+                    $expr: {
+                        $and: [
+                            {$eq: [ "$ts", "$$preimage_ts"]},
+                            {$lt: ["$ts", startFetchingTimestamp]}
+                        ]
+                    }
+                }
+            }],
             // This array is expected to contain exactly one element if the 'preImageOpTime'
             // field is not null.
             as: "preImageOps"
         }},
-        // Fetch postImage oplog entry for findAndModify from the oplog view.
+        // Fetch the postImage oplog entry for findAndModify from the oplog view only if it occurred
+        // before `startFetchingTimestamp`.
         {$lookup: {
             from: {db: "local", coll: "system.tenantMigration.oplogView"},
-            localField: "lastOp.postImageOpTime.ts",
-            foreignField: "ts",
+            let: { postimage_ts: "$lastOp.postImageOpTime.ts"},
+            pipeline: [{
+                $match: {
+                    $expr: {
+                        $and: [
+                            {$eq: [ "$ts", "$$postimage_ts"]},
+                            {$lt: ["$ts", startFetchingTimestamp]}
+                        ]
+                    }
+                }
+            }],
             // This array is expected to contain exactly one element if the 'postImageOpTime'
             // field is not null.
             as: "postImageOps"
