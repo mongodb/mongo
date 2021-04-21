@@ -888,6 +888,10 @@ DocumentSourceGroup::rewriteGroupAsTransformOnFirstDocument() const {
     return GroupFromFirstDocumentTransformation::create(pExpCtx, groupId, std::move(fields));
 }
 
+size_t DocumentSourceGroup::getMaxMemoryUsageBytes() const {
+    return _memoryTracker.maxMemoryUsageBytes;
+}
+
 }  // namespace mongo
 
 #include "mongo/db/sorter/sorter.cpp"

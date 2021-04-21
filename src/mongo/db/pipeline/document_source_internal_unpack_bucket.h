@@ -187,6 +187,14 @@ public:
      */
     std::pair<BSONObj, bool> extractProjectForPushDown(DocumentSource* src) const;
 
+    /**
+     * Helper method which checks if we can avoid unpacking if we have a group stage with min/max
+     * aggregates. If a rewrite is possible, 'container' is modified, and we returns result value
+     * for 'doOptimizeAt'.
+     */
+    std::pair<bool, Pipeline::SourceContainer::iterator> rewriteGroupByMinMax(
+        Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container);
+
 private:
     GetNextResult doGetNext() final;
 

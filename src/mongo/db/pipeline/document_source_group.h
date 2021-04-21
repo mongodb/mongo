@@ -183,6 +183,11 @@ public:
     std::unique_ptr<GroupFromFirstDocumentTransformation> rewriteGroupAsTransformOnFirstDocument()
         const;
 
+    /**
+     * Returns maximum allowed memory footprint.
+     */
+    size_t getMaxMemoryUsageBytes() const;
+
 protected:
     GetNextResult doGetNext() final;
     void doDispose() final;

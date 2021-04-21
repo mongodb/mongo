@@ -75,5 +75,56 @@ TEST_F(InternalUnpackBucketGroupReorder, OptimizeForCountNegative) {
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto groupSpecObj =
+        fromjson("{$group: {_id: '$meta1.a.b', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(1, serialized.size());
+
+    auto optimized = fromjson(
+        "{$group: {_id: '$meta.a.b', accmin: {$min: '$control.min.b'}, accmax: {$max: "
+        "'$control.max.c'}}}");
+    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$meta', accmin: {$min: '$b'}, s: {$sum: '$c'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+}
+
+TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative1) {
+    auto unpackSpecObj = fromjson(
+        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600}}");
+    auto groupSpecObj = fromjson("{$group: {_id: '$meta', accmin: {$min: '$t.a'}}}");
+
+    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
+    pipeline->optimizePipeline();
+
+    auto serialized = pipeline->serializeToBson();
+    ASSERT_EQ(2, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(unpackSpecObj, serialized[0]);
+    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized[1]);
+}
+
 }  // namespace
 }  // namespace mongo

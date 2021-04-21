@@ -686,6 +686,103 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
     return {BSONObj{}, false};
 }
 
+std::pair<bool, Pipeline::SourceContainer::iterator>
+DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContainer::iterator itr,
+                                                         Pipeline::SourceContainer* container) {
+    const auto* groupPtr = dynamic_cast<DocumentSourceGroup*>(std::next(itr)->get());
+    if (groupPtr == nullptr) {
+        return {};
+    }
+
+    const auto& idFields = groupPtr->getIdFields();
+    if (idFields.size() != 1 || !_bucketUnpacker.bucketSpec().metaField.has_value()) {
+        return {};
+    }
+
+    const auto& exprId = idFields.cbegin()->second;
+    const auto* exprIdPath = dynamic_cast<const ExpressionFieldPath*>(exprId.get());
+    if (exprIdPath == nullptr) {
+        return {};
+    }
+
+    const auto& idPath = exprIdPath->getFieldPath();
+    if (idPath.getPathLength() < 2 ||
+        idPath.getFieldName(1) != _bucketUnpacker.bucketSpec().metaField.get()) {
+        return {};
+    }
+
+    bool suitable = true;
+    std::vector<AccumulationStatement> accumulationStatements;
+    for (const AccumulationStatement& stmt : groupPtr->getAccumulatedFields()) {
+        const std::string& op = stmt.makeAccumulator()->getOpName();
+        const bool isMin = op == "$min";
+        const bool isMax = op == "$max";
+
+        // Rewrite is valid only for min and max aggregates.
+        if (!isMin && !isMax) {
+            suitable = false;
+            break;
+        }
+
+        const auto* exprArg = stmt.expr.argument.get();
+        if (const auto* exprArgPath = dynamic_cast<const ExpressionFieldPath*>(exprArg)) {
+            const auto& path = exprArgPath->getFieldPath();
+            if (path.getPathLength() <= 1 ||
+                path.getFieldName(1) == _bucketUnpacker.bucketSpec().timeField) {
+                // Rewrite not valid for time field. We want to eliminate the bucket
+                // unpack stage here.
+                suitable = false;
+                break;
+            }
+
+            // Update aggregates to reference the control field.
+            std::ostringstream os;
+            if (isMin) {
+                os << timeseries::kControlMinFieldNamePrefix;
+            } else {
+                os << timeseries::kControlMaxFieldNamePrefix;
+            }
+
+            for (size_t index = 1; index < path.getPathLength(); index++) {
+                if (index > 1) {
+                    os << ".";
+                }
+                os << path.getFieldName(index);
+            }
+
+            const auto& newExpr = ExpressionFieldPath::createPathFromString(
+                pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+
+            AccumulationExpression accExpr = stmt.expr;
+            accExpr.argument = newExpr;
+            accumulationStatements.emplace_back(stmt.fieldName, std::move(accExpr));
+        }
+    }
+
+    if (suitable) {
+        std::ostringstream os;
+        os << timeseries::kBucketMetaFieldName;
+        for (size_t index = 2; index < idPath.getPathLength(); index++) {
+            os << "." << idPath.getFieldName(index);
+        }
+        auto exprId1 = ExpressionFieldPath::createPathFromString(
+            pExpCtx.get(), os.str(), pExpCtx->variablesParseState);
+
+        auto newGroup = DocumentSourceGroup::create(pExpCtx,
+                                                    std::move(exprId1),
+                                                    std::move(accumulationStatements),
+                                                    groupPtr->getMaxMemoryUsageBytes());
+
+        // Erase current stage and following group stage, and replace with updated
+        // group.
+        container->erase(std::next(itr));
+        *itr = std::move(newGroup);
+        return {true, std::prev(itr)};
+    }
+
+    return {};
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -727,6 +824,13 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
         optimizeEndOfPipeline(itr, container);
+    }
+    {
+        // Check if we can avoid unpacking if we have a group stage with min/max aggregates.
+        auto [success, result] = rewriteGroupByMinMax(itr, container);
+        if (success) {
+            return result;
+        }
     }
 
     {
