@@ -482,6 +482,16 @@ server_parameters:
         validator:
             gte: 1
 
+    enableDefaultWriteConcernUpdatesForInitiate:
+        description: >-
+            When enabled, allow the default write concern to be updated in the replica set
+            initiate process. This parameter should only ever be enabled in our testing
+            infrastructure, as using it in production may lead to undefined behavior. 
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
+        default: false
+
 feature_flags:
     featureFlagTenantMigrations:
         description: >-

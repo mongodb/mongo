@@ -158,6 +158,12 @@ public:
      */
     void setImplicitDefaultWriteConcernMajority(bool newImplicitDefaultWCMajority);
 
+    /**
+     * Gets a bool indicating whether the implicit default write concern is majority.
+     * This function should only be used for testing purposes.
+     */
+    boost::optional<bool> getImplicitDefaultWriteConcernMajority_forTest();
+
 private:
     enum class Type { kReadWriteConcernEntry };
 

@@ -36,7 +36,9 @@
 #include <functional>
 #include <memory>
 
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_response.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -139,6 +141,11 @@ void ReplCoordTest::init() {
 
     // PRNG seed for tests.
     const int64_t seed = 0;
+
+    // The ReadWriteConcernDefaults decoration on the service context won't always be created,
+    // so we should manually instantiate it to ensure it exists in our tests.
+    ReadWriteConcernDefaults::create(service, _lookupMock.getFetchDefaultsFn());
+    enableDefaultWriteConcernUpdatesForInitiate.store(true);
 
     TopologyCoordinator::Options settings;
     auto topo = std::make_unique<TopologyCoordinator>(settings);

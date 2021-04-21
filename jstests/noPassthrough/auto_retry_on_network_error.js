@@ -16,8 +16,6 @@ if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().s
 TestData.networkErrorAndTxnOverrideConfig = {
     retryOnNetworkErrors: true
 };
-load('jstests/libs/override_methods/network_error_and_txn_override.js');
-load("jstests/replsets/rslib.js");
 
 function getThreadName(db) {
     let myUri = db.adminCommand({whatsmyuri: 1}).you;
@@ -47,6 +45,12 @@ rst.startSet();
 // awaitLastStableRecoveryTimestamp runs an 'appendOplogNote' command which is not retryable.
 rst.initiateWithAnyNodeAsPrimary(
     null, "replSetInitiate", {doNotWaitForStableRecoveryTimestamp: true});
+
+// We require the 'setParameter' command to initialize a replica set, and the command will fail
+// due to the override below. As a result, we must initiate our replica set before we load these
+// files.
+load('jstests/libs/override_methods/network_error_and_txn_override.js');
+load("jstests/replsets/rslib.js");
 
 const dbName = "test";
 const collName = "auto_retry";

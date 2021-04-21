@@ -212,8 +212,13 @@ ReadWriteConcernDefaults::_getDefault(OperationContext* opCtx) {
 
 void ReadWriteConcernDefaults::setImplicitDefaultWriteConcernMajority(
     bool newImplicitDefaultWCMajority) {
-    invariant(!_implicitDefaultWriteConcernMajority);
+    invariant(!_implicitDefaultWriteConcernMajority ||
+              repl::enableDefaultWriteConcernUpdatesForInitiate.load());
     _implicitDefaultWriteConcernMajority = newImplicitDefaultWCMajority;
+}
+
+boost::optional<bool> ReadWriteConcernDefaults::getImplicitDefaultWriteConcernMajority_forTest() {
+    return _implicitDefaultWriteConcernMajority;
 }
 
 boost::optional<ReadWriteConcernDefaults::ReadConcern>
@@ -242,14 +247,16 @@ void ReadWriteConcernDefaults::create(ServiceContext* service, FetchDefaultsFn f
 
 ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
                                                    FetchDefaultsFn fetchDefaultsFn)
-    : _defaults(service, _threadPool, std::move(fetchDefaultsFn)), _threadPool([] {
+    : _defaults(service, _threadPool, std::move(fetchDefaultsFn)),
+      _threadPool([] {
           ThreadPool::Options options;
           options.poolName = "ReadWriteConcernDefaults";
           options.minThreads = 0;
           options.maxThreads = 1;
 
           return options;
-      }()) {
+      }()),
+      _implicitDefaultWriteConcernMajority(boost::none) {
     _threadPool.startup();
 }
 

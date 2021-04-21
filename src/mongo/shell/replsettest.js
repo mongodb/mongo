@@ -74,6 +74,7 @@
 
 var ReplSetTest = function(opts) {
     'use strict';
+    load("jstests/multiVersion/libs/verify_versions.js");
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
@@ -1574,6 +1575,33 @@ var ReplSetTest = function(opts) {
             });
         }
 
+        // We need to disable the enableDefaultWriteConcernUpdatesForInitiate parameter
+        // to disallow updating the default write concern after initiating is complete.
+        asCluster(self.nodes, () => {
+            for (let node of self.nodes) {
+                // asCluster() currently does not validate connections with X509 authentication.
+                // If the test is using X509, we skip disabling the server parameter as the
+                // 'setParameter' command will fail.
+                const nodeId = "n" + self.getNodeId(node);
+                const nodeOptions = self.nodeOptions[nodeId] || {};
+                const options =
+                    (nodeOptions === {} || !self.startOptions) ? nodeOptions : self.startOptions;
+                const authMode = options.clusterAuthMode;
+                const notX509 =
+                    authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
+                const currVersion = node.getBinVersion();
+                const binVersionLatest =
+                    MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
+                                                      MongoRunner.getBinVersionFor("latest"));
+                if (binVersionLatest && notX509) {
+                    assert.commandWorked(node.adminCommand({
+                        setParameter: 1,
+                        enableDefaultWriteConcernUpdatesForInitiate: false,
+                    }));
+                }
+            }
+        });
+
         const awaitTsStart = new Date();  // Measure duration of awaitLastStableRecoveryTimestamp.
         if (!doNotWaitForStableRecoveryTimestamp) {
             // Speed up the polling interval so we can detect recovery timestamps more quickly.
@@ -2793,6 +2821,12 @@ var ReplSetTest = function(opts) {
         // Reduce this to 100ms for faster shutdown.
         options.setParameter.shutdownTimeoutMillisForSignaledShutdown =
             options.setParameter.shutdownTimeoutMillisForSignaledShutdown || 100;
+
+        // This parameter is enabled to allow the default write concern to change while
+        // initiating a ReplSetTest. This is due to our testing optimization to initiate
+        // with a single node, and reconfig the full membership set in.
+        // We need to recalculate the DWC after each reconfig until the full set is included.
+        options.setParameter.enableDefaultWriteConcernUpdatesForInitiate = true;
 
         if (tojson(options) != tojson({}))
             printjson(options);

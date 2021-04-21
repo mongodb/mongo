@@ -63,6 +63,7 @@
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
+#include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
@@ -702,6 +703,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         stdx::lock_guard<Latch> lk(_mutex);
         // Step down is impossible, so we don't need to wait for the returned event.
         _updateTerm_inlock(term);
+        _setImplicitDefaultWriteConcern(opCtx.get(), lk);
     }
     LOGV2_DEBUG(21320, 1, "Current term is now {term}", "Updated term", "term"_attr = term);
     _performPostMemberStateUpdateAction(action);
@@ -899,6 +901,14 @@ void ReplicationCoordinatorImpl::startup(
         invariant(!_rsConfig.isInitialized());
         _setConfigState_inlock(kConfigUninitialized);
     }
+}
+
+void ReplicationCoordinatorImpl::_setImplicitDefaultWriteConcern(OperationContext* opCtx,
+                                                                 WithLock lk) {
+    auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
+    bool isImplicitDefaultWriteConcernMajority = _rsConfig.isImplicitDefaultWriteConcernMajority();
+    // TODO (SERVER-55689): Add validation for shard and config servers
+    rwcDefaults.setImplicitDefaultWriteConcernMajority(isImplicitDefaultWriteConcernMajority);
 }
 
 void ReplicationCoordinatorImpl::enterTerminalShutdown() {
@@ -3683,6 +3693,16 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(OperationContext* opCtx,
         _clearCommittedSnapshot_inlock();
     }
 
+    // If 'enableDefaultWriteConcernUpdatesForInitiate' is enabled, we allow the IDWC to be
+    // recalculated after a reconfig. However, this logic is only relevant for testing,
+    // and should not be executed outside of our test infrastructure. This is needed due to an
+    // optimization in our ReplSetTest jstest fixture that initiates replica sets with only the
+    // primary, and then reconfigs the full membership set in. As a result, we must calculate
+    // the final IDWC only after the last node has been added to the set.
+    if (repl::enableDefaultWriteConcernUpdatesForInitiate.load()) {
+        _setImplicitDefaultWriteConcern(opCtx, lk);
+    }
+
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 }
@@ -3987,6 +4007,7 @@ void ReplicationCoordinatorImpl::_finishReplSetInitiate(OperationContext* opCtx,
     invariant(_rsConfigState == kConfigInitiating);
     invariant(!_rsConfig.isInitialized());
     auto action = _setCurrentRSConfig(lk, opCtx, newConfig, myIndex);
+    _setImplicitDefaultWriteConcern(opCtx, lk);
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
 }

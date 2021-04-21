@@ -1471,6 +1471,11 @@ private:
                                           ConfigVersionAndTerm versionAndTerm);
 
     /**
+     * Sets the implicit default write concern on startup.
+     */
+    void _setImplicitDefaultWriteConcern(OperationContext* opCtx, WithLock lk);
+
+    /**
      * Checks whether replication coordinator supports automatic reconfig.
      */
     bool _supportsAutomaticReconfig() const;

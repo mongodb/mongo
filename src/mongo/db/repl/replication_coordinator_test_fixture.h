@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/client.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -334,6 +335,8 @@ private:
 
     ReplSettings _settings;
     bool _callShutdown = false;
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 }  // namespace repl

@@ -691,6 +691,8 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "shutdownTimeoutMillisForSignaledShutdown", "4.5.0");
     _removeSetParameterIfBeforeVersion(
         opts, "failpoint.PrimaryOnlyServiceSkipRebuildingInstances", "4.8.0");
+    _removeSetParameterIfBeforeVersion(
+        opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
