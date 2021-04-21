@@ -172,6 +172,7 @@ typedef struct {
     uint32_t c_firstfit;
     uint32_t c_hs_cursor;
     uint32_t c_huffman_value;
+    uint32_t c_import;
     uint32_t c_in_memory;
     uint32_t c_independent_thread_rng;
     uint32_t c_insert_pct;
@@ -384,6 +385,7 @@ WT_THREAD_RET backup(void *);
 WT_THREAD_RET checkpoint(void *);
 WT_THREAD_RET compact(void *);
 WT_THREAD_RET hs_cursor(void *);
+WT_THREAD_RET import(void *);
 WT_THREAD_RET random_kv(void *);
 WT_THREAD_RET timestamp(void *);
 
@@ -395,6 +397,7 @@ void config_final(void);
 void config_print(bool);
 void config_run(void);
 void config_single(const char *, bool);
+void create_database(const char *home, WT_CONNECTION **connp);
 void fclose_and_clear(FILE **);
 bool fp_readv(FILE *, char *, uint32_t *);
 void key_gen_common(WT_ITEM *, uint64_t, const char *);

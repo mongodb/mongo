@@ -266,21 +266,21 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
                 len = strlen(g.home) + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/%s", g.home, name));
-                error_sys_check(rfd = open(tmp, O_RDONLY, 0));
+                error_sys_check(rfd = open(tmp, O_RDONLY, 0644));
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name));
-                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0));
+                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0644));
                 free(tmp);
                 tmp = NULL;
 
                 len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
                 tmp = dmalloc(len);
                 testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name));
-                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0));
+                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0644));
                 free(tmp);
                 tmp = NULL;
 

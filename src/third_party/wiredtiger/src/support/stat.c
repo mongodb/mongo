@@ -136,8 +136,8 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: history store table insert calls",
   "cache: history store table insert calls that returned restart",
   "cache: history store table out-of-order resolved updates that lose their durable timestamp",
-  "cache: history store table out-of-order updates that were fixed up by reinserting with the "
-  "fixed timestamp",
+  "cache: history store table out-of-order updates that were fixed up by moving existing records",
+  "cache: history store table out-of-order updates that were fixed up during insertion",
   "cache: history store table reads",
   "cache: history store table reads missed",
   "cache: history store table reads requiring squashed modifies",
@@ -146,8 +146,8 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: history store table truncation to remove an update",
   "cache: history store table truncation to remove range of updates due to key being removed from "
   "the data page during reconciliation",
-  "cache: history store table truncation to remove range of updates due to out-of-order timestamp "
-  "update on data page",
+  "cache: history store table truncation to remove range of updates due to non timestamped update "
+  "on data page",
   "cache: history store table writes requiring squashed modifies",
   "cache: in-memory page passed criteria to be split",
   "cache: in-memory page splits",
@@ -390,7 +390,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_hs_insert = 0;
     stats->cache_hs_insert_restart = 0;
     stats->cache_hs_order_lose_durable_timestamp = 0;
-    stats->cache_hs_order_reinsert = 0;
+    stats->cache_hs_order_fixup_move = 0;
+    stats->cache_hs_order_fixup_insert = 0;
     stats->cache_hs_read = 0;
     stats->cache_hs_read_miss = 0;
     stats->cache_hs_read_squash = 0;
@@ -398,7 +399,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_hs_key_truncate_rts = 0;
     stats->cache_hs_key_truncate = 0;
     stats->cache_hs_key_truncate_onpage_removal = 0;
-    stats->cache_hs_order_remove = 0;
+    stats->cache_hs_key_truncate_non_ts = 0;
     stats->cache_hs_write_squash = 0;
     stats->cache_inmem_splittable = 0;
     stats->cache_inmem_split = 0;
@@ -627,7 +628,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_hs_insert += from->cache_hs_insert;
     to->cache_hs_insert_restart += from->cache_hs_insert_restart;
     to->cache_hs_order_lose_durable_timestamp += from->cache_hs_order_lose_durable_timestamp;
-    to->cache_hs_order_reinsert += from->cache_hs_order_reinsert;
+    to->cache_hs_order_fixup_move += from->cache_hs_order_fixup_move;
+    to->cache_hs_order_fixup_insert += from->cache_hs_order_fixup_insert;
     to->cache_hs_read += from->cache_hs_read;
     to->cache_hs_read_miss += from->cache_hs_read_miss;
     to->cache_hs_read_squash += from->cache_hs_read_squash;
@@ -635,7 +637,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_hs_key_truncate_rts += from->cache_hs_key_truncate_rts;
     to->cache_hs_key_truncate += from->cache_hs_key_truncate;
     to->cache_hs_key_truncate_onpage_removal += from->cache_hs_key_truncate_onpage_removal;
-    to->cache_hs_order_remove += from->cache_hs_order_remove;
+    to->cache_hs_key_truncate_non_ts += from->cache_hs_key_truncate_non_ts;
     to->cache_hs_write_squash += from->cache_hs_write_squash;
     to->cache_inmem_splittable += from->cache_inmem_splittable;
     to->cache_inmem_split += from->cache_inmem_split;
@@ -863,7 +865,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cache_hs_insert_restart += WT_STAT_READ(from, cache_hs_insert_restart);
     to->cache_hs_order_lose_durable_timestamp +=
       WT_STAT_READ(from, cache_hs_order_lose_durable_timestamp);
-    to->cache_hs_order_reinsert += WT_STAT_READ(from, cache_hs_order_reinsert);
+    to->cache_hs_order_fixup_move += WT_STAT_READ(from, cache_hs_order_fixup_move);
+    to->cache_hs_order_fixup_insert += WT_STAT_READ(from, cache_hs_order_fixup_insert);
     to->cache_hs_read += WT_STAT_READ(from, cache_hs_read);
     to->cache_hs_read_miss += WT_STAT_READ(from, cache_hs_read_miss);
     to->cache_hs_read_squash += WT_STAT_READ(from, cache_hs_read_squash);
@@ -873,7 +876,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cache_hs_key_truncate += WT_STAT_READ(from, cache_hs_key_truncate);
     to->cache_hs_key_truncate_onpage_removal +=
       WT_STAT_READ(from, cache_hs_key_truncate_onpage_removal);
-    to->cache_hs_order_remove += WT_STAT_READ(from, cache_hs_order_remove);
+    to->cache_hs_key_truncate_non_ts += WT_STAT_READ(from, cache_hs_key_truncate_non_ts);
     to->cache_hs_write_squash += WT_STAT_READ(from, cache_hs_write_squash);
     to->cache_inmem_splittable += WT_STAT_READ(from, cache_inmem_splittable);
     to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);
@@ -1349,8 +1352,8 @@ static const char *const __stats_connection_desc[] = {
   "cache: history store table insert calls",
   "cache: history store table insert calls that returned restart",
   "cache: history store table out-of-order resolved updates that lose their durable timestamp",
-  "cache: history store table out-of-order updates that were fixed up by reinserting with the "
-  "fixed timestamp",
+  "cache: history store table out-of-order updates that were fixed up by moving existing records",
+  "cache: history store table out-of-order updates that were fixed up during insertion",
   "cache: history store table reads",
   "cache: history store table reads missed",
   "cache: history store table reads requiring squashed modifies",
@@ -1359,8 +1362,8 @@ static const char *const __stats_connection_desc[] = {
   "cache: history store table truncation to remove an update",
   "cache: history store table truncation to remove range of updates due to key being removed from "
   "the data page during reconciliation",
-  "cache: history store table truncation to remove range of updates due to out-of-order timestamp "
-  "update on data page",
+  "cache: history store table truncation to remove range of updates due to non timestamped update "
+  "on data page",
   "cache: history store table writes requiring squashed modifies",
   "cache: in-memory page passed criteria to be split",
   "cache: in-memory page splits",
@@ -1862,7 +1865,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_insert = 0;
     stats->cache_hs_insert_restart = 0;
     stats->cache_hs_order_lose_durable_timestamp = 0;
-    stats->cache_hs_order_reinsert = 0;
+    stats->cache_hs_order_fixup_move = 0;
+    stats->cache_hs_order_fixup_insert = 0;
     stats->cache_hs_read = 0;
     stats->cache_hs_read_miss = 0;
     stats->cache_hs_read_squash = 0;
@@ -1870,7 +1874,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_key_truncate_rts = 0;
     stats->cache_hs_key_truncate = 0;
     stats->cache_hs_key_truncate_onpage_removal = 0;
-    stats->cache_hs_order_remove = 0;
+    stats->cache_hs_key_truncate_non_ts = 0;
     stats->cache_hs_write_squash = 0;
     stats->cache_inmem_splittable = 0;
     stats->cache_inmem_split = 0;
@@ -2375,7 +2379,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_hs_insert_restart += WT_STAT_READ(from, cache_hs_insert_restart);
     to->cache_hs_order_lose_durable_timestamp +=
       WT_STAT_READ(from, cache_hs_order_lose_durable_timestamp);
-    to->cache_hs_order_reinsert += WT_STAT_READ(from, cache_hs_order_reinsert);
+    to->cache_hs_order_fixup_move += WT_STAT_READ(from, cache_hs_order_fixup_move);
+    to->cache_hs_order_fixup_insert += WT_STAT_READ(from, cache_hs_order_fixup_insert);
     to->cache_hs_read += WT_STAT_READ(from, cache_hs_read);
     to->cache_hs_read_miss += WT_STAT_READ(from, cache_hs_read_miss);
     to->cache_hs_read_squash += WT_STAT_READ(from, cache_hs_read_squash);
@@ -2385,7 +2390,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_hs_key_truncate += WT_STAT_READ(from, cache_hs_key_truncate);
     to->cache_hs_key_truncate_onpage_removal +=
       WT_STAT_READ(from, cache_hs_key_truncate_onpage_removal);
-    to->cache_hs_order_remove += WT_STAT_READ(from, cache_hs_order_remove);
+    to->cache_hs_key_truncate_non_ts += WT_STAT_READ(from, cache_hs_key_truncate_non_ts);
     to->cache_hs_write_squash += WT_STAT_READ(from, cache_hs_write_squash);
     to->cache_inmem_splittable += WT_STAT_READ(from, cache_inmem_splittable);
     to->cache_inmem_split += WT_STAT_READ(from, cache_inmem_split);

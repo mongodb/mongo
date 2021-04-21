@@ -87,6 +87,12 @@ class thread_context {
         return (_type);
     }
 
+    timestamp_manager *
+    get_timestamp_manager() const
+    {
+        return (_timestamp_manager);
+    }
+
     workload_tracking *
     get_tracking() const
     {
@@ -163,22 +169,16 @@ class thread_context {
     }
 
     /*
-     * Set a commit timestamp if the timestamp manager is enabled and always return the timestamp
-     * that should have been used for the commit.
+     * Set a commit timestamp if the timestamp manager is enabled.
      */
-    wt_timestamp_t
-    set_commit_timestamp(WT_SESSION *session)
+    void
+    set_commit_timestamp(WT_SESSION *session, wt_timestamp_t ts)
     {
+        if (!_timestamp_manager->is_enabled())
+            return;
 
-        wt_timestamp_t ts = _timestamp_manager->get_next_ts();
-        std::string config;
-
-        if (_timestamp_manager->is_enabled()) {
-            config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);
-            testutil_check(session->timestamp_transaction(session, config.c_str()));
-        }
-
-        return (ts);
+        std::string config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);
+        testutil_check(session->timestamp_transaction(session, config.c_str()));
     }
 
     private:

@@ -5824,228 +5824,233 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	1389
 /*!
  * cache: history store table out-of-order updates that were fixed up by
- * reinserting with the fixed timestamp
+ * moving existing records
  */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_REINSERT		1390
+#define	WT_STAT_CONN_CACHE_HS_ORDER_FIXUP_MOVE		1390
+/*!
+ * cache: history store table out-of-order updates that were fixed up
+ * during insertion
+ */
+#define	WT_STAT_CONN_CACHE_HS_ORDER_FIXUP_INSERT	1391
 /*! cache: history store table reads */
-#define	WT_STAT_CONN_CACHE_HS_READ			1391
+#define	WT_STAT_CONN_CACHE_HS_READ			1392
 /*! cache: history store table reads missed */
-#define	WT_STAT_CONN_CACHE_HS_READ_MISS			1392
+#define	WT_STAT_CONN_CACHE_HS_READ_MISS			1393
 /*! cache: history store table reads requiring squashed modifies */
-#define	WT_STAT_CONN_CACHE_HS_READ_SQUASH		1393
+#define	WT_STAT_CONN_CACHE_HS_READ_SQUASH		1394
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an unstable update
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	1394
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	1395
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an update
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS		1395
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_RTS		1396
 /*! cache: history store table truncation to remove an update */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE		1396
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE		1397
 /*!
  * cache: history store table truncation to remove range of updates due
  * to key being removed from the data page during reconciliation
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	1397
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	1398
 /*!
  * cache: history store table truncation to remove range of updates due
- * to out-of-order timestamp update on data page
+ * to non timestamped update on data page
  */
-#define	WT_STAT_CONN_CACHE_HS_ORDER_REMOVE		1398
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_NON_TS	1399
 /*! cache: history store table writes requiring squashed modifies */
-#define	WT_STAT_CONN_CACHE_HS_WRITE_SQUASH		1399
+#define	WT_STAT_CONN_CACHE_HS_WRITE_SQUASH		1400
 /*! cache: in-memory page passed criteria to be split */
-#define	WT_STAT_CONN_CACHE_INMEM_SPLITTABLE		1400
+#define	WT_STAT_CONN_CACHE_INMEM_SPLITTABLE		1401
 /*! cache: in-memory page splits */
-#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1401
+#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			1402
 /*! cache: internal pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1402
+#define	WT_STAT_CONN_CACHE_EVICTION_INTERNAL		1403
 /*! cache: internal pages split during eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_INTERNAL	1403
+#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_INTERNAL	1404
 /*! cache: leaf pages split during eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_LEAF		1404
+#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT_LEAF		1405
 /*! cache: modified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1405
+#define	WT_STAT_CONN_CACHE_EVICTION_DIRTY		1406
 /*! cache: overflow pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ_OVERFLOW		1406
+#define	WT_STAT_CONN_CACHE_READ_OVERFLOW		1407
 /*! cache: page split during eviction deepened the tree */
-#define	WT_STAT_CONN_CACHE_EVICTION_DEEPEN		1407
+#define	WT_STAT_CONN_CACHE_EVICTION_DEEPEN		1408
 /*! cache: page written requiring history store records */
-#define	WT_STAT_CONN_CACHE_WRITE_HS			1408
+#define	WT_STAT_CONN_CACHE_WRITE_HS			1409
 /*! cache: pages read into cache */
-#define	WT_STAT_CONN_CACHE_READ				1409
+#define	WT_STAT_CONN_CACHE_READ				1410
 /*! cache: pages read into cache after truncate */
-#define	WT_STAT_CONN_CACHE_READ_DELETED			1410
+#define	WT_STAT_CONN_CACHE_READ_DELETED			1411
 /*! cache: pages read into cache after truncate in prepare state */
-#define	WT_STAT_CONN_CACHE_READ_DELETED_PREPARED	1411
+#define	WT_STAT_CONN_CACHE_READ_DELETED_PREPARED	1412
 /*! cache: pages requested from the cache */
-#define	WT_STAT_CONN_CACHE_PAGES_REQUESTED		1412
+#define	WT_STAT_CONN_CACHE_PAGES_REQUESTED		1413
 /*! cache: pages seen by eviction walk */
-#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_SEEN		1413
+#define	WT_STAT_CONN_CACHE_EVICTION_PAGES_SEEN		1414
 /*! cache: pages written from cache */
-#define	WT_STAT_CONN_CACHE_WRITE			1414
+#define	WT_STAT_CONN_CACHE_WRITE			1415
 /*! cache: pages written requiring in-memory restoration */
-#define	WT_STAT_CONN_CACHE_WRITE_RESTORE		1415
+#define	WT_STAT_CONN_CACHE_WRITE_RESTORE		1416
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1416
+#define	WT_STAT_CONN_CACHE_BYTES_DIRTY			1417
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1417
+#define	WT_STAT_CONN_CACHE_EVICTION_CLEAN		1418
 /*! checkpoint-cleanup: pages added for eviction */
-#define	WT_STAT_CONN_CC_PAGES_EVICT			1418
+#define	WT_STAT_CONN_CC_PAGES_EVICT			1419
 /*! checkpoint-cleanup: pages removed */
-#define	WT_STAT_CONN_CC_PAGES_REMOVED			1419
+#define	WT_STAT_CONN_CC_PAGES_REMOVED			1420
 /*! checkpoint-cleanup: pages skipped during tree walk */
-#define	WT_STAT_CONN_CC_PAGES_WALK_SKIPPED		1420
+#define	WT_STAT_CONN_CC_PAGES_WALK_SKIPPED		1421
 /*! checkpoint-cleanup: pages visited */
-#define	WT_STAT_CONN_CC_PAGES_VISITED			1421
+#define	WT_STAT_CONN_CC_PAGES_VISITED			1422
 /*! cursor: Total number of entries skipped by cursor next calls */
-#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_TOTAL		1422
+#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_TOTAL		1423
 /*! cursor: Total number of entries skipped by cursor prev calls */
-#define	WT_STAT_CONN_CURSOR_PREV_SKIP_TOTAL		1423
+#define	WT_STAT_CONN_CURSOR_PREV_SKIP_TOTAL		1424
 /*!
  * cursor: Total number of entries skipped to position the history store
  * cursor
  */
-#define	WT_STAT_CONN_CURSOR_SKIP_HS_CUR_POSITION	1424
+#define	WT_STAT_CONN_CURSOR_SKIP_HS_CUR_POSITION	1425
 /*!
  * cursor: cursor next calls that skip due to a globally visible history
  * store tombstone
  */
-#define	WT_STAT_CONN_CURSOR_NEXT_HS_TOMBSTONE		1425
+#define	WT_STAT_CONN_CURSOR_NEXT_HS_TOMBSTONE		1426
 /*!
  * cursor: cursor next calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_GE_100		1426
+#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_GE_100		1427
 /*! cursor: cursor next calls that skip less than 100 entries */
-#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100		1427
+#define	WT_STAT_CONN_CURSOR_NEXT_SKIP_LT_100		1428
 /*!
  * cursor: cursor prev calls that skip due to a globally visible history
  * store tombstone
  */
-#define	WT_STAT_CONN_CURSOR_PREV_HS_TOMBSTONE		1428
+#define	WT_STAT_CONN_CURSOR_PREV_HS_TOMBSTONE		1429
 /*!
  * cursor: cursor prev calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_CONN_CURSOR_PREV_SKIP_GE_100		1429
+#define	WT_STAT_CONN_CURSOR_PREV_SKIP_GE_100		1430
 /*! cursor: cursor prev calls that skip less than 100 entries */
-#define	WT_STAT_CONN_CURSOR_PREV_SKIP_LT_100		1430
+#define	WT_STAT_CONN_CURSOR_PREV_SKIP_LT_100		1431
 /*! cursor: open cursor count */
-#define	WT_STAT_CONN_CURSOR_OPEN_COUNT			1431
+#define	WT_STAT_CONN_CURSOR_OPEN_COUNT			1432
 /*! reconciliation: approximate byte size of timestamps in pages written */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_BYTES_TS		1432
+#define	WT_STAT_CONN_REC_TIME_WINDOW_BYTES_TS		1433
 /*!
  * reconciliation: approximate byte size of transaction IDs in pages
  * written
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_BYTES_TXN		1433
+#define	WT_STAT_CONN_REC_TIME_WINDOW_BYTES_TXN		1434
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1434
+#define	WT_STAT_CONN_REC_PAGE_DELETE_FAST		1435
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1435
+#define	WT_STAT_CONN_REC_PAGES				1436
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1436
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1437
 /*! reconciliation: pages deleted */
-#define	WT_STAT_CONN_REC_PAGE_DELETE			1437
+#define	WT_STAT_CONN_REC_PAGE_DELETE			1438
 /*!
  * reconciliation: pages written including an aggregated newest start
  * durable timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	1438
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	1439
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * durable timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	1439
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	1440
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TS	1440
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TS	1441
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * transaction ID
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TXN	1441
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_STOP_TXN	1442
 /*!
  * reconciliation: pages written including an aggregated newest
  * transaction ID
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_TXN		1442
+#define	WT_STAT_CONN_REC_TIME_AGGR_NEWEST_TXN		1443
 /*!
  * reconciliation: pages written including an aggregated oldest start
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_AGGR_OLDEST_START_TS	1443
+#define	WT_STAT_CONN_REC_TIME_AGGR_OLDEST_START_TS	1444
 /*! reconciliation: pages written including an aggregated prepare */
-#define	WT_STAT_CONN_REC_TIME_AGGR_PREPARED		1444
+#define	WT_STAT_CONN_REC_TIME_AGGR_PREPARED		1445
 /*!
  * reconciliation: pages written including at least one start durable
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	1445
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	1446
 /*!
  * reconciliation: pages written including at least one start transaction
  * ID
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TXN	1446
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_START_TXN	1447
 /*!
  * reconciliation: pages written including at least one stop durable
  * timestamp
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	1447
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	1448
 /*! reconciliation: pages written including at least one stop timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TS	1448
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TS	1449
 /*!
  * reconciliation: pages written including at least one stop transaction
  * ID
  */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TXN	1449
+#define	WT_STAT_CONN_REC_TIME_WINDOW_PAGES_STOP_TXN	1450
 /*! reconciliation: records written including a start durable timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_START_TS	1450
+#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_START_TS	1451
 /*! reconciliation: records written including a start timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TS		1451
+#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TS		1452
 /*! reconciliation: records written including a start transaction ID */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TXN		1452
+#define	WT_STAT_CONN_REC_TIME_WINDOW_START_TXN		1453
 /*! reconciliation: records written including a stop durable timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_STOP_TS	1453
+#define	WT_STAT_CONN_REC_TIME_WINDOW_DURABLE_STOP_TS	1454
 /*! reconciliation: records written including a stop timestamp */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TS		1454
+#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TS		1455
 /*! reconciliation: records written including a stop transaction ID */
-#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TXN		1455
+#define	WT_STAT_CONN_REC_TIME_WINDOW_STOP_TXN		1456
 /*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_CONN_TIERED_RETENTION			1456
+#define	WT_STAT_CONN_TIERED_RETENTION			1457
 /*! session: tiered storage object size */
-#define	WT_STAT_CONN_TIERED_OBJECT_SIZE			1457
+#define	WT_STAT_CONN_TIERED_OBJECT_SIZE			1458
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1458
+#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1459
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1459
+#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1460
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1460
+#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1461
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1461
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1462
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1462
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1463
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1463
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1464
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1464
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1465
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1465
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1466
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1466
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1467
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1467
+#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1468
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1468
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1469
 
 /*!
  * @}
@@ -6438,228 +6443,233 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_HS_ORDER_LOSE_DURABLE_TIMESTAMP	2130
 /*!
  * cache: history store table out-of-order updates that were fixed up by
- * reinserting with the fixed timestamp
+ * moving existing records
  */
-#define	WT_STAT_DSRC_CACHE_HS_ORDER_REINSERT		2131
+#define	WT_STAT_DSRC_CACHE_HS_ORDER_FIXUP_MOVE		2131
+/*!
+ * cache: history store table out-of-order updates that were fixed up
+ * during insertion
+ */
+#define	WT_STAT_DSRC_CACHE_HS_ORDER_FIXUP_INSERT	2132
 /*! cache: history store table reads */
-#define	WT_STAT_DSRC_CACHE_HS_READ			2132
+#define	WT_STAT_DSRC_CACHE_HS_READ			2133
 /*! cache: history store table reads missed */
-#define	WT_STAT_DSRC_CACHE_HS_READ_MISS			2133
+#define	WT_STAT_DSRC_CACHE_HS_READ_MISS			2134
 /*! cache: history store table reads requiring squashed modifies */
-#define	WT_STAT_DSRC_CACHE_HS_READ_SQUASH		2134
+#define	WT_STAT_DSRC_CACHE_HS_READ_SQUASH		2135
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an unstable update
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	2135
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS_UNSTABLE	2136
 /*!
  * cache: history store table truncation by rollback to stable to remove
  * an update
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS		2136
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_RTS		2137
 /*! cache: history store table truncation to remove an update */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE		2137
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE		2138
 /*!
  * cache: history store table truncation to remove range of updates due
  * to key being removed from the data page during reconciliation
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	2138
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	2139
 /*!
  * cache: history store table truncation to remove range of updates due
- * to out-of-order timestamp update on data page
+ * to non timestamped update on data page
  */
-#define	WT_STAT_DSRC_CACHE_HS_ORDER_REMOVE		2139
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_NON_TS	2140
 /*! cache: history store table writes requiring squashed modifies */
-#define	WT_STAT_DSRC_CACHE_HS_WRITE_SQUASH		2140
+#define	WT_STAT_DSRC_CACHE_HS_WRITE_SQUASH		2141
 /*! cache: in-memory page passed criteria to be split */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLITTABLE		2141
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLITTABLE		2142
 /*! cache: in-memory page splits */
-#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2142
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			2143
 /*! cache: internal pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2143
+#define	WT_STAT_DSRC_CACHE_EVICTION_INTERNAL		2144
 /*! cache: internal pages split during eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_INTERNAL	2144
+#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_INTERNAL	2145
 /*! cache: leaf pages split during eviction */
-#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_LEAF		2145
+#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT_LEAF		2146
 /*! cache: modified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2146
+#define	WT_STAT_DSRC_CACHE_EVICTION_DIRTY		2147
 /*! cache: overflow pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2147
+#define	WT_STAT_DSRC_CACHE_READ_OVERFLOW		2148
 /*! cache: page split during eviction deepened the tree */
-#define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2148
+#define	WT_STAT_DSRC_CACHE_EVICTION_DEEPEN		2149
 /*! cache: page written requiring history store records */
-#define	WT_STAT_DSRC_CACHE_WRITE_HS			2149
+#define	WT_STAT_DSRC_CACHE_WRITE_HS			2150
 /*! cache: pages read into cache */
-#define	WT_STAT_DSRC_CACHE_READ				2150
+#define	WT_STAT_DSRC_CACHE_READ				2151
 /*! cache: pages read into cache after truncate */
-#define	WT_STAT_DSRC_CACHE_READ_DELETED			2151
+#define	WT_STAT_DSRC_CACHE_READ_DELETED			2152
 /*! cache: pages read into cache after truncate in prepare state */
-#define	WT_STAT_DSRC_CACHE_READ_DELETED_PREPARED	2152
+#define	WT_STAT_DSRC_CACHE_READ_DELETED_PREPARED	2153
 /*! cache: pages requested from the cache */
-#define	WT_STAT_DSRC_CACHE_PAGES_REQUESTED		2153
+#define	WT_STAT_DSRC_CACHE_PAGES_REQUESTED		2154
 /*! cache: pages seen by eviction walk */
-#define	WT_STAT_DSRC_CACHE_EVICTION_PAGES_SEEN		2154
+#define	WT_STAT_DSRC_CACHE_EVICTION_PAGES_SEEN		2155
 /*! cache: pages written from cache */
-#define	WT_STAT_DSRC_CACHE_WRITE			2155
+#define	WT_STAT_DSRC_CACHE_WRITE			2156
 /*! cache: pages written requiring in-memory restoration */
-#define	WT_STAT_DSRC_CACHE_WRITE_RESTORE		2156
+#define	WT_STAT_DSRC_CACHE_WRITE_RESTORE		2157
 /*! cache: tracked dirty bytes in the cache */
-#define	WT_STAT_DSRC_CACHE_BYTES_DIRTY			2157
+#define	WT_STAT_DSRC_CACHE_BYTES_DIRTY			2158
 /*! cache: unmodified pages evicted */
-#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2158
+#define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2159
 /*! checkpoint-cleanup: pages added for eviction */
-#define	WT_STAT_DSRC_CC_PAGES_EVICT			2159
+#define	WT_STAT_DSRC_CC_PAGES_EVICT			2160
 /*! checkpoint-cleanup: pages removed */
-#define	WT_STAT_DSRC_CC_PAGES_REMOVED			2160
+#define	WT_STAT_DSRC_CC_PAGES_REMOVED			2161
 /*! checkpoint-cleanup: pages skipped during tree walk */
-#define	WT_STAT_DSRC_CC_PAGES_WALK_SKIPPED		2161
+#define	WT_STAT_DSRC_CC_PAGES_WALK_SKIPPED		2162
 /*! checkpoint-cleanup: pages visited */
-#define	WT_STAT_DSRC_CC_PAGES_VISITED			2162
+#define	WT_STAT_DSRC_CC_PAGES_VISITED			2163
 /*! cursor: Total number of entries skipped by cursor next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_TOTAL		2163
+#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_TOTAL		2164
 /*! cursor: Total number of entries skipped by cursor prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_TOTAL		2164
+#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_TOTAL		2165
 /*!
  * cursor: Total number of entries skipped to position the history store
  * cursor
  */
-#define	WT_STAT_DSRC_CURSOR_SKIP_HS_CUR_POSITION	2165
+#define	WT_STAT_DSRC_CURSOR_SKIP_HS_CUR_POSITION	2166
 /*!
  * cursor: cursor next calls that skip due to a globally visible history
  * store tombstone
  */
-#define	WT_STAT_DSRC_CURSOR_NEXT_HS_TOMBSTONE		2166
+#define	WT_STAT_DSRC_CURSOR_NEXT_HS_TOMBSTONE		2167
 /*!
  * cursor: cursor next calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_GE_100		2167
+#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_GE_100		2168
 /*! cursor: cursor next calls that skip less than 100 entries */
-#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_LT_100		2168
+#define	WT_STAT_DSRC_CURSOR_NEXT_SKIP_LT_100		2169
 /*!
  * cursor: cursor prev calls that skip due to a globally visible history
  * store tombstone
  */
-#define	WT_STAT_DSRC_CURSOR_PREV_HS_TOMBSTONE		2169
+#define	WT_STAT_DSRC_CURSOR_PREV_HS_TOMBSTONE		2170
 /*!
  * cursor: cursor prev calls that skip greater than or equal to 100
  * entries
  */
-#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_GE_100		2170
+#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_GE_100		2171
 /*! cursor: cursor prev calls that skip less than 100 entries */
-#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_LT_100		2171
+#define	WT_STAT_DSRC_CURSOR_PREV_SKIP_LT_100		2172
 /*! cursor: open cursor count */
-#define	WT_STAT_DSRC_CURSOR_OPEN_COUNT			2172
+#define	WT_STAT_DSRC_CURSOR_OPEN_COUNT			2173
 /*! reconciliation: approximate byte size of timestamps in pages written */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_BYTES_TS		2173
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_BYTES_TS		2174
 /*!
  * reconciliation: approximate byte size of transaction IDs in pages
  * written
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_BYTES_TXN		2174
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_BYTES_TXN		2175
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2175
+#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2176
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2176
+#define	WT_STAT_DSRC_REC_PAGES				2177
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2177
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2178
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2178
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2179
 /*!
  * reconciliation: pages written including an aggregated newest start
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2179
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_START_DURABLE_TS	2180
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * durable timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2180
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_DURABLE_TS	2181
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2181
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TS	2182
 /*!
  * reconciliation: pages written including an aggregated newest stop
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2182
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_STOP_TXN	2183
 /*!
  * reconciliation: pages written including an aggregated newest
  * transaction ID
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2183
+#define	WT_STAT_DSRC_REC_TIME_AGGR_NEWEST_TXN		2184
 /*!
  * reconciliation: pages written including an aggregated oldest start
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2184
+#define	WT_STAT_DSRC_REC_TIME_AGGR_OLDEST_START_TS	2185
 /*! reconciliation: pages written including an aggregated prepare */
-#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2185
+#define	WT_STAT_DSRC_REC_TIME_AGGR_PREPARED		2186
 /*!
  * reconciliation: pages written including at least one start durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2186
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_START_TS	2187
 /*!
  * reconciliation: pages written including at least one start transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2187
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_START_TXN	2188
 /*!
  * reconciliation: pages written including at least one stop durable
  * timestamp
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2188
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_DURABLE_STOP_TS	2189
 /*! reconciliation: pages written including at least one stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2189
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TS	2190
 /*!
  * reconciliation: pages written including at least one stop transaction
  * ID
  */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2190
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_PAGES_STOP_TXN	2191
 /*! reconciliation: records written including a start durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2191
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_START_TS	2192
 /*! reconciliation: records written including a start timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2192
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TS		2193
 /*! reconciliation: records written including a start transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2193
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_START_TXN		2194
 /*! reconciliation: records written including a stop durable timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2194
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_DURABLE_STOP_TS	2195
 /*! reconciliation: records written including a stop timestamp */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2195
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TS		2196
 /*! reconciliation: records written including a stop transaction ID */
-#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2196
+#define	WT_STAT_DSRC_REC_TIME_WINDOW_STOP_TXN		2197
 /*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_DSRC_TIERED_RETENTION			2197
+#define	WT_STAT_DSRC_TIERED_RETENTION			2198
 /*! session: tiered storage object size */
-#define	WT_STAT_DSRC_TIERED_OBJECT_SIZE			2198
+#define	WT_STAT_DSRC_TIERED_OBJECT_SIZE			2199
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2199
+#define	WT_STAT_DSRC_TXN_READ_RACE_PREPARE_UPDATE	2200
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2200
+#define	WT_STAT_DSRC_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	2201
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2201
+#define	WT_STAT_DSRC_TXN_RTS_INCONSISTENT_CKPT		2202
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2202
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_REMOVED		2203
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2203
+#define	WT_STAT_DSRC_TXN_RTS_KEYS_RESTORED		2204
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2204
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_TOMBSTONES	2205
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2205
+#define	WT_STAT_DSRC_TXN_RTS_HS_RESTORE_UPDATES		2206
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2206
+#define	WT_STAT_DSRC_TXN_RTS_SWEEP_HS_KEYS		2207
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2207
+#define	WT_STAT_DSRC_TXN_RTS_HS_REMOVED			2208
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2208
+#define	WT_STAT_DSRC_TXN_CHECKPOINT_OBSOLETE_APPLIED	2209
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2209
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2210
 
 /*!
  * @}

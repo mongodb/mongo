@@ -49,16 +49,16 @@ class database_operation {
      *      - Store in memory the created collections and the generated keys that were inserted.
      */
     virtual void
-    populate(database &database, timestamp_manager *_timestamp_manager, configuration *_config,
+    populate(database &database, timestamp_manager *timestamp_manager, configuration *config,
       workload_tracking *tracking)
     {
         WT_CURSOR *cursor;
         WT_SESSION *session;
         wt_timestamp_t ts;
         int64_t collection_count, key_count, key_cpt, key_size, value_size;
-        std::string collection_name, config, home;
+        std::string collection_name, cfg, home;
         key_value_t generated_key, generated_value;
-        bool ts_enabled = _timestamp_manager->is_enabled();
+        bool ts_enabled = timestamp_manager->is_enabled();
 
         cursor = nullptr;
         collection_count = key_count = key_size = value_size = 0;
@@ -66,22 +66,22 @@ class database_operation {
         /* Get a session. */
         session = connection_manager::instance().create_session();
         /* Create n collections as per the configuration and store each collection name. */
-        testutil_check(_config->get_int(COLLECTION_COUNT, collection_count));
+        testutil_check(config->get_int(COLLECTION_COUNT, collection_count));
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
             database.collections[collection_name] = {};
             testutil_check(
               session->create(session, collection_name.c_str(), DEFAULT_FRAMEWORK_SCHEMA));
-            ts = _timestamp_manager->get_next_ts();
+            ts = timestamp_manager->get_next_ts();
             testutil_check(tracking->save(tracking_operation::CREATE, collection_name, 0, "", ts));
         }
         debug_print(std::to_string(collection_count) + " collections created", DEBUG_TRACE);
 
         /* Open a cursor on each collection and use the configuration to insert key/value pairs. */
-        testutil_check(_config->get_int(KEY_COUNT, key_count));
-        testutil_check(_config->get_int(VALUE_SIZE, value_size));
+        testutil_check(config->get_int(KEY_COUNT, key_count));
+        testutil_check(config->get_int(VALUE_SIZE, value_size));
         testutil_assert(value_size > 0);
-        testutil_check(_config->get_int(KEY_SIZE, key_size));
+        testutil_check(config->get_int(KEY_SIZE, key_size));
         testutil_assert(key_size > 0);
         /* Keys must be unique. */
         testutil_assert(key_count <= pow(10, key_size));
@@ -103,14 +103,14 @@ class database_operation {
                  */
                 generated_value =
                   random_generator::random_generator::instance().generate_string(value_size);
-                ts = _timestamp_manager->get_next_ts();
+                ts = timestamp_manager->get_next_ts();
                 if (ts_enabled)
                     testutil_check(session->begin_transaction(session, ""));
                 testutil_check(insert(cursor, tracking, collection_name, generated_key.c_str(),
                   generated_value.c_str(), ts));
                 if (ts_enabled) {
-                    config = std::string(COMMIT_TS) + "=" + _timestamp_manager->decimal_to_hex(ts);
-                    testutil_check(session->commit_transaction(session, config.c_str()));
+                    cfg = std::string(COMMIT_TS) + "=" + timestamp_manager->decimal_to_hex(ts);
+                    testutil_check(session->commit_transaction(session, cfg.c_str()));
                 }
                 /* Update the memory representation of the collections. */
                 database.collections[collection_name].keys[generated_key].exists = true;
@@ -176,10 +176,12 @@ class database_operation {
                 if (!iter_key->second.exists)
                     continue;
 
+                ts = context.get_timestamp_manager()->get_next_ts();
+
                 /* Start a transaction if possible. */
                 if (!context.is_in_transaction()) {
                     context.begin_transaction(session, "");
-                    ts = context.set_commit_timestamp(session);
+                    context.set_commit_timestamp(session, ts);
                 }
                 generated_value =
                   random_generator::random_generator::instance().generate_string(value_size);
