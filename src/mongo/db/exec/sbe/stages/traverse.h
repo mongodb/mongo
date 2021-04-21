@@ -70,6 +70,10 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+    void doRestoreState() final;
+
 private:
     void openInner(value::TypeTags tag, value::Value val);
     bool traverse(value::SlotAccessor* inFieldAccessor,
@@ -104,6 +108,8 @@ private:
 
     std::unique_ptr<vm::CodeFragment> _foldCode;
     std::unique_ptr<vm::CodeFragment> _finalCode;
+
+    std::list<value::ArrayAccessor> _inArrayAccessors;
 
     vm::ByteCode _bytecode;
 

@@ -42,6 +42,7 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
+class PlanYieldPolicy;
 namespace sbe {
 struct ParsedQueryTree {
     std::string identifier;
@@ -66,7 +67,8 @@ public:
     Parser(RuntimeEnvironment* env);
     std::unique_ptr<PlanStage> parse(OperationContext* opCtx,
                                      StringData defaultDb,
-                                     StringData line);
+                                     StringData line,
+                                     PlanYieldPolicy* yieldPolicy = nullptr);
 
     std::pair<boost::optional<value::SlotId>, boost::optional<value::SlotId>> getTopLevelSlots()
         const {
@@ -78,6 +80,7 @@ private:
     using SpoolBufferLookupTable = std::map<std::string, SpoolId>;
     peg::parser _parser;
     OperationContext* _opCtx{nullptr};
+    PlanYieldPolicy* _yieldPolicy{nullptr};
     std::string _defaultDb;
     SymbolTable _symbolsLookupTable;
     SpoolBufferLookupTable _spoolBuffersLookupTable;

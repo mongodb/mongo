@@ -202,7 +202,7 @@ const SpecificStats* HashAggStage::getSpecificStats() const {
 void HashAggStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _ht = boost::none;
 }
 

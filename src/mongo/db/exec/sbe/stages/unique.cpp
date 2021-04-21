@@ -89,7 +89,7 @@ PlanState UniqueStage::getNext() {
 
 void UniqueStage::close() {
     auto optTimer(getOptTimer(_opCtx));
-    _commonStats.closes++;
+    trackClose();
 
     _seen.clear();
     _children[0]->close();

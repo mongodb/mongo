@@ -142,7 +142,7 @@ TEST_F(SBEKeyStringTest, Basic) {
 
     bsonObjAccessor.reset(value::TypeTags::bsonObject,
                           value::bitcastFrom<const char*>(testValues.objdata()));
-    std::vector<sbe::value::ViewOfValueAccessor> keyStringValues;
+    std::vector<sbe::value::OwnedValueAccessor> keyStringValues;
     BufBuilder builder;
     for (auto&& element : testValues) {
         while (keyStringValues.empty()) {
@@ -185,7 +185,7 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     indexKeysToInclude.set(0);
     indexKeysToInclude.set(2);
 
-    std::vector<value::ViewOfValueAccessor> accessors;
+    std::vector<value::OwnedValueAccessor> accessors;
     accessors.resize(2);
 
     BufBuilder builder;

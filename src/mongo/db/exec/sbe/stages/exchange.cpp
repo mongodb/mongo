@@ -327,7 +327,7 @@ PlanState ExchangeConsumer::getNext() {
 void ExchangeConsumer::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
 
     {
         stdx::unique_lock lock(_state->consumerCloseMutex());
@@ -566,7 +566,7 @@ PlanState ExchangeProducer::getNext() {
 void ExchangeProducer::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[0]->close();
 }
 

@@ -113,13 +113,16 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+
 private:
     std::shared_ptr<SpoolBuffer> _buffer{nullptr};
     const SpoolId _spoolId;
 
     const value::SlotVector _vals;
     std::vector<value::SlotAccessor*> _inAccessors;
-    value::SlotMap<value::ViewOfValueAccessor> _outAccessors;
+    value::SlotMap<value::OwnedValueAccessor> _outAccessors;
 
     std::unique_ptr<EExpression> _predicate;
     std::unique_ptr<vm::CodeFragment> _predicateCode;
@@ -217,7 +220,7 @@ public:
     void close() {
         auto optTimer(getOptTimer(_opCtx));
 
-        _commonStats.closes++;
+        trackClose();
     }
 
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {

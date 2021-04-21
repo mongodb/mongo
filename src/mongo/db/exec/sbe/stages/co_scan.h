@@ -42,7 +42,7 @@ namespace mongo::sbe {
  */
 class CoScanStage final : public PlanStage {
 public:
-    explicit CoScanStage(PlanNodeId);
+    explicit CoScanStage(PlanNodeId, PlanYieldPolicy* yieldPolicy = nullptr);
 
     std::unique_ptr<PlanStage> clone() const final;
 

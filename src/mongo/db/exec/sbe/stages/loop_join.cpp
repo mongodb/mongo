@@ -149,7 +149,7 @@ PlanState LoopJoinStage::getNext() {
 void LoopJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
 
     if (_reOpenInner) {
         _children[1]->close();

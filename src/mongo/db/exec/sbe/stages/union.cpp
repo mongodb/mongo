@@ -150,7 +150,7 @@ PlanState UnionStage::getNext() {
 void UnionStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _currentStage = nullptr;
     while (!_remainingBranchesToDrain.empty()) {
         _remainingBranchesToDrain.front().close();

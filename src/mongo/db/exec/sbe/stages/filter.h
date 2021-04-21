@@ -124,7 +124,7 @@ public:
     void close() final {
         auto optTimer(getOptTimer(_opCtx));
 
-        _commonStats.closes++;
+        trackClose();
 
         if (_childOpened) {
             _children[0]->close();

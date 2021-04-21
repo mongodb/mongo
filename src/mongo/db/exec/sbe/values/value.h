@@ -1219,7 +1219,7 @@ public:
         reset(tag, val);
     }
 
-    void reset(TypeTags tag, Value val) {
+    void reset(TypeTags tag, Value val, size_t index = 0) {
         _tagArray = tag;
         _valArray = val;
         _array = nullptr;
@@ -1228,15 +1228,22 @@ public:
 
         if (tag == TypeTags::Array) {
             _array = getArrayView(val);
-        } else if (tag == TypeTags::ArraySet) {
-            _arraySet = getArraySetView(val);
-            _iter = _arraySet->values().begin();
-        } else if (tag == TypeTags::bsonArray) {
-            auto bson = getRawPointerView(val);
-            _arrayCurrent = bson + 4;
-            _arrayEnd = bson + ConstDataView(bson).read<LittleEndian<uint32_t>>();
+            _index = index;
         } else {
-            MONGO_UNREACHABLE;
+            if (tag == TypeTags::ArraySet) {
+                _arraySet = getArraySetView(val);
+                _iter = _arraySet->values().begin();
+            } else if (tag == TypeTags::bsonArray) {
+                auto bson = getRawPointerView(val);
+                _arrayCurrent = bson + 4;
+                _arrayEnd = bson + ConstDataView(bson).read<LittleEndian<uint32_t>>();
+            } else {
+                MONGO_UNREACHABLE;
+            }
+
+            for (size_t i = 0; !atEnd() && i < index; i++) {
+                advance();
+            }
         }
     }
 

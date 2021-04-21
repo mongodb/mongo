@@ -42,7 +42,7 @@ namespace mongo::sbe::value {
  * sbe::value::Value. During construction, these pairs are stored in the parallel '_tagList' and
  * '_valList' arrays, as a "structure of arrays."
  *
- * After constructing the array, use the 'readValues()' method to populate a ViewOfValueAccessor
+ * After constructing the array, use the 'readValues()' method to populate a OwnedValueAccessor
  * vector. Some "views" (values that are pointers into other memory) are constructed by appending
  * them to the 'valueBufferBuilder' provided to the constructor, and the internal buffer in that
  * 'valueBufferBuilder' must be kept alive for as long as the accessors are to remain valid.
@@ -198,7 +198,7 @@ public:
      * into the memory constructed by the '_valueBufferBuilder' object, which is a caller-owned
      * object that must remain valid for as long as these accessors are to remain valid.
      */
-    void readValues(std::vector<ViewOfValueAccessor>* accessors) {
+    void readValues(std::vector<OwnedValueAccessor>* accessors) {
         auto bufferLen = _valueBufferBuilder->len();
         for (size_t i = 0; i < _numValues; ++i) {
             auto tag = _tagList[i];
@@ -229,7 +229,7 @@ public:
             }
 
             invariant(i < accessors->size());
-            (*accessors)[i].reset(tag, val);
+            (*accessors)[i].reset(false, tag, val);
         }
     }
 

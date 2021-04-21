@@ -118,8 +118,8 @@ private:
 
     const ScanCallbacks _scanCallbacks;
 
-    std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
-    std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
     value::SlotAccessor* _indexIdAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
@@ -223,8 +223,8 @@ private:
 
     const ScanCallbacks _scanCallbacks;
 
-    std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
-    std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
     value::SlotAccessor* _indexIdAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};

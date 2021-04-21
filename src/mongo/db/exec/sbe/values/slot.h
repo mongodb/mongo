@@ -186,6 +186,15 @@ public:
         _owned = owned;
     }
 
+    void makeOwned() {
+        if (_owned) {
+            return;
+        }
+
+        std::tie(_tag, _val) = copyValue(_tag, _val);
+        _owned = true;
+    }
+
 private:
     void release() {
         if (_owned) {
@@ -208,8 +217,10 @@ private:
  */
 class ArrayAccessor final : public SlotAccessor {
 public:
-    void reset(TypeTags tag, Value val) {
-        _enumerator.reset(tag, val);
+    void reset(SlotAccessor* input) {
+        _input = input;
+        _currentIndex = 0;
+        refresh();
     }
 
     // Return non-owning view of the value.
@@ -227,10 +238,18 @@ public:
     }
 
     bool advance() {
+        ++_currentIndex;
         return _enumerator.advance();
     }
 
+    void refresh() {
+        auto [tag, val] = _input->getViewOfValue();
+        _enumerator.reset(tag, val, _currentIndex);
+    }
+
 private:
+    size_t _currentIndex = 0;
+    SlotAccessor* _input{nullptr};
     ArrayEnumerator _enumerator;
 };
 
@@ -628,7 +647,7 @@ void readKeyStringValueIntoAccessors(
     const KeyString::Value& keyString,
     const Ordering& ordering,
     BufBuilder* valueBufferBuilder,
-    std::vector<ViewOfValueAccessor>* accessors,
+    std::vector<OwnedValueAccessor>* accessors,
     boost::optional<IndexKeysInclusionSet> indexKeysToInclude = boost::none);
 
 
@@ -638,7 +657,8 @@ void readKeyStringValueIntoAccessors(
 template <typename T>
 using SlotMap = absl::flat_hash_map<SlotId, T>;
 using SlotAccessorMap = SlotMap<SlotAccessor*>;
-using FieldAccessorMap = StringMap<std::unique_ptr<ViewOfValueAccessor>>;
+using FieldAccessorMap = StringMap<std::unique_ptr<OwnedValueAccessor>>;
+using FieldViewAccessorMap = StringMap<std::unique_ptr<ViewOfValueAccessor>>;
 using SlotSet = absl::flat_hash_set<SlotId>;
 using SlotVector = std::vector<SlotId>;
 

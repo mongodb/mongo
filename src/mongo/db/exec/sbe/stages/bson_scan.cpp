@@ -136,7 +136,7 @@ PlanState BSONScanStage::getNext() {
 void BSONScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
 }
 
 std::unique_ptr<PlanStageStats> BSONScanStage::getStats(bool includeDebugInfo) const {

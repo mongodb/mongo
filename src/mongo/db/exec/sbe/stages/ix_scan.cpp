@@ -88,11 +88,11 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
 
 void IndexScanStage::prepare(CompileCtx& ctx) {
     if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     if (_snapshotIdSlot) {
@@ -110,7 +110,9 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     }
     if (_seekKeySlotHigh) {
         _seekKeyHiAccessor = ctx.getAccessor(*_seekKeySlotHigh);
+        _seekKeyHighHolder = std::make_unique<value::OwnedValueAccessor>();
     }
+    _seekKeyLowHolder = std::make_unique<value::OwnedValueAccessor>();
 
     std::tie(_collName, _catalogEpoch) =
         acquireCollection(_opCtx, _collUuid, _lockAcquisitionCallback, _coll);
@@ -156,6 +158,29 @@ value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId 
 }
 
 void IndexScanStage::doSaveState() {
+    if (slotsAccessible()) {
+        if (_recordAccessor) {
+            _recordAccessor->makeOwned();
+        }
+        if (_recordIdAccessor) {
+            _recordIdAccessor->makeOwned();
+        }
+        for (auto& accessor : _accessors) {
+            accessor.makeOwned();
+        }
+    }
+
+    // Seek points are external to the index scan and must be accessible no matter what as long as
+    // the index scan is opened.
+    if (_open) {
+        if (_seekKeyLowHolder) {
+            _seekKeyLowHolder->makeOwned();
+        }
+        if (_seekKeyHighHolder) {
+            _seekKeyHighHolder->makeOwned();
+        }
+    }
+
     if (_cursor) {
         _cursor->save();
     }
@@ -252,38 +277,55 @@ void IndexScanStage::open(bool reOpen) {
         uassert(4822851,
                 str::stream() << "seek key is wrong type: " << msgTagLow,
                 tagLow == value::TypeTags::ksValue);
-        _seekKeyLow = value::getKeyStringView(valLow);
+        _seekKeyLowHolder->reset(false, tagLow, valLow);
 
         auto [tagHi, valHi] = _seekKeyHiAccessor->getViewOfValue();
         const auto msgTagHi = tagHi;
         uassert(4822852,
                 str::stream() << "seek key is wrong type: " << msgTagHi,
                 tagHi == value::TypeTags::ksValue);
-        _seekKeyHi = value::getKeyStringView(valHi);
+
+        _seekKeyHighHolder->reset(false, tagHi, valHi);
     } else if (_seekKeyLowAccessor) {
         auto [tagLow, valLow] = _seekKeyLowAccessor->getViewOfValue();
         const auto msgTagLow = tagLow;
         uassert(4822853,
                 str::stream() << "seek key is wrong type: " << msgTagLow,
                 tagLow == value::TypeTags::ksValue);
-        _seekKeyLow = value::getKeyStringView(valLow);
-        _seekKeyHi = nullptr;
+        _seekKeyLowHolder->reset(false, tagLow, valLow);
     } else {
         auto sdi = entry->accessMethod()->getSortedDataInterface();
         KeyString::Builder kb(sdi->getKeyStringVersion(),
                               sdi->getOrdering(),
                               KeyString::Discriminator::kExclusiveBefore);
         kb.appendDiscriminator(KeyString::Discriminator::kExclusiveBefore);
-        _startPoint = kb.getValueCopy();
 
-        _seekKeyLow = &_startPoint;
-        _seekKeyHi = nullptr;
+        auto [copyTag, copyVal] = value::makeCopyKeyString(kb.getValueCopy());
+        _seekKeyLowHolder->reset(true, copyTag, copyVal);
     }
+
     ++_specificStats.seeks;
+}
+
+const KeyString::Value& IndexScanStage::getSeekKeyLow() const {
+    auto [tag, value] = _seekKeyLowHolder->getViewOfValue();
+    return *value::getKeyStringView(value);
+}
+
+const KeyString::Value* IndexScanStage::getSeekKeyHigh() const {
+    if (!_seekKeyHighHolder) {
+        return nullptr;
+    }
+    auto [tag, value] = _seekKeyHighHolder->getViewOfValue();
+    return value::getKeyStringView(value);
 }
 
 PlanState IndexScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
+
+    // We are about to get next record from a storage cursor so do not bother saving our internal
+    // state in case it yields as the state will be completely overwritten after the call.
+    disableSlotAccess();
 
     if (!_cursor) {
         return trackPlanState(PlanState::IS_EOF);
@@ -293,7 +335,7 @@ PlanState IndexScanStage::getNext() {
 
     if (_firstGetNext) {
         _firstGetNext = false;
-        _nextRecord = _cursor->seekForKeyString(*_seekKeyLow);
+        _nextRecord = _cursor->seekForKeyString(getSeekKeyLow());
     } else {
         _nextRecord = _cursor->nextKeyString();
     }
@@ -302,8 +344,8 @@ PlanState IndexScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_seekKeyHi) {
-        auto cmp = _nextRecord->keyString.compare(*_seekKeyHi);
+    if (auto seekKeyHigh = getSeekKeyHigh(); seekKeyHigh) {
+        auto cmp = _nextRecord->keyString.compare(*seekKeyHigh);
 
         if (_forward) {
             if (cmp > 0) {
@@ -317,12 +359,14 @@ PlanState IndexScanStage::getNext() {
     }
 
     if (_recordAccessor) {
-        _recordAccessor->reset(value::TypeTags::ksValue,
+        _recordAccessor->reset(false,
+                               value::TypeTags::ksValue,
                                value::bitcastFrom<KeyString::Value*>(&_nextRecord->keyString));
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::RecordId,
+        _recordIdAccessor->reset(false,
+                                 value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(_nextRecord->loc.getLong()));
     }
 
@@ -348,7 +392,7 @@ PlanState IndexScanStage::getNext() {
 void IndexScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
 
     _cursor.reset();
     _coll.reset();

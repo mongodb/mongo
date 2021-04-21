@@ -97,16 +97,16 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
 
 void ScanStage::prepare(CompileCtx& ctx) {
     if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
         auto [it, inserted] =
-            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::ViewOfValueAccessor>());
+            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::OwnedValueAccessor>());
         uassert(4822814, str::stream() << "duplicate field: " << _fields[idx], inserted);
         auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
         uassert(4822815, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
@@ -161,6 +161,18 @@ value::SlotAccessor* ScanStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 }
 
 void ScanStage::doSaveState() {
+    if (slotsAccessible()) {
+        if (_recordAccessor) {
+            _recordAccessor->makeOwned();
+        }
+        if (_recordIdAccessor) {
+            _recordIdAccessor->makeOwned();
+        }
+        for (auto& [fieldName, accessor] : _fieldAccessors) {
+            accessor->makeOwned();
+        }
+    }
+
     if (_cursor) {
         _cursor->save();
     }
@@ -263,6 +275,10 @@ void ScanStage::open(bool reOpen) {
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
+    // We are about to call next() on a storage cursor so do not bother saving our internal state in
+    // case it yields as the state will be completely overwritten after the next() call.
+    disableSlotAccess();
+
     if (!_cursor) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -299,12 +315,14 @@ PlanState ScanStage::getNext() {
     }
 
     if (_recordAccessor) {
-        _recordAccessor->reset(value::TypeTags::bsonObject,
+        _recordAccessor->reset(false,
+                               value::TypeTags::bsonObject,
                                value::bitcastFrom<const char*>(nextRecord->data.data()));
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::RecordId,
+        _recordIdAccessor->reset(false,
+                                 value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(nextRecord->id.getLong()));
     }
 
@@ -327,7 +345,7 @@ PlanState ScanStage::getNext() {
                     _oplogTsAccessor->reset(false, ownedTag, ownedVal);
                 }
 
-                it->second->reset(tag, val);
+                it->second->reset(false, tag, val);
 
                 if ((--fieldsToMatch) == 0) {
                     // No need to scan any further so bail out early.
@@ -355,7 +373,7 @@ PlanState ScanStage::getNext() {
 void ScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _cursor.reset();
     _coll.reset();
     _open = false;
@@ -541,16 +559,16 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
 
 void ParallelScanStage::prepare(CompileCtx& ctx) {
     if (_recordSlot) {
-        _recordAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     if (_recordIdSlot) {
-        _recordIdAccessor = std::make_unique<value::ViewOfValueAccessor>();
+        _recordIdAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
 
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
         auto [it, inserted] =
-            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::ViewOfValueAccessor>());
+            _fieldAccessors.emplace(_fields[idx], std::make_unique<value::OwnedValueAccessor>());
         uassert(4822816, str::stream() << "duplicate field: " << _fields[idx], inserted);
         auto [itRename, insertedRename] = _varAccessors.emplace(_vars[idx], it->second.get());
         uassert(4822817, str::stream() << "duplicate field: " << _vars[idx], insertedRename);
@@ -592,6 +610,18 @@ value::SlotAccessor* ParallelScanStage::getAccessor(CompileCtx& ctx, value::Slot
 }
 
 void ParallelScanStage::doSaveState() {
+    if (slotsAccessible()) {
+        if (_recordAccessor) {
+            _recordAccessor->makeOwned();
+        }
+        if (_recordIdAccessor) {
+            _recordIdAccessor->makeOwned();
+        }
+        for (auto& [fieldName, accessor] : _fieldAccessors) {
+            accessor->makeOwned();
+        }
+    }
+
     if (_cursor) {
         _cursor->save();
     }
@@ -697,6 +727,10 @@ boost::optional<Record> ParallelScanStage::nextRange() {
 PlanState ParallelScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
+    // We are about to call next() on a storage cursor so do not bother saving our internal state in
+    // case it yields as the state will be completely overwritten after the next() call.
+    disableSlotAccess();
+
     if (!_cursor) {
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -740,12 +774,14 @@ PlanState ParallelScanStage::getNext() {
     } while (!nextRecord);
 
     if (_recordAccessor) {
-        _recordAccessor->reset(value::TypeTags::bsonObject,
+        _recordAccessor->reset(false,
+                               value::TypeTags::bsonObject,
                                value::bitcastFrom<const char*>(nextRecord->data.data()));
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::RecordId,
+        _recordIdAccessor->reset(false,
+                                 value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(nextRecord->id.getLong()));
     }
 
@@ -764,7 +800,7 @@ PlanState ParallelScanStage::getNext() {
                 // Found the field so convert it to Value.
                 auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
 
-                it->second->reset(tag, val);
+                it->second->reset(false, tag, val);
 
                 if ((--fieldsToMatch) == 0) {
                     // No need to scan any further so bail out early.
@@ -782,6 +818,7 @@ PlanState ParallelScanStage::getNext() {
 void ParallelScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
+    trackClose();
     _cursor.reset();
     _coll.reset();
     _open = false;

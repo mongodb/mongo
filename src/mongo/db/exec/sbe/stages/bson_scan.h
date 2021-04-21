@@ -66,7 +66,7 @@ private:
 
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
 
-    value::FieldAccessorMap _fieldAccessors;
+    value::FieldViewAccessorMap _fieldAccessors;
     value::SlotAccessorMap _varAccessors;
 
     const char* _bsonCurrent;

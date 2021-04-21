@@ -225,7 +225,7 @@ PlanState SortStage::getNext() {
 void SortStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _mergeIt.reset();
     _sorter.reset();
 }

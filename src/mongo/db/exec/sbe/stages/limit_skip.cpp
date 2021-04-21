@@ -86,7 +86,7 @@ PlanState LimitSkipStage::getNext() {
 void LimitSkipStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[0]->close();
 }
 

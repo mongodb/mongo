@@ -130,7 +130,7 @@ PlanState SortedMergeStage::getNext() {
 }
 
 void SortedMergeStage::close() {
-    ++_commonStats.closes;
+    trackClose();
     for (auto& child : _children) {
         child->close();
     }

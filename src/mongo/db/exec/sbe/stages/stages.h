@@ -128,11 +128,14 @@ public:
     void saveState() {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
-        for (auto&& child : stage->_children) {
-            child->saveState();
-        }
 
         stage->doSaveState();
+        // Save the children in a right to left order so dependent stages (i.e. one using correlated
+        // slots) are saved first.
+        auto& children = stage->_children;
+        for (auto it = children.rbegin(); it != children.rend(); it++) {
+            (*it)->saveState();
+        }
     }
 
     /**
@@ -251,11 +254,27 @@ protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
             _commonStats.isEOF = true;
+            _slotsAccessible = false;
         } else {
             invariant(state == PlanState::ADVANCED);
             _commonStats.advances++;
+            _slotsAccessible = true;
         }
         return state;
+    }
+
+
+    void trackClose() {
+        _commonStats.closes++;
+        _slotsAccessible = false;
+    }
+
+    bool slotsAccessible() const {
+        return _slotsAccessible;
+    }
+
+    void disableSlotAccess() {
+        _slotsAccessible = false;
     }
 
     /**
@@ -272,6 +291,15 @@ protected:
     }
 
     CommonStats _commonStats;
+
+private:
+    /**
+     * In general, accessors can be accesed only after getNext returns a row. It is most definitely
+     * not OK to access accessors in ANY other state; e.g. closed, not yet opened, after EOF. We
+     * need this tracker to support unfortunate consequences of the internal yielding feature. Once
+     * that feature is retired we can then simply revisit all stages and simplify them.
+     */
+    bool _slotsAccessible{false};
 };
 
 /**

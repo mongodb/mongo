@@ -65,6 +65,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+
 private:
     using MergeJoinBuffer = std::vector<value::MaterializedRow>;
     using MergeJoinBufferAccessor = value::MaterializedRowAccessor<MergeJoinBuffer>;

@@ -118,6 +118,7 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
 void PlanExecutorSBE::saveState() {
     _root->saveState();
     _yieldPolicy->setYieldable(nullptr);
+    _lastGetNext = {};
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
@@ -235,6 +236,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
         if (result == sbe::PlanState::IS_EOF) {
             _root->close();
             _state = State::kClosed;
+            _lastGetNext = {};
 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
@@ -264,6 +266,9 @@ PlanExecutor::ExecState PlanExecutorSBE::getNext(BSONObj* out, RecordId* dlOut) 
         }
 
         invariant(result == sbe::PlanState::ADVANCED);
+        if (_mustReturnOwnedBson) {
+            _lastGetNext = *out;
+        }
         return PlanExecutor::ExecState::ADVANCED;
     }
 }

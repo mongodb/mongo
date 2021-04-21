@@ -1149,7 +1149,7 @@ StringData ObjectEnumerator::getFieldName() const {
 void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
                                      const Ordering& ordering,
                                      BufBuilder* valueBufferBuilder,
-                                     std::vector<ViewOfValueAccessor>* accessors,
+                                     std::vector<OwnedValueAccessor>* accessors,
                                      boost::optional<IndexKeysInclusionSet> indexKeysToInclude) {
     ValueBuilder valBuilder(valueBufferBuilder);
     invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());

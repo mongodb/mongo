@@ -68,10 +68,10 @@ void UnwindStage::prepare(CompileCtx& ctx) {
     _inFieldAccessor = _children[0]->getAccessor(ctx, _inField);
 
     // Prepare the outField output accessor.
-    _outFieldOutputAccessor = std::make_unique<value::ViewOfValueAccessor>();
+    _outFieldOutputAccessor = std::make_unique<value::OwnedValueAccessor>();
 
     // Prepare the outIndex output accessor.
-    _outIndexOutputAccessor = std::make_unique<value::ViewOfValueAccessor>();
+    _outIndexOutputAccessor = std::make_unique<value::OwnedValueAccessor>();
 }
 
 value::SlotAccessor* UnwindStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -101,6 +101,10 @@ PlanState UnwindStage::getNext() {
 
     if (!_inArray) {
         do {
+            // We are about to call getNext() on our child so do not bother saving our internal
+            // state in case it yields as the state will be completely overwritten after the
+            // getNext() call.
+            disableSlotAccess();
             auto state = _children[0]->getNext();
             if (state != PlanState::ADVANCED) {
                 return trackPlanState(state);
@@ -110,7 +114,7 @@ PlanState UnwindStage::getNext() {
             auto [tag, val] = _inFieldAccessor->getViewOfValue();
 
             if (value::isArray(tag)) {
-                _inArrayAccessor.reset(tag, val);
+                _inArrayAccessor.reset(_inFieldAccessor);
                 _index = 0;
                 _inArray = true;
 
@@ -118,8 +122,9 @@ PlanState UnwindStage::getNext() {
                 if (_inArrayAccessor.atEnd()) {
                     _inArray = false;
                     if (_preserveNullAndEmptyArrays) {
-                        _outFieldOutputAccessor->reset(value::TypeTags::Nothing, 0);
-                        _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64,
+                        _outFieldOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
+                        _outIndexOutputAccessor->reset(false,
+                                                       value::TypeTags::NumberInt64,
                                                        value::bitcastFrom<int64_t>(_index));
                         return trackPlanState(PlanState::ADVANCED);
                     }
@@ -129,8 +134,8 @@ PlanState UnwindStage::getNext() {
                     tag == value::TypeTags::Null || tag == value::TypeTags::Nothing;
 
                 if (!nullOrNothing || _preserveNullAndEmptyArrays) {
-                    _outFieldOutputAccessor->reset(tag, val);
-                    _outIndexOutputAccessor->reset(value::TypeTags::Nothing, 0);
+                    _outFieldOutputAccessor->reset(false, tag, val);
+                    _outIndexOutputAccessor->reset(false, value::TypeTags::Nothing, 0);
                     return trackPlanState(PlanState::ADVANCED);
                 }
             }
@@ -140,9 +145,9 @@ PlanState UnwindStage::getNext() {
     // We are inside the array so pull out the current element and advance.
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();
 
-    _outFieldOutputAccessor->reset(tagElem, valElem);
-    _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64,
-                                   value::bitcastFrom<int64_t>(_index));
+    _outFieldOutputAccessor->reset(false, tagElem, valElem);
+    _outIndexOutputAccessor->reset(
+        false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(_index));
 
     _inArrayAccessor.advance();
     ++_index;
@@ -157,7 +162,7 @@ PlanState UnwindStage::getNext() {
 void UnwindStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[0]->close();
 }
 
@@ -193,5 +198,26 @@ std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
     return ret;
+}
+
+void UnwindStage::doSaveState() {
+    if (!slotsAccessible()) {
+        return;
+    }
+
+    if (_outFieldOutputAccessor) {
+        _outFieldOutputAccessor->makeOwned();
+    }
+    if (_outIndexOutputAccessor) {
+        _outIndexOutputAccessor->makeOwned();
+    }
+}
+
+void UnwindStage::doRestoreState() {
+    if (!slotsAccessible()) {
+        return;
+    }
+
+    _inArrayAccessor.refresh();
 }
 }  // namespace mongo::sbe

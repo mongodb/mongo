@@ -82,6 +82,9 @@ PlanState CheckBoundsStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
+    // We are about to call getNext() on our child so do not bother saving our internal state in
+    // case it yields as the state will be completely overwritten after the getNext() call.
+    disableSlotAccess();
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -130,7 +133,7 @@ PlanState CheckBoundsStage::getNext() {
 void CheckBoundsStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[0]->close();
 }
 
@@ -165,5 +168,13 @@ std::vector<DebugPrinter::Block> CheckBoundsStage::debugPrint() const {
     DebugPrinter::addNewLine(ret);
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
     return ret;
+}
+
+void CheckBoundsStage::doSaveState() {
+    if (!slotsAccessible()) {
+        return;
+    }
+
+    _outAccessor.makeOwned();
 }
 }  // namespace mongo::sbe

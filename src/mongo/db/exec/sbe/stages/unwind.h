@@ -53,6 +53,10 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+    void doRestoreState() final;
+
 private:
     const value::SlotId _inField;
     const value::SlotId _outField;
@@ -60,8 +64,8 @@ private:
     const bool _preserveNullAndEmptyArrays;
 
     value::SlotAccessor* _inFieldAccessor{nullptr};
-    std::unique_ptr<value::ViewOfValueAccessor> _outFieldOutputAccessor;
-    std::unique_ptr<value::ViewOfValueAccessor> _outIndexOutputAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _outFieldOutputAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _outIndexOutputAccessor;
 
     value::ArrayAccessor _inArrayAccessor;
 

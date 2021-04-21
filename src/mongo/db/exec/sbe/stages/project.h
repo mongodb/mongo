@@ -52,6 +52,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+
 private:
     const value::SlotMap<std::unique_ptr<EExpression>> _projects;
     value::SlotMap<std::pair<std::unique_ptr<vm::CodeFragment>, value::OwnedValueAccessor>> _fields;

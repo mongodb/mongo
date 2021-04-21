@@ -102,6 +102,9 @@ private:
      */
     void restoreCollectionAndIndex();
 
+    const KeyString::Value& getSeekKeyLow() const;
+    const KeyString::Value* getSeekKeyHigh() const;
+
     const CollectionUUID _collUuid;
     const std::string _indexName;
     const bool _forward;
@@ -118,21 +121,20 @@ private:
 
     LockAcquisitionCallback _lockAcquisitionCallback;
 
-    std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
-    std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
+    std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
 
     // One accessor and slot for each key component that this stage will bind from an index entry's
     // KeyString. The accessors are in the same order as the key components they bind to.
-    std::vector<value::ViewOfValueAccessor> _accessors;
+    std::vector<value::OwnedValueAccessor> _accessors;
     value::SlotAccessorMap _accessorMap;
 
     value::SlotAccessor* _seekKeyLowAccessor{nullptr};
     value::SlotAccessor* _seekKeyHiAccessor{nullptr};
 
-    KeyString::Value _startPoint;
-    KeyString::Value* _seekKeyLow{nullptr};
-    KeyString::Value* _seekKeyHi{nullptr};
+    std::unique_ptr<value::OwnedValueAccessor> _seekKeyLowHolder;
+    std::unique_ptr<value::OwnedValueAccessor> _seekKeyHighHolder;
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;

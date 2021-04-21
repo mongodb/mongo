@@ -39,6 +39,8 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/yield_policy_callbacks_impl.h"
 
 namespace mongo {
 /**
@@ -69,15 +71,24 @@ public:
         uassertStatusOK(CursorRequest::parseCommandCursorOptions(
             cmdObj, query_request_helper::kDefaultBatchSize, &batchSize));
 
+        NamespaceString nss{dbname};
+
+        auto yieldPolicy = std::make_unique<PlanYieldPolicySBE>(
+            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+            opCtx->getServiceContext()->getFastClockSource(),
+            internalQueryExecYieldIterations.load(),
+            Milliseconds{internalQueryExecYieldPeriodMS.load()},
+            nullptr,
+            std::make_unique<YieldPolicyCallbacksImpl>(nss));
+
         auto env = std::make_unique<sbe::RuntimeEnvironment>();
         sbe::Parser parser(env.get());
-        auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String());
+        auto root = parser.parse(opCtx, dbname, cmdObj["sbe"].String(), yieldPolicy.get());
         auto [resultSlot, recordIdSlot] = parser.getTopLevelSlots();
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         BSONArrayBuilder firstBatch;
 
-        NamespaceString nss{dbname};
 
         // Create a trivial cannonical query for the 'sbe' command execution.
         auto statusWithCQ =
@@ -94,7 +105,6 @@ public:
         }
 
         root->attachToOperationContext(opCtx);
-
         exec = uassertStatusOK(plan_executor_factory::make(opCtx,
                                                            std::move(cq),
                                                            nullptr,
@@ -102,7 +112,7 @@ public:
                                                            &CollectionPtr::null,
                                                            false, /* returnOwnedBson */
                                                            nss,
-                                                           nullptr));
+                                                           std::move(yieldPolicy)));
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, nullptr);

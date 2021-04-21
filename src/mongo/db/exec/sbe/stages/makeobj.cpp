@@ -359,6 +359,9 @@ template <MakeObjOutputType O>
 PlanState MakeObjStageBase<O>::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
+    // We are about to call getNext() on our child so do not bother saving our internal state in
+    // case it yields as the state will be completely overwritten after the getNext() call.
+    disableSlotAccess();
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
@@ -371,7 +374,7 @@ template <MakeObjOutputType O>
 void MakeObjStageBase<O>::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[0]->close();
 }
 
@@ -446,6 +449,15 @@ std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
 
     return ret;
+}
+
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::doSaveState() {
+    if (!slotsAccessible()) {
+        return;
+    }
+
+    _obj.makeOwned();
 }
 
 // Explicit template instantiations.

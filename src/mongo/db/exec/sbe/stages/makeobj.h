@@ -91,6 +91,9 @@ public:
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
+protected:
+    void doSaveState() final;
+
 private:
     void projectField(value::Object* obj, size_t idx);
     void projectField(UniqueBSONObjBuilder* bob, size_t idx);

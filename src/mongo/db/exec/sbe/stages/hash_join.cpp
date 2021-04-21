@@ -210,7 +210,7 @@ PlanState HashJoinStage::getNext() {
 void HashJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
     _children[1]->close();
     _ht = boost::none;
 }

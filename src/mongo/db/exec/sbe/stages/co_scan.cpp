@@ -34,7 +34,8 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
 namespace mongo::sbe {
-CoScanStage::CoScanStage(PlanNodeId planNodeId) : PlanStage("coscan"_sd, planNodeId) {}
+CoScanStage::CoScanStage(PlanNodeId planNodeId, PlanYieldPolicy* yieldPolicy)
+    : PlanStage("coscan"_sd, yieldPolicy, planNodeId) {}
 
 std::unique_ptr<PlanStage> CoScanStage::clone() const {
     return std::make_unique<CoScanStage>(_commonStats.nodeId);
@@ -71,7 +72,7 @@ const SpecificStats* CoScanStage::getSpecificStats() const {
 void CoScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
-    _commonStats.closes++;
+    trackClose();
 }
 
 }  // namespace mongo::sbe
