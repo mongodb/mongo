@@ -129,7 +129,7 @@ size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* op
     auto res = cursor->nextSafe();
     auto numCoordField = res.getField(kNumCoordLabel);
     invariant(numCoordField);
-    return numCoordField.Long();
+    return numCoordField.numberLong();
 }
 
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
@@ -139,6 +139,11 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
             AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
             auto opCtx = cc().makeOperationContext();
             const auto numCoordinators = _countCoordinatorDocs(opCtx.get());
+            if (numCoordinators > 0) {
+                LOGV2(5622500,
+                      "Found Sharding DDL Coordinators to rebuild",
+                      "numCoordinators"_attr = numCoordinators);
+            }
             stdx::lock_guard lg(_mutex);
             if (numCoordinators > 0) {
                 _state = State::kRecovering;
@@ -152,6 +157,7 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
             LOGV2_ERROR(5469630,
                         "Failed to rebuild Sharding DDL coordinator service",
                         "error"_attr = status);
+            return status;
         });
 }
 
