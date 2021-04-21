@@ -9696,7 +9696,7 @@ buildvariants:
     packager_distro: amazon2
     repo_edition: org
     scons_cache_scope: shared
-    large_distro_name: amazon-build
+    large_distro_name: amazon2-build
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
