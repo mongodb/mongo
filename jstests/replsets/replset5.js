@@ -1,4 +1,4 @@
-// rs test getlasterrordefaults
+// Test the implicit default write concern.
 load("jstests/replsets/rslib.js");
 
 (function() {
@@ -9,14 +9,9 @@ var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 var nodes = replTest.startSet();
 replTest.initiate();
 
-// Set default for write concern
 var config = replTest.getReplSetConfigFromNode();
 config.version++;
 config.settings = {};
-config.settings.getLastErrorDefaults = {
-    'w': 3,
-    'wtimeout': ReplSetTest.kDefaultTimeoutMS
-};
 config.settings.heartbeatTimeoutSecs = 15;
 // Prevent node 2 from becoming primary, as we will attempt to set it to hidden later.
 config.members[2].priority = 0;
@@ -28,7 +23,10 @@ replTest.awaitSecondaryNodes();
 var testDB = "foo";
 
 // Initial replication
-primary.getDB("barDB").bar.save({a: 1});
+// TODO SERVER-55703: Remove manual write concern once we start using the new implicit default write
+// concern.
+primary.getDB("barDB").bar.save({a: 1},
+                                {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}});
 replTest.awaitReplication();
 
 // These writes should be replicated immediately
@@ -38,13 +36,12 @@ for (var n = 0; n < docNum; n++) {
     bulk.insert({n: n});
 }
 
-// should use the configured last error defaults from above, that's what we're testing.
-//
 // If you want to test failure, just add values for w and wtimeout (e.g. w=1)
 // to the following command. This will override the default set above and
 // prevent replication from happening in time for the count tests below.
-//
-var result = bulk.execute();
+// TODO SERVER-55703: Remove manual write concern once we start using the new implicit default write
+// concern.
+var result = bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS});
 var wcError = result.getWriteConcernError();
 
 if (wcError != null) {

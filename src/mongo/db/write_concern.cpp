@@ -97,8 +97,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
     bool getLastErrorDefaultsWasApplied = false;
 
     // If no write concern is specified in the command, then use the cluster-wide default WC (if
-    // there is one), or else the default WC from the ReplSetConfig (which takes the
-    // ReplicationCoordinator mutex).
+    // there is one), or else the default WC {w:1}.
     if (!clientSuppliedWriteConcern) {
         writeConcern = ([&]() {
             // WriteConcern defaults can only be applied on regular replica set members.  Operations
@@ -124,30 +123,7 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                     return *wcDefault;
                 }
             }
-
-            auto getLastErrorDefault =
-                repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
-            // Since replication configs always include all fields (explicitly setting them to the
-            // default value if necessary), usedDefault and usedDefaultW are always false here, even
-            // if the getLastErrorDefaults has never actually been set (because the
-            // getLastErrorDefaults writeConcern has been explicitly read out of the replset
-            // config).
-            //
-            // In this case, where the getLastErrorDefault is "conceptually unset" (ie. identical to
-            // the implicit server default of { w: 1, wtimeout: 0 }), we would prefer if downstream
-            // code behaved as if no writeConcern had been applied (since in addition to "no"
-            // getLastErrorDefaults, there is no ReadWriteConcernDefaults writeConcern and the user
-            // did not specify a writeConcern).
-            //
-            // Therefore when the getLastErrorDefault is { w: 1, wtimeout: 0 } we force usedDefault
-            // and usedDefaultW to be true.
-            if (getLastErrorDefault.wNumNodes == 1 && getLastErrorDefault.wTimeout == 0) {
-                getLastErrorDefault.usedDefault = true;
-                getLastErrorDefault.usedDefaultW = true;
-            } else {
-                getLastErrorDefaultsWasApplied = true;
-            }
-            return getLastErrorDefault;
+            return writeConcern;
         })();
         if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {
             writeConcern.wNumNodes = 1;

@@ -178,17 +178,7 @@ public:
             return bob.obj();
         }());
 
-        // Use the default options if we have no gle options aside from wOpTime/wElectionId
-        const int nFields = writeConcernDoc.nFields();
-        bool useDefaultGLEOptions = (nFields == 1) || (nFields == 2 && lastOpTimePresent) ||
-            (nFields == 3 && lastOpTimePresent && electionIdPresent);
-
         WriteConcernOptions writeConcern;
-
-        if (useDefaultGLEOptions) {
-            writeConcern = repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
-        }
-
         auto sw = WriteConcernOptions::parse(writeConcernDoc);
         Status status = sw.getStatus();
 
