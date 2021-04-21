@@ -30,9 +30,9 @@
 # include "timelib_config.h"
 #endif
 
-#define TIMELIB_VERSION 202104
-#define TIMELIB_EXTENDED_VERSION 20210401
-#define TIMELIB_ASCII_VERSION "2021.04"
+#define TIMELIB_VERSION 202105
+#define TIMELIB_EXTENDED_VERSION 20210501
+#define TIMELIB_ASCII_VERSION "2021.05"
 
 #include <stdlib.h>
 #include <stdbool.h>
