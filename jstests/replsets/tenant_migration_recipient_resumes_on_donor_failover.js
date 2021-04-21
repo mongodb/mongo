@@ -6,7 +6,8 @@
  * - donor shuts down after cloning is finished but the recipient has yet to declare that the data
  *   is consistent
  *
- * @tags: [requires_majority_read_concern, requires_fcv_49, incompatible_with_windows_tls]
+ * @tags: [requires_majority_read_concern, requires_fcv_49, incompatible_with_windows_tls,
+ * incompatible_with_eft, incompatible_with_macos, requires_persistence]
  */
 
 (function() {

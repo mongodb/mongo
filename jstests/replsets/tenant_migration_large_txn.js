@@ -6,7 +6,7 @@
  * entries are being written.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls]
+ * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
  */
 
 (function() {

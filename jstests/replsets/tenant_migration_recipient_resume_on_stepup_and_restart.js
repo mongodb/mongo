@@ -2,7 +2,7 @@
  * Tests that tenant migrations resume successfully on recipient stepup and restart.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, requires_persistence,
- * incompatible_with_eft, incompatible_with_windows_tls]
+ * incompatible_with_eft, incompatible_with_windows_tls, incompatible_with_macos]
  */
 
 (function() {
