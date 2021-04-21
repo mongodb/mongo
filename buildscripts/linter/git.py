@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import itertools
 import os
+from pathlib import Path
 import re
 from typing import Callable, List
 
 from buildscripts.linter import git_base as _git
 from buildscripts import moduleconfig
-from buildscripts.resmokelib.utils import globstar
 
 # Path to the modules in the mongodb source tree
 # Has to match the string in SConstruct
@@ -147,7 +147,8 @@ class Repo(_git.Repository):
 def expand_file_string(glob_pattern):
     # type: (str) -> List[str]
     """Expand a string that represents a set of files."""
-    return [os.path.abspath(f) for f in globstar.iglob(glob_pattern)]
+    current_path = Path(".")
+    return [str(glob_match.resolve()) for glob_match in current_path.glob(glob_pattern)]
 
 
 def get_files_to_check_working_tree(filter_function):

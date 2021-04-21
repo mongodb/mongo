@@ -15,8 +15,8 @@ from shrub.v2 import ShrubProject, BuildVariant
 from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
-from buildscripts.patch_builds.change_data import find_changed_files_in_repos, \
-    generate_revision_map_from_manifest
+from buildscripts.patch_builds.change_data import find_changed_files_in_repos
+from buildscripts.patch_builds.evg_change_data import generate_revision_map_from_manifest
 
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

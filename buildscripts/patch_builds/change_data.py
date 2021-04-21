@@ -5,7 +5,6 @@ from typing import Any, Dict, Iterable, Set, Optional, List
 
 import structlog
 from git import DiffIndex, Repo
-from evergreen import EvergreenApi
 
 LOGGER = structlog.get_logger(__name__)
 
@@ -34,26 +33,6 @@ def generate_revision_map(repos: List[Repo], revisions_data: Dict[str, str]) -> 
     """
     revision_map = {repo.git_dir: revisions_data.get(_get_id_from_repo(repo)) for repo in repos}
     return {k: v for k, v in revision_map.items() if v}
-
-
-def generate_revision_map_from_manifest(repos: List[Repo], task_id: str,
-                                        evg_api: EvergreenApi) -> RevisionMap:
-    """
-    Generate a revision map for the given repositories using the revisions from the manifest.
-
-    :param repos: Repositories to generate map for.
-    :param task_id: Id of evergreen task running.
-    :param evg_api: Evergreen API object.
-    :return: Map of repositories to revisions
-    """
-    manifest = evg_api.manifest_for_task(task_id)
-    revisions_data = {
-        module_name: module.revision
-        for module_name, module in manifest.modules.items()
-    }
-    revisions_data["mongo"] = manifest.revision
-
-    return generate_revision_map(repos, revisions_data)
 
 
 def _paths_for_iter(diff, iter_type):
