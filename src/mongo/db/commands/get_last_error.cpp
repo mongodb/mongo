@@ -42,6 +42,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/warn_deprecated_wire_ops.h"
 
 namespace mongo {
 namespace {
@@ -118,6 +119,8 @@ public:
                 lastOp.append(&result, "lastOp");
             }
         }
+
+        warnDeprecation(c, "getLastError");
 
         // for sharding; also useful in general for debugging
         result.appendNumber("connectionId", c.getConnectionId());

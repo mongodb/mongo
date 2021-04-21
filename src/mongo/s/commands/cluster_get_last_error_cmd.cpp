@@ -39,6 +39,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/warn_deprecated_wire_ops.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -246,6 +247,7 @@ public:
         LastError* le = &LastError::get(cc());
         le->disable();
 
+        warnDeprecation(cc(), "getLastError");
 
         // Write commands always have the error stored in the mongos last error
         bool errorOccurred = false;

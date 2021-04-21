@@ -51,14 +51,16 @@ protoEnv.Library(
 env.Library(
     target='rpc',
     source=[
+        'deprecated_wire_ops.idl',
         'factory.cpp',
-        'object_check.cpp',
-        'legacy_request.cpp',
-        'legacy_request_builder.cpp',
         'legacy_reply.cpp',
         'legacy_reply_builder.cpp',
-        'reply_builder_interface.cpp',
+        'legacy_request.cpp',
+        'legacy_request_builder.cpp',
+        'object_check.cpp',
         'object_check.idl',
+        'reply_builder_interface.cpp',
+        'warn_deprecated_wire_ops.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

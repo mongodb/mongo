@@ -46,6 +46,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/warn_deprecated_wire_ops.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
 
@@ -206,6 +207,7 @@ struct QueryOpRunner final : public OpRunner {
     DbResponse runOperation() override {
         // Commands are handled through CommandOpRunner and Strategy::clientCommand().
         invariant(!hr->nsString.isCommand());
+        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
         hr->rec->getOpCtx()->markKillOnClientDisconnect();
         return Strategy::queryOp(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
     }
@@ -214,6 +216,7 @@ struct QueryOpRunner final : public OpRunner {
 struct GetMoreOpRunner final : public OpRunner {
     using OpRunner::OpRunner;
     DbResponse runOperation() override {
+        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
         return Strategy::getMore(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
     }
 };
@@ -221,6 +224,7 @@ struct GetMoreOpRunner final : public OpRunner {
 struct KillCursorsOpRunner final : public OpRunner {
     using OpRunner::OpRunner;
     DbResponse runOperation() override {
+        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
         Strategy::killCursors(hr->rec->getOpCtx(), &hr->rec->getDbMessage());  // No Response.
         return {};
     }
@@ -229,6 +233,7 @@ struct KillCursorsOpRunner final : public OpRunner {
 struct WriteOpRunner final : public OpRunner {
     using OpRunner::OpRunner;
     DbResponse runOperation() override {
+        warnDeprecation(*hr->rec->getOpCtx()->getClient(), networkOpToString(hr->op));
         Strategy::writeOp(hr->rec);  // No Response.
         return {};
     }
