@@ -896,15 +896,19 @@ mongos or mongod that executes the command. In other words, each write operation
 is given its own `stmtId` and is individually retryable. The `lsid`, `txnNumber`, and `stmtId` constitute a
 unique identifier for a retryable write operation.
 
-This unique identifier enables a primary mongod to track and record its progress for a retryable write
-command using the `config.transactions` collection and augmented oplog entries. The oplog entry for a
-retryable write operation is written with a number of additional fields including `lsid`, `txnNumber`,
-`stmtId` and `prevOpTime`, where `prevOpTime` is the opTime of the write that precedes it. This results in
-a chain of write history that can be used to reconstruct the result of writes that have already executed.
-After generating the oplog entry for a retryable write operation, a primary mongod performs an upsert into
-`config.transactions` to write a document containing the `lsid` (`_id`), `txnNumber`, `stmtId` and
-`lastWriteOpTime`, where `lastWriteOpTime` is the opTime of the newly generated oplog entry. The `config.transactions` collection is indexed by `_id` so this document is replaced every time there is a new retryable write command
-(or transaction) on the session.
+This unique identifier enables a primary mongod to track and record its progress for a retryable
+write command using the `config.transactions` collection and augmented oplog entries. The oplog
+entry for a retryable write operation is written with a number of additional fields including
+`lsid`, `txnNumber`, `stmtId` and `prevOpTime`, where `prevOpTime` is the opTime of the write that
+precedes it. In certain cases, such as time-series inserts, a single oplog entry may encode
+multiple client writes, and thus may contain an array value for `stmtId` rather than the more
+typical single value. All of this results in a chain of write history that can be used to
+reconstruct the result of writes that have already executed. After generating the oplog entry for a
+retryable write operation, a primary mongod performs an upsert into `config.transactions` to write
+a document containing the `lsid` (`_id`), `txnNumber`, `stmtId` and `lastWriteOpTime`, where
+`lastWriteOpTime` is the opTime of the newly generated oplog entry. The `config.transactions`
+collection is indexed by `_id` so this document is replaced every time there is a new retryable
+write command (or transaction) on the session.
 
 The opTimes for all committed statements for the latest retryable write command is cached in an [in-memory table](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h#L928) that gets [updated](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.cpp#L2125-L2127) after each
 write oplog entry is generated, and gets cleared every time a new retryable write command starts. Prior to executing

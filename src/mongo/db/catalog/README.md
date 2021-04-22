@@ -12,14 +12,16 @@ and inconsistencies, and much more.
 The main code highlights are: the storage integration layer found in the [**storage/**][] directory;
 the lock manager and lock helpers found in the [**concurrency/**][] directory; the catalog found in
 the [**catalog/**][] directory; the index build code found in many directories; the various types of
-index implementations found in the [**index/**][] directory; and the sorter found in the
-[**sorter/**][] directory.
+index implementations found in the [**index/**][] directory; the sorter found in the
+[**sorter/**][] directory; and the time-series bucket catalog found in the [**timeseries/**][]
+directory.
 
 [**storage/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/storage
 [**concurrency/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/concurrency
 [**catalog/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/catalog
 [**index/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/index
 [**sorter/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/sorter
+[**timeseries/**]: https://github.com/mongodb/mongo/tree/master/src/mongo/db/timeseries
 
 For more information on the Storage Engine API, see the [storage/README][]. For additional
 specifics on the Ephemeral for Test storage engine, see the [ephemeral_for_test/README][].

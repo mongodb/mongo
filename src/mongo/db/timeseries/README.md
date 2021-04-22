@@ -46,6 +46,8 @@ certain properties:
             <field1>: <maximum value of 'field1' across all measurements>,
             ...
         },
+        closed: <bool> // Optional, signals the database that this document will not receive any
+                       // additional measurements.
     },
     meta: <meta-data field (if specified at creation) value common to all measurements in this bucket>,
     data: {
@@ -102,6 +104,43 @@ Index types that are not supported on time-series collections include
 [partial](https://docs.mongodb.com/manual/core/index-partial/),
 [unique](https://docs.mongodb.com/manual/core/index-unique/), and
 [text](https://docs.mongodb.com/manual/core/index-text/).
+
+## BucketCatalog
+
+In order to facilitate efficient bucketing, we maintain the set of open buckets in the
+`BucketCatalog` found in [bucket_catalog.h](bucket_catalog.h). At a high level, we attempt to group
+writes from concurrent writers into batches which can be committed together to minimize the number
+of underlying document writes. A writer will insert each document in its input batch to the
+`BucketCatalog`, which will return a handle to a `BucketCatalog::WriteBatch`. Upon finishing its
+inserts, the writer will check each write batch. If no other writer has already claimed commit
+rights to a batch, it will claim the rights and commit the batch itself; otherwise, it will set the
+batch aside to wait on later. When it has checked all batches, the writer will wait on each
+remaining batch to be committed by another writer.
+
+Internally, the `BucketCatalog` maintains a list of updates to each bucket document. When a batch
+is committed, it will pivot the insertions into the column-format for the buckets as well as
+determine any updates necessary for the `control` fields (e.g. `control.min` and `control.max`).
+
+Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs
+to call `BucketCatalog::clear` for the document or namespace in question so that it can update its
+internal state and avoid writing any data which may corrupt the bucket format. This is typically
+handled by an op observer, but may be necessary to call from other places.
+
+A bucket is closed either manually, by setting the optional `control.closed` flag, or automatically
+by the `BucketCatalog` in a number of situations. If the `BucketCatalog` is using more memory than
+it's given threshold (controlled by the server paramter
+`timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to close idle buckets. A bucket is
+considered idle if it is open and it does not have any uncommitted measurements pending. The
+`BucketCatalog` will also close a bucket if it contains more than the maximum number of measurments
+(`timeseriesBucketMaxCount`), if it contains more than the maximum amount of data
+(`timeseriesBucketMaxSize`), or if a new measurement would cause the bucket to span a greater
+amount of time between it's oldest and newest time stamp than is allowed (currently hard-coded to
+one hour).
+
+The first time a write batch is committed for a given bucket, the newly-formed document is
+inserted. On subsequent batch commits, we perform an update operation. Instead of generating the
+full document (a so-called "classic" update), we create a DocDiff directly (a "delta" or "v2"
+update).
 
 # References
 See:
