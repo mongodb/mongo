@@ -1777,9 +1777,8 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
     curop->setNS_inlock(nss.ns());
 }
 
-Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
+void parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
     execContext->setRequest(rpc::opMsgRequestFromAnyProtocol(execContext->getMessage()));
-    return Status::OK();
 } catch (const DBException& ex) {
     // Need to set request as `makeCommandResponse` expects an empty request on failure.
     execContext->setRequest({});
@@ -1792,74 +1791,53 @@ Future<void> parseCommand(std::shared_ptr<HandleRequest::ExecutionContext> execC
                 "Assertion while parsing command: {error}",
                 "Assertion while parsing command",
                 "error"_attr = ex.toString());
-
-    return ex.toStatus();
+    throw;
 }
 
-Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) {
-    auto [past, present] = makePromiseFuture<void>();
-    auto future =
-        std::move(present)
-            .then([execContext]() -> Future<void> {
-                // Prepare environment for command execution (e.g., find command object in registry)
-                auto opCtx = execContext->getOpCtx();
-                auto& request = execContext->getRequest();
-                curOpCommandSetup(opCtx, request);
+Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> execContext) try {
+    // Prepare environment for command execution (e.g., find command object in registry)
+    auto opCtx = execContext->getOpCtx();
+    auto& request = execContext->getRequest();
+    curOpCommandSetup(opCtx, request);
 
-                // In the absence of a Command object, no redaction is possible. Therefore to avoid
-                // displaying potentially sensitive information in the logs, we restrict the log
-                // message to the name of the unrecognized command. However, the complete command
-                // object will still be echoed to the client.
-                if (execContext->setCommand(CommandHelpers::findCommand(request.getCommandName()));
-                    !execContext->getCommand()) {
-                    globalCommandRegistry()->incrementUnknownCommands();
-                    LOGV2_DEBUG(21964,
-                                2,
-                                "No such command: {command}",
-                                "Command not found in registry",
-                                "command"_attr = request.getCommandName());
-                    return Status(ErrorCodes::CommandNotFound,
-                                  fmt::format("no such command: '{}'", request.getCommandName()));
-                }
-
-                Command* c = execContext->getCommand();
-                LOGV2_DEBUG(
-                    21965,
+    // In the absence of a Command object, no redaction is possible. Therefore to avoid
+    // displaying potentially sensitive information in the logs, we restrict the log
+    // message to the name of the unrecognized command. However, the complete command
+    // object will still be echoed to the client.
+    if (execContext->setCommand(CommandHelpers::findCommand(request.getCommandName()));
+        !execContext->getCommand()) {
+        globalCommandRegistry()->incrementUnknownCommands();
+        LOGV2_DEBUG(21964,
                     2,
-                    "Run command {db}.$cmd {commandArgs}",
-                    "About to run the command",
-                    "db"_attr = request.getDatabase(),
-                    "commandArgs"_attr = redact(
-                        ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
+                    "No such command: {command}",
+                    "Command not found in registry",
+                    "command"_attr = request.getCommandName());
+        return Status(ErrorCodes::CommandNotFound,
+                      fmt::format("no such command: '{}'", request.getCommandName()));
+    }
 
-                {
-                    // Try to set this as early as possible, as soon as we have figured out the
-                    // command.
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
-                }
+    Command* c = execContext->getCommand();
+    LOGV2_DEBUG(21965,
+                2,
+                "Run command {db}.$cmd {commandArgs}",
+                "About to run the command",
+                "db"_attr = request.getDatabase(),
+                "commandArgs"_attr =
+                    redact(ServiceEntryPointCommon::getRedactedCopyForLogging(c, request.body)));
 
-                opCtx->setExhaust(
-                    OpMsg::isFlagSet(execContext->getMessage(), OpMsg::kExhaustSupported));
+    {
+        // Try to set this as early as possible, as soon as we have figured out the
+        // command.
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setLogicalOp_inlock(c->getLogicalOp());
+    }
 
-                return Status::OK();
-            })
-            .then([execContext]() mutable {
-                return future_util::makeState<ExecCommandDatabase>(std::move(execContext))
-                    .thenWithState([](auto* runner) { return runner->run(); });
-            })
-            .tapError([execContext](Status status) {
-                LOGV2_DEBUG(
-                    21966,
-                    1,
-                    "Assertion while executing command '{command}' on database '{db}': {error}",
-                    "Assertion while executing command",
-                    "command"_attr = execContext->getRequest().getCommandName(),
-                    "db"_attr = execContext->getRequest().getDatabase(),
-                    "error"_attr = status.toString());
-            });
-    past.emplaceValue();
-    return future;
+    opCtx->setExhaust(OpMsg::isFlagSet(execContext->getMessage(), OpMsg::kExhaustSupported));
+
+    return future_util::makeState<ExecCommandDatabase>(std::move(execContext))
+        .thenWithState([](auto* runner) { return runner->run(); });
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> execContext) {
@@ -1902,10 +1880,19 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
 }
 
 Future<DbResponse> receivedCommands(std::shared_ptr<HandleRequest::ExecutionContext> execContext) {
-    execContext->setReplyBuilder(
-        rpc::makeReplyBuilder(rpc::protocolForMessage(execContext->getMessage())));
-    return parseCommand(execContext)
-        .then([execContext]() mutable { return executeCommand(std::move(execContext)); })
+    return makeReadyFutureWith([&]() -> Future<void> {
+               execContext->setReplyBuilder(
+                   rpc::makeReplyBuilder(rpc::protocolForMessage(execContext->getMessage())));
+               parseCommand(execContext);
+               return executeCommand(execContext).tapError([execContext](Status status) {
+                   LOGV2_DEBUG(21966,
+                               1,
+                               "Assertion while executing command",
+                               "command"_attr = execContext->getRequest().getCommandName(),
+                               "db"_attr = execContext->getRequest().getDatabase(),
+                               "error"_attr = status.toString());
+               });
+           })
         .onError([execContext](Status status) {
             if (ErrorCodes::isConnectionFatalMessageParseError(status.code())) {
                 // If this error needs to fail the connection, propagate it out.
