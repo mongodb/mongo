@@ -297,6 +297,46 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessio
     }
 }
 
+TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteForNewSessionMultiStmtIds) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber incomingTxnNumber = 100;
+    StmtId incomingStmtId = 1;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), makeLogicalSessionIdForTest(), 100, {3, 4});
+    }();
+
+    auto oplogEntry = makeUpdateOp(
+        BSON("_id" << 1), lsid, incomingTxnNumber, {incomingStmtId, incomingStmtId + 1});
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier;
+        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(hitPreparedTxn));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 1U);
+        checkGeneratedNoop(
+            foundOps[0], lsid, incomingTxnNumber, {incomingStmtId, incomingStmtId + 1});
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[0]);
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId);
+        checkStatementExecuted(opCtx.get(), lsid, incomingTxnNumber, incomingStmtId + 1);
+    }
+}
+
 TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteHasHigherTxnNumber) {
     auto lsid = makeLogicalSessionIdForTest();
 
@@ -467,6 +507,39 @@ TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtAlreadyE
     }();
 
     auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, txnNumber, {stmtId});
+
+    {
+        auto opCtx = makeOperationContext();
+        ReshardingOplogSessionApplication applier;
+        auto hitPreparedTxn = applier.tryApplyOperation(opCtx.get(), oplogEntry);
+        ASSERT_FALSE(bool(hitPreparedTxn));
+    }
+
+    {
+        auto opCtx = makeOperationContext();
+        auto foundOps = findOplogEntriesNewerThan(opCtx.get(), opTime.getTimestamp());
+        ASSERT_EQ(foundOps.size(), 0U);
+
+        auto sessionTxnRecord = findSessionRecord(opCtx.get(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        ASSERT_EQ(sessionTxnRecord->getSessionId(), lsid) << sessionTxnRecord->toBSON();
+        ASSERT_EQ(sessionTxnRecord->getTxnNum(), txnNumber) << sessionTxnRecord->toBSON();
+        ASSERT_EQ(sessionTxnRecord->getLastWriteOpTime(), opTime) << sessionTxnRecord->toBSON();
+    }
+}
+
+TEST_F(ReshardingOplogSessionApplicationTest, IncomingRetryableWriteStmtsAlreadyExecuted) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber txnNumber = 100;
+    StmtId stmtId = 3;
+
+    auto opTime = [&] {
+        auto opCtx = makeOperationContext();
+        return insertSessionRecord(opCtx.get(), lsid, txnNumber, {stmtId, stmtId + 1});
+    }();
+
+    auto oplogEntry = makeUpdateOp(BSON("_id" << 1), lsid, txnNumber, {stmtId, stmtId + 1});
 
     {
         auto opCtx = makeOperationContext();
