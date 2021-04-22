@@ -463,10 +463,10 @@ Status storeMongodOptions(const moe::Environment& params) {
         mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }
 
-    if (params.count("security.clusterIpSourceWhitelist")) {
+    if (params.count("security.clusterIpSourceAllowlist")) {
         mongodGlobalParams.whitelistedClusterNetwork = std::vector<std::string>();
         for (const std::string& whitelistEntry :
-             params["security.clusterIpSourceWhitelist"].as<std::vector<std::string>>()) {
+             params["security.clusterIpSourceAllowlist"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
             str::splitStringDelim(whitelistEntry, &intermediates, ',');
             std::copy(intermediates.begin(),

@@ -397,7 +397,7 @@ is, you can specify one or the other, but not both.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-clusterIpSourceWhitelist <string>
+.B \-\-clusterIpSourceAllowlist <string>
 New in version 3.6.
 
 .sp
@@ -409,17 +409,17 @@ either explicitly in the list or belongs to a CIDR range in the list. If the
 IP address is not present, the server does not authenticate the
 \fI\%mongod\fP or \fBmongos\fP\&.
 .sp
-\fI\%\-\-clusterIpSourceWhitelist\fP has no effect on a \fI\%mongod\fP started without
+\fI\%\-\-clusterIpSourceAllowlist\fP has no effect on a \fI\%mongod\fP started without
 authentication\&.
 .sp
-\fI\%\-\-clusterIpSourceWhitelist\fP accepts multiple comma\-separated IPv4/6 addresses or Classless
+\fI\%\-\-clusterIpSourceAllowlist\fP accepts multiple comma\-separated IPv4/6 addresses or Classless
 Inter\-Domain Routing (\fI\%CIDR\fP) ranges:
 .INDENT 7.0
 .INDENT 3.5
 .sp
 .nf
 .ft C
-mongod \-\-clusterIpSourceWhitelist 192.0.2.0/24,127.0.0.1,::1
+mongod \-\-clusterIpSourceAllowlist 192.0.2.0/24,127.0.0.1,::1
 .ft P
 .fi
 .UNINDENT
@@ -428,7 +428,7 @@ mongod \-\-clusterIpSourceWhitelist 192.0.2.0/24,127.0.0.1,::1
 \fBIMPORTANT:\fP
 .INDENT 7.0
 .INDENT 3.5
-Ensure \fI\%\-\-clusterIpSourceWhitelist\fP includes the IP address \fIor\fP CIDR ranges that include the
+Ensure \fI\%\-\-clusterIpSourceAllowlist\fP includes the IP address \fIor\fP CIDR ranges that include the
 IP address of each replica set member or \fBmongos\fP in the
 deployment to ensure healthy communication between cluster components.
 .UNINDENT

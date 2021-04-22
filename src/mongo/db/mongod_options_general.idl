@@ -41,9 +41,11 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
         conflicts: noauth
-    'security.clusterIpSourceWhitelist':
+    'security.clusterIpSourceAllowlist':
         description: 'Network CIDR specification of permitted origin for `__system` access'
-        short_name: clusterIpSourceWhitelist
+        short_name: clusterIpSourceAllowlist
+        deprecated_name: "security.clusterIpSourceWhitelist"
+        deprecated_short_name: clusterIpSourceWhitelist
         arg_vartype: StringVector
         source: [ cli, ini, yaml ]
         duplicate_behavior: append
