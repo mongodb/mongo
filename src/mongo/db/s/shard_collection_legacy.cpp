@@ -488,19 +488,19 @@ CreateCollectionResponse shardCollection(OperationContext* opCtx,
 
     CreateCollectionResponse shardCollectionResponse;
 
+    // Make the distlocks boost::optional so that they can be emplaced only if the request came
+    // from the router.
+    boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
+    boost::optional<DistLockManager::ScopedDistLock> collDistLock;
+    if (mustTakeDistLock) {
+        dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
+            opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
+        collDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
+            opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
+    }
+
     {
         pauseShardCollectionBeforeCriticalSection.pauseWhileSet();
-
-        // Make the distlocks boost::optional so that they can be emplaced only if the request came
-        // from the router.
-        boost::optional<DistLockManager::ScopedDistLock> dbDistLock;
-        boost::optional<DistLockManager::ScopedDistLock> collDistLock;
-        if (mustTakeDistLock) {
-            dbDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                opCtx, nss.db(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
-            collDistLock.emplace(uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                opCtx, nss.ns(), "shardCollection", DistLockManager::kDefaultLockTimeout)));
-        }
 
         // From this point onward the collection can only be read, not written to, so it is safe to
         // construct the prerequisites and generate the target state.
