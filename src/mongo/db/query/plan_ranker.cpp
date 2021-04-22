@@ -116,7 +116,7 @@ protected:
     }
 
     double getNumberOfAdvances(const PlanStageStats* stats) const final {
-        return stats->common.works;
+        return stats->common.advanced;
     }
 
     bool hasStage(StageType type, const PlanStageStats* root) const final {

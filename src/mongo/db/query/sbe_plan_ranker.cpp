@@ -49,22 +49,22 @@ protected:
     double calculateProductivity(const mongo::sbe::PlanStageStats* root) const final {
         auto numReads{calculateNumberOfReads(root)};
 
-        if (numReads == 0) {
-            return _kNoReadsBonus;
-        }
-
-        return static_cast<double>(root->common.advances) / static_cast<double>(numReads);
+        // We add one to the number of advances so that plans which returned zero documents still
+        // have a productivity of non-zero. This allows us to compare productivity scores between
+        // plans with zero advances. For example, a plan which did zero advances but examined ten
+        // documents would have a score of (0 + 1)/10, while a plan which did zero advances but
+        // examined a hundred documents would have a score of (0 + 1)/100.
+        //
+        // Similarly, we add one to the number of reads in case 0 reads were performed. This could
+        // happen if a plan encounters EOF right away, for example.
+        return static_cast<double>(root->common.advances + 1) / static_cast<double>(numReads + 1);
     }
 
     std::string getProductivityFormula(const mongo::sbe::PlanStageStats* root) const final {
         auto numReads{calculateNumberOfReads(root)};
         StringBuilder sb;
 
-        if (numReads == 0) {
-            sb << "(" << str::convertDoubleToString(_kNoReadsBonus) << " noReadsBonus)";
-        } else {
-            sb << "(" << root->common.advances << " advances)/(" << numReads << " numReads)";
-        }
+        sb << "(" << (root->common.advances + 1) << " advances)/(" << numReads << " numReads)";
 
         return sb.str();
     }
@@ -82,9 +82,6 @@ protected:
     }
 
 private:
-    // A plan that performs no reads scores higher than its peers.
-    static constexpr double _kNoReadsBonus = 1.0;
-
     const QuerySolution* _solution;
 };
 }  // namespace

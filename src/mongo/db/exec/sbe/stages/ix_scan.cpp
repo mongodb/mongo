@@ -303,8 +303,6 @@ void IndexScanStage::open(bool reOpen) {
         auto [copyTag, copyVal] = value::makeCopyKeyString(kb.getValueCopy());
         _seekKeyLowHolder->reset(true, copyTag, copyVal);
     }
-
-    ++_specificStats.seeks;
 }
 
 const KeyString::Value& IndexScanStage::getSeekKeyLow() const {
@@ -336,8 +334,20 @@ PlanState IndexScanStage::getNext() {
     if (_firstGetNext) {
         _firstGetNext = false;
         _nextRecord = _cursor->seekForKeyString(getSeekKeyLow());
+        ++_specificStats.seeks;
     } else {
         _nextRecord = _cursor->nextKeyString();
+    }
+
+    ++_specificStats.numReads;
+    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
+        // If we're collecting execution stats during multi-planning and reached the end of the
+        // trial period because we've performed enough physical reads, bail out from the trial run
+        // by raising a special exception to signal a runtime planner that this candidate plan has
+        // completed its trial run early. Note that a trial period is executed only once per a
+        // PlanStage tree, and once completed never run again on the same tree.
+        _tracker = nullptr;
+        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in ixscan");
     }
 
     if (!_nextRecord) {
@@ -358,6 +368,9 @@ PlanState IndexScanStage::getNext() {
         }
     }
 
+    // Note: we may in the future want to bump 'keysExamined' for comparisons to a key that result
+    // in the stage returning EOF.
+    ++_specificStats.keysExamined;
     if (_recordAccessor) {
         _recordAccessor->reset(false,
                                value::TypeTags::ksValue,
@@ -376,16 +389,6 @@ PlanState IndexScanStage::getNext() {
             _nextRecord->keyString, *_ordering, &_valuesBuffer, &_accessors, _indexKeysToInclude);
     }
 
-    ++_specificStats.numReads;
-    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
-        // If we're collecting execution stats during multi-planning and reached the end of the
-        // trial period because we've performed enough physical reads, bail out from the trial run
-        // by raising a special exception to signal a runtime planner that this candidate plan has
-        // completed its trial run early. Note that a trial period is executed only once per a
-        // PlanStage tree, and once completed never run again on the same tree.
-        _tracker = nullptr;
-        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in ixscan");
-    }
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -405,8 +408,9 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
 
     if (includeDebugInfo) {
         BSONObjBuilder bob;
-        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
+        bob.appendNumber("keysExamined", static_cast<long long>(_specificStats.keysExamined));
         bob.appendNumber("seeks", static_cast<long long>(_specificStats.seeks));
+        bob.appendNumber("numReads", static_cast<long long>(_specificStats.numReads));
         if (_recordSlot) {
             bob.appendNumber("recordSlot", static_cast<long long>(*_recordSlot));
         }

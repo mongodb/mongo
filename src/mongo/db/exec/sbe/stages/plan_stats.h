@@ -96,11 +96,12 @@ struct IndexScanStats final : public SpecificStats {
     }
 
     void accumulate(PlanSummaryStats& stats) const final {
-        stats.totalKeysExamined += numReads;
+        stats.totalKeysExamined += keysExamined;
     }
 
-    size_t numReads{0};
     size_t seeks{0};
+    size_t keysExamined{0};
+    size_t numReads{0};
 };
 
 struct FilterStats final : public SpecificStats {
