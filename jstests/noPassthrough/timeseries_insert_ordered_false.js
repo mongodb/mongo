@@ -23,38 +23,48 @@ const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-const resetColl = function() {
-    coll.drop();
-    assert.commandWorked(testDB.createCollection(
-        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
-};
-resetColl();
+coll.drop();
+assert.commandWorked(testDB.createCollection(
+    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
-configureFailPoint(conn, 'failTimeseriesInsert', {metadata: 'fail'});
-
-// Temporarily use null meta instead of missing meta to accomodate the new $_internalUnpackBucket
-// behavior which is null meta in a bucket is materialized as "null" meta.
-// TODO SERVER-55213: Remove 'meta: null'.
 const docs = [
-    {_id: 0, meta: null, [timeFieldName]: ISODate()},
-    {_id: 1, meta: null, [timeFieldName]: ISODate()},
-    {_id: 2, meta: null, [timeFieldName]: ISODate()},
+    {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: 0},
+    {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: 0},
+    {_id: 2, [timeFieldName]: ISODate(), [metaFieldName]: 0},
+    {_id: 3, [timeFieldName]: ISODate(), [metaFieldName]: 1},
+    {_id: 4, [timeFieldName]: ISODate(), [metaFieldName]: 1},
 ];
 
-let res = assert.commandWorked(coll.insert(docs, {ordered: false}));
-assert.eq(res.nInserted, 3, 'Invalid insert result: ' + tojson(res));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
-resetColl();
+assert.commandWorked(coll.insert(docs[0]));
 
-docs[1][metaFieldName] = 'fail';
-res = assert.commandFailed(coll.insert(docs, {ordered: false}));
+const fp = configureFailPoint(conn, 'failUnorderedTimeseriesInsert', {metadata: 0});
+
+// Insert two documents that would go into the existing bucket and two documents that go into a new
+// bucket.
+const res = assert.commandFailed(coll.insert(docs.slice(1), {ordered: false}));
+
 jsTestLog('Checking insert result: ' + tojson(res));
 assert.eq(res.nInserted, 2);
-assert.eq(res.getWriteErrors().length, 1);
-assert.eq(res.getWriteErrors()[0].index, 1);
-assert.docEq(res.getWriteErrors()[0].getOperation(), docs[1]);
-assert.docEq(coll.find().sort({_id: 1}).toArray(), [docs[0], docs[2]]);
+assert.eq(res.getWriteErrors().length, docs.length - res.nInserted - 1);
+for (let i = 0; i < res.getWriteErrors().length; i++) {
+    assert.eq(res.getWriteErrors()[i].index, i);
+    assert.docEq(res.getWriteErrors()[i].getOperation(), docs[i + 1]);
+}
+
+assert.docEq(coll.find().sort({_id: 1}).toArray(), [docs[0], docs[3], docs[4]]);
+assert.eq(bucketsColl.count(),
+          2,
+          'Expected two buckets but found: ' + tojson(bucketsColl.find().toArray()));
+
+fp.off();
+
+// The documents should go into two new buckets due to the failed insert on the existing bucket.
+assert.commandWorked(coll.insert(docs.slice(1, 3), {ordered: false}));
+assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
+assert.eq(bucketsColl.count(),
+          3,
+          'Expected three buckets but found: ' + tojson(bucketsColl.find().toArray()));
 
 MongoRunner.stopMongod(conn);
 })();

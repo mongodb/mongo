@@ -23,29 +23,44 @@ const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 const timeFieldName = 'time';
 const metaFieldName = 'meta';
 
-coll.drop();
-assert.commandWorked(testDB.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+const resetColl = function() {
+    coll.drop();
+    assert.commandWorked(testDB.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
+};
 
 const docs = [
-    {_id: 0, meta: 'fail', [timeFieldName]: ISODate()},
-    {_id: 1, meta: 'fail', [timeFieldName]: ISODate()},
+    {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: 0},
+    {_id: 1, [timeFieldName]: ISODate(), [metaFieldName]: 0},
 ];
 
-const fp = configureFailPoint(conn, 'failTimeseriesInsert', {metadata: 'fail'});
-assert.commandFailed(coll.insert(docs[0], {ordered: false}));
-fp.off();
+const runTest = function(ordered) {
+    jsTestLog('Running test with {ordered: ' + ordered + '} inserts');
+    resetColl();
 
-// Insert a document that belongs in the same bucket that the failed insert woulld have gone into.
-assert.commandWorked(coll.insert(docs[1], {ordered: false}));
+    const fp1 = configureFailPoint(conn, 'failAtomicTimeseriesWrites');
+    const fp2 = configureFailPoint(conn, 'failUnorderedTimeseriesInsert', {metadata: 0});
 
-// There should not be any leftover state from the failed insert.
-assert.docEq(coll.find().toArray(), [docs[1]]);
-const buckets = bucketsColl.find().sort({['control.min.' + timeFieldName]: 1}).toArray();
-jsTestLog('Checking buckets: ' + tojson(buckets));
-assert.eq(buckets.length, 1);
-assert.eq(buckets[0].control.min._id, docs[1]._id);
+    assert.commandFailed(coll.insert(docs[0], {ordered: ordered}));
+
+    fp1.off();
+    fp2.off();
+
+    // Insert a document that belongs in the same bucket that the failed insert would have gone
+    // into.
+    assert.commandWorked(coll.insert(docs[1], {ordered: ordered}));
+
+    // There should not be any leftover state from the failed insert.
+    assert.docEq(coll.find().toArray(), [docs[1]]);
+    const buckets = bucketsColl.find().sort({['control.min.' + timeFieldName]: 1}).toArray();
+    jsTestLog('Checking buckets: ' + tojson(buckets));
+    assert.eq(buckets.length, 1);
+    assert.eq(buckets[0].control.min._id, docs[1]._id);
+};
+
+runTest(true);
+runTest(false);
 
 MongoRunner.stopMongod(conn);
 })();

@@ -82,6 +82,10 @@ WriteResult performUpdates(OperationContext* opCtx,
                            const OperationSource& source = OperationSource::kStandard);
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::DeleteCommandRequest& op);
 
+Status performAtomicTimeseriesWrites(OperationContext* opCtx,
+                                     const std::vector<write_ops::InsertCommandRequest>& insertOps,
+                                     const std::vector<write_ops::UpdateCommandRequest>& updateOps);
+
 /**
  * Populate 'opDebug' with stats describing the execution of an update operation. Illegal to call
  * with a null OpDebug pointer.

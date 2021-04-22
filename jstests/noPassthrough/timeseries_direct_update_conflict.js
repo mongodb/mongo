@@ -55,7 +55,8 @@ assert.eq(buckets[0].control.max[timeFieldName], times[0]);
 const fpInsert = configureFailPoint(conn, "hangTimeseriesInsertBeforeWrite");
 const awaitInsert = startParallelShell(
     funWithArgs(function(dbName, collName, doc) {
-        assert.commandWorked(db.getSiblingDB(dbName).getCollection(collName).insert(doc));
+        assert.commandWorked(
+            db.getSiblingDB(dbName).getCollection(collName).insert(doc, {ordered: false}));
     }, dbName, coll.getName(), docs[1]), conn.port);
 fpInsert.wait();
 

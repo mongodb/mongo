@@ -5846,7 +5846,7 @@ tasks:
     vars:
       suite: sharding_jscore_passthrough
       depends_on: jsCore
-      resmoke_args: --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
+      resmoke_args: --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command,requires_timeseries
       fallback_num_sub_suites: 11
 
 - <<: *task_template

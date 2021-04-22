@@ -24,78 +24,72 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
+TimeseriesTest.run((insert) => {
+    const timeFieldName = 'tm';
+    const metaFieldName = 'mm';
 
-const timeFieldName = 'tm';
-const metaFieldName = 'mm';
+    const doc = {_id: 0, [timeFieldName]: ISODate(), [metaFieldName]: {tag1: 'a', tag2: 'b'}};
 
-const doc = {
-    _id: 0,
-    [timeFieldName]: ISODate(),
-    [metaFieldName]: {tag1: 'a', tag2: 'b'}
-};
+    const coll = db.timeseries_index_stats;
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    coll.drop();  // implicitly drops bucketsColl.
 
-const coll = db.timeseries_index_stats;
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
-coll.drop();  // implicitly drops bucketsColl.
+    assert.commandWorked(db.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
-assert.commandWorked(db.createCollection(
-    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
-assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
-assert.commandWorked(coll.insert(doc, {ordered: false}), 'failed to insert doc: ' + tojson(doc));
+    const indexKeys = {
+        index0: {[metaFieldName + '.tag1']: 1},
+        index1: {[metaFieldName + '.tag2']: -1, [timeFieldName]: -1},
+        index2: {[metaFieldName + '.tag3']: 1, [metaFieldName + '.tag4']: 1},
+    };
 
-const indexKeys = {
-    index0: {[metaFieldName + '.tag1']: 1},
-    index1: {[metaFieldName + '.tag2']: -1, [timeFieldName]: -1},
-    index2: {[metaFieldName + '.tag3']: 1, [metaFieldName + '.tag4']: 1},
-};
+    // Create a few indexes on the time-series collections that $indexStats should return.
+    for (const [indexName, indexKey] of Object.entries(indexKeys)) {
+        assert.commandWorked(coll.createIndex(indexKey, {name: indexName}),
+                             'failed to create index: ' + indexName + ': ' + tojson(indexKey));
+    }
 
-// Create a few indexes on the time-series collections that $indexStats should return.
-for (const [indexName, indexKey] of Object.entries(indexKeys)) {
-    assert.commandWorked(coll.createIndex(indexKey, {name: indexName}),
-                         'failed to create index: ' + indexName + ': ' + tojson(indexKey));
-}
+    // Create an index directly on the buckets collection that would not be visible in the
+    // time-series collection $indexStats results due to a failed conversion.
+    assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}, 'bucketindex'),
+                         'failed to create index: ' + tojson({not_metadata: 1}));
 
-// Create an index directly on the buckets collection that would not be visible in the time-series
-// collection $indexStats results due to a failed conversion.
-assert.commandWorked(bucketsColl.createIndex({not_metadata: 1}, 'bucketindex'),
-                     'failed to create index: ' + tojson({not_metadata: 1}));
+    // Check that $indexStats aggregation stage returns key patterns that are consistent with the
+    // ones provided to the createIndexes commands.
+    const indexStatsDocs = coll.aggregate([{$indexStats: {}}]).toArray();
+    assert.eq(Object.keys(indexKeys).length, indexStatsDocs.length, tojson(indexStatsDocs));
+    for (let i = 0; i < indexStatsDocs.length; ++i) {
+        const stat = indexStatsDocs[i];
+        assert(indexKeys.hasOwnProperty(stat.name),
+               '$indexStats returned unknown index: ' + stat.name + ': ' + tojson(indexStatsDocs));
+        assert.docEq(indexKeys[stat.name],
+                     stat.key,
+                     '$indexStats returned unexpected top-level key for index: ' + stat.name +
+                         ': ' + tojson(indexStatsDocs));
+        assert.docEq(indexKeys[stat.name],
+                     stat.spec.key,
+                     '$indexStats returned unexpected nested key in spec for index: ' + stat.name +
+                         ': ' + tojson(indexStatsDocs));
+    }
 
-// Check that $indexStats aggregation stage returns key patterns that are consistent with the ones
-// provided to the createIndexes commands.
-const indexStatsDocs = coll.aggregate([{$indexStats: {}}]).toArray();
-assert.eq(Object.keys(indexKeys).length, indexStatsDocs.length, tojson(indexStatsDocs));
-for (let i = 0; i < indexStatsDocs.length; ++i) {
-    const stat = indexStatsDocs[i];
-    assert(indexKeys.hasOwnProperty(stat.name),
-           '$indexStats returned unknown index: ' + stat.name + ': ' + tojson(indexStatsDocs));
-    assert.docEq(indexKeys[stat.name],
-                 stat.key,
-                 '$indexStats returned unexpected top-level key for index: ' + stat.name + ': ' +
-                     tojson(indexStatsDocs));
-    assert.docEq(indexKeys[stat.name],
-                 stat.spec.key,
-                 '$indexStats returned unexpected nested key in spec for index: ' + stat.name +
-                     ': ' + tojson(indexStatsDocs));
-}
+    // Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
+    // $indexStats on the buckets collection.
+    const bucketIndexStatsDocs = bucketsColl.aggregate([{$indexStats: {}}]).toArray();
+    assert.eq(Object.keys(indexKeys).length +
+                  (TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? 1 : 2),
+              bucketIndexStatsDocs.length,
+              tojson(bucketIndexStatsDocs));
 
-// Confirm that that $indexStats is indeed ignoring one index in schema translation by checking
-// $indexStats on the buckets collection.
-const bucketIndexStatsDocs = bucketsColl.aggregate([{$indexStats: {}}]).toArray();
-assert.eq(Object.keys(indexKeys).length +
-              (TimeseriesTest.supportsClusteredIndexes(db.getMongo()) ? 1 : 2),
-          bucketIndexStatsDocs.length,
-          tojson(bucketIndexStatsDocs));
-
-// Check that $indexStats is not limited to being the only stage in an aggregation pipeline on a
-// time-series collection.
-const multiStageDocs =
-    coll.aggregate([{$indexStats: {}}, {$group: {_id: 0, index_names: {$addToSet: '$name'}}}])
-        .toArray();
-assert.eq(1, multiStageDocs.length, tojson(multiStageDocs));
-assert.sameMembers(Object.keys(indexKeys), multiStageDocs[0].index_names, tojson(multiStageDocs));
+    // Check that $indexStats is not limited to being the only stage in an aggregation pipeline on a
+    // time-series collection.
+    const multiStageDocs =
+        coll.aggregate([{$indexStats: {}}, {$group: {_id: 0, index_names: {$addToSet: '$name'}}}])
+            .toArray();
+    assert.eq(1, multiStageDocs.length, tojson(multiStageDocs));
+    assert.sameMembers(
+        Object.keys(indexKeys), multiStageDocs[0].index_names, tojson(multiStageDocs));
+});
 })();

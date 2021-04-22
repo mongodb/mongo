@@ -15,45 +15,38 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");
 
-if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    return;
-}
+TimeseriesTest.run((insert) => {
+    const coll = db.timeseries_expire;
+    const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
 
-const coll = db.timeseries_expire;
-const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
+    coll.drop();
 
-coll.drop();
+    const timeFieldName = 'time';
+    const expireAfterSeconds = NumberLong(5);
+    assert.commandWorked(db.createCollection(
+        coll.getName(),
+        {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
+    assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
-const timeFieldName = 'time';
-const expireAfterSeconds = NumberLong(5);
-assert.commandWorked(db.createCollection(
-    coll.getName(),
-    {timeseries: {timeField: timeFieldName, expireAfterSeconds: expireAfterSeconds}}));
-assert.contains(bucketsColl.getName(), db.getCollectionNames());
+    // Inserts a measurement with a time in the past to ensure the measurement will be removed
+    // immediately.
+    const t = ISODate("2020-11-13T01:00:00Z");
+    let start = ISODate();
+    assert.lt(t, start);
 
-// Inserts a measurement with a time in the past to ensure the measurement will be removed
-// immediately.
-const t = ISODate("2020-11-13T01:00:00Z");
-let start = ISODate();
-assert.lt(t, start);
+    const doc = {_id: 0, [timeFieldName]: t, x: 0};
+    assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
+    jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
-const doc = {
-    _id: 0,
-    [timeFieldName]: t,
-    x: 0
-};
-assert.commandWorked(coll.insert(doc, {ordered: false}), 'failed to insert doc: ' + tojson(doc));
-jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
+    // Wait for the document to be removed.
+    start = ISODate();
+    assert.soon(() => {
+        return 0 == coll.find().itcount();
+    });
+    jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
-// Wait for the document to be removed.
-start = ISODate();
-assert.soon(() => {
-    return 0 == coll.find().itcount();
+    // Check bucket collection.
+    const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
+    assert.eq(0, bucketDocs.length, bucketDocs);
 });
-jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
-
-// Check bucket collection.
-const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
-assert.eq(0, bucketDocs.length, bucketDocs);
 })();

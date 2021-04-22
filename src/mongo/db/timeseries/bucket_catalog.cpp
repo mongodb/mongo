@@ -278,19 +278,17 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
         bucket->_preparedBatch.reset();
     }
 
-    if (info.result.isOK()) {
-        auto& stats = batch->_stats;
-        stats->numCommits.fetchAndAddRelaxed(1);
-        if (batch->numPreviouslyCommittedMeasurements() == 0) {
-            stats->numBucketInserts.fetchAndAddRelaxed(1);
-        } else {
-            stats->numBucketUpdates.fetchAndAddRelaxed(1);
-        }
+    auto& stats = batch->_stats;
+    stats->numCommits.fetchAndAddRelaxed(1);
+    if (batch->numPreviouslyCommittedMeasurements() == 0) {
+        stats->numBucketInserts.fetchAndAddRelaxed(1);
+    } else {
+        stats->numBucketUpdates.fetchAndAddRelaxed(1);
+    }
 
-        stats->numMeasurementsCommitted.fetchAndAddRelaxed(batch->measurements().size());
-        if (bucket) {
-            bucket->_numCommittedMeasurements += batch->measurements().size();
-        }
+    stats->numMeasurementsCommitted.fetchAndAddRelaxed(batch->measurements().size());
+    if (bucket) {
+        bucket->_numCommittedMeasurements += batch->measurements().size();
     }
 
     if (bucket && bucket->allCommitted()) {
@@ -318,7 +316,8 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
     }
 }
 
-void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
+void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch,
+                          const boost::optional<Status>& status) {
     invariant(batch);
     invariant(batch->_commitRights.load());
 
@@ -333,12 +332,12 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch) {
     auto lk = _lockExclusive();
     if (!_allBuckets.contains(bucket)) {
         // Special case, bucket has already been cleared, and we need only abort this batch.
-        batch->_abort(false);
+        batch->_abort(status, false);
         return;
     }
 
     stdx::unique_lock blk{bucket->_mutex};
-    _abort(blk, bucket, batch);
+    _abort(blk, bucket, batch, status);
 }
 
 void BucketCatalog::clear(const OID& oid) {
@@ -364,7 +363,7 @@ void BucketCatalog::clear(const NamespaceString& ns) {
         stdx::unique_lock blk{bucket->_mutex};
         if (shouldClear(bucket->_ns)) {
             _executionStats.erase(bucket->_ns);
-            _abort(blk, bucket.get(), nullptr);
+            _abort(blk, bucket.get(), nullptr, boost::none);
         }
 
         it = nextIt;
@@ -467,18 +466,19 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
 
 void BucketCatalog::_abort(stdx::unique_lock<Mutex>& lk,
                            Bucket* bucket,
-                           std::shared_ptr<WriteBatch> batch) {
+                           std::shared_ptr<WriteBatch> batch,
+                           const boost::optional<Status>& status) {
     // For any uncommitted batches that we need to abort, see if we already have the rights,
     // otherwise try to claim the rights and abort it. If we don't get the rights, then wait
     // for the other writer to resolve the batch.
     for (const auto& [_, current] : bucket->_batches) {
-        current->_abort(true);
+        current->_abort(status, true);
     }
     bucket->_batches.clear();
 
     if (auto& prepared = bucket->_preparedBatch) {
         if (prepared == batch) {
-            prepared->_abort(true);
+            prepared->_abort(status, true);
         }
         prepared.reset();
     }
@@ -806,7 +806,7 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketAndLock(std::size_t has
         }
     }
 
-    _catalog->_abort(_guard, _bucket, nullptr);
+    _catalog->_abort(_guard, _bucket, nullptr, boost::none);
     _create();
 }
 
@@ -1316,16 +1316,17 @@ void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
     _bucket = nullptr;
 }
 
-void BucketCatalog::WriteBatch::_abort(bool canAccessBucket) {
+void BucketCatalog::WriteBatch::_abort(const boost::optional<Status>& status,
+                                       bool canAccessBucket) {
     _active = false;
     std::string bucketIdentification;
     if (canAccessBucket) {
         bucketIdentification.append(str::stream()
                                     << _bucket->id() << " for " << _bucket->_ns << " ");
     }
-    _promise.setError(
-        {ErrorCodes::TimeseriesBucketCleared,
-         str::stream() << "Time-series bucket " << bucketIdentification << "was cleared"});
+    _promise.setError(status.value_or(
+        Status{ErrorCodes::TimeseriesBucketCleared,
+               str::stream() << "Time-series bucket " << bucketIdentification << "was cleared"}));
     _bucket = nullptr;
 }
 

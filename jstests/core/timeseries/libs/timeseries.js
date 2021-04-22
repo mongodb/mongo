@@ -151,4 +151,24 @@ var TimeseriesTest = class {
 
         return hosts;
     }
+
+    /**
+     * Runs the provided test with both ordered and unordered inserts.
+     */
+    static run(testFn) {
+        if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
+            jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+            return;
+        }
+
+        const insert = function(ordered) {
+            jsTestLog('Running test with {ordered: ' + ordered + '} inserts');
+            return function(coll, docs, options) {
+                return coll.insert(docs, Object.extend({ordered: ordered}, options));
+            };
+        };
+
+        testFn(insert(true));
+        testFn(insert(false));
+    }
 };

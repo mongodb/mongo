@@ -45,11 +45,15 @@ const docs = [
     {_id: 1, [timeFieldName]: ISODate()},
 ];
 
-const awaitInsert = startParallelShell(
-    funWithArgs(function(dbName, collName, doc) {
-        assert.commandWorked(db.getSiblingDB(dbName).runCommand(
-            {insert: collName, documents: [doc], writeConcern: {w: 2}, comment: '{w: 2} insert'}));
-    }, dbName, coll.getName(), docs[0]), primary.port);
+const awaitInsert = startParallelShell(funWithArgs(function(dbName, collName, doc) {
+                                           assert.commandWorked(db.getSiblingDB(dbName).runCommand({
+                                               insert: collName,
+                                               documents: [doc],
+                                               ordered: false,
+                                               writeConcern: {w: 2},
+                                               comment: '{w: 2} insert',
+                                           }));
+                                       }, dbName, coll.getName(), docs[0]), primary.port);
 
 // Wait for the {w: 2} insert to open a bucket.
 assert.soon(() => {
@@ -65,8 +69,7 @@ assert.commandWorked(coll.insert(docs[1], {writeConcern: {w: 1}, ordered: false}
 // Ensure the {w: 2} insert has not yet completed.
 assert.eq(
     assert.commandWorked(testDB.currentOp())
-        .inprog
-        .filter(op => op.ns === bucketsColl.getFullName() && op.command.comment === '{w: 2} insert')
+        .inprog.filter(op => op.ns === coll.getFullName() && op.command.comment === '{w: 2} insert')
         .length,
     1);
 

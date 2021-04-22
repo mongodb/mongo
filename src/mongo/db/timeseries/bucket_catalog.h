@@ -59,7 +59,6 @@ public:
     };
 
     struct CommitInfo {
-        StatusWith<SingleWriteResult> result;
         boost::optional<repl::OpTime> opTime;
         boost::optional<OID> electionId;
     };
@@ -144,7 +143,7 @@ public:
          * have commit rights. Parameter controls whether the function is allowed to access the
          * bucket.
          */
-        void _abort(bool canAccessBucket);
+        void _abort(const boost::optional<Status>& status, bool canAccessBucket);
 
 
         Bucket* _bucket;
@@ -209,9 +208,11 @@ public:
 
     /**
      * Aborts the given write batch and any other outstanding batches on the same bucket. Caller
-     * must already have commit rights on batch, and batch must not be finished.
+     * must already have commit rights on batch. Uses the provided status when clearing the bucket,
+     * or TimeseriesBucketCleared if not provided.
      */
-    void abort(std::shared_ptr<WriteBatch> batch);
+    void abort(std::shared_ptr<WriteBatch> batch,
+               const boost::optional<Status>& status = boost::none);
 
     /**
      * Marks any bucket with the specified OID as cleared and prevents any future inserts from
@@ -663,7 +664,10 @@ private:
      * Aborts any batches it can for the given bucket, then removes the bucket. If batch is
      * non-null, it is assumed that the caller has commit rights for that batch.
      */
-    void _abort(stdx::unique_lock<Mutex>& lk, Bucket* bucket, std::shared_ptr<WriteBatch> batch);
+    void _abort(stdx::unique_lock<Mutex>& lk,
+                Bucket* bucket,
+                std::shared_ptr<WriteBatch> batch,
+                const boost::optional<Status>& status);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date

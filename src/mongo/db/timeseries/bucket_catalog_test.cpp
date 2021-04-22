@@ -80,8 +80,6 @@ protected:
     NamespaceString _ns1{"bucket_catalog_test_1", "t_1"};
     NamespaceString _ns2{"bucket_catalog_test_1", "t_2"};
     NamespaceString _ns3{"bucket_catalog_test_2", "t_1"};
-
-    BucketCatalog::CommitInfo _commitInfo{StatusWith<SingleWriteResult>(SingleWriteResult{})};
 };
 
 class BucketCatalogWithoutMetadataTest : public BucketCatalogTest {
@@ -148,7 +146,7 @@ void BucketCatalogTest::_commit(const std::shared_ptr<BucketCatalog::WriteBatch>
     ASSERT_EQ(batch->measurements().size(), expectedBatchSize);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), numPreviouslyCommittedMeasurements);
 
-    _bucketCatalog->finish(batch, _commitInfo);
+    _bucketCatalog->finish(batch, {});
 }
 
 void BucketCatalogTest::_insertOneAndCommit(const NamespaceString& ns,
@@ -210,7 +208,7 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     ASSERT_EQ(batch1->numPreviouslyCommittedMeasurements(), 0);
 
     // Once the commit has occurred, the waiter should be notified.
-    _bucketCatalog->finish(batch1, _commitInfo);
+    _bucketCatalog->finish(batch1, {});
     ASSERT(batch2->finished());
     auto result3 = batch2->getResult();
     ASSERT_OK(result3.getStatus());
@@ -328,7 +326,7 @@ TEST_F(BucketCatalogTest, InsertBetweenPrepareAndFinish) {
                       .getValue();
     ASSERT_NE(batch1, batch2);
 
-    _bucketCatalog->finish(batch1, _commitInfo);
+    _bucketCatalog->finish(batch1, {});
     ASSERT(batch1->finished());
 
     // Verify the second batch still commits one doc, and that the first batch only commited one.
@@ -355,7 +353,7 @@ DEATH_TEST_F(BucketCatalogTest, CannotFinishUnpreparedBatch, "invariant") {
                                          BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     auto& batch = result.getValue();
     ASSERT(batch->claimCommitRights());
-    _bucketCatalog->finish(batch, _commitInfo);
+    _bucketCatalog->finish(batch, {});
 }
 
 TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
@@ -476,7 +474,7 @@ TEST_F(BucketCatalogTest, AbortBatchOnBucketWithPreparedCommit) {
     ASSERT(batch2->finished());
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
-    _bucketCatalog->finish(batch1, _commitInfo);
+    _bucketCatalog->finish(batch1, {});
     ASSERT(batch1->finished());
     ASSERT_OK(batch1->getResult().getStatus());
 }
@@ -519,7 +517,7 @@ TEST_F(BucketCatalogTest, ClearNamespaceWithConcurrentWrites) {
     // operation got the collection lock. So the write did actually happen, but is has since been
     // removed, and that's fine for our purposes. The finish just records the result to the batch
     // and updates some statistics.
-    _bucketCatalog->finish(batch, _commitInfo);
+    _bucketCatalog->finish(batch, {});
     ASSERT(batch->finished());
     ASSERT_OK(batch->getResult().getStatus());
 }
@@ -651,9 +649,9 @@ TEST_F(BucketCatalogTest, CannotConcurrentlyCommitBatchesForSameBucket) {
     ASSERT(stdx::future_status::timeout == task.future().wait_for(stdx::chrono::microseconds(1)))
         << "prepareCommit finished before expected";
 
-    _bucketCatalog->finish(batch1, _commitInfo);
+    _bucketCatalog->finish(batch1, {});
     task.future().wait();
-    _bucketCatalog->finish(batch2, _commitInfo);
+    _bucketCatalog->finish(batch2, {});
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
@@ -682,14 +680,14 @@ TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
     _bucketCatalog->prepareCommit(batch2);
     ASSERT_EQ(batch2->newFieldNamesToBeInserted().size(), 1);
     ASSERT_EQ(batch2->newFieldNamesToBeInserted().begin()->first, _timeField);
-    _bucketCatalog->finish(batch2, _commitInfo);
+    _bucketCatalog->finish(batch2, {});
 
     // Batch 1 was the first batch to insert the time field, but by commit time it was already
     // committed by batch 2.
     ASSERT(batch1->claimCommitRights());
     _bucketCatalog->prepareCommit(batch1);
     ASSERT(batch1->newFieldNamesToBeInserted().empty());
-    _bucketCatalog->finish(batch1, _commitInfo);
+    _bucketCatalog->finish(batch1, {});
 }
 
 }  // namespace

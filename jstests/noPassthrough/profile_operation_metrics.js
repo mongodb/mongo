@@ -1397,15 +1397,39 @@ const operations = [
         }
     },
     {
-        name: 'insertTimeseriesNewBucket',
+        name: 'insertTimeseriesNewBucketOrdered',
         skipTest: (db) => {
             return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
         },
         command: (db) => {
             // Inserts a document that creates a new bucket.
-            assert.commandWorked(db.ts.insert({t: new Date(), host: 0}));
+            assert.commandWorked(db.ts.insert({t: new Date(), host: 0}, {ordered: true}));
         },
-        profileFilter: {op: 'insert', 'command.insert': 'ts'},
+        profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.docUnitsRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.docBytesWritten, 194);
+            assert.eq(profileDoc.docUnitsWritten, 2);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
+        }
+    },
+    {
+        name: 'insertTimeseriesNewBucketUnordered',
+        skipTest: (db) => {
+            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
+        },
+        command: (db) => {
+            // Inserts a document that creates a new bucket.
+            assert.commandWorked(db.ts.insert({t: new Date(), host: 1}, {ordered: false}));
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -1422,15 +1446,39 @@ const operations = [
     },
     resetProfileColl,
     {
-        name: 'timeseriesUpdateBucket',
+        name: 'timeseriesUpdateBucketOrdered',
         skipTest: (db) => {
             return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
         },
         command: (db) => {
             // Inserts a document by updating an existing bucket.
-            assert.commandWorked(db.ts.insert({t: new Date(), host: 0}));
+            assert.commandWorked(db.ts.insert({t: new Date(), host: 0}, {ordered: true}));
         },
-        profileFilter: {op: 'update'},
+        profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 194);
+            assert.eq(profileDoc.docUnitsRead, 2);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.docBytesWritten, 220);
+            assert.eq(profileDoc.docUnitsWritten, 2);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.cursorSeeks, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
+        }
+    },
+    {
+        name: 'timeseriesUpdateBucketUnordered',
+        skipTest: (db) => {
+            return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
+        },
+        command: (db) => {
+            // Inserts a document by updating an existing bucket.
+            assert.commandWorked(db.ts.insert({t: new Date(), host: 1}, {ordered: false}));
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 194);
             assert.eq(profileDoc.docUnitsRead, 2);
@@ -1451,12 +1499,12 @@ const operations = [
             return !TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo());
         },
         command: (db) => {
-            assert.eq(2, db.ts.find().itcount());
+            assert.eq(4, db.ts.find().itcount());
         },
         profileFilter: {op: 'query', 'command.find': 'ts'},
         profileAssert: (db, profileDoc) => {
-            assert.eq(profileDoc.docBytesRead, 220);
-            assert.eq(profileDoc.docUnitsRead, 2);
+            assert.eq(profileDoc.docBytesRead, 110 * 4);
+            assert.eq(profileDoc.docUnitsRead, 4);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
