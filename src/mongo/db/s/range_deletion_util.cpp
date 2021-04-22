@@ -188,7 +188,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                                      min,
                                                      max,
                                                      BoundInclusion::kIncludeStartKeyOnly,
-                                                     PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
+                                                     PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
                                                      InternalPlanner::FORWARD);
 
     if (MONGO_unlikely(hangBeforeDoingDeletion.shouldFail())) {
