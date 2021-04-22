@@ -57,18 +57,6 @@
 
 namespace mongo::stage_builder {
 namespace {
-std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val) {
-    // TODO: Either make this conversion unnecessary by changing the value representation in
-    // ExpressionConstant, or provide a nicer way to convert directly from Document/Value to
-    // sbe::Value.
-    BSONObjBuilder bob;
-    val.addToBsonObj(&bob, ""_sd);
-    auto obj = bob.done();
-    auto be = obj.objdata();
-    auto end = be + obj.objsize();
-    return sbe::bson::convertFrom(false, be + 4, end, 0);
-}
-
 struct ExpressionVisitorContext {
     struct VarsFrame {
         std::deque<Variables::Id> variablesToBind;
@@ -729,7 +717,7 @@ public:
     };
 
     void visit(ExpressionConstant* expr) final {
-        auto [tag, val] = convertFrom(expr->getValue());
+        auto [tag, val] = makeValue(expr->getValue());
         _context->pushExpr(sbe::makeE<sbe::EConstant>(tag, val));
     }
 
@@ -1784,16 +1772,30 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
     void visit(ExpressionFieldPath* expr) final {
-        if (expr->getVariableId() == Variables::kRemoveId) {
-            // The case of $$REMOVE. Note that MQL allows a path in this situation (e.g.,
-            // "$$REMOVE.foo.bar") but ignores it.
-            _context->pushExpr(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
-            return;
-        }
-
         sbe::value::SlotId slotId;
-        if (!expr->isVariableReference()) {
-            slotId = _context->rootSlot;
+
+        if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
+            if (expr->getVariableId() == Variables::kRootId) {
+                slotId = _context->rootSlot;
+            } else if (expr->getVariableId() == Variables::kRemoveId) {
+                // For the field paths that begin with "$$REMOVE", we always produce Nothing,
+                // so no traversal is necessary.
+                _context->pushExpr(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
+                return;
+            } else {
+                auto it = Variables::kIdToBuiltinVarName.find(expr->getVariableId());
+                tassert(5611300,
+                        "Encountered unexpected system variable ID",
+                        it != Variables::kIdToBuiltinVarName.end());
+
+                auto variableSlot = _context->runtimeEnvironment->getSlotIfExists(it->second);
+                uassert(5611301,
+                        str::stream()
+                            << "Builtin variable '$$" << it->second << "' is not available",
+                        variableSlot.has_value());
+
+                slotId = *variableSlot;
+            }
         } else {
             auto it = _context->environment.find(expr->getVariableId());
             invariant(it != _context->environment.end());

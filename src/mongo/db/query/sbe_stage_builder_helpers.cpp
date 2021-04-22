@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include <iterator>
 #include <numeric>
@@ -570,9 +571,26 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
                 std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
 }
 
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONObj& bo) {
+    return sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
+                                 sbe::value::bitcastFrom<const char*>(bo.objdata()));
+}
+
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba) {
     return sbe::value::copyValue(sbe::value::TypeTags::bsonArray,
                                  sbe::value::bitcastFrom<const char*>(ba.objdata()));
+}
+
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const Value& val) {
+    // TODO: Either make this conversion unnecessary by changing the value representation in
+    // ExpressionConstant, or provide a nicer way to convert directly from Document/Value to
+    // sbe::Value.
+    BSONObjBuilder bob;
+    val.addToBsonObj(&bob, ""_sd);
+    auto obj = bob.done();
+    auto be = obj.objdata();
+    auto end = be + obj.objsize();
+    return sbe::bson::convertFrom(false, be + 4, end, 0);
 }
 
 uint32_t dateTypeMask() {

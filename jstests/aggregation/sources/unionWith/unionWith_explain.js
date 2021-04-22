@@ -86,7 +86,15 @@ function assertExplainEq(unionExplain, regularExplain) {
                    buildErrorString(unionSubStats, realStats));
         } else {
             const realExplain = regularExplain.stages;
-            assert(arrayEq(unionSubExplain, realExplain),
+            const filterExplain = expl => {
+                // When comparing explain output, we want to be tolerant of different values
+                // for the "NOW" slot in the environment.
+                if (expl[0]["$cursor"].queryPlanner.winningPlan.hasOwnProperty("slotBasedPlan")) {
+                    delete expl[0]["$cursor"].queryPlanner.winningPlan.slotBasedPlan.slots;
+                }
+                return expl;
+            };
+            assert(arrayEq(filterExplain(unionSubExplain), filterExplain(realExplain)),
                    buildErrorString(unionSubExplain, realExplain));
         }
     }

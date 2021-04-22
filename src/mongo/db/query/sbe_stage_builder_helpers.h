@@ -380,10 +380,17 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     sbe::value::Value arrVal);
 
 /**
- * Converts a BSONArray to an SBE Array. Caller owns the SBE Array returned. This method does not
- * assume ownership of the BSONArray.
+ * Helper functions for converting from BSONObj/BSONArray to SBE Object/Array. Caller owns the SBE
+ * Object/Array returned. These helper functions do not assume ownership of the BSONObj/BSONArray.
  */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONObj& bo);
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba);
+
+/**
+ * Helper function for converting mongo::Value to SBE Value. Caller owns the SBE Value returned.
+ * This helper function does not assume ownership of the mongo::Value.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const Value& val);
 
 /**
  * Returns a BSON type mask of all data types coercible to date.

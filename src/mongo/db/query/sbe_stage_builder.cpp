@@ -230,6 +230,14 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
                           slotIdGenerator);
     }
 
+    for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
+        if (id != Variables::kRootId && id != Variables::kRemoveId &&
+            cq.getExpCtx()->variables.hasValue(id)) {
+            auto [tag, val] = makeValue(cq.getExpCtx()->variables.getValue(id));
+            env->registerSlot(name, tag, val, true, slotIdGenerator);
+        }
+    }
+
     return env;
 }
 

@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+
 const coll = db[jsTest.name()];
 const otherColl = db[coll.getName() + "_other"];
 otherColl.drop();
