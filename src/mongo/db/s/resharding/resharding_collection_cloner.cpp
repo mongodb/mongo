@@ -42,6 +42,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -215,6 +216,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
+    // We associate the aggregation cursors established on each donor shard with a logical session
+    // to prevent them from killing the cursor when it is idle locally. Due to the cursor's merging
+    // behavior across all donor shards, it is possible for the cursor to be active on one donor
+    // shard while idle for a long period on another donor shard.
+    opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+
     AggregateCommandRequest request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
 
