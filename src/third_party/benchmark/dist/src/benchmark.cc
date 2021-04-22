@@ -51,66 +51,60 @@
 #include "thread_manager.h"
 #include "thread_timer.h"
 
-DEFINE_bool(benchmark_list_tests, false,
-            "Print a list of benchmarks. This option overrides all other "
-            "options.");
+// Print a list of benchmarks. This option overrides all other options.
+DEFINE_bool(benchmark_list_tests, false);
 
-DEFINE_string(benchmark_filter, ".",
-              "A regular expression that specifies the set of benchmarks "
-              "to execute.  If this flag is empty, or if this flag is the "
-              "string \"all\", all benchmarks linked into the binary are "
-              "run.");
+// A regular expression that specifies the set of benchmarks to execute.  If
+// this flag is empty, or if this flag is the string \"all\", all benchmarks
+// linked into the binary are run.
+DEFINE_string(benchmark_filter, ".");
 
-DEFINE_double(benchmark_min_time, 0.5,
-              "Minimum number of seconds we should run benchmark before "
-              "results are considered significant.  For cpu-time based "
-              "tests, this is the lower bound on the total cpu time "
-              "used by all threads that make up the test.  For real-time "
-              "based tests, this is the lower bound on the elapsed time "
-              "of the benchmark execution, regardless of number of "
-              "threads.");
+// Minimum number of seconds we should run benchmark before results are
+// considered significant.  For cpu-time based tests, this is the lower bound
+// on the total cpu time used by all threads that make up the test.  For
+// real-time based tests, this is the lower bound on the elapsed time of the
+// benchmark execution, regardless of number of threads.
+DEFINE_double(benchmark_min_time, 0.5);
 
-DEFINE_int32(benchmark_repetitions, 1,
-             "The number of runs of each benchmark. If greater than 1, the "
-             "mean and standard deviation of the runs will be reported.");
+// The number of runs of each benchmark. If greater than 1, the mean and
+// standard deviation of the runs will be reported.
+DEFINE_int32(benchmark_repetitions, 1);
 
-DEFINE_bool(
-    benchmark_report_aggregates_only, false,
-    "Report the result of each benchmark repetitions. When 'true' is specified "
-    "only the mean, standard deviation, and other statistics are reported for "
-    "repeated benchmarks. Affects all reporters.");
+// Report the result of each benchmark repetitions. When 'true' is specified
+// only the mean, standard deviation, and other statistics are reported for
+// repeated benchmarks. Affects all reporters.
+DEFINE_bool(benchmark_report_aggregates_only, false);
 
-DEFINE_bool(
-    benchmark_display_aggregates_only, false,
-    "Display the result of each benchmark repetitions. When 'true' is "
-    "specified only the mean, standard deviation, and other statistics are "
-    "displayed for repeated benchmarks. Unlike "
-    "benchmark_report_aggregates_only, only affects the display reporter, but "
-    "*NOT* file reporter, which will still contain all the output.");
+// Display the result of each benchmark repetitions. When 'true' is specified
+// only the mean, standard deviation, and other statistics are displayed for
+// repeated benchmarks. Unlike benchmark_report_aggregates_only, only affects
+// the display reporter, but  *NOT* file reporter, which will still contain
+// all the output.
+DEFINE_bool(benchmark_display_aggregates_only, false);
 
-DEFINE_string(benchmark_format, "console",
-              "The format to use for console output. Valid values are "
-              "'console', 'json', or 'csv'.");
+// The format to use for console output.
+// Valid values are 'console', 'json', or 'csv'.
+DEFINE_string(benchmark_format, "console");
 
-DEFINE_string(benchmark_out_format, "json",
-              "The format to use for file output. Valid values are "
-              "'console', 'json', or 'csv'.");
+// The format to use for file output.
+// Valid values are 'console', 'json', or 'csv'.
+DEFINE_string(benchmark_out_format, "json");
 
-DEFINE_string(benchmark_out, "", "The file to write additional output to");
+// The file to write additional output to.
+DEFINE_string(benchmark_out, "");
 
-DEFINE_string(benchmark_color, "auto",
-              "Whether to use colors in the output.  Valid values: "
-              "'true'/'yes'/1, 'false'/'no'/0, and 'auto'. 'auto' means to use "
-              "colors if the output is being sent to a terminal and the TERM "
-              "environment variable is set to a terminal type that supports "
-              "colors.");
+// Whether to use colors in the output.  Valid values:
+// 'true'/'yes'/1, 'false'/'no'/0, and 'auto'. 'auto' means to use colors if
+// the output is being sent to a terminal and the TERM environment variable is
+// set to a terminal type that supports colors.
+DEFINE_string(benchmark_color, "auto");
 
-DEFINE_bool(benchmark_counters_tabular, false,
-            "Whether to use tabular format when printing user counters to "
-            "the console.  Valid values: 'true'/'yes'/1, 'false'/'no'/0."
-            "Defaults to false.");
+// Whether to use tabular format when printing user counters to the console.
+// Valid values: 'true'/'yes'/1, 'false'/'no'/0.  Defaults to false.
+DEFINE_bool(benchmark_counters_tabular, false);
 
-DEFINE_int32(v, 0, "The level of verbose logging to output");
+// The level of verbose logging to output
+DEFINE_int32(v, 0);
 
 namespace benchmark {
 
@@ -148,7 +142,7 @@ State::State(IterationCount max_iters, const std::vector<int64_t>& ranges,
   // which must be suppressed.
 #if defined(__INTEL_COMPILER)
 #pragma warning push
-#pragma warning(disable:1875)
+#pragma warning(disable : 1875)
 #elif defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
@@ -289,6 +283,13 @@ void RunBenchmarks(const std::vector<BenchmarkInstance>& benchmarks,
   flushStreams(file_reporter);
 }
 
+// Disable deprecated warnings temporarily because we need to reference
+// CSVReporter but don't want to trigger -Werror=-Wdeprecated-declarations
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 std::unique_ptr<BenchmarkReporter> CreateReporter(
     std::string const& name, ConsoleReporter::OutputOptions output_opts) {
   typedef std::unique_ptr<BenchmarkReporter> PtrType;
@@ -304,6 +305,10 @@ std::unique_ptr<BenchmarkReporter> CreateReporter(
   }
 }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 }  // end namespace
 
 bool IsZero(double n) {
@@ -312,7 +317,7 @@ bool IsZero(double n) {
 
 ConsoleReporter::OutputOptions GetOutputOptions(bool force_no_color) {
   int output_opts = ConsoleReporter::OO_Defaults;
-  auto is_benchmark_color = [force_no_color] () -> bool {
+  auto is_benchmark_color = [force_no_color]() -> bool {
     if (force_no_color) {
       return false;
     }
@@ -430,7 +435,7 @@ void ParseCommandLineFlags(int* argc, char** argv) {
   using namespace benchmark;
   BenchmarkReporter::Context::executable_name =
       (argc && *argc > 0) ? argv[0] : "unknown";
-  for (int i = 1; i < *argc; ++i) {
+  for (int i = 1; argc && i < *argc; ++i) {
     if (ParseBoolFlag(argv[i], "benchmark_list_tests",
                       &FLAGS_benchmark_list_tests) ||
         ParseStringFlag(argv[i], "benchmark_filter", &FLAGS_benchmark_filter) ||

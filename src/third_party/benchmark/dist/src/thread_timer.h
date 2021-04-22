@@ -43,19 +43,19 @@ class ThreadTimer {
   bool running() const { return running_; }
 
   // REQUIRES: timer is not running
-  double real_time_used() {
+  double real_time_used() const {
     CHECK(!running_);
     return real_time_used_;
   }
 
   // REQUIRES: timer is not running
-  double cpu_time_used() {
+  double cpu_time_used() const {
     CHECK(!running_);
     return cpu_time_used_;
   }
 
   // REQUIRES: timer is not running
-  double manual_time_used() {
+  double manual_time_used() const {
     CHECK(!running_);
     return manual_time_used_;
   }

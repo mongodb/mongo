@@ -7,7 +7,7 @@ IFS=$'\n\t'
 
 NAME="benchmark"
 
-LIB_GIT_REV="mongo/v1.5.0"
+LIB_GIT_REV="mongo/v1.5.2"
 
 LIB_GIT_URL="https://github.com/mongodb-forks/benchmark.git"
 LIB_GIT_DIR=$(mktemp -d /tmp/import-benchmark.XXXXXX)

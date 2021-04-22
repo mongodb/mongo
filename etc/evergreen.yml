@@ -11564,16 +11564,12 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - centos6-perf
+  - rhel80-medium
   expansions:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
   tasks:
   - name: compile_benchmarks
-    distros:
-    - rhel80-medium
   - name: .benchmarks
-    distros:
-    - centos6-perf
 
 - name: enterprise-rhel-80-64-bit-inmem
   display_name: Enterprise RHEL 8.0 (inMemory)

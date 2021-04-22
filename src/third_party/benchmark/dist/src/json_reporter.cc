@@ -92,7 +92,7 @@ std::string FormatKV(std::string const& key, double value) {
   return ss.str();
 }
 
-int64_t RoundDouble(double v) { return static_cast<int64_t>(v + 0.5); }
+int64_t RoundDouble(double v) { return std::lround(v); }
 
 }  // end namespace
 
@@ -134,8 +134,10 @@ bool JSONReporter::ReportContext(const Context& context) {
       << FormatKV("mhz_per_cpu",
                   RoundDouble(info.cycles_per_second / 1000000.0))
       << ",\n";
-  out << indent << FormatKV("cpu_scaling_enabled", info.scaling_enabled)
-      << ",\n";
+  if (CPUInfo::Scaling::UNKNOWN != info.scaling) {
+    out << indent << FormatKV("cpu_scaling_enabled", info.scaling == CPUInfo::Scaling::ENABLED ? true : false)
+        << ",\n";
+  }
 
   out << indent << "\"caches\": [\n";
   indent = std::string(6, ' ');
@@ -147,7 +149,7 @@ bool JSONReporter::ReportContext(const Context& context) {
     out << cache_indent << FormatKV("level", static_cast<int64_t>(CI.level))
         << ",\n";
     out << cache_indent
-        << FormatKV("size", static_cast<int64_t>(CI.size) * 1000u) << ",\n";
+        << FormatKV("size", static_cast<int64_t>(CI.size)) << ",\n";
     out << cache_indent
         << FormatKV("num_sharing", static_cast<int64_t>(CI.num_sharing))
         << "\n";

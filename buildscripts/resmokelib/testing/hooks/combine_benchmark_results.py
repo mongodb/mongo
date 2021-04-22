@@ -131,10 +131,23 @@ class _BenchmarkThreadsReport(object):
     """
 
     CONTEXT_FIELDS = [
-        "date", "cpu_scaling_enabled", "num_cpus", "mhz_per_cpu", "library_build_type",
-        "executable", "caches"
+        "date",
+        "num_cpus",
+        "mhz_per_cpu",
+        "library_build_type",
+        "executable",
+        "caches",
+        "cpu_scaling_enabled",
     ]
-    Context = collections.namedtuple("Context", CONTEXT_FIELDS)  # type: ignore
+
+    Context = collections.namedtuple(
+        typename="Context",
+        field_names=CONTEXT_FIELDS,
+        # We need a default for cpu_scaling_enabled, since newer
+        # google benchmark doesn't report a value if it can't make a
+        # determination.
+        defaults=["unknown"],
+    )  # type: ignore
 
     def __init__(self, context_dict):
         # `context_dict` was parsed from a json file and might have additional fields.

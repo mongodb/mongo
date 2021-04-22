@@ -32,6 +32,10 @@ double Finish(Counter const& c, IterationCount iterations, double cpu_time,
   if (c.flags & Counter::kAvgIterations) {
     v /= iterations;
   }
+
+  if (c.flags & Counter::kInvert) {  // Invert is *always* last.
+    v = 1.0 / v;
+  }
   return v;
 }
 

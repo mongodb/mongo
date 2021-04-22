@@ -117,7 +117,7 @@ void RunInThread(const BenchmarkInstance* b, IterationCount iters,
           ? internal::ThreadTimer::CreateProcessCpuTime()
           : internal::ThreadTimer::Create());
   State st = b->Run(iters, thread_id, &timer, manager);
-  CHECK(st.iterations() >= st.max_iterations)
+  CHECK(st.error_occurred() || st.iterations() >= st.max_iterations)
       << "Benchmark returned before State::KeepRunning() returned false!";
   {
     MutexLock l(manager->GetBenchmarkMutex());
@@ -263,8 +263,9 @@ class BenchmarkRunner {
     if (multiplier <= 1.0) multiplier = 2.0;
 
     // So what seems to be the sufficiently-large iteration count? Round up.
-    const IterationCount max_next_iters =
-        0.5 + std::max(multiplier * i.iters, i.iters + 1.0);
+    const IterationCount max_next_iters = static_cast<IterationCount>(
+        std::lround(std::max(multiplier * static_cast<double>(i.iters),
+                             static_cast<double>(i.iters) + 1.0)));
     // But we do have *some* sanity limits though..
     const IterationCount next_iters = std::min(max_next_iters, kMaxIterations);
 

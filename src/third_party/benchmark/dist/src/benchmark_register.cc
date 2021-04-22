@@ -31,10 +31,13 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <thread>
 
+#ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
+#endif
 #include <inttypes.h>
 
 #include "benchmark/benchmark.h"
@@ -301,33 +304,41 @@ Benchmark* Benchmark::Ranges(
     const std::vector<std::pair<int64_t, int64_t>>& ranges) {
   CHECK(ArgsCnt() == -1 || ArgsCnt() == static_cast<int>(ranges.size()));
   std::vector<std::vector<int64_t>> arglists(ranges.size());
-  std::size_t total = 1;
   for (std::size_t i = 0; i < ranges.size(); i++) {
     AddRange(&arglists[i], ranges[i].first, ranges[i].second,
              range_multiplier_);
-    total *= arglists[i].size();
   }
 
-  std::vector<std::size_t> ctr(arglists.size(), 0);
+  ArgsProduct(arglists);
 
+  return this;
+}
+
+Benchmark* Benchmark::ArgsProduct(
+    const std::vector<std::vector<int64_t>>& arglists) {
+  CHECK(ArgsCnt() == -1 || ArgsCnt() == static_cast<int>(arglists.size()));
+
+  std::vector<std::size_t> indices(arglists.size());
+  const std::size_t total = std::accumulate(
+      std::begin(arglists), std::end(arglists), std::size_t{1},
+      [](const std::size_t res, const std::vector<int64_t>& arglist) {
+        return res * arglist.size();
+      });
+  std::vector<int64_t> args;
+  args.reserve(arglists.size());
   for (std::size_t i = 0; i < total; i++) {
-    std::vector<int64_t> tmp;
-    tmp.reserve(arglists.size());
-
-    for (std::size_t j = 0; j < arglists.size(); j++) {
-      tmp.push_back(arglists[j].at(ctr[j]));
+    for (std::size_t arg = 0; arg < arglists.size(); arg++) {
+      args.push_back(arglists[arg][indices[arg]]);
     }
+    args_.push_back(args);
+    args.clear();
 
-    args_.push_back(std::move(tmp));
-
-    for (std::size_t j = 0; j < arglists.size(); j++) {
-      if (ctr[j] + 1 < arglists[j].size()) {
-        ++ctr[j];
-        break;
-      }
-      ctr[j] = 0;
-    }
+    std::size_t arg = 0;
+    do {
+      indices[arg] = (indices[arg] + 1) % arglists[arg].size();
+    } while (indices[arg++] == 0 && arg < arglists.size());
   }
+
   return this;
 }
 

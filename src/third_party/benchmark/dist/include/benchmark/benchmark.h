@@ -176,6 +176,7 @@ BENCHMARK(BM_test)->Unit(benchmark::kMillisecond);
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(BENCHMARK_HAS_CXX11)
@@ -368,7 +369,10 @@ class Counter {
     // It will be presented divided by the number of iterations.
     kAvgIterations = 1U << 3U,
     // Mark the counter as a iteration-average rate. See above.
-    kAvgIterationsRate = kIsRate | kAvgIterations
+    kAvgIterationsRate = kIsRate | kAvgIterations,
+
+    // In the end, invert the result. This is always done last!
+    kInvert = 1U << 31U
   };
 
   enum OneK {
@@ -538,6 +542,9 @@ class State {
   // responsibility to exit the scope as needed.
   void SkipWithError(const char* msg);
 
+  // Returns true if an error has been reported with 'SkipWithError(...)'.
+  bool error_occurred() const { return error_occurred_; }
+
   // REQUIRES: called exactly once per iteration of the benchmarking loop.
   // Set the manually measured time for this benchmark iteration, which
   // is used instead of automatically measured time if UseManualTime() was
@@ -574,7 +581,7 @@ class State {
   void SetComplexityN(int64_t complexity_n) { complexity_n_ = complexity_n; }
 
   BENCHMARK_ALWAYS_INLINE
-  int64_t complexity_length_n() { return complexity_n_; }
+  int64_t complexity_length_n() const { return complexity_n_; }
 
   // If this routine is called with items > 0, then an items/s
   // label is printed on the benchmark report line for the currently
@@ -820,6 +827,11 @@ class Benchmark {
   // ranges [start..limit].  (starts and limits are always picked.)
   // REQUIRES: The function passed to the constructor must accept arg1, arg2 ...
   Benchmark* Ranges(const std::vector<std::pair<int64_t, int64_t> >& ranges);
+
+  // Run this benchmark once for each combination of values in the (cartesian)
+  // product of the supplied argument lists.
+  // REQUIRES: The function passed to the constructor must accept arg1, arg2 ...
+  Benchmark* ArgsProduct(const std::vector<std::vector<int64_t> >& arglists);
 
   // Equivalent to ArgNames({name})
   Benchmark* ArgName(const std::string& name);
@@ -1291,10 +1303,16 @@ struct CPUInfo {
     int num_sharing;
   };
 
+  enum Scaling {
+    UNKNOWN,
+    ENABLED,
+    DISABLED
+  };
+
   int num_cpus;
   double cycles_per_second;
   std::vector<CacheInfo> caches;
-  bool scaling_enabled;
+  Scaling scaling;
   std::vector<double> load_avg;
 
   static const CPUInfo& Get();
