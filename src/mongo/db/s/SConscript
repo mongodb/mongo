@@ -484,6 +484,7 @@ env.CppUnitTest(
         'resharding/resharding_oplog_fetcher_test.cpp',
         'resharding/resharding_oplog_session_application_test.cpp',
         'resharding/resharding_recipient_service_external_state_test.cpp',
+        'resharding/resharding_recipient_service_test.cpp',
         'resharding/resharding_donor_service_test.cpp',
         'resharding/resharding_txn_cloner_test.cpp',
         'session_catalog_migration_destination_test.cpp',
