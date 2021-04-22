@@ -462,7 +462,7 @@ void DBClientConnection::_checkConnection() {
             DBClientConnection::_auth(i->second);
         } catch (AssertionException& ex) {
             if (ex.code() != ErrorCodes::AuthenticationFailed) {
-                _failed = true;
+                _markFailed(kSetFlag);
                 throw;
             }
             LOG(_logLevel) << "reconnect: auth failed "
