@@ -4,13 +4,18 @@ import platform
 from shlex import quote
 from typing import Any
 
-import yaml
-import click
-
 
 def _error(msg: str) -> None:
     print(f"___expansions_error={quote(msg)}")
     sys.exit(1)
+
+
+try:
+    import yaml
+    import click
+except ModuleNotFoundError:
+    _error("ERROR: Failed to import a dependency. This is almost certainly because "
+           "the task did not initialize the venv immediately after cloning the repository.")
 
 
 def _load_defaults(defaults_file: str) -> dict:
