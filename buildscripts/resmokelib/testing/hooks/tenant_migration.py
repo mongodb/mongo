@@ -332,13 +332,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
             "errmsg"] == "simulate a tenant migration error"
 
-    def _is_stale_sync_source_err(self, abort_reason):
-        # TODO (SERVER-55355): Tenant migration recipient aborts the migration if it selected an
-        # invalid sync source instead of selecting a new one.
-        err_msg_regex = r"Sync source's last applied OpTime.*is older than our last fetched OpTime"
-        return abort_reason["code"] == self.INVALID_SYNC_SOURCE_ERR_CODE and re.search(
-            err_msg_regex, abort_reason["errmsg"])
-
     def _is_missing_uuid_in_collection_info_err(self, abort_reason):
         # TODO (SERVER-55352): Missing uuid in collection info returned by TenantDatabaseCloner's
         # listCollections command.
@@ -358,9 +351,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
             "Tenant migration recipient command failed")
         if not is_recipient_err:
             return False
-        return self._is_stale_sync_source_err(
-            abort_reason) or self._is_missing_uuid_in_collection_info_err(
-                abort_reason) or self._is_no_such_key_in_oplog_buffer_err(abort_reason)
+        return self._is_missing_uuid_in_collection_info_err(
+            abort_reason) or self._is_no_such_key_in_oplog_buffer_err(abort_reason)
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
