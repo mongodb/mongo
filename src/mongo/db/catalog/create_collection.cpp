@@ -190,6 +190,13 @@ Status _createTimeseries(OperationContext* opCtx,
             AutoGetDb autoDb(opCtx, bucketsNs.db(), MODE_IX);
             Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
 
+            if (opCtx->writesAreReplicated() &&
+                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, bucketsNs)) {
+                // Report the error with the user provided namespace
+                return Status(ErrorCodes::NotWritablePrimary,
+                              str::stream() << "Not primary while creating collection " << ns);
+            }
+
             auto db = autoDb.ensureDbExists();
 
             WriteUnitOfWork wuow(opCtx);
