@@ -701,7 +701,7 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     fromOptionsBob.append(info["uuid"]);
     fromOptions = fromOptionsBob.obj();
 
-    return {fromOptions, UUID::fromCDR(fromUUID)};
+    return {fromOptions, fromUUID};
 }
 
 void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
@@ -918,7 +918,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
           "fromShard"_attr = _fromShard,
           "epoch"_attr = _epoch,
           "sessionId"_attr = *_sessionId,
-          "migrationId"_attr = _migrationId->toBSON());
+          "migrationId"_attr = _migrationId.toBSON());
 
     MoveTimingHelper timing(
         outerOpCtx, "to", _nss.ns(), _min, _max, 6 /* steps */, &_errmsg, _toShard, _fromShard);
@@ -928,7 +928,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     if (initialState == ABORT) {
         LOGV2_ERROR(22013,
                     "Migration abort requested before the migration started",
-                    "migrationId"_attr = _migrationId->toBSON());
+                    "migrationId"_attr = _migrationId.toBSON());
         return;
     }
 
@@ -965,7 +965,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                   "scheduled for deletion",
                   "namespace"_attr = _nss.ns(),
                   "range"_attr = redact(range.toString()),
-                  "migrationId"_attr = _migrationId->toBSON());
+                  "migrationId"_attr = _migrationId.toBSON());
 
             auto status = CollectionShardingRuntime::waitForClean(
                 outerOpCtx, _nss, donorCollectionOptionsAndIndexes.uuid, range);
@@ -979,7 +979,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
         }
 
         // Insert a pending range deletion task for the incoming range.
-        RangeDeletionTask recipientDeletionTask(*_migrationId,
+        RangeDeletionTask recipientDeletionTask(_migrationId,
                                                 _nss,
                                                 donorCollectionOptionsAndIndexes.uuid,
                                                 _fromShard,
@@ -1099,7 +1099,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                             LOGV2_WARNING(
                                 22011,
                                 "secondaryThrottle on, but doc insert timed out; continuing",
-                                "migrationId"_attr = _migrationId->toBSON());
+                                "migrationId"_attr = _migrationId.toBSON());
                         } else {
                             uassertStatusOK(replStatus.status);
                         }
@@ -1177,7 +1177,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 if (getState() == ABORT) {
                     LOGV2(22002,
                           "Migration aborted while waiting for replication at catch up stage",
-                          "migrationId"_attr = _migrationId->toBSON());
+                          "migrationId"_attr = _migrationId.toBSON());
                     return;
                 }
 
@@ -1190,7 +1190,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
                 if (i > 100) {
                     LOGV2(22003,
                           "secondaries having hard time keeping up with migrate",
-                          "migrationId"_attr = _migrationId->toBSON());
+                          "migrationId"_attr = _migrationId.toBSON());
                 }
 
                 sleepmillis(20);
@@ -1212,12 +1212,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
         LOGV2(22004,
               "Waiting for replication to catch up before entering critical section",
-              "migrationId"_attr = _migrationId->toBSON());
+              "migrationId"_attr = _migrationId.toBSON());
         LOGV2_DEBUG_OPTIONS(4817411,
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Starting majority commit wait on recipient",
-                            "migrationId"_attr = _migrationId->toBSON());
+                            "migrationId"_attr = _migrationId.toBSON());
 
         runWithoutSession(outerOpCtx, [&] {
             auto awaitReplicationResult =
@@ -1229,12 +1229,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
         LOGV2(22005,
               "Chunk data replicated successfully.",
-              "migrationId"_attr = _migrationId->toBSON());
+              "migrationId"_attr = _migrationId.toBSON());
         LOGV2_DEBUG_OPTIONS(4817412,
                             2,
                             {logv2::LogComponent::kShardMigrationPerf},
                             "Finished majority commit wait on recipient",
-                            "migrationId"_attr = _migrationId->toBSON());
+                            "migrationId"_attr = _migrationId.toBSON());
     }
 
     {
@@ -1274,7 +1274,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             if (getState() == ABORT) {
                 LOGV2(22006,
                       "Migration aborted while transferring mods",
-                      "migrationId"_attr = _migrationId->toBSON());
+                      "migrationId"_attr = _migrationId.toBSON());
                 return;
             }
 
@@ -1407,7 +1407,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
                     "reloaded remote document",
                     "localDoc"_attr = redact(localDoc),
                     "remoteDoc"_attr = redact(updatedDoc),
-                    "migrationId"_attr = _migrationId->toBSON());
+                    "migrationId"_attr = _migrationId.toBSON());
             }
 
             // We are in write lock here, so sure we aren't killing
@@ -1438,7 +1438,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
                   "chunkMin"_attr = redact(_min),
                   "chunkMax"_attr = redact(_max),
                   "lastOpApplied"_attr = op,
-                  "migrationId"_attr = _migrationId->toBSON());
+                  "migrationId"_attr = _migrationId.toBSON());
         }
         return false;
     }
@@ -1449,7 +1449,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
           "namespace"_attr = _nss.ns(),
           "chunkMin"_attr = redact(_min),
           "chunkMax"_attr = redact(_max),
-          "migrationId"_attr = _migrationId->toBSON());
+          "migrationId"_attr = _migrationId.toBSON());
 
     return true;
 }
