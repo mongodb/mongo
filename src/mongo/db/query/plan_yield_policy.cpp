@@ -102,6 +102,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
             if (getPolicy() == PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY) {
                 // This yield policy doesn't release locks, but it does relinquish our storage
                 // snapshot.
+                invariant(!opCtx->isLockFreeReadsOp());
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 performYield(opCtx, yieldable, whileYieldingFn);
