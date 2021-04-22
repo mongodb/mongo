@@ -818,7 +818,15 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase1(
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-        sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, nss, fixedExecutor);
+        try {
+            sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, nss, fixedExecutor);
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            // Collection is being dropped by a legacy-path dropCollection
+            LOGV2(5617300,
+                  "Failed to refresh collection on shards after metadata patch-up",
+                  "nss"_attr = nss,
+                  "exception"_attr = redact(ex));
+        }
     }
 
     // Drop ns_* indexes of config.chunks
@@ -940,7 +948,15 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase1(
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-        sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, nss, fixedExecutor);
+        try {
+            sharding_util::tellShardsToRefreshCollection(opCtx, shardIds, nss, fixedExecutor);
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
+            // Collection is being dropped by a legacy-path dropCollection
+            LOGV2(5617301,
+                  "Failed to refresh collection on shards after metadata patch-up",
+                  "nss"_attr = nss,
+                  "exception"_attr = redact(ex));
+        }
     }
 
     // Drop uuid_* indexes for config.chunks
