@@ -708,15 +708,9 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
              * 'startApplyingDonorOpTime'
              * 3) Some other retriable error
              */
-            // TODO (SERVER-55473): Investigate if DBClientBase::_auth can return the original
-            // status instead of AuthenticationFailed.
             if (status == ErrorCodes::FailedToSatisfyReadPreference ||
                 status == ErrorCodes::Error(kDelayedMajorityOpTimeErrorCode) ||
-                ErrorCodes::isRetriableError(status) ||
-                (status == ErrorCodes::AuthenticationFailed &&
-                 status.reason().find(
-                     "network error while attempting to run command 'authenticate'") !=
-                     std::string::npos)) {
+                ErrorCodes::isRetriableError(status)) {
                 return false;
             }
 

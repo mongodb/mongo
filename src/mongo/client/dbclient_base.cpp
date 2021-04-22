@@ -512,12 +512,7 @@ void DBClientBase::_auth(const BSONObj& params) {
 #endif
 
     HostAndPort remote(getServerAddress());
-    auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook())
-        .onError([](Status status) {
-            // for some reason, DBClient transformed all errors into AuthenticationFailed errors
-            return Status(ErrorCodes::AuthenticationFailed, status.reason());
-        })
-        .get();
+    auth::authenticateClient(params, remote, clientName, _makeAuthRunCommandHook()).get();
 }
 
 Status DBClientBase::authenticateInternalUser(auth::StepDownBehavior stepDownBehavior) {
