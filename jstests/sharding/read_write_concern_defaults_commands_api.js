@@ -1,5 +1,6 @@
 // Tests the basic API of the getDefaultRWConcern and setDefaultRWConcern commands and their
 // associated persisted state against different topologies.
+// @tags: [requires_fcv_50]
 (function() {
 "use strict";
 
@@ -65,6 +66,17 @@ function verifyDefaultRWCommandsInvalidInput(conn) {
     }),
                                  ErrorCodes.BadValue);
 
+    // Empty write concern is not allowed if write concern has already been set.
+    const featureEnabled = assert
+                               .commandWorked(conn.adminCommand(
+                                   {getParameter: 1, featureFlagDefaultWriteConcernMajority: 1}))
+                               .featureFlagDefaultWriteConcernMajority.value;
+    if (featureEnabled) {
+        assert.commandFailedWithCode(
+            conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}}),
+            ErrorCodes.IllegalOperation);
+    }
+
     // Invalid read concern.
     assert.commandFailedWithCode(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: 1}),
                                  ErrorCodes.TypeMismatch);
@@ -100,21 +112,6 @@ function verifyDefaultRWCommandsInvalidInput(conn) {
                                  ErrorCodes.BadValue);
 }
 
-// Sets a default read and write concern.
-function setDefaultRWConcern(conn) {
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultReadConcern: {level: "local"},
-        defaultWriteConcern: {w: 1}
-    }));
-}
-
-// Unsets the default read and write concerns.
-function unsetDefaultRWConcern(conn) {
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
-}
-
 // Verifies the default responses for the default RWC commands and the default persisted state.
 function verifyDefaultState(conn) {
     const res = assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1}));
@@ -147,9 +144,9 @@ function verifyDefaultState(conn) {
     assert.eq(null, getPersistedRWCDocument(conn));
 }
 
-function verifyDefaultRWCommandsValidInput(conn) {
+function verifyDefaultRWCommandsValidInputOnSuccess(conn) {
     //
-    // Test parameters for getDefaultRWConcern.
+    // Test getDefaultRWConcern when neither read nor write concern are set.
     //
 
     // No parameters is allowed.
@@ -159,121 +156,66 @@ function verifyDefaultRWCommandsValidInput(conn) {
     assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1, inMemory: true}));
     assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1, inMemory: false}));
 
-    //
-    // Test parameters for setDefaultRWConcern.
-    //
-
-    // Setting only rc is allowed.
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}));
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
-
-    // Setting only wc is allowed.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}}));
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: false}}));
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
-
-    // Setting both wc and rc is allowed.
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {w: 1},
-        defaultReadConcern: {level: "local"}
-    }));
-
-    // Empty write concern is allowed.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}}));
-
-    // Empty read concern is allowed.
-    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}}));
-}
-
-// Verifies the responses from successful rwc commands and the persisted state after they complete
-// have the expected format.
-function verifyDefaultRWCommandsOnSuccess(conn) {
-    //
-    // Test responses for getDefaultRWConcern.
-    //
-
-    // When neither read nor write concern is set.
-    unsetDefaultRWConcern(conn);
-    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
-                 {expectRC: false, expectWC: false});
-
-    // When only read concern is set.
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}, defaultWriteConcern: {}}));
-    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
-                 {expectRC: true, expectWC: false});
-
-    // When only write concern is set.
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {w: 1}}));
-    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
-                 {expectRC: false, expectWC: true});
-
-    // When both read and write concern are set.
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultReadConcern: {level: "local"},
-        defaultWriteConcern: {w: 1}
-    }));
-    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
-                 {expectRC: true, expectWC: true});
-
     // An inMemory response should contain inMemory=true.
     const inMemoryRes =
         assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1, inMemory: true}));
     assert.eq(inMemoryRes.inMemory, true, tojson(inMemoryRes));
 
     //
-    // Test responses for setDefaultRWConcern and persisted state after.
+    // Test getting and setting read concern.
     //
 
-    // When unsetting both read and write concern.
-    setDefaultRWConcern(conn);
-    verifyFields(assert.commandWorked(conn.adminCommand(
-                     {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}})),
-                 {expectRC: false, expectWC: false});
-    verifyFields(getPersistedRWCDocument(conn),
-                 {expectRC: false, expectWC: false, isPersistedDocument: true});
-
-    // When unsetting only read concern.
-    setDefaultRWConcern(conn);
-    verifyFields(
-        assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}})),
-        {expectRC: false, expectWC: true});
-    verifyFields(getPersistedRWCDocument(conn),
-                 {expectRC: false, expectWC: true, isPersistedDocument: true});
-
-    // When unsetting only write concern.
-    setDefaultRWConcern(conn);
-    verifyFields(
-        assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}})),
-        {expectRC: true, expectWC: false});
-    verifyFields(getPersistedRWCDocument(conn),
-                 {expectRC: true, expectWC: false, isPersistedDocument: true});
-
-    // When setting only write concern.
-    unsetDefaultRWConcern(conn);
-    verifyFields(assert.commandWorked(
-                     conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}})),
-                 {expectRC: false, expectWC: true});
-    verifyFields(getPersistedRWCDocument(conn),
-                 {expectRC: false, expectWC: true, isPersistedDocument: true});
-
-    // When setting only read concern.
-    unsetDefaultRWConcern(conn);
+    // Test setDefaultRWConcern when only read concern is set.
     verifyFields(assert.commandWorked(conn.adminCommand(
                      {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}})),
                  {expectRC: true, expectWC: false});
     verifyFields(getPersistedRWCDocument(conn),
                  {expectRC: true, expectWC: false, isPersistedDocument: true});
 
-    // When setting both read and write concern.
-    unsetDefaultRWConcern(conn);
+    // Test getDefaultRWConcern when only read concern is set.
+    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
+                 {expectRC: true, expectWC: false});
+
+    // Test unsetting read concern.
+    verifyFields(
+        assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}})),
+        {expectRC: false, expectWC: false});
+    verifyFields(getPersistedRWCDocument(conn),
+                 {expectRC: false, expectWC: false, isPersistedDocument: true});
+    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
+                 {expectRC: false, expectWC: false});
+
+    //
+    // Test getting and setting write concern.
+    //
+
+    // Empty write concern is allowed if write concern has not already been set.
+    verifyFields(
+        assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}})),
+        {expectRC: false, expectWC: false});
+    verifyFields(getPersistedRWCDocument(conn),
+                 {expectRC: false, expectWC: false, isPersistedDocument: true});
+
+    // Test setRWConcern when only write concern is set.
+    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}}));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, j: false}}));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
+
+    verifyFields(assert.commandWorked(
+                     conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}})),
+                 {expectRC: false, expectWC: true});
+    verifyFields(getPersistedRWCDocument(conn),
+                 {expectRC: false, expectWC: true, isPersistedDocument: true});
+
+    // Test getRWConcern when only write concern is set.
+    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
+                 {expectRC: false, expectWC: true});
+
+    //
+    // Test getting and setting both read and write concern.
+    //
     verifyFields(assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
         defaultReadConcern: {level: "local"},
@@ -282,6 +224,10 @@ function verifyDefaultRWCommandsOnSuccess(conn) {
                  {expectRC: true, expectWC: true});
     verifyFields(getPersistedRWCDocument(conn),
                  {expectRC: true, expectWC: true, isPersistedDocument: true});
+
+    // Test getRWConcern when both read and write concern are set.
+    verifyFields(assert.commandWorked(conn.adminCommand({getDefaultRWConcern: 1})),
+                 {expectRC: true, expectWC: true});
 }
 
 function getPersistedRWCDocument(conn) {
@@ -315,9 +261,8 @@ jsTestLog("Testing standalone replica set...");
 
     // Primary succeeds.
     verifyDefaultState(rst.getPrimary());
-    verifyDefaultRWCommandsValidInput(rst.getPrimary());
+    verifyDefaultRWCommandsValidInputOnSuccess(rst.getPrimary());
     verifyDefaultRWCommandsInvalidInput(rst.getPrimary());
-    verifyDefaultRWCommandsOnSuccess(rst.getPrimary());
 
     // Secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
     assert.commandWorked(rst.getSecondary().adminCommand({getDefaultRWConcern: 1}));
@@ -331,13 +276,12 @@ jsTestLog("Testing standalone replica set...");
 
 jsTestLog("Testing sharded cluster...");
 {
-    const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
+    let st = new ShardingTest({shards: 1, rs: {nodes: 2}});
 
     // Mongos succeeds.
     verifyDefaultState(st.s);
-    verifyDefaultRWCommandsValidInput(st.s);
+    verifyDefaultRWCommandsValidInputOnSuccess(st.s);
     verifyDefaultRWCommandsInvalidInput(st.s);
-    verifyDefaultRWCommandsOnSuccess(st.s);
 
     // Shard node fails.
     verifyDefaultRWCommandsFailWithCode(st.rs0.getPrimary(), {failureCode: 51301});
@@ -349,10 +293,12 @@ jsTestLog("Testing sharded cluster...");
             {setDefaultRWConcern: 1, defaultReadConcern: {level: "local"}}),
         ErrorCodes.NotWritablePrimary);
 
+    st.stop();
+    st = new ShardingTest({shards: 1, rs: {nodes: 2}});
     // Config server primary succeeds.
-    verifyDefaultRWCommandsValidInput(st.configRS.getPrimary());
+    verifyDefaultState(st.configRS.getPrimary());
+    verifyDefaultRWCommandsValidInputOnSuccess(st.configRS.getPrimary());
     verifyDefaultRWCommandsInvalidInput(st.configRS.getPrimary());
-    verifyDefaultRWCommandsOnSuccess(st.configRS.getPrimary());
 
     // Config server secondary can run getDefaultRWConcern, but not setDefaultRWConcern.
     assert.commandWorked(st.configRS.getSecondary().adminCommand({getDefaultRWConcern: 1}));

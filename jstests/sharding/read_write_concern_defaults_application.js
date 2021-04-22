@@ -968,14 +968,13 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
                 configSvrCheckConn,
                 {explicitRWC: true, explicitProvenance: true});
 
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
-    runScenario("Scenario: RWC defaults unset, explicit RWC present, absent provenance",
+    assert.commandWorked(conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {}}));
+    runScenario("Scenario: Read concern defaults unset, explicit RWC present, absent provenance",
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,
                 {explicitRWC: true, explicitProvenance: false});
-    runScenario("Scenario: RWC defaults unset, explicit RWC present, explicit provenance",
+    runScenario("Scenario: Read concern defaults unset, explicit RWC present, explicit provenance",
                 conn,
                 regularCheckConn,
                 configSvrCheckConn,

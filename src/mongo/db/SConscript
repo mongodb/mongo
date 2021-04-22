@@ -432,8 +432,11 @@ env.Library(
         'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'repl/repl_server_parameters',
+        'server_options_core',
         'vector_clock',
     ],
 )
@@ -2421,6 +2424,7 @@ if wiredtiger:
             'repl/mock_repl_coord_server_fixture',
             'repl/oplog_interface_local',
             'repl/repl_coordinator_interface',
+            'repl/repl_server_parameters',
             'repl/replica_set_aware_service',
             'repl/replmocks',
             'repl/storage_interface_impl',

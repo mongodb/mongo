@@ -194,9 +194,9 @@ var res = testDB.a.insert({x: 1});
 assert.commandFailedWithCode(res, ErrorCodes.UnsatisfiableWriteConcern);
 assert.eq(res.getWriteConcernError().errInfo.writeConcern.provenance, "customDefault");
 
-// Unset the default WC.
-assert.commandWorked(
-    testDB.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {}, writeConcern: {w: 1}}));
+// Set the default WC back to {w: 1, wtimeout: 0}.
+assert.commandWorked(testDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1, wtimeout: 0}, writeConcern: {w: 1}}));
 
 // Validate counters.
 var endGLEMetrics = testDB.serverStatus().metrics.getLastError;

@@ -51,18 +51,20 @@ function testServerStatus(conn) {
     // When no defaults have been set.
     verifyServerStatus(conn, {expectNoDefaultsDocument: true});
 
-    // When only write concern is set.
-    assert.commandWorked(
-        conn.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}}));
-    verifyServerStatus(conn, {expectedWC: {w: "majority", wtimeout: 0}});
-
     // When only read concern is set.
-    assert.commandWorked(conn.adminCommand({
-        setDefaultRWConcern: 1,
-        defaultWriteConcern: {},
-        defaultReadConcern: {level: "majority"}
-    }));
+    assert.commandWorked(
+        conn.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "majority"}}));
     verifyServerStatus(conn, {expectedRC: {level: "majority"}});
+
+    // When read concern is explicitly unset and write concern is unset.
+    assert.commandWorked(conn.adminCommand(
+        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
+    verifyServerStatus(conn, {});
+
+    // When only write concern is set.
+    assert.commandWorked(conn.adminCommand(
+        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {w: "majority"}}));
+    verifyServerStatus(conn, {expectedWC: {w: "majority", wtimeout: 0}});
 
     // When both read and write concern are set.
     assert.commandWorked(conn.adminCommand({
@@ -72,11 +74,6 @@ function testServerStatus(conn) {
     }));
     verifyServerStatus(conn,
                        {expectedRC: {level: "majority"}, expectedWC: {w: "majority", wtimeout: 0}});
-
-    // When both read and write concern are explicitly unset.
-    assert.commandWorked(conn.adminCommand(
-        {setDefaultRWConcern: 1, defaultReadConcern: {}, defaultWriteConcern: {}}));
-    verifyServerStatus(conn, {});
 
     // When the defaults document has been deleted.
     assert.commandWorked(conn.getDB("config").settings.remove({_id: "ReadWriteConcernDefaults"}));

@@ -32,6 +32,8 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/vector_clock_test_fixture.h"
@@ -403,13 +405,14 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
 }
 
-TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidUnsetReadConcernAndWriteConcern) {
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestGenerateNewConcernsValidUnsetReadConcern) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewConcerns(
-        operationContext(), repl::ReadConcernArgs(), WriteConcernOptions());
+    auto defaults =
+        _rwcd.generateNewConcerns(operationContext(), repl::ReadConcernArgs(), boost::none);
     ASSERT(!defaults.getDefaultReadConcern());
-    ASSERT(!defaults.getDefaultWriteConcern());
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(oldDefaults.getDefaultWriteConcern()->wNumNodes,
+              defaults.getDefaultWriteConcern()->wNumNodes);
     ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
     ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
 
@@ -417,6 +420,56 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     _rwcd.refreshIfNecessary(operationContext());
     auto newDefaults = _rwcd.getDefault(operationContext());
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
+}
+
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewConcernsInvalidUnsetWriteConcern) {
+    auto oldDefaults = setupOldDefaults();
+    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ASSERT_THROWS_CODE(
+            _rwcd.generateNewConcerns(operationContext(), boost::none, WriteConcernOptions()),
+            AssertionException,
+            ErrorCodes::IllegalOperation);
+    } else {
+        auto defaults =
+            _rwcd.generateNewConcerns(operationContext(), boost::none, WriteConcernOptions());
+        ASSERT(defaults.getDefaultReadConcern());
+        ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
+               defaults.getDefaultReadConcern()->getLevel());
+        ASSERT(!defaults.getDefaultWriteConcern());
+        ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
+        ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
+
+        _lookupMock.setLookupCallReturnValue(std::move(defaults));
+        _rwcd.refreshIfNecessary(operationContext());
+        auto newDefaults = _rwcd.getDefault(operationContext());
+        ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
+    }
+}
+
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewConcernsInvalidUnsetReadWriteConcern) {
+    auto oldDefaults = setupOldDefaults();
+    if (repl::feature_flags::gDefaultWCMajority.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(
+                               operationContext(), repl::ReadConcernArgs(), WriteConcernOptions()),
+                           AssertionException,
+                           ErrorCodes::IllegalOperation);
+    } else {
+        auto defaults = _rwcd.generateNewConcerns(
+            operationContext(), repl::ReadConcernArgs(), WriteConcernOptions());
+        ASSERT(!defaults.getDefaultReadConcern());
+        ASSERT(!defaults.getDefaultWriteConcern());
+        ASSERT_LT(*oldDefaults.getUpdateOpTime(), *defaults.getUpdateOpTime());
+        ASSERT_LT(*oldDefaults.getUpdateWallClockTime(), *defaults.getUpdateWallClockTime());
+
+        _lookupMock.setLookupCallReturnValue(std::move(defaults));
+        _rwcd.refreshIfNecessary(operationContext());
+        auto newDefaults = _rwcd.getDefault(operationContext());
+        ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
+    }
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
