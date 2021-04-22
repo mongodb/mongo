@@ -83,7 +83,7 @@ public:
 
 private:
     mutable stdx::mutex _mutex;
-    std::set<std::string> _collectionsAlwaysNeedingSizeAdjustment;
+    stdx::unordered_set<std::string> _collectionsAlwaysNeedingSizeAdjustment;
 };
 
 /**
