@@ -3366,6 +3366,8 @@ tasks:
           workdir: ${workdir}
 
 - name: embedded_sdk_install_dev
+  depends_on:
+    - name: embedded_sdk_build_cdriver
   commands:
     - func: "scons compile"
       vars:
@@ -3386,6 +3388,8 @@ tasks:
           --link-model=dynamic-sdk
 
 - name: embedded_sdk_s3_put
+  depends_on:
+    - name: embedded_sdk_install_dev
   commands:
     - command: expansions.write
       params:
@@ -3413,6 +3417,8 @@ tasks:
         display_name: "Embedded SDK Tar Archive"
 
 - name: embedded_sdk_install_tests
+  depends_on:
+    - name: embedded_sdk_install_dev
   commands:
     - func: "scons compile"
       vars:
@@ -3428,6 +3434,8 @@ tasks:
         num_scons_link_jobs_available: 0.99
 
 - name: embedded_sdk_tests_s3_put
+  depends_on:
+    - name: embedded_sdk_install_tests
   commands:
     - command: expansions.write
       params:
@@ -3456,6 +3464,8 @@ tasks:
         display_name: "Embedded SDK Tests Tar Archive"
 
 - name: embedded_sdk_run_tests
+  depends_on:
+    - name: embedded_sdk_install_tests
   commands:
     - command: expansions.write
       params:
@@ -3479,6 +3489,8 @@ tasks:
           workdir: ${workdir}
 
 - name: embedded_sdk_s3_put_latest
+  depends_on:
+    - name: embedded_sdk_run_tests
   commands:
     # A second put, this time to -latest, to give devs a reasonable
     # way to get the most recent build.
@@ -3495,6 +3507,8 @@ tasks:
         content_type: ${content_type|application/x-gzip}
 
 - name: embedded_sdk_tests_s3_put_latest
+  depends_on:
+    - name: embedded_sdk_run_tests
   commands:
     # A second put, this time to -latest, to give devs a reasonable
     # way to get the most recent build.
@@ -3547,6 +3561,8 @@ tasks:
         display_name: "Stitch Support Library"
 
 - name: stitch_support_install_tests
+  depends_on:
+    - name: stitch_support_create_lib
   commands:
     - func: "scons compile"
       vars:
@@ -3562,6 +3578,8 @@ tasks:
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
 
 - name: stitch_support_run_tests
+  depends_on:
+    - name: stitch_support_install_tests
   commands:
     - command: expansions.write
       params:
