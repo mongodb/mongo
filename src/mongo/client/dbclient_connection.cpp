@@ -461,8 +461,10 @@ void DBClientConnection::_checkConnection() {
         try {
             DBClientConnection::_auth(i->second);
         } catch (AssertionException& ex) {
-            if (ex.code() != ErrorCodes::AuthenticationFailed)
+            if (ex.code() != ErrorCodes::AuthenticationFailed) {
+                _failed = true;
                 throw;
+            }
             LOG(_logLevel) << "reconnect: auth failed "
                            << i->second[auth::getSaslCommandUserDBFieldName()]
                            << i->second[auth::getSaslCommandUserFieldName()] << ' ' << ex.what()
