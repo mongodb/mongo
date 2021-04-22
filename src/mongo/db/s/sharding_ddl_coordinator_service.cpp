@@ -83,6 +83,12 @@ std::shared_ptr<ShardingDDLCoordinator> ShardingDDLCoordinatorService::_construc
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
     auto coord = _constructCoordinator(std::move(initialState));
+
+    {
+        stdx::lock_guard lg(_completionMutex);
+        ++_numActiveCoordinators;
+    }
+
     coord->getConstructionCompletionFuture()
         .thenRunOn(getInstanceCleanupExecutor())
         .getAsync([this](auto status) {
@@ -96,8 +102,27 @@ ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
                 _recoveredCV.notify_all();
             }
         });
+
+    coord->getCompletionFuture()
+        .thenRunOn(getInstanceCleanupExecutor())
+        .getAsync([this](auto status) {
+            stdx::lock_guard lg(_completionMutex);
+            if (--_numActiveCoordinators == 0) {
+                _completedCV.notify_all();
+            }
+        });
+
     return coord;
 }
+
+void ShardingDDLCoordinatorService::waitForAllCoordinatorsToComplete(
+    OperationContext* opCtx) const {
+    _waitForRecoveryCompletion(opCtx);
+    stdx::unique_lock lk(_completionMutex);
+    opCtx->waitForConditionOrInterrupt(
+        _completedCV, lk, [this]() { return _numActiveCoordinators == 0; });
+}
+
 
 void ShardingDDLCoordinatorService::_afterStepDown() {
     stdx::lock_guard lg(_mutex);
@@ -132,6 +157,12 @@ size_t ShardingDDLCoordinatorService::_countCoordinatorDocs(OperationContext* op
     return numCoordField.numberLong();
 }
 
+void ShardingDDLCoordinatorService::_waitForRecoveryCompletion(OperationContext* opCtx) const {
+    stdx::unique_lock lk(_mutex);
+    opCtx->waitForConditionOrInterrupt(
+        _recoveredCV, lk, [this]() { return _state == State::kRecovered; });
+}
+
 ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return ExecutorFuture<void>(**executor)
@@ -164,12 +195,8 @@ ExecutorFuture<void> ShardingDDLCoordinatorService::_rebuildService(
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSONObj coorDoc) {
 
-    {
-        // Wait for all coordinators to be recovered before to allow the creation of new ones.
-        stdx::unique_lock lk(_mutex);
-        opCtx->waitForConditionOrInterrupt(
-            _recoveredCV, lk, [this]() { return _state == State::kRecovered; });
-    }
+    // Wait for all coordinators to be recovered before to allow the creation of new ones.
+    _waitForRecoveryCompletion(opCtx);
 
     auto coorMetadata = extractShardingDDLCoordinatorMetadata(coorDoc);
     const auto& nss = coorMetadata.getId().getNss();
