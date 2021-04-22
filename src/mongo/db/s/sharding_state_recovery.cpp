@@ -129,7 +129,7 @@ public:
     }
 
 private:
-    RecoveryDocument() = default;
+    RecoveryDocument() : _minOpTimeUpdaters{0} {}
     repl::OpTime _minOpTime;
     long long _minOpTimeUpdaters;
 };
