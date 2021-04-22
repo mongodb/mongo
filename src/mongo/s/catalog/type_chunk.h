@@ -39,6 +39,7 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/type_traits.h"
 
 namespace mongo {
 
@@ -123,12 +124,12 @@ public:
     ChunkRange unionWith(ChunkRange const& other) const;
 
 private:
-    // For use with IDL parsing - limited to friend access only.
+    /** Does not enforce the non-empty range invariant. */
     ChunkRange() = default;
 
-    // Make the IDL generated parser a friend
-    friend class RangeDeletionTask;
-    friend class MigrationCoordinatorDocument;
+    friend ChunkRange idlPreparsedValue(stdx::type_identity<ChunkRange>) {
+        return {};
+    }
 
     BSONObj _minKey;
     BSONObj _maxKey;
