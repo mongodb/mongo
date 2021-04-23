@@ -12,3 +12,4 @@ grpcio-tools == 1.37.0; platform_machine == "x86_64" or platform_machine == "aar
 googleapis-common-protos == 1.53.0
 blackduck == 1.0.1
 PyGithub == 1.53
+urllib3 >= 1.26.0

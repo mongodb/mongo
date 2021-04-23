@@ -175,7 +175,7 @@ class HTTPHandler(object):
             retry_status = [500, 502, 503, 504]  # Retry for these statuses.
             retry = urllib3_retry.Retry(
                 backoff_factor=0.1,  # Enable backoff starting at 0.1s.
-                method_whitelist=False,  # Support all HTTP verbs.
+                allowed_methods=False,  # Support all HTTP verbs.
                 status_forcelist=retry_status)
 
             adapter = requests.adapters.HTTPAdapter(max_retries=retry)
