@@ -18,7 +18,7 @@ const primary = rst.getPrimary();
 const primaryDB = primary.getDB(dbName);
 
 // Create a collection.
-assert.commandWorked(primaryDB.createCollection(collName));
+assert.commandWorked(primaryDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const session = primary.startSession();
 const sessionDb = session.getDatabase(dbName);
