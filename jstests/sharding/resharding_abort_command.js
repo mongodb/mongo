@@ -11,9 +11,6 @@ load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load("jstests/sharding/libs/resharding_test_util.js");
 
-// TODO SERVER-52838 Re-enable checking UUIDs.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 const originalCollectionNs = "reshardingDb.coll";
 const enterAbortFailpointName = "reshardingPauseCoordinatorBeforeStartingErrorFlow";
 

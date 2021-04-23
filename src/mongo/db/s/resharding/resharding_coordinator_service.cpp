@@ -264,6 +264,8 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                     setBuilder.append(CollectionType::kUpdatedAtFieldName,
                                       opCtx->getServiceContext()->getPreciseClockSource()->now());
                 }
+
+                setBuilder.doneFast();
             }
 
             return updateBuilder.obj();
@@ -317,6 +319,13 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                     auto abortStatus = getStatusFromAbortReason(coordinatorDoc);
                     setBuilder.append("reshardingFields.userCanceled",
                                       abortStatus == ErrorCodes::ReshardCollectionAborted);
+                }
+
+                setBuilder.doneFast();
+
+                if (coordinatorDoc.getAbortReason()) {
+                    updateBuilder.append("$unset",
+                                         BSON(CollectionType::kAllowMigrationsFieldName << ""));
                 }
             }
 
@@ -465,19 +474,20 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
         opCtx, TagsType::ConfigNS, newZones, txnNumber);
 }
 
-void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc,
-                                          boost::optional<Timestamp> newCollectionTimestamp,
-                                          TxnNumber txnNumber) {
+void removeChunkAndTagsDocs(OperationContext* opCtx,
+                            const NamespaceString& ns,
+                            const boost::optional<UUID>& collUUID,
+                            TxnNumber txnNumber) {
     // Remove all chunk documents for the original nss. We do not know how many chunk docs currently
     // exist, so cannot pass a value for expectedNumModified
     const auto chunksQuery = [&]() {
-        if (newCollectionTimestamp) {
-            return BSON(ChunkType::collectionUUID() << coordinatorDoc.getSourceUUID());
+        if (collUUID) {
+            return BSON(ChunkType::collectionUUID() << *collUUID);
         } else {
-            return BSON(ChunkType::ns(coordinatorDoc.getSourceNss().ns()));
+            return BSON(ChunkType::ns(ns.ns()));
         }
     }();
+
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         ChunkType::ConfigNS,
@@ -492,12 +502,33 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx,
         TagsType::ConfigNS,
-        BatchedCommandRequest::buildDeleteOp(
-            TagsType::ConfigNS,
-            BSON(ChunkType::ns(coordinatorDoc.getSourceNss().ns())),  // query
-            true                                                      // multi
-            ),
+        BatchedCommandRequest::buildDeleteOp(TagsType::ConfigNS,
+                                             BSON(ChunkType::ns(ns.ns())),  // query
+                                             true                           // multi
+                                             ),
         txnNumber);
+}
+
+void removeConfigMetadataForTempNss(OperationContext* opCtx,
+                                    const ReshardingCoordinatorDocument& coordinatorDoc,
+                                    TxnNumber txnNumber) {
+    auto delCollEntryRequest = BatchedCommandRequest::buildDeleteOp(
+        CollectionType::ConfigNS,
+        BSON(CollectionType::kNssFieldName << coordinatorDoc.getTempReshardingNss().ns()),  // query
+        false                                                                               // multi
+    );
+
+    (void)ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, CollectionType::ConfigNS, delCollEntryRequest, txnNumber);
+
+    boost::optional<UUID> reshardingTempUUID;
+    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        reshardingTempUUID = coordinatorDoc.getReshardingUUID();
+    }
+
+    removeChunkAndTagsDocs(
+        opCtx, coordinatorDoc.getTempReshardingNss(), reshardingTempUUID, txnNumber);
 }
 
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
@@ -610,8 +641,13 @@ void writeDecisionPersistedState(OperationContext* opCtx,
         // Remove all chunk and tag documents associated with the original collection, then
         // update the chunk and tag docs currently associated with the temp nss to be associated
         // with the original nss
-        removeChunkAndTagsDocsForOriginalNss(
-            opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
+
+        boost::optional<UUID> collUUID;
+        if (newCollectionTimestamp) {
+            collUUID = coordinatorDoc.getSourceUUID();
+        }
+
+        removeChunkAndTagsDocs(opCtx, coordinatorDoc.getSourceNss(), collUUID, txnNumber);
         updateChunkAndTagsDocsForTempNss(
             opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
     });
@@ -841,9 +877,9 @@ void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFi
     // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
-    invariant(
-        (coordinatorDoc.getState() == CoordinatorStateEnum::kDecisionPersisted && !abortReason) ||
-        (abortReason && coordinatorDoc.getState() == CoordinatorStateEnum::kInitializing));
+    const bool wasDecisionPersisted =
+        coordinatorDoc.getState() == CoordinatorStateEnum::kDecisionPersisted;
+    invariant((wasDecisionPersisted && !abortReason) || abortReason);
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
@@ -859,6 +895,15 @@ void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFi
             // Remove the resharding fields from the config.collections entry
             updateConfigCollectionsForOriginalNss(
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
+
+            // Once the decision has been persisted, the coordinator would have modified the
+            // config.chunks and config.collections entry. This means that the UUID of the
+            // non-temp collection is now the UUID of what was previously the UUID of the temp
+            // collection. So don't try to call remove as it will end up removing the metadata
+            // for the real collection.
+            if (!wasDecisionPersisted) {
+                removeConfigMetadataForTempNss(opCtx, updatedCoordinatorDoc, txnNumber);
+            }
         });
 }
 
@@ -1472,10 +1517,6 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
 ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsDone(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kDecisionPersisted) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
     std::vector<ExecutorFuture<ReshardingCoordinatorDocument>> futures;
     futures.emplace_back(
         _reshardingCoordinatorObserver->awaitAllRecipientsDone().thenRunOn(**executor));
@@ -1489,8 +1530,15 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
         .thenRunOn(**executor)
         .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            auto& coordinatorDoc = coordinatorDocsChangedOnDisk[1];
+
+            boost::optional<Status> abortReason;
+            if (coordinatorDoc.getAbortReason()) {
+                abortReason = getStatusFromAbortReason(coordinatorDoc);
+            }
+
             _reshardingCoordinatorExternalState->removeCoordinatorDocAndReshardingFields(
-                opCtx.get(), coordinatorDocsChangedOnDisk[1]);
+                opCtx.get(), coordinatorDoc, abortReason);
         });
 }
 

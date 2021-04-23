@@ -24,7 +24,11 @@ var ReshardingTestUtil = (function() {
         assert.soon(
             () => {
                 const coordinatorDoc = reshardingOperationsCollection.findOne({ns});
-                assert(coordinatorDoc);
+                if (!coordinatorDoc) {
+                    // Coordinator has been cleaned up.
+                    return true;
+                }
+
                 // Iterate over both the recipientShards and donorShards and check that every shard
                 // entry is in state 'done'.
                 for (const shardEntry

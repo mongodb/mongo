@@ -76,13 +76,5 @@ createIndexFailpoint.off();
 createIndexThread.join();
 assert.commandWorked(createIndexThread.returnData());
 
-// Since the coordinator has already created the temporary collection locally, the ShardingTest
-// teardown expects the recipients to also have the temporary collection locally for consistency.
-// However, the recipients will be interrupted before the temporary collection is created locally
-// due to the killing of reshardCollection command. Skipping the check allows the test to pass.
-//
-// TODO SERVER-52838: Remove once the coordinator cleans up its local temporary collection when the
-// participants transition to error.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 reshardingTest.teardown();
 })();

@@ -144,6 +144,8 @@ private:
 
     void _renameTemporaryReshardingCollection();
 
+    void _cleanupReshardingCollections();
+
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(RecipientStateEnum newState);
 

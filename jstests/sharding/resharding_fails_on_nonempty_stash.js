@@ -31,6 +31,8 @@ const inputCollection = reshardingTest.createShardedCollection({
 const recipientShardNames = reshardingTest.recipientShardNames;
 const topology = DiscoverTopology.findConnectedNodes(inputCollection.getMongo());
 const recipient1Conn = new Mongo(topology.shards[recipientShardNames[1]].primary);
+const removeRecipientDocFailpoint =
+    configureFailPoint(recipient1Conn, "removeRecipientDocFailpoint");
 
 reshardingTest.withReshardingInBackground(
     {
@@ -63,6 +65,8 @@ reshardingTest.withReshardingInBackground(
         postDecisionPersistedFn: () => {
             ReshardingTestUtil.assertRecipientAbortsLocally(
                 recipient1Conn, recipient1Conn.shardName, "reshardingDb.coll", 5356800);
+
+            removeRecipientDocFailpoint.off();
         }
     });
 

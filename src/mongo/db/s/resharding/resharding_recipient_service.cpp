@@ -194,6 +194,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 stdx::lock_guard<Latch> lk(_mutex);
                 if (_abortStatus)
                     error = *_abortStatus;
+
+                _onAbortOrStepdown(lk, status);
             }
 
             LOGV2(4956500,
@@ -212,9 +214,8 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                         .onError([](Status status) { return Status::OK(); });
                 })
                 .then([this] {
-                    // TODO SERVER-52838: Ensure all local collections that may have been created
-                    // for resharding are removed, with the exception of the
-                    // ReshardingRecipientDocument, before transitioning to kDone.
+                    _cleanupReshardingCollections();
+
                     _transitionState(RecipientStateEnum::kDone);
                 })
                 .then([this, executor] {
@@ -223,6 +224,10 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                 })
                 .then([this, error] { return error; });
         })
+        // The shared_ptr stored in the PrimaryOnlyService's map for the
+        // ReshardingRecipientService Instance is removed when the recipient state document
+        // tied to the instance is deleted. It is necessary to use shared_from_this() to
+        // extend the lifetime so the code can safely finish executing.
         .onCompletion([this, self = shared_from_this()](Status status) {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
@@ -234,11 +239,6 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
             }
 
             if (status.isOK()) {
-                // The shared_ptr stored in the PrimaryOnlyService's map for the
-                // ReshardingRecipientService Instance is removed when the recipient state document
-                // tied to the instance is deleted. It is necessary to use shared_from_this() to
-                // extend the lifetime so the code can safely finish executing.
-
                 {
                     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                     removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
@@ -251,6 +251,15 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
                     _completionPromise.emplaceValue();
                 }
             } else {
+                if (_recipientCtx.getAbortReason()) {
+                    {
+                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                        removeRecipientDocFailpoint.pauseWhileSet(opCtx.get());
+                    }
+
+                    _removeRecipientDocument();
+                }
+
                 _metrics()->onCompletion(ErrorCodes::isCancellationError(status)
                                              ? ReshardingOperationStatusEnum::kCanceled
                                              : ReshardingOperationStatusEnum::kFailure);
@@ -571,13 +580,23 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
             ShardingCatalogClient::kLocalWriteConcern);
     }
 
-    {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        resharding::data_copy::ensureOplogCollectionsDropped(
-            opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
-    }
+    _cleanupReshardingCollections();
 
     _transitionState(RecipientStateEnum::kDone);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_cleanupReshardingCollections() {
+    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+    resharding::data_copy::ensureOplogCollectionsDropped(
+        opCtx.get(), _metadata.getReshardingUUID(), _metadata.getSourceUUID(), _donorShards);
+
+    // TODO: SERVER-55511 Handle potential cleanup changes.
+    // If resharding was successful, the collection would have been renamed by either this recipient
+    // or in parallel by the donor (if this shard is also one for this resharding operation).
+    if (_recipientCtx.getState() == RecipientStateEnum::kError) {
+        resharding::data_copy::ensureCollectionDropped(
+            opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getReshardingUUID());
+    }
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(

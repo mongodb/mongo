@@ -476,17 +476,7 @@ var ReshardingTest = class {
             expectedErrorCode: expectedErrorCode
         });
 
-        // TODO SERVER-52838: Call _checkPostState() without calling cleanupReshardCollection once
-        // donor and recipient shards clean up their local metadata on error.
-        if (expectedErrorCode === ErrorCodes.OK) {
-            this._checkPostState(expectedErrorCode);
-        } else {
-            const res = this._st.s.adminCommand({
-                cleanupReshardCollection: this._ns,
-            });
-            assert.commandWorked(res);
-            this._checkPostState(expectedErrorCode);
-        }
+        this._checkPostState(expectedErrorCode);
     }
 
     /** @private */
@@ -577,6 +567,11 @@ var ReshardingTest = class {
         assert.eq([],
                   this._st.config.collections.find({_id: this._tempNs}).toArray(),
                   "expected there to not be a config.collections entry for the temporary" +
+                      " resharding collection");
+
+        assert.eq([],
+                  this._st.config.chunks.find({ns: this._tempNs}).toArray(),
+                  "expected there to not be any config.chunks entry for the temporary" +
                       " resharding collection");
 
         const collEntry = this._st.config.collections.findOne({_id: this._ns});

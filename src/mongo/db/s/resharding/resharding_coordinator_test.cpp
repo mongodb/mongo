@@ -119,7 +119,8 @@ protected:
 
         // TODO SERVER-53330: Evaluate whether or not we can include
         // CoordinatorStateEnum::kInitializing in this if statement.
-        if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone) {
+        if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
+            coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
             collType.setAllowMigrations(true);
         } else if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
             collType.setAllowMigrations(false);
