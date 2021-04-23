@@ -122,8 +122,10 @@ public:
             auto const shardingState = ShardingState::get(opCtx);
             uassertStatusOK(shardingState->canAcceptShardedCommands());
 
-            bool useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            FixedFCVRegion fixedFCVRegion(opCtx);
+
+            const bool useNewPath =
+                feature_flags::gShardingFullDDLSupport.isEnabled(*fixedFCVRegion);
 
             if (fromNss.db() != toNss.db()) {
                 sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);

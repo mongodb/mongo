@@ -54,6 +54,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/db/vector_clock.h"
@@ -354,9 +355,11 @@ public:
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
                 if (actualVersion > requestedVersion) {
-                    // Downgrading
-                    // TODO SERVER-55898: Release fcvChangeRegion and wait for DDLCoordinators to
-                    // drain
+                    // No more ShardingDDLCoordinators will start because we have already switched
+                    // the FCV value to kDowngrading. Wait for the ongoing ones to finish.
+                    setFCVCommandLock.unlock();
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForAllCoordinatorsToComplete(opCtx);
                 }
                 // If we are only running phase-1, then we are done
                 return true;

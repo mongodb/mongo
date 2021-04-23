@@ -79,8 +79,10 @@ public:
 
             const auto dbName = request().getDbName();
 
-            const auto useNewPath = feature_flags::gShardingFullDDLSupport.isEnabled(
-                serverGlobalParams.featureCompatibility);
+            FixedFCVRegion fixedFCVRegion(opCtx);
+
+            const auto useNewPath =
+                feature_flags::gShardingFullDDLSupport.isEnabled(*fixedFCVRegion);
 
             if (!useNewPath) {
                 LOGV2_DEBUG(
