@@ -82,8 +82,9 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
         if (!metaField) {
             return {ErrorCodes::BadValue,
                     str::stream() << "Invalid index spec for time-series collection: "
-                                  << redact(timeseriesIndexSpecBSON) << ". Index must be on the '"
-                                  << timeField << "' field: " << elem};
+                                  << redact(timeseriesIndexSpecBSON)
+                                  << ". Indexes are only allowed on the '" << timeField
+                                  << "' field, no other data fields are supported: " << elem};
         }
 
         if (elem.fieldNameStringData() == *metaField) {
@@ -105,7 +106,7 @@ StatusWith<BSONObj> createBucketsIndexSpecFromTimeseriesIndexSpec(
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid index spec for time-series collection: "
                               << redact(timeseriesIndexSpecBSON)
-                              << ". Index must be either on the '" << *metaField << "' or '"
+                              << ". Indexes are only supported on the '" << *metaField << "' and '"
                               << timeField << "' fields: " << elem};
     }
 
