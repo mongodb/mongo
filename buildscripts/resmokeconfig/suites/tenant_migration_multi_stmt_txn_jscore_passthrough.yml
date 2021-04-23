@@ -401,7 +401,7 @@ executor:
         # the migration is committed, those transactions may never receive 'commitTransaction' or
         # 'abortTransaction', since all writes are automatically rerouted to the recipient. We set
         # a low 'transactionLifetimeLimitSeconds' value to ensure that they are cleaned up quickly.
-        transactionLifetimeLimitSeconds: 10
+        transactionLifetimeLimitSeconds: 20
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''
