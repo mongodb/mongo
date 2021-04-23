@@ -671,6 +671,16 @@ private:
      * taking this.
      */
     Lock::ResourceMutex _kZoneOpLock;
+
+    /**
+     * Lock for local database operations. This should be acquired when executing
+     * 'commitMovePrimary' and 'setFeatureCompatibilityVersion' commands which affect the
+     * config.databases collection. No other locks should be held when locking this. If an operation
+     * needs to take database locks (for example to write to a local collection) those locks should
+     * be taken after taking this.
+     * TODO (SERVER-53283): Remove once version 5.0 has been released.
+     */
+    Lock::ResourceMutex _kDatabaseOpLock;
 };
 
 }  // namespace mongo

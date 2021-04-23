@@ -266,6 +266,9 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
+    // TODO (SERVER-53283): Remove once version 5.0 has been released.
+    Lock::SharedLock lock(opCtx->lockState(), _kDatabaseOpLock);
+
     // Must use local read concern because we will perform subsequent writes.
     auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,

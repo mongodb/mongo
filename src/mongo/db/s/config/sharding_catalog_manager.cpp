@@ -314,7 +314,8 @@ ShardingCatalogManager::ShardingCatalogManager(
       _executorForAddShard(std::move(addShardExecutor)),
       _kShardMembershipLock("shardMembershipLock"),
       _kChunkOpLock("chunkOpLock"),
-      _kZoneOpLock("zoneOpLock") {
+      _kZoneOpLock("zoneOpLock"),
+      _kDatabaseOpLock("databaseOpLock") {
     startup();
 }
 
@@ -657,6 +658,7 @@ void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCt
         auto now = VectorClock::get(opCtx)->getTime();
         auto clusterTime = now.clusterTime().asTimestamp();
 
+        Lock::ExclusiveLock lock(opCtx->lockState(), _kDatabaseOpLock);
         updateConfigDocumentDBDirect(
             opCtx,
             DatabaseType::ConfigNS,
@@ -690,14 +692,17 @@ void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCt
 void ShardingCatalogManager::_downgradeDatabasesEntriesToPre50(OperationContext* opCtx) {
     LOGV2(5258806, "Starting downgrade of config.databases");
 
-    updateConfigDocumentDBDirect(
-        opCtx,
-        DatabaseType::ConfigNS,
-        {} /* query */,
-        BSON("$unset" << BSON(DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
-                              << "")),
-        false /* upsert */,
-        true /* multi */);
+    {
+        Lock::ExclusiveLock lock(opCtx->lockState(), _kDatabaseOpLock);
+        updateConfigDocumentDBDirect(
+            opCtx,
+            DatabaseType::ConfigNS,
+            {} /* query */,
+            BSON("$unset" << BSON(
+                     DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName << "")),
+            false /* upsert */,
+            true /* multi */);
+    }
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
