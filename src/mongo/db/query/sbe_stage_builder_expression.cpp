@@ -65,7 +65,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertFrom(Value val) {
     val.addToBsonObj(&bob, ""_sd);
     auto obj = bob.done();
     auto be = obj.objdata();
-    auto end = be + sbe::value::readFromMemory<uint32_t>(be);
+    auto end = be + obj.objsize();
     return sbe::bson::convertFrom(false, be + 4, end, 0);
 }
 
