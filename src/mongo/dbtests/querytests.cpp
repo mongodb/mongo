@@ -610,7 +610,6 @@ public:
         c->next();
         ASSERT(!c->more());
         insert(ns, BSON("a" << 2));
-        _client.remove(ns, QUERY("a" << 1));
         ASSERT(c->more());
         ASSERT_EQUALS(2, c->next().getIntField("a"));
         ASSERT(!c->more());

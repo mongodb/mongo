@@ -474,6 +474,7 @@ env.Library(
         'multi_index_block',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/local_oplog_info',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         'database_holder',
     ],

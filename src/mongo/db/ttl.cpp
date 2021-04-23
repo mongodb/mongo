@@ -254,6 +254,9 @@ private:
         if (!coll || coll->uuid() != uuid)
             return;
 
+        // TTL indexes are not compatible with capped collections.
+        invariant(!coll->isCapped());
+
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,
                   "Hanging due to hangTTLMonitorWithLock fail point",

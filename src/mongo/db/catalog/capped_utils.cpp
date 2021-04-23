@@ -48,6 +48,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -184,6 +185,10 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
 
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isOplogDisabledForCappedCollection =
+        replCoord->isOplogDisabledFor(opCtx, toCollection->ns());
+
     int retries = 0;  // non-zero when retrying our last document.
     while (true) {
         auto beforeGetNextSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
@@ -223,6 +228,20 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 
             WriteUnitOfWork wunit(opCtx);
             OpDebug* const nullOpDebug = nullptr;
+
+            InsertStatement insertStmt(objToClone);
+
+            // When converting a regular collection into a capped collection, we may start
+            // performing capped deletes during the conversion process. This can occur if the
+            // regular collections data exceeds the capacities set for the capped collection.
+            // Because of that, we acquire an optime for the insert now to ensure that the insert
+            // oplog entry gets logged before any delete oplog entries.
+            if (!isOplogDisabledForCappedCollection) {
+                auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+                auto oplogSlots = oplogInfo->getNextOpTimes(opCtx, /*batchSize=*/1);
+                insertStmt.oplogSlot = oplogSlots.front();
+            }
+
             uassertStatusOK(toCollection->insertDocument(
                 opCtx, InsertStatement(objToClone), nullOpDebug, true));
             wunit.commit();

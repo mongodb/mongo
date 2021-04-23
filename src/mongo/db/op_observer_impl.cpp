@@ -119,7 +119,10 @@ void onWriteOpCompleted(OperationContext* opCtx,
         return;
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
-    if (!txnParticipant)
+    if (!txnParticipant ||
+        (!stmtIdsWritten.empty() && stmtIdsWritten.front() == kUninitializedStmtId))
+        // If the first statement written in uninitialized, then all the statements are assumed to
+        // be uninitialized.
         return;
 
     // We add these here since they may not exist if we return early.

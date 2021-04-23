@@ -135,7 +135,10 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
                           "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
         }
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
-        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+
+        // TTL indexes are not compatible with capped collections.
+        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
+            !_collection->isCapped()) {
             TTLCollectionCache::get(opCtx->getServiceContext())
                 .registerTTLInfo(_collection->uuid(), indexName);
         }

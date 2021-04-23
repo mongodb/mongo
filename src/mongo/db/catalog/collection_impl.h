@@ -394,17 +394,11 @@ private:
      */
     Status checkValidation(OperationContext* opCtx, const BSONObj& document) const;
 
-    /**
-     * same semantics as insertDocument, but doesn't do:
-     *  - some user error checks
-     *  - adjust padding
-     */
-    Status _insertDocument(OperationContext* opCtx, const BSONObj& doc);
-
     Status _insertDocuments(OperationContext* opCtx,
                             std::vector<InsertStatement>::const_iterator begin,
                             std::vector<InsertStatement>::const_iterator end,
-                            OpDebug* opDebug) const;
+                            OpDebug* opDebug,
+                            bool fromMigrate) const;
 
     /**
      * Checks whether the collection is capped and if the current data size or number of records
@@ -412,11 +406,12 @@ private:
      */
     bool _cappedAndNeedDelete(OperationContext* opCtx) const;
 
+
     /**
-     * Deletes records from this capped collection as needed while _cappedMaxSize or _cappedMaxDocs
-     * is exceeded.
+     * Deletes records from this capped collection while _cappedMaxDocs or _cappedMaxSize is
+     * exceeded. Generates oplog entries for the deleted records in FCV >= 5.0.
      */
-    void _cappedDeleteAsNeeded(OperationContext* opCtx) const;
+    void _cappedDeleteAsNeeded(OperationContext* opCtx, const RecordId& justInserted) const;
 
     /**
      * Holder of shared state between CollectionImpl clones. Also implements CappedCallback, a

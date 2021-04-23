@@ -54,6 +54,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -2271,16 +2272,23 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsBadValueWhenFilterContains
 }
 
 TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsIllegalOperationOnCappedCollection) {
-    auto opCtx = getOperationContext();
+    // User operations are not allowed to delete from capped collections.
+    transport::TransportLayerMock transportLayerMock;
+    auto userClient = getOperationContext()->getServiceContext()->makeClient(
+        "user", transportLayerMock.createSession());
+    AlternativeClientRegion acr(userClient);
+    const auto opCtx = cc().makeOperationContext();
+    ASSERT(cc().isFromUserConnection());
+
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     CollectionOptions options = generateOptionsWithUuid();
     options.capped = true;
     options.cappedSize = 1024 * 1024;
-    ASSERT_OK(storage.createCollection(opCtx, nss, options));
+    ASSERT_OK(storage.createCollection(opCtx.get(), nss, options));
 
     auto filter = BSON("x" << 1);
-    auto status = storage.deleteByFilter(opCtx, nss, filter);
+    auto status = storage.deleteByFilter(opCtx.get(), nss, filter);
     ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            str::stream() << "cannot remove from a capped collection: " << nss.ns());

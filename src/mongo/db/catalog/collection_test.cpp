@@ -295,6 +295,8 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 1;
+    // Large enough to use 'cappedMaxDocs' as the primary indicator for capped deletes.
+    options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
@@ -335,6 +337,8 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 10;
+    // Large enough to use 'cappedMaxDocs' as the primary indicator for capped deletes.
+    options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
@@ -523,6 +527,8 @@ TEST_F(CatalogTestFixture, CappedCursorRollover) {
     CollectionOptions options;
     options.capped = true;
     options.cappedMaxDocs = 5;
+    // Large enough to use 'cappedMaxDocs' as the primary indicator for capped deletes.
+    options.cappedSize = 512 * 1024 * 1024;
     ASSERT_OK(storageInterface()->createCollection(operationContext(), nss, options));
 
     AutoGetCollection autoColl(operationContext(), nss, MODE_IX);

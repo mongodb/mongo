@@ -1321,7 +1321,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         }
     }
 
-    if (collection && collection->isCapped()) {
+    if (collection && collection->isCapped() && opCtx->isEnforcingConstraints()) {
+        // System operations such as tenant migration or secondary batch application can delete
+        // from capped collections.
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "cannot remove from a capped collection: " << nss.ns());
     }
