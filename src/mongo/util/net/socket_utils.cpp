@@ -199,11 +199,16 @@ std::string makeUnixSockPath(int port) {
 // If an ip address is passed in, just return that.  If a hostname is passed
 // in, look up its ip and return that.  Returns "" on failure.
 std::string hostbyname(const char* hostname) {
-    SockAddr sockAddr(hostname, 0, IPv6Enabled() ? AF_UNSPEC : AF_INET);
-    if (!sockAddr.isValid() || sockAddr.getAddr() == "0.0.0.0")
+    try {
+        auto addr = SockAddr::create(hostname, 0, IPv6Enabled() ? AF_UNSPEC : AF_INET).getAddr();
+        if (addr == "0.0.0.0") {
+            return "";
+        }
+
+        return addr;
+    } catch (const DBException&) {
         return "";
-    else
-        return sockAddr.getAddr();
+    }
 }
 
 //  --- my --

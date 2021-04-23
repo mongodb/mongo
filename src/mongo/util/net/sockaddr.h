@@ -73,23 +73,23 @@ struct SockAddr {
     SockAddr();
 
     explicit SockAddr(int sourcePort); /* listener side */
+    explicit SockAddr(const sockaddr* other, socklen_t size);
+    explicit SockAddr(const sockaddr* other, socklen_t size, StringData hostOrIp);
+
 
     /**
      * Initialize a SockAddr for a given IP or Hostname.
      *
-     * If target fails to resolve/parse, SockAddr.isValid() may return false,
-     * or the resulting SockAddr may be equivalent to SockAddr(port).
+     * If target fails to resolve/parse, this function may throw or the resulting SockAddr may be
+     * equivalent to SockAddr(port).
      *
-     * If target is a unix domain socket, a uassert() exception will be thrown
-     * on windows or if addr exceeds maximum path length.
+     * If target is a unix domain socket, a uassert() exception will be thrown on windows or if addr
+     * exceeds maximum path length.
      *
-     * If target resolves to more than one address, only the first address
-     * will be used. Others will be discarded.
-     * SockAddr::createAll() is recommended for capturing all addresses.
+     * If target resolves to more than one address, only the first address will be used. Others will
+     * be discarded. SockAddr::createAll() is recommended for capturing all addresses.
      */
-    explicit SockAddr(StringData target, int port, sa_family_t familyHint);
-
-    explicit SockAddr(const sockaddr* other, socklen_t size);
+    static SockAddr create(StringData target, int port, sa_family_t familyHint);
 
     /**
      * Resolve an ip or hostname to a vector of SockAddr objects.
@@ -153,11 +153,11 @@ struct SockAddr {
     void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const;
 
 private:
-    void initUnixDomainSocket(const std::string& path, int port);
+    void initUnixDomainSocket(StringData path, int port);
 
     std::string _hostOrIp;
     struct sockaddr_storage sa;
-    bool _isValid;
+    bool _isValid = false;
 };
 
 }  // namespace mongo

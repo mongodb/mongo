@@ -41,25 +41,33 @@
 namespace mongo {
 
 void KMSNetworkConnection::connect(const HostAndPort& host) {
-    SockAddr server(host.host().c_str(), host.port(), AF_UNSPEC);
+    auto makeAddress = [](const auto& host) -> SockAddr {
+        try {
+            return SockAddr::create(host.host().c_str(), host.port(), AF_UNSPEC);
+        } catch (const DBException& ex) {
+            uasserted(51136, "Unable to resolve KMS server address" + causedBy(ex));
+        }
 
-    uassert(51136,
-            str::stream() << "KMS server address " << host.host() << " is invalid.",
-            server.isValid());
+        MONGO_UNREACHABLE;
+    };
 
-    int attempt = 0;
-    bool connected = false;
-    while (!connected && attempt < 20) {
-        connected = _socket->connect(server);
-        attempt++;
+    auto addr = makeAddress(host);
+
+    size_t attempt = 0;
+    constexpr size_t kMaxAttempts = 20;
+    while (!_socket->connect(addr)) {
+        ++attempt;
+        if (attempt > kMaxAttempts) {
+            uasserted(51137,
+                      str::stream() << "Could not connect to KMS server " << addr.toString());
+        }
     }
-    uassert(
-        51137, str::stream() << "Could not connect to KMS server " << server.toString(), connected);
 
-    uassert(51138,
-            str::stream() << "Failed to perform SSL handshake with the KMS server "
-                          << host.toString(),
-            _socket->secure(_sslManager, host.host()));
+    if (!_socket->secure(_sslManager, host.host())) {
+        uasserted(51138,
+                  str::stream() << "Failed to perform SSL handshake with the KMS server "
+                                << addr.toString());
+    }
 }
 
 // Sends a request message to the KMS server and creates a KMS Response.

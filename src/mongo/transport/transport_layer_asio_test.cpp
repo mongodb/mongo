@@ -105,7 +105,7 @@ public:
     explicit SimpleConnectionThread(int port) : _port(port) {
         _thr = stdx::thread{[&] {
             Socket s;
-            SockAddr sa{"localhost", _port, AF_INET};
+            auto sa = SockAddr::create("localhost", _port, AF_INET);
             s.connect(sa);
             LOGV2(23034, "connection: port {port}", "port"_attr = _port);
             stdx::unique_lock<Latch> lk(_mutex);

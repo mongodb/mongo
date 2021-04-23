@@ -211,8 +211,8 @@ TEST(AddressRestrictionTest, contains) {
         {{}, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", false},
     };
     for (const auto& p : contains) {
-        const SockAddr dummy;
-        const SockAddr addr(p.address, 1024, AF_UNSPEC);
+        const auto dummy = SockAddr();
+        const auto addr = SockAddr::create(p.address, 1024, AF_UNSPEC);
         const RestrictionEnvironment rec(addr, dummy);
         const RestrictionEnvironment res(dummy, addr);
 
@@ -319,8 +319,8 @@ TEST(AddressRestrictionTest, parseAndMatch) {
         const auto setwith = parseAddressRestrictionSet(doc);
         ASSERT_OK(setwith);
 
-        const RestrictionEnvironment env(SockAddr(t.client, 1024, AF_UNSPEC),
-                                         SockAddr(t.server, 1025, AF_UNSPEC));
+        const RestrictionEnvironment env(SockAddr::create(t.client, 1024, AF_UNSPEC),
+                                         SockAddr::create(t.server, 1025, AF_UNSPEC));
         ASSERT_EQ(setwith.getValue().validate(env).isOK(), t.valid);
     }
 }

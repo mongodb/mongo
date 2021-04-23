@@ -488,8 +488,8 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival
         {"127.0.0.1", "::1", false},
     };
     for (const auto& p : tests) {
-        const RestrictionEnvironment re(SockAddr(p.client, 1024, AF_UNSPEC),
-                                        SockAddr(p.server, 1025, AF_UNSPEC));
+        const RestrictionEnvironment re(SockAddr::create(p.client, 1024, AF_UNSPEC),
+                                        SockAddr::create(p.server, 1025, AF_UNSPEC));
         ASSERT_EQ(doc.validate(re).isOK(), p.valid);
     }
 }
