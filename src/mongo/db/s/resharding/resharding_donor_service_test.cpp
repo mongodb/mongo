@@ -81,12 +81,13 @@ private:
         _pauseDuringTransitionCond.notify_all();
     }
 
-    void notifyNewStateAndWaitUntilUnpaused(DonorStateEnum newState) {
+    void notifyNewStateAndWaitUntilUnpaused(OperationContext* opCtx, DonorStateEnum newState) {
         stdx::unique_lock lk(_mutex);
         _state = newState;
         _waitUntilUnpausedCond.notify_all();
-        _pauseDuringTransitionCond.wait(
-            lk, [this, newState] { return _pauseDuringTransition.count(newState) == 0; });
+        opCtx->waitForConditionOrInterrupt(_pauseDuringTransitionCond, lk, [this, newState] {
+            return _pauseDuringTransition.count(newState) == 0;
+        });
     }
 
     Mutex _mutex = MONGO_MAKE_LATCH("DonorStateTransitionController::_mutex");
@@ -99,6 +100,9 @@ private:
 
 class PauseDuringStateTransitions {
 public:
+    PauseDuringStateTransitions(DonorStateTransitionController* controller, DonorStateEnum state)
+        : PauseDuringStateTransitions(controller, std::vector<DonorStateEnum>{state}) {}
+
     PauseDuringStateTransitions(DonorStateTransitionController* controller,
                                 std::vector<DonorStateEnum> states)
         : _controller{controller}, _states{std::move(states)} {
@@ -112,6 +116,12 @@ public:
             _controller->unsetPauseDuringTransition(state);
         }
     }
+
+    PauseDuringStateTransitions(const PauseDuringStateTransitions&) = delete;
+    PauseDuringStateTransitions& operator=(const PauseDuringStateTransitions&) = delete;
+
+    PauseDuringStateTransitions(PauseDuringStateTransitions&&) = delete;
+    PauseDuringStateTransitions& operator=(PauseDuringStateTransitions&&) = delete;
 
     void wait(DonorStateEnum state) {
         _controller->waitUntilStateIsReached(state);
@@ -139,7 +149,7 @@ public:
         auto doc =
             ReshardingDonorDocument::parse({"OpObserverForTest"}, args.updateArgs.updatedDoc);
 
-        _controller->notifyNewStateAndWaitUntilUnpaused(doc.getMutableState().getState());
+        _controller->notifyNewStateAndWaitUntilUnpaused(opCtx, doc.getMutableState().getState());
     }
 
 private:
@@ -228,8 +238,6 @@ public:
                                   const ReshardingDonorDocument& donorDoc) {
         CollectionOptions options;
         options.uuid = donorDoc.getSourceUUID();
-        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
-            opCtx);
         resharding::data_copy::ensureCollectionExists(opCtx, donorDoc.getSourceNss(), options);
     }
 
@@ -291,8 +299,8 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
 }
 
 TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimestamp) {
-    boost::optional<PauseDuringStateTransitions> donatingInitialDataTransitionGuard =
-        PauseDuringStateTransitions{controller(), {DonorStateEnum::kDonatingInitialData}};
+    boost::optional<PauseDuringStateTransitions> donatingInitialDataTransitionGuard;
+    donatingInitialDataTransitionGuard.emplace(controller(), DonorStateEnum::kDonatingInitialData);
 
     auto doc = makeStateDocument();
     auto opCtx = makeOperationContext();
@@ -325,8 +333,8 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryToGenerateMinFetchTimesta
 }
 
 TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBlocked) {
-    boost::optional<PauseDuringStateTransitions> blockingWritesTransitionGuard =
-        PauseDuringStateTransitions{controller(), {DonorStateEnum::kBlockingWrites}};
+    boost::optional<PauseDuringStateTransitions> blockingWritesTransitionGuard;
+    blockingWritesTransitionGuard.emplace(controller(), DonorStateEnum::kBlockingWrites);
 
     auto doc = makeStateDocument();
     auto opCtx = makeOperationContext();
@@ -369,17 +377,13 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
                                  << cursor->nextSafe();
 }
 
-// TODO SERVER-56174: Re-enable this test once the issue with PauseDuringStateTransitions is
-// resolved.
-/**
 TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
-    const std::vector<DonorStateEnum> _donorStates{DonorStateEnum::kDonatingInitialData,
-                                                   DonorStateEnum::kDonatingOplogEntries,
-                                                   DonorStateEnum::kPreparingToBlockWrites,
-                                                   DonorStateEnum::kBlockingWrites,
-                                                   DonorStateEnum::kDone};
-    boost::optional<PauseDuringStateTransitions> stateTransitionsGuard =
-        PauseDuringStateTransitions{controller(), _donorStates};
+    const std::vector<DonorStateEnum> donorStates{DonorStateEnum::kDonatingInitialData,
+                                                  DonorStateEnum::kDonatingOplogEntries,
+                                                  DonorStateEnum::kPreparingToBlockWrites,
+                                                  DonorStateEnum::kBlockingWrites,
+                                                  DonorStateEnum::kDone};
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), donorStates};
     auto doc = makeStateDocument();
     {
         auto opCtx = makeOperationContext();
@@ -387,7 +391,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     }
 
     auto prevState = DonorStateEnum::kUnused;
-    for (const auto state : _donorStates) {
+    for (const auto state : donorStates) {
         {
             auto opCtx = makeOperationContext();
             auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
@@ -395,7 +399,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
             if (prevState != DonorStateEnum::kUnused) {
                 // Allow the transition to prevState to succeed on this primary-only service
                 // instance.
-                stateTransitionsGuard->unset(prevState);
+                stateTransitionsGuard.unset(prevState);
             }
 
             // Signal a change in the coordinator's state for donor state transitions dependent
@@ -405,7 +409,8 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
                     break;
                 }
-                case DonorStateEnum::kPreparingToBlockWrites: {
+                case DonorStateEnum::kPreparingToBlockWrites:
+                case DonorStateEnum::kBlockingWrites: {
                     notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
                     break;
                 }
@@ -418,7 +423,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
             }
 
             // Step down before the transition to state can complete.
-            stateTransitionsGuard->wait(state);
+            stateTransitionsGuard.wait(state);
             stepDown();
 
             ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
@@ -435,12 +440,11 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         auto opCtx = makeOperationContext();
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        stateTransitionsGuard->unset(DonorStateEnum::kDone);
+        stateTransitionsGuard.unset(DonorStateEnum::kDone);
         notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
     }
 }
-*/
 
 TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
     auto doc = makeStateDocument();
@@ -470,8 +474,7 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
 }
 
 TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterError) {
-    boost::optional<PauseDuringStateTransitions> stateTransitionsGuard =
-        PauseDuringStateTransitions{controller(), {DonorStateEnum::kDone}};
+    PauseDuringStateTransitions stateTransitionsGuard{controller(), DonorStateEnum::kDone};
     auto doc = makeStateDocument();
     {
         auto opCtx = makeOperationContext();
@@ -484,7 +487,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterError) {
         notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
         notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
 
-        stateTransitionsGuard->wait(DonorStateEnum::kDone);
+        stateTransitionsGuard.wait(DonorStateEnum::kDone);
         stepDown();
 
         ASSERT_EQ(donor->getCompletionFuture().getNoThrow(),
@@ -495,7 +498,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterError) {
         auto opCtx = makeOperationContext();
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
-        stateTransitionsGuard->unset(DonorStateEnum::kDone);
+        stateTransitionsGuard.unset(DonorStateEnum::kDone);
 
         notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
         ASSERT_EQ(donor->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
