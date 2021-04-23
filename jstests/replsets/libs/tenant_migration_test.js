@@ -15,17 +15,22 @@ load("jstests/replsets/libs/tenant_migration_util.js");
  * instead, with all nodes running the latest version.
  *
  * @param {string} [name] the name of the replica sets
+ * @param {boolean} [enableRecipientTesting] whether recipient would actually migrate tenant data
  * @param {Object} [donorRst] the ReplSetTest instance to adopt for the donor
  * @param {Object} [recipientRst] the ReplSetTest instance to adopt for the recipient
  * @param {Object} [sharedOptions] an object that can contain 'nodes' <number>, the number of nodes
  *     each RST will contain, and 'setParameter' <object>, an object with various server parameters.
+ * @param {boolean} [allowDonorReadAfterMigration] whether donor would allow reads after a committed
+ *     migration.
  */
 function TenantMigrationTest({
     name = "TenantMigrationTest",
     enableRecipientTesting = true,
     donorRst,
     recipientRst,
-    sharedOptions = {}
+    sharedOptions = {},
+    // Default this to true so it is easier for data consistency checks.
+    allowStaleReadsOnDonor = true,
 }) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
@@ -62,6 +67,11 @@ function TenantMigrationTest({
 
         if (!(isDonor || enableRecipientTesting)) {
             setParameterOpts["failpoint.returnResponseOkForRecipientSyncDataCmd"] =
+                tojson({mode: 'alwaysOn'});
+        }
+
+        if (allowStaleReadsOnDonor) {
+            setParameterOpts["failpoint.tenantMigrationDonorAllowsNonTimestampedReads"] =
                 tojson({mode: 'alwaysOn'});
         }
 

@@ -145,25 +145,25 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
 
     // Default read concern.
     ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx()).get(), DBException, ErrorCodes::SnapshotTooOld);
+        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
 
     // Majority read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
     ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx()).get(), DBException, ErrorCodes::SnapshotTooOld);
+        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
 
     // Snapshot read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     opCtx()->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                     Timestamp(1, 1));
     ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx()).get(), DBException, ErrorCodes::SnapshotTooOld);
+        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
 
     // Snapshot read concern with atClusterTime.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(1, 1));
     ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx()).get(), DBException, ErrorCodes::SnapshotTooOld);
+        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
 }
 
 TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
@@ -194,22 +194,22 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     }
 
     // Default read concern.
-    ASSERT_OK(mtab.getCanReadFuture(opCtx()).getNoThrow());
+    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
 
     // Majority read concern.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern);
-    ASSERT_OK(mtab.getCanReadFuture(opCtx()).getNoThrow());
+    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
 
     // Snapshot read at a later timestamp.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(3, 1));
-    ASSERT_OK(mtab.getCanReadFuture(opCtx()).getNoThrow());
+    ASSERT_OK(mtab.getCanReadFuture(opCtx(), "find").getNoThrow());
 
     // Snapshot read at an earlier timestamp.
     ReadConcernArgs::get(opCtx()) = ReadConcernArgs(ReadConcernLevel::kSnapshotReadConcern);
     ReadConcernArgs::get(opCtx()).setArgsAtClusterTimeForSnapshot(Timestamp(1, 1));
     ASSERT_THROWS_CODE(
-        mtab.getCanReadFuture(opCtx()).get(), DBException, ErrorCodes::SnapshotTooOld);
+        mtab.getCanReadFuture(opCtx(), "find").get(), DBException, ErrorCodes::SnapshotTooOld);
 }
 
 }  // namespace repl

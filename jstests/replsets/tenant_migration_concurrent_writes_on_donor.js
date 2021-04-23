@@ -19,7 +19,14 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+const tenantMigrationTest = new TenantMigrationTest({
+    name: jsTestName(),
+    sharedOptions: {
+        setParameter:
+            // Allow non-timestamped reads on donor after migration completes for testing.
+            {'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'})}
+    }
+});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     return;

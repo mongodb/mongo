@@ -284,6 +284,22 @@ var TenantMigrationUtil = (function() {
         const donorPrimary = donorRst.getPrimary();
         const recipientPrimary = recipientRst.getPrimary();
 
+        // Allows listCollections and listIndexes on donor after migration for consistency checks.
+        const donorAllowsReadsAfterMigration =
+            assert
+                .commandWorked(donorPrimary.adminCommand({
+                    getParameter: 1,
+                    "failpoint.tenantMigrationDonorAllowsNonTimestampedReads": 1
+                }))["failpoint.tenantMigrationDonorAllowsNonTimestampedReads"]
+                .mode;
+        // Only turn on the failpoint if it is not already.
+        if (!donorAllowsReadsAfterMigration) {
+            assert.commandWorked(donorPrimary.adminCommand({
+                configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
+                mode: "alwaysOn"
+            }));
+        }
+
         // Filter out all dbs that don't belong to the tenant.
         let combinedDBNames = [...donorPrimary.getDBNames(), ...recipientPrimary.getDBNames()];
         combinedDBNames = combinedDBNames.filter(
@@ -329,6 +345,14 @@ var TenantMigrationUtil = (function() {
                 recipientRst.dumpOplog(recipientPrimary, {}, 100);
             }
             assert(success, 'dbhash mismatch between donor and recipient primaries');
+        }
+
+        // Reset failpoint on the donor after consistency checks if it wasn't enabled before.
+        if (!donorAllowsReadsAfterMigration) {
+            assert.commandWorked(donorPrimary.adminCommand({
+                configureFailPoint: "tenantMigrationDonorAllowsNonTimestampedReads",
+                mode: "off"
+            }));
         }
     }
 

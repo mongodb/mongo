@@ -10,7 +10,7 @@
  * selection until it finds a sync source that is no longer too stale.
  *
  * @tags: [requires_fcv_49, requires_majority_read_concern, incompatible_with_eft,
- * incompatible_with_windows_tls]
+ * incompatible_with_windows_tls, incompatible_with_macos, requires_persistence]
  */
 
 (function() {
@@ -26,7 +26,12 @@ const donorRst = new ReplSetTest({
     name: `${jsTestName()}_donor`,
     nodes: 3,
     settings: {chainingAllowed: false},
-    nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().donor,
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+        setParameter: {
+            // Allow non-timestamped reads on donor after migration completes for testing.
+            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
+        }
+    }),
 });
 donorRst.startSet();
 donorRst.initiateWithHighElectionTimeout();

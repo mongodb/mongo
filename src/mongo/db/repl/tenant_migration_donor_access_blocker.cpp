@@ -47,7 +47,26 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(tenantMigrationDonorAllowsNonTimestampedReads);
+
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
+// Commands that are not allowed to run against the donor after a committed migration so that we
+// typically provide read-your-own-write guarantees for primary reads across tenant migrations.
+const StringMap<int> commandDenyListAfterMigration = {
+    {"find", 1},
+    {"count", 1},
+    {"distinct", 1},
+    {"aggregate", 1},
+    {"mapReduce", 1},
+    {"mapreduce", 1},
+    {"findAndModify", 1},
+    {"findandmodify", 1},
+    {"listCollections", 1},
+    {"listIndexes", 1},
+    {"update", 1},
+    {"delete", 1},
+};
 
 }  // namespace
 
@@ -115,10 +134,10 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
     MONGO_UNREACHABLE;
 }
 
-SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(
-    OperationContext* opCtx) {
+SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(OperationContext* opCtx,
+                                                                           StringData command) {
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    auto readTimestamp = [opCtx, &readConcernArgs]() -> std::optional<Timestamp> {
+    auto readTimestamp = [opCtx, &readConcernArgs]() -> boost::optional<Timestamp> {
         if (auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime()) {
             return afterClusterTime->asTimestamp();
         }
@@ -128,20 +147,29 @@ SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
             return repl::StorageInterface::get(opCtx)->getPointInTimeReadTimestamp(opCtx);
         }
-        return std::nullopt;
+        return boost::none;
     }();
-    if (!readTimestamp) {
-        return SharedSemiFuture<void>();
-    }
-    return _getCanDoClusterTimeReadFuture(opCtx, *readTimestamp);
-}
 
-SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::_getCanDoClusterTimeReadFuture(
-    OperationContext* opCtx, Timestamp readTimestamp) {
-    stdx::unique_lock<Latch> ul(_mutex);
+    stdx::lock_guard<Latch> lk(_mutex);
+    if (!readTimestamp) {
+        if (!MONGO_unlikely(tenantMigrationDonorAllowsNonTimestampedReads.shouldFail()) &&
+            _state == State::kReject &&
+            commandDenyListAfterMigration.find(command) != commandDenyListAfterMigration.end()) {
+            LOGV2_DEBUG(5505100,
+                        1,
+                        "Donor blocking non-timestamped reads after committed migration",
+                        "command"_attr = command,
+                        "tenantId"_attr = _tenantId);
+            return SharedSemiFuture<void>(
+                Status(ErrorCodes::TenantMigrationCommitted,
+                       "Read must be re-routed to the new owner of this tenant"));
+        } else {
+            return SharedSemiFuture<void>();
+        }
+    }
 
     auto canRead = _state == State::kAllow || _state == State::kAborted ||
-        _state == State::kBlockWrites || readTimestamp < *_blockTimestamp;
+        _state == State::kBlockWrites || *readTimestamp < *_blockTimestamp;
 
     if (canRead) {
         return SharedSemiFuture<void>();

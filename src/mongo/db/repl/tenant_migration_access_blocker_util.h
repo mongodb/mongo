@@ -53,12 +53,14 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
 
 /**
- * If the operation has read concern "snapshot" or includes afterClusterTime, and the database is
- * in the read blocking state at the given atClusterTime or afterClusterTime or the selected read
- * timestamp, the promise will be set for the returned future when the migration is committed or
- * aborted. Note: for better performance, check if the future is immediately ready.
+ * Checks if a request is allowed to read based on the tenant migration states of this node as a
+ * donor or as a recipient. TenantMigrationCommitted is returned if the request needs to be
+ * re-routed to the new owner of the tenant. If the tenant is currently being migrated and the
+ * request needs to block, a future for when the request is unblocked is returned, and the promise
+ * will be set for the returned future when the migration is committed or aborted. Note: for better
+ * performance, check if the future is immediately ready.
  */
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName);
+SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgRequest& request);
 
 /**
  * If the operation has read concern "linearizable", throws TenantMigrationCommitted error if the

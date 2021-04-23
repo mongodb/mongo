@@ -189,7 +189,7 @@ public:
     Status waitUntilCommittedOrAborted(OperationContext* opCtx, OperationType operationType) final;
 
     Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) final;
-    SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx) final;
+    SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx, StringData command) final;
 
     //
     // Called by index build user threads before acquiring an index build slot, and again right
@@ -269,10 +269,6 @@ private:
 
     void _onMajorityCommitCommitOpTime(stdx::unique_lock<Latch>& lk);
     void _onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk);
-
-    // Helper for the method 'getCanReadFuture()'.
-    SharedSemiFuture<void> _getCanDoClusterTimeReadFuture(OperationContext* opCtx,
-                                                          Timestamp readTimestamp);
 
     ServiceContext* _serviceContext;
     const std::string _tenantId;
