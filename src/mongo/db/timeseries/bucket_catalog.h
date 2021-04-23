@@ -36,6 +36,7 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/timeseries/minmax.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
@@ -43,9 +44,9 @@
 #include "mongo/util/string_map.h"
 
 namespace mongo {
+
 class BucketCatalog {
     struct ExecutionStats;
-    class MinMax;
 
     // Number of new field names we can hold in NewFieldNames without needing to allocate memory.
     static constexpr std::size_t kNumStaticNewFields = 10;
@@ -322,168 +323,6 @@ private:
         bool _copied = false;
     };
 
-    class MinMax {
-    public:
-        /**
-         * Updates the min/max according to 'comp', ignoring the 'metaField' field.
-         */
-        void update(const BSONObj& doc,
-                    boost::optional<StringData> metaField,
-                    const StringData::ComparatorInterface* stringComparator);
-
-        /**
-         * Returns the full min/max object.
-         */
-        BSONObj min() const;
-        BSONObj max() const;
-
-        /**
-         * Returns the updates since the previous time this function was called in the format for
-         * an update op.
-         */
-        BSONObj minUpdates();
-        BSONObj maxUpdates();
-
-        /**
-         * Returns the approximate memory usage of this MinMax.
-         */
-        uint64_t getMemoryUsage() const;
-
-    private:
-        enum class Type {
-            kObject,
-            kArray,
-            kValue,
-            kUnset,
-        };
-
-        void _update(BSONElement elem, const StringData::ComparatorInterface* stringComparator);
-        void _updateWithMemoryUsage(MinMax* minMax,
-                                    BSONElement elem,
-                                    const StringData::ComparatorInterface* stringComparator);
-
-        template <typename GetDataFn>
-        void _append(BSONObjBuilder* builder, GetDataFn getData) const;
-        template <typename GetDataFn>
-        void _append(BSONArrayBuilder* builder, GetDataFn getData) const;
-
-        /**
-         * Appends updates, if any, to the builder. Returns whether any updates were appended by
-         * this MinMax or any MinMaxes below it.
-         */
-        template <typename GetDataFn>
-        bool _appendUpdates(BSONObjBuilder* builder, GetDataFn getData);
-
-        /**
-         * Clears the '_updated' flag on this MinMax and all MinMaxes below it.
-         */
-        template <typename GetDataFn>
-        void _clearUpdated(GetDataFn getData);
-
-        StringMap<MinMax> _object;
-        std::vector<MinMax> _array;
-
-        /**
-         * Data bearing representation for MinMax. Can represent unset, Object, Array or Value
-         * (BSONElement).
-         */
-        class Data {
-        public:
-            /**
-             * Set type to value and store provided element without its field name.
-             */
-            void setValue(const BSONElement& elem);
-
-            /**
-             * Set type to object.
-             */
-            void setObject();
-
-            /**
-             * Set type to array.
-             */
-            void setArray();
-
-            /**
-             * Set to be the root object.
-             */
-            void setRootObject();
-
-            /**
-             * Returns stored BSONElement with field name as empty string..
-             */
-            BSONElement value() const;
-
-            /**
-             * Returns stored value type and size without needing to construct BSONElement above.
-             */
-            BSONType valueType() const;
-            int valueSize() const;
-
-            /**
-             * Type this MinMax::Data represents, Object, Array, Value or Unset.
-             */
-            Type type() const {
-                return _type;
-            }
-
-            /**
-             * Flag to indicate if this MinMax::Data was updated since last clear.
-             */
-            bool updated() const {
-                return _updated;
-            }
-
-            /**
-             * Clear update flag.
-             */
-            void clearUpdated() {
-                _updated = false;
-            }
-
-        private:
-            // Memory buffer to store BSONElement without the field name
-            std::unique_ptr<char[]> _value;
-
-            // Size of buffer above
-            int _totalSize = 0;
-
-            // Type that this MinMax::Data represents
-            Type _type = Type::kUnset;
-
-            // Flag to indicate if we got updated as part of this MinMax update.
-            bool _updated = false;
-        };
-
-        /**
-         * Helper for the recursive internal functions to access the min data component.
-         */
-        struct GetMin {
-            Data& operator()(MinMax& minmax) const {
-                return minmax._min;
-            }
-            const Data& operator()(const MinMax& minmax) const {
-                return minmax._min;
-            }
-        };
-
-        /**
-         * Helper for the recursive internal functions to access the max data component.
-         */
-        struct GetMax {
-            Data& operator()(MinMax& minmax) const {
-                return minmax._max;
-            }
-            const Data& operator()(const MinMax& minmax) const {
-                return minmax._max;
-            }
-        };
-
-        Data _min;
-        Data _max;
-        uint64_t _memoryUsage = 0;
-    };
-
     using IdleList = std::list<Bucket*>;
 
 public:
@@ -546,7 +385,7 @@ public:
         StringSet _fieldNames;
 
         // The minimum and maximum values for each field in the bucket.
-        MinMax _minmax;
+        timeseries::MinMax _minmax;
 
         // The latest time that has been inserted into the bucket.
         Date_t _latestTime;

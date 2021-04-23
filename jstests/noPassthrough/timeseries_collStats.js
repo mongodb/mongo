@@ -178,7 +178,7 @@ expectedStats.avgNumMeasurementsPerCommit =
 checkCollStats();
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 100;
-numDocs = 60;
+numDocs = 70;
 largeValue = 'a'.repeat(1024 * 1024);
 
 const testIdleBucketExpiry = function(docFn) {

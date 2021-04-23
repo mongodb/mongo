@@ -87,10 +87,23 @@ TimeseriesTest.run((insert) => {
             {a: {x: {z: [4, 4]}, y: 2}, b: [{x: 4, y: 4}, 3, 1]});
     clearColl();
 
-    // If the two types being compared are not both objects or both arrays, a woCompare is used.
+    // If the two types being compared are not both objects or both arrays, a woCompare is used. We
+    // can transition in max from Object to Array.
     runTest({a: 1}, {a: 1}, {a: 1});
     runTest({a: {b: 1}}, {a: 1}, {a: {b: 1}});
     runTest({a: []}, {a: 1}, {a: []});
+    runTest({a: [5]}, {a: 1}, {a: [5]});
+    clearColl();
+
+    // We can transition in min from empty Array to Object
+    runTest({a: []}, {a: []}, {a: []});
+    runTest({a: {b: 1}}, {a: {b: 1}}, {a: []});
+    runTest({a: [5]}, {a: {b: 1}}, {a: [5]});
+    clearColl();
+
+    // We can transition in min from non-empty Array to Object
+    runTest({a: [1, 2, 3]}, {a: [1, 2, 3]}, {a: [1, 2, 3]});
+    runTest({a: {b: 5}}, {a: {b: 5}}, {a: [1, 2, 3]});
     clearColl();
 
     // Sparse measurements only affect the min/max for the fields present.
