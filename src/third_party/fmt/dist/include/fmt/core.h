@@ -245,6 +245,13 @@
 #  define FMT_USE_EXPERIMENTAL_STRING_VIEW
 #endif
 
+// MONGODB HACK
+// Clang -frewrite-includes, used by icecream, is broken around __has_include
+// so forcefully declare that the compiler has <string_view> since MongoDB
+// only uses C++17 compilers. Fixed in Clang 10.
+// See https://reviews.llvm.org/D63508
+#define FMT_USE_STRING_VIEW
+
 #ifndef FMT_UNICODE
 #  define FMT_UNICODE !FMT_MSC_VER
 #endif
