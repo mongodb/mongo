@@ -111,7 +111,7 @@ let runSampleTests = (measurementsPerBucket, backupPlanSelected) => {
     const viewDocs = coll.find({}, {x: 1}).toArray();
     assert.eq(numDocs, viewDocs.length, viewDocs);
 
-    let sampleSize = 5;
+    let sampleSize = 20;
     let result = coll.aggregate([{$sample: {size: sampleSize}}]).toArray();
     assert.eq(sampleSize, result.length, result);
     assertUniqueDocuments(result);
