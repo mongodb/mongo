@@ -184,6 +184,49 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
     pool.release(host, conn2);
 }
 
+// Tests that internal condition variable is properly notified.
+TEST(ConnectionPoolTest, ConnectionPoolConditionNotifyTest) {
+    DBConnectionPool pool;
+
+    auto fixture = unittest::getFixtureConnectionString();
+    auto host = fixture.getServers()[0].toString();
+
+    pool.setMaxInUse(1);
+
+    // Check out maxInUse connections.
+    auto conn1 = pool.get(host, 100);
+    ASSERT(conn1);
+
+    stdx::condition_variable cv;
+    stdx::mutex mutex;
+    bool aboutToGetConnection = false;
+
+    // Release the conn1 asynchronously, expect the internal condition to be notified.
+    stdx::thread t([&] {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        cv.wait(lk, [&] { return aboutToGetConnection; });
+        lk.release();
+        // Small chance of race is intentional, if the conn1 is released before
+        // conn2 is requested, the test is still valid.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(10));
+        std::cerr << "Releasing first connection..." << std::endl;
+        pool.decrementEgress(host, conn1);
+        delete conn1;
+    });
+
+    {
+        stdx::unique_lock<stdx::mutex> lk(mutex);
+        aboutToGetConnection = true;
+        cv.notify_all();
+    }
+
+    auto conn2 = pool.get(host, 100);
+    ASSERT(conn2);
+    t.join();
+
+    pool.release(host, conn2);
+}
+
 }  // namespace
 
 }  // namespace mongo
