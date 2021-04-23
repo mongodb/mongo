@@ -78,13 +78,11 @@ public:
      *     left
      *       limit 1 -> espool -> mock scan
      *     right
-     *       [c|s]spool
+     *       cspool
      *
      * In other words, the outer branch spools the mock input collection. The inner branch returns
-     * the data after unspooling it. The inner branch's spool consumer may be either a stack spool
-     * or regular (non-stack) spool, depending on the value of the template parameter.
+     * the data after unspooling it.
      */
-    template <bool IsStack>
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> makeSpoolUnspoolPlan(
         value::SlotId mockScanSlot, std::unique_ptr<PlanStage> mockScanStage) {
         auto spoolId = generateSpoolId();
@@ -94,7 +92,7 @@ public:
         auto outerBranch =
             makeS<LimitSkipStage>(std::move(spoolProducer), 1, boost::none, kEmptyPlanNodeId);
 
-        return makeSpoolConsumer<IsStack>(std::move(outerBranch), spoolId);
+        return makeSpoolConsumer<false>(std::move(outerBranch), spoolId);
     }
 
 private:
@@ -171,7 +169,7 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeNonStack) {
             expectedTag,
             expectedVal,
             [this](value::SlotId mockScanSlot, std::unique_ptr<PlanStage> mockScanStage) {
-                return makeSpoolUnspoolPlan<false>(mockScanSlot, std::move(mockScanStage));
+                return makeSpoolUnspoolPlan(mockScanSlot, std::move(mockScanStage));
             });
 }
 
@@ -182,22 +180,32 @@ TEST_F(SbeSpoolTest, SpoolAndConsumeStack) {
     auto [inputTag, inputVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard inputGuard{inputTag, inputVal};
 
-    // Since the plan uses the stack spool consumer, we expect the data to be returned from the
-    // spool in LIFO order.
-    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY("c"
-                                                                          << "b"
-                                                                          << "a"));
+    // We expect the input to be returned unchanged after being buffered in the spool and then
+    // consumed in FIFO order.
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(inputArray);
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     inputGuard.reset();
     expectedGuard.reset();
-    runTest(inputTag,
-            inputVal,
-            expectedTag,
-            expectedVal,
-            [this](value::SlotId mockScanSlot, std::unique_ptr<PlanStage> mockScanStage) {
-                return makeSpoolUnspoolPlan<true>(mockScanSlot, std::move(mockScanStage));
-            });
+    runTest(
+        inputTag,
+        inputVal,
+        expectedTag,
+        expectedVal,
+        [this](value::SlotId mockScanSlot, std::unique_ptr<PlanStage> mockScanStage) {
+            // Constructs a plan like the following which uses a lazy spool producer and stack spool
+            // consumer to feed the data through the spool before returning it.
+            //
+            //  nlj
+            //    left
+            //      lspool -> mock scan
+            //    right
+            //      sspool
+            auto spoolId = generateSpoolId();
+            auto spoolProducer = makeS<SpoolLazyProducerStage>(
+                std::move(mockScanStage), spoolId, makeSV(mockScanSlot), nullptr, kEmptyPlanNodeId);
+            return makeSpoolConsumer<true>(std::move(spoolProducer), spoolId);
+        });
 }
 
 /**
