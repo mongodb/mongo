@@ -284,10 +284,10 @@ void iassertFailed(const Status& status, SourceLocation loc) {
 
 void tassertFailed(const Status& status, SourceLocation loc) {
     assertionCount.condrollover(assertionCount.tripwire.addAndFetch(1));
-    LOGV2(TRIPWIRE_ASSERTION_ID,
-          "Tripwire assertion",
-          "error"_attr = status,
-          "location"_attr = SourceLocationHolder(std::move(loc)));
+    LOGV2_ERROR(TRIPWIRE_ASSERTION_ID,
+                "Tripwire assertion",
+                "error"_attr = status,
+                "location"_attr = SourceLocationHolder(std::move(loc)));
     breakpoint();
     error_details::throwExceptionForStatus(status);
 }
