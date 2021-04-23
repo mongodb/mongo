@@ -437,108 +437,6 @@ err:
 }
 
 /*
- * __wt_modify_vector_init --
- *     Initialize a modify vector.
- */
-void
-__wt_modify_vector_init(WT_SESSION_IMPL *session, WT_MODIFY_VECTOR *modifies)
-{
-    WT_CLEAR(*modifies);
-    modifies->session = session;
-    modifies->listp = modifies->list;
-}
-
-/*
- * __wt_modify_vector_push --
- *     Push a modify update pointer to a modify vector. If we exceed the allowed stack space in the
- *     vector, we'll be doing malloc here.
- */
-int
-__wt_modify_vector_push(WT_MODIFY_VECTOR *modifies, WT_UPDATE *upd)
-{
-    WT_DECL_RET;
-    bool migrate_from_stack;
-
-    migrate_from_stack = false;
-
-    if (modifies->size >= WT_MODIFY_VECTOR_STACK_SIZE) {
-        if (modifies->allocated_bytes == 0 && modifies->size == WT_MODIFY_VECTOR_STACK_SIZE) {
-            migrate_from_stack = true;
-            modifies->listp = NULL;
-        }
-        WT_ERR(__wt_realloc_def(
-          modifies->session, &modifies->allocated_bytes, modifies->size + 1, &modifies->listp));
-        if (migrate_from_stack)
-            memcpy(modifies->listp, modifies->list, sizeof(modifies->list));
-    }
-    modifies->listp[modifies->size++] = upd;
-    return (0);
-
-err:
-    /*
-     * This only happens when we're migrating from the stack to the heap but failed to allocate. In
-     * that case, point back to the stack allocated memory and set the allocation to zero to
-     * indicate that we don't have heap memory to free.
-     *
-     * If we're already on the heap, we have nothing to do. The realloc call above won't touch the
-     * list pointer unless allocation is successful and we won't have incremented the size yet.
-     */
-    if (modifies->listp == NULL) {
-        WT_ASSERT(modifies->session, modifies->size == WT_MODIFY_VECTOR_STACK_SIZE);
-        modifies->listp = modifies->list;
-        modifies->allocated_bytes = 0;
-    }
-    return (ret);
-}
-
-/*
- * __wt_modify_vector_pop --
- *     Pop an update pointer off a modify vector.
- */
-void
-__wt_modify_vector_pop(WT_MODIFY_VECTOR *modifies, WT_UPDATE **updp)
-{
-    WT_ASSERT(modifies->session, modifies->size > 0);
-
-    *updp = modifies->listp[--modifies->size];
-}
-
-/*
- * __wt_modify_vector_peek --
- *     Peek an update pointer off a modify vector.
- */
-void
-__wt_modify_vector_peek(WT_MODIFY_VECTOR *modifies, WT_UPDATE **updp)
-{
-    WT_ASSERT(modifies->session, modifies->size > 0);
-
-    *updp = modifies->listp[modifies->size - 1];
-}
-
-/*
- * __wt_modify_vector_clear --
- *     Clear a modify vector.
- */
-void
-__wt_modify_vector_clear(WT_MODIFY_VECTOR *modifies)
-{
-    modifies->size = 0;
-}
-
-/*
- * __wt_modify_vector_free --
- *     Free any resources associated with a modify vector. If we exceeded the allowed stack space on
- *     the vector and had to fallback to dynamic allocations, we'll be doing a free here.
- */
-void
-__wt_modify_vector_free(WT_MODIFY_VECTOR *modifies)
-{
-    if (modifies->allocated_bytes != 0)
-        __wt_free(modifies->session, modifies->listp);
-    __wt_modify_vector_init(modifies->session, modifies);
-}
-
-/*
  * __wt_modify_reconstruct_from_upd_list --
  *     Takes an in-memory modify and populates an update value with the reconstructed full value.
  */
@@ -548,8 +446,8 @@ __wt_modify_reconstruct_from_upd_list(
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
-    WT_MODIFY_VECTOR modifies;
     WT_TIME_WINDOW tw;
+    WT_UPDATE_VECTOR modifies;
 
     WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
 
@@ -560,7 +458,7 @@ __wt_modify_reconstruct_from_upd_list(
     upd_value->tw.start_txn = upd->txnid;
 
     /* Construct full update */
-    __wt_modify_vector_init(session, &modifies);
+    __wt_update_vector_init(session, &modifies);
     /* Find a complete update. */
     for (; upd != NULL; upd = upd->next) {
         if (upd->txnid == WT_TXN_ABORTED)
@@ -570,7 +468,7 @@ __wt_modify_reconstruct_from_upd_list(
             break;
 
         if (upd->type == WT_UPDATE_MODIFY)
-            WT_ERR(__wt_modify_vector_push(&modifies, upd));
+            WT_ERR(__wt_update_vector_push(&modifies, upd));
     }
     /*
      * If there's no full update, the base item is the on-page item. If the update is a tombstone,
@@ -599,11 +497,11 @@ __wt_modify_reconstruct_from_upd_list(
     }
     /* Once we have a base item, roll forward through any visible modify updates. */
     while (modifies.size > 0) {
-        __wt_modify_vector_pop(&modifies, &upd);
+        __wt_update_vector_pop(&modifies, &upd);
         WT_ERR(__wt_modify_apply_item(session, cursor->value_format, &upd_value->buf, upd->data));
     }
     upd_value->type = WT_UPDATE_STANDARD;
 err:
-    __wt_modify_vector_free(&modifies);
+    __wt_update_vector_free(&modifies);
     return (ret);
 }

@@ -377,10 +377,14 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
          * stop timestamp if the original update's commit timestamp is out of order. We may see
          * records newer than or equal to the onpage value if eviction runs concurrently with
          * checkpoint. In that case, don't verify the first record.
+         *
+         * If we have fixed the out-of-order timestamps, then the newer update reinserted with an
+         * older timestamp may have a durable timestamp that is smaller than the current stop
+         * durable timestamp.
          */
         WT_ASSERT(session,
           hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
-            first_record);
+            hs_start_ts == newer_hs_durable_ts || first_record);
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
@@ -419,7 +423,7 @@ __rollback_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page
               __wt_timestamp_to_string(hs_durable_ts, ts_string[1]),
               __wt_timestamp_to_string(hs_stop_durable_ts, ts_string[2]),
               __wt_timestamp_to_string(rollback_timestamp, ts_string[3]), hs_tw->start_txn, type);
-            WT_ASSERT(session, hs_tw->start_ts < unpack->tw.start_ts);
+            WT_ASSERT(session, hs_tw->start_ts <= unpack->tw.start_ts);
             valid_update_found = true;
             break;
         }

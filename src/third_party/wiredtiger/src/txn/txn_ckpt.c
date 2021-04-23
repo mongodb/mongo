@@ -897,7 +897,13 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      */
     if (F_ISSET(hs_dhandle, WT_DHANDLE_OPEN)) {
         time_start_hs = __wt_clock(session);
+        conn->txn_global.checkpoint_running_hs = true;
+        WT_STAT_CONN_SET(session, txn_checkpoint_running_hs, 1);
+
         WT_WITH_DHANDLE(session, hs_dhandle, ret = __wt_checkpoint(session, cfg));
+
+        WT_STAT_CONN_SET(session, txn_checkpoint_running_hs, 0);
+        conn->txn_global.checkpoint_running_hs = false;
         WT_ERR(ret);
 
         /*

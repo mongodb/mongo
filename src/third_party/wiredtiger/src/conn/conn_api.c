@@ -888,6 +888,25 @@ __wt_conn_remove_storage_source(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __conn_ext_file_system_get --
+ *     WT_EXTENSION.file_system_get method. Get file system in use.
+ */
+static int
+__conn_ext_file_system_get(
+  WT_EXTENSION_API *wt_api, WT_SESSION *session, WT_FILE_SYSTEM **file_system)
+{
+    WT_FILE_SYSTEM *fs;
+
+    WT_UNUSED(session);
+
+    fs = ((WT_CONNECTION_IMPL *)wt_api->conn)->file_system;
+    if (fs == NULL)
+        return (WT_NOTFOUND);
+    *file_system = fs;
+    return (0);
+}
+
+/*
  * __conn_get_extension_api --
  *     WT_CONNECTION.get_extension_api method.
  */
@@ -911,6 +930,7 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
     conn->extension_api.config_get_string = __wt_ext_config_get_string;
     conn->extension_api.config_parser_open = __wt_ext_config_parser_open;
     conn->extension_api.config_parser_open_arg = __wt_ext_config_parser_open_arg;
+    conn->extension_api.file_system_get = __conn_ext_file_system_get;
     conn->extension_api.metadata_insert = __wt_ext_metadata_insert;
     conn->extension_api.metadata_remove = __wt_ext_metadata_remove;
     conn->extension_api.metadata_search = __wt_ext_metadata_search;

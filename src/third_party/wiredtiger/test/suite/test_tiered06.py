@@ -71,11 +71,11 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         fh = fs.fs_open_file(session, 'foobar', FileSystem.open_file_type_data, FileSystem.open_create)
 
+        # Just like a regular file system, the object exists now.
+        self.assertTrue(fs.fs_exist(session, 'foobar'))
+
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
         fh.fh_write(session, 0, outbytes)
-
-        # The object doesn't even exist now.
-        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         # The object exists after close
         fh.close(session)
@@ -97,22 +97,36 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
-        # Make sure any new object is not in the list until it is closed.
+        # Newly created objects are in the list.
         fh = fs.fs_open_file(session, 'zzz', FileSystem.open_file_type_data, FileSystem.open_create)
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')), ['foobar', 'zzz' ])
         # Sync merely syncs to the local disk.
         fh.fh_sync(session)
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
         fh.close(session)    # zero length
-        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')),
-          ['foobar', 'zzz'])
+        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')), ['foobar', 'zzz' ])
+
+        # See that we can rename objects.
+        fs.fs_rename(session, 'zzz', 'yyy', 0)
+        self.assertEquals(sorted(fs.fs_directory_list(session, '', '')), ['foobar', 'yyy' ])
 
         # See that we can remove objects.
-        fs.fs_remove(session, 'zzz', 0)
+        fs.fs_remove(session, 'yyy', 0)
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         # Flushing doesn't do anything that's visible.
         local.ss_flush(session, fs, None, '')
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+
+        # Files that have been flushed cannot be manipulated.
+        with self.expectedStderrPattern('foobar: rename of flushed file not allowed'):
+            self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: fs.fs_rename(session, 'foobar', 'barfoo', 0))
+        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+
+        # Files that have been flushed cannot be manipulated through the custom file system.
+        with self.expectedStderrPattern('foobar: remove of flushed file not allowed'):
+            self.assertRaisesException(wiredtiger.WiredTigerError,
+                lambda: fs.fs_remove(session, 'foobar', 0))
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
         fs.terminate(session)
