@@ -301,9 +301,12 @@ private:
                              const repl::OplogEntry& oplogToCheck) {
         ASSERT_TRUE(oplogToCheck.getOpType() == OpTypeEnum::kNoop);
 
-        ASSERT_EQ(originalOplog.getStatementIds().size(), 1);
-        ASSERT_EQ(oplogToCheck.getStatementIds().size(), 1);
-        ASSERT_EQ(originalOplog.getStatementIds().front(), oplogToCheck.getStatementIds().front());
+        auto originalStmtIds = originalOplog.getStatementIds();
+        auto checkStmtIds = oplogToCheck.getStatementIds();
+        ASSERT_EQ(originalStmtIds.size(), checkStmtIds.size());
+        for (size_t i = 0; i < originalStmtIds.size(); ++i) {
+            ASSERT_EQ(originalStmtIds[i], checkStmtIds[i]);
+        }
 
         const auto origSessionInfo = originalOplog.getOperationSessionInfo();
         const auto sessionInfoToCheck = oplogToCheck.getOperationSessionInfo();
@@ -385,6 +388,69 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     checkStatementExecuted(opCtx, 2, 23, oplog1);
     checkStatementExecuted(opCtx, 2, 45, oplog2);
     checkStatementExecuted(opCtx, 2, 5, oplog3);
+}
+
+TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+
+    SessionCatalogMigrationDestination sessionMigration(kNs, kFromShard, migrationId());
+    sessionMigration.start(getServiceContext());
+
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(2);
+
+    auto oplog1 = makeOplogEntry(OpTime(Timestamp(100, 2), 1),  // optime
+                                 OpTypeEnum::kInsert,           // op type
+                                 BSON("x" << 100),              // o
+                                 boost::none,                   // o2
+                                 sessionInfo,                   // session info
+                                 Date_t::now(),                 // wall clock time
+                                 {23, 24});                     // statement ids
+
+    auto oplog2 = makeOplogEntry(OpTime(Timestamp(80, 2), 1),  // optime
+                                 OpTypeEnum::kInsert,          // op type
+                                 BSON("x" << 80),              // o
+                                 boost::none,                  // o2
+                                 sessionInfo,                  // session info
+                                 Date_t::now(),                // wall clock time
+                                 {45, 46});                    // statement ids
+
+    auto oplog3 = makeOplogEntry(OpTime(Timestamp(60, 2), 1),  // optime
+                                 OpTypeEnum::kInsert,          // op type
+                                 BSON("x" << 60),              // o
+                                 boost::none,                  // o2
+                                 sessionInfo,                  // sessionInfo
+                                 Date_t::now(),                // wall clock time
+                                 {5, 6});                      // statement ids
+
+    returnOplog({oplog1, oplog2, oplog3});
+
+    finishSessionExpectSuccess(&sessionMigration);
+    auto opCtx = operationContext();
+    setUpSessionWithTxn(opCtx, sessionId, 2);
+    MongoDOperationContextSession ocs(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+
+    TransactionHistoryIterator historyIter(txnParticipant.getLastWriteOpTime());
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog3, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog2, historyIter.next(opCtx));
+
+    ASSERT_TRUE(historyIter.hasNext());
+    checkOplogWithNestedOplog(oplog1, historyIter.next(opCtx));
+
+    ASSERT_FALSE(historyIter.hasNext());
+
+    checkStatementExecuted(opCtx, 2, 23, oplog1);
+    checkStatementExecuted(opCtx, 2, 24, oplog1);
+    checkStatementExecuted(opCtx, 2, 45, oplog2);
+    checkStatementExecuted(opCtx, 2, 46, oplog2);
+    checkStatementExecuted(opCtx, 2, 5, oplog3);
+    checkStatementExecuted(opCtx, 2, 6, oplog3);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn) {
