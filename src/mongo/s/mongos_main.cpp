@@ -763,6 +763,9 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     clusterCursorCleanupJob.go();
 
     UserCacheInvalidator::start(serviceContext, opCtx);
+    if (audit::initializeSynchronizeJob) {
+        audit::initializeSynchronizeJob(serviceContext);
+    }
 
     PeriodicTask::startRunningPeriodicTasks();
 

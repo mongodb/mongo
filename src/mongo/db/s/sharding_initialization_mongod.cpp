@@ -37,6 +37,7 @@
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -436,6 +437,10 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     }
 
     Grid::get(opCtx)->setShardingInitialized();
+
+    if (audit::initializeSynchronizeJob) {
+        audit::initializeSynchronizeJob(opCtx->getServiceContext());
+    }
 }
 
 void ShardingInitializationMongoD::updateShardIdentityConfigString(

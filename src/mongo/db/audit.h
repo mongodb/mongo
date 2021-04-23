@@ -52,6 +52,7 @@ class Client;
 class NamespaceString;
 class OperationContext;
 class OpObserverRegistry;
+class ServiceContext;
 class StringData;
 class UserName;
 
@@ -64,6 +65,7 @@ namespace audit {
 // AuditManager hooks.
 extern std::function<void(OperationContext*)> initializeManager;
 extern std::function<void(OpObserverRegistry*)> opObserverRegistrar;
+extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
 
 /**
  * Struct that temporarily stores client information when an audit hook

@@ -355,6 +355,7 @@ env.Library(
         "server_options_init.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/audit",
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
     ],
