@@ -207,20 +207,21 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
             }
             return donorMtabStatus;
         })
-        .onError<ErrorCodes::CallbackCanceled>(
-            [cancelCanReadSource, donorMtab, recipientMtab, opCtx](Status status) mutable {
-                cancelCanReadSource.cancel();
-                // At least one of 'donorMtab' or 'recipientMtab' must exist if we timed out here.
-                BSONObj info =
-                    donorMtab ? donorMtab->getDebugInfo() : recipientMtab->getDebugInfo();
-                if (recipientMtab) {
-                    info = info.addField(
-                        recipientMtab->getDebugInfo().getField("donorConnectionString"));
-                }
-                return Status(opCtx->getTimeoutError(),
-                              "Read timed out waiting for tenant migration blocker",
-                              info);
-            })
+        .onError<ErrorCodes::CallbackCanceled>([cancelCanReadSource,
+                                                donorMtab,
+                                                recipientMtab,
+                                                timeoutError = opCtx->getTimeoutError()](
+                                                   Status status) mutable {
+            cancelCanReadSource.cancel();
+            // At least one of 'donorMtab' or 'recipientMtab' must exist if we timed out here.
+            BSONObj info = donorMtab ? donorMtab->getDebugInfo() : recipientMtab->getDebugInfo();
+            if (recipientMtab) {
+                info =
+                    info.addField(recipientMtab->getDebugInfo().getField("donorConnectionString"));
+            }
+            return Status(
+                timeoutError, "Read timed out waiting for tenant migration blocker", info);
+        })
         .semi();  // To require continuation in the user executor.
 }
 
