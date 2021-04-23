@@ -51,6 +51,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -648,6 +649,18 @@ Status renameBetweenDBs(OperationContext* opCtx,
                                         << "' was removed while renaming collection across DBs");
         }
 
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        auto isOplogDisabledForTmpColl = replCoord->isOplogDisabledFor(opCtx, tmpName);
+
+        auto batchSize = internalInsertMaxBatchSize.load();
+
+        // Inserts to indexed capped collections cannot be batched.
+        // Otherwise, CollectionImpl::_insertDocuments() will fail with OperationCannotBeBatched.
+        // See SERVER-21512.
+        if (autoTmpColl->isCapped() && autoTmpColl->getIndexCatalog()->haveAnyIndexes()) {
+            batchSize = 1;
+        }
+
         auto cursor = sourceColl->getCursor(opCtx);
         auto record = cursor->next();
         while (record) {
@@ -657,22 +670,36 @@ Status renameBetweenDBs(OperationContext* opCtx,
             Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
                 // Always reposition cursor in case it gets a WCE midway through.
                 record = cursor->seekExact(beginBatchId);
-                for (int i = 0; record && (i < internalInsertMaxBatchSize.load()); i++) {
-                    WriteUnitOfWork wunit(opCtx);
-                    const InsertStatement stmt(record->data.releaseToBson());
-                    OpDebug* const opDebug = nullptr;
-                    auto status = autoTmpColl->insertDocument(opCtx, stmt, opDebug, true);
-                    if (!status.isOK()) {
-                        return status;
-                    }
-                    record = cursor->next();
 
-                    // Used to make sure that a WCE can be handled by this logic without data loss.
-                    if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
-                        throw WriteConflictException();
-                    }
-                    wunit.commit();
+                std::vector<InsertStatement> stmts;
+                for (int i = 0; record && (i < batchSize); i++) {
+                    stmts.push_back(InsertStatement(record->data.getOwned().releaseToBson()));
+                    record = cursor->next();
                 }
+
+                WriteUnitOfWork wunit(opCtx);
+
+                if (!isOplogDisabledForTmpColl) {
+                    auto oplogInfo = repl::LocalOplogInfo::get(opCtx);
+                    auto slots = oplogInfo->getNextOpTimes(opCtx, stmts.size());
+                    for (std::size_t i = 0; i < stmts.size(); ++i) {
+                        stmts[i].oplogSlot = slots[i];
+                    }
+                }
+
+                OpDebug* const opDebug = nullptr;
+                auto status =
+                    autoTmpColl->insertDocuments(opCtx, stmts.begin(), stmts.end(), opDebug, true);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                // Used to make sure that a WCE can be handled by this logic without data loss.
+                if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
+                    throw WriteConflictException();
+                }
+
+                wunit.commit();
 
                 // Time to yield; make a safe copy of the current record before releasing our
                 // cursor.
