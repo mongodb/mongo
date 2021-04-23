@@ -130,10 +130,11 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     return donorStateDoc;
 }
 
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
+SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgRequest& request) {
     // We need to check both donor and recipient access blockers in the case where two
     // migrations happen back-to-back before the old recipient state (from the first
     // migration) is garbage collected.
+    auto dbName = request.getDatabase();
     auto mtabPair = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                         .getTenantMigrationAccessBlockerForDbName(dbName);
 
@@ -152,7 +153,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbNam
     std::vector<ExecutorFuture<void>> futures;
     std::shared_ptr<executor::TaskExecutor> executor;
     if (donorMtab) {
-        auto canReadFuture = donorMtab->getCanReadFuture(opCtx);
+        auto canReadFuture = donorMtab->getCanReadFuture(opCtx, request.getCommandName());
         if (canReadFuture.isReady()) {
             auto status = canReadFuture.getNoThrow();
             donorMtab->recordTenantMigrationError(status);
@@ -164,7 +165,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbNam
         futures.emplace_back(std::move(canReadFuture).semi().thenRunOn(executor));
     }
     if (recipientMtab) {
-        auto canReadFuture = recipientMtab->getCanReadFuture(opCtx);
+        auto canReadFuture = recipientMtab->getCanReadFuture(opCtx, request.getCommandName());
         if (canReadFuture.isReady()) {
             auto status = canReadFuture.getNoThrow();
             recipientMtab->recordTenantMigrationError(status);

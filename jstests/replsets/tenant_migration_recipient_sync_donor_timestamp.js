@@ -16,22 +16,11 @@ load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject()
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-// Use a single node replSet to simplify the process.
-const donorRst = new ReplSetTest({
-    nodes: 1,
-    name: jsTestName() + "_donor",
-    nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().donor
-});
-
-donorRst.startSet();
-donorRst.initiate();
-
 // Make the batch size small so that we can pause before all the batches are applied.
 const tenantMigrationTest = new TenantMigrationTest(
-    {name: jsTestName(), donorRst, sharedOptions: {setParameter: {tenantApplierBatchSizeOps: 2}}});
+    {name: jsTestName(), sharedOptions: {setParameter: {tenantApplierBatchSizeOps: 2}}});
 
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    donorRst.stopSet();
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     return;
 }
@@ -105,6 +94,5 @@ fpPauseOplogApplier.off();
 jsTestLog("Waiting for migration to complete.");
 assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
-donorRst.stopSet();
 tenantMigrationTest.stop();
 })();

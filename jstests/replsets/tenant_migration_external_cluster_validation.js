@@ -52,9 +52,13 @@ const donorRst = new ReplSetTest({
     nodes: 2,
     name: "donor",
     keyFile: "jstests/libs/key1",
-    nodeOptions: Object.assign(
-        x509Options.donor,
-        {setParameter: {"failpoint.alwaysValidateClientsClusterTime": tojson({mode: "alwaysOn"})}}),
+    nodeOptions: Object.assign(x509Options.donor, {
+        setParameter: {
+            "failpoint.alwaysValidateClientsClusterTime": tojson({mode: "alwaysOn"}),
+            // Allow non-timestamped reads on donor after migration completes for testing.
+            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
+        }
+    }),
 });
 
 const recipientRst = new ReplSetTest({

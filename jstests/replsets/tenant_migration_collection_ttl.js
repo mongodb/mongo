@@ -23,6 +23,8 @@ const garbageCollectionOpts = {
     ttlMonitorSleepSecs: 5,
     // Allow reads on recipient before migration completes for testing.
     'failpoint.tenantMigrationRecipientNotRejectReads': tojson({mode: 'alwaysOn'}),
+    // Allow non-timestamped reads on donor after migration completes for testing.
+    'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
 };
 
 const tenantMigrationTest = new TenantMigrationTest(

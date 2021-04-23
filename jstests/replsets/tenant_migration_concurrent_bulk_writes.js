@@ -36,8 +36,10 @@ const donorRst = new ReplSetTest({
     nodeOptions: Object.assign(migrationX509Options.donor, {
         setParameter: {
             internalInsertMaxBatchSize:
-                kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
+                kMaxBatchSize, /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
+            // Allow non-timestamped reads on donor after migration completes for testing.
+            'failpoint.tenantMigrationDonorAllowsNonTimestampedReads': tojson({mode: 'alwaysOn'}),
         }
     })
 });
@@ -46,9 +48,9 @@ const recipientRst = new ReplSetTest({
     name: 'recipient',
     nodeOptions: Object.assign(migrationX509Options.recipient, {
         setParameter: {
-            internalInsertMaxBatchSize:
-                kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
-                                 batched without inserting hundreds of documents. */
+            internalInsertMaxBatchSize: kMaxBatchSize /* Decrease internal max batch size so we can
+                                                         still show writes are batched without
+                                                         inserting hundreds of documents. */
         },
     })
 });
@@ -272,9 +274,9 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
-    // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
-    // observer. Without this failpoint, the migration could have already aborted by the time the
-    // write gets to the op observer.
+    // The failpoint below is used to ensure that a write to throw
+    // TenantMigrationConflict in the op observer. Without this failpoint, the migration
+    // could have already aborted by the time the write gets to the op observer.
     const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
@@ -369,8 +371,8 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length, 1);
     assert(writeErrors[0].errmsg);
 
-    // The single write error should correspond to the first write after the migration started
-    // blocking writes.
+    // The single write error should correspond to the first write after the migration
+    // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
 
@@ -444,8 +446,8 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length, 1);
     assert(writeErrors[0].errmsg);
 
-    // The single write error should correspond to the first write after the migration started
-    // blocking writes.
+    // The single write error should correspond to the first write after the migration
+    // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
 
@@ -493,9 +495,9 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
 
     const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationBeforeLeavingBlockingState");
 
-    // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
-    // observer. Without this failpoint, the migration could have already aborted by the time the
-    // write gets to the op observer.
+    // The failpoint below is used to ensure that a write to throw
+    // TenantMigrationConflict in the op observer. Without this failpoint, the migration
+    // could have already aborted by the time the write gets to the op observer.
     const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationBeforeLeavingBlockingState");
     const migrationThread =
         new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
@@ -525,8 +527,8 @@ function bulkWriteDocsUnordered(primaryHost, dbName, collName, numDocs) {
     assert.eq(writeErrors.length, 1);
     assert(writeErrors[0].errmsg);
 
-    // The single write error should correspond to the first write after the migration started
-    // blocking writes.
+    // The single write error should correspond to the first write after the migration
+    // started blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationAborted);
 

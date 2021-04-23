@@ -23,9 +23,14 @@ const setUpMigrationSyncSourceTest = function() {
         name: `${jsTestName()}_donor`,
         nodes: 3,
         settings: {chainingAllowed: false},
-        nodeOptions:
-            Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor,
-                          {setParameter: {tenantMigrationExcludeDonorHostTimeoutMS: 30 * 1000}}),
+        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+            setParameter: {
+                tenantMigrationExcludeDonorHostTimeoutMS: 30 * 1000,
+                // Allow non-timestamped reads on donor after migration completes for testing.
+                'failpoint.tenantMigrationDonorAllowsNonTimestampedReads':
+                    tojson({mode: 'alwaysOn'}),
+            }
+        }),
     });
     donorRst.startSet();
     donorRst.initiateWithHighElectionTimeout();

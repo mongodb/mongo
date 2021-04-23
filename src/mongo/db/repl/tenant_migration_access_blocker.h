@@ -66,7 +66,8 @@ public:
                                                OperationType operationType) = 0;
 
     virtual Status checkIfLinearizableReadWasAllowed(OperationContext* opCtx) = 0;
-    virtual SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx) = 0;
+    virtual SharedSemiFuture<void> getCanReadFuture(OperationContext* opCtx,
+                                                    StringData command) = 0;
 
     //
     // Called by index build user threads before acquiring an index build slot, and again right

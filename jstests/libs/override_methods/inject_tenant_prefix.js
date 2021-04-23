@@ -237,6 +237,11 @@ function reformatResObjForLogging(resObj) {
  * object so that only failed operations are retried.
  */
 function modifyCmdObjForRetry(cmdObj, resObj) {
+    if (!resObj.hasOwnProperty("writeErrors") && ErrorCodes.isTenantMigrationError(resObj.code)) {
+        // If we get a top level error without writeErrors, retry the entire command.
+        return;
+    }
+
     if (cmdObj.insert) {
         let retryOps = [];
         if (cmdObj.ordered === false) {
