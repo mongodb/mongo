@@ -574,7 +574,7 @@ bool DBConnectionPool::poolKeyCompare::operator()(const PoolKey& a, const PoolKe
     if (DBConnectionPool::serverNameCompare()(b.ident, a.ident))
         return false;
 
-    return a.timeout < b.timeout;
+    return a.socketTimeoutMs < b.socketTimeoutMs;
 }
 
 bool DBConnectionPool::isConnectionGood(const string& hostName, DBClientBase* conn) {
