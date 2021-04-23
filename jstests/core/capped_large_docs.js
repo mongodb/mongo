@@ -8,7 +8,9 @@
  *     requires_collstats,
  *     requires_fastcount,
  *     requires_non_retryable_writes,
- *     requires_fcv_49
+ *     requires_fcv_49,
+ *     # Capped collections cannot be sharded
+ *     assumes_unsharded_collection,
  * ]
  */
 (function() {
