@@ -50,6 +50,8 @@ template <typename T>
 auto abslHash(const T& val) {
     if constexpr (std::is_same_v<T, StringData>) {
         return absl::Hash<absl::string_view>{}(absl::string_view{val.rawData(), val.size()});
+    } else if constexpr (IsEndian<T>::value) {
+        return abslHash(val.value);
     } else {
         return absl::Hash<T>{}(val);
     }
@@ -725,8 +727,9 @@ bool isShallowType(TypeTags tag) noexcept {
 }
 
 inline std::size_t hashObjectId(const uint8_t* objId) noexcept {
-    return abslHash(readFromMemory<uint64_t>(objId)) ^
-        abslHash(readFromMemory<uint32_t>(objId + 8));
+    auto dataView = ConstDataView(reinterpret_cast<const char*>(objId));
+    return abslHash(dataView.read<LittleEndian<uint64_t>>()) ^
+        abslHash(dataView.read<LittleEndian<uint32_t>>(sizeof(uint64_t)));
 }
 
 std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator) noexcept {
@@ -824,11 +827,11 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
                 memcpy(buffer, getRawPointerView(val), size);
 
                 // Hash as if it is 64bit integer.
-                return abslHash(readFromMemory<uint64_t>(buffer));
+                return abslHash(ConstDataView(buffer).read<LittleEndian<uint64_t>>());
             } else {
                 // Hash only the first 8 bytes. It should be enough.
-                return abslHash(
-                    readFromMemory<uint64_t>(getRawPointerView(val) + sizeof(uint32_t)));
+                auto dataView = ConstDataView(getRawPointerView(val) + sizeof(uint32_t));
+                return abslHash(dataView.read<LittleEndian<uint64_t>>());
             }
         }
         case TypeTags::bsonRegex: {

@@ -137,6 +137,25 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // fail
 };
 
+namespace {
+template <typename T>
+T readFromMemory(const uint8_t* ptr) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    T val;
+    memcpy(&val, ptr, sizeof(T));
+    return val;
+}
+
+template <typename T>
+size_t writeToMemory(uint8_t* ptr, const T val) noexcept {
+    static_assert(!IsEndian<T>::value);
+
+    memcpy(ptr, &val, sizeof(T));
+    return sizeof(T);
+}
+}  // namespace
+
 void CodeFragment::adjustStackSimple(const Instruction& i) {
     _stackSize += Instruction::stackOffset[i.tag];
 }
@@ -144,8 +163,8 @@ void CodeFragment::adjustStackSimple(const Instruction& i) {
 void CodeFragment::fixup(int offset) {
     for (auto fixUp : _fixUps) {
         auto ptr = instrs().data() + fixUp.offset;
-        int newOffset = value::readFromMemory<int>(ptr) + offset;
-        value::writeToMemory(ptr, newOffset);
+        int newOffset = readFromMemory<int>(ptr) + offset;
+        writeToMemory(ptr, newOffset);
     }
 }
 
@@ -194,9 +213,9 @@ void CodeFragment::appendConstVal(value::TypeTags tag, value::Value val) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(tag) + sizeof(val));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, tag);
-    offset += value::writeToMemory(offset, val);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, tag);
+    offset += writeToMemory(offset, val);
 }
 
 void CodeFragment::appendAccessVal(value::SlotAccessor* accessor) {
@@ -206,8 +225,8 @@ void CodeFragment::appendAccessVal(value::SlotAccessor* accessor) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(accessor));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, accessor);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, accessor);
 }
 
 void CodeFragment::appendMoveVal(value::SlotAccessor* accessor) {
@@ -217,8 +236,8 @@ void CodeFragment::appendMoveVal(value::SlotAccessor* accessor) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(accessor));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, accessor);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, accessor);
 }
 
 void CodeFragment::appendLocalVal(FrameId frameId, int stackOffset) {
@@ -231,8 +250,8 @@ void CodeFragment::appendLocalVal(FrameId frameId, int stackOffset) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(stackOffset));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, stackOffset);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, stackOffset);
 }
 
 void CodeFragment::appendAdd() {
@@ -246,8 +265,8 @@ void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(targetTag));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, targetTag);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, targetTag);
 }
 
 void CodeFragment::appendSub() {
@@ -285,7 +304,7 @@ void CodeFragment::appendSimpleInstruction(Instruction::Tags tag) {
 
     auto offset = allocateSpace(sizeof(Instruction));
 
-    offset += value::writeToMemory(offset, i);
+    offset += writeToMemory(offset, i);
 }
 
 void CodeFragment::appendGetField() {
@@ -375,8 +394,8 @@ void CodeFragment::appendTypeMatch(uint32_t typeMask) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(typeMask));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, typeMask);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, typeMask);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -392,10 +411,10 @@ void CodeFragment::appendFunction(Builtin f, ArityType arity) {
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(f) +
                                 (isSmallArity ? sizeof(SmallArityType) : sizeof(ArityType)));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, f);
-    offset += isSmallArity ? value::writeToMemory(offset, static_cast<SmallArityType>(arity))
-                           : value::writeToMemory(offset, arity);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, f);
+    offset += isSmallArity ? writeToMemory(offset, static_cast<SmallArityType>(arity))
+                           : writeToMemory(offset, arity);
 }
 
 void CodeFragment::appendJump(int jumpOffset) {
@@ -405,8 +424,8 @@ void CodeFragment::appendJump(int jumpOffset) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, jumpOffset);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, jumpOffset);
 }
 
 void CodeFragment::appendJumpTrue(int jumpOffset) {
@@ -416,8 +435,8 @@ void CodeFragment::appendJumpTrue(int jumpOffset) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, jumpOffset);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, jumpOffset);
 }
 
 void CodeFragment::appendJumpNothing(int jumpOffset) {
@@ -427,8 +446,8 @@ void CodeFragment::appendJumpNothing(int jumpOffset) {
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
-    offset += value::writeToMemory(offset, i);
-    offset += value::writeToMemory(offset, jumpOffset);
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, jumpOffset);
 }
 
 ByteCode::~ByteCode() {
@@ -3175,13 +3194,13 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
         if (pcPointer == pcEnd) {
             break;
         } else {
-            Instruction i = value::readFromMemory<Instruction>(pcPointer);
+            Instruction i = readFromMemory<Instruction>(pcPointer);
             pcPointer += sizeof(i);
             switch (i.tag) {
                 case Instruction::pushConstVal: {
-                    auto tag = value::readFromMemory<value::TypeTags>(pcPointer);
+                    auto tag = readFromMemory<value::TypeTags>(pcPointer);
                     pcPointer += sizeof(tag);
-                    auto val = value::readFromMemory<value::Value>(pcPointer);
+                    auto val = readFromMemory<value::Value>(pcPointer);
                     pcPointer += sizeof(val);
 
                     pushStack(false, tag, val);
@@ -3189,7 +3208,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::pushAccessVal: {
-                    auto accessor = value::readFromMemory<value::SlotAccessor*>(pcPointer);
+                    auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                     pcPointer += sizeof(accessor);
 
                     auto [tag, val] = accessor->getViewOfValue();
@@ -3198,7 +3217,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::pushMoveVal: {
-                    auto accessor = value::readFromMemory<value::SlotAccessor*>(pcPointer);
+                    auto accessor = readFromMemory<value::SlotAccessor*>(pcPointer);
                     pcPointer += sizeof(accessor);
 
                     auto [tag, val] = accessor->copyOrMoveValue();
@@ -3207,7 +3226,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::pushLocalVal: {
-                    auto stackOffset = value::readFromMemory<int>(pcPointer);
+                    auto stackOffset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(stackOffset);
 
                     auto [owned, tag, val] = getFromStack(stackOffset);
@@ -3369,7 +3388,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::numConvert: {
-                    auto tag = value::readFromMemory<value::TypeTags>(pcPointer);
+                    auto tag = readFromMemory<value::TypeTags>(pcPointer);
                     pcPointer += sizeof(tag);
 
                     auto [owned, lhsTag, lhsVal] = getFromStack(0);
@@ -4062,7 +4081,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::typeMatch: {
-                    auto typeMask = value::readFromMemory<uint32_t>(pcPointer);
+                    auto typeMask = readFromMemory<uint32_t>(pcPointer);
                     pcPointer += sizeof(typeMask);
 
                     auto [owned, tag, val] = getFromStack(0);
@@ -4080,14 +4099,14 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                 }
                 case Instruction::function:
                 case Instruction::functionSmall: {
-                    auto f = value::readFromMemory<Builtin>(pcPointer);
+                    auto f = readFromMemory<Builtin>(pcPointer);
                     pcPointer += sizeof(f);
                     ArityType arity{0};
                     if (i.tag == Instruction::function) {
-                        arity = value::readFromMemory<ArityType>(pcPointer);
+                        arity = readFromMemory<ArityType>(pcPointer);
                         pcPointer += sizeof(ArityType);
                     } else {
-                        arity = value::readFromMemory<SmallArityType>(pcPointer);
+                        arity = readFromMemory<SmallArityType>(pcPointer);
                         pcPointer += sizeof(SmallArityType);
                     }
 
@@ -4106,14 +4125,14 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::jmp: {
-                    auto jumpOffset = value::readFromMemory<int>(pcPointer);
+                    auto jumpOffset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(jumpOffset);
 
                     pcPointer += jumpOffset;
                     break;
                 }
                 case Instruction::jmpTrue: {
-                    auto jumpOffset = value::readFromMemory<int>(pcPointer);
+                    auto jumpOffset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(jumpOffset);
 
                     auto [owned, tag, val] = getFromStack(0);
@@ -4129,7 +4148,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     break;
                 }
                 case Instruction::jmpNothing: {
-                    auto jumpOffset = value::readFromMemory<int>(pcPointer);
+                    auto jumpOffset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(jumpOffset);
 
                     auto [owned, tag, val] = getFromStack(0);

@@ -664,27 +664,6 @@ constexpr size_t kSmallStringMaxLength = 7;
 using ObjectIdType = std::array<uint8_t, 12>;
 static_assert(sizeof(ObjectIdType) == 12);
 
-template <typename T>
-T readFromMemory(const char* memory) noexcept {
-    T val;
-    memcpy(&val, memory, sizeof(T));
-    return val;
-}
-
-template <typename T>
-T readFromMemory(const unsigned char* memory) noexcept {
-    T val;
-    memcpy(&val, memory, sizeof(T));
-    return val;
-}
-
-template <typename T>
-size_t writeToMemory(unsigned char* memory, const T val) noexcept {
-    memcpy(memory, &val, sizeof(T));
-
-    return sizeof(T);
-}
-
 /**
  * getRawStringView() returns a char* or const char* that points to the first character of a given
  * string (or a null terminator byte if the string is empty). Where possible, getStringView() should
