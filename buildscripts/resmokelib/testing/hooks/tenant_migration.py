@@ -221,6 +221,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self.logger = logger
         self._tenant_migration_fixture = tenant_migration_fixture
         self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
+        self._auth_options = shell_options["global_vars"]["TestData"]["authOptions"]
         self._test_report = test_report
         self._shell_options = shell_options
 
@@ -360,8 +361,12 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         read_preference = {"mode": "primary"} if random.randint(0, 1) else {"mode": "secondary"}
         return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference)
 
+    def _create_client(self, node):
+        return self._tenant_migration_fixture.auth(node.mongo_client(), self._auth_options)
+
     def _check_tenant_migration_dbhash(self, migration_opts):
-        # Set the donor connection string, recipient connection string, and migration uuid string for the tenant migration dbhash check script.
+        # Set the donor connection string, recipient connection string, and migration uuid string
+        # for the tenant migration dbhash check script.
         self._shell_options[
             "global_vars"]["TestData"]["donorConnectionString"] = migration_opts.get_donor_primary(
             ).get_internal_connection_string()
@@ -461,7 +466,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         while True:
             try:
                 # Keep polling the migration state until the migration completes.
-                donor_primary_client = donor_primary.mongo_client()
+                donor_primary_client = self._create_client(donor_primary)
                 res = donor_primary_client.admin.command(
                     cmd_obj,
                     bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
@@ -508,7 +513,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         while True:
             try:
-                donor_primary_client = donor_primary.mongo_client()
+                donor_primary_client = self._create_client(donor_primary)
                 donor_primary_client.admin.command(
                     cmd_obj,
                     bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
@@ -547,7 +552,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 migration_opts.get_donor_name())
             while True:
                 try:
-                    donor_primary_client = donor_primary.mongo_client()
+                    donor_primary_client = self._create_client(donor_primary)
                     res = donor_primary_client.config.command({
                         "count": "tenantMigrationDonors",
                         "query": {"tenantId": migration_opts.tenant_id}
@@ -570,7 +575,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 recipient_primary.port, migration_opts.get_recipient_name())
             while True:
                 try:
-                    recipient_primary_client = recipient_primary.mongo_client()
+                    recipient_primary_client = self._create_client(recipient_primary)
                     res = recipient_primary_client.config.command({
                         "count": "tenantMigrationRecipients",
                         "query": {"tenantId": migration_opts.tenant_id}
@@ -605,7 +610,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         while not self.__lifecycle.is_test_finished():
             try:
-                donor_primary_client = donor_primary.mongo_client()
+                donor_primary_client = self._create_client(donor_primary)
                 doc = donor_primary_client["testTenantMigration"]["rerouted"].find_one(
                     {"_id": bson.Binary(migration_opts.migration_id.bytes, 4)})
                 if doc is not None:
@@ -636,7 +641,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         while True:
             try:
-                primary_client = primary.mongo_client()
+                primary_client = self._create_client(primary)
                 res = primary_client.admin.command({"listDatabases": 1})
                 for database in res["databases"]:
                     db_name = database["name"]
