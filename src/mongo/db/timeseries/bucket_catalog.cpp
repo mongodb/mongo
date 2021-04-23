@@ -270,9 +270,10 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
     invariant(!batch->finished());
     invariant(!batch->active());
 
-    BucketAccess bucket(this, batch->bucket());
-
+    Bucket* ptr(batch->bucket());
     batch->_finish(info);
+
+    BucketAccess bucket(this, ptr);
     if (bucket) {
         invariant(_setBucketState(bucket->_id, BucketState::kNormal));
         bucket->_preparedBatch.reset();
@@ -291,13 +292,21 @@ void BucketCatalog::finish(std::shared_ptr<WriteBatch> batch, const CommitInfo& 
         bucket->_numCommittedMeasurements += batch->measurements().size();
     }
 
-    if (bucket && bucket->allCommitted()) {
+    if (!bucket) {
+        // It's possible that we cleared the bucket in between preparing the commit and finishing
+        // here. In this case, we should abort any other ongoing batches and clear the bucket from
+        // the catalog so it's not hanging around idle.
+        auto lk = _lockExclusive();
+        if (_allBuckets.contains(ptr)) {
+            stdx::unique_lock blk{ptr->_mutex};
+            _abort(blk, ptr, nullptr, boost::none);
+        }
+    } else if (bucket->allCommitted()) {
         if (bucket->_full) {
             // Everything in the bucket has been committed, and nothing more will be added since the
             // bucket is full. Thus, we can remove it.
             _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
 
-            Bucket* ptr(bucket);
             bucket.release();
             auto lk = _lockExclusive();
 

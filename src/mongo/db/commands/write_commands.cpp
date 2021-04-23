@@ -644,6 +644,8 @@ public:
                 docsToRetry->push_back(index);
                 return;
             }
+            // Now that the batch is prepared, make sure we clean up if we throw.
+            auto batchGuard = makeGuard([&] { bucketCatalog.abort(batch); });
 
             hangTimeseriesInsertBeforeWrite.pauseWhileSet();
 
@@ -654,6 +656,7 @@ public:
             if (auto error = generateError(opCtx, result, start + index, errors->size())) {
                 errors->push_back(*error);
                 bucketCatalog.abort(batch, result.getStatus());
+                batchGuard.dismiss();
                 return;
             }
 
@@ -661,7 +664,6 @@ public:
                 result.getValue().getNModified() == 0) {
                 // No document in the buckets collection was found to update, meaning that it was
                 // removed.
-                bucketCatalog.abort(batch);
                 docsToRetry->push_back(index);
                 return;
             }
@@ -669,6 +671,7 @@ public:
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
             bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+            batchGuard.dismiss();
         }
 
         bool _commitTimeseriesBucketsAtomically(OperationContext* opCtx,
