@@ -28,7 +28,7 @@ struct __wt_tiered_manager {
 
 /*
  * WT_CURSOR_TIERED --
- *	An tiered cursor.
+ *	A tiered cursor.
  */
 struct __wt_cursor_tiered {
     WT_CURSOR iface;
@@ -49,17 +49,103 @@ struct __wt_cursor_tiered {
 };
 
 /*
+ * Define the maximum number of tiers for convenience. We expect at most two initially. This can
+ * change if more are needed. It is easier to have the array statically allocated initially than
+ * worrying about the memory management. For now also assign types to slots. Local files in slot 0.
+ * Shared tier top level in slot 1.
+ */
+#define WT_TIERED_INDEX_INVALID (uint32_t) - 1
+#define WT_TIERED_INDEX_LOCAL 0
+#define WT_TIERED_INDEX_SHARED 1
+
+#define WT_TIERED_MAX_TIERS 4
+
+/* Object name types */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_NAME_LOCAL 0x1u
+#define WT_TIERED_NAME_OBJECT 0x2u
+#define WT_TIERED_NAME_PREFIX 0x4u
+#define WT_TIERED_NAME_SHARED 0x8u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/*
+ * WT_TIERED_TIERS --
+ *	Information we need to keep about each tier such as its data handle and name.
+ */
+struct __wt_tiered_tiers {
+    WT_DATA_HANDLE *tier; /* Data handle for this tier */
+    const char *name;     /* Tier's metadata name */
+};
+
+/*
  * WT_TIERED --
- *	Handle for a tiered data source.
+ *	Handle for a tiered data source. This data structure is used as the basis for metadata
+ *	as the top level definition of a tiered table. This structure tells us where to find the
+ *	parts of the tree and in what order we should look at the tiers. Prior to the first call
+ *	to flush_tier after the creation of this table the only tier that exists will be the local
+ *	disk represented by a file: URI. Then a second (or more) set of tiers will be where the
+ *	tiered data lives. The non-local tier will point to a tier: URI and that is described by a
+ *	WT_TIERED_TREE data structure that will encapsulate what the current state of the
+ *	individual objects is.
  */
 struct __wt_tiered {
     WT_DATA_HANDLE iface;
 
-    const char *config, *filename;
+    const char *obj_config; /* Config to use for each object */
     const char *key_format, *value_format;
 
-    WT_DATA_HANDLE **tiers;
-    u_int ntiers;
+    WT_BUCKET_STORAGE *bstorage;
+
+    WT_TIERED_TIERS tiers[WT_TIERED_MAX_TIERS]; /* Tiers array */
+
+    uint64_t current_id; /* Current object id number */
+    uint64_t next_id;    /* Next object number */
 
     WT_COLLATOR *collator; /* TODO: handle custom collation */
+    /* TODO: What about compression, encryption, etc? Do we need to worry about that here? */
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_FLAG_UNUSED 0x1u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
+};
+
+/*
+ * WT_TIERED_OBJECT --
+ *     Definition of a tiered object. This is a single object in a tiered tree.
+ *     This is the lowest level data structure and item that makes
+ *     up a tiered table. This structure contains the information needed to construct the name of
+ *     this object and how to access it.
+ */
+struct __wt_tiered_object {
+    const char *uri;      /* Data source for this object */
+    WT_TIERED_TREE *tree; /* Pointer to tree this object is part of */
+    uint64_t count;       /* Approximate count of records */
+    uint64_t size;        /* Final size of object */
+    uint64_t switch_txn;  /* Largest txn that can write to this object */
+    uint64_t switch_ts;   /* Timestamp for switching */
+    uint32_t id;          /* This object's id */
+    uint32_t generation;  /* Do we need this?? */
+    uint32_t refcnt;      /* Number of references */
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_OBJ_LOCAL 0x1u /* Local resident also */
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
+};
+
+/*
+ * WT_TIERED_TREE --
+ *     Definition of the shared tiered portion of a tree.
+ */
+struct __wt_tiered_tree {
+    WT_DATA_HANDLE iface;
+    const char *name, *config;
+    const char *key_format, *value_format;
+    const char *file_config;
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define WT_TIERED_TREE_UNUSED 0x1u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP */
+    uint32_t flags;
 };

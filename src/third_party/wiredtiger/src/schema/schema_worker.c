@@ -59,8 +59,10 @@ __wt_schema_tiered_worker(WT_SESSION_IMPL *session, const char *uri,
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, open_flags));
     tiered = (WT_TIERED *)session->dhandle;
 
-    for (i = 0; i < tiered->ntiers; i++) {
-        dhandle = tiered->tiers[i];
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        dhandle = tiered->tiers[i].tier;
+        if (dhandle == NULL)
+            continue;
         WT_SAVE_DHANDLE(session,
           ret = __wt_schema_worker(session, dhandle->name, file_func, name_func, cfg, open_flags));
         WT_ERR(ret);

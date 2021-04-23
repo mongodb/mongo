@@ -272,10 +272,20 @@ __wt_schema_colgroup_source(
         prefix = cval.str;
         len = cval.len;
         suffix = "";
-    } else {
+    } else if ((S2C(session)->bstorage == NULL) ||
+      ((ret = __wt_config_getones(session, config, "tiered_storage.name", &cval)) == 0 &&
+        cval.len != 0 && WT_STRING_MATCH("none", cval.str, cval.len))) {
+        /*
+         * If we're using tiered storage, the default is not file unless the user explicitly turns
+         * off using tiered storage for this create. Otherwise the default prefix is tiered.
+         */
         prefix = "file";
         len = strlen(prefix);
         suffix = ".wt";
+    } else {
+        prefix = "tiered";
+        len = strlen(prefix);
+        suffix = "";
     }
     WT_RET_NOTFOUND_OK(ret);
 
@@ -768,24 +778,47 @@ err:
 }
 
 /*
+ * __create_object --
+ *     Create a tiered object for the given name.
+ */
+static int
+__create_object(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
+{
+    WT_UNUSED(exclusive);
+    WT_RET(__wt_metadata_insert(session, uri, config));
+    return (0);
+}
+
+/*
+ * __wt_tiered_tree_create --
+ *     Create a tiered tree structure for the given name.
+ */
+int
+__wt_tiered_tree_create(
+  WT_SESSION_IMPL *session, const char *uri, bool exclusive, bool import, const char *config)
+{
+    WT_UNUSED(exclusive);
+    WT_UNUSED(import);
+    WT_RET(__wt_metadata_insert(session, uri, config));
+    return (0);
+}
+
+/*
  * __create_tiered --
  *     Create a tiered tree structure for the given name.
  */
 static int
 __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
-    WT_CONFIG cparser;
-    WT_CONFIG_ITEM ckey, cval, tierconf;
     WT_DECL_RET;
-    int ntiers;
+    WT_TIERED *tiered;
     char *meta_value;
-    const char *cfg[] = {WT_CONFIG_BASE(session, tiered_meta), config, NULL};
+    const char *cfg[4] = {WT_CONFIG_BASE(session, tiered_meta), config, NULL, NULL};
     const char *metadata;
 
     metadata = NULL;
-    ntiers = 0;
 
-    /* If it can be opened, it already exists. */
+    /* Check if the tiered table already exists. */
     if ((ret = __wt_metadata_search(session, uri, &meta_value)) != WT_NOTFOUND) {
         if (exclusive)
             WT_TRET(EEXIST);
@@ -793,23 +826,24 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
     }
     WT_RET_NOTFOUND_OK(ret);
 
-    /* A tiered cursor must specify at least one underlying table */
-    WT_RET(__wt_config_gets(session, cfg, "tiered.tiers", &tierconf));
-    __wt_config_subinit(session, &cparser, &tierconf);
-
-    while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
-        ++ntiers;
-    WT_RET_NOTFOUND_OK(ret);
-
-    if (ntiers == 0)
-        WT_RET_MSG(session, EINVAL, "tiered table must specify at least one tier");
-
+    /*
+     * We're creating a tiered table. Set the initial tiers list to empty. Opening the table will
+     * cause us to create our first file or tiered object.
+     */
     if (!F_ISSET(S2C(session), WT_CONN_READONLY)) {
+        cfg[2] = "tiers=()";
         WT_ERR(__wt_config_merge(session, cfg, NULL, &metadata));
         WT_ERR(__wt_metadata_insert(session, uri, metadata));
     }
+    WT_ERR(__wt_schema_get_tiered_uri(session, uri, WT_DHANDLE_EXCLUSIVE, &tiered));
+    if (WT_META_TRACKING(session)) {
+        WT_WITH_DHANDLE(session, &tiered->iface, ret = __wt_meta_track_handle_lock(session, true));
+        WT_ERR(ret);
+        tiered = NULL;
+    }
 
 err:
+    WT_TRET(__wt_schema_release_tiered(session, &tiered));
     __wt_free(session, meta_value);
     __wt_free(session, metadata);
     return (ret);
@@ -880,8 +914,12 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
         ret = __wt_lsm_tree_create(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "index:"))
         ret = __create_index(session, uri, exclusive, config);
+    else if (WT_PREFIX_MATCH(uri, "object:"))
+        ret = __create_object(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "table:"))
         ret = __create_table(session, uri, exclusive, import, config);
+    else if (WT_PREFIX_MATCH(uri, "tier:"))
+        ret = __wt_tiered_tree_create(session, uri, exclusive, import, config);
     else if (WT_PREFIX_MATCH(uri, "tiered:"))
         ret = __create_tiered(session, uri, exclusive, config);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)

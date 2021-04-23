@@ -52,9 +52,12 @@ __truncate_tiered(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 
     WT_STAT_DATA_INCR(session, cursor_truncate);
 
-    /* Truncate the column groups. */
-    for (i = 0; i < tiered->ntiers; i++)
-        WT_ERR(__wt_schema_truncate(session, tiered->tiers[i]->name, cfg));
+    /* Truncate the tiered entries. */
+    for (i = 0; i < WT_TIERED_MAX_TIERS; i++) {
+        if (tiered->tiers[i].tier == NULL)
+            continue;
+        WT_ERR(__wt_schema_truncate(session, tiered->tiers[i].name, cfg));
+    }
 
 err:
     WT_TRET(__wt_session_release_dhandle(session));

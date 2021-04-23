@@ -1168,7 +1168,7 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     uint64_t yield_count, sleep_usecs;
-    bool leaf_found, valid;
+    bool valid;
 
     btree = CUR2BT(cbt);
     cursor = &cbt->iface;
@@ -1221,30 +1221,11 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
     WT_ERR(__cursor_localvalue(cursor));
     __cursor_state_save(cursor, &state);
 
-    /* If our caller configures for a local search and we have a page pinned, do that search. */
-    if (F_ISSET(cursor, WT_CURSTD_UPDATE_LOCAL) && __cursor_page_pinned(cbt, true)) {
-        __wt_txn_cursor_op(session);
-        WT_ERR(__wt_txn_autocommit_check(session));
-
-        WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, cbt->ref, &leaf_found) :
-                                          __cursor_col_search(cbt, cbt->ref, &leaf_found));
-        /*
-         * Only use the pinned page search results if search returns an exact match or a slot other
-         * than the page's boundary slots, if that's not the case, the record might belong on an
-         * entirely different page. This test is simplistic as we're ignoring append lists (there
-         * may be no page slots or we might be legitimately positioned after the last page slot).
-         * Ignore those cases, it makes things too complicated.
-         */
-        if (leaf_found &&
-          (cbt->compare == 0 || (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)))
-            goto update_local;
-    }
-
 retry:
     WT_ERR(__cursor_func_init(cbt, true));
     WT_ERR(btree->type == BTREE_ROW ? __cursor_row_search(cbt, true, NULL, NULL) :
                                       __cursor_col_search(cbt, NULL, NULL));
-update_local:
+
     if (btree->type == BTREE_ROW) {
         /*
          * If not overwriting, check for conflicts and fail if the key does not exist.

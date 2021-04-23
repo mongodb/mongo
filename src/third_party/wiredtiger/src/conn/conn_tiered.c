@@ -23,18 +23,46 @@
  * __flush_tier_once --
  *     Perform one iteration of tiered storage maintenance.
  */
-static void
+static int
 __flush_tier_once(WT_SESSION_IMPL *session, bool force)
 {
-    WT_UNUSED(session);
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    const char *key, *value;
+
     WT_UNUSED(force);
+    __wt_verbose(session, WT_VERB_TIERED, "%s", "FLUSH_TIER_ONCE: Called");
     /*
      * - See if there is any "merging" work to do to prepare and create an object that is
      *   suitable for placing onto tiered storage.
      * - Do the work to create said objects.
      * - Move the objects.
      */
-    return;
+    cursor = NULL;
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+    while (cursor->next(cursor) == 0) {
+        cursor->get_key(cursor, &key);
+        cursor->get_value(cursor, &value);
+        /* For now just switch tiers which just does metadata manipulation. */
+        if (WT_PREFIX_MATCH(key, "tiered:")) {
+            __wt_verbose(session, WT_VERB_TIERED, "FLUSH_TIER_ONCE: %s %s", key, value);
+            WT_ERR(__wt_session_get_dhandle(session, key, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+            /*
+             * When we call wt_tiered_switch the session->dhandle points to the tiered: entry and
+             * the arg is the config string that is currently in the metadata.
+             */
+            WT_ERR(__wt_tiered_switch(session, value));
+            WT_ERR(__wt_session_release_dhandle(session));
+        }
+    }
+    WT_ERR(__wt_metadata_cursor_release(session, &cursor));
+
+    return (0);
+
+err:
+    WT_TRET(__wt_session_release_dhandle(session));
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
+    return (ret);
 }
 
 /*
@@ -117,6 +145,7 @@ int
 __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
 {
     WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
     const char *cfg[3];
     bool force;
 
@@ -131,8 +160,8 @@ __wt_flush_tier(WT_SESSION_IMPL *session, const char *config)
     WT_RET(__wt_config_gets(session, cfg, "force", &cval));
     force = cval.val != 0;
 
-    __flush_tier_once(session, force);
-    return (0);
+    WT_WITH_SCHEMA_LOCK(session, ret = __flush_tier_once(session, force));
+    return (ret);
 }
 
 /*
@@ -208,13 +237,20 @@ __tiered_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
     conn = S2C(session);
 
     if (!reconfig) {
+        conn->bstorage = NULL;
         WT_RET(__wt_config_gets(session, cfg, "tiered_storage.name", &cval));
         WT_RET(__wt_config_gets(session, cfg, "tiered_storage.bucket", &bucket));
-        WT_RET(__wt_tiered_bucket_config(session, &cval, &bucket, &conn->bstorage));
+        if (cval.len != 0) {
+            if (bucket.len != 0)
+                WT_RET(__wt_tiered_bucket_config(session, &cval, &bucket, &conn->bstorage));
+            else
+                WT_RET_MSG(session, EINVAL, "Must specify a bucket");
+        }
     }
     /* If the connection is not set up for tiered storage there is nothing more to do. */
     if (conn->bstorage == NULL)
         return (0);
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_CONFIG: bucket %s", conn->bstorage->bucket);
 
     WT_ASSERT(session, conn->bstorage != NULL);
     WT_RET(__wt_tiered_common_config(session, cfg, conn->bstorage));
@@ -223,7 +259,11 @@ __tiered_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp, bool rec
 
     /* The strings for unique identification are connection level. */
     WT_RET(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &cval));
+    if (cval.len == 0)
+        WT_RET_MSG(session, EINVAL, "Must specify a bucket prefix");
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &conn->tiered_prefix));
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_CONFIG: prefix %s", conn->tiered_prefix);
+    WT_ASSERT(session, conn->tiered_prefix != NULL);
 
     return (__tiered_manager_config(session, cfg, runp));
 err:

@@ -205,18 +205,37 @@ lsm_config = [
     ]),
 ]
 
-tiered_config = common_runtime_config + [
-    Config('tiered', '', r'''
-        options only relevant for tiered data sources''',
+tiered_config = [
+    Config('tiered_storage', '', r'''
+        configure a storage source for this table''',
         type='category', subconfig=[
-        Config('chunk_size', '1GB', r'''
-            the maximum size of the hot chunk of tiered tree.  This
-            limit is soft - it is possible for chunks to be temporarily
-            larger than this value''',
-            min='1M'),
-        Config('tiers', '', r'''
-            list of data sources to combine into a tiered storage structure''', type='list')
-    ]),
+        Config('name', 'none', r'''
+            permitted values are \c "none"
+            or custom storage source name created with
+            WT_CONNECTION::add_storage_source.
+            See @ref custom_storage_sources for more information'''),
+        Config('auth_token', '', r'''
+            authentication string identifier'''),
+        Config('bucket', '', r'''
+            the bucket indicating the location for this table'''),
+        Config('bucket_prefix', '', r'''
+            the unique bucket prefix for this table'''),
+        Config('local_retention', '300', r'''
+            time in seconds to retain data on tiered storage on the local tier
+            for faster read access''',
+            min='0', max='10000'),
+        Config('object_target_size', '10M', r'''
+            the approximate size of objects before creating them on the
+            tiered storage tier''',
+            min='100K', max='10TB'),
+        ]),
+]
+
+tiered_tree_config = [
+    Config('bucket', '', r'''
+        the bucket indicating the location for this table'''),
+    Config('bucket_prefix', '', r'''
+        the unique bucket prefix for this table'''),
 ]
 
 file_runtime_config = common_runtime_config + [
@@ -258,7 +277,7 @@ file_runtime_config = common_runtime_config + [
 ]
 
 # Per-file configuration
-file_config = format_meta + file_runtime_config + [
+file_config = format_meta + file_runtime_config + tiered_config + [
     Config('block_allocation', 'best', r'''
         configure block allocation. Permitted values are \c "best" or \c "first";
         the \c "best" configuration uses a best-fit algorithm,
@@ -413,27 +432,6 @@ file_config = format_meta + file_runtime_config + [
         split into smaller pages, where each page is the specified
         percentage of the maximum Btree page size''',
         min='50', max='100'),
-    Config('tiered_storage', '', r'''
-        configure a storage source for this table''',
-        type='category', subconfig=[
-        Config('name', 'none', r'''
-            Permitted values are \c "none"
-            or custom storage source name created with
-            WT_CONNECTION::add_storage_source.
-            See @ref custom_storage_sources for more information'''),
-        Config('auth_token', '', r'''
-            authentication string identifier'''),
-        Config('bucket', '', r'''
-            The bucket indicating the location for this table'''),
-        Config('local_retention', '300', r'''
-            time in seconds to retain data on tiered storage on the local tier
-            for faster read access''',
-        min='0', max='10000'),
-        Config('object_target_size', '10M', r'''
-            the approximate size of objects before creating them on the
-            tiered storage tier''',
-            min='100K', max='10TB'),
-        ]),
 ]
 
 # File metadata, including both configurable and non-configurable (internal)
@@ -451,7 +449,7 @@ file_meta = file_config + [
 ]
 
 lsm_meta = file_config + lsm_config + [
-    Config('last', '', r'''
+    Config('last', '0', r'''
         the last allocated chunk ID'''),
     Config('chunks', '', r'''
         active chunks in the LSM tree'''),
@@ -459,7 +457,20 @@ lsm_meta = file_config + lsm_config + [
         obsolete chunks in the LSM tree'''),
 ]
 
-tiered_meta = tiered_config
+tiered_meta = common_meta + tiered_config + [
+    Config('last', '0', r'''
+        the last allocated object ID'''),
+    Config('tiers', '', r'''
+        list of data sources to combine into a tiered storage structure''', type='list'),
+]
+
+tier_meta = file_meta + tiered_tree_config
+object_meta = file_meta + [
+    Config('bucket_prefix', '', r'''
+        unique string prefix to identify our objects in the bucket.
+        Multiple instances can share the storage bucket and this
+        identifier is used in naming objects'''),
+]
 
 table_only_config = [
     Config('colgroups', '', r'''
@@ -742,6 +753,21 @@ connection_runtime_config = [
             this will update the value if one is already set''',
             min='1MB', max='10TB')
         ]),
+    Config('statistics', 'none', r'''
+        Maintain database statistics, which may impact performance.
+        Choosing "all" maintains all statistics regardless of cost,
+        "fast" maintains a subset of statistics that are relatively
+        inexpensive, "none" turns off all statistics. The "clear"
+        configuration resets statistics after they are gathered,
+        where appropriate (for example, a cache size statistic is
+        not cleared, while the count of cursor insert operations will
+        be cleared).   When "clear" is configured for the database,
+        gathered statistics are reset each time a statistics cursor
+        is used to gather statistics, as well as each time statistics
+        are logged using the \c statistics_log configuration.  See
+        @ref statistics for more information''',
+        type='list',
+        choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
     Config('tiered_manager', '', r'''
         tiered storage manager configuration options''',
         type='category', undoc=True, subconfig=[
@@ -760,21 +786,6 @@ connection_runtime_config = [
                 management inside WiredTiger''',
                 min='0', max='100000'),
             ]),
-    Config('statistics', 'none', r'''
-        Maintain database statistics, which may impact performance.
-        Choosing "all" maintains all statistics regardless of cost,
-        "fast" maintains a subset of statistics that are relatively
-        inexpensive, "none" turns off all statistics. The "clear"
-        configuration resets statistics after they are gathered,
-        where appropriate (for example, a cache size statistic is
-        not cleared, while the count of cursor insert operations will
-        be cleared).   When "clear" is configured for the database,
-        gathered statistics are reset each time a statistics cursor
-        is used to gather statistics, as well as each time statistics
-        are logged using the \c statistics_log configuration.  See
-        @ref statistics for more information''',
-        type='list',
-        choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
     Config('timing_stress_for_test', '', r'''
         enable code that interrupts the usual timing of operations with a goal
         of uncovering race conditions and unexpected blocking. This option is
@@ -820,6 +831,7 @@ connection_runtime_config = [
             'split',
             'temporary',
             'thread_group',
+            'tiered',
             'timestamp',
             'transaction',
             'verify',
@@ -1249,7 +1261,11 @@ methods = {
 
 'lsm.meta' : Method(lsm_meta),
 
+'object.meta' : Method(object_meta),
+
 'table.meta' : Method(table_meta),
+
+'tier.meta' : Method(tier_meta),
 
 'tiered.meta' : Method(tiered_meta),
 

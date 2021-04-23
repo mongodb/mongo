@@ -1111,6 +1111,7 @@ nuls
 num
 numSymbols
 numbare
+objs
 offpage
 ok
 oldv
@@ -1483,6 +1484,7 @@ wrlsn
 ws
 wtbench
 wti
+wtobj
 wtperf
 wtperf's
 wts

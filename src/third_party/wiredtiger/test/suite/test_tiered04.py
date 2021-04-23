@@ -41,6 +41,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
     bucket = "mybucket"
     bucket1 = "otherbucket"
     extension_name = "local_store"
+    prefix = "this_pfx"
     object_sys = "9M"
     object_sys_val = 9 * 1024 * 1024
     object_uri = "15M"
@@ -52,6 +53,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
           'statistics=(all),' + \
           'tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket + \
+          'bucket_prefix=%s,' % self.prefix + \
           'local_retention=%d,' % self.retention + \
           'name=%s,' % self.extension_name + \
           'object_target_size=%s)' % self.object_sys
@@ -62,7 +64,10 @@ class test_tiered04(wttest.WiredTigerTestCase):
         extlist.extension('storage_sources', self.extension_name)
 
     def get_stat(self, stat, uri):
-        stat_cursor = self.session.open_cursor('statistics:' + uri)
+        if uri == None:
+            stat_cursor = self.session.open_cursor('statistics:')
+        else:
+            stat_cursor = self.session.open_cursor('statistics:' + uri)
         val = stat_cursor[stat][2]
         stat_cursor.close()
         return val
@@ -73,6 +78,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
         # specifying its own bucket and object size and one using no
         # tiered storage. Use stats to verify correct setup.
         base_create = 'key_format=S'
+        self.pr("create sys")
         self.session.create(self.uri, base_create)
         conf = \
           ',tiered_storage=(auth_token=%s,' % self.auth_token + \
@@ -80,40 +86,58 @@ class test_tiered04(wttest.WiredTigerTestCase):
           'local_retention=%d,' % self.retention1 + \
           'name=%s,' % self.extension_name + \
           'object_target_size=%s)' % self.object_uri
-        self.session.create(self.uri1, base_create + conf)
+        #self.pr("create non-sys tiered")
+        #self.session.create(self.uri1, base_create + conf)
         conf = ',tiered_storage=(name=none)'
-        self.session.create(self.uri_none, base_create + conf)
+        #self.pr("create non tiered/local")
+        #self.session.create(self.uri_none, base_create + conf)
 
-        # Verify the table settings.
-        obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri)
+        #self.pr("open cursor")
+        #c = self.session.open_cursor(self.uri)
+        self.pr("flush tier")
+        self.session.flush_tier(None)
+
+        self.pr("flush tier again")
+        self.session.flush_tier(None)
+        calls = self.get_stat(stat.conn.flush_tier, None)
+        self.assertEqual(calls, 2)
+        obj = self.get_stat(stat.conn.tiered_object_size, None)
         self.assertEqual(obj, self.object_sys_val)
-        obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri1)
-        self.assertEqual(obj, self.object_uri_val)
-        obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri_none)
-        self.assertEqual(obj, 0)
 
-        retain = self.get_stat(stat.dsrc.tiered_retention, self.uri)
-        self.assertEqual(retain, self.retention)
-        retain = self.get_stat(stat.dsrc.tiered_retention, self.uri1)
-        self.assertEqual(retain, self.retention1)
-        retain = self.get_stat(stat.dsrc.tiered_retention, self.uri_none)
-        self.assertEqual(retain, 0)
+        self.pr("verify stats")
+        # Verify the table settings.
+        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri)
+        #self.assertEqual(obj, self.object_sys_val)
+        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri1)
+        #self.assertEqual(obj, self.object_uri_val)
+        #obj = self.get_stat(stat.dsrc.tiered_object_size, self.uri_none)
+        #self.assertEqual(obj, 0)
+
+        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri)
+        #self.assertEqual(retain, self.retention)
+        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri1)
+        #self.assertEqual(retain, self.retention1)
+        #retain = self.get_stat(stat.dsrc.tiered_retention, self.uri_none)
+        #self.assertEqual(retain, 0)
 
         # Now test some connection statistics with operations.
-        retain = self.get_stat(stat.conn.tiered_retention, '')
+        retain = self.get_stat(stat.conn.tiered_retention, None)
         self.assertEqual(retain, self.retention)
         self.session.flush_tier(None)
         self.session.flush_tier('force=true')
-        calls = self.get_stat(stat.conn.flush_tier, '')
-        self.assertEqual(calls, 2)
+        calls = self.get_stat(stat.conn.flush_tier, None)
+        self.assertEqual(calls, 4)
+
+        # Test reconfiguration.
         new = self.retention * 2
         config = 'tiered_storage=(local_retention=%d)' % new
+        self.pr("reconfigure")
         self.conn.reconfigure(config)
         self.session.flush_tier(None)
-        retain = self.get_stat(stat.conn.tiered_retention, '')
-        calls = self.get_stat(stat.conn.flush_tier, '')
+        retain = self.get_stat(stat.conn.tiered_retention, None)
+        calls = self.get_stat(stat.conn.flush_tier, None)
         self.assertEqual(retain, new)
-        self.assertEqual(calls, 3)
+        self.assertEqual(calls, 5)
 
 if __name__ == '__main__':
     wttest.run()
