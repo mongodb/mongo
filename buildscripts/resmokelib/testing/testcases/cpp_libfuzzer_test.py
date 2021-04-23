@@ -37,6 +37,7 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
             self.program_executable,
             "-max_len=100000",
             "-rss_limit_mb=5000",
+            "-max_total_time=3600",  # 1 hour is the maximum amount of time to allow a fuzzer to run
             f"-runs={self.runs}",
             self.corpus_directory,
         ]
