@@ -949,6 +949,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
 
 Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops) {
     auto opCtx = cc().makeOperationContext();
+    opCtx->setEnforceConstraints(false);
     tenantMigrationRecipientInfo(opCtx.get()) =
         boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
 
