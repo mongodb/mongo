@@ -438,7 +438,17 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
                         const RenameCollectionOptions& options) {
-    invariant(source.db() != target.db());
+    invariant(
+        source.db() != target.db(),
+        str::stream()
+            << "cannot rename within same database (use renameCollectionWithinDB instead): source: "
+            << source << "; target: " << target);
+
+    // Refer to txnCmdWhitelist in commands.cpp.
+    invariant(
+        !opCtx->inMultiDocumentTransaction(),
+        str::stream() << "renameBetweenDBs not supported in multi-document transaction: source: "
+                      << source << "; target: " << target);
 
     boost::optional<Lock::DBLock> sourceDbLock;
     boost::optional<Lock::CollectionLock> sourceCollLock;
