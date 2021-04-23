@@ -1,3 +1,12 @@
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: admin
+  authenticationMechanism: SCRAM-SHA-1
+  password: *keyFileData
+  username: __system
+
 test_kind: js_test
 # This suite starts two 3-node replica sets and uses the ContinuousTenantMigration hook to run
 # background tenant migrations. It also wraps all CRUD commands in transactions and asserts that
@@ -14,6 +23,8 @@ selector:
 
   # These tests already run with transactions.
   - jstests/core/txns/**/*.js
+  # Skip any tests that run with auth explicitly.
+  - jstests/core/*[aA]uth*.js
   # These tests depend on hardcoded database name equality.
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/list_databases.js
@@ -332,9 +343,15 @@ executor:
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
+        jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
           tenantId: "tenantMigrationTenantId"
+          auth: true
+          authMechanism: SCRAM-SHA-1
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
           networkErrorAndTxnOverrideConfig:
             wrapCRUDinTransactions: true
           sessionOptions:
@@ -346,12 +363,20 @@ executor:
   - class: ContinuousTenantMigration
     shell_options:
       global_vars:
-        TestData: *TestData
+        TestData:
+          <<: *TestData
+          authOptions: *authOptions
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
+    shell_options:
+      global_vars:
+        TestData: *TestData
   - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData: *TestData
   - class: ValidateCollections
   - class: CleanEveryN
     n: 1
@@ -380,6 +405,8 @@ executor:
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''
+      auth: ''
+      keyFile: *keyFile
     per_mongod_options:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem
@@ -387,3 +414,4 @@ executor:
     num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true
+    auth_options: *authOptions

@@ -88,6 +88,7 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         # Start up each of the replica sets
         for replica_set in self.replica_sets:
             replica_set.setup()
+            self._create_tenant_migration_donor_and_recipient_roles(replica_set)
 
     def await_ready(self):
         """Block until the fixture can be used for testing."""
@@ -152,3 +153,47 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         for replica_set in self.replica_sets:
             output += replica_set.get_node_info()
         return output
+
+    @staticmethod
+    def auth(client, auth_options=None):
+        """Auth a client connection."""
+        if auth_options is not None:
+            auth_db = client[auth_options["authenticationDatabase"]]
+            auth_db.authenticate(auth_options["username"], password=auth_options["password"],
+                                 mechanism=auth_options["authenticationMechanism"])
+
+        return client
+
+    def _create_tenant_migration_donor_and_recipient_roles(self, rs):
+        """Create a role for tenant migration donor and recipient."""
+        primary = rs.get_primary()
+        primary_client = self.auth(primary.mongo_client(), self.auth_options)
+
+        try:
+            primary_client.admin.command({
+                "createRole": "tenantMigrationDonorRole", "privileges": [{
+                    "resource": {"cluster": True}, "actions": ["runTenantMigration"]
+                }, {"resource": {"db": "admin", "collection": "system.keys"}, "actions": ["find"]}],
+                "roles": []
+            })
+        except:
+            self.logger.exception(
+                "Error creating tenant migration donor role on primary on port %d of replica" +
+                " set '%s'.", primary.port, rs.replset_name)
+            raise
+
+        try:
+            primary_client.admin.command({
+                "createRole": "tenantMigrationRecipientRole", "privileges":
+                    [{"resource": {"cluster": True}, "actions": ["listDatabases", "useUUID"]},
+                     {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
+                     {
+                         "resource": {"anyResource": True},
+                         "actions": ["dbStats", "collStats", "find", "listIndexes"]
+                     }], "roles": []
+            })
+        except:
+            self.logger.exception(
+                "Error creating tenant migration recipient role on primary on port %d of replica" +
+                " set '%s'.", primary.port, rs.replset_name)
+            raise
