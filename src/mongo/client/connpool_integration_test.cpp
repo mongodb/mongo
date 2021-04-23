@@ -82,6 +82,9 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     {
         stdx::unique_lock<stdx::mutex> lk(mutex);
         cv.wait(lk, [&] { return counter == 1; });
+        // We expect this wait to time out as the condition is never true.
+        auto ret = cv.wait_for(lk, stdx::chrono::seconds{1}, [&] { return counter == 2; });
+        ASSERT_FALSE(ret) << "Thread is expected to be blocked";
     }
 
     // Return one to the pool, thread should be un-blocked.
@@ -113,7 +116,10 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseTimeoutTest) {
 
     // Try creating a new connection with a 1-second timeout, should block,
     // then should time out.
+    Timer t;
     ASSERT_THROWS(pool.get(host, 1), AssertionException);
+    // The timeout should be respected, throws after 1 second.
+    ASSERT_GT(t.millis(), 800);
 
     pool.release(host, conn1);
     pool.release(host, conn2);

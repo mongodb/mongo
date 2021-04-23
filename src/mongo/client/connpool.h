@@ -105,13 +105,6 @@ public:
     }
 
     /**
-     * Sets the maximum number of in-use connections for this pool.
-     */
-    void setMaxInUse(int maxInUse) {
-        _maxInUse = maxInUse;
-    }
-
-    /**
      * Sets the socket timeout on this host, in seconds, for reporting purposes only.
      */
     void setSocketTimeout(double socketTimeout) {
@@ -181,7 +174,7 @@ public:
      * throw if a free connection cannot be acquired within that amount of
      * time. Timeout is in seconds.
      */
-    void waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk);
+    void waitForFreeConnection(int timeout, stdx::unique_lock<stdx::mutex>& lk, int maxInUse);
 
     /**
      * Notifies any waiters that there are new connections available.
@@ -221,9 +214,6 @@ private:
 
     // The maximum number of connections we'll save in the pool
     int _maxPoolSize;
-
-    // The maximum number of connections allowed to be in-use in this pool
-    int _maxInUse;
 
     // The number of currently active connections from this pool
     int _checkedOut;
@@ -402,6 +392,7 @@ private:
     // 0 effectively disables the pool
     int _maxPoolSize;
 
+    // The maximum number of connections allowed to be in-use in this pool.
     int _maxInUse;
     Minutes _idleTimeout;
 
