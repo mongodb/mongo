@@ -44,6 +44,15 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollect
     {min: {newKey: 0}, max: {newKey: MaxKey}, shard: st.shard1.shardName},
 ]);
 
+// The shardCollection command doesn't wait for the config.cache.chunks entries to have been written
+// on the primary shard for the database. We manually run the _flushRoutingTableCacheUpdates command
+// to guarantee they have been written and are visible with the atClusterTime used by the
+// testReshardCloneCollection command.
+for (const shard of [st.shard0, st.shard1]) {
+    assert.commandWorked(shard.rs.getPrimary().adminCommand(
+        {_flushRoutingTableCacheUpdates: temporaryReshardingCollection.getFullName()}));
+}
+
 assert.commandWorked(inputCollection.insert([
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
     {_id: "moves to shard0", oldKey: 10, newKey: -10},
