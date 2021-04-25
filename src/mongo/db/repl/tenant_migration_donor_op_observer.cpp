@@ -269,6 +269,20 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
     }
 }
 
+repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* opCtx,
+                                                              const NamespaceString& collectionName,
+                                                              OptionalCollectionUUID uuid,
+                                                              std::uint64_t numRecords,
+                                                              const CollectionDropType dropType) {
+    if (collectionName == NamespaceString::kTenantMigrationDonorsNamespace) {
+        opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
+        });
+    }
+    return {};
+}
+
 void TenantMigrationDonorOpObserver::onMajorityCommitPointUpdate(
     ServiceContext* service, const repl::OpTime& newCommitPoint) {
     TenantMigrationAccessBlockerRegistry::get(service).onMajorityCommitPointUpdate(newCommitPoint);
