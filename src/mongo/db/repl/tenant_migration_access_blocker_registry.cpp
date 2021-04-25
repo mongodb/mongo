@@ -62,9 +62,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
-void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType type) {
-    stdx::lock_guard<Latch> lg(_mutex);
-
+void TenantMigrationAccessBlockerRegistry::_remove(WithLock, StringData tenantId, MtabType type) {
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
     invariant(it != _tenantMigrationAccessBlockers.end());
     auto mtabPair = it->second;
@@ -72,6 +70,19 @@ void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType 
     if (!mtabPair.getAccessBlocker(MtabType::kDonor) &&
         !mtabPair.getAccessBlocker(MtabType::kRecipient)) {
         _tenantMigrationAccessBlockers.erase(it);
+    }
+}
+
+void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType type) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _remove(lg, tenantId, type);
+}
+
+void TenantMigrationAccessBlockerRegistry::removeAll(MtabType type) {
+    stdx::lock_guard<Latch> lg(_mutex);
+
+    for (auto& [tenantId, _] : _tenantMigrationAccessBlockers) {
+        _remove(lg, tenantId, type);
     }
 }
 

@@ -95,6 +95,12 @@ public:
      * Invariants that an entry for tenantId exists, and then removes the entry for (tenantId, mtab)
      */
     void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
+    void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
+
+    /**
+     * Removes all mtabs of the given type.
+     */
+    void removeAll(TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and

@@ -126,9 +126,7 @@ public:
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
                                   std::uint64_t numRecords,
-                                  CollectionDropType dropType) final {
-        return repl::OpTime();
-    }
+                                  CollectionDropType dropType) final;
 
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
