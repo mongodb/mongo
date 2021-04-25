@@ -375,8 +375,8 @@ void _createCollection(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const CollectionOptions options = {}) {
     writeConflictRetry(opCtx, "_createCollection", nss.ns(), [=] {
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_X);
-        auto db = autoDb.getDb();
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        auto db = autoDb.ensureDbExists();
         ASSERT_TRUE(db) << "Cannot create collection " << nss << " because database " << nss.db()
                         << " does not exist.";
 
