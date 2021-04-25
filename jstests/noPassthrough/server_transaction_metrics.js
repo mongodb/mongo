@@ -2,6 +2,7 @@
 // @tags: [uses_transactions]
 (function() {
 "use strict";
+load("jstests/libs/fail_point_util.js");  // For configureFailPoint
 
 // Verifies that the server status response has the fields that we expect.
 function verifyServerStatusFields(serverStatusResponse) {
@@ -152,8 +153,7 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 // Hang the transaction on a failpoint in the middle of an operation to check active and
 // inactive counters while operation is running inside a transaction.
 jsTest.log("Start a transaction that will hang in the middle of an operation due to a fail point.");
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'alwaysOn'}));
+const fpHangDuringBatchUpdate = configureFailPoint(primary, 'hangDuringBatchUpdate');
 
 const transactionFn = function() {
     const collName = 'server_transactions_metrics';
@@ -176,6 +176,10 @@ assert.soon(function() {
     };
     return 1 === adminDB.aggregate([{$currentOp: {}}, {$match: transactionFilter}]).itcount();
 });
+
+jsTestLog("Wait until the operation is in the middle of executing.");
+fpHangDuringBatchUpdate.wait();
+
 newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
 verifyServerStatusFields(newStatus);
 // Verify that the open transaction counter is incremented while inside the transaction.
@@ -185,8 +189,7 @@ verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "cu
 verifyServerStatusChange(initialStatus.transactions, newStatus.transactions, "currentInactive", 0);
 
 // Now the transaction can proceed.
-assert.commandWorked(
-    testDB.adminCommand({configureFailPoint: 'hangDuringBatchUpdate', mode: 'off'}));
+fpHangDuringBatchUpdate.off();
 transactionProcess();
 newStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
 verifyServerStatusFields(newStatus);
