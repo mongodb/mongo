@@ -35,8 +35,8 @@
 namespace mongo {
 namespace sbe {
 namespace bson {
-std::pair<value::TypeTags, value::Value> convertFrom(bool view,
-                                                     const char* be,
+template <bool View>
+std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize);
 

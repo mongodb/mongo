@@ -1137,7 +1137,7 @@ std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {
         return {_iter->first, _iter->second};
     } else {
         auto sv = bson::fieldNameView(_arrayCurrent);
-        return bson::convertFrom(true, _arrayCurrent, _arrayEnd, sv.size());
+        return bson::convertFrom<true>(_arrayCurrent, _arrayEnd, sv.size());
     }
 }
 
@@ -1169,7 +1169,7 @@ std::pair<TypeTags, Value> ObjectEnumerator::getViewOfValue() const {
         return _object->getAt(_index);
     } else {
         auto sv = bson::fieldNameView(_objectCurrent);
-        return bson::convertFrom(true, _objectCurrent, _objectEnd, sv.size());
+        return bson::convertFrom<true>(_objectCurrent, _objectEnd, sv.size());
     }
 }
 

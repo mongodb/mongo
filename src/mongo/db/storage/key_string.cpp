@@ -2443,8 +2443,11 @@ Discriminator decodeDiscriminator(const char* buffer,
     return Discriminator::kInclusive;
 }
 
-BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
-    BSONObjBuilder builder;
+void toBsonSafe(const char* buffer,
+                size_t len,
+                Ordering ord,
+                const TypeBits& typeBits,
+                BSONObjBuilder& builder) {
     BufReader reader(buffer, len);
     TypeBits::Reader typeBitsReader(typeBits);
     for (int i = 0; reader.remaining(); i++) {
@@ -2462,6 +2465,11 @@ BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits&
             break;
         toBsonValue(ctype, &reader, &typeBitsReader, invert, typeBits.version, &(builder << ""), 1);
     }
+}
+
+BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& typeBits) {
+    BSONObjBuilder builder;
+    toBsonSafe(buffer, len, ord, typeBits, builder);
     return builder.obj();
 }
 

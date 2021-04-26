@@ -401,4 +401,52 @@ TEST(SBEVM, ConvertBinDataToBsonObj) {
 
     ASSERT_EQ(originalBinData.woCompare(convertedBinData), 0);
 }
+
+namespace {
+
+/**
+ * Fills bytes after the null terminator in the string with 'pattern'.
+ *
+ * We use this function in the tests to ensure that the implementation of 'getStringLength' for
+ * 'StringSmall' type does not rely on the fact that all bytes after null terminator are zero or any
+ * other special value.
+ */
+void fillSmallStringTail(value::Value val, char pattern) {
+    char* rawView = value::getRawStringView(value::TypeTags::StringSmall, val);
+    for (auto i = std::strlen(rawView) + 1; i <= value::kSmallStringMaxLength; i++) {
+        rawView[i] = pattern;
+    }
+}
+}  // namespace
+
+TEST(SBESmallString, Length) {
+    std::vector<std::pair<std::string, size_t>> testCases{
+        {"", 0},
+        {"a", 1},
+        {"ab", 2},
+        {"abc", 3},
+        {"abcd", 4},
+        {"abcde", 5},
+        {"abcdef", 6},
+        {"abcdefh", 7},
+    };
+
+    for (const auto& [string, length] : testCases) {
+        ASSERT(value::canUseSmallString(string));
+        auto [tag, val] = value::makeSmallString(string);
+        ASSERT_EQ(tag, value::TypeTags::StringSmall);
+
+        fillSmallStringTail(val, char(0));
+        ASSERT_EQ(length, value::getStringLength(tag, val));
+
+        fillSmallStringTail(val, char(1));
+        ASSERT_EQ(length, value::getStringLength(tag, val));
+
+        fillSmallStringTail(val, char(1 << 7));
+        ASSERT_EQ(length, value::getStringLength(tag, val));
+
+        fillSmallStringTail(val, ~char(0));
+        ASSERT_EQ(length, value::getStringLength(tag, val));
+    }
+}
 }  // namespace mongo::sbe

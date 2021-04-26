@@ -33,6 +33,7 @@
 #include <absl/container/flat_hash_set.h>
 #include <array>
 #include <bitset>
+#include <boost/predef/hardware/simd.h>
 #include <cstdint>
 #include <ostream>
 #include <pcre.h>
@@ -47,7 +48,9 @@
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/platform/bits.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
 
@@ -693,7 +696,56 @@ inline const char* getRawStringView(TypeTags tag, const Value& val) noexcept {
  */
 inline size_t getStringLength(TypeTags tag, const Value& val) noexcept {
     if (tag == TypeTags::StringSmall) {
-        return strlen(reinterpret_cast<const char*>(&val));
+        // This path turned out to be very hot in our benchmarks, so we avoid calling 'strlen()' and
+        // use an alternative approach to compute string length.
+        // NOTE: Small string value always contains exactly one zero byte, marking the end of the
+        // string. Bytes after this zero byte can have arbitrary value.
+#if defined(BOOST_HW_SIMD_X86_AVAILABLE) && BOOST_HW_SIMD_X86 >= BOOST_HW_SIMD_X86_SSE2_VERSION
+        // If SSE2 instruction set is available, we use SIMD instructions. There are several steps:
+        //  (1) _mm_cvtsi64_si128(val) - Copy string value into the 128-bit register
+        //  (2) _mm_cmpeq_epi8 - Make each zero byte equal to 0xFF. Other bytes become zero
+        //  (3) _mm_movemask_epi8 - Copy most significant bit of each byte into int
+        //  (4) countTrailingZerosNonZeroInt - Get the position of the first trailing bit set
+        static_assert(endian::Order::kNative == endian::Order::kLittle);
+        int ret = _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_cvtsi64_si128(val), _mm_setzero_si128()));
+        return countTrailingZerosNonZero32(ret);
+#else
+        // If SSE2 is not available, we use bit magic.
+        const uint64_t magic = 0x7F7F7F7F7F7F7F7FULL;
+
+        // This is based on a trick from following link, which describes how to make an expression
+        // which results in '0' when ALL bytes are non-zero, and results in zero when ANY byte is
+        // zero. Instead of casting this result to bool, we count how many complete 0 bytes there
+        // are in 'ret'. This tells us the length of the string.
+        // https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
+
+        // At the end of this, ret will store a value where  each byte which was all 0's is now
+        // 10000000 and any byte that was anything non zero is now 0.
+
+        // (1) compute (val & magic). This clears the highest bit in each byte.
+        uint64_t ret = val & magic;
+
+        // (2) add magic to the above expression. The result is that, from overflow,
+        // the high bit will be set if any bit was set in 'v' other than the high bit.
+        ret += magic;
+        // (3) OR this result with v. This ensures that if the high bit in 'v' was set
+        // then the high bit in our result will be set.
+        ret |= val;
+        // (4) OR with magic. This will set any low bits which were not already set. At this point
+        // each byte is either all ones or 01111111.
+        ret |= magic;
+
+        // When we invert this, each byte will either be
+        // all zeros (previously non zero) or 10000000 (previously 0).
+        ret = ~ret;
+
+        // So all we have to do is count how many complete 0 bytes there are from one end.
+        if constexpr (endian::Order::kNative == endian::Order::kLittle) {
+            return (countTrailingZerosNonZero64(ret) >> 3);
+        } else {
+            return (countLeadingZerosNonZero64(ret) >> 3);
+        }
+#endif
     } else if (tag == TypeTags::StringBig || tag == TypeTags::bsonString) {
         return ConstDataView(getRawPointerView(val)).read<LittleEndian<int32_t>>() - 1;
     }

@@ -487,7 +487,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTa
             auto sv = bson::fieldNameView(be);
 
             if (sv == fieldStr) {
-                auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
                 return {false, tag, val};
             }
 
@@ -844,7 +844,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(Arit
             auto sv = bson::fieldNameView(be);
 
             if (restrictFieldsSet.count(sv) == 0) {
-                auto [tag, val] = bson::convertFrom(false, be, end, sv.size());
+                auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
                 obj->push_back(sv, tag, val);
             }
 
@@ -2562,7 +2562,7 @@ std::pair<value::TypeTags, value::Value> collComparisonKey(value::TypeTags tag,
     auto ptr = outputView.objdata();
     auto be = ptr + 4;
     auto end = ptr + ConstDataView(ptr).read<LittleEndian<uint32_t>>();
-    return bson::convertFrom(false, be, end, 0);
+    return bson::convertFrom<false>(be, end, 0);
 }
 
 }  // namespace

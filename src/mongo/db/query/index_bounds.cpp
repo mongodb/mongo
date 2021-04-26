@@ -491,6 +491,8 @@ IndexBoundsChecker::IndexBoundsChecker(const IndexBounds* bounds,
                                        const BSONObj& keyPattern,
                                        int scanDirection)
     : _bounds(bounds), _curInterval(bounds->fields.size(), 0) {
+    _keyValues.resize(_curInterval.size());
+
     BSONObjIterator it(keyPattern);
     while (it.more()) {
         int indexDirection = it.next().number() >= 0 ? 1 : -1;
@@ -588,19 +590,20 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
     out->suffixInclusive.resize(_curInterval.size());
 
     // It's useful later to go from a field number to the value for that field.  Store these.
-    // TODO: on optimization pass, populate the vector as-needed and keep the vector around as a
-    // member variable
-    vector<BSONElement> keyValues;
+    size_t i = 0;
     BSONObjIterator keyIt(key);
     while (keyIt.more()) {
-        keyValues.push_back(keyIt.next());
+        verify(i < _curInterval.size());
+
+        _keyValues[i] = keyIt.next();
+        i++;
     }
-    verify(keyValues.size() == _curInterval.size());
+    verify(i == _curInterval.size());
 
     size_t firstNonContainedField;
     Location orientation;
 
-    if (!findLeftmostProblem(keyValues, &firstNonContainedField, &orientation)) {
+    if (!findLeftmostProblem(_keyValues, &firstNonContainedField, &orientation)) {
         // All fields in the index are within the current interval.  Caller can use the key.
         return VALID;
     }
@@ -616,7 +619,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
         // ...and try again.  This call modifies 'orientation', so we may check its value again
         // in the clause below if field number 'firstNonContainedField' isn't in its first
         // interval.
-        if (!findLeftmostProblem(keyValues, &firstNonContainedField, &orientation)) {
+        if (!findLeftmostProblem(_keyValues, &firstNonContainedField, &orientation)) {
             return VALID;
         }
     }
@@ -646,7 +649,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
         // Find the interval that contains our field.
         size_t newIntervalForField;
 
-        Location where = findIntervalForField(keyValues[firstNonContainedField],
+        Location where = findIntervalForField(_keyValues[firstNonContainedField],
                                               _bounds->fields[firstNonContainedField],
                                               _expectedDirection[firstNonContainedField],
                                               &newIntervalForField);
@@ -686,7 +689,7 @@ IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key, In
 
             // If all fields to the left have hit the end of their intervals, we can't ask them
             // to move forward and we should stop iterating.
-            if (!spaceLeftToAdvance(firstNonContainedField, keyValues)) {
+            if (!spaceLeftToAdvance(firstNonContainedField, _keyValues)) {
                 return DONE;
             }
 

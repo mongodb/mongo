@@ -51,7 +51,7 @@ public:
         const char* end = be + obj.objsize();
         while (*be != 0) {
             auto sv = bson::fieldNameView(be);
-            auto [tag, val] = bson::convertFrom(false, be, end, sv.size());
+            auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
             be = bson::advance(be, sv.size());
 
             objView->push_back(sv, tag, val);
