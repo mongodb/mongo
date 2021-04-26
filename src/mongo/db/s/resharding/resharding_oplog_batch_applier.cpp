@@ -60,7 +60,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     auto chainCtx = std::make_shared<ChainContext>();
     chainCtx->batch = std::move(batch);
 
-    return resharding::WithAutomaticRetry([this, chainCtx, factory] {
+    return resharding::WithAutomaticRetry([this, chainCtx, cancelToken, factory] {
                // Writing `auto& i = chainCtx->nextToApply` takes care of incrementing
                // chainCtx->nextToApply on each loop iteration.
                for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
@@ -72,13 +72,14 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                            _sessionApplication.tryApplyOperation(opCtx.get(), oplogEntry);
 
                        if (hitPreparedTxn) {
-                           return *hitPreparedTxn;
+                           return future_util::withCancellation(std::move(*hitPreparedTxn),
+                                                                cancelToken);
                        }
                    } else {
                        uassertStatusOK(_crudApplication.applyOperation(opCtx.get(), oplogEntry));
                    }
                }
-               return makeReadyFutureWith([] {}).share();
+               return makeReadyFutureWith([] {}).semi();
            })
         .onTransientError([](const Status& status) {
             LOGV2(5615800,
@@ -94,7 +95,12 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
         .until([chainCtx](const Status& status) {
             return status.isOK() && chainCtx->nextToApply >= chainCtx->batch.size();
         })
-        .on(std::move(executor), std::move(cancelToken))
+        .on(std::move(executor), cancelToken)
+        // There isn't a guarantee that the reference count to `executor` has been decremented after
+        // .on() returns. We schedule a trivial task on the task executor to ensure the callback's
+        // destructor has run. Otherwise `executor` could end up outliving the ServiceContext and
+        // triggering an invariant due to the task executor's thread having a Client still.
+        .onCompletion([](auto x) { return x; })
         .semi();
 }
 
