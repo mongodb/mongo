@@ -3705,6 +3705,15 @@ tasks:
         python: ${python}
         workdir: ${workdir}
 
+- name: lint_shellscripts
+  commands:
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+        - "src/evergreen/lint_shellscripts.sh"
+
 - name: lint_errorcodes
   commands:
     - func: "set task expansion macros"
@@ -9827,6 +9836,7 @@ buildvariants:
   - name: lint_cpplint
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
+  - name: lint_shellscripts
   - name: lint_errorcodes
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
