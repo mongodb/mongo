@@ -85,7 +85,7 @@ public:
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() override {
+    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
     }
 
@@ -133,19 +133,6 @@ public:
                 UnionRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        DistributedPlanLogic logic;
-        // This stage must run on mongos to ensure it sees the resume token, which could have come
-        // from any shard.  We also must include a mergingPresorted $sort stage to communicate to
-        // the AsyncResultsMerger that we need to merge the streams in a particular order.
-        logic.mergingStage = this;
-        // Also add logic to the shards to ensure that each shard has enough oplog history to resume
-        // the change stream.
-        logic.shardsStage = DocumentSourceCheckResumability::create(pExpCtx, _tokenFromClient);
-        logic.inputSortPattern = change_stream_constants::kSortSpec;
-        return logic;
-    };
 
     static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);

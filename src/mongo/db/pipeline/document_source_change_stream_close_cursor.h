@@ -77,10 +77,7 @@ public:
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        // This stage must run on mongos to ensure it sees any invalidation in the correct order,
-        // and to ensure that all remote cursors are cleaned up properly.
-        // {shardsStage, mergingStage, sortPattern}
-        return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
+        return boost::none;
     }
 
 private:

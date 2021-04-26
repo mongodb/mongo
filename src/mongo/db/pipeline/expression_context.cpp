@@ -214,6 +214,9 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->exprUnstableForApiV1 = exprUnstableForApiV1;
     expCtx->exprDeprectedForApiV1 = exprDeprectedForApiV1;
 
+    expCtx->initialPostBatchResumeToken = initialPostBatchResumeToken.getOwned();
+    expCtx->originalAggregateCommand = originalAggregateCommand.getOwned();
+
     // Note that we intentionally skip copying the value of '_interruptCounter' because 'expCtx' is
     // intended to be used for executing a separate aggregation pipeline.
 

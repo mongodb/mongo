@@ -105,7 +105,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const AggregateCommandRequest& request,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces) {
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
+    bool hasChangeStream) {
 
     std::unique_ptr<CollatorInterface> collation;
     if (!collationObj.isEmpty()) {
@@ -126,6 +127,15 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         uuid);
 
     mergeCtx->inMongos = true;
+
+    // Serialize the 'AggregateCommandRequest' and save it so that the original command can be
+    // reconstructed for dispatch to a new shard, which is sometimes necessary for change streams
+    // pipelines.
+    if (hasChangeStream) {
+        mergeCtx->originalAggregateCommand =
+            aggregation_request_helper::serializeToCommandObj(request);
+    }
+
     return mergeCtx;
 }
 
@@ -293,8 +303,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
         // resolves all involved namespaces, and creates a shared MongoProcessInterface for use by
         // the pipeline's stages.
-        expCtx = makeExpressionContext(
-            opCtx, request, collationObj, uuid, resolveInvolvedNamespaces(involvedNamespaces));
+        expCtx = makeExpressionContext(opCtx,
+                                       request,
+                                       collationObj,
+                                       uuid,
+                                       resolveInvolvedNamespaces(involvedNamespaces),
+                                       hasChangeStream);
 
         // Parse and optimize the full pipeline.
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);

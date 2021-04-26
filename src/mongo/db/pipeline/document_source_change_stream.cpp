@@ -46,6 +46,7 @@
 #include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
 #include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -448,6 +449,23 @@ list<intrusive_ptr<DocumentSource>> buildPipeline(const intrusive_ptr<Expression
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
     stages.push_back(DocumentSourceCheckInvalidate::create(expCtx, startAfterInvalidate));
+
+    // The resume stage 'DocumentSourceCheckResumability' should come before the split point stage
+    // 'DocumentSourceUpdateOnAddShard'.
+    if (resumeStage &&
+        resumeStage->getSourceName() == DocumentSourceCheckResumability::kStageName) {
+        stages.push_back(resumeStage);
+        resumeStage.reset();
+    }
+
+    // If the pipeline is built on MongoS, then the stage 'DocumentSourceUpdateOnAddShard' acts as
+    // the split point for the pipline. All stages before this stages will run on shards and all
+    // stages after and inclusive of this stage will run on the MongoS.
+    if (expCtx->inMongos) {
+        stages.push_back(DocumentSourceUpdateOnAddShard::create(expCtx));
+    }
+
+    // This resume stage should be 'DocumentSourceEnsureResumeTokenPresent'.
     if (resumeStage) {
         stages.push_back(resumeStage);
     }
@@ -491,16 +509,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     auto stages = buildPipeline(expCtx, spec, elem);
 
-    const bool csOptFeatureFlag =
-        feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
-
-    if (expCtx->inMongos && csOptFeatureFlag) {
-        // TODO SERVER-55491: replace with DocumentSourceUpdateOnAddShard.
-        stages.push_back(DocumentSourceChangeStreamPipelineSplitter::create(expCtx));
-    }
-
     if (!expCtx->needsMerge) {
-        if (!csOptFeatureFlag) {
+        if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
             // There should only be one close cursor stage. If we're on the shards and producing
             // input to be merged, do not add a close cursor stage, since the mongos will already
             // have one.
@@ -525,28 +535,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         }
     }
     return stages;
-}
-
-BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(BSONObj originalCmdObj,
-                                                                Document resumeToken) {
-    Document originalCmd(originalCmdObj);
-    auto pipeline = originalCmd[AggregateCommandRequest::kPipelineFieldName].getArray();
-    // A $changeStream must be the first element of the pipeline in order to be able
-    // to replace (or add) a resume token.
-    invariant(!pipeline[0][DocumentSourceChangeStream::kStageName].missing());
-
-    MutableDocument changeStreamStage(
-        pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
-    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
-
-    // If the command was initially specified with a startAtOperationTime, we need to remove it to
-    // use the new resume token.
-    changeStreamStage[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName] = Value();
-    pipeline[0] =
-        Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
-    MutableDocument newCmd(std::move(originalCmd));
-    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline);
-    return newCmd.freeze().toBson();
 }
 
 void DocumentSourceChangeStream::assertIsLegalSpecification(

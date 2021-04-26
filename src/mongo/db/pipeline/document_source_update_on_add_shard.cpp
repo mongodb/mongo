@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/s/query/document_source_update_on_add_shard.h"
+#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
 
 #include <algorithm>
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/establish_cursors.h"
@@ -59,25 +62,26 @@ bool isShardConfigEvent(const Document& eventDoc) {
 }  // namespace
 
 boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> DocumentSourceUpdateOnAddShard::create(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
-    std::vector<ShardId> shardsWithCursors,
-    BSONObj cmdToRunOnNewShards) {
-    return new DocumentSourceUpdateOnAddShard(
-        expCtx, mergeCursors, std::move(shardsWithCursors), cmdToRunOnNewShards);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new DocumentSourceUpdateOnAddShard(expCtx);
 }
 
 DocumentSourceUpdateOnAddShard::DocumentSourceUpdateOnAddShard(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const boost::intrusive_ptr<DocumentSourceMergeCursors>& mergeCursors,
-    std::vector<ShardId>&& shardsWithCursors,
-    BSONObj cmdToRunOnNewShards)
-    : DocumentSource(kStageName, expCtx),
-      _mergeCursors(mergeCursors),
-      _shardsWithCursors(shardsWithCursors.begin(), shardsWithCursors.end()),
-      _cmdToRunOnNewShards(cmdToRunOnNewShards.getOwned()) {}
+    const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx) {}
 
 DocumentSource::GetNextResult DocumentSourceUpdateOnAddShard::doGetNext() {
+    // For the first call to the 'doGetNext', the '_mergeCursors' will be null and must be
+    // populated. We also resolve the original aggregation command from the expression context.
+    if (!_mergeCursors) {
+        _mergeCursors = dynamic_cast<DocumentSourceMergeCursors*>(pSource);
+        _originalAggregateCommand = pExpCtx->originalAggregateCommand.getOwned();
+
+        tassert(5549100, "Missing $mergeCursors stage", _mergeCursors);
+        tassert(
+            5549101, "Empty $changeStream command object", !_originalAggregateCommand.isEmpty());
+    }
+
     auto childResult = pSource->getNext();
 
     // If this is an insertion into the 'config.shards' collection, open a cursor on the new shard.
@@ -107,17 +111,12 @@ std::vector<RemoteCursor> DocumentSourceUpdateOnAddShard::establishShardCursorsO
     auto newShard = uassertStatusOK(ShardType::fromBSON(newShardSpec.getDocument().toBson()));
 
     // Make sure we are not attempting to open a cursor on a shard that already has one.
-    if (!_shardsWithCursors.insert(newShard.getName()).second) {
+    if (_mergeCursors->getShardIds().count(newShard.getName()) != 0) {
         return {};
     }
 
-    // We must start the new cursor from the moment at which the shard became visible.
-    const auto newShardAddedTime = LogicalTime{
-        newShardDetectedObj[DocumentSourceChangeStream::kClusterTimeField].getTimestamp()};
-    auto resumeTokenForNewShard =
-        ResumeToken::makeHighWaterMarkToken(newShardAddedTime.addTicks(1).asTimestamp());
-    auto cmdObj = DocumentSourceChangeStream::replaceResumeTokenInCommand(
-        _cmdToRunOnNewShards, resumeTokenForNewShard.toDocument());
+    auto cmdObj = createUpdatedCommandForNewShard(
+        newShardDetectedObj[DocumentSourceChangeStream::kClusterTimeField].getTimestamp());
 
     const bool allowPartialResults = false;  // partial results are not allowed
     return establishCursors(opCtx,
@@ -126,6 +125,61 @@ std::vector<RemoteCursor> DocumentSourceUpdateOnAddShard::establishShardCursorsO
                             ReadPreferenceSetting::get(opCtx),
                             {{newShard.getName(), cmdObj}},
                             allowPartialResults);
+}
+
+BSONObj DocumentSourceUpdateOnAddShard::createUpdatedCommandForNewShard(Timestamp shardAddedTime) {
+    // We must start the new cursor from the moment at which the shard became visible.
+    const auto newShardAddedTime = LogicalTime{shardAddedTime};
+    auto resumeTokenForNewShard =
+        ResumeToken::makeHighWaterMarkToken(newShardAddedTime.addTicks(1).asTimestamp());
+
+    // Create a new shard command object containing the new resume token.
+    auto shardCommand = replaceResumeTokenInCommand(resumeTokenForNewShard.toDocument());
+
+    auto* opCtx = pExpCtx->opCtx;
+    bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+
+    // Create the 'AggregateCommandRequest' object which will help in creating the parsed pipeline.
+    auto aggCmdRequest = aggregation_request_helper::parseFromBSON(
+        pExpCtx->ns, shardCommand, boost::none, apiStrict);
+
+    // Parse and optimize the pipeline.
+    auto pipeline = Pipeline::parse(aggCmdRequest.getPipeline(), pExpCtx);
+    pipeline->optimizePipeline();
+
+    // Split the full pipeline to get the shard pipeline.
+    auto splitPipelines = sharded_agg_helpers::splitPipeline(std::move(pipeline));
+
+    // Create the new command that will run on the shard.
+    return sharded_agg_helpers::createCommandForTargetedShards(pExpCtx,
+                                                               Document{shardCommand},
+                                                               splitPipelines,
+                                                               boost::none, /* exhangeSpec */
+                                                               true /* needsMerge */);
+}
+
+BSONObj DocumentSourceUpdateOnAddShard::replaceResumeTokenInCommand(Document resumeToken) {
+    Document originalCmd(_originalAggregateCommand);
+    auto pipeline = originalCmd[AggregateCommandRequest::kPipelineFieldName].getArray();
+
+    // A $changeStream must be the first element of the pipeline in order to be able
+    // to replace (or add) a resume token.
+    tassert(5549102,
+            "Invalid $changeStream command object",
+            !pipeline[0][DocumentSourceChangeStream::kStageName].missing());
+
+    MutableDocument changeStreamStage(
+        pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
+
+    // If the command was initially specified with a startAtOperationTime, we need to remove it to
+    // use the new resume token.
+    changeStreamStage[DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName] = Value();
+    pipeline[0] =
+        Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
+    MutableDocument newCmd(std::move(originalCmd));
+    newCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline);
+    return newCmd.freeze().toBson();
 }
 
 }  // namespace mongo

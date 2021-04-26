@@ -383,6 +383,9 @@ public:
     enum class CollationMatchesDefault { kNoDefault, kYes, kNo };
     CollationMatchesDefault collationMatchesDefault = CollationMatchesDefault::kNoDefault;
 
+    // When non-empty, contains the unmodified user provided aggregation command.
+    BSONObj originalAggregateCommand;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

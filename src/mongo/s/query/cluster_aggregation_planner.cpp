@@ -410,14 +410,15 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
 
         consumerPipelines.emplace_back(std::move(consumerPipeline), nullptr, boost::none);
 
-        auto consumerCmdObj = sharded_agg_helpers::createCommandForTargetedShards(
-            expCtx, serializedCommand, consumerPipelines.back(), boost::none, false);
+        auto consumerCmdObj =
+            sharded_agg_helpers::createCommandForTargetedShards(expCtx,
+                                                                serializedCommand,
+                                                                consumerPipelines.back(),
+                                                                boost::none, /* exchangeSpec */
+                                                                false /* needsMerge */);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
-                              applyReadWriteConcern(opCtx,
-                                                    true,             /* appendRC */
-                                                    !expCtx->explain, /* appendWC */
-                                                    consumerCmdObj));
+                              consumerCmdObj);
     }
     auto cursors = establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
@@ -620,13 +621,11 @@ Status runPipelineOnPrimaryShard(const boost::intrusive_ptr<ExpressionContext>& 
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
-    BSONObj cmdObj =
-        applyReadWriteConcern(opCtx,
-                              true,     /* appendRC */
-                              !explain, /* appendWC */
-                              CommandHelpers::filterCommandRequestForPassthrough(
-                                  sharded_agg_helpers::createPassthroughCommandForShard(
-                                      expCtx, serializedCommand, explain, nullptr, BSONObj())));
+    BSONObj cmdObj = sharded_agg_helpers::createPassthroughCommandForShard(expCtx,
+                                                                           serializedCommand,
+                                                                           explain,
+                                                                           nullptr, /* pipeline */
+                                                                           BSONObj());
 
     const auto shardId = cm.dbPrimary();
     const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)

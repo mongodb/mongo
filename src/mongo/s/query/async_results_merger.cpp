@@ -128,6 +128,8 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         tassert(
             5493704, "Found invalidated cursor on the first batch", !_remotes.back().invalidated);
 
+        _remotes.back().shardId = remote.getShardId().toString();
+
         // We don't check the return value of _addBatchToBuffer here; if there was an error,
         // it will be stored in the remote and the first call to ready() will return true.
         _addBatchToBuffer(WithLock::withoutLock(), remoteIndex, remote.getCursorResponse());

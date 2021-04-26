@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/document_source_update_on_add_shard.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/vector_clock.h"
@@ -56,7 +57,6 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/cluster_query_knobs_gen.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/query/document_source_update_on_add_shard.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
@@ -273,11 +273,8 @@ boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pi
             continue;
         }
 
-        // TODO SERVER-55491: remove this 'if' to make the invariant unconditional.
-        if (distributedPlanLogic->shardsStage && distributedPlanLogic->mergingStage) {
-            // A source may not simultaneously be present on both sides of the split.
-            invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
-        }
+        // A source may not simultaneously be present on both sides of the split.
+        invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
 
         if (distributedPlanLogic->shardsStage)
             shardPipe->push_back(std::move(distributedPlanLogic->shardsStage));
@@ -837,8 +834,15 @@ BSONObj createPassthroughCommandForShard(
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
     }
 
-    return genericTransformForShards(
-        std::move(targetedCmd), expCtx, explainVerbosity, collationObj);
+    auto shardCommand =
+        genericTransformForShards(std::move(targetedCmd), expCtx, explainVerbosity, collationObj);
+
+    // Apply filter and RW concern to the final shard command.
+    return CommandHelpers::filterCommandRequestForPassthrough(
+        applyReadWriteConcern(expCtx->opCtx,
+                              true,              /* appendRC */
+                              !explainVerbosity, /* appendWC */
+                              shardCommand));
 }
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -876,8 +880,14 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     targetedCmd[AggregateCommandRequest::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
-    return genericTransformForShards(
+    auto shardCommand = genericTransformForShards(
         std::move(targetedCmd), expCtx, expCtx->explain, expCtx->getCollatorBSON());
+
+    // Apply RW concern to the final shard command.
+    return applyReadWriteConcern(expCtx->opCtx,
+                                 true,             /* appendRC */
+                                 !expCtx->explain, /* appendWC */
+                                 shardCommand);
 }
 
 /**
@@ -951,15 +961,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
     }
 
     // Generate the command object for the targeted shards.
-    BSONObj targetedCommand = applyReadWriteConcern(
-        opCtx,
-        true,             /* appendRC */
-        !expCtx->explain, /* appendWC */
-        splitPipelines
-            ? createCommandForTargetedShards(
-                  expCtx, serializedCommand, *splitPipelines, exchangeSpec, true)
-            : createPassthroughCommandForShard(
-                  expCtx, serializedCommand, expCtx->explain, pipeline.get(), collationObj));
+    BSONObj targetedCommand =
+        (splitPipelines
+             ? createCommandForTargetedShards(
+                   expCtx, serializedCommand, *splitPipelines, exchangeSpec, true /* needsMerge */)
+             : createPassthroughCommandForShard(
+                   expCtx, serializedCommand, expCtx->explain, pipeline.get(), collationObj));
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any
@@ -1097,15 +1104,8 @@ void addMergeCursorsSource(Pipeline* mergePipeline,
 
     armParams.setRemotes(std::move(remoteCursors));
 
-    // For change streams, we need to set up a custom stage to establish cursors on new shards when
-    // they are added, to ensure we don't miss results from the new shards.
     auto mergeCursorsStage =
         DocumentSourceMergeCursors::create(mergePipeline->getContext(), std::move(armParams));
-
-    if (hasChangeStream) {
-        mergePipeline->addInitialSource(DocumentSourceUpdateOnAddShard::create(
-            mergePipeline->getContext(), mergeCursorsStage, targetedShards, cmdSentToShards));
-    }
 
     mergePipeline->addInitialSource(std::move(mergeCursorsStage));
 }

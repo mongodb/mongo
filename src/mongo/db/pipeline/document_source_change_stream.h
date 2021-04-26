@@ -184,14 +184,6 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Given a BSON object containing an aggregation command with a $changeStream stage, and a
-     * resume token, returns a new BSON object with the same command except with the addition of a
-     * resumeAfter: option containing the resume token.  If there was a previous resumeAfter:
-     * option, it is removed.
-     */
-    static BSONObj replaceResumeTokenInCommand(BSONObj originalCmdObj, Document resumeToken);
-
-    /**
      * Helper used by various change stream stages. Used for asserting that a certain Value of a
      * field has a certain type. Will uassert() if the field does not have the expected type.
      */
@@ -267,59 +259,6 @@ public:
 
 private:
     using DocumentSourceMatch::DocumentSourceMatch;
-};
-
-/**
- * A DocumentSource that if part of the pipeline, directly passes on the received documents to the
- * next stages without interpreting it and marks where a sharded change streams pipeline should be
- * split. This stage should only ever be created by a mongoS.
- *
- * TODO SERVER-55491: replace this class with DocumentSourceUpdateOnAddShard.
- */
-class DocumentSourceChangeStreamPipelineSplitter final : public DocumentSource {
-public:
-    static constexpr StringData kStageName = "$_internalChangeStreamPipelineSplitter"_sd;
-
-    static boost::intrusive_ptr<DocumentSourceChangeStreamPipelineSplitter> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        return new DocumentSourceChangeStreamPipelineSplitter(expCtx);
-    }
-
-    const char* getSourceName() const final {
-        return DocumentSourceChangeStreamPipelineSplitter::kStageName.rawData();
-    }
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                HostTypeRequirement::kMongoS,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
-    }
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        return (explain ? Value(Document{{kStageName, Document{}}}) : Value());
-    }
-
-    boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return DistributedPlanLogic{nullptr, nullptr, change_stream_constants::kSortSpec};
-    }
-
-private:
-    DocumentSourceChangeStreamPipelineSplitter(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {
-        invariant(expCtx->inMongos);
-    }
-
-    GetNextResult doGetNext() final {
-        // Pass on the document to the next stage without interpreting.
-        return pSource->getNext();
-    }
 };
 
 }  // namespace mongo

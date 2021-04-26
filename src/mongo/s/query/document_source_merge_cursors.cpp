@@ -53,6 +53,9 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
       _armParamsObj(std::move(ownedParamsSpec)),
       _armParams(std::move(armParams)) {
     _armParams->setRecordRemoteOpWaitTime(true);
+
+    // Populate the shard ids from the 'RemoteCursor'.
+    recordRemoteCursorShardIds(_armParams->getRemotes());
 }
 
 std::size_t DocumentSourceMergeCursors::getNumRemotes() const {
@@ -150,6 +153,15 @@ void DocumentSourceMergeCursors::doDispose() {
     } else if (_ownCursors) {
         populateMerger();
         _blockingResultsMerger->kill(pExpCtx->opCtx);
+    }
+}
+
+
+void DocumentSourceMergeCursors::recordRemoteCursorShardIds(
+    const std::vector<RemoteCursor>& remoteCursors) {
+    for (const auto& remoteCursor : remoteCursors) {
+        tassert(5549103, "Encountered invalid shard ID", !remoteCursor.getShardId().empty());
+        _shardsWithCursors.emplace(remoteCursor.getShardId().toString());
     }
 }
 

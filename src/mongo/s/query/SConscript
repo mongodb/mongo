@@ -56,7 +56,6 @@ env.Library(
     target="router_exec_stage",
     source=[
         'document_source_merge_cursors.cpp',
-        'document_source_update_on_add_shard.cpp',
         'router_stage_limit.cpp',
         'router_stage_mock.cpp',
         'router_stage_pipeline.cpp',

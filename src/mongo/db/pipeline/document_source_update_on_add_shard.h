@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/shard_id.h"
@@ -53,15 +54,10 @@ public:
      * by 'mergeCursorsStage' whenever a new shard is detected by a change stream.
      */
     static boost::intrusive_ptr<DocumentSourceUpdateOnAddShard> create(
-        const boost::intrusive_ptr<ExpressionContext>&,
-        const boost::intrusive_ptr<DocumentSourceMergeCursors>&,
-        std::vector<ShardId> shardsWithCursors,
-        BSONObj cmdToRunOnNewShards);
+        const boost::intrusive_ptr<ExpressionContext>&);
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        // We only ever expect to add this stage if the pipeline is being executed locally on a
-        // mongos. In this case, it should never be serialized.
-        MONGO_UNREACHABLE;
+        return (explain ? Value(Document{{kStageName, Value()}}) : Value());
     }
 
     virtual StageConstraints constraints(Pipeline::SplitState) const {
@@ -77,14 +73,11 @@ public:
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
-        return boost::none;
+        return DistributedPlanLogic{nullptr, this, change_stream_constants::kSortSpec};
     }
 
 private:
-    DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&,
-                                   const boost::intrusive_ptr<DocumentSourceMergeCursors>&,
-                                   std::vector<ShardId>&& shardsWithCursors,
-                                   BSONObj cmdToRunOnNewShards);
+    DocumentSourceUpdateOnAddShard(const boost::intrusive_ptr<ExpressionContext>&);
 
     GetNextResult doGetNext() final;
 
@@ -98,8 +91,21 @@ private:
      */
     std::vector<RemoteCursor> establishShardCursorsOnNewShards(const Document& newShardDetectedObj);
 
+    /**
+     * Updates the $changeStream stage in the '_originalAggregateCommand' to reflect the start time
+     * for the newly-added shard(s), then generates the final command object to be run on those
+     * shards.
+     */
+    BSONObj createUpdatedCommandForNewShard(Timestamp shardAddedTime);
+
+    /**
+     * Given the '_originalAggregateCommand' and a resume token, returns a new BSON object with the
+     * same command except with the addition of a resumeAfter option containing the resume token.
+     * If there was a previous resumeAfter option, it will be removed.
+     */
+    BSONObj replaceResumeTokenInCommand(Document resumeToken);
+
     boost::intrusive_ptr<DocumentSourceMergeCursors> _mergeCursors;
-    std::set<ShardId> _shardsWithCursors;
-    BSONObj _cmdToRunOnNewShards;
+    BSONObj _originalAggregateCommand;
 };
 }  // namespace mongo
