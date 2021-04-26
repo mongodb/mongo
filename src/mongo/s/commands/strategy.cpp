@@ -654,8 +654,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         (!TransactionRouter::get(opCtx) || isTransactionCommand(_parc->_commandName)) &&
         !opCtx->getClient()->isInDirectClient()) {
         if (isInternalClient) {
-            tassert(
-                5569901,
+            uassert(
+                5569900,
                 "received command without explicit writeConcern on an internalClient connection {}"_format(
                     redact(request.body.toString())),
                 request.body.hasField(WriteConcernOptions::kWriteConcernField));
