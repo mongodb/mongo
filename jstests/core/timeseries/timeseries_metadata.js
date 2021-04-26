@@ -66,12 +66,6 @@ TimeseriesTest.run((insert) => {
                       'invalid meta in first bucket: ' + tojson(bucketDocs[0]));
             assert(!bucketDocs[0].data.hasOwnProperty(metaFieldName),
                    'unexpected metadata in first bucket data: ' + tojson(bucketDocs[0]));
-        } else {
-            assert(bucketDocs[0].hasOwnProperty('meta'),
-                   'missing meta in first bucket: ' + tojson(bucketDocs[0]));
-            assert.eq(null,
-                      bucketDocs[0].meta,
-                      'invalid meta for x in first bucket: ' + tojson(bucketDocs[0]));
         }
 
         // Second bucket should contain documents specified in 'bucketB'.
@@ -84,12 +78,6 @@ TimeseriesTest.run((insert) => {
                       'invalid meta in second bucket: ' + tojson(bucketDocs[1]));
             assert(!bucketDocs[1].data.hasOwnProperty(metaFieldName),
                    'unexpected metadata in second bucket data: ' + tojson(bucketDocs[1]));
-        } else {
-            assert(bucketDocs[1].hasOwnProperty('meta'),
-                   'missing meta in second bucket: ' + tojson(bucketDocs[1]));
-            assert.eq(null,
-                      bucketDocs[1].meta,
-                      'invalid meta for x in second bucket: ' + tojson(bucketDocs[1]));
         }
     };
 
@@ -112,10 +100,16 @@ TimeseriesTest.run((insert) => {
         ]);
 
     runTest(
-        // Null metadata field in first bucket. Temporarily use null meta instead of missing meta
-        // to accomodate the new $_internalUnpackBucket behavior which is null meta in a bucket
-        // is materialized as "null" meta.
-        // TODO SERVER-55213: Need to test both missing meta case and null meta case.
+        [
+            {_id: 0, time: t[0], meta: null, x: 0},
+            {_id: 1, time: t[1], meta: null, x: 10},
+        ],
+        [
+            {_id: 2, time: t[2], x: 20},
+            {_id: 3, time: t[3], x: 30},
+        ]);
+
+    runTest(
         [
             {_id: 0, time: t[0], meta: null, x: 0},
             {_id: 1, time: t[1], meta: null, x: 10},
@@ -131,13 +125,9 @@ TimeseriesTest.run((insert) => {
             {_id: 0, time: t[0], meta: [1, 2, 3], x: 0},
             {_id: 1, time: t[1], meta: [1, 2, 3], x: 10},
         ],
-        // Null metadata field in second bucket. Temporarily use null meta instead of missing meta
-        // to accomodate the new $_internalUnpackBucket behavior which is null meta in a bucket
-        // is materialized as "null" meta.
-        // TODO SERVER-55213: Need to test both missing meta case and null meta case.
         [
-            {_id: 2, time: t[2], meta: null, x: 20},
-            {_id: 3, time: t[3], meta: null, x: 30},
+            {_id: 2, time: t[2], x: 20},
+            {_id: 3, time: t[3], x: 30},
         ]);
 
     runTest(

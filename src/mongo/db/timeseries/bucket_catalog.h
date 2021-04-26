@@ -745,7 +745,7 @@ private:
         // Lock _bucket.
         void _acquire();
 
-        // Allocate a new bucket in the catalog, set the local state to that bucket, and aquire
+        // Allocate a new bucket in the catalog, set the local state to that bucket, and acquire
         // a lock on it.
         void _create(const HashedBucketKey& normalizedKey,
                      const HashedBucketKey& key,

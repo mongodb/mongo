@@ -262,12 +262,42 @@ TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
                       _bucketCatalog->getMetadata(result1.getValue()->bucket()));
     ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()),
                       _bucketCatalog->getMetadata(result2.getValue()->bucket()));
-    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
-                      _bucketCatalog->getMetadata(result3.getValue()->bucket()));
+    ASSERT(_bucketCatalog->getMetadata(result3.getValue()->bucket()).isEmpty());
 
-    // Committing one bucket should only return the one document in that bucket and shoukd not
+    // Committing one bucket should only return the one document in that bucket and should not
     // affect the other bucket.
     for (const auto& batch : {result1.getValue(), result2.getValue(), result3.getValue()}) {
+        _commit(batch, 0);
+    }
+}
+
+TEST_F(BucketCatalogTest, InsertNullAndMissingMetaFieldIntoDifferentBuckets) {
+    auto result1 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now() << _metaField << BSONNULL),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    auto result2 =
+        _bucketCatalog->insert(_opCtx,
+                               _ns1,
+                               _getCollator(_ns1),
+                               _getTimeseriesOptions(_ns1),
+                               BSON(_timeField << Date_t::now()),
+                               BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+
+    // Inserts should all be into three distinct buckets (and therefore batches).
+    ASSERT_NE(result1.getValue(), result2.getValue());
+
+    // Check metadata in buckets.
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL),
+                      _bucketCatalog->getMetadata(result1.getValue()->bucket()));
+    ASSERT(_bucketCatalog->getMetadata(result2.getValue()->bucket()).isEmpty());
+
+    // Committing one bucket should only return the one document in that bucket and should not
+    // affect the other bucket.
+    for (const auto& batch : {result1.getValue(), result2.getValue()}) {
         _commit(batch, 0);
     }
 }

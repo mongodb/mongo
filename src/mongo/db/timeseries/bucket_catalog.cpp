@@ -147,8 +147,6 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     if (auto metaField = options.getMetaField()) {
         if (auto elem = doc[*metaField]) {
             metadata.append(elem);
-        } else {
-            metadata.appendNull(*metaField);
         }
     }
     auto key = BucketKey{ns, BucketMetadata{metadata.obj(), comparator}};
