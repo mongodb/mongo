@@ -73,6 +73,32 @@ selector:
   # require a collection scan and return an error.
   - jstests/core/notablescan.js
   - jstests/core/notablescan_capped.js
+  # These tests run applyOps which is not supported in serverless.
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops2.js
+  - jstests/core/apply_ops_dups.js
+  - jstests/core/apply_ops_index_collation.js
+  - jstests/core/apply_ops_invalid_index_spec.js
+  - jstests/core/apply_ops_missing_field.js
+  - jstests/core/apply_ops_system_dot_views.js
+  - jstests/core/apply_ops_without_ns.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/collation.js
+  - jstests/core/collmod_without_uuid.js
+  - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
+  - jstests/core/txns/commands_not_allowed_in_txn.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+  - jstests/core/txns/statement_ids_accepted.js
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/views/duplicate_ns.js
+  - jstests/core/views/view_with_invalid_dbname.js
+  - jstests/core/views/views_creation.js
+  - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/rename_collection_staytemp.js
 
   #
   # From retryable writes jscore stepdown passthrough

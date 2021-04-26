@@ -441,6 +441,7 @@ function testRejectBlockedWritesAfterMigrationAborted(testCase, testOpts) {
 
 const isNotWriteCommand = "not a write command";
 const isNotRunOnUserDatabase = "not run on user database";
+const isNotSupportedInServerless = "not supported in serverless cluster";
 const isAuthCommand = "is an auth command";
 const isOnlySupportedOnStandalone = "is only supported on standalone";
 const isOnlySupportedOnShardedCluster = "is only supported on sharded cluster";
@@ -516,85 +517,7 @@ const testCases = {
         }
     },
     appendOplogNote: {skip: isNotRunOnUserDatabase},
-    applyOpsCrudAllowAtomic: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {
-                applyOps: [
-                    {op: "i", ns: dbName + "." + collName, o: {_id: 0}},
-                    {op: "u", ns: dbName + "." + collName, o2: {_id: 0}, o: {$set: {a: 0}}},
-                ],
-                allowAtomic: true,
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0, a: 0}), 1);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0}), 0);
-        }
-    },
-    applyOpsCrudNotAllowAtomic: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {
-                applyOps: [
-                    {op: "i", ns: dbName + "." + collName, o: {_id: 0}},
-                    {op: "i", ns: dbName + "." + collName, o: {_id: 1}},
-                    {op: "d", ns: dbName + "." + collName, o: {_id: 1}},
-                ],
-                allowAtomic: false,
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0}), 1);
-            assert.eq(countDocs(db, collName, {_id: 1}), 0);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0}), 0);
-            assert.eq(countDocs(db, collName, {_id: 1}), 0);
-        }
-    },
-    applyOpsNonCrudAllowAtomic: {
-        command: function(dbName, collName) {
-            return {
-                applyOps: [
-                    {op: "c", ns: dbName + ".$cmd", o: {create: collName + "1"}},
-                    {op: "c", ns: dbName + ".$cmd", o: {create: collName + "2"}},
-                    {op: "c", ns: dbName + ".$cmd", o: {drop: collName + "2"}},
-                ],
-                allowAtomic: true,
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName + "1"));
-            assert(!collectionExists(db, collName + "2"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName + "1"));
-            assert(!collectionExists(db, collName + "2"));
-        }
-    },
-    applyOpsNonCrudNotAllowAtomic: {
-        command: function(dbName, collName) {
-            return {
-                applyOps: [
-                    {op: "c", ns: dbName + ".$cmd", o: {create: collName + "1"}},
-                    {op: "c", ns: dbName + ".$cmd", o: {create: collName + "2"}},
-                    {op: "c", ns: dbName + ".$cmd", o: {drop: collName + "2"}},
-                ],
-                allowAtomic: false,
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName + "1"));
-            assert(!collectionExists(db, collName + "2"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName + "1"));
-            assert(!collectionExists(db, collName + "2"));
-        }
-    },
+    applyOps: {skip: isNotSupportedInServerless},
     authenticate: {skip: isAuthCommand},
     availableQueryOptions: {skip: isNotWriteCommand},
     buildInfo: {skip: isNotWriteCommand},
