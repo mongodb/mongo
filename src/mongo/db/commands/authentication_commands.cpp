@@ -139,6 +139,24 @@ private:
     SecureRandom _random;
 } cmdGetNonce;
 
+/**
+ * A simple class to track "global" parameters related to the logout command.
+ */
+class LogoutCommandState {
+public:
+    /**
+     * Marks the command as invoked and returns if it was previously invoked.
+     */
+    bool markAsInvoked() {
+        return _hasBeenInvoked.swap(true);
+    }
+
+private:
+    AtomicWord<bool> _hasBeenInvoked{false};
+};
+
+auto getLogoutCommandState = ServiceContext::declareDecoration<LogoutCommandState>();
+
 class CmdLogout : public TypedCommand<CmdLogout> {
 public:
     using Request = LogoutCommand;
@@ -168,6 +186,14 @@ public:
         static constexpr auto kAdminDB = "admin"_sd;
         static constexpr auto kLocalDB = "local"_sd;
         void typedRun(OperationContext* opCtx) {
+            auto& logoutState = getLogoutCommandState(opCtx->getServiceContext());
+            auto hasBeenInvoked = logoutState.markAsInvoked();
+            if (!hasBeenInvoked) {
+                LOGV2_WARNING(5626600,
+                              "The logout command has been deprecated, clients should end their "
+                              "session instead");
+            }
+
             auto dbname = request().getDbName();
             auto* as = AuthorizationSession::get(opCtx->getClient());
 
