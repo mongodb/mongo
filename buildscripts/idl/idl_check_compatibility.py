@@ -92,10 +92,8 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     "replyFieldDeserializerNotEqualUnstable-reply-deserializerNotEqualReplyUnstableField",
     "commandDeserializerNotEqualUnstable",
 
-    # TODO (SERVER-54956): Decide what to do with commands: (create, createIndexes).
+    # TODO (SERVER-55899): Decide what to do with command: (create).
     'create-param-backwards',
-    'createIndexes-param-commitQuorum',
-    'createIndexes-reply-commitQuorum',
 
     # TODO (SERVER-54923): Decide what to do with commands: (saslStart, saslContinue).
     'saslStart-param-payload',
