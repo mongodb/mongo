@@ -198,6 +198,8 @@ public:
 
     static bool instanceExists();
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
+
 private:
     void _cleanHistory(WithLock);
 

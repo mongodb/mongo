@@ -395,6 +395,15 @@ void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationCont
                                                                    const Timestamp& timestamp) {
     fassert(40512, _setOplogTruncateAfterPoint(opCtx, timestamp));
 
+    if (timestamp != Timestamp::min()) {
+        // Update the oplog pin so we don't delete oplog history past the oplogTruncateAfterPoint.
+        _storageInterface->setPinnedOplogTimestamp(opCtx, timestamp);
+    } else {
+        // Set Timestamp::max() to nullify the pin, rather than pinning all oplog history with a
+        // Timestamp::min().
+        _storageInterface->setPinnedOplogTimestamp(opCtx, Timestamp::max());
+    }
+
     // If the oplogTruncateAfterPoint is manually reset via this function, then we need to clear the
     // cached last no-holes oplog entry. This is important so that
     // refreshOplogTruncateAfterPointIfPrimary always returns the latest oplog entry without
@@ -545,6 +554,12 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     _lastNoHolesOplogOpTimeAndWallTime = fassert(
         4455501,
         OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.get()));
+
+    // Pass the _lastNoHolesOplogTimestamp timestamp down to the storage layer to prevent oplog
+    // history lte to oplogTruncateAfterPoint from being entirely deleted. There should always be a
+    // single oplog entry lte to the oplogTruncateAfterPoint. Otherwise there will not be a valid
+    // oplog entry with which to update the caller.
+    _storageInterface->setPinnedOplogTimestamp(opCtx, _lastNoHolesOplogTimestamp.get());
 
     return _lastNoHolesOplogOpTimeAndWallTime;
 }

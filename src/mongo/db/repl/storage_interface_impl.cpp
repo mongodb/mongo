@@ -1484,5 +1484,10 @@ Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* op
     return *readTimestamp;
 }
 
+void StorageInterfaceImpl::setPinnedOplogTimestamp(OperationContext* opCtx,
+                                                   const Timestamp& pinnedTimestamp) const {
+    opCtx->getServiceContext()->getStorageEngine()->setPinnedOplogTimestamp(pinnedTimestamp);
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -362,6 +362,8 @@ public:
 
     std::map<std::string, Timestamp> getPinnedTimestampRequests();
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
+
 private:
     class WiredTigerSessionSweeper;
 
@@ -493,5 +495,9 @@ private:
     mutable Mutex _oldestTimestampPinRequestsMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_oldestTimestampPinRequestsMutex");
     std::map<std::string, Timestamp> _oldestTimestampPinRequests;
+
+    // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
+    // timestamp.
+    AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
 };
 }  // namespace mongo

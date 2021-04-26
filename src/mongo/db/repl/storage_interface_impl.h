@@ -202,6 +202,9 @@ public:
 
     Timestamp getPointInTimeReadTimestamp(OperationContext* opCtx) const override;
 
+    void setPinnedOplogTimestamp(OperationContext* opCtx,
+                                 const Timestamp& pinnedTimestamp) const override;
+
 private:
     const NamespaceString _rollbackIdNss;
 };

@@ -1265,5 +1265,8 @@ void StorageEngineImpl::unpinOldestTimestamp(const std::string& requestingServic
     _engine->unpinOldestTimestamp(requestingServiceName);
 }
 
+void StorageEngineImpl::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {
+    _engine->setPinnedOplogTimestamp(pinnedTimestamp);
+}
 
 }  // namespace mongo

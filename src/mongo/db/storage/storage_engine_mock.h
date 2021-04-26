@@ -203,6 +203,8 @@ public:
     }
 
     void unpinOldestTimestamp(const std::string& requestingServiceName) final {}
+
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) final {}
 };
 
 }  // namespace mongo

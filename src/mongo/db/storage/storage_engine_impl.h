@@ -369,6 +369,8 @@ public:
 
     void unpinOldestTimestamp(const std::string& requestingServiceName) override;
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

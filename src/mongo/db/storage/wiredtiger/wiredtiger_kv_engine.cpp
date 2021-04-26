@@ -326,6 +326,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
       _inRepairMode(repair),
       _readOnly(readOnly),
       _keepDataHistory(serverGlobalParams.enableMajorityReadConcern) {
+    _pinnedOplogTimestamp.store(Timestamp::max().asULL());
     boost::filesystem::path journalPath = path;
     journalPath /= "journal";
     if (_durable) {
@@ -2319,28 +2320,30 @@ boost::optional<Timestamp> WiredTigerKVEngine::getOplogNeededForCrashRecovery() 
 }
 
 Timestamp WiredTigerKVEngine::getPinnedOplog() const {
+    // The storage engine may have been told to keep oplog back to a certain timestamp.
+    Timestamp pinned = Timestamp(_pinnedOplogTimestamp.load());
+
     {
         stdx::lock_guard<Latch> lock(_oplogPinnedByBackupMutex);
         if (!storageGlobalParams.allowOplogTruncation) {
             // If oplog truncation is not allowed, then return the min timestamp so that no history
-            // is
-            // ever allowed to be deleted.
+            // is ever allowed to be deleted.
             return Timestamp::min();
         }
         if (_oplogPinnedByBackup) {
             // All the oplog since `_oplogPinnedByBackup` should remain intact during the backup.
-            return _oplogPinnedByBackup.get();
+            return std::min(_oplogPinnedByBackup.get(), pinned);
         }
     }
 
     auto oplogNeededForCrashRecovery = getOplogNeededForCrashRecovery();
     if (!_keepDataHistory) {
         // We use rollbackViaRefetch, so we only need to pin oplog for crash recovery.
-        return oplogNeededForCrashRecovery.value_or(Timestamp::max());
+        return std::min((oplogNeededForCrashRecovery.value_or(Timestamp::max())), pinned);
     }
 
     if (oplogNeededForCrashRecovery) {
-        return oplogNeededForCrashRecovery.value();
+        return std::min(oplogNeededForCrashRecovery.value(), pinned);
     }
 
     auto status = getOplogNeededForRollback();
@@ -2438,6 +2441,10 @@ void WiredTigerKVEngine::unpinOldestTimestamp(const std::string& requestingServi
 std::map<std::string, Timestamp> WiredTigerKVEngine::getPinnedTimestampRequests() {
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     return _oldestTimestampPinRequests;
+}
+
+void WiredTigerKVEngine::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {
+    _pinnedOplogTimestamp.store(pinnedTimestamp.asULL());
 }
 
 bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {
