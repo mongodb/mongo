@@ -51,6 +51,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -90,6 +91,7 @@ bool checkContracts() {
     return true;
 }
 
+MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
@@ -122,6 +124,52 @@ void AuthorizationSessionImpl::startContractTracking() {
 
 Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
                                                      const UserName& userName) {
+    auto checkForMultipleUsers = [&]() {
+        const auto userCount = _authenticatedUsers.count();
+        if (userCount == 0) {
+            // This is the first authentication.
+            return;
+        }
+
+        auto previousUser = _authenticatedUsers.lookupByDBName(userName.getDB());
+        if (previousUser) {
+            const auto& previousUserName = previousUser->getName();
+            if (previousUserName.getUser() == userName.getUser()) {
+                LOGV2_WARNING(5626700,
+                              "Client has attempted to reauthenticate as a single user",
+                              "user"_attr = userName);
+            } else {
+                LOGV2_WARNING(5626701,
+                              "Client has attempted to authenticate as multiple users on the "
+                              "same database",
+                              "previousUser"_attr = previousUserName,
+                              "user"_attr = userName);
+            }
+        } else {
+            LOGV2_WARNING(5626702,
+                          "Client has attempted to authenticate on multiple databases",
+                          "previousUsers"_attr = _authenticatedUsers.toBSON(),
+                          "user"_attr = userName);
+        }
+
+        const auto hasStrictAPI = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        if (!hasStrictAPI) {
+            // We're allowed to skip the uassert because we're not so strict.
+            return;
+        }
+
+        if (allowMultipleUsersWithApiStrict.shouldFail()) {
+            // We've explicitly allowed this for testing.
+            return;
+        }
+
+        uasserted(5626703, "Each client connection may only be authenticated once");
+    };
+
+    // Check before we start to reveal as little as possible. Note that we do not need the lock
+    // because only the Client thread can mutate _authenticatedUsers.
+    checkForMultipleUsers();
+
     AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto swUser = authzManager->acquireUser(opCtx, userName);
     if (!swUser.isOK()) {
