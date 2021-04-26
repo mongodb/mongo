@@ -320,6 +320,8 @@ void updateCatalogEntry(OperationContext* opCtx, const NamespaceString& nss, Col
     updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
     try {
         cluster::write(opCtx, updateRequest, &stats, &response, boost::none);
+
+        uassertStatusOK(response.toStatus());
     } catch (const DBException&) {
         // If an error happens when contacting the config server, we don't know if the update
         // succeded or not, which might cause the local shard version to differ from the config
