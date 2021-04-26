@@ -268,7 +268,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
     CancelableOperationContextFactory opCtxFactory,
-    Milliseconds minimumOperationDuration) {
+    const mongo::Date_t& startConfigTxnCloneTime) {
     CancellationSource errorSource(cancelToken);
 
     auto oplogFetcherFutures = _runOplogFetchers(executor, errorSource.token(), opCtxFactory);
@@ -277,7 +277,7 @@ SemiFuture<void> ReshardingDataReplication::runUntilStrictlyConsistent(
         _runCollectionCloner(executor, cleanupExecutor, errorSource.token(), opCtxFactory);
 
     auto txnClonerFutures = _runTxnCloners(
-        executor, cleanupExecutor, errorSource.token(), opCtxFactory, minimumOperationDuration);
+        executor, cleanupExecutor, errorSource.token(), opCtxFactory, startConfigTxnCloneTime);
 
     auto fulfillCloningDoneFuture =
         whenAllSucceed(collectionClonerFuture.thenRunOn(executor),
@@ -341,13 +341,13 @@ std::vector<SharedSemiFuture<void>> ReshardingDataReplication::_runTxnCloners(
     std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
     CancellationToken cancelToken,
     CancelableOperationContextFactory opCtxFactory,
-    Milliseconds minimumOperationDuration) {
+    const mongo::Date_t& startConfigTxnCloneTime) {
     std::vector<SharedSemiFuture<void>> txnClonerFutures;
     txnClonerFutures.reserve(_txnCloners.size());
 
     for (const auto& txnCloner : _txnCloners) {
         txnClonerFutures.emplace_back(
-            executor->sleepFor(minimumOperationDuration, cancelToken)
+            executor->sleepUntil(startConfigTxnCloneTime, cancelToken)
                 .then([executor,
                        cleanupExecutor,
                        cancelToken,

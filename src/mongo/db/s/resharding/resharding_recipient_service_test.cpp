@@ -132,7 +132,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory,
-        Milliseconds minimumOperationDuration) override {
+        const mongo::Date_t& startConfigTxnCloneTime) override {
         return makeReadyFutureWith([] {}).semi();
     };
 

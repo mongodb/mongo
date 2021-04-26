@@ -124,6 +124,7 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
       _donorShards{recipientDoc.getDonorShards()},
       _cloneTimestamp{recipientDoc.getCloneTimestamp()},
       _externalState{std::move(externalState)},
+      _startConfigTxnCloneAt{recipientDoc.getStartConfigTxnCloneTime()},
       _markKilledExecutor(std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "RecipientStateMachineCancelableOpCtxPool";
@@ -364,8 +365,10 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
     return _allDonorsPreparedToDonate.getFuture()
         .thenRunOn(**executor)
-        .then([this](ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
-            _transitionToCreatingCollection(cloneDetails);
+        .then([this, executor](
+                  ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
+            _transitionToCreatingCollection(cloneDetails,
+                                            (*executor)->now() + _minimumOperationDuration);
             _metrics()->setDocumentsToCopy(cloneDetails.approxDocumentsToCopy,
                                            cloneDetails.approxBytesToCopy);
         });
@@ -428,13 +431,15 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
 
     if (!_dataReplication) {
         auto dataReplication = _makeDataReplication(opCtx, cloningDone);
+        const auto txnCloneTime = _startConfigTxnCloneAt;
+        invariant(txnCloneTime);
         _dataReplicationQuiesced =
             dataReplication
                 ->runUntilStrictlyConsistent(**executor,
                                              _recipientService->getInstanceCleanupExecutor(),
                                              abortToken,
                                              *_cancelableOpCtxFactory,
-                                             _minimumOperationDuration)
+                                             txnCloneTime.get())
                 .share();
 
         stdx::lock_guard lk(_mutex);
@@ -606,20 +611,21 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
 
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(newState);
-    _transitionState(std::move(newRecipientCtx), boost::none);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientShardContext&& newRecipientCtx,
-    boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&&
-        cloneDetails) {
+    boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
+    boost::optional<mongo::Date_t> configStartTime) {
     invariant(newRecipientCtx.getState() != RecipientStateEnum::kAwaitingFetchTimestamp);
 
     // For logging purposes.
     auto oldState = _recipientCtx.getState();
     auto newState = newRecipientCtx.getState();
 
-    _updateRecipientDocument(std::move(newRecipientCtx), std::move(cloneDetails));
+    _updateRecipientDocument(
+        std::move(newRecipientCtx), std::move(cloneDetails), std::move(configStartTime));
 
     _metrics()->setRecipientState(newState);
 
@@ -633,17 +639,19 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCollection(
-    ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails) {
+    ReshardingRecipientService::RecipientStateMachine::CloneDetails cloneDetails,
+    const boost::optional<mongo::Date_t> startConfigTxnCloneTime) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCreatingCollection);
-    _transitionState(std::move(newRecipientCtx), std::move(cloneDetails));
+    _transitionState(
+        std::move(newRecipientCtx), std::move(cloneDetails), std::move(startConfigTxnCloneTime));
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(Status abortReason) {
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kError);
     emplaceAbortReasonIfExists(newRecipientCtx, abortReason);
-    _transitionState(std::move(newRecipientCtx), boost::none);
+    _transitionState(std::move(newRecipientCtx), boost::none, boost::none);
 }
 
 /**
@@ -754,8 +762,8 @@ void ReshardingRecipientService::RecipientStateMachine::insertStateDocument(
 
 void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
     RecipientShardContext&& newRecipientCtx,
-    boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&&
-        cloneDetails) {
+    boost::optional<ReshardingRecipientService::RecipientStateMachine::CloneDetails>&& cloneDetails,
+    boost::optional<mongo::Date_t> configStartTime) {
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
@@ -779,6 +787,11 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               donorShardsArrayBuilder.arr());
         }
 
+        if (configStartTime) {
+            setBuilder.append(ReshardingRecipientDocument::kStartConfigTxnCloneTimeFieldName,
+                              *configStartTime);
+        }
+
         setBuilder.doneFast();
     }
 
@@ -793,6 +806,10 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     if (cloneDetails) {
         _cloneTimestamp = cloneDetails->cloneTimestamp;
         _donorShards = std::move(cloneDetails->donorShards);
+    }
+
+    if (configStartTime) {
+        _startConfigTxnCloneAt = *configStartTime;
     }
 }
 

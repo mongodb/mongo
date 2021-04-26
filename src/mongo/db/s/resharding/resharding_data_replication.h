@@ -96,7 +96,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory,
-        Milliseconds minimumOperationDuration) = 0;
+        const mongo::Date_t& startConfigTxnCloneTime) = 0;
 
     /**
      * Releases the barrier to allow the fetched oplog entries to be applied.
@@ -159,7 +159,7 @@ public:
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory,
-        Milliseconds minimumOperationDuration) override;
+        const mongo::Date_t& startConfigTxnCloneTime) override;
 
     void startOplogApplication() override;
 
@@ -226,7 +226,7 @@ private:
         std::shared_ptr<executor::TaskExecutor> cleanupExecutor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory,
-        Milliseconds minimumOperationDuration);
+        const mongo::Date_t& startConfigTxnCloneTime);
 
     std::vector<SharedSemiFuture<void>> _runOplogFetchers(
         std::shared_ptr<executor::TaskExecutor> executor,

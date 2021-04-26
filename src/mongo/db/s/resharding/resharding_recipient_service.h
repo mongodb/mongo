@@ -150,10 +150,12 @@ private:
     void _transitionState(RecipientStateEnum newState);
 
     void _transitionState(RecipientShardContext&& newRecipientCtx,
-                          boost::optional<CloneDetails>&& cloneDetails);
+                          boost::optional<CloneDetails>&& cloneDetails,
+                          boost::optional<mongo::Date_t> configStartTime);
 
     // Transitions the on-disk and in-memory state to RecipientStateEnum::kCreatingCollection.
-    void _transitionToCreatingCollection(CloneDetails cloneDetails);
+    void _transitionToCreatingCollection(CloneDetails cloneDetails,
+                                         boost::optional<mongo::Date_t> startConfigTxnCloneTime);
 
     // Transitions the on-disk and in-memory state to RecipientStateEnum::kError.
     void _transitionToError(Status abortReason);
@@ -166,7 +168,8 @@ private:
     // Updates the mutable portion of the on-disk and in-memory recipient document with
     // 'newRecipientCtx', 'fetchTimestamp and 'donorShards'.
     void _updateRecipientDocument(RecipientShardContext&& newRecipientCtx,
-                                  boost::optional<CloneDetails>&& cloneDetails);
+                                  boost::optional<CloneDetails>&& cloneDetails,
+                                  boost::optional<mongo::Date_t> configStartTime);
 
     // Removes the local recipient document from disk.
     void _removeRecipientDocument();
@@ -204,6 +207,10 @@ private:
     boost::optional<Timestamp> _cloneTimestamp;
 
     const std::unique_ptr<RecipientStateMachineExternalState> _externalState;
+
+    // Time at which the minimum operation duration threshold has been met, and
+    // config.transactions cloning can begin.
+    boost::optional<Date_t> _startConfigTxnCloneAt;
 
     // ThreadPool used by CancelableOperationContext.
     // CancelableOperationContext must have a thread that is always available to it to mark its
