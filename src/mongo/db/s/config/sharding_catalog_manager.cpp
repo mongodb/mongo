@@ -676,9 +676,18 @@ void ShardingCatalogManager::_upgradeDatabasesEntriesTo50(OperationContext* opCt
         opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
     // Forcing a refresh of each DB on each shard
+    const auto allDBDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                               opCtx,
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               repl::ReadConcernLevel::kLocalReadConcern,
+                                               DatabaseType::ConfigNS,
+                                               BSONObj(),
+                                               BSONObj(),
+                                               boost::none))
+                               .docs;
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     const auto fixedExecutor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-    for (const auto& doc : dbDocs) {
+    for (const auto& doc : allDBDocs) {
         const DatabaseType db = uassertStatusOK(DatabaseType::fromBSON(doc));
         const auto name = db.getName();
 
@@ -706,18 +715,15 @@ void ShardingCatalogManager::_downgradeDatabasesEntriesToPre50(OperationContext*
 
     auto const catalogCache = Grid::get(opCtx)->catalogCache();
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    const auto dbDocs =
-        uassertStatusOK(
-            configShard->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                DatabaseType::ConfigNS,
-                BSON(DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
-                     << BSON("$exists" << false)),
-                BSONObj(),
-                boost::none))
-            .docs;
+    const auto dbDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                            opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            DatabaseType::ConfigNS,
+                                            BSONObj(),
+                                            BSONObj(),
+                                            boost::none))
+                            .docs;
 
     // Wait until the last operation is majority-committed
     WriteConcernResult ignoreResult;
@@ -817,9 +823,19 @@ void ShardingCatalogManager::_upgradeCollectionsAndChunksEntriesTo50Phase1(
         opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
     // Forcing a refresh of each collection on each shard
+    const auto allCollectionDocs =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                CollectionType::ConfigNS,
+                                                BSONObj(),
+                                                BSONObj(),
+                                                boost::none))
+            .docs;
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     const auto fixedExecutor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-    for (const auto& doc : collectionDocs) {
+    for (const auto& doc : allCollectionDocs) {
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
@@ -947,9 +963,19 @@ void ShardingCatalogManager::_downgradeCollectionsAndChunksEntriesToPre50Phase1(
         opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
 
     // Forcing a refresh of each collection on each shard
+    const auto allCollectionDocs =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                CollectionType::ConfigNS,
+                                                BSONObj(),
+                                                BSONObj(),
+                                                boost::none))
+            .docs;
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     const auto fixedExecutor = Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor();
-    for (const auto& doc : collectionDocs) {
+    for (const auto& doc : allCollectionDocs) {
         const CollectionType coll(doc);
         const auto nss = coll.getNss();
         catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
