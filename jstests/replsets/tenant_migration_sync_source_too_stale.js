@@ -47,7 +47,7 @@ const tenantMigrationTest = new TenantMigrationTest({
     donorRst,
     // Set a low value for excluding donor hosts so that the test doesn't take long to retry a sync
     // source.
-    sharedOptions: {setParamter: {tenantMigrationExcludeDonorHostTimeoutMS: 1000}}
+    sharedOptions: {setParameter: {tenantMigrationExcludeDonorHostTimeoutMS: 1000}}
 });
 
 const tenantId = "testTenantId";
@@ -111,7 +111,7 @@ tenantMigrationTest.insertDonorDB(tenantDB, collName);
 hangRecipientPrimaryAfterRetrievingStartOpTimes.off();
 hangRecipientPrimaryBeforeConsistentState.wait();
 
-const hangRecipientPrimaryAfterRestart = configureFailPoint(
+const hangAfterRetrievingOpTimesAfterRestart = configureFailPoint(
     recipientPrimary, 'fpAfterRetrievingStartOpTimesMigrationRecipientInstance', {action: "hang"});
 
 jsTestLog("Stopping donorSecondary");
@@ -128,7 +128,7 @@ assert.soon(() => {
     return recipientDoc[0].numRestartsDueToDonorConnectionFailure == 1;
 });
 
-hangRecipientPrimaryAfterRestart.wait();
+hangAfterRetrievingOpTimesAfterRestart.wait();
 
 res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
 currOp = res.inprog[0];
@@ -138,19 +138,26 @@ assert.eq(currOp.dataSyncCompleted, false, tojson(res));
 // Since 'donorSecondary' was shut down, the sync source can only be 'delayedSecondary'.
 assert.eq(delayedSecondary.host, currOp.donorSyncSource, tojson(res));
 
-hangRecipientPrimaryAfterRestart.off();
+const hangAfterPersistingTenantMigrationRecipientInstanceStateDoc =
+    configureFailPoint(recipientPrimary,
+                       "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                       {action: "hang"});
+hangAfterRetrievingOpTimesAfterRestart.off();
 
 assert.soon(() => {
     // Verify that the recipient eventually has to restart again, since its lastFetched is ahead of
     // the last OpTime on 'delayedSecondary'.
     const recipientDoc = configRecipientNs.find({"_id": migrationId}).toArray();
-    return recipientDoc[0].numRestartsDueToDonorConnectionFailure == 2;
+    return recipientDoc[0].numRestartsDueToDonorConnectionFailure >= 2;
 });
+
+hangAfterPersistingTenantMigrationRecipientInstanceStateDoc.wait();
 
 // Let 'delayedSecondary' catch back up to the recipient's lastFetched OpTime.
 donorRst.remove(donorSecondary);
 restartServerReplication(delayedSecondary);
 donorRst.awaitReplication();
+hangAfterPersistingTenantMigrationRecipientInstanceStateDoc.off();
 
 // Verify that the migration eventually commits successfully.
 const migrationRes =
