@@ -135,9 +135,9 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
                 raise ValueError(
                     "The replica sets that are the target of the ContinuousStepdown hook must have"
                     " the 'all_nodes_electable' option set.")
-            # TODO (SERVER-52713): Allow tenant migration stepdown/kill/terminate suites to commit
-            # migrations and interrupt all replica sets.
-            self._rs_fixtures.append(fixture.get_replsets()[0])
+
+            for rs_fixture in fixture.get_replsets():
+                self._rs_fixtures.append(rs_fixture)
 
 
 class FlagBasedStepdownLifecycle(object):
