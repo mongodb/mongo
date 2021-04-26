@@ -37,7 +37,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         if not isinstance(fixture, tenant_migration.TenantMigrationFixture):
             raise ValueError("The ContinuousTenantMigration hook requires a TenantMigrationFixture")
         self._tenant_migration_fixture = fixture
-        self._shell_options = shell_options
+        self._shell_options = shell_options.copy()
 
         self._tenant_migration_thread = None
 
