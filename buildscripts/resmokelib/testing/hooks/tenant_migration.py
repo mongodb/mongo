@@ -205,7 +205,7 @@ class _TenantMigrationOptions:
 class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
     THREAD_NAME = "TenantMigrationThread"
 
-    WAIT_SECS_RANGES = [[0.1, 0.5], [1, 5], [5, 15]]
+    WAIT_SECS_RANGES = [[0.05, 0.1], [0.1, 0.5], [1, 5], [5, 15]]
     POLL_INTERVAL_SECS = 0.1
 
     NO_SUCH_MIGRATION_ERR_CODE = 327
@@ -262,6 +262,13 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     donor_rs_index + 1) % self._tenant_migration_fixture.get_num_replsets()
                 migration_opts = self._create_migration_opts(donor_rs_index, recipient_rs_index)
 
+                # Briefly wait to let the test run before starting the tenant migration, so that
+                # the first migration is more likely to have data to migrate.
+                wait_secs = random.uniform(
+                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)])
+                self.logger.info("Waiting for %.3f seconds before starting migration.", wait_secs)
+                self.__lifecycle.wait_for_tenant_migration_interval(wait_secs)
+
                 self.logger.info("Starting tenant migration: %s.", str(migration_opts))
                 start_time = time.time()
                 is_committed = self._run_migration(migration_opts)
@@ -272,10 +279,6 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 found_idle_request = self.__lifecycle.poll_for_idle_request()
                 if found_idle_request:
                     continue
-
-                wait_secs = random.uniform(
-                    *self.WAIT_SECS_RANGES[migration_num % len(self.WAIT_SECS_RANGES)])
-                self.__lifecycle.wait_for_tenant_migration_interval(wait_secs)
 
                 if is_committed:
                     donor_rs_index = recipient_rs_index

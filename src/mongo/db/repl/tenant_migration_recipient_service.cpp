@@ -937,6 +937,13 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
                           << txnNumber << " on session " << sessionId,
             txnParticipant);
 
+    // The in-memory transaction state may have been updated past the on-disk transaction state. For
+    // instance, this might happen in an unprepared read-only transaction, which updates in-memory
+    // but not on-disk. To prevent potential errors, we use the on-disk state for the following
+    // transaction number checks.
+    txnParticipant.invalidate(opCtx);
+    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+
     // If the entry's transaction number is stale/older than the current active transaction number
     // on the participant, fail the migration.
     uassert(ErrorCodes::TransactionTooOld,

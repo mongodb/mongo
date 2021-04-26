@@ -296,9 +296,6 @@ selector:
   # Does not support tojson of command objects.
   - jstests/core/SERVER-23626.js
 
-  # TODO(SERVER-55882): Investigate why this test is failing.
-  - jstests/core/wildcard_index_multikey.js
-
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # These tests run getMore commands which are not supported in the tenant migration passthrough.
