@@ -281,10 +281,10 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
         uassert(
             5563501,
             "Shard received a timestamp for phase 1 of the 'setFeatureCompatibilityVersion' "
-            "command which is too old, so the request is discarded. This may indicate that it is a "
-            "request related to a previous invocation of the 'setFeatureCompatibilityVersion' "
-            "command which, for example, was temporarily stuck on a router.",
-            previousTimestamp && previousTimestamp > changeTimestamp);
+            "command which is too old, so the request is discarded. This may indicate that the "
+            "request is related to a previous invocation of the 'setFeatureCompatibilityVersion' "
+            "command which, for example, was temporarily stuck on network.",
+            !previousTimestamp || previousTimestamp <= changeTimestamp);
     } else {
         uassert(5563601,
                 "Cannot transition to fully upgraded or fully downgraded state if the shard is not "
@@ -292,20 +292,19 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
                 serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
         tassert(5563502,
-                "Shard received a timestamp for phase-2 of the 'setFeatureCompatibilityVersion' "
-                "command that does not match the one received for phase-1, so the request is "
-                "discarded. This may indicate that it is a request related to a previous "
-                "invocation of the 'setFeatureCompatibilityVersion' command which, for example, "
-                "was temporarily stuck on a router.",
-                !previousTimestamp || previousTimestamp < changeTimestamp);
+                "Shard received a request for phase 2 of the 'setFeatureCompatibilityVersion' "
+                "command that cannot be correlated with the previous one, so the request is "
+                "discarded. This may indicate that the request for step 1 was not received or "
+                "processed properly.",
+                previousTimestamp);
 
-        uassert(
-            5563503,
-            "Shard received a timestamp for phase-2 of the 'setFeatureCompatibilityVersion' "
-            "command which is too old, so the request is discarded. This may indicate that it is a "
-            "request related to a previous invocation of the 'setFeatureCompatibilityVersion' "
-            "command which, for example, was temporarily stuck on a router.",
-            previousTimestamp > changeTimestamp);
+        uassert(5563503,
+                "Shard received a timestamp for phase 2 of the 'setFeatureCompatibilityVersion' "
+                "command that does not match the one received for phase 1, so the request is "
+                "discarded. This could indicate, for example, that the request is related to a "
+                "previous invocation of the 'setFeatureCompatibilityVersion' command which, for "
+                "example, was temporarily stuck on network.",
+                previousTimestamp == changeTimestamp);
     }
 }
 

@@ -400,6 +400,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
+            requestPhase1.setFromConfigServer(true);
             requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
             requestPhase1.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
@@ -465,6 +466,7 @@ private:
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             auto requestPhase2 = request;
+            requestPhase2.setFromConfigServer(true);
             requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
             requestPhase2.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
@@ -524,6 +526,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
             auto requestPhase1 = request;
+            requestPhase1.setFromConfigServer(true);
             requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
             requestPhase1.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
@@ -607,6 +610,7 @@ private:
 
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             auto requestPhase2 = request;
+            requestPhase2.setFromConfigServer(true);
             requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
             requestPhase2.setChangeTimestamp(changeTimestamp);
             uassertStatusOK(
