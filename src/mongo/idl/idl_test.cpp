@@ -3709,5 +3709,55 @@ TEST(IDLAccessCheck, TestComplexAccessCheck) {
     verifyContract(ac, AccessCheckComplexPrivilege::kAuthorizationContract);
 }
 
+TEST(IDLFieldTests, TestOptionalBoolField) {
+    IDLParserErrorContext ctxt("root");
+
+    {
+        auto testDoc = BSON("optBoolField" << true);
+        auto parsed = OptionalBool::parseFromBSON(testDoc.firstElement());
+        ASSERT_TRUE(parsed.has_value());
+        ASSERT_TRUE(parsed);
+        BSONObjBuilder serialized;
+        parsed.serializeToBSON("optBoolField", &serialized);
+        ASSERT_BSONOBJ_EQ(serialized.obj(), testDoc);
+    }
+
+    {
+        auto testDoc = BSON("optBoolField" << false);
+        auto parsed = OptionalBool::parseFromBSON(testDoc.firstElement());
+        ASSERT_TRUE(parsed.has_value());
+        ASSERT_FALSE(parsed);
+        BSONObjBuilder serialized;
+        parsed.serializeToBSON("optBoolField", &serialized);
+        ASSERT_BSONOBJ_EQ(serialized.obj(), testDoc);
+    }
+
+    {
+        auto testDoc = BSONObj();
+        auto parsed = OptionalBool::parseFromBSON(testDoc.firstElement());
+        ASSERT_FALSE(parsed.has_value());
+        ASSERT_FALSE(parsed);
+        BSONObjBuilder serialized;
+        parsed.serializeToBSON("", &serialized);
+        ASSERT_BSONOBJ_EQ(serialized.obj(), testDoc);
+    }
+
+    {
+        auto testDoc = BSON("optBoolField" << jstNULL);
+        ASSERT_THROWS(OptionalBool::parseFromBSON(testDoc.firstElement()), AssertionException);
+    }
+
+    {
+        auto testDoc = BSON("optBoolField" << BSONUndefined);
+        ASSERT_THROWS(OptionalBool::parseFromBSON(testDoc.firstElement()), AssertionException);
+    }
+
+    {
+        auto testDoc = BSON("optBoolField"
+                            << "abc");
+        ASSERT_THROWS(OptionalBool::parseFromBSON(testDoc.firstElement()), AssertionException);
+    }
+}
+
 }  // namespace
 }  // namespace mongo
