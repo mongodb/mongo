@@ -127,7 +127,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                 int numDocsToRemovePerBatch) {
     invariant(collection);
 
-    auto const& nss = collection->ns();
+    auto const nss = collection->ns();
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
