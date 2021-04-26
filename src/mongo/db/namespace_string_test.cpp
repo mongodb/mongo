@@ -258,7 +258,13 @@ TEST(NamespaceStringTest, NamespaceStringParse3) {
 TEST(NamespaceStringTest, NamespaceStringParse4) {
     NamespaceString ns("abc.");
     ASSERT_EQUALS(std::string("abc"), ns.db());
-    ASSERT_EQUALS(std::string(""), ns.coll());
+    ASSERT(ns.coll().empty());
+}
+
+TEST(NamespaceStringTest, NamespaceStringParse5) {
+    NamespaceString ns("abc", "");
+    ASSERT_EQUALS(std::string("abc"), ns.db());
+    ASSERT(ns.coll().empty());
 }
 
 TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {

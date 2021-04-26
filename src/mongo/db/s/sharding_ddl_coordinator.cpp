@@ -112,7 +112,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 DatabaseShardingState::checkIsPrimaryShardForDb(opCtx, nss().db());
             };
 
-            if (!nss().ns().empty()) {
+            if (!nss().coll().empty()) {
                 auto collDistLock = uassertStatusOK(distLockManager->lock(
                     opCtx, nss().ns(), coorName, DistLockManager::kDefaultLockTimeout));
                 _scopedLocks.emplace(collDistLock.moveToAnotherThread());
