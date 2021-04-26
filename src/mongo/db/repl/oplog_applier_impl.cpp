@@ -734,6 +734,14 @@ void OplogApplierImpl::fillWriterVectors(
     }
 }
 
+void OplogApplierImpl::fillWriterVectors_forTest(
+    OperationContext* opCtx,
+    std::vector<OplogEntry>* ops,
+    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
+    fillWriterVectors(opCtx, ops, writerVectors, derivedOps);
+}
+
 Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
                                        const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
                                        OplogApplication::Mode oplogApplicationMode) {

@@ -161,8 +161,7 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateOrFlush(
         return _flush(entry);
     }
 
-    _updateSessionInfo(entry);
-    return boost::none;
+    return _updateSessionInfo(entry);
 }
 
 boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
@@ -187,11 +186,12 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::updateSession(
     return boost::none;
 }
 
-void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
+boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateSessionInfo(
+    const OplogEntry& entry) {
     const auto& sessionInfo = entry.getOperationSessionInfo();
 
     if (!sessionInfo.getTxnNumber()) {
-        return;
+        return {};
     }
 
     const auto& lsid = sessionInfo.getSessionId();
@@ -200,24 +200,33 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
     // Ignore pre/post image no-op oplog entries. These entries will not have an o2 field.
     if (entry.getOpType() == OpTypeEnum::kNoop) {
         if (!entry.getFromMigrate() || !*entry.getFromMigrate()) {
-            return;
+            return {};
         }
 
         if (!entry.getObject2()) {
-            return;
+            return {};
         }
     }
 
     auto iter = _sessionsToUpdate.find(*lsid);
     if (iter == _sessionsToUpdate.end()) {
         _sessionsToUpdate.emplace(*lsid, entry);
-        return;
+        return {};
     }
 
     const auto& existingSessionInfo = iter->second.getOperationSessionInfo();
-    if (*sessionInfo.getTxnNumber() >= *existingSessionInfo.getTxnNumber()) {
+    const auto existingTxnNumber = *existingSessionInfo.getTxnNumber();
+    if (*sessionInfo.getTxnNumber() == existingTxnNumber) {
         iter->second = entry;
-        return;
+        return {};
+    }
+
+    if (*sessionInfo.getTxnNumber() > existingTxnNumber) {
+        // Do not coalesce updates across txn numbers. For more details, see SERVER-55305.
+        auto updateOplog = createMatchingTransactionTableUpdate(iter->second);
+        invariant(updateOplog);
+        iter->second = entry;
+        return std::vector<OplogEntry>{std::move(*updateOplog)};
     }
 
     LOGV2_FATAL_NOTRACE(50843,
@@ -226,8 +235,7 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
                         "oplog entry: {existingEntry}",
                         "lsid"_attr = lsid->toBSON(),
                         "sessionInfo_getTxnNumber"_attr = *sessionInfo.getTxnNumber(),
-                        "existingSessionInfo_getTxnNumber"_attr =
-                            *existingSessionInfo.getTxnNumber(),
+                        "existingSessionInfo_getTxnNumber"_attr = existingTxnNumber,
                         "newEntry"_attr = redact(entry.toBSONForLogging()),
                         "existingEntry"_attr = redact(iter->second.toBSONForLogging()));
 }

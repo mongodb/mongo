@@ -85,9 +85,11 @@ private:
     std::vector<OplogEntry> _flushForQueryPredicate(const BSONObj& queryPredicate);
 
     /**
-     * Extract transaction information from the oplog if any and records them internally.
+     * Extract transaction information from the oplog if any and records them internally. Returns
+     * a list of 'config.transactions' table updates to be flushed if 'entry' has a 'txnNumber'
+     * greater than the currently stored session information.
      */
-    void _updateSessionInfo(const OplogEntry& entry);
+    boost::optional<std::vector<OplogEntry>> _updateSessionInfo(const OplogEntry& entry);
 
     /**
      * Inspects the oplog entry and determines whether this needs to update the session info or

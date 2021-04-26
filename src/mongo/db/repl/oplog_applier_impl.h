@@ -74,6 +74,10 @@ public:
                      const Options& options,
                      ThreadPool* writerPool);
 
+    void fillWriterVectors_forTest(OperationContext* opCtx,
+                                   std::vector<OplogEntry>* ops,
+                                   std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                   std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
 private:
     /**

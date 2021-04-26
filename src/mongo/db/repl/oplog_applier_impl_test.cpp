@@ -484,6 +484,56 @@ TEST_F(OplogApplierImplTest,
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
+TEST_F(OplogApplierImplTest,
+       TxnTableUpdatesDoNotGetCoalescedForRetryableWritesAcrossDifferentTxnNumbers) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    const NamespaceString& nss{"test", "foo"};
+    repl::OpTime firstInsertOpTime(Timestamp(1, 0), 1);
+    auto firstRetryableOp = makeInsertDocumentOplogEntryWithSessionInfo(
+        firstInsertOpTime, nss, BSON("_id" << 1), sessionInfo);
+
+    repl::OpTime secondInsertOpTime(Timestamp(2, 0), 1);
+    sessionInfo.setTxnNumber(4);
+    auto secondRetryableOp = makeInsertDocumentOplogEntryWithSessionInfo(
+        secondInsertOpTime, nss, BSON("_id" << 2), sessionInfo);
+
+    auto writerPool = makeReplWriterPool();
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        writerPool.get());
+
+    std::vector<std::vector<const OplogEntry*>> writerVectors(writerPool->getStats().numThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    std::vector<OplogEntry> ops{firstRetryableOp, secondRetryableOp};
+    oplogApplier.fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    // We expect a total of two derived ops - one for each distinct 'txnNumber'.
+    ASSERT_EQUALS(2, derivedOps.size());
+    ASSERT_EQUALS(1, derivedOps[0].size());
+    ASSERT_EQUALS(1, derivedOps[1].size());
+    const auto firstDerivedOp = derivedOps[0][0];
+    ASSERT_EQUALS(firstInsertOpTime.getTimestamp(),
+                  firstDerivedOp.getObject()["lastWriteOpTime"]["ts"].timestamp());
+    ASSERT_EQUALS(NamespaceString::kSessionTransactionsTableNamespace, firstDerivedOp.getNss());
+    ASSERT_EQUALS(*firstRetryableOp.getTxnNumber(),
+                  firstDerivedOp.getObject()["txnNum"].numberInt());
+    const auto secondDerivedOp = derivedOps[1][0];
+    ASSERT_EQUALS(*secondRetryableOp.getTxnNumber(),
+                  secondDerivedOp.getObject()["txnNum"].numberInt());
+    ASSERT_EQUALS(NamespaceString::kSessionTransactionsTableNamespace, secondDerivedOp.getNss());
+    ASSERT_EQUALS(secondInsertOpTime.getTimestamp(),
+                  secondDerivedOp.getObject()["lastWriteOpTime"]["ts"].timestamp());
+}
+
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
 public:
     MultiOplogEntryOplogApplierImplTest()
