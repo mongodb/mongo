@@ -31,7 +31,7 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{self.sudo} mkdir -p {remote_dir}; {self.sudo} chown -R {user_group} {remote_dir}; {set_permission_stmt} {remote_dir}; ls -ld {remote_dir}"
         cmds = f"{cmds}; {self.sudo} mkdir -p {db_path}; {self.sudo} chown -R {user_group} {db_path}; {set_permission_stmt} {db_path}; ls -ld {db_path}"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, None)
+        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)
 
         # Second operation -
         # Copy buildscripts and mongoDB executables to the remote host.
@@ -41,7 +41,7 @@ class SetUpEC2Instance(PowercycleCommand):
         if os.path.isdir(shared_libs):
             files.append(shared_libs)
 
-        self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir)
+        self.remote_op.operation(SSHOperation.COPY_TO, files, remote_dir, retry=True, retry_count=2)
 
         # Third operation -
         # Set up virtualenv on remote.
@@ -57,7 +57,7 @@ class SetUpEC2Instance(PowercycleCommand):
         cmds = f"{cmds}; . $activate"
         cmds = f"{cmds}; pip3 install -r $remote_dir/etc/pip/powercycle-requirements.txt"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, None)
+        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)
 
         # Fourth operation -
         # Enable core dumps on non-Windows remote hosts.
@@ -72,7 +72,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; if [ -f {sysctl_conf} ]"
             cmds = f"{cmds}; then grep ^kernel.core_pattern {sysctl_conf}"
             cmds = f"{cmds};    if [ $? -eq  0 ]"
-            cmds = f"{cmds};    then {self.sudo} sed -i \"s,kernel.core_pattern=.*,kernel.core_pattern=$core_pattern,\" {sysctl_conf}"
+            cmds = f"{cmds};    then {self.sudo} sed -i \"s,kernel.core_pattern=.*,kernel.core_pattern={core_pattern},\" {sysctl_conf}"
             cmds = f"{cmds};    else echo \"kernel.core_pattern={core_pattern}\" | {self.sudo} tee -a {sysctl_conf}"
             cmds = f"{cmds};    fi"
             cmds = f"{cmds}; else echo Cannot change the core pattern and no core dumps will be generated."
@@ -81,7 +81,7 @@ class SetUpEC2Instance(PowercycleCommand):
             # https://unix.stackexchange.com/a/349558 in order to ensure the ssh client gets a
             # response from the remote machine before it restarts.
             cmds = f"{cmds}; nohup {self.sudo} reboot &>/dev/null & exit"
-            self.remote_op.operation(SSHOperation.SHELL, cmds, None)
+            self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)
 
         # Fifth operation -
         # Print the ulimit & kernel.core_pattern
@@ -93,7 +93,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; then /sbin/sysctl kernel.core_pattern"
             cmds = f"{cmds}; fi"
 
-            self.remote_op.operation(SSHOperation.SHELL, cmds, None, True)
+            self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)
 
         # Sixth operation -
         # Set up curator to collect system & process stats on remote.
@@ -120,7 +120,7 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"{cmds}; crontab -l"
             cmds = f"{cmds}; {{ {self.sudo} $HOME/curator stat system --file {monitor_system_file} > /dev/null 2>&1 & {self.sudo} $HOME/curator stat process-all --file {monitor_proc_file} > /dev/null 2>&1 & }} & disown"
 
-        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True)
+        self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)
 
         # Seventh operation -
         # Install NotMyFault, used to crash Windows.
@@ -132,4 +132,4 @@ class SetUpEC2Instance(PowercycleCommand):
             cmds = f"curl -s -o {windows_crash_zip} {windows_crash_dl}"
             cmds = f"{cmds}; unzip -q {windows_crash_zip} -d {windows_crash_dir}"
             cmds = f"{cmds}; chmod +x {windows_crash_dir}/*.exe"
-            self.remote_op.operation(SSHOperation.SHELL, cmds, None)
+            self.remote_op.operation(SSHOperation.SHELL, cmds, retry=True, retry_count=2)

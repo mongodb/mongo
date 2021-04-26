@@ -58,7 +58,6 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         self.ssh_connection_options = ssh_connection_options if ssh_connection_options else ""
         self.ssh_options = ssh_options if ssh_options else ""
         self.scp_options = scp_options if scp_options else ""
-        self.retries = 5
         self.retry_sleep = 10
         self.ignore_ret = ignore_ret
         self.shell_binary = shell_binary
@@ -80,7 +79,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         print(textwrap.indent(buff, "[result body] "))
         return process.poll(), buff
 
-    def _call_retries(self, cmd):
+    def _call_retries(self, cmd, retry_count):
         attempt_num = 0
         while True:
             ret, buff = self._call(cmd)
@@ -88,7 +87,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
             if not ret and not any(ssh_error in buff for ssh_error in _SSH_CONNECTION_ERRORS):
                 return ret, buff
             attempt_num += 1
-            if attempt_num > self.retries:
+            if attempt_num > retry_count:
                 print("Exhausted all retry attempts.")
                 break
             print("Remote attempt {} unsuccessful, retrying in {} seconds".format(
@@ -100,11 +99,11 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         """Check if a remote session is possible."""
         cmd = "ssh {} {} {} date".format(self.ssh_connection_options, self.ssh_options,
                                          self.user_host)
-        return self._call_retries(cmd)
+        return self._call_retries(cmd, 5)
 
-    def _perform_operation(self, cmd, retry):
+    def _perform_operation(self, cmd, retry, retry_count):
         if retry:
-            return self._call_retries(cmd)
+            return self._call_retries(cmd, retry_count)
 
         return self._call(cmd)
 
@@ -126,7 +125,8 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         return message.startswith("ssh:")
 
     # pylint: disable=too-many-branches,too-many-arguments,too-many-locals,inconsistent-return-statements
-    def operation(self, operation_type, operation_param, operation_dir=None, retry=False):
+    def operation(self, operation_type, operation_param, operation_dir=None, retry=False,
+                  retry_count=5):
         """Execute Main entry for remote operations. Returns (code, output).
 
         'operation_type' supports remote shell and copy operations.
@@ -196,7 +196,7 @@ class RemoteOperations(object):  # pylint: disable=too-many-instance-attributes
         print(f"Created {operation_type} operation")
         buff = ""
 
-        ret, new_buff = self._perform_operation(cmd, retry)
+        ret, new_buff = self._perform_operation(cmd, retry, retry_count)
         buff += new_buff
 
         if ret != 0:
