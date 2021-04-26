@@ -114,7 +114,15 @@ struct SortOptions {
     // extSortAllowed is true.
     std::string tempDir;
 
-    SortOptions() : limit(0), maxMemoryUsageBytes(64 * 1024 * 1024), extSortAllowed(false) {}
+    // If set to true and sorted data fits into memory, sorted data will be moved into iterator
+    // instead of copying.
+    bool moveSortedDataIntoIterator;
+
+    SortOptions()
+        : limit(0),
+          maxMemoryUsageBytes(64 * 1024 * 1024),
+          extSortAllowed(false),
+          moveSortedDataIntoIterator(false) {}
 
     // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
 
@@ -140,6 +148,11 @@ struct SortOptions {
 
     SortOptions& DBName(std::string newDbName) {
         dbName = std::move(newDbName);
+        return *this;
+    }
+
+    SortOptions& MoveSortedDataIntoIterator(bool newMoveSortedDataIntoIterator = true) {
+        moveSortedDataIntoIterator = newMoveSortedDataIntoIterator;
         return *this;
     }
 };

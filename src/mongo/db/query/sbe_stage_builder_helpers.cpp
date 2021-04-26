@@ -645,7 +645,7 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const Value& val) {
     auto obj = bob.done();
     auto be = obj.objdata();
     auto end = be + obj.objsize();
-    return sbe::bson::convertFrom(false, be + 4, end, 0);
+    return sbe::bson::convertFrom<false>(be + 4, end, 0);
 }
 
 uint32_t dateTypeMask() {

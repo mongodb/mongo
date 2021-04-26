@@ -173,7 +173,7 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
                 }
 
                 if (!projected && !isFieldRestricted(key)) {
-                    auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                    auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
                     auto [copyTag, copyVal] = value::copyValue(tag, val);
                     obj->push_back(sv, copyTag, copyVal);
                     --nFieldsNeededIfInclusion;

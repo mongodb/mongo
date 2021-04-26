@@ -125,6 +125,7 @@ void SortStage::makeSorter() {
     opts.extSortAllowed = _allowDiskUse;
     opts.limit =
         _specificStats.limit != std::numeric_limits<size_t>::max() ? _specificStats.limit : 0;
+    opts.moveSortedDataIntoIterator = true;
 
     auto comp = [&](const SorterData& lhs, const SorterData& rhs) {
         auto size = lhs.first.size();

@@ -109,7 +109,7 @@ PlanState BSONScanStage::getNext() {
                 auto sv = bson::fieldNameView(be);
                 if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
                     // Found the field so convert it to Value.
-                    auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                    auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
 
                     it->second->reset(tag, val);
 

@@ -95,10 +95,14 @@ PlanState CheckBoundsStage::getNext() {
                 keyTag == value::TypeTags::ksValue);
 
         auto key = value::getKeyStringView(keyVal);
-        auto bsonKey = KeyString::toBson(*key, _params.ord);
-        IndexSeekPoint seekPoint;
 
-        switch (_checker.checkKey(bsonKey, &seekPoint)) {
+        _keyBuffer.reset();
+        BSONObjBuilder keyBuilder(_keyBuffer);
+        KeyString::toBsonSafe(
+            key->getBuffer(), key->getSize(), _params.ord, key->getTypeBits(), keyBuilder);
+        auto bsonKey = keyBuilder.done();
+
+        switch (_checker.checkKey(bsonKey, &_seekPoint)) {
             case IndexBoundsChecker::VALID: {
                 auto [tag, val] = _inRecordIdAccessor->getViewOfValue();
                 _outAccessor.reset(false, tag, val);
@@ -112,7 +116,7 @@ PlanState CheckBoundsStage::getNext() {
             case IndexBoundsChecker::MUST_ADVANCE: {
                 auto seekKey = std::make_unique<KeyString::Value>(
                     IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                        seekPoint, _params.version, _params.ord, _params.direction == 1));
+                        _seekPoint, _params.version, _params.ord, _params.direction == 1));
                 _outAccessor.reset(true,
                                    value::TypeTags::ksValue,
                                    value::bitcastFrom<KeyString::Value*>(seekKey.release()));

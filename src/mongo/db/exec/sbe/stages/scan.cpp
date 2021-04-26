@@ -338,7 +338,7 @@ PlanState ScanStage::getNext() {
             auto sv = bson::fieldNameView(be);
             if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
                 // Found the field so convert it to Value.
-                auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
 
                 if (_oplogTsAccessor && it->first == repl::OpTime::kTimestampFieldName) {
                     auto&& [ownedTag, ownedVal] = value::copyValue(tag, val);
@@ -798,7 +798,7 @@ PlanState ParallelScanStage::getNext() {
             auto sv = bson::fieldNameView(be);
             if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
                 // Found the field so convert it to Value.
-                auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
 
                 it->second->reset(false, tag, val);
 

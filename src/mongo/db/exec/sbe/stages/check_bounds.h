@@ -101,5 +101,8 @@ private:
 
     bool _isEOF{false};
     CheckBoundsStats _specificStats;
+
+    BufBuilder _keyBuffer;
+    IndexSeekPoint _seekPoint;
 };
 }  // namespace mongo::sbe

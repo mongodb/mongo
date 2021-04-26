@@ -299,6 +299,8 @@ private:
 
     // Direction of scan * direction of indexing.
     std::vector<int> _expectedDirection;
+
+    std::vector<BSONElement> _keyValues;
 };
 
 }  // namespace mongo

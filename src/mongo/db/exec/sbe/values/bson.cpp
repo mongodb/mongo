@@ -104,8 +104,8 @@ const char* advance(const char* be, size_t fieldNameSize) {
     return be;
 }
 
-std::pair<value::TypeTags, value::Value> convertFrom(bool view,
-                                                     const char* be,
+template <bool View>
+std::pair<value::TypeTags, value::Value> convertFrom(const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize) {
     auto type = static_cast<BSONType>(static_cast<signed char>(*be));
@@ -118,14 +118,14 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(dbl)};
         }
         case BSONType::NumberDecimal: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::NumberDecimal, value::bitcastFrom<const char*>(be)};
             }
 
             return value::makeCopyDecimal(value::readDecimal128FromMemory(ConstDataView{be}));
         }
         case BSONType::String: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonString, value::bitcastFrom<const char*>(be)};
             }
             // len includes trailing zero.
@@ -146,14 +146,14 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
         }
         case BSONType::Symbol: {
             auto value = value::bitcastFrom<const char*>(be);
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonSymbol, value};
             }
             return value::makeNewBsonSymbol(
                 value::getStringOrSymbolView(value::TypeTags::bsonSymbol, value));
         }
         case BSONType::BinData: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(be)};
             }
 
@@ -174,7 +174,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             }
         }
         case BSONType::Object: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonObject, value::bitcastFrom<const char*>(be)};
             }
             // Skip document length.
@@ -185,7 +185,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             while (*be != 0) {
                 auto sv = bson::fieldNameView(be);
 
-                auto [tag, val] = convertFrom(false, be, end, sv.size());
+                auto [tag, val] = convertFrom<false>(be, end, sv.size());
                 obj->push_back(sv, tag, val);
 
                 be = advance(be, sv.size());
@@ -193,7 +193,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {tag, val};
         }
         case BSONType::Array: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonArray, value::bitcastFrom<const char*>(be)};
             }
             // Skip array length.
@@ -204,7 +204,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             while (*be != 0) {
                 auto sv = bson::fieldNameView(be);
 
-                auto [tag, val] = convertFrom(false, be, end, sv.size());
+                auto [tag, val] = convertFrom<false>(be, end, sv.size());
                 arr->push_back(tag, val);
 
                 be = advance(be, sv.size());
@@ -212,7 +212,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {tag, val};
         }
         case BSONType::jstOID: {
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(be)};
             }
             auto [tag, val] = value::makeNewObjectId();
@@ -247,28 +247,28 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {value::TypeTags::bsonUndefined, 0};
         case BSONType::RegEx: {
             auto value = value::bitcastFrom<const char*>(be);
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonRegex, value};
             }
             return value::makeCopyBsonRegex(value::getBsonRegexView(value));
         }
         case BSONType::Code: {
             auto value = value::bitcastFrom<const char*>(be);
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonJavascript, value};
             }
             return value::makeCopyBsonJavascript(value::getBsonJavascriptView(value));
         }
         case BSONType::DBRef: {
             auto value = value::bitcastFrom<const char*>(be);
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonDBPointer, value};
             }
             return value::makeCopyBsonDBPointer(value::getBsonDBPointerView(value));
         }
         case BSONType::CodeWScope: {
             auto value = value::bitcastFrom<const char*>(be);
-            if (view) {
+            if constexpr (View) {
                 return {value::TypeTags::bsonCodeWScope, value};
             }
             return value::makeCopyBsonCodeWScope(value::getBsonCodeWScopeView(value));
@@ -277,6 +277,14 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {value::TypeTags::Nothing, 0};
     }
 }
+
+template std::pair<value::TypeTags, value::Value> convertFrom<false>(const char* be,
+                                                                     const char* end,
+                                                                     size_t fieldNameSize);
+
+template std::pair<value::TypeTags, value::Value> convertFrom<true>(const char* be,
+                                                                    const char* end,
+                                                                    size_t fieldNameSize);
 
 template <class ArrayBuilder>
 void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {

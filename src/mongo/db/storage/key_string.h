@@ -933,6 +933,8 @@ size_t getKeySize(const char* buffer, size_t len, Ordering ord, const TypeBits& 
 BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
 BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types) noexcept;
 BSONObj toBsonSafe(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
+void toBsonSafe(
+    const char* buffer, size_t len, Ordering ord, const TypeBits& types, BSONObjBuilder& builder);
 Discriminator decodeDiscriminator(const char* buffer,
                                   size_t len,
                                   Ordering ord,
