@@ -155,26 +155,10 @@ function assertResultsEqual(wfRes, index, groupRes, accum) {
     // loss when spilling to disk.
     // TODO SERVER-42616: Enable the exact check for $stdDevPop/Samp.
     if (accum == "$stdDevSamp" || accum == "$stdDevPop") {
-        // $group doesn't return NaN, returns 0 or null.
-        // TODO SERVER-55063: The stdDev functions should not return NaN.
-        if (isNaN(wfRes.res)) {
-            if (accum == "$stdDevPop") {
-                assert.eq(groupRes,
-                          0,
-                          "$stdDevPop window function returned NaN, but $group returned " +
-                              tojson(groupRes) + " at index " + index);
-            } else {
-                assert.eq(groupRes,
-                          null,
-                          "$stdDevSamp window function returned NaN, but $group returned " +
-                              tojson(groupRes) + " at index " + index);
-            }
-        } else {
-            assert.close(groupRes,
-                         wfRes.res,
-                         "Window function $stdDev result for index " + index + ": " + tojson(wfRes),
-                         10 /* 10 decimal places */);
-        }
+        assert.close(groupRes,
+                     wfRes.res,
+                     "Window function $stdDev result for index " + index + ": " + tojson(wfRes),
+                     10 /* 10 decimal places */);
     } else if (accum == "$addToSet") {
         // Order doesn't matter for $addToSet.
         assert(arrayEq(groupRes, wfRes.res),

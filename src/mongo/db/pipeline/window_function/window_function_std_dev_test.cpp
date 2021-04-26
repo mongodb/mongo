@@ -146,18 +146,18 @@ TEST_F(WindowFunctionStdDevTest, HandlesNonfinite) {
     pop.add(Value{1});
     pop.add(Value{2});
     pop.add(Value{inf});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{nan});  // 1, 2, inf
+    ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, inf
     pop.remove(Value{inf});
     ASSERT_EQ(pop.getValue().getDouble(), 0.5);  // 1, 2
     pop.add(Value{nan});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{nan});  // 1, 2, nan
+    ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, nan
     pop.remove(Value{nan});
     pop.add(Value{-inf});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{nan});  // 1, 2, -inf
+    ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, -inf
     pop.add(Value{inf});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{nan});  // 1, 2, -inf, inf
+    ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, -inf, inf
     pop.add(Value{nan});
-    ASSERT_VALUE_EQ(pop.getValue(), Value{nan});  // 1, 2, -inf, inf, nan
+    ASSERT_VALUE_EQ(pop.getValue(), Value{BSONNULL});  // 1, 2, -inf, inf, nan
 }
 
 TEST_F(WindowFunctionStdDevTest, Stability) {
