@@ -53,12 +53,15 @@ void MigrationTestFixture::setUpDatabase(const std::string& dbName, const ShardI
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }
 
-void MigrationTestFixture::setUpCollection(const NamespaceString& collName,
-                                           const UUID& collUUID,
-                                           ChunkVersion version) {
-    CollectionType coll(collName, version.epoch(), Date_t::now(), collUUID);
+void MigrationTestFixture::setUpCollection(
+    const NamespaceString& collName,
+    const UUID& collUUID,
+    const ChunkVersion& version,
+    boost::optional<TypeCollectionTimeseriesFields> timeseriesFields) {
+    CollectionType coll(collName, version.epoch(), version.getTimestamp(), Date_t::now(), collUUID);
     coll.setKeyPattern(kKeyPattern);
     coll.setUnique(false);
+    coll.setTimeseriesFields(std::move(timeseriesFields));
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
 }

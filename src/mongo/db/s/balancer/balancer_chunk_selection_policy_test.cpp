@@ -34,6 +34,7 @@
 #include "mongo/db/s/balancer/cluster_statistics_impl.h"
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 
 namespace mongo {
 namespace {
@@ -228,6 +229,98 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                               {BSON(kPattern << -5), kKeyPattern.globalMax()}});
     assertErrorWhenMoveChunk({{kKeyPattern.globalMin(), BSON(kPattern << -15)},
                               {BSON(kPattern << -15), kKeyPattern.globalMax()}});
+}
+
+TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeAutoSplitted) {
+    // Set up two shards in the metadata, each one with its own tag
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    appendTags(kShard0, {"A"}),
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    ShardType::ConfigNS,
+                                                    appendTags(kShard1, {"B"}),
+                                                    kMajorityWriteConcern));
+
+    // Set up a database and a sharded collection in the metadata.
+    const auto collUUID = UUID::gen();
+    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    setUpDatabase(kDbName, kShardId0);
+    setUpCollection(kNamespace, collUUID, version, TypeCollectionTimeseriesFields("fieldName"));
+
+    // Set up two zones
+    setUpTags(kNamespace,
+              {
+                  {"A", {kKeyPattern.globalMin(), BSON(kPattern << 0)}},
+                  {"B", {BSON(kPattern << 0), kKeyPattern.globalMax()}},
+              });
+
+    // Create just one chunk covering the whole space
+    setUpChunk(
+        kNamespace, collUUID, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
+
+    auto future = launchAsync([this] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Requests chunks to be relocated requires running commands on each shard to
+        // get shard statistics. Set up dummy hosts for the source shards.
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
+
+        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToSplit(opCtx.get());
+        ASSERT_OK(candidateChunksStatus.getStatus());
+
+        // No chunks to split since the coll is a sharded time-series collection
+        ASSERT_EQUALS(0U, candidateChunksStatus.getValue().size());
+    });
+
+    expectGetStatsCommands(2);
+    future.default_timed_get();
+}
+
+TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCannotBeBalanced) {
+    // Set up two shards in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(
+        operationContext(), ShardType::ConfigNS, kShard1, kMajorityWriteConcern));
+
+    // Set up a database and a sharded collection in the metadata.
+    const auto collUUID = UUID::gen();
+    ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
+    setUpDatabase(kDbName, kShardId0);
+    setUpCollection(kNamespace, collUUID, version, TypeCollectionTimeseriesFields("fieldName"));
+
+    auto addChunk = [&](const BSONObj& min, const BSONObj& max) {
+        setUpChunk(kNamespace, collUUID, min, max, kShardId0, version);
+        version.incMinor();
+    };
+
+    addChunk(kKeyPattern.globalMin(), BSON(kPattern << 0));
+    for (int i = 1; i <= 100; ++i) {
+        addChunk(BSON(kPattern << (i - 1)), BSON(kPattern << i));
+    }
+    addChunk(BSON(kPattern << 100), kKeyPattern.globalMax());
+
+    auto future = launchAsync([this] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Requests chunks to be relocated requires running commands on each shard to
+        // get shard statistics. Set up dummy hosts for the source shards.
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
+
+        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get());
+        ASSERT_OK(candidateChunksStatus.getStatus());
+
+        // No chunks to move since the coll is a sharded time-series collection
+        ASSERT_EQUALS(0, candidateChunksStatus.getValue().size());
+    });
+
+    expectGetStatsCommands(2);
+    future.default_timed_get();
 }
 
 }  // namespace

@@ -300,6 +300,16 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
         const NamespaceString& nss(coll.getNss());
 
+        if (coll.getTimeseriesFields()) {
+            LOGV2_DEBUG(5559200,
+                        1,
+                        "Not splitting collection {namespace}; explicitly disabled.",
+                        "Not splitting explicitly disabled collection",
+                        "namespace"_attr = nss,
+                        "timeseriesFields"_attr = coll.getTimeseriesFields());
+            continue;
+        }
+
         auto candidatesStatus = _getSplitCandidatesForCollection(opCtx, nss, shardStats);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
@@ -373,14 +383,15 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
         const NamespaceString& nss(coll.getNss());
 
-        if (!coll.getAllowBalance() || !coll.getAllowMigrations()) {
+        if (!coll.getAllowBalance() || !coll.getAllowMigrations() || coll.getTimeseriesFields()) {
             LOGV2_DEBUG(21851,
                         1,
                         "Not balancing collection {namespace}; explicitly disabled.",
                         "Not balancing explicitly disabled collection",
                         "namespace"_attr = nss,
                         "allowBalance"_attr = coll.getAllowBalance(),
-                        "allowMigrations"_attr = coll.getAllowMigrations());
+                        "allowMigrations"_attr = coll.getAllowMigrations(),
+                        "timeseriesFields"_attr = coll.getTimeseriesFields());
             continue;
         }
 

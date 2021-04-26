@@ -115,7 +115,7 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
     check(st.s.getDB(dbName).runCommand({update: 'coll', updates: [{q: {}, u: {$set: {b: 10}}}]}));
     check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {a: 1}, limit: 1}]}));
     check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {}, limit: 0}]}));
-    // check(st.s.getDB(dbName).runCommand({drop: 'coll'}), ErrorCodes.IllegalOperation);
+    check(st.s.getDB(dbName).runCommand({drop: 'coll'}), ErrorCodes.IllegalOperation);
 
     // Hacky code again to restore the previous environment to finish this test properly
     modifyTimeseriesMetadata({$unset: {timeseriesFields: 1}});

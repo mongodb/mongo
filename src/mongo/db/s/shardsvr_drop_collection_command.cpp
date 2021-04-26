@@ -40,6 +40,7 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -75,6 +76,16 @@ public:
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            try {
+                const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns());
+
+                uassert(ErrorCodes::NotImplemented,
+                        "drop collection of a sharded time-series collection is not supported",
+                        !coll.getTimeseriesFields());
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                // The collection is not sharded or doesn't exist.
+            }
 
             FixedFCVRegion fcvRegion(opCtx);
 
