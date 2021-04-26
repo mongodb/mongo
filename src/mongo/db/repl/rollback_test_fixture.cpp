@@ -68,6 +68,7 @@ ReplSettings createReplSettings() {
 
 class RollbackTestOpObserver : public OpObserverNoop {
 public:
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,

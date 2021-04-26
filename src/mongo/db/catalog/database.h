@@ -116,7 +116,8 @@ public:
                                   repl::OpTime dropOpTime = {}) const = 0;
     virtual Status dropCollectionEvenIfSystem(OperationContext* const opCtx,
                                               NamespaceString nss,
-                                              repl::OpTime dropOpTime = {}) const = 0;
+                                              repl::OpTime dropOpTime = {},
+                                              bool markFromMigrate = false) const = 0;
 
     virtual Status dropView(OperationContext* const opCtx, NamespaceString viewName) const = 0;
 

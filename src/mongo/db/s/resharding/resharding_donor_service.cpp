@@ -622,6 +622,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
         RenameCollectionOptions options;
         options.dropTarget = true;
+        options.markFromMigrate = true;
         uassertStatusOK(renameCollection(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
     } else {

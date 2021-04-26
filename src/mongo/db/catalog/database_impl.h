@@ -66,7 +66,8 @@ public:
                           repl::OpTime dropOpTime) const final;
     Status dropCollectionEvenIfSystem(OperationContext* opCtx,
                                       NamespaceString nss,
-                                      repl::OpTime dropOpTime) const final;
+                                      repl::OpTime dropOpTime,
+                                      bool markFromMigrate = false) const final;
 
     Status dropView(OperationContext* opCtx, NamespaceString viewName) const final;
 

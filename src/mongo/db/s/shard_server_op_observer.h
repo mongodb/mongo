@@ -120,6 +120,7 @@ public:
 
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
 
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
@@ -132,6 +133,7 @@ public:
                      const std::string& indexName,
                      const BSONObj& indexInfo) override;
 
+    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
@@ -149,6 +151,7 @@ public:
                                     const BSONObj& storageMetadata,
                                     bool isDryRun) override {}
 
+    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,

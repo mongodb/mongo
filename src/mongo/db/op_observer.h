@@ -246,6 +246,15 @@ public:
                                           OptionalCollectionUUID uuid,
                                           std::uint64_t numRecords,
                                           CollectionDropType dropType) = 0;
+    virtual repl::OpTime onDropCollection(OperationContext* opCtx,
+                                          const NamespaceString& collectionName,
+                                          OptionalCollectionUUID uuid,
+                                          std::uint64_t numRecords,
+                                          CollectionDropType dropType,
+                                          bool markFromMigrate) {
+        return onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
+    }
+
 
     /**
      * This function logs an oplog entry when an index is dropped. The namespace of the index,
@@ -277,6 +286,18 @@ public:
                                              OptionalCollectionUUID dropTargetUUID,
                                              std::uint64_t numRecords,
                                              bool stayTemp) = 0;
+
+    virtual repl::OpTime preRenameCollection(OperationContext* opCtx,
+                                             const NamespaceString& fromCollection,
+                                             const NamespaceString& toCollection,
+                                             OptionalCollectionUUID uuid,
+                                             OptionalCollectionUUID dropTargetUUID,
+                                             std::uint64_t numRecords,
+                                             bool stayTemp,
+                                             bool markFromMigrate) {
+        return preRenameCollection(
+            opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    }
     /**
      * This function performs all op observer handling for a 'renameCollection' command except for
      * logging the oplog entry. It should be used specifically in instances where the optime is
@@ -301,6 +322,17 @@ public:
                                     OptionalCollectionUUID dropTargetUUID,
                                     std::uint64_t numRecords,
                                     bool stayTemp) = 0;
+    virtual void onRenameCollection(OperationContext* opCtx,
+                                    const NamespaceString& fromCollection,
+                                    const NamespaceString& toCollection,
+                                    OptionalCollectionUUID uuid,
+                                    OptionalCollectionUUID dropTargetUUID,
+                                    std::uint64_t numRecords,
+                                    bool stayTemp,
+                                    bool markFromMigrate) {
+        onRenameCollection(
+            opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    }
 
     virtual void onImportCollection(OperationContext* opCtx,
                                     const UUID& importUUID,

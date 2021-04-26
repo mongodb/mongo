@@ -116,12 +116,14 @@ public:
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime) override;
 
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
                                   std::uint64_t numRecords,
                                   CollectionDropType dropType) override;
 
+    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
@@ -130,6 +132,7 @@ public:
                             std::uint64_t numRecords,
                             bool stayTemp) override;
 
+    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,

@@ -560,6 +560,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
 
         RenameCollectionOptions options;
         options.dropTarget = true;
+        options.markFromMigrate = true;
         uassertStatusOK(renameCollection(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
 

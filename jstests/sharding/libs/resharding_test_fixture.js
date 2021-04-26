@@ -30,6 +30,8 @@ var ReshardingTest = class {
         minimumOperationDurationMS: minimumOperationDurationMS = undefined,
         criticalSectionTimeoutMS: criticalSectionTimeoutMS = 24 * 60 * 60 * 1000 /* 1 day */,
         commitImplicitly: commitImplicitly = true,
+        periodicNoopIntervalSecs: periodicNoopIntervalSecs = undefined,
+        writePeriodicNoops: writePeriodicNoops = undefined,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -50,6 +52,10 @@ var ReshardingTest = class {
         this._criticalSectionTimeoutMS = criticalSectionTimeoutMS;
         /** @private */
         this._commitImplicitly = commitImplicitly;
+        /** @private */
+        this._periodicNoopIntervalSecs = periodicNoopIntervalSecs;
+        /** @private */
+        this._writePeriodicNoops = writePeriodicNoops;
 
         // Properties set by setup().
         /** @private */
@@ -97,6 +103,15 @@ var ReshardingTest = class {
                 this._criticalSectionTimeoutMS;
         }
 
+        let rsConfig = {setParameter: {featureFlagResharding: true}};
+        if (this._periodicNoopIntervalSecs !== undefined) {
+            rsConfig.setParameter.periodicNoopIntervalSecs = this._periodicNoopIntervalSecs;
+        }
+
+        if (this._writePeriodicNoops !== undefined) {
+            rsConfig.setParameter.writePeriodicNoops = this._writePeriodicNoops;
+        }
+
         this._st = new ShardingTest({
             mongos: 1,
             mongosOptions: {setParameter: {featureFlagResharding: true}},
@@ -104,7 +119,7 @@ var ReshardingTest = class {
             configOptions: config,
             shards: this._numShards,
             rs: {nodes: 2},
-            rsOptions: {setParameter: {featureFlagResharding: true}},
+            rsOptions: rsConfig,
             manualAddShard: true,
         });
 

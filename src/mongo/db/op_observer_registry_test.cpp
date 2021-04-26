@@ -53,6 +53,7 @@ struct TestObserver : public OpObserverNoop {
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
         drops++;
     }
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,
@@ -62,6 +63,7 @@ struct TestObserver : public OpObserverNoop {
         OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
         return {};
     }
+    using OpObserver::onRenameCollection;
     void onRenameCollection(OperationContext* opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
@@ -73,6 +75,8 @@ struct TestObserver : public OpObserverNoop {
             opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
         postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
+
+    using OpObserver::preRenameCollection;
     repl::OpTime preRenameCollection(OperationContext* opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,

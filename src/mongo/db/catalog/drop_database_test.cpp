@@ -67,6 +67,8 @@ using namespace mongo;
 class OpObserverMock : public OpObserverNoop {
 public:
     void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
+
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,

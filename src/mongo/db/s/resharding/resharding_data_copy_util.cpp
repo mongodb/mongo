@@ -86,7 +86,8 @@ void ensureCollectionDropped(OperationContext* opCtx,
             }
 
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(opCtx, nss));
+            uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
+                opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
             wuow.commit();
         });
 }

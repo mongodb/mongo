@@ -153,6 +153,7 @@ public:
             preparedTransactionCommitted = true;
         };
 
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,

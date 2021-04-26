@@ -50,6 +50,7 @@ class OpTime;
 struct RenameCollectionOptions {
     bool dropTarget = false;
     bool stayTemp = false;
+    bool markFromMigrate = false;
 };
 
 void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,

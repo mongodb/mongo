@@ -363,7 +363,8 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 NamespaceString nss,
-                                                repl::OpTime dropOpTime) const {
+                                                repl::OpTime dropOpTime,
+                                                bool markFromMigrate) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     LOGV2_DEBUG(20313, 1, "dropCollection: {namespace}", "dropCollection", "namespace"_attr = nss);
@@ -405,8 +406,12 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     auto isOplogDisabledForNamespace = replCoord->isOplogDisabledFor(opCtx, nss);
     if (dropOpTime.isNull() && isOplogDisabledForNamespace) {
         _dropCollectionIndexes(opCtx, nss, collection.getWritableCollection());
-        opObserver->onDropCollection(
-            opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
+        opObserver->onDropCollection(opCtx,
+                                     nss,
+                                     uuid,
+                                     numRecords,
+                                     OpObserver::CollectionDropType::kOnePhase,
+                                     markFromMigrate);
         return _finishDropCollection(opCtx, nss, collection.getWritableCollection());
     }
 
@@ -431,14 +436,22 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
               "commitTimestamp"_attr = commitTimestamp);
         if (dropOpTime.isNull()) {
             // Log oplog entry for collection drop and remove the UUID.
-            dropOpTime = opObserver->onDropCollection(
-                opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
+            dropOpTime = opObserver->onDropCollection(opCtx,
+                                                      nss,
+                                                      uuid,
+                                                      numRecords,
+                                                      OpObserver::CollectionDropType::kOnePhase,
+                                                      markFromMigrate);
             invariant(!dropOpTime.isNull());
         } else {
             // If we are provided with a valid 'dropOpTime', it means we are dropping this
             // collection in the context of applying an oplog entry on a secondary.
-            auto opTime = opObserver->onDropCollection(
-                opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kOnePhase);
+            auto opTime = opObserver->onDropCollection(opCtx,
+                                                       nss,
+                                                       uuid,
+                                                       numRecords,
+                                                       OpObserver::CollectionDropType::kOnePhase,
+                                                       markFromMigrate);
             // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
             invariant(opTime.isNull(),
                       str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
@@ -452,14 +465,22 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     if (dropOpTime.isNull()) {
         // Log oplog entry for collection drop.
-        dropOpTime = opObserver->onDropCollection(
-            opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kTwoPhase);
+        dropOpTime = opObserver->onDropCollection(opCtx,
+                                                  nss,
+                                                  uuid,
+                                                  numRecords,
+                                                  OpObserver::CollectionDropType::kTwoPhase,
+                                                  markFromMigrate);
         invariant(!dropOpTime.isNull());
     } else {
         // If we are provided with a valid 'dropOpTime', it means we are dropping this
         // collection in the context of applying an oplog entry on a secondary.
-        auto opTime = opObserver->onDropCollection(
-            opCtx, nss, uuid, numRecords, OpObserver::CollectionDropType::kTwoPhase);
+        auto opTime = opObserver->onDropCollection(opCtx,
+                                                   nss,
+                                                   uuid,
+                                                   numRecords,
+                                                   OpObserver::CollectionDropType::kTwoPhase,
+                                                   markFromMigrate);
         // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
         invariant(opTime.isNull());
     }

@@ -859,13 +859,24 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               const NamespaceString& collectionName,
                                               OptionalCollectionUUID uuid,
                                               std::uint64_t numRecords,
-                                              const CollectionDropType dropType) {
+                                              CollectionDropType dropType) {
+    return onDropCollection(
+        opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate */);
+}
+
+repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
+                                              const NamespaceString& collectionName,
+                                              OptionalCollectionUUID uuid,
+                                              std::uint64_t numRecords,
+                                              const CollectionDropType dropType,
+                                              bool markFromMigrate) {
     if (!collectionName.isSystemDotProfile()) {
         // Do not replicate system.profile modifications.
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
         oplogEntry.setNss(collectionName.getCommandNS());
         oplogEntry.setUuid(uuid);
+        oplogEntry.setFromMigrateIfTrue(markFromMigrate);
         oplogEntry.setObject(BSON("drop" << collectionName.coll()));
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
         logOperation(opCtx, &oplogEntry);
@@ -918,7 +929,6 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     logOperation(opCtx, &oplogEntry);
 }
 
-
 repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  const NamespaceString& fromCollection,
                                                  const NamespaceString& toCollection,
@@ -926,6 +936,24 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  OptionalCollectionUUID dropTargetUUID,
                                                  std::uint64_t numRecords,
                                                  bool stayTemp) {
+    return preRenameCollection(opCtx,
+                               fromCollection,
+                               toCollection,
+                               uuid,
+                               dropTargetUUID,
+                               numRecords,
+                               stayTemp,
+                               false /* markFromMigrate */);
+}
+
+repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
+                                                 const NamespaceString& fromCollection,
+                                                 const NamespaceString& toCollection,
+                                                 OptionalCollectionUUID uuid,
+                                                 OptionalCollectionUUID dropTargetUUID,
+                                                 std::uint64_t numRecords,
+                                                 bool stayTemp,
+                                                 bool markFromMigrate) {
     BSONObjBuilder builder;
     builder.append("renameCollection", fromCollection.ns());
     builder.append("to", toCollection.ns());
@@ -938,6 +966,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(fromCollection.getCommandNS());
     oplogEntry.setUuid(uuid);
+    oplogEntry.setFromMigrateIfTrue(markFromMigrate);
     oplogEntry.setObject(builder.done());
     if (dropTargetUUID)
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
@@ -965,8 +994,32 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
                                         OptionalCollectionUUID dropTargetUUID,
                                         std::uint64_t numRecords,
                                         bool stayTemp) {
-    preRenameCollection(
-        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+    onRenameCollection(opCtx,
+                       fromCollection,
+                       toCollection,
+                       uuid,
+                       dropTargetUUID,
+                       numRecords,
+                       stayTemp,
+                       false /* markFromMigrate */);
+}
+
+void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
+                                        const NamespaceString& fromCollection,
+                                        const NamespaceString& toCollection,
+                                        OptionalCollectionUUID uuid,
+                                        OptionalCollectionUUID dropTargetUUID,
+                                        std::uint64_t numRecords,
+                                        bool stayTemp,
+                                        bool markFromMigrate) {
+    preRenameCollection(opCtx,
+                        fromCollection,
+                        toCollection,
+                        uuid,
+                        dropTargetUUID,
+                        numRecords,
+                        stayTemp,
+                        markFromMigrate);
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
 }
 

@@ -203,10 +203,20 @@ public:
                                   const OptionalCollectionUUID uuid,
                                   std::uint64_t numRecords,
                                   const CollectionDropType dropType) override {
+        return onDropCollection(
+            opCtx, collectionName, uuid, numRecords, dropType, false /* markFromMigrate*/);
+    }
+
+    repl::OpTime onDropCollection(OperationContext* const opCtx,
+                                  const NamespaceString& collectionName,
+                                  const OptionalCollectionUUID uuid,
+                                  std::uint64_t numRecords,
+                                  const CollectionDropType dropType,
+                                  bool markFromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
-            auto time =
-                observer->onDropCollection(opCtx, collectionName, uuid, numRecords, dropType);
+            auto time = observer->onDropCollection(
+                opCtx, collectionName, uuid, numRecords, dropType, markFromMigrate);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);
@@ -222,7 +232,6 @@ public:
             o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor);
     }
 
-
     void onRenameCollection(OperationContext* const opCtx,
                             const NamespaceString& fromCollection,
                             const NamespaceString& toCollection,
@@ -230,10 +239,34 @@ public:
                             OptionalCollectionUUID dropTargetUUID,
                             std::uint64_t numRecords,
                             bool stayTemp) override {
+        onRenameCollection(opCtx,
+                           fromCollection,
+                           toCollection,
+                           uuid,
+                           dropTargetUUID,
+                           numRecords,
+                           stayTemp,
+                           false /* markFromMigrate */);
+    }
+
+    void onRenameCollection(OperationContext* const opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
+                            bool stayTemp,
+                            bool markFromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
-            o->onRenameCollection(
-                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+            o->onRenameCollection(opCtx,
+                                  fromCollection,
+                                  toCollection,
+                                  uuid,
+                                  dropTargetUUID,
+                                  numRecords,
+                                  stayTemp,
+                                  markFromMigrate);
     }
 
     void onImportCollection(OperationContext* opCtx,
@@ -263,10 +296,34 @@ public:
                                      OptionalCollectionUUID dropTargetUUID,
                                      std::uint64_t numRecords,
                                      bool stayTemp) override {
+        return preRenameCollection(opCtx,
+                                   fromCollection,
+                                   toCollection,
+                                   uuid,
+                                   dropTargetUUID,
+                                   numRecords,
+                                   stayTemp,
+                                   false /* markFromMigrate */);
+    }
+
+    repl::OpTime preRenameCollection(OperationContext* const opCtx,
+                                     const NamespaceString& fromCollection,
+                                     const NamespaceString& toCollection,
+                                     OptionalCollectionUUID uuid,
+                                     OptionalCollectionUUID dropTargetUUID,
+                                     std::uint64_t numRecords,
+                                     bool stayTemp,
+                                     bool markFromMigrate) override {
         ReservedTimes times{opCtx};
         for (auto& observer : this->_observers) {
-            const auto time = observer->preRenameCollection(
-                opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+            const auto time = observer->preRenameCollection(opCtx,
+                                                            fromCollection,
+                                                            toCollection,
+                                                            uuid,
+                                                            dropTargetUUID,
+                                                            numRecords,
+                                                            stayTemp,
+                                                            markFromMigrate);
             invariant(time.isNull());
         }
         return _getOpTimeToReturn(times.get().reservedOpTimes);

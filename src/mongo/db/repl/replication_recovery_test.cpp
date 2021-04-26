@@ -119,6 +119,7 @@ private:
 
 class ReplicationRecoveryTestObObserver : public OpObserverNoop {
 public:
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,

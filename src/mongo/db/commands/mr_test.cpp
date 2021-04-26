@@ -273,6 +273,7 @@ public:
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime) override;
 
+    using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid,

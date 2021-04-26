@@ -198,7 +198,8 @@ Status renameCollectionDirectly(OperationContext* opCtx,
         // avoid unintentionally removing a collection on a secondary with the same name as
         // the target.
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        opObserver->onRenameCollection(opCtx, source, target, uuid, {}, 0U, options.stayTemp);
+        opObserver->onRenameCollection(
+            opCtx, source, target, uuid, {}, 0U, options.stayTemp, options.markFromMigrate);
 
         wunit.commit();
         return Status::OK();
@@ -231,8 +232,15 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
 
         auto numRecords = targetColl->numRecords(opCtx);
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        auto renameOpTime = opObserver->preRenameCollection(
-            opCtx, source, target, uuid, targetColl->uuid(), numRecords, options.stayTemp);
+
+        auto renameOpTime = opObserver->preRenameCollection(opCtx,
+                                                            source,
+                                                            target,
+                                                            uuid,
+                                                            targetColl->uuid(),
+                                                            numRecords,
+                                                            options.stayTemp,
+                                                            options.markFromMigrate);
 
         if (!renameOpTimeFromApplyOps.isNull()) {
             // 'renameOpTime' must be null because a valid 'renameOpTimeFromApplyOps' implies
