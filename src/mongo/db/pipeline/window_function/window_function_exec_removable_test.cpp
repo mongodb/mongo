@@ -80,7 +80,11 @@ public:
         std::unique_ptr<WindowFunctionState> integralFunc =
             std::make_unique<WindowFunctionIntegral>(getExpCtx().get());
         return WindowFunctionExecRemovableDocument(
-            _iter.get(), std::move(input), std::move(sortBy), std::move(integralFunc), bounds);
+            _iter.get(),
+            ExpressionArray::create(getExpCtx().get(),
+                                    std::vector<boost::intrusive_ptr<Expression>>{sortBy, input}),
+            std::move(integralFunc),
+            bounds);
     }
 
     auto advanceIterator() {

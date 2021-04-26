@@ -32,7 +32,6 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -228,9 +227,7 @@ TEST_F(WindowFunctionIntegralTest, CanHandleDateTypeWithOutputUnit) {
     ASSERT_VALUE_EQ(integral.getValue(), Value(expectedIntegral));
 }
 
-DEATH_TEST_F(WindowFunctionIntegralTest,
-             DatesWithoutOutputUnitShouldFail,
-             "expects the sortBy field to be numeric") {
+TEST_F(WindowFunctionIntegralTest, DatesWithoutOutputUnitShouldFail) {
     const std::vector<Value> values = {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1000)), Value(2)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(4)})),
@@ -240,9 +237,7 @@ DEATH_TEST_F(WindowFunctionIntegralTest,
     ASSERT_THROWS_CODE(addValuesToWindow(values), AssertionException, 5423902);
 }
 
-DEATH_TEST_F(WindowFunctionIntegralTest,
-             NumbersWithOutputUnitShouldFail,
-             "expects the sortBy field to be a Date") {
+TEST_F(WindowFunctionIntegralTest, NumbersWithOutputUnitShouldFail) {
     const std::vector<Value> values = {
         Value(std::vector<Value>({Value(3), Value(2)})),
         Value(std::vector<Value>({Value(5), Value(4)})),
@@ -256,9 +251,7 @@ DEATH_TEST_F(WindowFunctionIntegralTest,
     ASSERT_THROWS_CODE(addValuesToWindow(values), AssertionException, 5423901);
 }
 
-DEATH_TEST_F(WindowFunctionIntegralTest,
-             ResetShouldNotResetOutputUnit,
-             "expects the sortBy field to be a Date") {
+TEST_F(WindowFunctionIntegralTest, ResetShouldNotResetOutputUnit) {
     const std::vector<Value> dateValues = {
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1000)), Value(0)})),
         Value(std::vector<Value>({Value(Date_t::fromMillisSinceEpoch(1002)), Value(2)})),

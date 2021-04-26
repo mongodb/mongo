@@ -38,21 +38,52 @@ namespace mongo {
 
 namespace {
 
+/**
+ * Translates the input Expression to suit certain window function's need. For example, $integral
+ * window function requires the input value to be a 2-sized Value vector containing the evaluating
+ * value of 'sortBy' and 'input' field. So we create an 'ExpressionArray' as the input Expression
+ * for Executors.
+ *
+ * Returns the 'input' in 'expr' if no extra translation is needed.
+ */
+boost::intrusive_ptr<Expression> translateInputExpression(
+    boost::intrusive_ptr<window_function::Expression> expr,
+    const boost::optional<SortPattern>& sortBy) {
+    if (!expr)
+        return nullptr;
+    if (auto integral = dynamic_cast<window_function::ExpressionIntegral*>(expr.get())) {
+        auto expCtx = integral->expCtx();
+        tassert(5558802,
+                "$integral requires a 1-field ascending sortBy",
+                sortBy && sortBy->size() == 1 && !sortBy->begin()->expression &&
+                    sortBy->begin()->isAscending);
+        auto sortByExpr = ExpressionFieldPath::createPathFromString(
+            expCtx, sortBy->begin()->fieldPath->fullPath(), expCtx->variablesParseState);
+        return ExpressionArray::create(
+            expCtx, std::vector<boost::intrusive_ptr<Expression>>{sortByExpr, integral->input()});
+    }
+
+    return expr->input();
+}
+
 std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
     PartitionIterator* iter,
     boost::intrusive_ptr<window_function::Expression> expr,
+    const boost::optional<SortPattern>& sortBy,
     const WindowBounds::DocumentBased& bounds) {
+    auto inputExpr = translateInputExpression(expr, sortBy);
+
     return stdx::visit(
         visit_helper::Overloaded{
             [&](const WindowBounds::Unbounded&) -> std::unique_ptr<WindowFunctionExec> {
                 // A left unbounded window will always be non-removable regardless of the upper
                 // bound.
                 return std::make_unique<WindowFunctionExecNonRemovable<AccumulatorState>>(
-                    iter, expr->input(), expr->buildAccumulatorOnly(), bounds.upper);
+                    iter, inputExpr, expr->buildAccumulatorOnly(), bounds.upper);
             },
             [&](const auto&) -> std::unique_ptr<WindowFunctionExec> {
                 return std::make_unique<WindowFunctionExecRemovableDocument>(
-                    iter, expr->input(), expr->buildRemovable(), bounds);
+                    iter, inputExpr, expr->buildRemovable(), bounds);
             }},
         bounds.lower);
 }
@@ -74,7 +105,6 @@ std::unique_ptr<WindowFunctionExec> translateDerivative(
         iter, deriv.input(), sortExpr, deriv.bounds(), deriv.outputUnit());
 }
 
-
 }  // namespace
 
 std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
@@ -93,7 +123,7 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     return stdx::visit(
         visit_helper::Overloaded{
             [&](const WindowBounds::DocumentBased& docBounds) {
-                return translateDocumentWindow(iter, functionStmt.expr, docBounds);
+                return translateDocumentWindow(iter, functionStmt.expr, sortBy, docBounds);
             },
             [&](const WindowBounds::RangeBased& rangeBounds)
                 -> std::unique_ptr<WindowFunctionExec> {

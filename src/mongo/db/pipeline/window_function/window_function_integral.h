@@ -45,7 +45,8 @@ public:
     }
 
     explicit WindowFunctionIntegral(ExpressionContext* const expCtx,
-                                    boost::optional<long long> outputUnitMillis = boost::none)
+                                    boost::optional<long long> outputUnitMillis = boost::none,
+                                    bool isNonremovable = false)
         : WindowFunctionState(expCtx), _integral(expCtx), _outputUnitMillis(outputUnitMillis) {
         _memUsageBytes = sizeof(*this);
     }
@@ -61,6 +62,9 @@ public:
         _values.clear();
         _nanCount = 0;
         _integral.reset();
+        // AccumulatorIntegral's reset() depends on the fact that WindowFunctionIntegral's reset()
+        // will set '_memUsageBytes' to sizeof(*this). If you want to reset '_memUsageBytes' to
+        // other value, please update AccumulatorIntegral's reset() as well.
         _memUsageBytes = sizeof(*this);
     }
 
@@ -91,6 +95,7 @@ private:
     std::deque<Value> _values;
     boost::optional<long long> _outputUnitMillis;
     int _nanCount = 0;
+    bool isNonremovable = false;
 };
 
 }  // namespace mongo

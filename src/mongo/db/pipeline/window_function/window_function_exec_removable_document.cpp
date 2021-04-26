@@ -73,12 +73,7 @@ void WindowFunctionExecRemovableDocument::initialize() {
     for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[i]) {
-            Value valToAdd = _sortBy
-                ? Value(std::vector<Value>{
-                      _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables),
-                      _input->evaluate(*doc, &_input->getExpressionContext()->variables)})
-                : _input->evaluate(*doc, &_input->getExpressionContext()->variables);
-            addValue(valToAdd);
+            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         } else {
             break;
         }
@@ -96,12 +91,7 @@ void WindowFunctionExecRemovableDocument::update() {
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[_upperBound.get()]) {
-            Value valToAdd = _sortBy
-                ? Value(std::vector<Value>{
-                      _sortBy->evaluate(*doc, &_sortBy->getExpressionContext()->variables),
-                      _input->evaluate(*doc, &_input->getExpressionContext()->variables)})
-                : _input->evaluate(*doc, &_input->getExpressionContext()->variables);
-            addValue(valToAdd);
+            addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         }
     }
 

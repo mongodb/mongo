@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/window_function/window_function_covariance.h"
+#include "mongo/db/pipeline/window_function/window_function_integral.h"
 
 namespace mongo {
 
@@ -126,6 +127,24 @@ public:
     void processInternal(const Value& input, bool merging) final;
     const char* getOpName() const final;
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* const expCtx);
+};
+
+class AccumulatorIntegral : public AccumulatorForWindowFunctions {
+public:
+    explicit AccumulatorIntegral(ExpressionContext* const expCtx,
+                                 boost::optional<long long> outputUnitMillis = boost::none);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    void reset() final;
+
+    const char* getOpName() const final;
+
+    static boost::intrusive_ptr<AccumulatorState> create(
+        ExpressionContext* const expCtx, boost::optional<long long> outputUnitMillis = boost::none);
+
+private:
+    WindowFunctionIntegral _integralWF;
 };
 
 }  // namespace mongo

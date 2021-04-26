@@ -64,11 +64,11 @@ void WindowFunctionIntegral::assertValueType(const Value& value) {
 
     auto arr = value.getArray();
     if (_outputUnitMillis) {
-        tassert(5423901,
+        uassert(5423901,
                 "$integral with 'outputUnit' expects the sortBy field to be a Date",
                 arr[0].getType() == BSONType::Date);
     } else {
-        tassert(5423902,
+        uassert(5423902,
                 "$integral (with no 'outputUnit') expects the sortBy field to be numeric",
                 arr[0].numeric());
     }
@@ -86,6 +86,13 @@ void WindowFunctionIntegral::add(Value value) {
         _integral.add(integralOfTwoPointsByTrapezoidalRule(_values.back(), value));
     }
 
+    // "WindowFunctionIntegral" could be used as a non-removable accumulator which does not need to
+    // track the values in the window because no removal will be made. 'pop_front()' whenever a new
+    // value is added to the queue so as to save memory.
+    if (!_values.empty() && isNonremovable) {
+        _memUsageBytes -= _values.front().getApproximateSize();
+        _values.pop_front();
+    }
     _memUsageBytes += value.getApproximateSize();
     _values.emplace_back(std::move(value));
 }

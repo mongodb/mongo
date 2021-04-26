@@ -121,6 +121,7 @@ env.Library(
         'accumulator_covariance.cpp',
         'accumulator_exp_moving_avg.cpp',
         'accumulator_first.cpp',
+        'accumulator_integral.cpp',
         'accumulator_js_reduce.cpp',
         'accumulator_last.cpp',
         'accumulator_merge_objects.cpp',

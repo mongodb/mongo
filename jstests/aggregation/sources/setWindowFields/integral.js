@@ -1,0 +1,204 @@
+/**
+ * Test the behavior of $integral.
+ */
+(function() {
+"use strict";
+
+load("jstests/aggregation/extras/window_function_helpers.js");
+
+const getParam = db.adminCommand({getParameter: 1, featureFlagWindowFunctions: 1});
+jsTestLog(getParam);
+const featureEnabled = assert.commandWorked(getParam).featureFlagWindowFunctions.value;
+if (!featureEnabled) {
+    jsTestLog("Skipping test because the window function feature flag is disabled");
+    return;
+}
+
+const coll = db.setWindowFields_integral;
+
+// Like most other window functions, the default window for $integral is [unbounded, unbounded].
+coll.drop();
+assert.commandWorked(coll.insert([
+    {x: 0, y: 0},
+    {x: 1, y: 42},
+    {x: 3, y: 67},
+    {x: 7, y: 99},
+    {x: 10, y: 20},
+]));
+let result = coll.runCommand({
+    aggregate: coll.getName(),
+    cursor: {},
+    pipeline: [
+        {
+            $setWindowFields: {
+                sortBy: {x: 1},
+                output: {
+                    integral: {$integral: {input: "$y"}},
+                }
+            }
+        },
+    ]
+});
+assert.commandWorked(result);
+
+// $integral never compares values from separate partitions.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {partitionID: 1, x: 0, y: 1},
+    {partitionID: 1, x: 1, y: 2},
+    {partitionID: 1, x: 2, y: 1},
+    {partitionID: 1, x: 3, y: 4},
+
+    {partitionID: 2, x: 0, y: 100},
+    {partitionID: 2, x: 2, y: 105},
+    {partitionID: 2, x: 4, y: 107},
+    {partitionID: 2, x: 6, y: -100},
+]));
+result = coll.aggregate([
+                 {
+                     $setWindowFields: {
+                         partitionBy: "$partitionID",
+                         sortBy: {x: 1},
+                         output: {
+                             integral: {$integral: {input: "$y"}, window: {documents: [-1, 0]}},
+                         }
+                     }
+                 },
+                 {$unset: "_id"},
+             ])
+             .toArray();
+assert.sameMembers(result, [
+    {partitionID: 1, x: 0, y: 1, integral: 0},
+    {partitionID: 1, x: 1, y: 2, integral: 1.5},  // (1 + 2) * (1 - 0) / 2 = 1.5
+    {partitionID: 1, x: 2, y: 1, integral: 1.5},  // (1 + 2) * (2 - 1) / 2 = 1.5
+    {partitionID: 1, x: 3, y: 4, integral: 2.5},  // (4 + 1) * (3 - 2) / 2 = 2.5
+
+    {partitionID: 2, x: 0, y: 100, integral: 0},    //
+    {partitionID: 2, x: 2, y: 105, integral: 205},  // (100 + 105) * 2 / 2 = 205
+    {partitionID: 2, x: 4, y: 107, integral: 212},  // (105 + 107) * 2 / 2 = 212
+    {partitionID: 2, x: 6, y: -100, integral: 7},   // (107 - 100) * 2 / 2 = 7
+]);
+
+// 'outputUnit' only supports 'week' and smaller.
+coll.drop();
+function explainUnit(outputUnit) {
+    return coll.runCommand({
+        explain: {
+            aggregate: coll.getName(),
+            cursor: {},
+            pipeline: [{
+                $setWindowFields: {
+                    sortBy: {x: 1},
+                    output: {
+                        integral: {
+                            $integral: {
+                                input: "$y",
+                                outputUnit: outputUnit,
+                            },
+                            window: {documents: [-1, 1]}
+                        },
+                    }
+                }
+            }]
+        }
+    });
+}
+assert.commandFailedWithCode(explainUnit('year'), 5490704);
+assert.commandFailedWithCode(explainUnit('quarter'), 5490704);
+assert.commandFailedWithCode(explainUnit('month'), 5490704);
+assert.commandWorked(explainUnit('week'));
+assert.commandWorked(explainUnit('day'));
+assert.commandWorked(explainUnit('hour'));
+assert.commandWorked(explainUnit('minute'));
+assert.commandWorked(explainUnit('second'));
+assert.commandWorked(explainUnit('millisecond'));
+
+// Test if 'outputUnit' is specified. Date type input is supported.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {x: ISODate("2020-01-01T00:00:00.000Z"), y: 0},
+    {x: ISODate("2020-01-01T00:00:00.002Z"), y: 2},
+    {x: ISODate("2020-01-01T00:00:00.004Z"), y: 4},
+    {x: ISODate("2020-01-01T00:00:00.006Z"), y: 6},
+]));
+
+const pipelineWithOutputUnit = [
+    {
+        $setWindowFields: {
+            sortBy: {x: 1},
+            output: {
+                integral:
+                    {$integral: {input: "$y", outputUnit: 'second'}, window: {documents: [-1, 1]}},
+            }
+        }
+    },
+    {$unset: "_id"},
+];
+result = coll.aggregate(pipelineWithOutputUnit).toArray();
+assert.sameMembers(result, [
+    // We should scale the result by 'millisecond/second'.
+    {x: ISODate("2020-01-01T00:00:00.000Z"), y: 0, integral: 0.002},
+    {x: ISODate("2020-01-01T00:00:00.002Z"), y: 2, integral: 0.008},
+    {x: ISODate("2020-01-01T00:00:00.004Z"), y: 4, integral: 0.016},
+    {x: ISODate("2020-01-01T00:00:00.006Z"), y: 6, integral: 0.010},
+]);
+
+const pipelineWithNoOutputUnit = [
+    {
+        $setWindowFields: {
+            sortBy: {x: 1},
+            output: {
+                integral: {$integral: {input: "$y"}, window: {documents: [-1, 1]}},
+            }
+        }
+    },
+    {$unset: "_id"},
+];
+// 'outputUnit' is only valid if the 'sortBy' values are ISODate objects.
+// Dates are only valid if 'outputUnit' is specified.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {x: 0, y: 100},
+    {x: 1, y: 100},
+    {x: ISODate("2020-01-01T00:00:00.000Z"), y: 5},
+    {x: ISODate("2020-01-01T00:00:00.001Z"), y: 4},
+]));
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "setWindowFields_integral",
+    pipeline: pipelineWithOutputUnit,
+    cursor: {},
+}),
+                             5423901);
+
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "setWindowFields_integral",
+    pipeline: pipelineWithNoOutputUnit,
+    cursor: {},
+}),
+                             5423902);
+
+// Test various type of window. Only test the stability not testing the actual result.
+coll.drop();
+assert.commandWorked(coll.insert([
+    {x: 0, y: 0},
+    {x: 1, y: 42},
+    {x: 3, y: 67},
+]));
+documentBounds.forEach(function(bounds) {
+    const res = assert.commandWorked(coll.runCommand({
+        aggregate: coll.getName(),
+        cursor: {},
+        pipeline: [
+            {
+                $setWindowFields: {
+                    sortBy: {x: 1},
+                    output: {
+                        integral: {$integral: {input: "$y"}, window: {documents: bounds}},
+                    }
+                }
+            },
+        ]
+    }));
+    assert.eq(res.cursor.firstBatch.length, 3);
+});
+})();

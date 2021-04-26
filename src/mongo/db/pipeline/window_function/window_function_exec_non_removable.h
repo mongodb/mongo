@@ -78,10 +78,10 @@ public:
                     return stdx::get<int>(_upperDocumentBound);
             }();
 
-            if (auto doc = (this->_iter)[upperIndex])
+            if (auto doc = (this->_iter)[upperIndex]) {
                 _function->process(
                     _input->evaluate(*doc, &_input->getExpressionContext()->variables), false);
-            else {
+            } else {
                 // Upper bound is out of range, but may be because it's off of the end of the
                 // partition. For instance, for bounds [unbounded, -1] we won't be able to
                 // access the upper bound until the second call to getNext().
