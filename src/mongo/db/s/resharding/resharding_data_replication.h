@@ -120,14 +120,6 @@ public:
 
     /**
      * Returns a future that becomes ready when either
-     *   (a) the recipient with respect to each donor shard has applied through the timestamp it has
-     *       finished cloning at (the cloneTimestamp), or
-     *   (b) the recipient has encountered an operation-fatal error.
-     */
-    virtual SharedSemiFuture<void> awaitConsistentButStale() = 0;
-
-    /**
-     * Returns a future that becomes ready when either
      *   (a) the recipient has applied the final resharding oplog entry from every donor shard, or
      *   (b) the recipient has encountered an operation-fatal error.
      */
@@ -173,8 +165,6 @@ public:
 
     SharedSemiFuture<void> awaitCloningDone() override;
 
-    SharedSemiFuture<void> awaitConsistentButStale() override;
-
     SharedSemiFuture<void> awaitStrictlyConsistent() override;
 
     void shutdown() override;
@@ -218,7 +208,7 @@ private:
     static std::vector<std::unique_ptr<ReshardingOplogApplier>> _makeOplogAppliers(
         OperationContext* opCtx,
         ReshardingMetrics* metrics,
-        CommonReshardingMetadata metadata,
+        const CommonReshardingMetadata& metadata,
         const std::vector<DonorShardFetchTimestamp>& donorShards,
         Timestamp cloneTimestamp,
         ChunkManager sourceChunkMgr,
@@ -243,12 +233,7 @@ private:
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory);
 
-    std::vector<SharedSemiFuture<void>> _runOplogAppliersUntilConsistentButStale(
-        std::shared_ptr<executor::TaskExecutor> executor,
-        CancellationToken cancelToken,
-        CancelableOperationContextFactory opCtxFactory);
-
-    std::vector<SharedSemiFuture<void>> _runOplogAppliersUntilStrictlyConsistent(
+    std::vector<SharedSemiFuture<void>> _runOplogAppliers(
         std::shared_ptr<executor::TaskExecutor> executor,
         CancellationToken cancelToken,
         CancelableOperationContextFactory opCtxFactory);
@@ -270,7 +255,6 @@ private:
     SharedPromise<void> _startOplogApplication;
 
     SharedPromise<void> _cloningDone;
-    SharedPromise<void> _consistentButStale;
     SharedPromise<void> _strictlyConsistent;
 };
 

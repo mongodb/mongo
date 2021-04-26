@@ -234,18 +234,6 @@ public:
                                         Value(id.toBSON()))};
     }
 
-    const NamespaceString& oplogNs() {
-        return kOplogNs;
-    }
-
-    const NamespaceString& crudNs() {
-        return kCrudNs;
-    }
-
-    const UUID& crudUUID() {
-        return kCrudUUID;
-    }
-
     const NamespaceString& appliedToNs() {
         return kAppliedToNs;
     }
@@ -331,7 +319,6 @@ protected:
     const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
     const ShardId kMyShardId{"shard1"};
     const ShardId kOtherShardId{"shard2"};
-    UUID _crudNsUuid = UUID::gen();
     boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
@@ -347,22 +334,16 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
 
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-    future.get();
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
 }
 
 TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
@@ -389,31 +370,19 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-    future.get();
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
@@ -424,46 +393,6 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
     ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
-}
-
-TEST_F(ReshardingOplogApplierTest, CanceledCloningBatch) {
-    std::deque<repl::OplogEntry> crudOps;
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 1),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
-    boost::optional<ReshardingOplogApplier> applier;
-    auto executor = makeTaskExecutorForApplier();
-
-    applier.emplace(makeApplierEnv(),
-                    sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
-                    stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(7, 3),
-                    std::move(iterator),
-                    chunkManager());
-
-    // Cancel the rescheduling of the next batch.
-    auto abortSource = CancellationSource();
-    abortSource.cancel();
-    auto cancelToken = abortSource.token();
-    auto factory = makeCancelableOpCtxForApplier(cancelToken);
-
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
@@ -477,12 +406,8 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
                                 BSON("_id" << 2),
                                 boost::none));
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kUpdate,
-                                BSON("$set" << BSON("x" << 1)),
-                                BSON("_id" << 2)));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                                repl::OpTypeEnum::kDelete,
-                                BSON("_id" << 1),
+                                repl::OpTypeEnum::kInsert,
+                                BSON("_id" << 2),
                                 boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
@@ -491,25 +416,19 @@ TEST_F(ReshardingOplogApplierTest, CanceledApplyingBatch) {
 
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto abortSource = CancellationSource();
+    abortSource.cancel();
     auto cancelToken = abortSource.token();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
 
-    abortSource.cancel();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
@@ -527,51 +446,32 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(8, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
 
     DBDirectClient client(operationContext());
 
-    for (int x = 0; x < 9; x++) {
+    for (int x = 0; x < 19; x++) {
         auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << x));
         ASSERT_BSONOBJ_EQ(BSON("_id" << x), doc);
     }
 
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 9));
-    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
-
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
-    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-    future.get();
-
-    for (int x = 0; x < 19; x++) {
-        doc = client.findOne(appliedToNs().ns(), BSON("_id" << x));
-        ASSERT_BSONOBJ_EQ(BSON("_id" << x), doc);
-    }
-
-    progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getTs());
     ASSERT_EQ(20, progressDoc->getNumEntriesApplied());
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
+TEST_F(ReshardingOplogApplierTest, ErrorDuringFirstBatchApply) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -587,20 +487,16 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(7, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -610,7 +506,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
     ASSERT_FALSE(progressDoc);
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
+TEST_F(ReshardingOplogApplierTest, ErrorDuringSecondBatchApply) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -634,23 +530,16 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::FailedToParse);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::FailedToParse);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -669,7 +558,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
     ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
+TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplog) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -683,20 +572,16 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -706,57 +591,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     ASSERT_FALSE(progressDoc);
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
-    std::deque<repl::OplogEntry> crudOps;
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 1),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 3),
-                                boost::none));
-
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
-    iterator->setThrowWhenSingleItem();
-
-    boost::optional<ReshardingOplogApplier> applier;
-    auto executor = makeTaskExecutorForApplier();
-    applier.emplace(makeApplierEnv(),
-                    sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
-                    stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(5, 3),
-                    std::move(iterator),
-                    chunkManager());
-
-    auto cancelToken = operationContext()->getCancellationToken();
-    auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
-
-    DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
-    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
-
-    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
-    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
-}
-
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
+TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatch) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -774,20 +609,16 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(8, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -797,62 +628,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     ASSERT_FALSE(progressDoc);
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
-    std::deque<repl::OplogEntry> crudOps;
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 1),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 3),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
-    iterator->setThrowWhenSingleItem();
-
-    boost::optional<ReshardingOplogApplier> applier;
-    auto executor = makeTaskExecutorForApplier();
-    applier.emplace(makeApplierEnv(),
-                    sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
-                    stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
-
-    auto cancelToken = operationContext()->getCancellationToken();
-    auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
-
-    DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
-    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
-
-    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
-    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
-}
-
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
+TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatch) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -874,20 +650,16 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(7, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::InternalError);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -906,78 +678,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
 }
 
-TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
-    std::deque<repl::OplogEntry> crudOps;
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 1),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 3),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 4),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(9, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 5),
-                                boost::none));
-
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
-    iterator->setThrowWhenSingleItem();
-
-    boost::optional<ReshardingOplogApplier> applier;
-    auto executor = makeTaskExecutorForApplier();
-    applier.emplace(makeApplierEnv(),
-                    sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
-                    stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(6, 3),
-                    std::move(iterator),
-                    chunkManager());
-
-    auto cancelToken = operationContext()->getCancellationToken();
-    auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);
-
-    DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 4));
-    ASSERT_BSONOBJ_EQ(BSON("_id" << 4), doc);
-
-    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 5));
-    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
-
-    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
-    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
-    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
-}
-
-TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
+TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDown) {
     std::deque<repl::OplogEntry> crudOps;
     crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                                 repl::OpTypeEnum::kInsert,
@@ -989,21 +690,18 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(5, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     executor->shutdown();
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::ShutdownInProgress);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
@@ -1013,57 +711,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
     ASSERT_FALSE(progressDoc);
 }
 
-TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
-    std::deque<repl::OplogEntry> crudOps;
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 1),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 2),
-                                boost::none));
-    crudOps.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
-                                repl::OpTypeEnum::kInsert,
-                                BSON("_id" << 3),
-                                boost::none));
-
-    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps), 2 /* batchSize */);
-    boost::optional<ReshardingOplogApplier> applier;
-    auto executor = makeTaskExecutorForApplier();
-    applier.emplace(makeApplierEnv(),
-                    sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
-                    stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(5, 3),
-                    std::move(iterator),
-                    chunkManager());
-
-    auto cancelToken = operationContext()->getCancellationToken();
-    auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
-
-    executor->shutdown();
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
-
-    DBDirectClient client(operationContext());
-    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
-    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
-
-    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
-    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
-    ASSERT_EQ(2, progressDoc->getNumEntriesApplied());
-}
-
-TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseReshardingApplicationRules) {
+TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
     std::deque<repl::OplogEntry> ops;
     ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                             repl::OpTypeEnum::kInsert,
@@ -1084,27 +732,20 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(5, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-    future.get();
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
-
-    future = applier->applyUntilDone(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
@@ -1116,8 +757,7 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldErrorUseResharding
     ASSERT_EQ(1, progressDoc->getNumEntriesApplied());
 }
 
-TEST_F(ReshardingOplogApplierTest,
-       DropSourceCollectionCmdShouldErrorUseReshardingApplicationRules) {
+TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
     std::deque<repl::OplogEntry> ops;
     ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                             repl::OpTypeEnum::kCommand,
@@ -1129,20 +769,16 @@ TEST_F(ReshardingOplogApplierTest,
     auto executor = makeTaskExecutorForApplier();
     applier.emplace(makeApplierEnv(),
                     sourceId(),
-                    oplogNs(),
-                    crudNs(),
-                    crudUUID(),
+                    appliedToNs(),
                     stashCollections(),
-                    0U, /* myStashIdx */
-                    Timestamp(5, 3),
-                    std::move(iterator),
-                    chunkManager());
+                    0U /* myStashIdx */,
+                    chunkManager(),
+                    std::move(iterator));
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
-    auto future = applier->applyUntilCloneFinishedTs(executor, cancelToken, factory);
-
-    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::OplogOperationUnsupported);
+    auto future = applier->run(executor, cancelToken, factory);
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::OplogOperationUnsupported);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_FALSE(progressDoc);
@@ -1165,31 +801,21 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
         2);
     ReshardingOplogApplier applier(makeApplierEnv(),
                                    sourceId(),
-                                   oplogNs(),
-                                   crudNs(),
-                                   crudUUID(),
+                                   appliedToNs(),
                                    stashCollections(),
-                                   0U,
-                                   Timestamp(7, 3),
-                                   std::move(iterator),
-                                   chunkManager());
+                                   0U /* myStashIdx */,
+                                   chunkManager(),
+                                   std::move(iterator));
 
     ASSERT_EQ(metricsAppliedCount(), 0);
 
     auto cancelToken = operationContext()->getCancellationToken();
     auto factory = makeCancelableOpCtxForApplier(cancelToken);
+    auto future = applier.run(executor, cancelToken, factory);
+    ASSERT_OK(future.getNoThrow());
 
-    applier.applyUntilCloneFinishedTs(executor, cancelToken, factory)
-        .get();  // Stop at clone timestamp 7
-    ASSERT_EQ(metricsAppliedCount(),
-              4);  // Applied timestamps {5,6,7}, and {8} drafts in on the batch.
+    ASSERT_EQ(metricsAppliedCount(), 5);
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
-    ASSERT_TRUE(progressDoc);
-    ASSERT_EQ(4, progressDoc->getNumEntriesApplied());
-
-    applier.applyUntilDone(executor, cancelToken, factory).get();
-    ASSERT_EQ(metricsAppliedCount(), 5);  // Now includes timestamp {9}
-    progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(5, progressDoc->getNumEntriesApplied());
 }

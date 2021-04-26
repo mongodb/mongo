@@ -434,26 +434,9 @@ ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyS
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     _ensureDataReplicationStarted(opCtx.get(), executor, abortToken);
 
-    return _updateCoordinator(opCtx.get(), executor)
-        // ReshardingOplogApplier::applyUntilCloneFinishedTs() won't return a ready future until it
-        // has applied at least one batch. We skip waiting on awaitConsistentButStale() to avoid a
-        // situation where, in the absence of write activity on the collection being resharding, the
-        // recipient remains stuck in kApplying. This is because the coordinator will only have
-        // donor shards begin blocking writes (and thus write their final resharding oplog entries)
-        // once all recipients have reached kSteadyState. Waiting on awaitConsistentButStale() isn't
-        // necessary for resharding's correctness. It is always safe for the coordinator to block
-        // writes sooner. It isn't even inefficient due to how recipients clone the collection being
-        // resharded using {atClusterTime: *_fetchTimestamp}.
-        //
-        // TODO SERVER-49897: See if the following lines can be uncommented once a no-op oplog entry
-        // would be inserted into the local oplog buffer after the recipient reaches the end of the
-        // donor's oplog.
-        //
-        // .then([this, abortToken] {
-        //     return future_util::withCancellation(_dataReplication->awaitConsistentButStale(),
-        //                                          abortToken);
-        // })
-        .then([this] { _transitionState(RecipientStateEnum::kSteadyState); });
+    return _updateCoordinator(opCtx.get(), executor).then([this] {
+        _transitionState(RecipientStateEnum::kSteadyState);
+    });
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::

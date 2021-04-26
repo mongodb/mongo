@@ -142,10 +142,6 @@ public:
         return makeReadyFutureWith([] {}).share();
     };
 
-    SharedSemiFuture<void> awaitConsistentButStale() override {
-        return makeReadyFutureWith([] {}).share();
-    };
-
     SharedSemiFuture<void> awaitStrictlyConsistent() override {
         return makeReadyFutureWith([] {}).share();
     };
