@@ -387,8 +387,8 @@ void writeArrayToStream(T& stream, TypeTags tag, Value val) {
     stream << '[';
     if (auto ae = ArrayEnumerator{tag, val}; !ae.atEnd()) {
         for (;;) {
-            auto [tag, val] = ae.getViewOfValue();
-            writeValueToStream(stream, tag, val);
+            auto [aeTag, aeVal] = ae.getViewOfValue();
+            writeValueToStream(stream, aeTag, aeVal);
 
             ae.advance();
             if (ae.atEnd()) {
@@ -407,8 +407,8 @@ void writeObjectToStream(T& stream, TypeTags tag, Value val) {
     if (auto oe = ObjectEnumerator{tag, val}; !oe.atEnd()) {
         for (;;) {
             stream << "\"" << oe.getFieldName() << "\" : ";
-            auto [tag, val] = oe.getViewOfValue();
-            writeValueToStream(stream, tag, val);
+            auto [oeTag, oeVal] = oe.getViewOfValue();
+            writeValueToStream(stream, oeTag, oeVal);
 
             oe.advance();
             if (oe.atEnd()) {
