@@ -301,9 +301,8 @@ boost::optional<BSONObj> generateError(OperationContext* opCtx,
             BSONObjBuilder errInfo(error.subobjStart("errInfo"));
             staleInfo->serialize(&errInfo);
         }
-    } else if (ErrorCodes::DocumentValidationFailure == status.code() && status.extraInfo()) {
-        auto docValidationError =
-            status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>();
+    } else if (auto docValidationError =
+                   status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>()) {
         error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
         error.append("errInfo", docValidationError->getDetails());
     } else if (ErrorCodes::isTenantMigrationError(status.code())) {
