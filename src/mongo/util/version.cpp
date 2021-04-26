@@ -44,6 +44,10 @@
 #include <fmt/format.h>
 #include <sstream>
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
@@ -131,6 +135,31 @@ std::string VersionInfoInterface::makeVersionString(StringData binaryName) const
     return format(FMT_STRING("{} v{}"), binaryName, version());
 }
 
+#ifdef __APPLE__
+namespace {
+const std::map<std::string, std::string> kMacOSInfoMap = {
+    // sysctl name, followed by label for returned info object.
+    {"kern.osproductversion", "osProductVersion"},
+    {"kern.osrelease", "osRelease"},
+    {"kern.version", "version"},
+};
+// Collect macOS specific detail about the running version.
+void appendMacOSInfo(BSONObjBuilder* builder) {
+    BSONObjBuilder macOS(builder->subobjStart("macOS"));
+    char buffer[2048];
+
+    for (const auto& item : kMacOSInfoMap) {
+        std::size_t buffer_len = sizeof(buffer) - 1;
+        if ((sysctlbyname(item.first.c_str(), buffer, &buffer_len, nullptr, 0) == 0) &&
+            (buffer_len > 1)) {
+            // buffer_len returned by macOS includes the trailing nul byte.
+            macOS.append(item.second, StringData(buffer, buffer_len - 1));
+        }
+    }
+}
+}  // namespace
+#endif
+
 void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
     BSONObjBuilder& o = *result;
     o.append("version", version());
@@ -177,6 +206,9 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
     o.append("bits", (int)sizeof(void*) * CHAR_BIT);
     o.appendBool("debug", kDebugBuild);
     o.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+#ifdef __APPLE__
+    appendMacOSInfo(&o);
+#endif
 }
 
 std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
