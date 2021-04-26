@@ -359,6 +359,8 @@ public:
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) override;
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

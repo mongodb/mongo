@@ -1127,4 +1127,8 @@ int64_t StorageEngineImpl::sizeOnDiskForDb(OperationContext* opCtx, StringData d
     return size;
 }
 
+void StorageEngineImpl::setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {
+    _engine->setPinnedOplogTimestamp(pinnedTimestamp);
+}
+
 }  // namespace mongo

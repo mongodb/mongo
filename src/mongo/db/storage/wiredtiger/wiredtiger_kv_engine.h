@@ -352,6 +352,8 @@ public:
         return _clockSource;
     }
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
+
 private:
     class WiredTigerSessionSweeper;
     class WiredTigerCheckpointThread;
@@ -474,5 +476,9 @@ private:
     mutable Mutex _highestDurableTimestampMutex =
         MONGO_MAKE_LATCH("WiredTigerKVEngine::_highestDurableTimestampMutex");
     mutable unsigned long long _highestSeenDurableTimestamp = StorageEngine::kMinimumTimestamp;
+
+    // Pins the oplog so that OplogStones will not truncate oplog history equal or newer to this
+    // timestamp.
+    AtomicWord<std::uint64_t> _pinnedOplogTimestamp;
 };
 }  // namespace mongo

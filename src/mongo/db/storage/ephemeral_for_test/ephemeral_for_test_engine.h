@@ -123,6 +123,8 @@ public:
         return boost::none;
     }
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
+
 private:
     typedef StringMap<std::shared_ptr<void>> DataMap;
 

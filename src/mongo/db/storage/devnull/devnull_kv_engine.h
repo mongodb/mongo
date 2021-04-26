@@ -151,6 +151,8 @@ public:
         return boost::none;
     }
 
+    virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
+
 private:
     std::shared_ptr<void> _catalogInfo;
 

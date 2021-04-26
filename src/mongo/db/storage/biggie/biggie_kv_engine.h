@@ -164,6 +164,8 @@ public:
      */
     bool trySwapMaster(StringStore& newMaster, uint64_t version);
 
+    virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
+
 private:
     std::shared_ptr<void> _catalogInfo;
     int _cachePressureForTest = 0;

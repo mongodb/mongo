@@ -191,6 +191,8 @@ public:
     const DurableCatalog* getCatalog() const final {
         return nullptr;
     }
+
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) final {}
 };
 
 }  // namespace mongo

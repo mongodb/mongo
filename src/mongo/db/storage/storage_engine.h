@@ -634,6 +634,13 @@ public:
     virtual const KVEngine* getEngine() const = 0;
     virtual DurableCatalog* getCatalog() = 0;
     virtual const DurableCatalog* getCatalog() const = 0;
+
+    /**
+     * Prevents oplog history at 'pinnedTimestamp' and later from being truncated. Setting
+     * Timestamp::max() effectively nullifies the pin because no oplog truncation will be stopped by
+     * it.
+     */
+    virtual void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) = 0;
 };
 
 }  // namespace mongo

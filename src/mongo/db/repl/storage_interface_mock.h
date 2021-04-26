@@ -354,6 +354,9 @@ public:
         return {};
     }
 
+    void setPinnedOplogTimestamp(OperationContext* opCtx,
+                                 const Timestamp& pinnedTimestamp) const override {}
+
     // Testing functions.
     CreateCollectionForBulkFn createCollectionForBulkFn =
         [](const NamespaceString& nss,

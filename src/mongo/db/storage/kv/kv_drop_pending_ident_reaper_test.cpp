@@ -128,6 +128,8 @@ public:
         return boost::none;
     }
 
+    void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) {}
+
     // List of idents removed using dropIdent().
     std::vector<std::string> droppedIdents;
 
