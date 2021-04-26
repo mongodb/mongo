@@ -47,6 +47,8 @@ class OpMsgFuzzerFixture {
 public:
     OpMsgFuzzerFixture(bool skipGlobalInitializers = false);
 
+    ~OpMsgFuzzerFixture();
+
     /**
      * Run a single operation as if it came from the network.
      */

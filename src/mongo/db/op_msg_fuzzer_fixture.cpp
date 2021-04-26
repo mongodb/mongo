@@ -121,6 +121,20 @@ OpMsgFuzzerFixture::OpMsgFuzzerFixture(bool skipGlobalInitializers)
     _serviceContext->getStorageEngine()->notifyStartupComplete();
 }
 
+OpMsgFuzzerFixture::~OpMsgFuzzerFixture() {
+    CollectionShardingStateFactory::clear(_serviceContext);
+
+    {
+        auto clientGuard = _clientStrand->bind();
+        auto opCtx = _serviceContext->makeOperationContext(clientGuard.get());
+        Lock::GlobalLock glk(opCtx.get(), MODE_X);
+        auto databaseHolder = DatabaseHolder::get(opCtx.get());
+        databaseHolder->closeAll(opCtx.get());
+    }
+
+    shutdownGlobalStorageEngineCleanly(_serviceContext);
+}
+
 int OpMsgFuzzerFixture::testOneInput(const char* Data, size_t Size) {
     if (Size < sizeof(MSGHEADER::Value)) {
         return 0;
