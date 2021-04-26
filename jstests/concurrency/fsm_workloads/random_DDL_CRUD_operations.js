@@ -26,6 +26,24 @@ var $config = (function() {
         return prefix + tid;
     }
 
+    function countDocuments(coll, query) {
+        var count;
+        assert.soon(() => {
+            try {
+                count = coll.countDocuments(query);
+                return true;
+            } catch (e) {
+                if (e.code === ErrorCodes.QueryPlanKilled) {
+                    // Retry. Can happen due to concurrent rename collection.
+                    return false;
+                }
+                throw e;
+            }
+        });
+
+        return count;
+    }
+
     let data = {numChunks: 20, documentsPerChunk: 5, CRUDMutex: 'CRUDMutex'};
 
     /**
@@ -90,7 +108,6 @@ var $config = (function() {
                 tid = Random.randInt(this.threadCount);
             const srcCollName = threadCollectionName(collName, tid);
             const srcColl = db[srcCollName];
-            const numInitialDocs = srcColl.countDocuments({});
             // Rename collection
             const destCollName = threadCollectionName(collName, tid + '_' + new Date().getTime());
             try {
@@ -162,7 +179,8 @@ var $config = (function() {
             var res = insertBulkOp.execute();
             assertAlways.commandWorked(res);
 
-            let currentDocs = coll.countDocuments({generation: generation});
+            let currentDocs = countDocuments(coll, {generation: generation});
+
             // Check guarantees IF NO CONCURRENT DROP is running.
             // If a concurrent rename came in, then either the full operation succeded (meaning
             // there will be 0 documents left) or the insert came in first.
@@ -190,7 +208,7 @@ var $config = (function() {
             // Check if delete succeeded
             coll.remove({generation: generation}, {multi: true});
             // Check guarantees IF NO CONCURRENT DROP is running.
-            assertAlways.eq(coll.countDocuments({generation: generation}), 0);
+            assertAlways.eq(countDocuments(coll, {generation: generation}), 0);
             mutexUnlock(db, tid, targetThreadColl);
             jsTestLog('CRUD state finished');
         }
@@ -201,6 +219,8 @@ var $config = (function() {
             db[data.CRUDMutex].insert({tid: tid, mutex: 0});
         }
     };
+
+    let teardown = function(db, collName, cluster) {};
 
     let transitions = {
         init: {create: 1.0},
@@ -218,6 +238,7 @@ var $config = (function() {
         transitions: transitions,
         data: data,
         setup: setup,
+        teardown: teardown,
         passConnectionCache: true
     };
 })();
