@@ -173,7 +173,9 @@ void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
         tenantBuilder.append("rejectBeforeTimestamp", _rejectBeforeTimestamp.get());
     }
     tenantBuilder.append("ttlIsBlocked", _ttlIsBlocked);
-    builder->append(_tenantId, tenantBuilder.obj());
+    tenantBuilder.append("tenantId", _tenantId);
+
+    builder->append("recipient", tenantBuilder.obj());
 }
 
 std::string TenantMigrationRecipientAccessBlocker::BlockerState::toString() const {

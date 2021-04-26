@@ -399,7 +399,7 @@ function TenantMigrationTest({
             : TenantMigrationTest.DonorAccessState.kAborted;
         const mtabs =
             assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
-        return (mtabs[tenantId].state === expectedAccessState);
+        return (mtabs[tenantId].donor.state === expectedAccessState);
     };
 
     /**
@@ -440,7 +440,7 @@ function TenantMigrationTest({
 
         const mtabs =
             assert.commandWorked(node.adminCommand({serverStatus: 1})).tenantMigrationAccessBlocker;
-        return (mtabs[tenantId].state === expectedAccessState);
+        return (mtabs[tenantId].recipient.state === expectedAccessState);
     };
 
     function loadDummyData() {

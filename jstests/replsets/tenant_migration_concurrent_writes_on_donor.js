@@ -65,7 +65,7 @@ function checkTenantMigrationAccessBlocker(node, tenantId, {
     numTenantMigrationCommittedErrors = 0,
     numTenantMigrationAbortedErrors = 0
 }) {
-    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId);
+    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId).donor;
     if (!mtab) {
         assert.eq(0, numBlockedWrites);
         assert.eq(0, numTenantMigrationCommittedErrors);
@@ -315,7 +315,7 @@ function testDoNotRejectWritesAfterMigrationAborted(testCase, testOpts) {
     assert.soon(() => {
         const mtabs =
             testOpts.primaryDB.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[tenantId].state === TenantMigrationTest.DonorAccessState.kAborted;
+        return mtabs[tenantId].donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
 
     runCommand(testOpts);

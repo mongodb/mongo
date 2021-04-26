@@ -89,47 +89,47 @@ if (donorDoc) {
         case TenantMigrationTest.DonorState.kDataSync:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.DonorAccessState.kAllow);
+                                  .donor.state == TenantMigrationTest.DonorAccessState.kAllow);
             break;
         case TenantMigrationTest.DonorState.kBlocking:
             assert.soon(
                 () =>
                     tenantMigrationTest.getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                        .state == TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
+                        .donor.state == TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .blockTimestamp,
+                                        .donor.blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
         case TenantMigrationTest.DonorState.kCommitted:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.DonorAccessState.kReject);
+                                  .donor.state == TenantMigrationTest.DonorAccessState.kReject);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .commitOpTime,
+                                        .donor.commitOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .blockTimestamp,
+                                        .donor.blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
         case TenantMigrationTest.DonorState.kAborted:
             assert.soon(() => tenantMigrationTest
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .state == TenantMigrationTest.DonorAccessState.kAborted);
+                                  .donor.state == TenantMigrationTest.DonorAccessState.kAborted);
             assert.soon(
                 () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .abortOpTime,
+                                        .donor.abortOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
-                () => bsonWoCompare(tenantMigrationTest
+                () => bsonWoCompare(tenantMigrationTest.donor
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                        .blockTimestamp,
+                                        .donor.blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
         default:

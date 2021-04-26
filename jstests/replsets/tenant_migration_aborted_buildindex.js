@@ -97,7 +97,8 @@ const blockingFp =
     configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingBlockingState");
 dataSyncFp.off();
 assert.soon(
-    () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state ===
+    () =>
+        tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).donor.state ===
         TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 
 // Clear the log so we can wait for the new index builds to start.

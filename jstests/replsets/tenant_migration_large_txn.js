@@ -82,7 +82,8 @@ logApplyOpsForTxnFp.wait();
 // Allow the migration to move to the blocking state and commit.
 dataSyncFp.off();
 assert.soon(
-    () => tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).state ===
+    () =>
+        tenantMigrationTest.getTenantMigrationAccessBlocker(donorPrimary, kTenantId).donor.state ===
         TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
 logApplyOpsForTxnFp.off();
 assert.commandWorked(migrationThread.returnData());

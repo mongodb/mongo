@@ -40,7 +40,7 @@ function checkTenantMigrationAccessBlocker(node, tenantId, {
     numTenantMigrationCommittedErrors = 0,
     numTenantMigrationAbortedErrors = 0
 }) {
-    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId);
+    const mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(node, tenantId).donor;
     if (!mtab) {
         assert.eq(0, numBlockedReads);
         assert.eq(0, numTenantMigrationCommittedErrors);

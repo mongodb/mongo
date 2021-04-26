@@ -73,24 +73,26 @@ if (recipientDoc) {
             if (recipientDoc.dataConsistentStopDonorOpTime) {
                 assert.soon(() => tenantMigrationTest
                                       .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
-                                      .state == TenantMigrationTest.RecipientAccessState.kReject);
+                                      .recipient.state ==
+                                TenantMigrationTest.RecipientAccessState.kReject);
             }
             break;
         case TenantMigrationTest.RecipientState.kConsistent:
             if (recipientDoc.rejectReadsBeforeTimestamp) {
                 assert.soon(() => tenantMigrationTest
                                       .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
-                                      .state ==
+                                      .recipient.state ==
                                 TenantMigrationTest.RecipientAccessState.kRejectBefore);
                 assert.soon(() => bsonWoCompare(tenantMigrationTest
                                                     .getTenantMigrationAccessBlocker(
                                                         recipientPrimary, kTenantId)
-                                                    .rejectBeforeTimestamp,
+                                                    .recipient.rejectBeforeTimestamp,
                                                 recipientDoc.rejectReadsBeforeTimestamp) == 0);
             } else {
                 assert.soon(() => tenantMigrationTest
                                       .getTenantMigrationAccessBlocker(recipientPrimary, kTenantId)
-                                      .state == TenantMigrationTest.RecipientAccessState.kReject);
+                                      .recipient.state ==
+                                TenantMigrationTest.RecipientAccessState.kReject);
             }
             break;
         default:

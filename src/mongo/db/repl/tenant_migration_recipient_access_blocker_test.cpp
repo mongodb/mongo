@@ -137,10 +137,11 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateReject) {
     {
         BSONObjBuilder builder;
         mtab.appendInfoForServerStatus(&builder);
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON(getTenantId() << BSON("state"
-                                                     << "reject"
-                                                     << "ttlIsBlocked" << true)));
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            BSON("recipient" << BSON("state"
+                                     << "reject"
+                                     << "ttlIsBlocked" << true << "tenantId" << getTenantId())));
     }
 
     // Default read concern.
@@ -174,11 +175,12 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     {
         BSONObjBuilder builder;
         mtab.appendInfoForServerStatus(&builder);
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON(getTenantId() << BSON("state"
-                                                     << "rejectBefore"
-                                                     << "rejectBeforeTimestamp" << Timestamp(1, 1)
-                                                     << "ttlIsBlocked" << true)));
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            BSON("recipient" << BSON("state"
+                                     << "rejectBefore"
+                                     << "rejectBeforeTimestamp" << Timestamp(1, 1) << "ttlIsBlocked"
+                                     << true << "tenantId" << getTenantId())));
     }
 
     // Advance 'rejectBeforeTimestamp'.
@@ -186,11 +188,12 @@ TEST_F(TenantMigrationRecipientAccessBlockerTest, StateRejectBefore) {
     {
         BSONObjBuilder builder;
         mtab.appendInfoForServerStatus(&builder);
-        ASSERT_BSONOBJ_EQ(builder.obj(),
-                          BSON(getTenantId() << BSON("state"
-                                                     << "rejectBefore"
-                                                     << "rejectBeforeTimestamp" << Timestamp(2, 1)
-                                                     << "ttlIsBlocked" << true)));
+        ASSERT_BSONOBJ_EQ(
+            builder.obj(),
+            BSON("recipient" << BSON("state"
+                                     << "rejectBefore"
+                                     << "rejectBeforeTimestamp" << Timestamp(2, 1) << "ttlIsBlocked"
+                                     << true << "tenantId" << getTenantId())));
     }
 
     // Default read concern.

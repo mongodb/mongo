@@ -246,7 +246,7 @@ var TenantMigrationUtil = (function() {
         if (!mtab) {
             return 0;
         }
-        return mtab.numBlockedReads;
+        return mtab.donor.numBlockedReads;
     }
 
     /**
@@ -258,7 +258,7 @@ var TenantMigrationUtil = (function() {
         if (!mtab) {
             return 0;
         }
-        return mtab.numBlockedWrites;
+        return mtab.donor.numBlockedWrites;
     }
 
     /**

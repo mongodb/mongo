@@ -374,7 +374,9 @@ void TenantMigrationDonorAccessBlocker::appendInfoForServerStatus(BSONObjBuilder
         tenantBuilder.append("abortOpTime", _abortOpTime->toBSON());
     }
     _stats.report(&tenantBuilder);
-    builder->append(_tenantId, tenantBuilder.obj());
+    tenantBuilder.append("tenantId", _tenantId);
+
+    builder->append("donor", tenantBuilder.obj());
 }
 
 BSONObj TenantMigrationDonorAccessBlocker::getDebugInfo() const {

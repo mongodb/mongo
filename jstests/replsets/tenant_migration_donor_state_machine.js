@@ -153,8 +153,9 @@ function testStats(node, {
     blockingFp.wait();
 
     let mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-    assert.eq(mtabs[kTenantId].state, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
-    assert(mtabs[kTenantId].blockTimestamp);
+    assert.eq(mtabs[kTenantId].donor.state,
+              TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
+    assert(mtabs[kTenantId].donor.blockTimestamp);
 
     let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let blockOplogEntry =
@@ -189,9 +190,9 @@ function testStats(node, {
 
     assert.soon(() => {
         mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].state === TenantMigrationTest.DonorAccessState.kReject;
+        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kReject;
     });
-    assert(mtabs[kTenantId].commitOpTime);
+    assert(mtabs[kTenantId].donor.commitOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -234,9 +235,9 @@ function testStats(node, {
     let mtabs;
     assert.soon(() => {
         mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].state === TenantMigrationTest.DonorAccessState.kAborted;
+        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
-    assert(mtabs[kTenantId].abortOpTime);
+    assert(mtabs[kTenantId].donor.abortOpTime);
 
     expectedRecipientSyncDataMetricsFailed++;
     expectedNumRecipientSyncDataCmdSent++;
@@ -277,9 +278,9 @@ function testStats(node, {
     let mtabs;
     assert.soon(() => {
         mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[kTenantId].state === TenantMigrationTest.DonorAccessState.kAborted;
+        return mtabs[kTenantId].donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
-    assert(mtabs[kTenantId].abortOpTime);
+    assert(mtabs[kTenantId].donor.abortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
