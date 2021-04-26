@@ -425,7 +425,9 @@ boost::optional<Record> RecordStore::Cursor::seekNear(const RecordId& id) {
 
 // Positions are saved as we go.
 void RecordStore::Cursor::save() {}
-void RecordStore::Cursor::saveUnpositioned() {}
+void RecordStore::Cursor::saveUnpositioned() {
+    _savedPosition = boost::none;
+}
 
 bool RecordStore::Cursor::restore() {
     if (!_savedPosition)
@@ -550,7 +552,9 @@ boost::optional<Record> RecordStore::ReverseCursor::seekNear(const RecordId& id)
 }
 
 void RecordStore::ReverseCursor::save() {}
-void RecordStore::ReverseCursor::saveUnpositioned() {}
+void RecordStore::ReverseCursor::saveUnpositioned() {
+    _savedPosition = boost::none;
+}
 
 bool RecordStore::ReverseCursor::restore() {
     if (!_savedPosition)
