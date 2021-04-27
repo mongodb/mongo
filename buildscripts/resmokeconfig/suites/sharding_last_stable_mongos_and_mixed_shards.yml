@@ -177,6 +177,8 @@ selector:
   - jstests/sharding/sharding_task_executor_pool_matching_policy.js
   # Enable the following once SERVER-50412 is backported to 4.0. "helloOk" does not exist on 4.0.
   - jstests/sharding/mongos_helloOk_protocol.js
+  # Enable the following once SERVER-55725 is backported to 4.0.
+  - jstests/sharding/time_zone_info_mongos.js
 executor:
   config:
     shell_options:
