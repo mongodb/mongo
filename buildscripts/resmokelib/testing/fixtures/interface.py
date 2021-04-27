@@ -339,5 +339,14 @@ def create_fixture_table(fixture):
     return "Fixture status:\n" + table
 
 
+def authenticate(client, auth_options=None):
+    """Authenticate client for the 'authenticationDatabase' and return the client."""
+    if auth_options is not None:
+        auth_db = client[auth_options["authenticationDatabase"]]
+        auth_db.authenticate(auth_options["username"], password=auth_options["password"],
+                             mechanism=auth_options["authenticationMechanism"])
+    return client
+
+
 # Represents a row in a node info table.
 NodeInfo = namedtuple('NodeInfo', ['full_name', 'name', 'port', 'pid'])

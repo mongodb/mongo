@@ -146,7 +146,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
             mongos.await_ready()
 
         client = self.mongo_client()
-        self._auth_to_db(client)
+        interface.authenticate(client, self.auth_options)
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
@@ -196,7 +196,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                               for mongod in shard.nodes]
 
             for client, port in mongod_clients:
-                self._auth_to_db(client)
+                interface.authenticate(client, self.auth_options)
 
                 while True:
                     # The choice of namespace (local.fooCollection) does not affect the output.
@@ -211,25 +211,17 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
                             .format(port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
                     time.sleep(0.1)
 
-    def _auth_to_db(self, client):
-        """Authenticate client for the 'authenticationDatabase'."""
-        if self.auth_options is not None:
-            auth_db = client[self.auth_options["authenticationDatabase"]]
-            auth_db.authenticate(self.auth_options["username"],
-                                 password=self.auth_options["password"],
-                                 mechanism=self.auth_options["authenticationMechanism"])
-
     def stop_balancer(self, timeout_ms=60000):
         """Stop the balancer."""
         client = self.mongo_client()
-        self._auth_to_db(client)
+        interface.authenticate(client, self.auth_options)
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Stopped the balancer")
 
     def start_balancer(self, timeout_ms=60000):
         """Start the balancer."""
         client = self.mongo_client()
-        self._auth_to_db(client)
+        interface.authenticate(client, self.auth_options)
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Started the balancer")
 

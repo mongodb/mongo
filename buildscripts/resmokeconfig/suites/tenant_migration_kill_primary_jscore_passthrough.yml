@@ -237,6 +237,7 @@ executor:
   hooks:
   - class: ContinuousStepdown
     kill: true
+    auth_options: *authOptions
   - class: ContinuousTenantMigration
     shell_options:
       global_vars:
