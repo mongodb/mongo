@@ -1,15 +1,23 @@
 /**
  * Tests that wildcard indexes are prepared to handle and retry WriteConflictExceptions while
  * interacting with the storage layer to retrieve multikey paths.
- * @tags: [
- *   sbe_incompatible,
- * ]
+ *
+ * TODO SERVER-56443: This test is specific to the classic engine. If/when the classic engine is
+ * deleted, this test should be removed as well.
  */
 (function() {
 "strict";
 
+load("jstests/libs/sbe_util.js");
+
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("test");
+
+if (checkSBEEnabled(testDB)) {
+    jsTestLog("Skipping test as SBE is not resilient to WCEs");
+    MongoRunner.stopMongod(conn);
+    return;
+}
 
 const coll = testDB.write_conflict_wildcard;
 coll.drop();
