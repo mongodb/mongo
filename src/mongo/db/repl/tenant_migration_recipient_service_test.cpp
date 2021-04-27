@@ -1848,11 +1848,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
     // Continue and hang before starting the oplog applier.
     const auto hangAfterStartingOplogApplier =
         globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
-    hangBeforeFetcherFp->setMode(FailPoint::off);
     initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
                                                                  0,
                                                                  BSON("action"
                                                                       << "hang"));
+    hangBeforeFetcherFp->setMode(FailPoint::off);
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     // The oplog fetcher should exist and be running.
@@ -1931,6 +1931,14 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
 
+    // Hang before starting the oplog applier.
+    const auto hangAfterStartingOplogApplier =
+        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
+    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
+                                                                      0,
+                                                                      BSON("action"
+                                                                           << "hang"));
+
     {
         FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
         // Create and start the instance.
@@ -1983,13 +1991,6 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
                                 {resumeNoOpEntry.toBSON(), resumeRecipientOpTime.getTimestamp()},
                                 resumeRecipientOpTime.getTerm()));
 
-    // Hang before starting the oplog applier.
-    const auto hangAfterStartingOplogApplier =
-        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
-    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
-                                                                      0,
-                                                                      BSON("action"
-                                                                           << "hang"));
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
@@ -2056,6 +2057,14 @@ TEST_F(TenantMigrationRecipientServiceTest,
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
 
+    // Hang before starting the oplog applier.
+    const auto hangAfterStartingOplogApplier =
+        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
+    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
+                                                                      0,
+                                                                      BSON("action"
+                                                                           << "hang"));
+
     {
         FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
         // Create and start the instance.
@@ -2072,9 +2081,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
     //       is less than the 'startApplyingDonorOpTime'. We will resume batching from this
     //       timestamp.
     // - (4) A no-op oplog entry with an inner oplog entry as the 'o2' field but no
-    //       'fromTenantMigrate' field. This oplog entry do not satisfy the conditions for the
-    //       oplog applier to resume applying from so we default to apply
-    //       from 'startDonorApplyingOpTime'.
+    //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
+    //       for the oplog applier to resume applying from so we default to apply from
+    //       'startDonorApplyingOpTime'.
     const auto insertNss = NamespaceString("tenantA_foo.bar");
     const auto beforeStartApplyingOpTime = OpTime(Timestamp(1, 1), 1);
     const auto entryBeforeStartApplyingOpTime = makeOplogEntry(
@@ -2144,13 +2153,6 @@ TEST_F(TenantMigrationRecipientServiceTest,
             opCtx.get(), oplogNss, {entry.toBSON(), opTime.getTimestamp()}, opTime.getTerm()));
     }
 
-    // Hang before starting the oplog applier.
-    const auto hangAfterStartingOplogApplier =
-        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
-    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
-                                                                      0,
-                                                                      BSON("action"
-                                                                           << "hang"));
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
@@ -2219,6 +2221,14 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
 
+    // Hang before starting the oplog applier.
+    const auto hangAfterStartingOplogApplier =
+        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
+    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
+                                                                      0,
+                                                                      BSON("action"
+                                                                           << "hang"));
+
     {
         FailPointEnableBlock fp("pauseBeforeRunTenantMigrationRecipientInstance");
         // Create and start the instance.
@@ -2232,9 +2242,9 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     // - (1) An oplog entry with opTime earlier than 'cloneFinishedRecipientOpTime'.
     // - (2) An oplog entry with opTime greater than 'cloneFinishedRecipientOpTime'.
     // - (3) A no-op oplog entry with an inner oplog entry as the 'o2' field but no
-    //       'fromTenantMigrate' field. This oplog entry do not satisfy the conditions for the
-    //       oplog applier to resume applying from so we default to applying and batching
-    //       from the start of the buffer collection.
+    //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
+    //       for the oplog applier to resume applying from so we default to applying and
+    //       batching from the start of the buffer collection.
     const auto insertNss = NamespaceString("tenantA_foo.bar");
     const auto afterStartApplyingOpTime = OpTime(Timestamp(3, 1), 1);
     const auto entryAfterStartApplyingOpTime = makeOplogEntry(
@@ -2288,13 +2298,6 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
                                       {noOpEntry.toBSON(), laterOpTime.getTimestamp()},
                                       laterOpTime.getTerm()));
 
-    // Hang before starting the oplog applier.
-    const auto hangAfterStartingOplogApplier =
-        globalFailPointRegistry().find("fpAfterStartingOplogApplierMigrationRecipientInstance");
-    auto initialTimesEntered = hangAfterStartingOplogApplier->setMode(FailPoint::alwaysOn,
-                                                                      0,
-                                                                      BSON("action"
-                                                                           << "hang"));
     hangAfterStartingOplogApplier->waitForTimesEntered(initialTimesEntered + 1);
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
