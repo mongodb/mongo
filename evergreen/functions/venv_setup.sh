@@ -9,7 +9,7 @@ venv_dir="${workdir}/venv"
 if [ -d "$venv_dir" ]; then
   exit 0
 fi
-"$python_loc" -m venv --system-site-packages "$venv_dir"
+"$python_loc" -m venv "$venv_dir"
 
 # venv creates its Scripts/activate file with CLRF endings, which
 # cygwin bash does not like. dos2unix it
