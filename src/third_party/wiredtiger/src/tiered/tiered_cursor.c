@@ -1063,6 +1063,70 @@ err:
 }
 
 /*
+ * __curtiered_insert_bulk --
+ *     WT_CURSOR->insert method for tiered bulk cursors.
+ */
+static int
+__curtiered_insert_bulk(WT_CURSOR *cursor)
+{
+    WT_CURSOR *bulk_cursor;
+    WT_CURSOR_TIERED *curtiered;
+    WT_SESSION_IMPL *session;
+
+    curtiered = (WT_CURSOR_TIERED *)cursor;
+    session = CUR2S(curtiered);
+    bulk_cursor = curtiered->cursors[WT_TIERED_INDEX_LOCAL];
+
+    WT_ASSERT(session, bulk_cursor != NULL);
+    bulk_cursor->set_key(bulk_cursor, &cursor->key);
+    bulk_cursor->set_value(bulk_cursor, &cursor->value);
+    WT_RET(bulk_cursor->insert(bulk_cursor));
+
+    return (0);
+}
+
+/*
+ * __curtiered_open_bulk --
+ *     WT_SESSION->open_cursor method for tiered bulk cursors.
+ */
+static int
+__curtiered_open_bulk(WT_CURSOR_TIERED *curtiered, const char *cfg[])
+{
+    WT_CURSOR *cursor;
+    WT_DATA_HANDLE *dhandle;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    WT_TIERED *tiered;
+
+    cursor = &curtiered->iface;
+    session = CUR2S(curtiered);
+    tiered = curtiered->tiered;
+
+    /* Bulk cursors only support insert and close. */
+    __wt_cursor_set_notsup(cursor);
+    cursor->insert = __curtiered_insert_bulk;
+    cursor->close = __wt_curtiered_close;
+
+    WT_ASSERT(session, curtiered->cursors == NULL);
+    WT_ERR(__wt_calloc_def(session, WT_TIERED_MAX_TIERS, &curtiered->cursors));
+
+    /* Open a bulk cursor on the local tier. */
+    dhandle = tiered->tiers[WT_TIERED_INDEX_LOCAL].tier;
+    WT_ASSERT(session, dhandle != NULL);
+    WT_ERR(__wt_open_cursor(
+      session, dhandle->name, cursor, cfg, &curtiered->cursors[WT_TIERED_INDEX_LOCAL]));
+
+    /* Child cursors always use overwrite and raw mode. */
+    F_SET(curtiered->cursors[WT_TIERED_INDEX_LOCAL], WT_CURSTD_OVERWRITE | WT_CURSTD_RAW);
+
+    if (0) {
+err:
+        __wt_free(session, curtiered->cursors);
+    }
+    return (ret);
+}
+
+/*
  * __wt_curtiered_open --
  *     WT_SESSION->open_cursor method for tiered cursors.
  */
@@ -1118,7 +1182,7 @@ __wt_curtiered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
 
     /* Check whether the exclusive open for a bulk load succeeded. */
     if (bulk && ret == EBUSY)
-        WT_ERR_MSG(session, EINVAL, "bulk-load is only supported on newly created trees");
+        ret = EINVAL;
     /* Flag any errors from the tree get. */
     WT_ERR(ret);
 
@@ -1148,7 +1212,7 @@ __wt_curtiered_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
     WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
     if (bulk)
-        WT_ERR(ENOTSUP); /* TODO */
+        WT_ERR(__curtiered_open_bulk(curtiered, cfg));
 
     if (0) {
 err:

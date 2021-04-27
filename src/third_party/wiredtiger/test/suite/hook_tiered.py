@@ -62,8 +62,8 @@ def session_create_replace(ntiers, orig_session_create, session_self, uri, confi
     # If the test is creating a table (not colstore or lsm), create a tiered table instead,
     # using arg to determine number of tiers. Otherwise just do the create as normal.
     #
-    # NOTE: the API for creating a tiered table will change in WT-7173 and this will need to
-    # be updated.
+    # NOTE: The following code uses the old API for creating tiered tables.  As of WT-7173
+    # this no longer works.  It will be updated and fixed in WT-7440.
     if (uri.startswith("table:") and "key_format=r" not in base_config and
       "type=lsm" not in base_config):
         tier_string = ""
@@ -106,11 +106,12 @@ class TieredHookCreator(wthooks.WiredTigerHookCreator):
     # Is this test one we should skip? We skip tests of features supported on standard
     # tables but not tiered tables, specififically cursor caching and checkpoint cursors.
     def skip_test(self, test):
-        skip = ["test_cursor13_reopens",
+        skip = ["bulk_backup",
+                "checkpoint",
                 "test_cursor13_big",
                 "test_cursor13_drops",
                 "test_cursor13_dup",
-                "checkpoint"]
+                "test_cursor13_reopens"]
         for item in skip:
             if item in str(test):
                 return True
