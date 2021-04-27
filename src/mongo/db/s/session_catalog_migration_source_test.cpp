@@ -166,6 +166,60 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
     ASSERT_FALSE(migrationSource.hasMoreOplog());
 }
 
+TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWritesMultiStmtIds) {
+    auto entry1 = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {0, 1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry1);
+
+    auto entry2 =
+        makeOplogEntry(repl::OpTime(Timestamp(67, 54801), 2),  // optime
+                       repl::OpTypeEnum::kInsert,              // op type
+                       BSON("x" << 50),                        // o
+                       boost::none,                            // o2
+                       Date_t::now(),                          // wall clock time
+                       {2, 3},                                 // statement ids
+                       entry1.getOpTime());  // optime of previous write within same transaction
+    insertOplogEntry(entry2);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
+    sessionRecord.setTxnNum(1);
+    sessionRecord.setLastWriteOpTime(entry2.getOpTime());
+    sessionRecord.setLastWriteDate(entry2.getWallClockTime());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+
+    {
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+        // Cannot compare directly because of SERVER-31356
+        ASSERT_BSONOBJ_EQ(entry2.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
+        ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    }
+
+    {
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+        // Cannot compare directly because of SERVER-31356
+        ASSERT_BSONOBJ_EQ(entry1.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
+    }
+
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+}
+
 TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWrites) {
     auto entry1a = makeOplogEntry(
         repl::OpTime(Timestamp(52, 345), 2),  // optime
@@ -328,9 +382,80 @@ TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithFindAndModifyPreImageAnd
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    auto expectedSequece = {entry3, entry4, entry1, entry2};
+    auto expectedSequence = {entry3, entry4, entry1, entry2};
 
-    for (auto oplog : expectedSequece) {
+    for (auto oplog : expectedSequence) {
+        ASSERT_TRUE(migrationSource.hasMoreOplog());
+        auto nextOplogResult = migrationSource.getLastFetchedOplog();
+        ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
+        // Cannot compare directly because of SERVER-31356
+        ASSERT_BSONOBJ_EQ(oplog.getEntry().toBSON(), nextOplogResult.oplog->getEntry().toBSON());
+        migrationSource.fetchNextOplog(opCtx());
+    }
+
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest,
+       OneSessionWithFindAndModifyPreImageAndPostImageMultiStmtIds) {
+    auto entry1 = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kNoop,              // op type
+        BSON("x" << 30),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {0, 1},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry1);
+
+    auto entry2 = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 346), 2),  // optime
+        repl::OpTypeEnum::kDelete,            // op type
+        BSON("x" << 50),                      // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        {2, 3},                               // statement ids
+        repl::OpTime(Timestamp(0, 0), 0),     // optime of previous write within same transaction
+        entry1.getOpTime());                  // pre-image optime
+    insertOplogEntry(entry2);
+
+    auto entry3 = makeOplogEntry(
+        repl::OpTime(Timestamp(73, 5), 2),  // optime
+        repl::OpTypeEnum::kNoop,            // op type
+        BSON("x" << 20),                    // o
+        boost::none,                        // o2
+        Date_t::now(),                      // wall clock time
+        {4, 5},                             // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));  // optime of previous write within same transaction
+    insertOplogEntry(entry3);
+
+    auto entry4 =
+        makeOplogEntry(repl::OpTime(Timestamp(73, 6), 2),  // optime
+                       repl::OpTypeEnum::kUpdate,          // op type
+                       BSON("$inc" << BSON("x" << 1)),     // o
+                       BSON("x" << 19),                    // o2
+                       Date_t::now(),                      // wall clock time
+                       {6, 7},                             // statement ids
+                       entry2.getOpTime(),   // optime of previous write within same transaction
+                       boost::none,          // pre-image optime
+                       entry3.getOpTime());  // post-image optime
+    insertOplogEntry(entry4);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
+    sessionRecord.setTxnNum(1);
+    sessionRecord.setLastWriteOpTime(entry4.getOpTime());
+    sessionRecord.setLastWriteDate(entry4.getWallClockTime());
+
+    DBDirectClient client(opCtx());
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
+
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+
+    auto expectedSequence = {entry3, entry4, entry1, entry2};
+
+    for (auto oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -931,9 +1056,9 @@ TEST_F(SessionCatalogMigrationSourceTest,
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    auto expectedSequece = {entry1, entry2};
+    auto expectedSequence = {entry1, entry2};
 
-    for (auto oplog : expectedSequece) {
+    for (auto oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
@@ -1089,9 +1214,9 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
 
-    auto expectedSequece = {entry1a, entry2b, entry2a};
+    auto expectedSequence = {entry1a, entry2b, entry2a};
 
-    for (auto oplog : expectedSequece) {
+    for (auto oplog : expectedSequence) {
         ASSERT_TRUE(migrationSource.hasMoreOplog());
         auto nextOplogResult = migrationSource.getLastFetchedOplog();
         ASSERT_FALSE(nextOplogResult.shouldWaitForMajority);
