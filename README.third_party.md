@@ -38,7 +38,7 @@ a notice will be included in
 | [scons]                    | MIT               | 2.5.0             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.3             |          ✗           |                ✗                |
 | [sqlite]                   | Public Domain     | 3190300           |          ✗           |                ✗                |
-| [timelib]                  | MIT               | 2018.01alpha1     |                      |                ✗                |
+| [timelib]                  | MIT               | 2021.06           |                      |                ✗                |
 | [TomCrypt]                 | Public Domain     | 1.18.1            |          ✗           |                ✗                |
 | [Unicode]                  | Unicode-DFS-2015  | 8.0.0             |          ✗           |                ✗                |
 | [Valgrind]                 | BSD-3-Clause<sup>\[<a href="#note_vg" id="ref_vg">1</a>]</sup> | 3.11.0 |       |                ✗                |

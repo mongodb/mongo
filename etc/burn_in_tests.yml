@@ -7,3 +7,5 @@ selector:
     exclude_tasks:
     # Exclude list of jstests file names.
     exclude_tests:
+    # Enable the following once SERVER-55725 is backported to 4.0 (and prev. versions checked here).
+    - jstests/sharding/time_zone_info_mongos.js
