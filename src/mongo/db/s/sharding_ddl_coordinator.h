@@ -31,10 +31,10 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
 
@@ -45,7 +45,7 @@ ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONO
 class ShardingDDLCoordinator
     : public repl::PrimaryOnlyService::TypedInstance<ShardingDDLCoordinator> {
 public:
-    explicit ShardingDDLCoordinator(const BSONObj& coorDoc);
+    explicit ShardingDDLCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& coorDoc);
 
     ~ShardingDDLCoordinator();
 
@@ -95,6 +95,7 @@ protected:
         return {};
     };
 
+    ShardingDDLCoordinatorService* _service;
     ShardingDDLCoordinatorMetadata _coorMetadata;
     bool _recoveredFromDisk;
 
@@ -111,7 +112,7 @@ private:
 
     void interrupt(Status status) override final;
 
-    void _removeDocument(OperationContext* opCtx);
+    bool _removeDocument(OperationContext* opCtx);
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;

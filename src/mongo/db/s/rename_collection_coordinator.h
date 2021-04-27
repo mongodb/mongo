@@ -40,7 +40,8 @@ public:
     using StateDoc = RenameCollectionCoordinatorDocument;
     using Phase = RenameCollectionCoordinatorPhaseEnum;
 
-    RenameCollectionCoordinator(const BSONObj& initialState);
+    RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                const BSONObj& initialState);
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
 

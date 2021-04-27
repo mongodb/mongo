@@ -48,29 +48,24 @@
 #include "mongo/db/s/rename_collection_coordinator.h"
 
 namespace mongo {
+namespace {
 
-ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(OperationContext* opCtx) {
-    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-    auto service = registry->lookupServiceByName(kServiceName);
-    return checked_cast<ShardingDDLCoordinatorService*>(std::move(service));
-}
-
-std::shared_ptr<ShardingDDLCoordinator> ShardingDDLCoordinatorService::_constructCoordinator(
-    BSONObj initialState) const {
+std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
+    ShardingDDLCoordinatorService* service, BSONObj initialState) {
     const auto op = extractShardingDDLCoordinatorMetadata(initialState);
     LOGV2(
         5390510, "Constructing new sharding DDL coordinator", "coordinatorDoc"_attr = op.toBSON());
     switch (op.getId().getOperationType()) {
         case DDLCoordinatorTypeEnum::kDropDatabase:
-            return std::make_shared<DropDatabaseCoordinator>(std::move(initialState));
+            return std::make_shared<DropDatabaseCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kDropCollection:
-            return std::make_shared<DropCollectionCoordinator>(std::move(initialState));
+            return std::make_shared<DropCollectionCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kRenameCollection:
-            return std::make_shared<RenameCollectionCoordinator>(std::move(initialState));
+            return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
-            return std::make_shared<CreateCollectionCoordinator>(std::move(initialState));
+            return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
             break;
         default:
             uasserted(ErrorCodes::BadValue,
@@ -80,9 +75,18 @@ std::shared_ptr<ShardingDDLCoordinator> ShardingDDLCoordinatorService::_construc
     }
 }
 
+
+}  // namespace
+
+ShardingDDLCoordinatorService* ShardingDDLCoordinatorService::getService(OperationContext* opCtx) {
+    auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+    auto service = registry->lookupServiceByName(kServiceName);
+    return checked_cast<ShardingDDLCoordinatorService*>(std::move(service));
+}
+
 std::shared_ptr<ShardingDDLCoordinatorService::Instance>
 ShardingDDLCoordinatorService::constructInstance(BSONObj initialState) {
-    auto coord = _constructCoordinator(std::move(initialState));
+    auto coord = constructShardingDDLCoordinatorInstance(this, std::move(initialState));
 
     {
         stdx::lock_guard lg(_completionMutex);

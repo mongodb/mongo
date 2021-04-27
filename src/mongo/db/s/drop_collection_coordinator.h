@@ -39,7 +39,7 @@ public:
     using StateDoc = DropCollectionCoordinatorDocument;
     using Phase = DropCollectionCoordinatorPhaseEnum;
 
-    DropCollectionCoordinator(const BSONObj& initialState);
+    DropCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
     ~DropCollectionCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}

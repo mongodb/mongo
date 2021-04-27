@@ -44,7 +44,8 @@ public:
     using CoordDoc = CreateCollectionCoordinatorDocument;
     using Phase = CreateCollectionCoordinatorPhaseEnum;
 
-    CreateCollectionCoordinator(const BSONObj& initialState);
+    CreateCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                const BSONObj& initialState);
     ~CreateCollectionCoordinator() = default;
 
 

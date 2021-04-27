@@ -354,8 +354,9 @@ void broadcastDropCollection(OperationContext* opCtx,
 
 }  // namespace
 
-CreateCollectionCoordinator::CreateCollectionCoordinator(const BSONObj& initialState)
-    : ShardingDDLCoordinator(initialState),
+CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                                         const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
       _doc(CreateCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("CreateCollectionCoordinatorDocument"), initialState)),
       _critSecReason(BSON("command"

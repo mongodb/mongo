@@ -44,8 +44,9 @@
 
 namespace mongo {
 
-DropCollectionCoordinator::DropCollectionCoordinator(const BSONObj& initialState)
-    : ShardingDDLCoordinator(initialState),
+DropCollectionCoordinator::DropCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                                     const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
       _doc(DropCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("DropCollectionCoordinatorDocument"), initialState)) {}
 

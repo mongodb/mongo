@@ -31,7 +31,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 
@@ -66,8 +65,6 @@ public:
     void waitForAllCoordinatorsToComplete(OperationContext* opCtx) const;
 
 private:
-    std::shared_ptr<ShardingDDLCoordinator> _constructCoordinator(BSONObj initialState) const;
-
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
 

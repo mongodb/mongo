@@ -66,8 +66,9 @@ boost::optional<CollectionType> getShardedCollection(OperationContext* opCtx,
 
 }  // namespace
 
-RenameCollectionCoordinator::RenameCollectionCoordinator(const BSONObj& initialState)
-    : ShardingDDLCoordinator(initialState),
+RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorService* service,
+                                                         const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
       _doc(RenameCollectionCoordinatorDocument::parse(
           IDLParserErrorContext("RenameCollectionCoordinatorDocument"), initialState)) {}
 

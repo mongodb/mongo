@@ -39,7 +39,7 @@ public:
     using StateDoc = DropDatabaseCoordinatorDocument;
     using Phase = DropDatabaseCoordinatorPhaseEnum;
 
-    DropDatabaseCoordinator(const BSONObj& initialState);
+    DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
     ~DropDatabaseCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override {}

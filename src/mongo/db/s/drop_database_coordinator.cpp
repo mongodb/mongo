@@ -92,8 +92,9 @@ void removeDatabaseMetadataFromConfig(OperationContext* opCtx, StringData dbName
 
 }  // namespace
 
-DropDatabaseCoordinator::DropDatabaseCoordinator(const BSONObj& initialState)
-    : ShardingDDLCoordinator(initialState),
+DropDatabaseCoordinator::DropDatabaseCoordinator(ShardingDDLCoordinatorService* service,
+                                                 const BSONObj& initialState)
+    : ShardingDDLCoordinator(service, initialState),
       _doc(DropDatabaseCoordinatorDocument::parse(
           IDLParserErrorContext("DropDatabaseCoordinatorDocument"), initialState)),
       _dbName(nss().db()) {}
