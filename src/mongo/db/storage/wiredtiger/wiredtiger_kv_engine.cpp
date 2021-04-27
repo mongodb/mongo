@@ -343,7 +343,7 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         }
     }
 
-    _previousCheckedDropsQueued = _clockSource->now();
+    _previousCheckedDropsQueued.store(_clockSource->now().toMillisSinceEpoch());
 
     std::stringstream ss;
     ss << "create,";
@@ -1726,7 +1726,7 @@ std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDro
 
 bool WiredTigerKVEngine::haveDropsQueued() const {
     Date_t now = _clockSource->now();
-    Milliseconds delta = now - _previousCheckedDropsQueued;
+    Milliseconds delta = now - Date_t::fromMillisSinceEpoch(_previousCheckedDropsQueued.load());
 
     if (!_readOnly && _sizeStorerSyncTracker.intervalHasElapsed()) {
         _sizeStorerSyncTracker.resetLastTime();
@@ -1737,7 +1737,7 @@ bool WiredTigerKVEngine::haveDropsQueued() const {
     if (delta < Milliseconds(1000))
         return false;
 
-    _previousCheckedDropsQueued = now;
+    _previousCheckedDropsQueued.store(now.toMillisSinceEpoch());
 
     // Don't wait for the mutex: if we can't get it, report that no drops are queued.
     stdx::unique_lock<Latch> lk(_identToDropMutex, stdx::defer_lock);

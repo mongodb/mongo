@@ -464,7 +464,7 @@ private:
     mutable Mutex _identToDropMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_identToDropMutex");
     std::list<IdentToDrop> _identToDrop;
 
-    mutable Date_t _previousCheckedDropsQueued;
+    mutable AtomicWord<long long> _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
     WiredTigerBackup _wtBackup;
