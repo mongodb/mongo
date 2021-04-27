@@ -1,7 +1,6 @@
 // Tests the behavior of change streams on sharded collections.
 // @tags: [
 //   requires_majority_read_concern,
-//   sbe_incompatible,
 //   uses_change_streams,
 // ]
 (function() {

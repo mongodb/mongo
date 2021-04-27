@@ -375,6 +375,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             resultSlot = slotIdGenerator->generate();
             recordIdSlot = slotIdGenerator->generate();
 
+            std::tie(fields, slots, tsSlot) = makeOplogTimestampSlotsIfNeeded(
+                env, slotIdGenerator, shouldTrackLatestOplogTimestamp);
+
             stage = sbe::makeS<sbe::LoopJoinStage>(
                 sbe::makeS<sbe::LimitSkipStage>(std::move(stage), 1, boost::none, csn->nodeId()),
                 sbe::makeS<sbe::ScanStage>(collection->uuid(),
@@ -383,9 +386,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                            boost::none,
                                            boost::none,
                                            boost::none,
-                                           boost::none,
-                                           std::vector<std::string>(),
-                                           sbe::makeSV(),
+                                           tsSlot,
+                                           std::move(fields),
+                                           std::move(slots),
                                            seekRecordIdSlot,
                                            true /* forward */,
                                            yieldPolicy,

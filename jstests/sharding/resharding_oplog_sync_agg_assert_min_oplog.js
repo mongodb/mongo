@@ -3,7 +3,6 @@
  * entries from a donor shard.
  * @tags: [
  *   requires_fcv_47,
- *   sbe_incompatible,
  * ]
  */
 (function() {
