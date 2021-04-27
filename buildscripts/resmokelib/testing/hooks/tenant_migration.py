@@ -362,7 +362,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference)
 
     def _create_client(self, node):
-        return self._tenant_migration_fixture.auth(node.mongo_client(), self._auth_options)
+        return fixture_interface.authenticate(node.mongo_client(), self._auth_options)
 
     def _check_tenant_migration_dbhash(self, migration_opts):
         # Set the donor connection string, recipient connection string, and migration uuid string

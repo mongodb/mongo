@@ -28,7 +28,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
             self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
             stepdown_interval_ms=8000, terminate=False, kill=False,
             use_stepdown_permitted_file=False, wait_for_mongos_retarget=False,
-            stepdown_via_heartbeats=True, background_reconfig=False):
+            stepdown_via_heartbeats=True, background_reconfig=False, auth_options=None):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -66,6 +66,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._kill = kill
 
         self._background_reconfig = background_reconfig
+        self._auth_options = auth_options
 
         # The stepdown file names need to match the same construction as found in
         # jstests/concurrency/fsm_libs/resmoke_runner.js.
@@ -90,7 +91,8 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
             self._terminate, self._kill, lifecycle, self._wait_for_mongos_retarget,
-            self._stepdown_via_heartbeats, self._background_reconfig, self._fixture)
+            self._stepdown_via_heartbeats, self._background_reconfig, self._fixture,
+            self._auth_options)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -352,7 +354,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
     def __init__(  # pylint: disable=too-many-arguments
             self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
             stepdown_lifecycle, wait_for_mongos_retarget, stepdown_via_heartbeats,
-            background_reconfig, fixture):
+            background_reconfig, fixture, auth_options=None):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -371,6 +373,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._stepdown_via_heartbeats = stepdown_via_heartbeats
         self._background_reconfig = background_reconfig
         self._fixture = fixture
+        self._auth_options = auth_options
 
         self._last_exec = time.time()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -480,6 +483,9 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         for fixture in self._rs_fixtures:
             fixture.get_primary()
 
+    def _create_client(self, node):
+        return fixture_interface.authenticate(node.mongo_client(), self._auth_options)
+
     def _step_down_all(self):
         for rs_fixture in self._rs_fixtures:
             self._step_down(rs_fixture)
@@ -533,7 +539,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             self.logger.info("Stepping down the primary on port %d of replica set '%s'.",
                              primary.port, rs_fixture.replset_name)
             try:
-                client = primary.mongo_client()
+                client = self._create_client(primary)
                 client.admin.command(
                     bson.SON([
                         ("replSetStepDown", self._stepdown_duration_secs),
@@ -565,7 +571,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                              chosen.port, rs_fixture.replset_name)
 
             try:
-                client = chosen.mongo_client()
+                client = self._create_client(chosen)
                 client.admin.command("replSetStepUp")
                 break
             except pymongo.errors.OperationFailure:
@@ -607,7 +613,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             # introduced a stepdown period on the former primary and so we have to run the
             # {replSetFreeze: 0} command to ensure the former primary is electable in the next
             # round of _step_down().
-            client = primary.mongo_client()
+            client = self._create_client(primary)
             client.admin.command({"replSetFreeze": 0})
         elif secondaries:
             # We successfully stepped up a secondary, wait for the former primary to step down via
@@ -619,7 +625,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                 chosen.port, rs_fixture.replset_name)
             while True:
                 try:
-                    client = primary.mongo_client()
+                    client = self._create_client(primary)
                     is_secondary = client.admin.command("isMaster")["secondary"]
                     if is_secondary:
                         break
@@ -641,7 +647,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             retry_start_time = time.time()
             while True:
                 try:
-                    client = primary.mongo_client()
+                    client = self._create_client(primary)
                     client.admin.command("replSetStepUp")
                     break
                 except pymongo.errors.OperationFailure:
@@ -670,7 +676,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         for mongos_fixture in self._mongos_fixtures:
             mongos_conn_str = mongos_fixture.get_internal_connection_string()
             try:
-                client = mongos_fixture.mongo_client()
+                client = self._create_client(mongos_fixture)
             except pymongo.errors.AutoReconnect:
                 pass
             for db in client.database_names():

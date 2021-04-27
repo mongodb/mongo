@@ -154,20 +154,10 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
             output += replica_set.get_node_info()
         return output
 
-    @staticmethod
-    def auth(client, auth_options=None):
-        """Auth a client connection."""
-        if auth_options is not None:
-            auth_db = client[auth_options["authenticationDatabase"]]
-            auth_db.authenticate(auth_options["username"], password=auth_options["password"],
-                                 mechanism=auth_options["authenticationMechanism"])
-
-        return client
-
     def _create_tenant_migration_donor_and_recipient_roles(self, rs):
         """Create a role for tenant migration donor and recipient."""
         primary = rs.get_primary()
-        primary_client = self.auth(primary.mongo_client(), self.auth_options)
+        primary_client = interface.authenticate(primary.mongo_client(), self.auth_options)
 
         try:
             primary_client.admin.command({
