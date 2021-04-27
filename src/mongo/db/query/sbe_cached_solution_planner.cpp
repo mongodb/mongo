@@ -48,7 +48,12 @@ CandidatePlans CachedSolutionPlanner::plan(
     invariant(solutions.size() == roots.size());
 
     auto candidate = [&]() {
-        auto candidates = collectExecutionStats(std::move(solutions), std::move(roots));
+        // In cached solution planning we collect execution stats with an upper bound on reads
+        // allowed per trial run computed based on previous decision reads.
+        auto candidates = collectExecutionStats(
+            std::move(solutions),
+            std::move(roots),
+            static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionReads));
         invariant(candidates.size() == 1);
         return std::move(candidates[0]);
     }();

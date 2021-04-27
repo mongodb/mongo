@@ -194,7 +194,7 @@ void SortStage::open(bool reOpen) {
             // higher level stages.
             _tracker = nullptr;
             _children[0]->close();
-            uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit");
+            uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in sort");
         }
     }
 

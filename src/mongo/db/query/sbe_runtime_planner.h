@@ -104,10 +104,14 @@ protected:
      * of the candidate plans by calling 'CandidatePlan->root->getStats()'.
      *
      * After the trial period ends, all plans remain open.
+     *
+     * The number of reads allowed for a trial execution period is bounded by
+     * 'maxTrialPeriodNumReads'.
      */
     std::vector<plan_ranker::CandidatePlan> collectExecutionStats(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
-        std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots);
+        std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
+        size_t maxTrialPeriodNumReads);
 
     OperationContext* const _opCtx;
     const CollectionPtr& _collection;

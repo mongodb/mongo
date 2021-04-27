@@ -2,8 +2,6 @@
  * This test will attempt to create a scenario where the plan cache entry for a given query shape
  * oscillates. It achieves this by creating two indexes, A and B, on a collection, and interleaving
  * queries which are "ideal" for index A with queries that are "ideal" for index B.
- *
- * @tags: [sbe_incompatible]
  */
 (function() {
 "use strict";

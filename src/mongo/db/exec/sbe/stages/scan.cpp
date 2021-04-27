@@ -323,14 +323,16 @@ PlanState ScanStage::getNext() {
         }
     }
 
+    ++_specificStats.numReads;
     if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
         // If we're collecting execution stats during multi-planning and reached the end of the
-        // trial period (trackProgress() will return 'true' in this case), then we can reset the
-        // tracker. Note that a trial period is executed only once per a PlanStge tree, and once
-        // completed never run again on the same tree.
+        // trial period because we've performed enough physical reads, bail out from the trial run
+        // by raising a special exception to signal a runtime planner that this candidate plan has
+        // completed its trial run early. Note that a trial period is executed only once per a
+        // PlanStage tree, and once completed never run again on the same tree.
         _tracker = nullptr;
+        uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
     }
-    ++_specificStats.numReads;
     return trackPlanState(PlanState::ADVANCED);
 }
 

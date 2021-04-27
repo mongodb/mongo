@@ -115,7 +115,8 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
 
 std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStats(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
-    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
+    std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots,
+    size_t maxTrialPeriodNumReads) {
     invariant(solutions.size() == roots.size());
 
     std::vector<plan_ranker::CandidatePlan> candidates;
@@ -131,12 +132,12 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
     });
 
     const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
-    const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
+
     for (size_t ix = 0; ix < roots.size(); ++ix) {
         auto&& [root, data] = roots[ix];
 
         // Attach a unique TrialRunTracker to each SBE plan.
-        auto tracker = std::make_unique<TrialRunTracker>(maxNumResults, maxNumReads);
+        auto tracker = std::make_unique<TrialRunTracker>(maxNumResults, maxTrialPeriodNumReads);
         root->attachToTrialRunTracker(tracker.get());
         trialRunTrackers.emplace_back(root.get(), std::move(tracker));
 
