@@ -182,7 +182,8 @@ void TimeZoneDatabase::loadTimeZoneInfo(
                                << entry.id << "\": " << timelib_get_error_message(errorCode)});
         }
 
-        invariant(errorCode == TIMELIB_ERROR_NO_ERROR);
+        invariant(errorCode == TIMELIB_ERROR_NO_ERROR ||
+                  errorCode == TIMELIB_ERROR_EMPTY_POSIX_STRING);
         _timeZones[entry.id] = TimeZone{tzInfo};
     }
 }
