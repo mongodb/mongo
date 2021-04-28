@@ -60,7 +60,9 @@ var $config = extendWorkload($config, function($config, $super) {
                 // The query was interrupted due to an index or collection drop
                 ErrorCodes.QueryPlanKilled,
                 // The required, hinted index does not exist
-                ErrorCodes.BadValue
+                ErrorCodes.BadValue,
+                // The collection was dropped
+                ErrorCodes.NamespaceNotFound,
             ],
             'unexpected error code: ' + res.code + ': ' + res.message);
     };
