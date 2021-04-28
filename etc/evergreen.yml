@@ -10104,6 +10104,7 @@ buildvariants:
   - name: .jscore !.sharding !.decimal !.compat !cst_jscore_passthrough
   - name: .jstestfuzz !.flow_control
   - name: .read_write_concern
+  - name: .replica_sets
   - name: .rollbackfuzzer
   - name: causally_consistent_hedged_reads_jscore_passthrough_gen
   - name: causally_consistent_jscore_passthrough_auth_gen
@@ -10116,19 +10117,8 @@ buildvariants:
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: replica_sets
-  - name: replica_sets_auth_gen
-  - name: replica_sets_ese_gcm_gen
-  - name: replica_sets_ese_gen
-  - name: replica_sets_initsync_static_jscore_passthrough
-  - name: replica_sets_jscore_passthrough_gen
-  - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: replica_sets_large_txns_format_gen
-  - name: replica_sets_max_mirroring_gen
   - name: replica_sets_multiversion_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_update_v1_oplog_gen
-  - name: replica_sets_update_v1_oplog_jscore_passthrough
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: session_jscore_passthrough
