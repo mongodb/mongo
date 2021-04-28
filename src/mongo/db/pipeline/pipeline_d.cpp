@@ -298,6 +298,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
 
     const ExtensionsCallbackReal extensionsCallback(expCtx->opCtx, &nss);
 
+    // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially allow
+    // SBE to execute the portion of the query that's pushed down, even if the portion of the query
+    // that is not pushed down contains expressions not supported by SBE.
+    expCtx->sbeCompatible = true;
+
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
                                            std::move(findCommand),
                                            isExplain,
