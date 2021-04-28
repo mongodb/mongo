@@ -107,6 +107,9 @@ const NamespaceString NamespaceString::kRecipientReshardingOperationsNamespace(
 const NamespaceString NamespaceString::kShardingDDLCoordinatorsNamespace(
     NamespaceString::kConfigDb, "system.sharding_ddl_coordinators");
 
+const NamespaceString NamespaceString::kShardingRenameParticipantsNamespace(
+    NamespaceString::kConfigDb, "localRenameParticipants");
+
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,

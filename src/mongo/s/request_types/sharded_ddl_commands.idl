@@ -199,28 +199,6 @@ commands:
         chained_structs:
             RenameCollectionRequest: RenameCollectionRequest
 
-    _shardsvrRenameCollectionParticipant:
-        command_name: _shardsvrRenameCollectionParticipant
-        cpp_name: ShardsvrRenameCollectionParticipant
-        description: "Internal command sent to shard participating in a rename collection procedure"
-        strict: false
-        api_version: ""
-        namespace: concatenate_with_db
-        chained_structs:
-            RenameCollectionRequest: RenameCollectionRequest
-
-    _shardsvrRenameCollectionUnblockParticipant:
-        command_name: _shardsvrRenameCollectionUnblockParticipant
-        cpp_name: ShardsvrRenameCollectionUnblockParticipant
-        description: "Parser for the _shardsvrRenameCollectionUnblockParticipant command"
-        strict: false
-        api_version: ""
-        namespace: concatenate_with_db
-        fields:
-            to:
-                type: namespacestring
-                description: "The new namespace for the collection being renamed."
-
     _shardsvrReshardCollection:
         command_name: _shardsvrReshardCollection
         cpp_name: ShardsvrReshardCollection

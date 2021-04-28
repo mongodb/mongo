@@ -38,7 +38,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
-#include "mongo/db/s/rename_collection_coordinator_document_gen.h"
+#include "mongo/db/s/sharded_rename_collection_gen.h"
 #include "mongo/db/s/sharding_ddl_50_upgrade_downgrade.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -140,6 +140,16 @@ public:
                                   << " must be called with majority writeConcern, got "
                                   << opCtx->getWriteConcern().wMode,
                     opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+            // TODO SERVER-56296 Uniform `fromNss == toNss` behavior between RS and sharded cluster
+            if (fromNss == toNss) {
+                // Simply return the current collection version
+                const auto catalog = Grid::get(opCtx)->catalogCache();
+                const auto cm =
+                    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, fromNss));
+                return RenameCollectionResponse(cm.isSharded() ? cm.getVersion()
+                                                               : ChunkVersion::UNSHARDED());
+            }
 
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 

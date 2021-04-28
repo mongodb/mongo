@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/rename_collection_coordinator_document_gen.h"
+#include "mongo/db/s/sharded_rename_collection_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 

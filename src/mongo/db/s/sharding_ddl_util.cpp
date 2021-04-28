@@ -189,9 +189,24 @@ void shardedRenameMetadata(OperationContext* opCtx,
     auto fromNss = fromCollType.getNss();
 
     // Delete eventual TO chunk/collection entries referring a dropped collection
-    removeCollMetadataFromConfig(opCtx, toNss);
+    try {
+        auto coll = catalogClient->getCollection(opCtx, toNss);
 
-    // Clone FROM tags to TO
+        if (coll.getUuid() == fromCollType.getUuid()) {
+            // Metadata rename already happened
+            return;
+        }
+
+        // Delete TO chunk/collection entries referring a dropped collection
+        removeCollMetadataFromConfig(opCtx, toNss);
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The TO collection is not sharded or doesn't exist
+    }
+
+    // Delete FROM collection entry
+    deleteCollection(opCtx, fromNss);
+
+    // Update FROM tags to TO
     updateTags(opCtx, fromNss, toNss);
 
     // Insert the TO collection entry
@@ -201,18 +216,16 @@ void shardedRenameMetadata(OperationContext* opCtx,
                                             CollectionType::ConfigNS,
                                             fromCollType.toBSON(),
                                             ShardingCatalogClient::kMajorityWriteConcern));
-
-    deleteCollection(opCtx, fromNss);
 }
 
 void checkShardedRenamePreconditions(OperationContext* opCtx,
                                      const NamespaceString& toNss,
                                      const bool dropTarget) {
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
     if (!dropTarget) {
         // Check that the sharded target collection doesn't exist
-        auto catalogCache = Grid::get(opCtx)->catalogCache();
         try {
-            catalogCache->getShardedCollectionRoutingInfo(opCtx, toNss);
+            catalogClient->getCollection(opCtx, toNss);
             // If no exception is thrown, the collection exists and is sharded
             uasserted(ErrorCodes::CommandFailed,
                       str::stream() << "Sharded target collection " << toNss.ns()
@@ -234,7 +247,6 @@ void checkShardedRenamePreconditions(OperationContext* opCtx,
     }
 
     // Check that there are no tags associated to the target collection
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, toNss));
     uassert(ErrorCodes::CommandFailed,
             str::stream() << "Can't rename to target collection " << toNss.ns()
@@ -511,6 +523,7 @@ void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
             AutoGetCollection cCollLock(opCtx, nss, MODE_S);
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
+
             // It may happen that the ReplWriterWorker enters the critical section before drain mode
             // upon committing a recoverable critical section oplog entry (SERVER-56104)
             if (!csr->getCriticalSectionSignal(
@@ -524,6 +537,7 @@ void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
             AutoGetCollection cCollLock(opCtx, nss, MODE_X);
             auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
             auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
+
             // It may happen that the ReplWriterWorker enters the critical section before drain mode
             // upon committing a recoverable critical section oplog entry (SERVER-56104)
             if (!csr->getCriticalSectionSignal(

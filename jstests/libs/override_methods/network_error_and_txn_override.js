@@ -106,7 +106,6 @@ const kNonRetryableCommands = new Set([
     "emptycapped",
     "godinsert",
     "internalRenameIfOptionsAndIndexesMatch",
-    "renameCollection",
     "updateRole",
     "updateUser",
 ]);

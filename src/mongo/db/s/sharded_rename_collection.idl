@@ -41,7 +41,7 @@ imports:
 
 enums:
     RenameCollectionCoordinatorPhase:
-        description: "The current state of a drop collection operation on the coordinator."
+        description: "The current state of a rename collection operation on the coordinator."
         type: string
         values:
             kUnset: "unset"
@@ -51,6 +51,16 @@ enums:
             kUnblockCRUD: "unblockCRUD"
             kSetResponse: "setResponse"
 
+    RenameCollectionParticipantPhase:
+        description: "The current state of a rename collection operation on a participant."
+        type: string
+        values:
+            kUnset: "unset"
+            kBlockCRUDAndSnapshotRangeDeletions: "blockCRUDAndSnapshotRangeDeletions"
+            kRenameLocalAndRestoreRangeDeletions: "renameLocalAndRestoreRangeDeletions"
+            kDeleteFromRangeDeletions: "deleteFromRangeDeletions"
+            kUnblockCRUD: "unblockCRUD"
+
 types:
     CollectionInfo:
         description: "Information of the sharded collection to rename."
@@ -58,6 +68,35 @@ types:
         cpp_type: CollectionType
         serializer: "mongo::CollectionType::toBSON"
         deserializer: "mongo::CollectionType"
+
+commands:
+    _shardsvrRenameCollectionParticipant:
+        command_name: _shardsvrRenameCollectionParticipant
+        cpp_name: ShardsvrRenameCollectionParticipant
+        description: "Internal command sent to shard participating in a rename collection procedure"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+
+    _shardsvrRenameCollectionParticipantUnblock:
+        command_name: _shardsvrRenameCollectionParticipantUnblock
+        cpp_name: ShardsvrRenameCollectionUnblockParticipant
+        description: "Parser for the _shardsvrRenameCollectionParticipantUnblock command"
+        strict: false
+        api_version: ""
+        namespace: concatenate_with_db
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
 
 structs:
     RenameCollectionCoordinatorDocument:
@@ -79,3 +118,26 @@ structs:
                 description: "CollectionType of the collection currently being renamed (if sharded)."
                 type: CollectionInfo
                 optional: true
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."
+                optional: true
+
+    RenameCollectionParticipantDocument:
+        description: "Represents a rename collection operation on a participant shard."
+        generate_comparison_operators: false
+        strict: false
+        chained_structs:
+            RenameCollectionRequest: RenameCollectionRequest
+        fields:
+            _id:
+                type: namespacestring
+                cpp_name: fromNss
+            phase:
+                type: RenameCollectionParticipantPhase
+                default: kUnset
+            forwardableOpMetadata:
+                type: ForwardableOperationMetadata
+            sourceUUID:
+                type: uuid
+                description: "ID of the collection getting renamed."

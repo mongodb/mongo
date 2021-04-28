@@ -157,6 +157,9 @@ public:
     // Namespace for persisting sharding DDL coordinators state documents
     static const NamespaceString kShardingDDLCoordinatorsNamespace;
 
+    // Namespace for persisting sharding DDL rename participant state documents
+    static const NamespaceString kShardingRenameParticipantsNamespace;
+
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 

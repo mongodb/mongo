@@ -132,7 +132,7 @@ let testCases = {
     _shardsvrRefineCollectionShardKey: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrRenameCollectionParticipant: {skip: "internal command"},
-    _shardsvrRenameCollectionUnblockParticipant: {skip: "internal command"},
+    _shardsvrRenameCollectionParticipantUnblock: {skip: "internal command"},
     _shardsvrReshardCollection: {skip: "internal command"},
     _shardsvrReshardingOperationTime: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},

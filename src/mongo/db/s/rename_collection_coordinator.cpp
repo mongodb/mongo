@@ -38,6 +38,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -79,7 +80,7 @@ void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) con
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Another rename collection for namespace " << nss()
-                          << "is being executed with different parameters: " << selfReq,
+                          << " is being executed with different parameters: " << selfReq,
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }
 
@@ -174,12 +175,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // Make sure the source collection exists
                 const auto optSourceCollType = getShardedCollection(opCtx, nss());
                 const bool sourceIsSharded = (bool)optSourceCollType;
+
                 if (sourceIsSharded) {
                     uassert(ErrorCodes::CommandFailed,
                             str::stream() << "Source and destination collections must be on the "
                                              "same database because "
                                           << fromNss << " is sharded.",
                             fromNss.db() == toNss.db());
+                    _doc.setOptShardedCollInfo(optSourceCollType);
+                    _doc.setSourceUUID(optSourceCollType->getUuid());
                 } else {
                     Lock::DBLock dbLock(opCtx, fromNss.db(), MODE_IS);
                     Lock::CollectionLock collLock(opCtx, fromNss, MODE_IS);
@@ -193,9 +197,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     if (fromNss.db() != toNss.db()) {
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
                     }
-                }
 
-                _doc.setOptShardedCollInfo(optSourceCollType);
+                    _doc.setSourceUUID(sourceCollPtr->uuid());
+                }
 
                 // Make sure the target namespace is not a view
                 {
@@ -231,36 +235,38 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     BSON("source" << fromNss.toString() << "destination" << toNss.toString()),
                     ShardingCatalogClient::kMajorityWriteConcern);
             }))
-        .then(_executePhase(
-            Phase::kBlockCRUDAndRename,
-            [this, executor = executor, anchor = shared_from_this()] {
-                auto opCtxHolder = cc().makeOperationContext();
-                auto* opCtx = opCtxHolder.get();
-                getForwardableOpMetadata().setOn(opCtx);
+        .then(_executePhase(Phase::kBlockCRUDAndRename,
+                            [this, executor = executor, anchor = shared_from_this()] {
+                                auto opCtxHolder = cc().makeOperationContext();
+                                auto* opCtx = opCtxHolder.get();
+                                getForwardableOpMetadata().setOn(opCtx);
 
-                const auto& fromNss = nss();
+                                const auto& fromNss = nss();
 
-                // On participant shards:
-                // - Block CRUD on source and target collection in case at least one
-                // of such collections is currently sharded.
-                // - Locally drop the target collection
-                // - Locally rename source to target
-                ShardsvrRenameCollectionParticipant renameCollParticipantRequest(fromNss);
-                renameCollParticipantRequest.setDbName(fromNss.db());
-                renameCollParticipantRequest.setRenameCollectionRequest(
-                    _doc.getRenameCollectionRequest());
+                                // On participant shards:
+                                // - Block CRUD on source and target collection in case at least one
+                                // of such collections is currently sharded.
+                                // - Locally drop the target collection
+                                // - Locally rename source to target
+                                ShardsvrRenameCollectionParticipant renameCollParticipantRequest(
+                                    fromNss, _doc.getSourceUUID().get());
+                                renameCollParticipantRequest.setDbName(fromNss.db());
+                                renameCollParticipantRequest.setRenameCollectionRequest(
+                                    _doc.getRenameCollectionRequest());
 
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                // We need to send the command to all the shards because both movePrimary and
-                // moveChunk leave garbage behind for sharded collections.
-                sharding_ddl_util::sendAuthenticatedCommandToShards(
-                    opCtx,
-                    fromNss.db(),
-                    CommandHelpers::appendMajorityWriteConcern(
-                        renameCollParticipantRequest.toBSON({})),
-                    participants,
-                    **executor);
-            }))
+                                auto participants =
+                                    Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                                // We need to send the command to all the shards because both
+                                // movePrimary and moveChunk leave garbage behind for sharded
+                                // collections.
+                                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                                    opCtx,
+                                    fromNss.db(),
+                                    CommandHelpers::appendMajorityWriteConcern(
+                                        renameCollParticipantRequest.toBSON({})),
+                                    participants,
+                                    **executor);
+                            }))
         .then(_executePhase(
             Phase::kRenameMetadata,
             [this, anchor = shared_from_this()] {
@@ -289,9 +295,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // On participant shards:
                 // - Unblock CRUD on participants for both source and destination collections
-                ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(fromNss);
+                ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(
+                    fromNss, _doc.getSourceUUID().get());
                 unblockParticipantRequest.setDbName(fromNss.db());
-                unblockParticipantRequest.setTo(_doc.getTo());
+                unblockParticipantRequest.setRenameCollectionRequest(
+                    _doc.getRenameCollectionRequest());
 
                 auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
