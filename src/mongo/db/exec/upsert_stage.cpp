@@ -31,6 +31,7 @@
 
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -148,11 +149,18 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
 
     writeConflictRetry(opCtx(), "upsert", collection()->ns().ns(), [&] {
         WriteUnitOfWork wunit(opCtx());
+        InsertStatement insertStmt(_params.request->getStmtIds(), newDocument);
+
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx());
+        if (collection()->isCapped() &&
+            !replCoord->isOplogDisabledFor(opCtx(), collection()->ns())) {
+            auto oplogInfo = repl::LocalOplogInfo::get(opCtx());
+            auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
+            insertStmt.oplogSlot = oplogSlots.front();
+        }
+
         uassertStatusOK(collection()->insertDocument(
-            opCtx(),
-            InsertStatement(_params.request->getStmtIds(), newDocument),
-            _params.opDebug,
-            _params.request->isFromMigration()));
+            opCtx(), insertStmt, _params.opDebug, _params.request->isFromMigration()));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.

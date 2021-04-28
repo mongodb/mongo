@@ -1300,6 +1300,7 @@ env.Library(
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/local_oplog_info',
         'catalog/database_holder',
         'commands/server_status_core',
         'kill_sessions',
