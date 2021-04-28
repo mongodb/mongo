@@ -41,15 +41,23 @@ CancelableOperationContext::CancelableOperationContext(ServiceContext::UniqueOpe
                                                        ExecutorPtr executor)
     : _sharedBlock{std::make_shared<SharedBlock>()},
       _opCtx{std::move(opCtx)},
-      _markKilledFinished{cancelToken.onCancel()
-                              .thenRunOn(std::move(executor))
-                              .then([sharedBlock = _sharedBlock, opCtx = _opCtx.get()] {
-                                  if (!sharedBlock->done.swap(true)) {
-                                      stdx::lock_guard<Client> lk(*opCtx->getClient());
-                                      opCtx->markKilled(ErrorCodes::Interrupted);
-                                  }
-                              })
-                              .semi()} {}
+      _markKilledFinished{[&] {
+          if (cancelToken.isCanceled()) {
+              // This thread owns _opCtx so it isn't necessary to acquire the Client mutex.
+              _opCtx->markKilled(ErrorCodes::Interrupted);
+              return makeReadyFutureWith([] {}).semi();
+          }
+
+          return cancelToken.onCancel()
+              .thenRunOn(std::move(executor))
+              .then([sharedBlock = _sharedBlock, opCtx = _opCtx.get()] {
+                  if (!sharedBlock->done.swap(true)) {
+                      stdx::lock_guard<Client> lk(*opCtx->getClient());
+                      opCtx->markKilled(ErrorCodes::Interrupted);
+                  }
+              })
+              .semi();
+      }()} {}
 
 CancelableOperationContext::~CancelableOperationContext() {
     if (_sharedBlock->done.swap(true)) {

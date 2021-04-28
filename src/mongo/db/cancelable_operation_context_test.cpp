@@ -102,6 +102,21 @@ TEST_F(CancelableOperationContextTest, KilledWhenCancellationSourceIsCanceled) {
     ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
 }
 
+TEST_F(CancelableOperationContextTest,
+       KilledUponConstructionWhenCancellationSourceAlreadyCanceled) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("CancelableOperationContextTest");
+
+    shutDownExecutor();
+    CancellationSource cancelSource;
+    cancelSource.cancel();
+
+    auto opCtx = CancelableOperationContext{
+        client->makeOperationContext(), cancelSource.token(), executor()};
+
+    ASSERT_EQ(opCtx->checkForInterruptNoAssert(), ErrorCodes::Interrupted);
+}
+
 TEST_F(CancelableOperationContextTest, SafeWhenCancellationSourceIsCanceledUnderClientMutex) {
     auto serviceCtx = ServiceContext::make();
     auto client = serviceCtx->makeClient("CancelableOperationContextTest");
