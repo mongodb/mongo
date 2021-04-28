@@ -462,8 +462,7 @@ private:
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
-            if (requestedVersion >= FeatureCompatibility::kLatest) {
+            if (requestedVersion >= FeatureCompatibility::Version::kVersion50) {
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase1(opCtx);
             }
 
@@ -477,8 +476,7 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
-            if (requestedVersion >= FeatureCompatibility::kLatest) {
+            if (requestedVersion >= FeatureCompatibility::Version::kVersion50) {
                 ShardingCatalogManager::get(opCtx)->upgradeMetadataFor50Phase2(opCtx);
             }
         }
@@ -606,8 +604,7 @@ private:
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
-            if (requestedVersion < FeatureCompatibility::kLatest) {
+            if (requestedVersion < FeatureCompatibility::Version::kVersion50) {
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase1(opCtx);
             }
 
@@ -621,8 +618,7 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
 
             // TODO SERVER-53283: This block can removed once 5.0 becomes last-lts.
-            // TODO SERVER-53774: Replace kLatest by the version defined in the feature flag IDL
-            if (requestedVersion < FeatureCompatibility::kLatest) {
+            if (requestedVersion < FeatureCompatibility::Version::kVersion50) {
                 ShardingCatalogManager::get(opCtx)->downgradeMetadataToPre50Phase2(opCtx);
             }
         }
