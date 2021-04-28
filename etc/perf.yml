@@ -622,6 +622,12 @@ buildvariants:
         --storageEngine mmapv1
         --syncdelay 0
       project: *project
+      platform: linux
+      infrastructure_provisioning: microbenchmarks
+      mongodb_setup: microbenchmarks_standalone
+      canaries: none
+      storageEngine: inMemory
+      project_dir: *project_dir
     run_on:
     - "centos6-perf"
     tasks:
@@ -700,6 +706,12 @@ buildvariants:
         --storageEngine mmapv1
         --syncdelay 0
       project: *project
+      platform: linux
+      infrastructure_provisioning: microbenchmarks
+      mongodb_setup: microbenchmarks_standalone
+      canaries: none
+      storageEngine: inMemory
+      project_dir: *project_dir
     run_on:
     - "centos6-perf"
     tasks:
