@@ -298,10 +298,11 @@ __random_leaf(WT_CURSOR_BTREE *cbt)
         return (__cursor_kv_return(cbt, upd));
 
     /*
-     * Try again if there are at least a few hundred disk-based entries: this may be a normal leaf
-     * page with big items.
+     * Try again if there are at least a few hundred disk-based entries or this is a page as we read
+     * it from disk, it might be a normal leaf page with big items.
      */
-    if (cbt->ref->page->entries > WT_RANDOM_DISK_ENOUGH / 2) {
+    if (cbt->ref->page->entries > WT_RANDOM_DISK_ENOUGH / 5 ||
+      (cbt->ref->page->dsk != NULL && cbt->ref->page->modify == NULL)) {
         WT_RET(__random_leaf_disk(cbt, &upd, &valid));
         if (valid)
             return (__cursor_kv_return(cbt, upd));
