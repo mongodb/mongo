@@ -49,6 +49,10 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
 // static
 std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool() {
+    if (replWriterThreadCount < replWriterMinThreadCount) {
+        severe() << "replWriterMinThreadCount must be less than or equal to replWriterThreadCount.";
+        fassertFailedNoTrace(5605400);
+    }
     return makeWriterPool(replWriterThreadCount);
 }
 
@@ -57,7 +61,9 @@ std::unique_ptr<ThreadPool> OplogApplier::makeWriterPool(int threadCount) {
     ThreadPool::Options options;
     options.threadNamePrefix = "repl-writer-worker-";
     options.poolName = "repl writer worker Pool";
-    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.minThreads =
+        replWriterMinThreadCount < threadCount ? replWriterMinThreadCount : threadCount;
+    options.maxThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
         Client::initThread(getThreadName());
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
