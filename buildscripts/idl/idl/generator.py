@@ -1140,6 +1140,14 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 with self.gen_class_declaration_block(struct.cpp_name):
                     self.write_unindented_line('public:')
 
+                    if isinstance(struct, ast.Command):
+                        if struct.reply_type:
+                            # Alias the reply type as a named type for commands
+                            self.gen_type_alias_declaration("Reply",
+                                                            struct.reply_type.type.cpp_type)
+                        else:
+                            self._writer.write_line('using Reply = void;')
+
                     # Generate a sorted list of string constants
                     self.gen_string_constants_declarations(struct)
                     self.write_empty_line()
