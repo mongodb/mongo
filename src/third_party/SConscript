@@ -8,7 +8,6 @@ Import("use_system_libunwind")
 Import("use_vendored_libunwind")
 Import("wiredtiger")
 
-boostSuffix = "-1.70.0"
 snappySuffix = '-1.1.7'
 zlibSuffix = '-1.2.11'
 zstdSuffix = '-1.4.4'
@@ -83,8 +82,26 @@ if not use_system_version_of_library('pcre'):
     }
 
 if not use_system_version_of_library('boost'):
+
+
+    # On at least Apple clang, proto throws this error.
+    #
+    # See https://github.com/boostorg/proto/issues/30.
+    #
+    # We use a generator so we can filter out conf tests, where applying this
+    # flag could change their meaning.
+    def NoErrorForUnknownWarningOptionGenerator(target, source, env, for_signature):
+        if 'conftest' in str(target[0]):
+            return str()
+        return '-Wno-error=unknown-warning-option'
+
     thirdPartyEnvironmentModifications['boost'] = {
-        'CPPPATH' : ['#/src/third_party/boost' + boostSuffix],
+        'CPPPATH' : ['#/src/third_party/boost'],
+
+        # We could narror further to just clang on Darwin, but there is
+        # little harm in applying for all clang.
+        'NOERROR_FOR_UNKNOWN_WARNING_OPTION_GEN' : NoErrorForUnknownWarningOptionGenerator,
+        'CCFLAGS' : ['$NOERROR_FOR_UNKNOWN_WARNING_OPTION_GEN'] if env.ToolchainIs('clang') else []
     }
 
 if not use_system_version_of_library('abseil-cpp'):
@@ -313,7 +330,7 @@ if use_system_version_of_library("boost"):
                 env['LIBDEPS_BOOST_LOG_SYSLIBDEP'],
             ])
 else:
-    boostDirectory = 'boost' + boostSuffix
+    boostDirectory = 'boost'
     boostEnv = boostEnv.Clone()
     boostEnv.InjectThirdParty(libraries=['boost'])
     boostEnv.SConscript(boostDirectory + '/SConscript', exports={ 'env' : boostEnv })

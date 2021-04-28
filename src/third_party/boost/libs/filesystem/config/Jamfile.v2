@@ -1,0 +1,28 @@
+#
+#             Copyright Andrey Semashev 2020.
+# Distributed under the Boost Software License, Version 1.0.
+#    (See accompanying file LICENSE_1_0.txt or copy at
+#          http://www.boost.org/LICENSE_1_0.txt)
+#
+
+obj has_stat_st_mtim : has_stat_st_mtim.cpp : <include>../src ;
+explicit has_stat_st_mtim ;
+obj has_stat_st_mtimensec : has_stat_st_mtimensec.cpp : <include>../src ;
+explicit has_stat_st_mtimensec ;
+obj has_stat_st_mtimespec : has_stat_st_mtimespec.cpp : <include>../src ;
+explicit has_stat_st_mtimespec ;
+obj has_statx : has_statx.cpp : <include>../src ;
+explicit has_statx ;
+obj has_statx_syscall : has_statx_syscall.cpp : <include>../src ;
+explicit has_statx_syscall ;
+obj has_stat_st_birthtim : has_stat_st_birthtim.cpp : <include>../src ;
+explicit has_stat_st_birthtim ;
+obj has_stat_st_birthtimensec : has_stat_st_birthtimensec.cpp : <include>../src ;
+explicit has_stat_st_birthtimensec ;
+obj has_stat_st_birthtimespec : has_stat_st_birthtimespec.cpp : <include>../src ;
+explicit has_stat_st_birthtimespec ;
+
+obj has_bcrypt : has_bcrypt.cpp : <include>../src ;
+explicit has_bcrypt ;
+obj is_windows_ce : is_windows_ce.cpp ;
+explicit is_windows_ce ;
