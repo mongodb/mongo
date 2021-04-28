@@ -587,7 +587,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     // setup/teardown overhead across many writes.
     const size_t kMinOplogEntriesPerThread = 16;
     const bool enoughToMultiThread =
-        ops.size() >= kMinOplogEntriesPerThread * writerPool->getStats().numThreads;
+        ops.size() >= kMinOplogEntriesPerThread * writerPool->getStats().options.maxThreads;
 
     // Only doc-locking engines support parallel writes to the oplog because they are required to
     // ensure that oplog entries are ordered correctly, even if inserted out-of-order. Additionally,
@@ -601,7 +601,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     }
 
 
-    const size_t numOplogThreads = writerPool->getStats().numThreads;
+    const size_t numOplogThreads = writerPool->getStats().options.maxThreads;
     const size_t numOpsPerThread = ops.size() / numOplogThreads;
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
         size_t begin = thread * numOpsPerThread;
@@ -634,7 +634,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
     // Increment the batch size stat.
     oplogApplicationBatchSize.increment(ops.size());
 
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().numThreads);
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().options.maxThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
@@ -660,7 +660,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         std::vector<std::vector<OplogEntry>> derivedOps;
 
         std::vector<std::vector<const OplogEntry*>> writerVectors(
-            _writerPool->getStats().numThreads);
+            _writerPool->getStats().options.maxThreads);
         fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
@@ -682,7 +682,8 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         }
 
         {
-            std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
+            std::vector<Status> statusVector(_writerPool->getStats().options.maxThreads,
+                                             Status::OK());
 
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
             // but  applyOplogBatchPerWorker will modify the vectors that it contains.

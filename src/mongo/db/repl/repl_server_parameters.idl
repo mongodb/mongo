@@ -218,6 +218,16 @@ server_parameters:
             gte: 1
             lte: 256
 
+    replWriterMinThreadCount:
+        description: The minimum number of threads in the thread pool used to apply the oplog
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: replWriterMinThreadCount
+        default: 0
+        validator:
+            gte: 0
+            lte: 256
+
     replBatchLimitOperations:
         description: The maximum number of operations to apply in a single batch
         set_at: [ startup, runtime ]

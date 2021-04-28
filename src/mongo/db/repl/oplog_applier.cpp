@@ -136,6 +136,15 @@ const OplogApplier::Options& OplogApplier::getOptions() const {
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool() {
+    // Reduce content pinned in cache by single oplog batch on small machines by reducing the number
+    // of threads of ReplWriter to reduce the number of concurrent open WT transactions.
+    if (replWriterThreadCount < replWriterMinThreadCount) {
+        LOGV2_FATAL_NOTRACE(
+            5605400,
+            "replWriterMinThreadCount must be less than or equal to replWriterThreadCount",
+            "replWriterMinThreadCount"_attr = replWriterMinThreadCount,
+            "replWriterThreadCount"_attr = replWriterThreadCount);
+    }
     return makeReplWriterPool(replWriterThreadCount);
 }
 
@@ -143,7 +152,9 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
     ThreadPool::Options options;
     options.threadNamePrefix = "ReplWriterWorker-";
     options.poolName = "ReplWriterWorkerThreadPool";
-    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.minThreads =
+        replWriterMinThreadCount < threadCount ? replWriterMinThreadCount : threadCount;
+    options.maxThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
         Client::initThread(getThreadName());
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
