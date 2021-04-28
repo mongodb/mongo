@@ -81,6 +81,7 @@ static constexpr auto kSyntax = R"(
                                IDENT? # optional variable name of the snapshot id read by the scan
                                IDENT? # optional variable name of the index name read by the scan
                                IDENT? # optional variable name of the index key read by the scan
+                               IDENT? # optional variable name of the index key pattern read by the scan
                                IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                IDENT # collection name to scan
                                FORWARD_FLAG # forward scan or not
@@ -91,6 +92,7 @@ static constexpr auto kSyntax = R"(
                                  IDENT? # optional variable name of the snapshot id read by the scan
                                  IDENT? # optional variable name of the index name read by the scan
                                  IDENT? # optional variable name of the index key read by the scan
+                                 IDENT? # optional variable name of the index key pattern read by the scan
                                  IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                  IDENT # collection name to scan
 
@@ -100,6 +102,7 @@ static constexpr auto kSyntax = R"(
                                IDENT? # optional variable name of the snapshot id delivered by the scan
                                IDENT? # optional variable name of the index name read by the scan
                                IDENT? # optional variable name of the index key read by the scan
+                               IDENT? # optional variable name of the index key pattern read by the scan
                                IDENT_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                IDENT # collection name to scan
                                FORWARD_FLAG # forward scan or not
@@ -626,15 +629,17 @@ void Parser::walkScan(AstQuery& ast) {
     std::string snapshotIdName;
     std::string indexIdName;
     std::string indexKeyName;
+    std::string indexKeyPatternName;
     int projectsPos;
 
-    if (ast.nodes.size() == 9) {
+    if (ast.nodes.size() == 10) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
         snapshotIdName = std::move(ast.nodes[2]->identifier);
         indexIdName = std::move(ast.nodes[3]->identifier);
         indexKeyName = std::move(ast.nodes[4]->identifier);
-        projectsPos = 5;
+        indexKeyPatternName = std::move(ast.nodes[5]->identifier);
+        projectsPos = 6;
     } else if (ast.nodes.size() == 6) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
@@ -667,6 +672,7 @@ void Parser::walkScan(AstQuery& ast) {
                                  lookupSlot(snapshotIdName),
                                  lookupSlot(indexIdName),
                                  lookupSlot(indexKeyName),
+                                 lookupSlot(indexKeyPatternName),
                                  oplogTs,
                                  ast.nodes[projectsPos]->identifiers,
                                  lookupSlots(ast.nodes[projectsPos]->renames),
@@ -685,17 +691,19 @@ void Parser::walkParallelScan(AstQuery& ast) {
     std::string snapshotIdName;
     std::string indexIdName;
     std::string indexKeyName;
+    std::string indexKeyPatternName;
     std::string collName;
     int projectsPos;
 
-    if (ast.nodes.size() == 7) {
+    if (ast.nodes.size() == 8) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
         snapshotIdName = std::move(ast.nodes[2]->identifier);
         indexIdName = std::move(ast.nodes[3]->identifier);
         indexKeyName = std::move(ast.nodes[4]->identifier);
-        projectsPos = 5;
-        collName = std::move(ast.nodes[6]->identifier);
+        indexKeyPatternName = std::move(ast.nodes[5]->identifier);
+        projectsPos = 6;
+        collName = std::move(ast.nodes[7]->identifier);
     } else if (ast.nodes.size() == 4) {
         recordName = std::move(ast.nodes[0]->identifier);
         recordIdName = std::move(ast.nodes[1]->identifier);
@@ -718,6 +726,7 @@ void Parser::walkParallelScan(AstQuery& ast) {
                                          lookupSlot(snapshotIdName),
                                          lookupSlot(indexIdName),
                                          lookupSlot(indexKeyName),
+                                         lookupSlot(indexKeyPatternName),
                                          ast.nodes[projectsPos]->identifiers,
                                          lookupSlots(ast.nodes[projectsPos]->renames),
                                          nullptr,
@@ -733,24 +742,26 @@ void Parser::walkSeek(AstQuery& ast) {
     std::string snapshotIdName;
     std::string indexIdName;
     std::string indexKeyName;
+    std::string indexKeyPatternName;
 
     int projectsPos;
 
-    if (ast.nodes.size() == 10) {
+    if (ast.nodes.size() == 11) {
         recordName = std::move(ast.nodes[1]->identifier);
         recordIdName = std::move(ast.nodes[2]->identifier);
         snapshotIdName = std::move(ast.nodes[3]->identifier);
         indexIdName = std::move(ast.nodes[4]->identifier);
         indexKeyName = std::move(ast.nodes[5]->identifier);
-        projectsPos = 6;
-    } else if (ast.nodes.size() == 6) {
+        indexKeyPatternName = std::move(ast.nodes[6]->identifier);
+        projectsPos = 7;
+    } else if (ast.nodes.size() == 7) {
         recordName = std::move(ast.nodes[1]->identifier);
         recordIdName = std::move(ast.nodes[2]->identifier);
         projectsPos = 3;
-    } else if (ast.nodes.size() == 5) {
+    } else if (ast.nodes.size() == 6) {
         recordName = std::move(ast.nodes[1]->identifier);
         projectsPos = 2;
-    } else if (ast.nodes.size() == 4) {
+    } else if (ast.nodes.size() == 5) {
         projectsPos = 1;
     } else {
         uasserted(5290717, "Wrong number of arguments for SEEK");
@@ -775,6 +786,7 @@ void Parser::walkSeek(AstQuery& ast) {
                                  lookupSlot(snapshotIdName),
                                  lookupSlot(indexIdName),
                                  lookupSlot(indexKeyName),
+                                 lookupSlot(indexKeyPatternName),
                                  oplogTs,
                                  ast.nodes[projectsPos]->identifiers,
                                  lookupSlots(ast.nodes[projectsPos]->renames),

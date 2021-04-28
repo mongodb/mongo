@@ -45,6 +45,7 @@ ScanStage::ScanStage(CollectionUUID collectionUuid,
                      boost::optional<value::SlotId> snapshotIdSlot,
                      boost::optional<value::SlotId> indexIdSlot,
                      boost::optional<value::SlotId> indexKeySlot,
+                     boost::optional<value::SlotId> indexKeyPatternSlot,
                      boost::optional<value::SlotId> oplogTsSlot,
                      std::vector<std::string> fields,
                      value::SlotVector vars,
@@ -60,6 +61,7 @@ ScanStage::ScanStage(CollectionUUID collectionUuid,
       _snapshotIdSlot(snapshotIdSlot),
       _indexIdSlot(indexIdSlot),
       _indexKeySlot(indexKeySlot),
+      _indexKeyPatternSlot(indexKeyPatternSlot),
       _oplogTsSlot(oplogTsSlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
@@ -82,6 +84,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _snapshotIdSlot,
                                        _indexIdSlot,
                                        _indexKeySlot,
+                                       _indexKeyPatternSlot,
                                        _oplogTsSlot,
                                        _fields,
                                        _vars,
@@ -122,7 +125,11 @@ void ScanStage::prepare(CompileCtx& ctx) {
     }
 
     if (_indexKeySlot) {
-        _keyStringAccessor = ctx.getAccessor(*_indexKeySlot);
+        _indexKeyAccessor = ctx.getAccessor(*_indexKeySlot);
+    }
+
+    if (_indexKeyPatternSlot) {
+        _indexKeyPatternAccessor = ctx.getAccessor(*_indexKeyPatternSlot);
     }
 
     if (_oplogTsSlot) {
@@ -262,24 +269,33 @@ PlanState ScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
-    // Loop until we have a valid result or we return EOF.
-    boost::optional<Record> nextRecord;
-    while (true) {
-        nextRecord =
-            (_firstGetNext && _seekKeyAccessor) ? _cursor->seekExact(_key) : _cursor->next();
-        _firstGetNext = false;
+    auto res = _firstGetNext && _seekKeyAccessor;
+    auto nextRecord = res ? _cursor->seekExact(_key) : _cursor->next();
+    _firstGetNext = false;
 
-        if (!nextRecord) {
-            return trackPlanState(PlanState::IS_EOF);
+    if (!nextRecord) {
+        // Only check our index key for corruption during the first call to 'getNext' and while
+        // seeking.
+        if (_scanCallbacks.indexKeyCorruptionCheckCallback) {
+            tassert(5113712,
+                    "Index key corruption check can only be performed on the first call "
+                    "to getNext() during a seek",
+                    res);
+            _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
+                                                           _snapshotIdAccessor,
+                                                           _indexKeyAccessor,
+                                                           _indexKeyPatternAccessor,
+                                                           _key,
+                                                           _collName);
         }
+        return trackPlanState(PlanState::IS_EOF);
+    }
 
-        if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-            !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _keyStringAccessor, *nextRecord)) {
-            continue;
-        } else {
-            break;
-        }
+    // Return EOF if the index key is found to be inconsistent.
+    if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
+        !_scanCallbacks.indexKeyConsistencyCheckCallBack(
+            _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, *nextRecord)) {
+        return trackPlanState(PlanState::IS_EOF);
     }
 
     if (_recordAccessor) {
@@ -370,6 +386,9 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
         if (_indexKeySlot) {
             bob.appendNumber("indexKeySlot", static_cast<long long>(*_indexKeySlot));
         }
+        if (_indexKeyPatternSlot) {
+            bob.appendNumber("indexKeyPatternSlot", static_cast<long long>(*_indexKeyPatternSlot));
+        }
 
         bob.append("fields", _fields);
         bob.append("outputSlots", _vars);
@@ -419,6 +438,12 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
+    if (_indexKeyPatternSlot) {
+        DebugPrinter::addIdentifier(ret, _indexKeyPatternSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _fields.size(); ++idx) {
         if (idx) {
@@ -448,6 +473,7 @@ ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
                                      boost::optional<value::SlotId> snapshotIdSlot,
                                      boost::optional<value::SlotId> indexIdSlot,
                                      boost::optional<value::SlotId> indexKeySlot,
+                                     boost::optional<value::SlotId> indexKeyPatternSlot,
                                      std::vector<std::string> fields,
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
@@ -460,6 +486,7 @@ ParallelScanStage::ParallelScanStage(CollectionUUID collectionUuid,
       _snapshotIdSlot(snapshotIdSlot),
       _indexIdSlot(indexIdSlot),
       _indexKeySlot(indexKeySlot),
+      _indexKeyPatternSlot(indexKeyPatternSlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
       _scanCallbacks(std::move(callbacks)) {
@@ -475,6 +502,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
                                      boost::optional<value::SlotId> snapshotIdSlot,
                                      boost::optional<value::SlotId> indexIdSlot,
                                      boost::optional<value::SlotId> indexKeySlot,
+                                     boost::optional<value::SlotId> indexKeyPatternSlot,
                                      std::vector<std::string> fields,
                                      value::SlotVector vars,
                                      PlanYieldPolicy* yieldPolicy,
@@ -487,6 +515,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
       _snapshotIdSlot(snapshotIdSlot),
       _indexIdSlot(indexIdSlot),
       _indexKeySlot(indexKeySlot),
+      _indexKeyPatternSlot(indexKeyPatternSlot),
       _fields(std::move(fields)),
       _vars(std::move(vars)),
       _state(state),
@@ -502,6 +531,7 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _snapshotIdSlot,
                                                _indexIdSlot,
                                                _indexKeySlot,
+                                               _indexKeyPatternSlot,
                                                _fields,
                                                _vars,
                                                _yieldPolicy,
@@ -535,7 +565,11 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
     }
 
     if (_indexKeySlot) {
-        _keyStringAccessor = ctx.getAccessor(*_indexKeySlot);
+        _indexKeyAccessor = ctx.getAccessor(*_indexKeySlot);
+    }
+
+    if (_indexKeyPatternSlot) {
+        _indexKeyPatternAccessor = ctx.getAccessor(*_indexKeyPatternSlot);
     }
 
     std::tie(_collName, _catalogEpoch) = acquireCollection(_opCtx, _collUuid, nullptr, _coll);
@@ -673,8 +707,21 @@ PlanState ParallelScanStage::getNext() {
 
     // Loop until we have a valid result or we return EOF.
     do {
-        nextRecord = needsRange() ? nextRange() : _cursor->next();
+        auto needRange = needsRange();
+        nextRecord = needRange ? nextRange() : _cursor->next();
         if (!nextRecord) {
+            if (_scanCallbacks.indexKeyCorruptionCheckCallback) {
+                tassert(5113711,
+                        "Index key corruption check can only performed when inspecting the first "
+                        "recordId in a range",
+                        needRange);
+                _scanCallbacks.indexKeyCorruptionCheckCallback(_opCtx,
+                                                               _snapshotIdAccessor,
+                                                               _indexKeyAccessor,
+                                                               _indexKeyPatternAccessor,
+                                                               _range.begin,
+                                                               _collName);
+            }
             return trackPlanState(PlanState::IS_EOF);
         }
 
@@ -684,11 +731,11 @@ PlanState ParallelScanStage::getNext() {
             continue;
         }
 
+        // Return EOF if the index key is found to be inconsistent.
         if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
             !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _keyStringAccessor, *nextRecord)) {
-            nextRecord = boost::none;
-            continue;
+                _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, *nextRecord)) {
+            return trackPlanState(PlanState::IS_EOF);
         }
     } while (!nextRecord);
 
@@ -778,6 +825,12 @@ std::vector<DebugPrinter::Block> ParallelScanStage::debugPrint() const {
 
     if (_indexKeySlot) {
         DebugPrinter::addIdentifier(ret, _indexKeySlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexKeyPatternSlot) {
+        DebugPrinter::addIdentifier(ret, _indexKeyPatternSlot.get());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }

@@ -53,6 +53,14 @@ using IndexKeyConsistencyCheckCallback = std::function<bool(OperationContext* op
                                                             value::SlotAccessor* indexKeyAccessor,
                                                             const Record& nextRecord)>;
 
+using IndexKeyCorruptionCheckCallback =
+    std::function<void(OperationContext* opCtx,
+                       value::SlotAccessor* snapshotIdAccessor,
+                       value::SlotAccessor* indexKeyAccessor,
+                       value::SlotAccessor* indexKeyPatternAccessor,
+                       const RecordId& rid,
+                       const NamespaceString& nss)>;
+
 /**
  * Given a collection UUID, acquires 'coll', invokes the provided 'lockAcquisiionCallback', and
  * returns the collection's name as well as the current catalog epoch.

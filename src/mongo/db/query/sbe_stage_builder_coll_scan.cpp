@@ -171,13 +171,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         makeOplogTimestampSlotsIfNeeded(env, slotIdGenerator, shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks(
-        lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
+        lockAcquisitionCallback, {}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
                                             boost::none /* snapshotIdSlot */,
                                             boost::none /* indexIdSlot */,
                                             boost::none /* indexKeySlot */,
+                                            boost::none /* keyPatternSlot */,
                                             tsSlot,
                                             std::move(fields),
                                             std::move(slots),
@@ -251,12 +252,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         sbe::ScanCallbacks branchCallbacks(lockAcquisitionCallback);
         auto minTsBranch = sbe::makeS<sbe::FilterStage<false, true>>(
             sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                       boost::none,
-                                       boost::none,
-                                       boost::none,
-                                       boost::none,
-                                       boost::none,
-                                       boost::none,
+                                       boost::none /* resultSlot */,
+                                       boost::none /* recordIdSlot */,
+                                       boost::none /* snapshotIdSlot */,
+                                       boost::none /* indexIdSlot */,
+                                       boost::none /* indexKeySlot */,
+                                       boost::none /* keyPatternSlot */,
+                                       boost::none /* oplogTsSlot*/,
                                        std::move(fields),
                                        minTsSlots, /* don't move this */
                                        boost::none,
@@ -383,9 +385,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                 sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                            resultSlot,
                                            recordIdSlot,
-                                           boost::none,
-                                           boost::none,
-                                           boost::none,
+                                           boost::none /* snapshotIdSlot */,
+                                           boost::none /* indexIdSlot */,
+                                           boost::none /* indexKeySlot */,
+                                           boost::none /* keyPatternSlot */,
                                            tsSlot,
                                            std::move(fields),
                                            std::move(slots),
@@ -455,13 +458,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         makeOplogTimestampSlotsIfNeeded(env, slotIdGenerator, csn->shouldTrackLatestOplogTimestamp);
 
     sbe::ScanCallbacks callbacks(
-        lockAcquisitionCallback, {}, makeOpenCallbackIfNeeded(collection, csn));
+        lockAcquisitionCallback, {}, {}, makeOpenCallbackIfNeeded(collection, csn));
     auto stage = sbe::makeS<sbe::ScanStage>(collection->uuid(),
                                             resultSlot,
                                             recordIdSlot,
-                                            boost::none,
-                                            boost::none,
-                                            boost::none,
+                                            boost::none /* snapshotIdSlot */,
+                                            boost::none /* indexIdSlot */,
+                                            boost::none /* indexKeySlot */,
+                                            boost::none /* keyPatternSlot */,
                                             tsSlot,
                                             std::move(fields),
                                             std::move(slots),
@@ -488,26 +492,27 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         // Construct a 'seek' branch of the 'union'. If we're succeeded to reposition the cursor,
         // the branch will output  the 'seekSlot' to start the real scan from, otherwise it will
         // produce EOF.
-        auto seekBranch =
-            sbe::makeS<sbe::LoopJoinStage>(std::move(projStage),
-                                           sbe::makeS<sbe::ScanStage>(collection->uuid(),
-                                                                      boost::none,
-                                                                      boost::none,
-                                                                      boost::none,
-                                                                      boost::none,
-                                                                      boost::none,
-                                                                      boost::none,
-                                                                      std::vector<std::string>{},
-                                                                      sbe::makeSV(),
-                                                                      seekSlot,
-                                                                      forward,
-                                                                      yieldPolicy,
-                                                                      csn->nodeId(),
-                                                                      lockAcquisitionCallback),
-                                           sbe::makeSV(seekSlot),
-                                           sbe::makeSV(seekSlot),
-                                           nullptr,
-                                           csn->nodeId());
+        auto seekBranch = sbe::makeS<sbe::LoopJoinStage>(
+            std::move(projStage),
+            sbe::makeS<sbe::ScanStage>(collection->uuid(),
+                                       boost::none /* recordSlot */,
+                                       boost::none /* recordIdSlot*/,
+                                       boost::none /* snapshotIdSlot */,
+                                       boost::none /* indexIdSlot */,
+                                       boost::none /* indexKeySlot */,
+                                       boost::none /* keyPatternSlot */,
+                                       boost::none /* oplogTsSlot */,
+                                       std::vector<std::string>{},
+                                       sbe::makeSV(),
+                                       seekSlot,
+                                       forward,
+                                       yieldPolicy,
+                                       csn->nodeId(),
+                                       lockAcquisitionCallback),
+            sbe::makeSV(seekSlot),
+            sbe::makeSV(seekSlot),
+            nullptr,
+            csn->nodeId());
 
         // Construct a 'fail' branch of the union. The 'unusedSlot' is needed as each union branch
         // must have the same number of slots, and we use just one in the 'seek' branch above. This

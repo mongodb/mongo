@@ -61,15 +61,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
     sbe::LockAcquisitionCallback lockAcquisitionCallback,
-    StringMap<const IndexAccessMethod*>* iamMap);
+    StringMap<const IndexAccessMethod*>* iamMap,
+    bool needsCorruptionCheck);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds. The
  * generated subtree will have the following form:
  *
- *         nlj [indexIdSlot] [lowKeySlot, highKeySlot]
+ *         nlj [indexIdSlot, keyPatternSlot] [lowKeySlot, highKeySlot]
  *              left
- *                  project [indexIdSlot = <indexName>, lowKeySlot = KS(...), highKeySlot = KS(...)]
+ *                  project [indexIdSlot = <indexName>, keyPatternSlot = <index key pattern>,
+ *                          lowKeySlot =  KS(...), highKeySlot = KS(...)]
  *                  limit 1
  *                  coscan
  *               right
@@ -84,13 +86,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleIntervalIndexScan(
     const CollectionPtr& collection,
     const std::string& indexName,
+    const BSONObj& keyPattern,
     bool forward,
     std::unique_ptr<KeyString::Value> lowKey,
     std::unique_ptr<KeyString::Value> highKey,
     sbe::IndexKeysInclusionSet indexKeysToInclude,
     sbe::value::SlotVector vars,
-    boost::optional<sbe::value::SlotId> recordSlot,
     boost::optional<sbe::value::SlotId> snapshotIdSlot,
+    boost::optional<sbe::value::SlotId> indexIdSlot,
+    boost::optional<sbe::value::SlotId> recordSlot,
+    boost::optional<sbe::value::SlotId> keyPatternSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     PlanNodeId nodeId,

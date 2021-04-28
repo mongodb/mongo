@@ -1,7 +1,6 @@
 // @tags: [
 //   requires_journaling,
 //   requires_persistence,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

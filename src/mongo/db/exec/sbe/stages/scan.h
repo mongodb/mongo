@@ -41,13 +41,16 @@ using ScanOpenCallback = std::function<void(OperationContext*, const CollectionP
 
 struct ScanCallbacks {
     ScanCallbacks(LockAcquisitionCallback lockAcquisition,
+                  IndexKeyCorruptionCheckCallback indexKeyCorruptionCheck = {},
                   IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
                   ScanOpenCallback scanOpen = {})
         : lockAcquisitionCallback(std::move(lockAcquisition)),
+          indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
           indexKeyConsistencyCheckCallBack(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
     LockAcquisitionCallback lockAcquisitionCallback;
+    IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
     IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallBack;
     ScanOpenCallback scanOpenCallback;
 };
@@ -60,6 +63,7 @@ public:
               boost::optional<value::SlotId> snapshotIdSlot,
               boost::optional<value::SlotId> indexIdSlot,
               boost::optional<value::SlotId> indexKeySlot,
+              boost::optional<value::SlotId> indexKeyPatternSlot,
               boost::optional<value::SlotId> oplogTsSlot,
               std::vector<std::string> fields,
               value::SlotVector vars,
@@ -96,6 +100,7 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const boost::optional<value::SlotId> _indexIdSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
+    const boost::optional<value::SlotId> _indexKeyPatternSlot;
     const boost::optional<value::SlotId> _oplogTsSlot;
 
     const std::vector<std::string> _fields;
@@ -117,7 +122,8 @@ private:
     std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
     value::SlotAccessor* _indexIdAccessor{nullptr};
-    value::SlotAccessor* _keyStringAccessor{nullptr};
+    value::SlotAccessor* _indexKeyAccessor{nullptr};
+    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
     RuntimeEnvironment::Accessor* _oplogTsAccessor{nullptr};
 
     value::FieldAccessorMap _fieldAccessors;
@@ -152,6 +158,7 @@ public:
                       boost::optional<value::SlotId> snapshotIdSlot,
                       boost::optional<value::SlotId> indexIdSlot,
                       boost::optional<value::SlotId> indexKeySlot,
+                      boost::optional<value::SlotId> indexKeyPatternSlot,
                       std::vector<std::string> fields,
                       value::SlotVector vars,
                       PlanYieldPolicy* yieldPolicy,
@@ -165,6 +172,7 @@ public:
                       boost::optional<value::SlotId> snapshotIdSlot,
                       boost::optional<value::SlotId> indexIdSlot,
                       boost::optional<value::SlotId> indexKeySlot,
+                      boost::optional<value::SlotId> indexKeyPatternSlot,
                       std::vector<std::string> fields,
                       value::SlotVector vars,
                       PlanYieldPolicy* yieldPolicy,
@@ -204,6 +212,7 @@ private:
     const boost::optional<value::SlotId> _snapshotIdSlot;
     const boost::optional<value::SlotId> _indexIdSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
+    const boost::optional<value::SlotId> _indexKeyPatternSlot;
     const std::vector<std::string> _fields;
     const value::SlotVector _vars;
 
@@ -218,7 +227,8 @@ private:
     std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
     value::SlotAccessor* _indexIdAccessor{nullptr};
-    value::SlotAccessor* _keyStringAccessor{nullptr};
+    value::SlotAccessor* _indexKeyAccessor{nullptr};
+    value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
 
     value::FieldAccessorMap _fieldAccessors;
     value::SlotAccessorMap _varAccessors;

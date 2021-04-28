@@ -62,6 +62,7 @@ public:
     static constexpr StringData kSnapshotId = "snapshotId"_sd;
     static constexpr StringData kIndexId = "indexId"_sd;
     static constexpr StringData kIndexKey = "indexKey"_sd;
+    static constexpr StringData kIndexKeyPattern = "indexKeyPattern"_sd;
 
     PlanStageSlots() = default;
 
@@ -258,6 +259,7 @@ public:
     static constexpr StringData kSnapshotId = PlanStageSlots::kSnapshotId;
     static constexpr StringData kIndexId = PlanStageSlots::kIndexId;
     static constexpr StringData kIndexKey = PlanStageSlots::kIndexKey;
+    static constexpr StringData kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
 
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const CollectionPtr& collection,
@@ -335,7 +337,8 @@ private:
                          sbe::value::SlotId recordIdSlot,
                          sbe::value::SlotId snapshotIdSlot,
                          sbe::value::SlotId indexIdSlot,
-                         sbe::value::SlotId keyStringSlot,
+                         sbe::value::SlotId indexKeySlot,
+                         sbe::value::SlotId indexKeyPatternSlot,
                          StringMap<const IndexAccessMethod*> iamMap,
                          PlanNodeId planNodeId,
                          sbe::value::SlotVector slotsToForward = {});

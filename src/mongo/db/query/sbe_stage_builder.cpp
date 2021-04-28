@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/query/sbe_stage_builder.h"
@@ -61,6 +63,7 @@
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo::stage_builder {
 namespace {
@@ -292,6 +295,68 @@ sbe::LockAcquisitionCallback makeLockAcquisitionCallback(bool checkNodeCanServeR
 }
 
 /**
+ * Callback function that logs a message and uasserts if it detects a corrupt index key. An index
+ * key is considered corrupt if it has no corresponding Record.
+ */
+void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
+                                     sbe::value::SlotAccessor* snapshotIdAccessor,
+                                     sbe::value::SlotAccessor* indexKeyAccessor,
+                                     sbe::value::SlotAccessor* indexKeyPatternAccessor,
+                                     const RecordId& rid,
+                                     const NamespaceString& nss) {
+    // Having a recordId but no record is only an issue when we are not ignoring prepare conflicts.
+    if (opCtx->recoveryUnit()->getPrepareConflictBehavior() == PrepareConflictBehavior::kEnforce) {
+        tassert(5113700, "Should have snapshot id accessor", snapshotIdAccessor);
+        auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+        auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
+        const auto msgSnapshotIdTag = snapshotIdTag;
+        tassert(5113701,
+                str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
+                snapshotIdTag == sbe::value::TypeTags::NumberInt64);
+        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
+
+        // If we have a recordId but no corresponding record, this means that said record has been
+        // deleted. This can occur during yield, in which case the snapshot id would be incremented.
+        // If, on the other hand, the current snapshot id matches that of the recordId, this
+        // indicates an error as no yield could have taken place.
+        if (snapshotId == currentSnapshotId.toNumber()) {
+            tassert(5113703, "Should have index key accessor", indexKeyAccessor);
+            tassert(5113704, "Should have key pattern accessor", indexKeyPatternAccessor);
+
+            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
+            auto [kpTag, kpVal] = indexKeyPatternAccessor->getViewOfValue();
+
+            const auto msgKsTag = ksTag;
+            tassert(5113706,
+                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
+                    ksTag == sbe::value::TypeTags::ksValue);
+
+            const auto msgKpTag = kpTag;
+            tassert(5113707,
+                    str::stream() << "Index key pattern is of wrong type: " << msgKpTag,
+                    kpTag == sbe::value::TypeTags::bsonObject);
+
+            auto keyString = sbe::value::getKeyStringView(ksVal);
+            tassert(5113708, "KeyString does not exist", keyString);
+
+            BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
+            auto bsonKeyString = KeyString::toBson(*keyString, Ordering::make(bsonKeyPattern));
+            auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
+
+            LOGV2_ERROR_OPTIONS(
+                5113709,
+                {logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)},
+                "Erroneous index key found with reference to non-existent record id. Consider "
+                "dropping and then re-creating the index and then running the validate command "
+                "on the collection.",
+                "namespace"_attr = nss,
+                "recordId"_attr = rid,
+                "indexKeyData"_attr = hydratedKey);
+        }
+    }
+}
+
+/**
  * Callback function that returns true if a given index key is valid, false otherwise. An index key
  * is valid if either the snapshot id of the underlying index scan matches the current snapshot id,
  * or that the index keys are still part of the underlying index.
@@ -310,25 +375,28 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                 str::stream() << "SnapshotId is of wrong type: " << msgSnapshotIdTag,
                 snapshotIdTag == sbe::value::TypeTags::NumberInt64);
 
-        auto snapshotId = static_cast<uint64_t>(snapshotIdVal);
+        auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
         if (currentSnapshotId.toNumber() != snapshotId) {
             tassert(5290707, "Should have index key accessor", indexKeyAccessor);
             tassert(5290714, "Should have index id accessor", indexIdAccessor);
-            auto& executionCtx = StorageExecutionContext::get(opCtx);
-            auto keys = executionCtx.keys();
-
-            // There's no need to compute the prefixes of the indexed fields that cause the
-            // index to be multikey when ensuring the keyData is still valid.
-            KeyStringSet* multikeyMetadataKeys = nullptr;
-            MultikeyPaths* multikeyPaths = nullptr;
 
             auto [indexIdTag, indexIdVal] = indexIdAccessor->getViewOfValue();
+            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
+
             const auto msgIndexIdTag = indexIdTag;
             tassert(5290708,
                     str::stream() << "Index name is of wrong type: " << msgIndexIdTag,
                     sbe::value::isString(indexIdTag));
 
+            const auto msgKsTag = ksTag;
+            tassert(5290710,
+                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
+                    ksTag == sbe::value::TypeTags::ksValue);
+
+            auto keyString = sbe::value::getKeyStringView(ksVal);
             auto indexId = sbe::value::getStringView(indexIdTag, indexIdVal);
+            tassert(5290712, "KeyString does not exist", keyString);
+
             auto it = iamTable.find(indexId);
             tassert(5290713,
                     str::stream() << "IndexAccessMethod not found for index " << indexId,
@@ -338,6 +406,14 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             tassert(5290709,
                     str::stream() << "Expected to find IndexAccessMethod for index " << indexId,
                     iam);
+
+            auto& executionCtx = StorageExecutionContext::get(opCtx);
+            auto keys = executionCtx.keys();
+
+            // There's no need to compute the prefixes of the indexed fields that cause the
+            // index to be multikey when ensuring the keyData is still valid.
+            KeyStringSet* multikeyMetadataKeys = nullptr;
+            MultikeyPaths* multikeyPaths = nullptr;
 
             iam->getKeys(executionCtx.pooledBufferBuilder(),
                          nextRecord.data.toBson(),
@@ -349,13 +425,6 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                          nextRecord.id,
                          IndexAccessMethod::kNoopOnSuppressedErrorFn);
 
-            auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
-            const auto msgKsTag = ksTag;
-            tassert(5290710,
-                    str::stream() << "KeyString is of wrong type: " << msgKsTag,
-                    ksTag == sbe::value::TypeTags::ksValue);
-            auto keyString = sbe::value::getKeyStringView(ksVal);
-            tassert(5290712, "KeyString does not exist", keyString);
             return keys->count(*keyString);
         }
     }
@@ -581,7 +650,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                               _yieldPolicy,
                                               _data.env,
                                               _lockAcquisitionCallback,
-                                              iamMap);
+                                              iamMap,
+                                              reqs.has(kIndexKeyPattern));
 
     if (reqs.has(PlanStageSlots::kReturnKey)) {
         std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
@@ -627,7 +697,8 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
                                             sbe::value::SlotId seekKeySlot,
                                             sbe::value::SlotId snapshotIdSlot,
                                             sbe::value::SlotId indexIdSlot,
-                                            sbe::value::SlotId keyStringSlot,
+                                            sbe::value::SlotId indexKeySlot,
+                                            sbe::value::SlotId indexKeyPatternSlot,
                                             StringMap<const IndexAccessMethod*> iamMap,
                                             PlanNodeId planNodeId,
                                             sbe::value::SlotVector slotsToForward) {
@@ -637,6 +708,7 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
     using namespace std::placeholders;
     sbe::ScanCallbacks callbacks(
         _lockAcquisitionCallback,
+        indexKeyCorruptionCheckCallback,
         std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5));
     // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(_collection->uuid(),
@@ -644,7 +716,8 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
                                                 recordIdSlot,
                                                 snapshotIdSlot,
                                                 indexIdSlot,
-                                                keyStringSlot,
+                                                indexKeySlot,
+                                                indexKeyPatternSlot,
                                                 boost::none,
                                                 std::vector<std::string>{},
                                                 sbe::makeSV(),
@@ -660,7 +733,7 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
-        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, keyStringSlot),
+        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,
         planNodeId);
 
@@ -675,8 +748,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // 'resultSlot' which will be produced by the call to makeLoopJoinForFetch() below. In addition
     // to that, the child must always produce a 'recordIdSlot' because it's needed for the call to
     // makeLoopJoinForFetch() below.
-    auto childReqs =
-        reqs.copy().clear(kResult).set(kRecordId).set(kSnapshotId).set(kIndexId).set(kIndexKey);
+    auto childReqs = reqs.copy()
+                         .clear(kResult)
+                         .set(kRecordId)
+                         .set(kSnapshotId)
+                         .set(kIndexId)
+                         .set(kIndexKey)
+                         .set(kIndexKeyPattern);
 
     auto [stage, outputs] = build(fn->children[0], childReqs);
 
@@ -686,7 +764,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         4953600, "ReturnKey slot is not defined", !reqs.has(kReturnKey) || outputs.has(kReturnKey));
     uassert(5290701, "Snapshot id slot is not defined", outputs.has(kSnapshotId));
     uassert(5290702, "Index id slot is not defined", outputs.has(kIndexId));
-    uassert(5290711, "Keystring slot is not defined", outputs.has(kIndexKey));
+    uassert(5290711, "Index key slot is not defined", outputs.has(kIndexKey));
+    uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
 
     auto forwardingReqs = reqs.copy().clear(kResult).clear(kRecordId);
 
@@ -705,6 +784,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                              outputs.get(kSnapshotId),
                              outputs.get(kIndexId),
                              outputs.get(kIndexKey),
+                             outputs.get(kIndexKeyPattern),
                              std::move(iamMap),
                              root->nodeId(),
                              std::move(relevantSlots));
@@ -1567,7 +1647,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerResultSlot = innerOutputs.get(kResult);
     auto innerSnapshotIdSlot = innerOutputs.getIfExists(kSnapshotId);
     auto innerIndexIdSlot = innerOutputs.getIfExists(kIndexId);
-    auto innerKeyStringSlot = innerOutputs.getIfExists(kIndexKey);
+    auto innerIndexKeySlot = innerOutputs.getIfExists(kIndexKey);
+    auto innerIndexKeyPatternSlot = innerOutputs.getIfExists(kIndexKeyPattern);
 
     auto innerCondSlots = sbe::makeSV(innerIdSlot);
     auto innerProjectSlots = sbe::makeSV(innerResultSlot);
@@ -1592,10 +1673,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         innerProjectSlots.push_back(slot);
         outputs.set(kIndexId, slot);
     }
-    if (reqs.has(kIndexKey) && innerKeyStringSlot) {
-        auto slot = *innerKeyStringSlot;
+    if (reqs.has(kIndexKey) && innerIndexKeySlot) {
+        auto slot = *innerIndexKeySlot;
         innerProjectSlots.push_back(slot);
         outputs.set(kIndexKey, slot);
+    }
+
+    if (reqs.has(kIndexKeyPattern) && innerIndexKeyPatternSlot) {
+        auto slot = *innerIndexKeyPatternSlot;
+        innerProjectSlots.push_back(slot);
+        outputs.set(kIndexKeyPattern, slot);
     }
 
     auto hashJoinStage = sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
@@ -1664,6 +1751,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outerProjectSlots.push_back(outerOutputs.get(kIndexKey));
     }
 
+    if (outerOutputs.has(kIndexKeyPattern)) {
+        outerProjectSlots.push_back(outerOutputs.get(kIndexKeyPattern));
+    }
+
     auto [innerStage, innerOutputs] = build(innerChild, childReqs);
     tassert(5073707, "innerOutputs must contain kRecordId slot", innerOutputs.has(kRecordId));
     tassert(5073708, "innerOutputs must contain kResult slot", innerOutputs.has(kResult));
@@ -1691,9 +1782,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         outputs.set(kIndexId, innerIndexIdSlot);
     }
     if (reqs.has(kIndexKey)) {
-        auto innerKeyStringSlot = innerOutputs.get(kIndexKey);
-        innerProjectSlots.push_back(innerKeyStringSlot);
-        outputs.set(kIndexKey, innerKeyStringSlot);
+        auto innerIndexKeySlot = innerOutputs.get(kIndexKey);
+        innerProjectSlots.push_back(innerIndexKeySlot);
+        outputs.set(kIndexKey, innerIndexKeySlot);
+    }
+
+    if (reqs.has(kIndexKeyPattern)) {
+        auto innerIndexKeyPatternSlot = innerOutputs.get(kIndexKeyPattern);
+        innerProjectSlots.push_back(innerIndexKeyPatternSlot);
+        outputs.set(kIndexKeyPattern, innerIndexKeyPatternSlot);
     }
 
     std::vector<sbe::value::SortDirection> sortDirs(outerKeySlots.size(),
