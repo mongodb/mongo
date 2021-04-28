@@ -825,8 +825,8 @@ var ReplSetTest = function(opts) {
                         // Node sees two primaries.
                         if (nodesPrimary !== -1) {
                             print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
-                                  " thinks both " + nodes[nodesPrimary].name + " and " +
-                                  nodes[j].name + " are primary.");
+                                  " thinks both " + self.nodes[nodesPrimary].name + " and " +
+                                  self.nodes[j].name + " are primary.");
 
                             return false;
                         }
@@ -845,13 +845,13 @@ var ReplSetTest = function(opts) {
                     primary = nodesPrimary;
                 } else if (primary !== nodesPrimary) {
                     print("AwaitNodesAgreeOnPrimary: Retrying because " + nodes[i].name +
-                          " thinks the primary is " + nodes[nodesPrimary].name + " instead of " +
-                          nodes[primary].name);
+                          " thinks the primary is " + self.nodes[nodesPrimary].name +
+                          " instead of " + self.nodes[primary].name);
                     return false;
                 }
             }
 
-            print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + nodes[primary].name);
+            print("AwaitNodesAgreeOnPrimary: Nodes agreed on primary " + self.nodes[primary].name);
             return true;
         }, "Awaiting nodes to agree on primary timed out", timeout);
     };
