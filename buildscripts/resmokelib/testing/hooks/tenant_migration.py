@@ -526,8 +526,9 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 # The fixture was restarted.
                 self.logger.info(
                     "Could not find tenant migration '%s' on donor primary on" +
-                    " port %d of replica set '%s'.", migration_opts.migration_id,
-                    donor_primary.port, migration_opts.get_donor_name())
+                    " port %d of replica set '%s': %s.", migration_opts.migration_id,
+                    donor_primary.port, migration_opts.get_donor_name(), str(err))
+                return
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
                     "Error forgetting tenant migration '%s' on donor primary on" +
