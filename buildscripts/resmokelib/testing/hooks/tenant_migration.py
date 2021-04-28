@@ -340,20 +340,12 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.FAIL_TO_PARSE_ERR_CODE and re.search(
             err_msg_regex, abort_reason["errmsg"])
 
-    def _is_no_such_key_in_oplog_buffer_err(self, abort_reason):
-        # TODO (SERVER-55353): Tenant migration recipient can fail to find pre-image or post-image
-        # for oplog entry in its tenant migration oplog buffer.
-        err_msg_regex = r"No document found with _id.*in namespace config.repl.migration.oplog"
-        return abort_reason["code"] == self.NO_SUCH_KEY_ERR_CODE and re.search(
-            err_msg_regex, abort_reason["errmsg"])
-
     def _is_blacklisted_abort_reason(self, abort_reason):
         is_recipient_err = abort_reason["errmsg"].startswith(
             "Tenant migration recipient command failed")
         if not is_recipient_err:
             return False
-        return self._is_missing_uuid_in_collection_info_err(
-            abort_reason) or self._is_no_such_key_in_oplog_buffer_err(abort_reason)
+        return self._is_missing_uuid_in_collection_info_err(abort_reason)
 
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)

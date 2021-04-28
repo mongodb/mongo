@@ -660,15 +660,13 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             }
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
 
-            if (entry.getPreImageOpTime()) {
-                uassert(
-                    5351005,
-                    str::stream()
-                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
-                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
-                        << sessionId << " because the preImage is missing",
-                    prePostImageEntry);
-
+            if (!prePostImageEntry && (entry.getPreImageOpTime() || entry.getPostImageOpTime())) {
+                LOGV2(5535302,
+                      "Tenant Oplog Applier omitting pre- or post- image for findAndModify",
+                      "entry"_attr = redact(entry.toBSONForLogging()),
+                      "tenant"_attr = _tenantId,
+                      "migrationUuid"_attr = _migrationUuid);
+            } else if (entry.getPreImageOpTime()) {
                 uassert(
                     5351002,
                     str::stream()
@@ -681,14 +679,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     originalPrePostImageOpTime == entry.getPreImageOpTime());
                 noopEntry.setPreImageOpTime(prePostImageEntry->getOpTime());
             } else if (entry.getPostImageOpTime()) {
-                uassert(
-                    5351006,
-                    str::stream()
-                        << "Tenant oplog application cannot apply retryable write with txnNumber  "
-                        << txnNumber << " statementNumber " << stmtIds.front() << " on session "
-                        << sessionId << " because the postImage is missing",
-                    prePostImageEntry);
-
                 uassert(
                     5351007,
                     str::stream()

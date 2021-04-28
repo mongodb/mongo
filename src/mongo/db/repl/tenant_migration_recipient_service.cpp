@@ -1118,6 +1118,13 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
         startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().get().getTimestamp();
     }
 
+    LOGV2_DEBUG(5535300,
+                1,
+                "Pre-fetching retryable oplog entries before startFetchingTimstamp",
+                "startFetchingTimestamp"_attr = startFetchingTimestamp,
+                "tenantId"_attr = getTenantId(),
+                "migrationId"_attr = getMigrationUUID());
+
     // Fetch the oplog chains of all retryable writes that occurred before startFetchingTimestamp
     // on this tenant.
     auto serializedPipeline =

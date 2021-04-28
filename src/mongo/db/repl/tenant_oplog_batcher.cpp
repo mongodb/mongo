@@ -111,9 +111,21 @@ void TenantOplogBatcher::_pushEntry(OperationContext* opCtx,
                         "Tenant Oplog Batcher reordering pre- or post- image for oplog entry",
                         "opTime"_attr = op.getOpTime(),
                         "imageOpTime"_attr = imageOpTime);
-            auto imageOp = OplogEntry(
-                uassertStatusOK(_oplogBuffer->findByTimestamp(opCtx, imageOpTime.getTimestamp())));
-            batch->ops.emplace_back(TenantOplogEntry(std::move(imageOp)));
+            auto swImageOp = _oplogBuffer->findByTimestamp(opCtx, imageOpTime.getTimestamp());
+            if (swImageOp.getStatus() == ErrorCodes::NoSuchKey) {
+                // If we don't find the pre/post image in the buffer, it means that the pre/post
+                // image has an optime less than the startFetchingDonorOpTime and was never
+                // fetched. This implies that there was a newer transaction number started in
+                // the same session on the donor when the retryable write pre-fetch stage tried
+                // to fetch oplog entries with optime less than the startFetchingDonorOpTime. In
+                // that case, we don't need to support retrying the current findAndModify.
+                // Therefore, use a dummy pre/post image.
+                LOGV2(5535301,
+                      "Tenant Oplog Batcher cannot find pre- or post- image",
+                      "imageOpTime"_attr = imageOpTime);
+            } else {
+                batch->ops.emplace_back(TenantOplogEntry(uassertStatusOK(swImageOp)));
+            }
         }
         batch->ops.emplace_back(TenantOplogEntry(std::move(op)));
     } else {
