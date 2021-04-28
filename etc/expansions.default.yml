@@ -11,6 +11,7 @@ resmoke_jobs_factor: "1"
 resmoke_jobs_max: "0"
 timeout_secs: "0"
 exec_timeout_secs: "0"
+python: /opt/mongodbtoolchain/v3/bin/python3
 multiversion_edition: base
 multiversion_platform: linux_x86_64
 multiversion_architecture: x86_64

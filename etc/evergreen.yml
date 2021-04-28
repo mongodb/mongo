@@ -137,7 +137,6 @@ variables:
   setup_task:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
-  - func: "f_expansions_write"
   teardown_task:
   - func: "attach scons logs"
   - func: "attach report"
@@ -175,20 +174,18 @@ variables:
   - func: "git get project"
   - func: "kill processes"
   - func: "cleanup environment"
+  - func: "get all modified patch files"
   - func: "set task expansion macros"
   # The python virtual environment is installed in ${workdir}, which is created in
   # "set up venv".
   - func: "set up venv"
   - func: "upload pip requirements"
-  - func: "get all modified patch files"
   - func: "configure evergreen api credentials"
   - func: "get buildnumber"
-  - func: "f_expansions_write"
   - func: "set up credentials"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
   - func: "set up win mount script"
   - func: "generate compile expansions"
-  - func: "f_expansions_write"
   teardown_group:
   - func: "umount shared scons directory"
   - func: "cleanup environment"
@@ -258,7 +255,6 @@ variables:
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
-    - func: "f_expansions_write"
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
@@ -366,42 +362,52 @@ variables:
 #######################################
 
 functions:
-  "f_expansions_write": &f_expansions_write
-    command: expansions.write
+  "remove files": &remove_files
+    command: shell.exec
     params:
-      file: expansions.yml
-      redacted: true
-
-  "remove files":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "src/evergreen/functions/files_remove.sh"
-        env:
-          workdir: ${workdir}
+      shell: bash
+      script: |
+        if [ -z "${files}" ]; then
+          exit 0
+        fi
+        for file in ${files}
+        do
+          if [ -f "$file" ]; then
+            echo "Removing file $file"
+            rm -f $file
+          fi
+        done
 
   "configure evergreen api credentials": &configure_evergreen_api_credentials
-    command: subprocess.exec
+    command: shell.exec
     type: test
     params:
-      binary: bash
-      args:
-        - "src/evergreen/functions/evergreen_api_credentials_configure.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      working_dir: src
+      silent: true
+      script: |
+        # Create the Evergreen API credentials
+        cat > .evergreen.yml <<END_OF_CREDS
+        api_server_host: https://evergreen.mongodb.com/api
+        api_key: "${evergreen_api_key}"
+        user: "${evergreen_api_user}"
+        END_OF_CREDS
 
   "configure selected tests credentials": &configure_selected_tests_credentials
-    command: subprocess.exec
+    command: shell.exec
     type: test
     params:
-      binary: bash
+      working_dir: src
       silent: true
-      args:
-        - "src/evergreen/functions/selected_tests_credentials_configure.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      script: |
+        # Create the Evergreen API credentials
+        cat > .selected_tests.yml <<END_OF_CREDS
+        url: "https://selected-tests.server-tig.prod.corp.mongodb.com"
+        project: "${project}"
+        auth_user: "${selected_tests_auth_user}"
+        auth_token: "${selected_tests_auth_token}"
+        END_OF_CREDS
 
   "git get project": &git_get_project
     - command: git.get_project
@@ -458,22 +464,31 @@ functions:
       local_file: src/mongo-binaries.tgz
 
   "extract binaries": &extract_binaries
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
-      args:
-        - "src/evergreen/functions/binaries_extract.sh"
-      env:
-        workdir: ${workdir}
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        ${decompress|tar xzvf} mongo-binaries.tgz
 
   "check binary version": &check_binary_version
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
-      args:
-        - "src/evergreen/functions/binary_version_check.sh"
-      env:
-        workdir: ${workdir}
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        mongo_binary=dist-test/bin/mongo${exe}
+        ${activate_virtualenv}
+        bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
+        # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
+        mongo_ver=$($mongo_binary --version | perl -pe '/version v([^\"]*)/; $_ = $1;' | tr -d '[ \r\n]')
+        # The versions must match
+        if [ "$bin_ver" != "$mongo_ver" ]; then
+          echo "The mongo version is $mongo_ver, expected version is $bin_ver"
+          exit 1
+        fi
 
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
@@ -552,41 +567,88 @@ functions:
       system_log: true
       binary: bash
       args:
-        - "./src/evergreen/functions/run_diskstats.sh"
+        - "./src/evergreen/run_diskstats.sh"
 
   "collect system resource info": &collect_system_resource_info
-    command: subprocess.exec
+    command: shell.exec
     params:
+      working_dir: src
       background: true
       system_log: true
-      binary: bash
-      args:
-        - "./src/evergreen/functions/system_resource_info_collect.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      script: |
+        ${activate_virtualenv}
+        $python buildscripts/collect_resource_info.py -o system_resource_info.json -i 5
 
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.
   "monitor process threads": &monitor_process_threads
-    command: subprocess.exec
+    command: shell.exec
     params:
       background: true
       system_log: true
-      binary: bash
-      args:
-        - "./src/evergreen/functions/process_threads_monitor.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      script: |
+        proc_list="(java|lein|mongo|python|_test$|_test\.exe$)"
+        if [ "Windows_NT" = "$OS" ]; then
+          get_pids() {
+            proc_pids=$(tasklist /fo:csv |
+                        awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' |
+                        grep -iE $1 |
+                        cut -f1 -d ' ');
+          }
+          get_process_info() {
+            proc_name="";
+            proc_info=$(wmic process where "ProcessId=\"$1\"" get "Name,ProcessId,ThreadCount" /format:csv 2> /dev/null | grep $1);
+            if [ ! -z $proc_info ]; then
+              proc_name=$(echo $proc_info | cut -f2 -d ',');
+              proc_threads=$(echo $proc_info | cut -f4 -d ',');
+            fi;
+          }
+        else
+          get_pids() { proc_pids=$(pgrep $1); }
+          get_process_info() {
+            proc_name=$(ps -p $1 -o comm=);
+            # /proc is available on Linux platforms
+            if [ -f /proc/$1/status ]; then
+              ${set_sudo}
+              proc_threads=$($sudo grep Threads /proc/$1/status | sed "s/\s//g" | cut -f2 -d ":");
+            else
+              proc_threads=$(ps -AM $1 | grep -vc PID);
+            fi;
+          }
+        fi
+        while [ 1 ]
+        do
+          get_pids $proc_list
+          if [ ! -z "$proc_pids" ]; then
+            printf "Running process/thread counter\n"
+            printf "PROCESS\tPID\tTHREADS\n"
+          fi
+          for pid in $proc_pids
+          do
+            get_process_info $pid
+            if [ ! -z "$proc_name" ]; then
+              printf "$proc_name\t$pid\t$proc_threads\n"
+            fi
+          done
+          sleep 60
+        done
 
   "set up credentials": &set_up_credentials
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
+      working_dir: src
       silent: true
-      args:
-        - "./src/evergreen/functions/credentials_setup.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      script: |
+        cat > mci.buildlogger <<END_OF_CREDS
+        slavename='${slave}'
+        passwd='${passwd}'
+        builder='MCI_${build_variant}'
+        build_num=${builder_num}
+        build_phase='${task_name}_${execution}'
+        END_OF_CREDS
 
   "set up win mount script": &set_up_win_mount_script
     command: shell.exec
@@ -601,14 +663,21 @@ functions:
         chmod +x win_mount.sh
 
   "set up notary client credentials": &set_up_notary_client_credentials
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
+      working_dir: src
       silent: true
-      args:
-        - "./src/evergreen/functions/notary_client_credentials_setup.sh"
-      env:
-        workdir: ${workdir}
+      shell: bash
+      script: |
+        set -o errexit
+
+        cat <<EOF > notary_env.sh
+        export NOTARY_TOKEN=${signing_auth_token_50}
+        export BARQUE_USERNAME=${barque_user}
+        export BARQUE_API_KEY=${barque_api_key}
+        EOF
+
+        echo "${signing_auth_token_50}" > signing_auth_token
 
   "set up remote credentials": &set_up_remote_credentials
     command: shell.exec
@@ -659,14 +728,29 @@ functions:
         EOF
 
   "call BF Suggestion service":
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
+      working_dir: src
+      shell: bash
       silent: true
-      args:
-        - "./src/evergreen/functions/bf_suggestion_service_call.sh"
-      env:
-        workdir: ${workdir}
+      script: |
+        report_file="report.json"
+        # Check if the report file exists and has failures.
+        if [ -f $report_file ] && grep -Eq "\"failures\": [1-9]" $report_file; then
+          # Calling the BF Suggestion server endpoint to start feature extraction.
+          payload="{\"task_id\": \"${task_id}\", \"execution\": ${execution}}"
+          echo "Sending task info to the BF suggestion service"
+          # The --user option is passed through stdin to avoid showing in process list.
+          user_option="--user ${bfsuggestion_user}:${bfsuggestion_password}"
+          curl --header "Content-Type: application/json" \
+               --data "$payload" \
+               --max-time 10 \
+               --silent \
+               --show-error \
+               --config - \
+               https://bfsuggestion.corp.mongodb.com/tasks <<< $user_option
+          echo "Request to BF Suggestion service status: $?"
+        fi
 
   "upload debugsymbols": &upload_debugsymbols
     command: s3.put
@@ -689,65 +773,177 @@ functions:
       local_file: src/mongo-debugsymbols.tgz
 
   "use WiredTiger develop":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/wiredtiger_develop_use.sh"
-        env:
-          workdir: ${workdir}
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        if [ "${use_wt_develop|}" = "true" ]; then
+        cd src/third_party
+        for wtdir in dist examples ext lang src test tools ; do
+          rm -rf wiredtiger/$wtdir
+          mv wtdevelop/$wtdir wiredtiger/
+        done
+        fi
 
   "shared scons cache pruning":
-    - *f_expansions_write
-    - command: subprocess.exec
-      type: system
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/shared_scons_cache_pruning.sh"
-        env:
-          workdir: ${workdir}
+    command: shell.exec
+    type: system
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        # removes files from the shared scons cache.
+
+        # Only prune on master branch
+        if [[ "${project}" == "mongodb-mongo-master" ]]; then
+
+
+          set +o errexit
+
+          if [ "Windows_NT" = "$OS" ]; then
+            ./win_mount.sh
+          else
+            mount | grep "\/efs" > /dev/null
+          fi
+          if [ $? -eq 0 ]; then
+            echo "Shared cache is already mounted"
+          else
+            echo "Shared cache - mounting file system"
+            if [ "Windows_NT" = "$OS" ]; then
+              ./win_mount.sh
+            else
+              sudo mount /efs
+            fi
+          fi
+          set -o errexit
+
+          if [ "Windows_NT" = "$OS" ]; then
+            cache_folder=/cygdrive/x
+          else
+            cache_folder=/efs
+          fi
+          dirs=$(ls -l $cache_folder | grep -v total | awk '{print $NF}')
+
+          echo "Pruning shared SCons directories"
+
+          for dir in $dirs; do
+            echo "Pruning $cache_folder/$dir/scons-cache"
+
+            if [ -e $cache_folder/$dir/info/distro_name ]; then
+              distro=$(cat $cache_folder/$dir/info/distro_name)
+            fi
+
+            # Set cache sizes by distro
+            case $distro in
+                 ubuntu1604|ubuntu1804|rhel62|rhel70)
+                      cache_size=600
+                      ;;
+                 *)
+                      # default
+                      cache_size=400
+                      ;;
+            esac
+
+            if [ "Windows_NT" = "$OS" ]; then
+              echo "dir="$dir
+              python buildscripts/scons_cache_prune.py --cache-dir x:/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            else
+              sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+            fi
+            echo ""
+          done
+
+          if [ "Windows_NT" = "$OS" ]; then
+            net use X: /delete || true
+          else
+            sudo umount /efs || true
+          fi
+
+        else
+          echo "Not on master, shared SCons cache pruning skipped"
+        fi
 
   "umount shared scons directory":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/shared_scons_directory_umount.sh"
-        env:
-          workdir: ${workdir}
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [ "${disable_shared_scons_cache}" = true ]; then
+            exit
+        fi
+        if [ "${scons_cache_scope}" = "shared" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+                net use X: /delete || true
+            else
+                ${set_sudo}
+                $sudo umount /efs || true
+            fi
+        fi
 
   "get all modified patch files":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/modified_patch_files_get_all.sh"
-        env:
-          workdir: ${workdir}
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        # For patch builds gather the modified patch files.
+        if [ "${is_patch}" = "true" ]; then
+          # Get list of patched files
+          git diff HEAD --name-only >> patch_files.txt
+          if [ -d src/mongo/db/modules/enterprise ]; then
+            pushd src/mongo/db/modules/enterprise
+            # Update the patch_files.txt in the mongo repo.
+            git diff HEAD --name-only >> ~1/patch_files.txt
+            popd
+          fi
+        fi
 
   # This function should only be called from patch-build-only tasks.
   "get added and modified patch files":
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/functions/added_and_modified_patch_files_get.sh"
-        env:
-          workdir: ${workdir}
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        git diff HEAD --name-only --line-prefix="${workdir}/src/" --diff-filter=d >> modified_and_created_patch_files.txt
+        if [ -d src/mongo/db/modules/enterprise ]; then
+          pushd src/mongo/db/modules/enterprise
+          git diff HEAD --name-only --line-prefix="${workdir}/src/src/mongo/db/modules/enterprise/" --diff-filter=d >> ~1/modified_and_created_patch_files.txt
+          popd
+        fi
 
   "determine resmoke jobs": &determine_resmoke_jobs
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
-      args:
-        - "./src/evergreen/functions/resmoke_jobs_determine.sh"
-      env:
-        workdir: ${workdir}
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        $python buildscripts/evergreen_resmoke_job_count.py \
+          --taskName ${task_name}                           \
+          --buildVariant ${build_variant}                   \
+          --distro ${distro_id}                             \
+          --jobFactor ${resmoke_jobs_factor|1}              \
+          --jobsMax ${resmoke_jobs_max|0}                   \
+          --outFile resmoke_jobs_expansion.yml
 
   "update resmoke jobs expansions": &update_resmoke_jobs_expansions
     command: expansions.update
@@ -756,13 +952,22 @@ functions:
       file: src/resmoke_jobs_expansion.yml
 
   "determine task timeout": &determine_task_timeout
-    command: subprocess.exec
+    command: shell.exec
     params:
-      binary: bash
-      args:
-        - "./src/evergreen/functions/task_timeout_determine.sh"
-      env:
-        workdir: ${workdir}
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        $python buildscripts/evergreen_task_timeout.py \
+          --task-name ${task_name}                     \
+          --build-variant ${build_variant}             \
+          --evg-alias '${alias|}'                      \
+          --timeout ${timeout_secs|0}                  \
+          --exec-timeout ${exec_timeout_secs|0}        \
+          --out-file task_timeout_expansions.yml
 
   "update task timeout expansions": &update_task_timeout_expansions
     command: expansions.update
@@ -864,14 +1069,42 @@ functions:
         value: skip_test-${build_id}
 
   "set up venv": &set_up_venv
-    command: subprocess.exec
+    command: shell.exec
     params:
-        binary: bash
-        args:
-          - "src/evergreen/functions/venv_setup.sh"
-        env:
-          workdir: ${workdir}
-          pip_dir: ${pip_dir}
+        shell: bash
+        script: |
+          # exit immediately if virtualenv is not found
+          set -o errexit
+
+          python_loc=$(which ${python|/opt/mongodbtoolchain/v3/bin/python3})
+          venv_dir="${workdir}/venv"
+          "$python_loc" -m venv "$venv_dir"
+
+          # venv creates its Scripts/activate file with CLRF endings, which
+          # cygwin bash does not like. dos2unix it
+          # (See https://bugs.python.org/issue32451)
+          if [ "Windows_NT" = "$OS" ]; then
+            dos2unix "${workdir}/venv/Scripts/activate"
+          fi
+
+          export VIRTUAL_ENV_DISABLE_PROMPT=yes
+
+          # Not all git get project calls clone into ${workdir}/src so we allow
+          # callers to tell us where the pip requirements files are.
+          pip_dir="${pip_dir}"
+          if [[ -z $pip_dir ]]; then
+            # Default to most common location
+            pip_dir="${workdir}/src/etc/pip"
+          fi
+
+          # Same as above we have to use quotes to preserve the
+          # Windows path separator
+          toolchain_txt="$pip_dir/toolchain-requirements.txt"
+          ${activate_virtualenv}
+          echo "Upgrading pip to 21.0.1"
+          python -m pip install "pip==21.0.1"
+          python -m pip install -r "$toolchain_txt" -q
+          python -m pip freeze > pip-requirements.txt
 
   "upload pip requirements": &upload_pip_requirements
     command: s3.put
@@ -892,17 +1125,15 @@ functions:
       file: src/perf.json
 
   "do setup":
-  - *set_up_venv
-  - *upload_pip_requirements
   - *set_task_expansion_macros
-  - *f_expansions_write
   - *fetch_artifacts
   - *fetch_binaries
   - *fetch_debugsymbols_archive
   - *extract_binaries
+  - *set_up_venv
+  - *upload_pip_requirements
   - *check_binary_version
   - *get_buildnumber
-  - *f_expansions_write
   - *set_up_credentials
   - *run_diskstats
   - *monitor_process_threads
@@ -913,7 +1144,6 @@ functions:
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
-  - *f_expansions_write
   - *set_up_credentials
 
   "do benchmark setup":
@@ -921,7 +1151,6 @@ functions:
   - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
-  - *f_expansions_write
   - *set_up_credentials
   - *fetch_benchmarks
 
@@ -1209,7 +1438,6 @@ functions:
         - "./src/evergreen/extract_generated_test_configuration.sh"
 
   "generate selected tests":
-    - *f_expansions_write
     - command: expansions.write
       params:
         file: src/expansions.yml
@@ -1358,7 +1586,9 @@ functions:
     - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: src/expansions.yml
 
     - command: shell.exec
       type: test
@@ -1369,7 +1599,7 @@ functions:
           set -o errexit
 
           ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
+          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file expansions.yml --verbose
 
     - command: archive.targz_pack
       params:
@@ -1417,7 +1647,6 @@ functions:
   - *set_up_remote_credentials
   - *determine_resmoke_jobs
   - *update_resmoke_jobs_expansions
-  - *f_expansions_write
   - *execute_resmoke_tests
     # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
     # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -1448,7 +1677,6 @@ functions:
     - *set_up_remote_credentials
     - *determine_resmoke_jobs
     - *update_resmoke_jobs_expansions
-    - *f_expansions_write
     - *execute_resmoke_tests
       # The existence of the "run_tests_infrastructure_failure" file indicates this failure isn't
       # directly actionable. We use type=setup rather than type=system or type=test for this command
@@ -1461,7 +1689,9 @@ functions:
           - "./src/evergreen/check_run_tests_infrastructure_failure.sh"
 
   "scons lint":
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -1469,10 +1699,13 @@ functions:
         args:
           - "src/evergreen/scons_lint.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
   "scons compile":
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -1480,6 +1713,7 @@ functions:
         args:
           - "src/evergreen/scons_compile.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
           patch_compile_flags: ${patch_compile_flags}
 
@@ -1491,6 +1725,7 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+
         # We get the raw version string (r1.2.3-45-gabcdef) from git
         MONGO_VERSION=$(git describe --abbrev=7)
         # If this is a patch build, we add the patch version id to the version string so we know
@@ -1498,20 +1733,28 @@ functions:
         if [ "${is_patch}" = "true" ]; then
           MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
         fi
+
         echo "MONGO_VERSION = ${MONGO_VERSION}"
+
         ${activate_virtualenv}
+
         # shared scons cache testing
         # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
         # 'scons_cache_scope' is set on a per variant basis
         # 'disable_shared_scons_cache' is set on a project level and applies to all variants
+
         # Shared - if scons_cache_scope is set, then use new shared scons cache settings
         if [ ! -z ${scons_cache_scope} ]; then
+
           if [ "${disable_shared_scons_cache}" = "true" ]; then
+
             echo "SCons Cache disabled. All shared scons settings will be ignored"
             scons_cache_scope=none
+
           else
             scons_cache_scope=${scons_cache_scope}
           fi
+
           if [ "$scons_cache_scope" = "shared" ]; then
             set +o errexit
             if [ "Windows_NT" = "$OS" ]; then
@@ -1528,8 +1771,10 @@ functions:
             fi
             set -o errexit
           fi
+
           echo "Shared Cache with setting: ${scons_cache_scope}"
           MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+
         # Legacy Expansion generation
         else
           echo "Using legacy expansion generation"
@@ -1540,10 +1785,9 @@ functions:
         fi
 
   "apply compile expansions":
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
-    - *f_expansions_write
+    command: expansions.update
+    params:
+      file: src/compile_expansions.yml
 
   "do jepsen setup":
     - command: subprocess.exec
@@ -2182,12 +2426,6 @@ functions:
       optional: true
 
   "save ec2 task artifacts":
-    - *f_expansions_write
-    # deliberate double write. Powercyle expects the expansions.yml file to
-    # be in src
-    - command: expansions.write
-      params:
-        file: src/expansions.yml
     - *save_powercycle_artifacts
     - *archive_remote_ec2_artifacts
     - *archive_remote_ec2_monitor_files
@@ -2227,7 +2465,7 @@ functions:
     params:
       binary: bash
       args:
-        - "./src/evergreen/functions/fuse_watchdog_cleanup.sh"
+        - "./src/evergreen/cleanup_fuse_watchdog.sh"
 
   ### Process & archive Code Coverage artifacts ###
   "process code coverage data": &process_code_coverage_data
@@ -2235,7 +2473,7 @@ functions:
     params:
       binary: bash
       args:
-        - "./src/evergreen/functions/code_coverage_data_process.sh"
+        - "./src/evergreen/process_code_coverage_data.sh"
 
   "tar code coverage data": &tar_code_coverage_data
     command: archive.targz_pack
@@ -2684,9 +2922,7 @@ pre:
   - func: "git get project"
   - func: "kill processes"
   - func: "cleanup environment"
-  - func: "set up venv"
   - func: "set task expansion macros"
-  - func: "f_expansions_write"
 
 # Post task steps
 post:
@@ -2758,7 +2994,9 @@ tasks:
         content_type: application/gzip
         display_name: Binaries
 
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -2766,6 +3004,7 @@ tasks:
         args:
           - "src/evergreen/gen_feature_flags.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
     - command: archive.targz_pack
@@ -2895,13 +3134,16 @@ tasks:
 
 - name: libdeps_graph_linting
   commands:
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/libdeps_setup.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
     - func: "scons compile"
@@ -2920,6 +3162,7 @@ tasks:
         args:
           - "src/evergreen/libdeps_run.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
     - command: s3.put
@@ -3110,13 +3353,16 @@ tasks:
 
 - name: embedded_sdk_build_cdriver
   commands:
-    - func: f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_build_cdriver.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
 - name: embedded_sdk_install_dev
@@ -3145,13 +3391,16 @@ tasks:
   depends_on:
     - name: embedded_sdk_install_dev
   commands:
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/embedded_sdk_s3_tar.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
     # Upload it so we can download from EVG.
@@ -3188,7 +3437,9 @@ tasks:
   depends_on:
     - name: embedded_sdk_install_tests
   commands:
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -3196,6 +3447,7 @@ tasks:
         args:
           - "src/evergreen/embedded_sdk_tests_s3_tar.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
     # Upload it so we can download from EVG.
@@ -3215,7 +3467,9 @@ tasks:
   depends_on:
     - name: embedded_sdk_install_tests
   commands:
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -3223,6 +3477,7 @@ tasks:
         args:
           - "src/evergreen/embedded_sdk_run_tests.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
     - command: subprocess.exec
       params:
@@ -3230,6 +3485,7 @@ tasks:
         args:
           - "src/evergreen/embedded_sdk_run_tests_post.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
 - name: embedded_sdk_s3_put_latest
@@ -3282,13 +3538,16 @@ tasks:
           --modules=
           --separate-debug
           DESTDIR='$BUILD_ROOT/stitch-support-lib-$MONGO_VERSION'
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/stitch_support_create_lib_tar.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
     - command: s3.put
       params:
@@ -3322,7 +3581,9 @@ tasks:
   depends_on:
     - name: stitch_support_install_tests
   commands:
-    - *f_expansions_write
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -3330,6 +3591,7 @@ tasks:
         args:
           - "src/evergreen/stitch_support_run_tests.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
 - name: compile_benchmarks
@@ -3339,7 +3601,6 @@ tasks:
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
-    - func: "f_expansions_write"
     - func: "set up credentials"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "set up win mount script"
@@ -3431,7 +3692,9 @@ tasks:
   - func: "set task expansion macros"
   - func: "set up venv"
   - func: "upload pip requirements"
-  - func: "f_expansions_write"
+  - command: expansions.write
+    params:
+      file: expansions.yml
   - command: subprocess.exec
     type: test
     params:
@@ -3439,6 +3702,7 @@ tasks:
       args:
         - "src/evergreen/lint_yaml.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
 
 - name: lint_shellscripts
@@ -3467,7 +3731,9 @@ tasks:
     - func: "set up venv"
     - func: "upload pip requirements"
     - func: "do setup"
-    - func: "f_expansions_write"
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       type: test
       params:
@@ -3475,6 +3741,7 @@ tasks:
         args:
           - "src/evergreen/check_idl_compat.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
 
 - name: burn_in_tests_gen
@@ -3484,7 +3751,9 @@ tasks:
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - *do_multiversion_setup
-  - func: "f_expansions_write"
+  - command: expansions.write
+    params:
+      file: expansions.yml
   - command: subprocess.exec
     type: test
     params:
@@ -3492,6 +3761,7 @@ tasks:
       args:
         - "src/evergreen/burn_in_tests.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
   - command: archive.targz_pack
     params:
@@ -3522,7 +3792,9 @@ tasks:
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
-  - func: "f_expansions_write"
+  - command: expansions.write
+    params:
+      file: expansions.yml
   - command: subprocess.exec
     type: test
     params:
@@ -3530,6 +3802,7 @@ tasks:
       args:
         - "src/evergreen/burn_in_tests_multiversion.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
 
   - command: archive.targz_pack
@@ -4996,6 +5269,7 @@ tasks:
       args:
         - "src/evergreen/external_auth_pip.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
   - func: "run tests"
     vars:
@@ -5005,7 +5279,9 @@ tasks:
   name: external_auth_aws
   commands:
   - func: "do setup"
-  - func: "f_expansions_write"
+  - command: expansions.write
+    params:
+      file: expansions.yml
   - command: subprocess.exec
     params:
       binary: bash
@@ -5013,6 +5289,7 @@ tasks:
       args:
         - "src/evergreen/external_auth_aws_setup.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
   - command: subprocess.exec
     params:
@@ -5020,6 +5297,7 @@ tasks:
       args:
         - "src/evergreen/external_auth_aws_pip.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
   - func: "run tests"
     vars:
@@ -6764,7 +7042,9 @@ tasks:
   patchable: false
   commands:
   - func: "do non-compile setup"
-  - func: "f_expansions_write"
+  - command: expansions.write
+    params:
+      file: expansions.yml
   - command: subprocess.exec
     type: setup
     params:
@@ -6773,6 +7053,7 @@ tasks:
       args:
         - "src/evergreen/blackduck_setup.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
   - command: subprocess.exec
     type: test
@@ -6781,6 +7062,7 @@ tasks:
       args:
         - "src/evergreen/blackduck_hub.sh"
       env:
+        python: ${python}
         workdir: ${workdir}
 
 - name: tla_plus
@@ -6846,13 +7128,16 @@ tasks:
         task_compile_flags: >-
           --separate-debug
           --legacy-tarball
-    - func: "f_expansions_write"
+    - command: expansions.write
+      params:
+        file: expansions.yml
     - command: subprocess.exec
       params:
         binary: bash
         args:
           - "src/evergreen/package.sh"
         env:
+          python: ${python}
           workdir: ${workdir}
     - command: s3.put
       params:
@@ -7783,13 +8068,10 @@ task_groups:
     - func: "git get project"
     - func: "kill processes"
     - func: "cleanup environment"
-    - func: "set up venv"
-    - func: "upload pip requirements"
     - func: "set task expansion macros"
-    - func: "f_expansions_write"
+    - func: "set up venv"
     - func: "configure evergreen api credentials"
     - func: "get buildnumber"
-    - func: "f_expansions_write"
     - func: "set up credentials"
     - func: "set up win mount script"
     - func: "generate compile expansions"
@@ -7810,11 +8092,10 @@ task_groups:
     - command: manifest.load
     - func: "git get project"
     - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
-    - func: "set task expansion macros"
-    - func: "f_expansions_write"
-    - func: "set up credentials"
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
@@ -7834,11 +8115,10 @@ task_groups:
     - command: manifest.load
     - func: "git get project"
     - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "set task expansion macros"
     - func: "set up venv"
     - func: "upload pip requirements"
-    - func: "set task expansion macros"
-    - func: "f_expansions_write"
-    - func: "set up credentials"
     - func: "set up win mount script"
     - func: "generate compile expansions"
   teardown_group:
@@ -12100,8 +12380,6 @@ buildvariants:
   run_on:
   - windows-vsCurrent-small
   stepback: false
-  expansions:
-    python: '/cygdrive/c/python/python37/python.exe'
   tasks:
   - name: win_shared_scons_cache_pruning
 
