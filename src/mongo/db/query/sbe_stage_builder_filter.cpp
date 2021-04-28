@@ -1745,9 +1745,9 @@ public:
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
             const MatcherTypeSet& ts = expr->typeSet();
-            return {sbe::makeE<sbe::ETypeMatch>(sbe::makeE<sbe::EVariable>(inputSlot),
-                                                ts.getBSONTypeMask()),
-                    std::move(inputStage)};
+            auto resultExpr = makeFillEmptyFalse(
+                sbe::makeE<sbe::ETypeMatch>(makeVariable(inputSlot), ts.getBSONTypeMask()));
+            return {std::move(resultExpr), std::move(inputStage)};
         };
 
         const auto traversalMode = expr->typeSet().hasType(BSONType::Array)
