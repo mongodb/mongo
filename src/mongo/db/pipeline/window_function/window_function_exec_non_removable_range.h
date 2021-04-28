@@ -45,8 +45,10 @@ public:
                                         boost::intrusive_ptr<Expression> input,
                                         boost::intrusive_ptr<ExpressionFieldPath> sortExpr,
                                         boost::intrusive_ptr<AccumulatorState> function,
-                                        WindowBounds bounds)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kRightEndpoint)),
+                                        WindowBounds bounds,
+                                        MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kRightEndpoint),
+                             memTracker),
           _input(std::move(input)),
           _sortExpr(std::move(sortExpr)),
           _function(std::move(function)),
@@ -55,10 +57,6 @@ public:
     Value getNext() final {
         update();
         return _function->getValue(false);
-    }
-
-    size_t getApproximateSize() const final {
-        return _function->getMemUsage();
     }
 
     void reset() final {
@@ -80,6 +78,7 @@ private:
             } else {
                 // Transition from nonempty to empty: discard the accumulator state.
                 _function->reset();
+                _memTracker->set(_function->getMemUsage());
             }
         } else {
             if (endpoints) {
@@ -105,6 +104,7 @@ private:
         tassert(5429411, "endpoints must fall in the partition", doc);
         Value v = _input->evaluate(*doc, &_input->getExpressionContext()->variables);
         _function->process(v, false);
+        _memTracker->set(_function->getMemUsage());
     }
 
     boost::intrusive_ptr<Expression> _input;

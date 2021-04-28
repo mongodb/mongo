@@ -72,7 +72,8 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
     PartitionIterator* iter,
     boost::intrusive_ptr<window_function::Expression> expr,
     const boost::optional<SortPattern>& sortBy,
-    const WindowBounds::DocumentBased& bounds) {
+    const WindowBounds::DocumentBased& bounds,
+    MemoryUsageTracker::PerFunctionMemoryTracker* memTracker) {
     auto inputExpr = translateInputExpression(expr, sortBy);
 
     return stdx::visit(
@@ -80,12 +81,12 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
             [&](const WindowBounds::Unbounded&) -> std::unique_ptr<WindowFunctionExec> {
                 // A left unbounded window will always be non-removable regardless of the upper
                 // bound.
-                return std::make_unique<WindowFunctionExecNonRemovable<AccumulatorState>>(
-                    iter, inputExpr, expr->buildAccumulatorOnly(), bounds.upper);
+                return std::make_unique<WindowFunctionExecNonRemovable>(
+                    iter, inputExpr, expr->buildAccumulatorOnly(), bounds.upper, memTracker);
             },
             [&](const auto&) -> std::unique_ptr<WindowFunctionExec> {
                 return std::make_unique<WindowFunctionExecRemovableDocument>(
-                    iter, inputExpr, expr->buildRemovable(), bounds);
+                    iter, inputExpr, expr->buildRemovable(), bounds, memTracker);
             }},
         bounds.lower);
 }
@@ -93,7 +94,8 @@ std::unique_ptr<WindowFunctionExec> translateDocumentWindow(
 std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
     window_function::ExpressionDerivative* expr,
     PartitionIterator* iter,
-    const boost::optional<SortPattern>& sortBy) {
+    const boost::optional<SortPattern>& sortBy,
+    MemoryUsageTracker::PerFunctionMemoryTracker* memTracker) {
     tassert(5490703,
             "$derivative requires a 1-field ascending sortBy",
             sortBy && sortBy->size() == 1 && !sortBy->begin()->expression &&
@@ -104,7 +106,7 @@ std::unique_ptr<mongo::WindowFunctionExec> translateDerivative(
                                                   expr->expCtx()->variablesParseState);
 
     return std::make_unique<WindowFunctionExecDerivative>(
-        iter, expr->input(), sortExpr, expr->bounds(), expr->outputUnit());
+        iter, expr->input(), sortExpr, expr->bounds(), expr->outputUnit(), memTracker);
 }
 
 
@@ -114,20 +116,25 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     ExpressionContext* expCtx,
     PartitionIterator* iter,
     const WindowFunctionStatement& functionStmt,
-    const boost::optional<SortPattern>& sortBy) {
+    const boost::optional<SortPattern>& sortBy,
+    MemoryUsageTracker* memTracker) {
 
+    MemoryUsageTracker::PerFunctionMemoryTracker& functionMemTracker =
+        (*memTracker)[functionStmt.fieldName];
     if (auto expr = dynamic_cast<window_function::ExpressionDerivative*>(functionStmt.expr.get())) {
-        return translateDerivative(expr, iter, sortBy);
+        return translateDerivative(expr, iter, sortBy, &functionMemTracker);
     } else if (auto expr =
                    dynamic_cast<window_function::ExpressionFirst*>(functionStmt.expr.get())) {
-        return std::make_unique<WindowFunctionExecFirst>(iter, expr->input(), expr->bounds());
+        return std::make_unique<WindowFunctionExecFirst>(
+            iter, expr->input(), expr->bounds(), boost::none, &functionMemTracker);
     } else if (auto expr =
                    dynamic_cast<window_function::ExpressionLast*>(functionStmt.expr.get())) {
-        return std::make_unique<WindowFunctionExecLast>(iter, expr->input(), expr->bounds());
+        return std::make_unique<WindowFunctionExecLast>(
+            iter, expr->input(), expr->bounds(), &functionMemTracker);
     } else if (auto expr =
                    dynamic_cast<window_function::ExpressionShift*>(functionStmt.expr.get())) {
         return std::make_unique<WindowFunctionExecFirst>(
-            iter, expr->input(), expr->bounds(), expr->defaultVal());
+            iter, expr->input(), expr->bounds(), expr->defaultVal(), &functionMemTracker);
     }
 
     WindowBounds bounds = functionStmt.expr->bounds();
@@ -135,7 +142,8 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
     return stdx::visit(
         visit_helper::Overloaded{
             [&](const WindowBounds::DocumentBased& docBounds) {
-                return translateDocumentWindow(iter, functionStmt.expr, sortBy, docBounds);
+                return translateDocumentWindow(
+                    iter, functionStmt.expr, sortBy, docBounds, &functionMemTracker);
             },
             [&](const WindowBounds::RangeBased& rangeBounds)
                 -> std::unique_ptr<WindowFunctionExec> {
@@ -157,14 +165,16 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
                         inputExpr,
                         std::move(sortByExpr),
                         functionStmt.expr->buildAccumulatorOnly(),
-                        bounds);
+                        bounds,
+                        &functionMemTracker);
                 } else {
                     return std::make_unique<WindowFunctionExecRemovableRange>(
                         iter,
                         inputExpr,
                         std::move(sortByExpr),
                         functionStmt.expr->buildRemovable(),
-                        bounds);
+                        bounds,
+                        &functionMemTracker);
                 }
             },
         },

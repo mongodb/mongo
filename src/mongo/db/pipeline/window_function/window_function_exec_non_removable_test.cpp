@@ -51,38 +51,41 @@ namespace {
 class WindowFunctionExecNonRemovableTest : public AggregationContextFixture {
 public:
     template <class AccumulatorType>
-    WindowFunctionExecNonRemovable<AccumulatorState> createForFieldPath(
+    WindowFunctionExecNonRemovable createForFieldPath(
         std::deque<DocumentSource::GetNextResult> docs,
         const std::string& inputPath,
         WindowBounds::Bound<int> upper,
         boost::optional<std::string> sortByPath = boost::none) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
-                                                    _docSource.get(),
-                                                    boost::none,
-                                                    boost::none,
-                                                    100 * 1024 * 1024 /* default memory limit */);
+        _iter = std::make_unique<PartitionIterator>(
+            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, boost::none);
         auto input = ExpressionFieldPath::parse(
             getExpCtx().get(), inputPath, getExpCtx()->variablesParseState);
         if (sortByPath) {
             auto sortBy = ExpressionFieldPath::parse(
                 getExpCtx().get(), *sortByPath, getExpCtx()->variablesParseState);
-            return WindowFunctionExecNonRemovable<AccumulatorState>(
+            return WindowFunctionExecNonRemovable(
                 _iter.get(),
                 ExpressionArray::create(
                     getExpCtx().get(),
                     std::vector<boost::intrusive_ptr<Expression>>{sortBy, input}),
                 AccumulatorType::create(getExpCtx().get()),
-                upper);
+                upper,
+                &_tracker["output"]);
         } else {
-            return WindowFunctionExecNonRemovable<AccumulatorState>(
-                _iter.get(), std::move(input), AccumulatorType::create(getExpCtx().get()), upper);
+            return WindowFunctionExecNonRemovable(_iter.get(),
+                                                  std::move(input),
+                                                  AccumulatorType::create(getExpCtx().get()),
+                                                  upper,
+                                                  &_tracker["output"]);
         }
     }
 
     auto advanceIterator() {
         return _iter->advance();
     }
+
+    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
 
 private:
     boost::intrusive_ptr<DocumentSourceMock> _docSource;
@@ -142,13 +145,13 @@ TEST_F(WindowFunctionExecNonRemovableTest, AccumulateOnlyWithMultiplePartitions)
         getExpCtx().get(), "key", getExpCtx()->variablesParseState);
     auto iter = PartitionIterator(getExpCtx().get(),
                                   mock.get(),
+                                  &_tracker,
                                   boost::optional<boost::intrusive_ptr<Expression>>(key),
-                                  boost::none,
-                                  100 * 1024 * 1024 /* default memory limit */);
+                                  boost::none);
     auto input =
         ExpressionFieldPath::parse(getExpCtx().get(), "$a", getExpCtx()->variablesParseState);
-    auto mgr = WindowFunctionExecNonRemovable<AccumulatorState>(
-        &iter, std::move(input), AccumulatorSum::create(getExpCtx().get()), 1);
+    auto mgr = WindowFunctionExecNonRemovable(
+        &iter, std::move(input), AccumulatorSum::create(getExpCtx().get()), 1, &_tracker["output"]);
     ASSERT_VALUE_EQ(Value(1), mgr.getNext());
     iter.advance();
     // Normally the stage would be responsible for detecting a new partition, for this test reset
@@ -175,17 +178,17 @@ TEST_F(WindowFunctionExecNonRemovableTest, InputExpressionAllowedToCreateVariabl
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     auto docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-    auto iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
-                                                    docSource.get(),
-                                                    boost::none,
-                                                    boost::none,
-                                                    100 * 1024 * 1024 /* default memory limit */);
+    auto iter = std::make_unique<PartitionIterator>(
+        getExpCtx().get(), docSource.get(), &_tracker, boost::none, boost::none);
     auto filterBSON =
         fromjson("{$filter: {input: [1, 2, 3], as: 'num', cond: {$gte: ['$$num', 2]}}}");
     auto input = ExpressionFilter::parse(
         getExpCtx().get(), filterBSON.firstElement(), getExpCtx()->variablesParseState);
-    auto exec = WindowFunctionExecNonRemovable<AccumulatorState>(
-        iter.get(), std::move(input), AccumulatorFirst::create(getExpCtx().get()), 1);
+    auto exec = WindowFunctionExecNonRemovable(iter.get(),
+                                               std::move(input),
+                                               AccumulatorFirst::create(getExpCtx().get()),
+                                               1,
+                                               &_tracker["output"]);
     // The input is a constant [2, 3] for each document.
     ASSERT_VALUE_EQ(Value(std::vector<Value>{Value(2), Value(3)}), exec.getNext());
     iter->advance();

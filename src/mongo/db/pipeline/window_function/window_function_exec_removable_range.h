@@ -65,17 +65,13 @@ public:
                                      boost::intrusive_ptr<Expression> input,
                                      boost::intrusive_ptr<ExpressionFieldPath> sortBy,
                                      std::unique_ptr<WindowFunctionState> function,
-                                     WindowBounds bounds);
-
-    Value getNext() override {
-        update();
-        return _function->getValue();
-    }
+                                     WindowBounds bounds,
+                                     MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
 
     void reset() final {
-        _function->reset();
         _lastEndpoints = boost::none;
-        _memUsageBytes = 0;
+        _memTracker->set(0);
+        WindowFunctionExecRemovable::reset();
     }
 
 private:

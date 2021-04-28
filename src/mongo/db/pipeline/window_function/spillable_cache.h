@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {
@@ -43,9 +44,18 @@ namespace mongo {
  */
 class SpillableCache {
 public:
-    SpillableCache(ExpressionContext* expCtx, size_t maxMemToUse)
-        : _expCtx(expCtx), _maxMem(maxMemToUse) {}
+    SpillableCache(ExpressionContext* expCtx, MemoryUsageTracker* tracker)
+        : _expCtx(expCtx), _memTracker(tracker) {}
 
+    /**
+     * Adds 'input' to the in-memory cache and spills to disk if the document size puts us over the
+     * memory limit and spilling is allowed.
+     *
+     * Note that the reported approximate size of 'input' may include the internal Document field
+     * cache along with the underlying BSON size, which can change depending on the access pattern.
+     * This class assumes that the size of the Document does not change from the time that it's
+     * added here until it's freed via freeUpTo().
+     */
     void addDocument(Document input);
 
     /**
@@ -83,7 +93,7 @@ public:
     }
 
     size_t getApproximateSize() {
-        return _memUsed;
+        return _memTracker.currentMemoryBytes();
     }
 
     int getNumDocs() {
@@ -122,12 +132,7 @@ private:
     Document readDocumentFromMemCacheById(int desired);
     void verifyInCache(int desired);
     void writeBatchToDisk(std::vector<Record>& records);
-    // Document size can change while in the cache depending on what fields are accessed. This
-    // function updates '_memUsed' based on changes between calls.
-    void updateMemoryUsage();
     ExpressionContext* _expCtx;
-    size_t _maxMem = 0;
-    size_t _memUsed = 0;
     std::deque<Document> _memCache;
 
     std::unique_ptr<TemporaryRecordStore> _diskCache = nullptr;
@@ -145,6 +150,8 @@ private:
 
     // Be able to report that disk was used after the cache has been finalized.
     bool _usedDisk = false;
+
+    MemoryUsageTracker::PerFunctionMemoryTracker _memTracker;
 };
 
 }  // namespace mongo

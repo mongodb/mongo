@@ -112,8 +112,8 @@ public:
           _partitionBy(partitionBy),
           _sortBy(std::move(sortBy)),
           _outputFields(std::move(outputFields)),
-          _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy, maxMemoryBytes),
-          _memoryTracker{pExpCtx->allowDiskUse, maxMemoryBytes} {};
+          _memoryTracker{expCtx->allowDiskUse, maxMemoryBytes},
+          _iterator(expCtx.get(), pSource, &_memoryTracker, std::move(partitionBy), _sortBy){};
 
     GetModPathsReturn getModifiedPaths() const final {
         std::set<std::string> outputPaths;
@@ -185,9 +185,9 @@ private:
     boost::optional<boost::intrusive_ptr<Expression>> _partitionBy;
     boost::optional<SortPattern> _sortBy;
     std::vector<WindowFunctionStatement> _outputFields;
+    MemoryUsageTracker _memoryTracker;
     PartitionIterator _iterator;
     StringMap<std::unique_ptr<WindowFunctionExec>> _executableOutputs;
-    MemoryUsageTracker _memoryTracker;
     bool _init = false;
     bool _eof = false;
 };

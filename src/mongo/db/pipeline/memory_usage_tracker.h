@@ -32,6 +32,7 @@
 #include <memory>
 #include <utility>
 
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -44,18 +45,23 @@ class MemoryUsageTracker {
 public:
     class PerFunctionMemoryTracker {
     public:
-        PerFunctionMemoryTracker() = default;
+        explicit PerFunctionMemoryTracker(MemoryUsageTracker* base) : base(base){};
+        PerFunctionMemoryTracker() = delete;
 
-        void update(int diff) {
-            _currentMemoryBytes += diff;
-            if (_currentMemoryBytes > _maxMemoryBytes)
-                _maxMemoryBytes = _currentMemoryBytes;
+        void update(long long diff) {
+            tassert(5578603,
+                    str::stream() << "Underflow on memory tracking, attempting to add " << diff
+                                  << " but only " << _currentMemoryBytes << " available",
+                    diff >= 0 || _currentMemoryBytes >= std::abs(diff));
+            set(_currentMemoryBytes + diff);
         }
 
-        void set(uint64_t total) {
+        void set(long long total) {
             if (total > _maxMemoryBytes)
                 _maxMemoryBytes = total;
+            long long prior = _currentMemoryBytes;
             _currentMemoryBytes = total;
+            base->update(total - prior);
         }
 
         auto currentMemoryBytes() const {
@@ -66,38 +72,30 @@ public:
             return _maxMemoryBytes;
         }
 
+        MemoryUsageTracker* base = nullptr;
+
     private:
         // Maximum memory consumption thus far observed for this function.
-        uint64_t _maxMemoryBytes = 0;
+        long long _maxMemoryBytes = 0;
         // Tracks the current memory footprint.
-        uint64_t _currentMemoryBytes = 0;
+        long long _currentMemoryBytes = 0;
     };
 
-    MemoryUsageTracker(bool allowDiskUse, size_t maxMemoryUsageBytes)
+    MemoryUsageTracker(bool allowDiskUse = false, size_t maxMemoryUsageBytes = 0)
         : _allowDiskUse(allowDiskUse), _maxAllowedMemoryUsageBytes(maxMemoryUsageBytes) {}
 
     /**
-     * Sets the new total for 'functionName', and updates the current total memory usage.
+     * Sets the new total for 'name', and updates the current total memory usage.
      */
-    void set(StringData functionName, uint64_t total) {
-        auto oldFuncUsage = _functionMemoryTracker[functionName].currentMemoryBytes();
-        _functionMemoryTracker[functionName].set(total);
-        update(total - oldFuncUsage);
-    }
-
-    void setInternal(StringData functionName, uint64_t total) {
-        auto oldFuncUsage = _internalMemoryTracker[functionName].currentMemoryBytes();
-        _internalMemoryTracker[functionName].set(total);
-        _memoryUsageBytes += total - oldFuncUsage;
-        if (_memoryUsageBytes > _maxMemoryUsageBytes) {
-            _maxMemoryUsageBytes = _memoryUsageBytes;
-        }
+    void set(StringData name, long long total) {
+        _functionMemoryTracker.try_emplace(name, this);
+        _functionMemoryTracker.find(name)->second.set(total);
     }
 
     /**
      * Sets the new current memory usage in bytes.
      */
-    void set(uint64_t total) {
+    void set(long long total) {
         _memoryUsageBytes = total;
         if (_memoryUsageBytes > _maxMemoryUsageBytes) {
             _maxMemoryUsageBytes = _memoryUsageBytes;
@@ -109,13 +107,10 @@ public:
      * current value for maximum total memory usage.
      */
     void resetCurrent() {
-        _memoryUsageBytes = 0;
         for (auto& [_, funcTracker] : _functionMemoryTracker) {
             funcTracker.set(0);
         }
-        for (auto& [_, funcTracker] : _internalMemoryTracker) {
-            funcTracker.set(0);
-        }
+        _memoryUsageBytes = 0;
     }
 
     /**
@@ -127,35 +122,34 @@ public:
                               << name,
                 _functionMemoryTracker.find(name) != _functionMemoryTracker.end());
         return _functionMemoryTracker.at(name);
-        MONGO_UNREACHABLE;
-    }
-
-    auto readInternal(StringData name) const {
-        tassert(5643009,
-                str::stream() << "Invalid call to memory usage tracker, could not find function "
-                              << name,
-                _internalMemoryTracker.find(name) != _internalMemoryTracker.end());
-        return _internalMemoryTracker.at(name);
     }
 
     /**
-     * Updates the memory usage for 'functionName' by adding 'diff' to the current memory usage for
+     * Non-const version, creates a new element if one doesn't exist and returns a reference to it.
+     */
+    PerFunctionMemoryTracker& operator[](StringData name) {
+        _functionMemoryTracker.try_emplace(name, this);
+        return _functionMemoryTracker.at(name);
+    }
+
+    /**
+     * Updates the memory usage for 'name' by adding 'diff' to the current memory usage for
      * that function. Also updates the total memory usage.
      */
-    void update(StringData name, int diff) {
-        _functionMemoryTracker[name].update(diff);
-        update(diff);
+    void update(StringData name, long long diff) {
+        _functionMemoryTracker.try_emplace(name, this);
+        _functionMemoryTracker.find(name)->second.update(diff);
     }
 
     /**
      * Updates total memory usage.
      */
-    void update(int diff) {
+    void update(long long diff) {
+        tassert(5578602,
+                str::stream() << "Underflow on memory tracking, attempting to add " << diff
+                              << " but only " << _memoryUsageBytes << " available",
+                diff >= 0 || (int)_memoryUsageBytes >= -1 * diff);
         set(_memoryUsageBytes + diff);
-    }
-    void updateInternal(StringData name, int diff) {
-        _internalMemoryTracker[name].update(diff);
-        _memoryUsageBytes += diff;
     }
 
     auto currentMemoryBytes() const {
@@ -170,14 +164,11 @@ public:
 
 private:
     // Tracks current memory used.
-    size_t _memoryUsageBytes = 0;
-    size_t _maxMemoryUsageBytes = 0;
+    long long _memoryUsageBytes = 0;
+    long long _maxMemoryUsageBytes = 0;
 
     // Tracks memory consumption per function using the output field name as a key.
     StringMap<PerFunctionMemoryTracker> _functionMemoryTracker;
-    // Tracks memory consumption of internal values so there is no worry of colliding with a user
-    // field name.
-    StringMap<PerFunctionMemoryTracker> _internalMemoryTracker;
 };
 
 }  // namespace mongo

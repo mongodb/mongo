@@ -362,6 +362,14 @@ void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
     _metadataFields = DocumentMetadataFields{};
 }
 
+void DocumentStorage::fillCache() const {
+    for (DocumentStorageIterator it = iterator(); !it.atEnd(); it.advance()) {
+        // Retrieve the value and force it to be cached.
+        if (it->val.getType() == BSONType::Object)
+            it->val.getDocument().fillCache();
+    }
+}
+
 void DocumentStorage::loadLazyMetadata() const {
     if (_haveLazyLoadedMetadata) {
         return;

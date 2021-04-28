@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/spillable_cache.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -48,17 +49,14 @@ namespace mongo {
  *
  * The 'sortPattern' is used for resolving range-based and time-based bounds, in 'getEndpoints()'.
  *
- * 'maxMem' is the maximum amount of memory (in bytes) the PartitionIterator is allowed to use.
- * Depending on whether disk use is allowed when the memory limit is hit it will either spill to
- * disk or throw.
  */
 class PartitionIterator {
 public:
     PartitionIterator(ExpressionContext* expCtx,
                       DocumentSource* source,
+                      MemoryUsageTracker* tracker,
                       boost::optional<boost::intrusive_ptr<Expression>> partitionExpr,
-                      const boost::optional<SortPattern>& sortPattern,
-                      size_t maxMem);
+                      const boost::optional<SortPattern>& sortPattern);
 
     using SlotId = unsigned int;
     SlotId newSlot() {
@@ -245,6 +243,10 @@ private:
                 "Invalid call to PartitionIterator::advanceToNextPartition",
                 _nextPartition != boost::none);
         resetCache();
+        // The memory accounted for in the _nextPartition will be moved to the spillable cache, so
+        // subtract it out here.
+        _tracker->update(-1 * getNextPartitionStateSize());
+
         // Cache is cleared, and we are moving the _nextPartition value to different positions.
         _cache->addDocument(std::move(_nextPartition->_doc));
         _partitionKey = std::move(_nextPartition->_partitionKey);
@@ -308,6 +310,8 @@ private:
     // The actual cache of the PartitionIterator. Holds documents and spills documents that exceed
     // the memory limit given to PartitionIterator to disk. Behaves like a deque.
     std::unique_ptr<SpillableCache> _cache = nullptr;
+
+    MemoryUsageTracker* _tracker;
 };
 
 /**

@@ -58,15 +58,13 @@ public:
         auto vps = expCtx->variablesParseState;
         auto optKey =
             keyPath ? optExp(ExpressionFieldPath::parse(expCtx, *keyPath, vps)) : boost::none;
-        _iter = std::make_unique<PartitionIterator>(expCtx,
-                                                    _docSource.get(),
-                                                    optKey,
-                                                    boost::none,
-                                                    100 * 1024 * 1024 /* default memory limit */);
+        _iter = std::make_unique<PartitionIterator>(
+            expCtx, _docSource.get(), &_tracker, optKey, boost::none);
         auto inputField = ExpressionFieldPath::parse(expCtx, "$val", vps);
 
-        return {WindowFunctionExecFirst(_iter.get(), inputField, bounds, defaultVal),
-                WindowFunctionExecLast(_iter.get(), inputField, bounds)};
+        return {WindowFunctionExecFirst(
+                    _iter.get(), inputField, bounds, defaultVal, &_tracker["first"]),
+                WindowFunctionExecLast(_iter.get(), inputField, bounds, &_tracker["last"])};
     }
 
     auto advanceIterator() {
@@ -75,6 +73,7 @@ public:
 
 private:
     boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
     std::unique_ptr<PartitionIterator> _iter;
 };
 
