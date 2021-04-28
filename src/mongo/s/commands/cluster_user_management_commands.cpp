@@ -112,12 +112,12 @@ struct UserCacheInvalidatorAll {
  * 2. Invalidate whatever we were just working on.
  * 3. Panic if anything went wrong.
  */
-template <typename RequestT, typename ReplyT, typename InvalidatorT>
-class CmdUMCPassthrough : public TypedCommand<CmdUMCPassthrough<RequestT, ReplyT, InvalidatorT>> {
+template <typename RequestT, typename InvalidatorT>
+class CmdUMCPassthrough : public TypedCommand<CmdUMCPassthrough<RequestT, InvalidatorT>> {
 public:
     using Request = RequestT;
-    using Reply = ReplyT;
-    using TC = TypedCommand<CmdUMCPassthrough<RequestT, ReplyT, InvalidatorT>>;
+    using Reply = typename RequestT::Reply;
+    using TC = TypedCommand<CmdUMCPassthrough<RequestT, InvalidatorT>>;
 
     class Invocation final : public TC::InvocationBase {
     public:
@@ -173,7 +173,7 @@ public:
     }
 };
 
-class CmdCreateUser : public CmdUMCPassthrough<CreateUserCommand, void, UserCacheInvalidatorNOOP> {
+class CmdCreateUser : public CmdUMCPassthrough<CreateUserCommand, UserCacheInvalidatorNOOP> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
     std::set<StringData> sensitiveFieldNames() const final {
@@ -181,7 +181,7 @@ public:
     }
 } cmdCreateUser;
 
-class CmdUpdateUser : public CmdUMCPassthrough<UpdateUserCommand, void, UserCacheInvalidatorUser> {
+class CmdUpdateUser : public CmdUMCPassthrough<UpdateUserCommand, UserCacheInvalidatorUser> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
     std::set<StringData> sensitiveFieldNames() const final {
@@ -189,37 +189,31 @@ public:
     }
 } cmdUpdateUser;
 
-CmdUMCPassthrough<DropUserCommand, void, UserCacheInvalidatorUser> cmdDropUser;
-CmdUMCPassthrough<DropAllUsersFromDatabaseCommand,
-                  DropAllUsersFromDatabaseReply,
-                  UserCacheInvalidatorDB>
+CmdUMCPassthrough<DropUserCommand, UserCacheInvalidatorUser> cmdDropUser;
+CmdUMCPassthrough<DropAllUsersFromDatabaseCommand, UserCacheInvalidatorDB>
     cmdDropAllUsersFromDatabase;
-CmdUMCPassthrough<GrantRolesToUserCommand, void, UserCacheInvalidatorUser> cmdGrantRolesToUser;
-CmdUMCPassthrough<RevokeRolesFromUserCommand, void, UserCacheInvalidatorUser>
-    cmdRevokeRolesFromUser;
-CmdUMCPassthrough<CreateRoleCommand, void, UserCacheInvalidatorNOOP> cmdCreateRole;
-CmdUMCPassthrough<UpdateRoleCommand, void, UserCacheInvalidatorAll> cmdUpdateRole;
-CmdUMCPassthrough<GrantPrivilegesToRoleCommand, void, UserCacheInvalidatorAll>
-    cmdGrantPrivilegesToRole;
-CmdUMCPassthrough<RevokePrivilegesFromRoleCommand, void, UserCacheInvalidatorAll>
+CmdUMCPassthrough<GrantRolesToUserCommand, UserCacheInvalidatorUser> cmdGrantRolesToUser;
+CmdUMCPassthrough<RevokeRolesFromUserCommand, UserCacheInvalidatorUser> cmdRevokeRolesFromUser;
+CmdUMCPassthrough<CreateRoleCommand, UserCacheInvalidatorNOOP> cmdCreateRole;
+CmdUMCPassthrough<UpdateRoleCommand, UserCacheInvalidatorAll> cmdUpdateRole;
+CmdUMCPassthrough<GrantPrivilegesToRoleCommand, UserCacheInvalidatorAll> cmdGrantPrivilegesToRole;
+CmdUMCPassthrough<RevokePrivilegesFromRoleCommand, UserCacheInvalidatorAll>
     cmdRevokePrivilegesFromRole;
-CmdUMCPassthrough<GrantRolesToRoleCommand, void, UserCacheInvalidatorAll> cmdGrantRolesToRole;
-CmdUMCPassthrough<RevokeRolesFromRoleCommand, void, UserCacheInvalidatorAll> cmdRevokeRolesFromRole;
-CmdUMCPassthrough<DropRoleCommand, void, UserCacheInvalidatorAll> cmdDropRole;
-CmdUMCPassthrough<DropAllRolesFromDatabaseCommand,
-                  DropAllRolesFromDatabaseReply,
-                  UserCacheInvalidatorAll>
+CmdUMCPassthrough<GrantRolesToRoleCommand, UserCacheInvalidatorAll> cmdGrantRolesToRole;
+CmdUMCPassthrough<RevokeRolesFromRoleCommand, UserCacheInvalidatorAll> cmdRevokeRolesFromRole;
+CmdUMCPassthrough<DropRoleCommand, UserCacheInvalidatorAll> cmdDropRole;
+CmdUMCPassthrough<DropAllRolesFromDatabaseCommand, UserCacheInvalidatorAll>
     cmdDropAllRolesFromDatabase;
 
 /**
  * usersInfo and rolesInfo are simpler read-only passthrough commands.
  */
-template <typename RequestT, typename ReplyT>
-class CmdUMCInfo : public TypedCommand<CmdUMCInfo<RequestT, ReplyT>> {
+template <typename RequestT>
+class CmdUMCInfo : public TypedCommand<CmdUMCInfo<RequestT>> {
 public:
     using Request = RequestT;
-    using Reply = ReplyT;
-    using TC = TypedCommand<CmdUMCInfo<RequestT, ReplyT>>;
+    using Reply = typename RequestT::Reply;
+    using TC = TypedCommand<CmdUMCInfo<RequestT>>;
 
     class Invocation final : public TC::InvocationBase {
     public:
@@ -266,8 +260,8 @@ public:
     }
 };
 
-CmdUMCInfo<UsersInfoCommand, UsersInfoReply> cmdUsersInfo;
-CmdUMCInfo<RolesInfoCommand, RolesInfoReply> cmdRolesInfo;
+CmdUMCInfo<UsersInfoCommand> cmdUsersInfo;
+CmdUMCInfo<RolesInfoCommand> cmdRolesInfo;
 
 class CmdInvalidateUserCache : public TypedCommand<CmdInvalidateUserCache> {
 public:
@@ -306,7 +300,7 @@ public:
 } cmdInvalidateUserCache;
 
 class CmdMergeAuthzCollections
-    : public CmdUMCPassthrough<MergeAuthzCollectionsCommand, void, UserCacheInvalidatorNOOP> {
+    : public CmdUMCPassthrough<MergeAuthzCollectionsCommand, UserCacheInvalidatorNOOP> {
 public:
     bool adminOnly() const final {
         return true;

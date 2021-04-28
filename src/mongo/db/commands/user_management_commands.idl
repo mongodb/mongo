@@ -62,7 +62,7 @@ structs:
                 type: array<object_owned>
 
     rolesInfoReply:
-        description: "Reply from usersInfo command"
+        description: "Reply from rolesInfo command"
         strict: false
         fields:
             roles:
@@ -182,6 +182,7 @@ commands:
         api_version: ""
         cpp_name: DropAllUsersFromDatabaseCommand
         strict: true
+        reply_type: dropAllUsersFromDatabaseReply
 
     grantRolesToUser:
         description: "Grant additional roles to a user"
@@ -327,6 +328,7 @@ commands:
         api_version: ""
         cpp_name: DropAllRolesFromDatabaseCommand
         strict: true
+        reply_type: dropAllRolesFromDatabaseReply
 
     usersInfo:
         description: "Returns information about users."
@@ -336,6 +338,7 @@ commands:
         type: UsersInfoCommandArg
         cpp_name: UsersInfoCommand
         strict: true
+        reply_type: usersInfoReply
         fields:
             showPrivileges:
                 description: >-
@@ -370,6 +373,7 @@ commands:
         type: RolesInfoCommandArg
         cpp_name: RolesInfoCommand
         strict: true
+        reply_type: rolesInfoReply
         fields:
             showPrivileges:
                 description: >-
@@ -407,6 +411,7 @@ commands:
         command_name: _getUserCacheGeneration
         cpp_name: GetUserCacheGenerationCommand
         strict: true
+        reply_type: GetUserCacheGenerationReply
 
     _mergeAuthzCollections:
         description: "Internal command used by mongorestore for updating user/role data"
