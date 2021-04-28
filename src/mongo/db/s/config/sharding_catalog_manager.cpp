@@ -446,17 +446,22 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        const auto result = createUuidIndexesForConfigChunks(opCtx);
-        if (result != Status::OK()) {
-            return result;
-        }
+    // (Generic FCV reference): TODO SERVER-53283 Remove the outermost 'if' statement once 5.0 has
+    // branched out.
+    if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading() ||
+        !feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupportTimestampedVersion.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            const auto result = createUuidIndexesForConfigChunks(opCtx);
+            if (result != Status::OK()) {
+                return result;
+            }
 
-    } else {
-        const auto result = createNsIndexesForConfigChunks(opCtx);
-        if (result != Status::OK()) {
-            return result;
+        } else {
+            const auto result = createNsIndexesForConfigChunks(opCtx);
+            if (result != Status::OK()) {
+                return result;
+            }
         }
     }
 
