@@ -105,7 +105,7 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
-  fmt:
+  fmtlib/fmt:
     homepage_url: https://fmt.dev
     open_hub_url: https://www.openhub.net/p/fmtlib_fmt
     release_monitoring_id: 11526
@@ -153,6 +153,14 @@ components:
     local_directory_path: src/third_party/IntelRDFPMathLib20U1
     team_owner: "Execution"
     # Note: IntelRDFPMathLib exists in Black Duck, but not OpenHub
+
+  jbeder/yaml-cpp:
+    homepage_url: https://github.com/jbeder/yaml-cpp
+    open_hub_url: https://www.openhub.net/p/jbeder_yaml-cpp
+    release_monitoring_id: 5284
+    local_directory_path: src/third_party/yaml-cpp-0.6.2
+    team_owner: "Security"
+    upgrade_suppression: TODO SERVER-48258
 
   JSON-Schema-Test-Suite:
     homepage_url: https://github.com/json-schema-org/JSON-Schema-Test-Suite
@@ -319,14 +327,6 @@ components:
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34
     is_test_only: true
     team_owner: "Wiredtiger"
-
-  yaml-cpp:
-    homepage_url: https://github.com/jbeder/yaml-cpp
-    open_hub_url: https://www.openhub.net/p/jbeder_yaml-cpp
-    release_monitoring_id: 5284
-    local_directory_path: src/third_party/yaml-cpp-0.6.2
-    team_owner: "Security"
-    upgrade_suppression: TODO SERVER-48258
 
   yhirose/cpp-peglib:
     homepage_url: https://github.com/yhirose/cpp-peglib

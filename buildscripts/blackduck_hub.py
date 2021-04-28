@@ -547,7 +547,9 @@ def _query_blackduck():
     LOGGER.info("Getting version components from blackduck")
     bom_components = hub.get_version_components(version)
 
-    components = [Component.parse(hub, comp) for comp in bom_components["items"]]
+    components = [
+        Component.parse(hub, comp) for comp in bom_components["items"] if comp['ignored'] is False
+    ]
 
     BLACKDUCK_PROJECT_URL = version["_meta"]["href"]
 
@@ -654,17 +656,17 @@ def _get_default(list1, idx, default):
 class TableWriter:
     """Generate an ASCII table that summarizes the results of all the reports generated."""
 
-    def __init__(self, headers: [str]):
+    def __init__(self, headers: List[str]):
         """Init writer."""
         self._headers = headers
         self._rows = []
 
-    def add_row(self, row: [str]):
+    def add_row(self, row: List[str]):
         """Add a row to the table."""
         self._rows.append(row)
 
     @staticmethod
-    def _write_row(col_sizes: [int], row: [str], writer: io.StringIO):
+    def _write_row(col_sizes: List[int], row: List[str], writer: io.StringIO):
         writer.write("|")
         for idx, row_value in enumerate(row):
             writer.write(" ")
@@ -707,7 +709,7 @@ class TableData:
 
         self._rows[col].append(value)
 
-    def write(self, headers: [str], writer: io.StringIO):
+    def write(self, headers: List[str], writer: io.StringIO):
         """Write table data as nice prettty table to writer."""
         tw = TableWriter(headers)
 
@@ -1120,7 +1122,8 @@ class Analyzer:
         # Rather then constantly have to supress this in Black Duck itself which will generate false positives
         # We filter ourself our of the list of components.
         self.black_duck_components = [
-            comp for comp in self.black_duck_components if not comp.name == "MongoDB"
+            comp for comp in self.black_duck_components
+            if not (comp.name == "MongoDB" or comp.name == "WiredTiger")
         ]
 
         # Remove duplicate Black Duck components. We only care about the component with highest version number
