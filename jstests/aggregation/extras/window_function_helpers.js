@@ -1,4 +1,6 @@
 load("jstests/aggregation/extras/utils.js");  // arrayEq
+load("jstests/libs/analyze_plan.js");         // For getAggPlanStages().
+
 /**
  * Create a collection of tickers and prices.
  */
@@ -170,6 +172,28 @@ function assertResultsEqual(wfRes, index, groupRes, accum) {
                   "Window function result for index " + index + ": " + tojson(wfRes));
 }
 
+function assertExplainResult(explainResult) {
+    const stages = getAggPlanStages(explainResult, "$_internalSetWindowFields");
+    for (let stage of stages) {
+        assert(stage.hasOwnProperty("$_internalSetWindowFields"), stage);
+
+        assert(stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
+        const maxFunctionMemUsages = stage["maxFunctionMemoryUsageBytes"];
+        for (let field of Object.keys(maxFunctionMemUsages)) {
+            assert.gte(maxFunctionMemUsages[field],
+                       0,
+                       "invalid memory usage for '" + field + "': " + tojson(stage));
+        }
+        assert.gt(
+            stage["maxTotalMemoryUsageBytes"], 0, "Incorrect total mem usage: " + tojson(stage));
+        // No test should be using more than 1GB of memory. This is mostly a sanity check that
+        // integer underflow doesn't occur.
+        assert.lt(stage["maxTotalMemoryUsageBytes"],
+                  1 * 1024 * 1024 * 1024,
+                  "Incorrect total mem usage: " + tojson(stage));
+    }
+}
+
 /**
  * Runs the given 'accum' as both a window function and its equivalent accumulator in $group across
  * various combinations of partitioning and window bounds. Asserts that the results are consistent.
@@ -182,19 +206,17 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null) {
         documentBounds.forEach(function(bounds, index) {
             jsTestLog("Testing accumulator " + accum + " against " + tojson(partition) +
                       " partition and [" + bounds + "] bounds");
-            const wfResults =
-                coll.aggregate(
-                        [
-                            {
-                                $setWindowFields: {
-                                    partitionBy: partition,
-                                    sortBy: {_id: 1},
-                                    output: {res: {[accum]: "$price", window: {documents: bounds}}}
-                                },
-                            },
-                        ],
-                        {allowDiskUse: true})
-                    .toArray();
+
+            const pipeline = [
+                {
+                    $setWindowFields: {
+                        partitionBy: partition,
+                        sortBy: {_id: 1},
+                        output: {res: {[accum]: "$price", window: {documents: bounds}}}
+                    },
+                },
+            ];
+            const wfResults = coll.aggregate(pipeline, {allowDiskUse: true}).toArray();
             for (let index = 0; index < wfResults.length; index++) {
                 const wfRes = wfResults[index];
 
@@ -222,6 +244,11 @@ function testAccumAgainstGroup(coll, accum, onNoResults = null) {
 
                 assertResultsEqual(wfRes, index, groupRes, accum);
             }
+
+            // Run the same pipeline with explain verbosity "executionStats" and verify that the
+            // reported metrics are sensible.
+            assertExplainResult(
+                coll.explain("executionStats").aggregate(pipeline, {allowDiskUse: true}));
 
             jsTestLog("Done");
         });

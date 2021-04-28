@@ -47,12 +47,19 @@ public:
     auto makeDefaultAccessor(
         boost::intrusive_ptr<DocumentSourceMock> mock,
         boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
-        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
-                                                    mock.get(),
-                                                    partExpr,
-                                                    boost::none,
-                                                    100 * 1024 * 1024 /* default memory limit */);
+        if (!_iter)
+            _iter = std::make_unique<PartitionIterator>(
+                getExpCtx().get(), mock.get(), &_tracker, partExpr, boost::none);
         return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kDefaultSequential);
+    }
+
+    auto makeEndpointAccessor(
+        boost::intrusive_ptr<DocumentSourceMock> mock,
+        boost::optional<boost::intrusive_ptr<Expression>> partExpr = boost::none) {
+        if (!_iter)
+            _iter = std::make_unique<PartitionIterator>(
+                getExpCtx().get(), mock.get(), &_tracker, partExpr, boost::none);
+        return PartitionAccessor(_iter.get(), PartitionAccessor::Policy::kEndpoints);
     }
 
     auto advance() {
@@ -60,7 +67,8 @@ public:
         return _iter->advance();
     }
 
-private:
+protected:
+    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
     std::unique_ptr<PartitionIterator> _iter;
 };
 
@@ -276,12 +284,7 @@ TEST_F(PartitionIteratorTest, OutsideOfPartitionAccessShouldNotTassert) {
     const auto docs =
         std::deque<DocumentSource::GetNextResult>{Document{{"a", 1}}, Document{{"a", 2}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
-    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    auto accessor = makeDefaultAccessor(mock, boost::none);
 
     // Test that an accessor that attempts to read off the end of the partition returns boost::none
     // instead of tassert'ing.
@@ -293,16 +296,11 @@ DEATH_TEST_F(PartitionIteratorTest, SingleConsumerDefaultPolicy, "Requested expi
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
-    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    auto accessor = makeDefaultAccessor(mock, boost::none);
     // Access the first document, which marks it as expired.
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *accessor[0]);
     // Advance the iterator which frees the first expired document.
-    partIter.advance();
+    advance();
     // Attempting to access the first doc results in a tripwire assertion.
     ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5643005);
 }
@@ -311,25 +309,18 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerDefaultPolicy, "Requested ex
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
-    auto laggingAccessor =
-        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
-    auto leadingAccessor =
-        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    auto laggingAccessor = makeDefaultAccessor(mock, boost::none);
+    auto leadingAccessor = makeDefaultAccessor(mock, boost::none);
 
     // The lagging accessor is referencing 1 doc behind current, and leading is 1 doc ahead.
     ASSERT_FALSE(laggingAccessor[-1]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *leadingAccessor[1]);
-    partIter.advance();
+    advance();
 
     // At this point, no documents are expired.
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *laggingAccessor[-1]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *leadingAccessor[1]);
-    partIter.advance();
+    advance();
 
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *laggingAccessor[-1]);
     // The leading accessor has fallen off the right side of the partition.
@@ -344,12 +335,7 @@ DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested exp
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
-    auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
+    auto accessor = makeEndpointAccessor(mock, boost::none);
     // Mock a window with documents [1, 2].
     auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
                                       SortPattern(BSON("a" << 1), getExpCtx()),
@@ -358,35 +344,30 @@ DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested exp
     // below the lower bound are not needed.
     auto endpoints = accessor.getEndpoints(bounds);
     // Advance the iterator which frees the first expired document.
-    partIter.advance();
+    advance();
 
     // Advancing again does not trigger any expiration since there has not been a subsequent call to
     // getEndpoints().
-    partIter.advance();
+    advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *accessor[-1]);
 
     endpoints = accessor.getEndpoints(bounds);
     // Now the second document, currently at index 0 in the cache, will be released.
-    partIter.advance();
-    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5643005);
-    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5643005);
+    advance();
+    ASSERT_THROWS_CODE(accessor[-1], AssertionException, 5371202);
+    ASSERT_THROWS_CODE(accessor[-2], AssertionException, 5371202);
 }
 
 DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
 
     // Create two endpoint accessors, one at [-1, 0] and another at [0, 1]. Since the first one may
     // access the document at (current - 1), the only expiration that can happen on advance() would
     // be (newCurrent - 2).
-    auto lookBehindAccessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
-    auto lookAheadAccessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
+    auto lookBehindAccessor = makeEndpointAccessor(mock, boost::none);
+    auto lookAheadAccessor = makeEndpointAccessor(mock, boost::none);
     auto negBounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-1 << 0)),
                                          SortPattern(BSON("a" << 1), getExpCtx()),
                                          getExpCtx().get());
@@ -401,7 +382,7 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested e
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookAheadAccessor[endpoints->first]);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookAheadAccessor[endpoints->second]);
     // Advance the iterator which does not free any documents.
-    partIter.advance();
+    advance();
 
     endpoints = lookBehindAccessor.getEndpoints(negBounds);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookBehindAccessor[endpoints->first]);
@@ -411,7 +392,7 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested e
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *lookAheadAccessor[endpoints->second]);
 
     // Advance again, the current document is now {a: 3}.
-    partIter.advance();
+    advance();
     endpoints = lookBehindAccessor.getEndpoints(negBounds);
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[endpoints->first]);
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *lookBehindAccessor[endpoints->second]);
@@ -421,7 +402,7 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested e
 
     // Since both accessors are done with document 0, the next advance will free it but keep around
     // the other docs.
-    partIter.advance();
+    advance();
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *lookBehindAccessor[-2]);
     ASSERT_THROWS_CODE(lookBehindAccessor[-3], AssertionException, 5643005);
 }
@@ -432,11 +413,8 @@ DEATH_TEST_F(PartitionIteratorTest,
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
+    auto partIter =
+        PartitionIterator(getExpCtx().get(), mock.get(), &_tracker, boost::none, boost::none);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kRightEndpoint);
     // Use a window of 'documents: [-2, -1]'.
     auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-2 << -1)),
@@ -470,14 +448,8 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     const auto docs = std::deque<DocumentSource::GetNextResult>{
         Document{{"a", 1}}, Document{{"a", 2}}, Document{{"a", 3}}, Document{{"a", 4}}};
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
-    auto partIter = PartitionIterator(getExpCtx().get(),
-                                      mock.get(),
-                                      boost::none,
-                                      boost::none,
-                                      100 * 1024 * 1024 /* default memory limit */);
-    auto endpointAccessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kEndpoints);
-    auto defaultAccessor =
-        PartitionAccessor(&partIter, PartitionAccessor::Policy::kDefaultSequential);
+    auto endpointAccessor = makeEndpointAccessor(mock, boost::none);
+    auto defaultAccessor = makeDefaultAccessor(mock, boost::none);
     // Mock a window with documents [1, 2].
     auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
                                       SortPattern(BSON("a" << 1), getExpCtx()),
@@ -490,10 +462,10 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *defaultAccessor[1]);
 
     // Advance the iterator which frees the first expired document.
-    partIter.advance();
+    advance();
 
     // Advance again to get the iterator to document {a: 3}.
-    partIter.advance();
+    advance();
     // Adjust the default accessor to refer back to the document {a: 2}.
     ASSERT_DOCUMENT_EQ(docs[1].getDocument(), *defaultAccessor[-1]);
     // Keep the same endpoint accessor, which will only include the last document.
@@ -503,11 +475,101 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
 
     // Since the default accessor has not read {a: 3} yet, it won't be released after another
     // advance.
-    partIter.advance();
+    advance();
     ASSERT_DOCUMENT_EQ(docs[2].getDocument(), *defaultAccessor[-1]);
 
     // The iterator is currently at {a: 4}, with {a: 1} and {a: 2} both being released.
     ASSERT_THROWS_CODE(defaultAccessor[-2], AssertionException, 5643005);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("a" << largeStr);
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly double
+    // the size of the document.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 500);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2 * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 * 2 + 500);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON("arr" << BSON_ARRAY(BSON("subObj" << largeStr)));
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly
+    // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
+    // for the 'arr' element and once for the nested 'subObj' element.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+
+    // Pull in the second document. Both docs remain in the cache so the reported memory should
+    // include both.
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), (initialDocSize * 2) * 2);
+    ASSERT_LT(_iter->getApproximateSize(), (initialDocSize * 2) * 2 + 1024);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorCache) {
+    std::string largeStr(1024, 'x');
+    auto bsonDoc = BSON(
+        "obj" << BSON("subObj" << BSON("subObjSubObj" << largeStr) << "uncachedSub" << largeStr));
+    const auto docs = std::deque<DocumentSource::GetNextResult>{Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    // Pull in the first document, and verify the reported size. TODO SERVER-57011: The approximate
+    // size should not double count the nested strings.
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 3);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 4);
+}
+
+TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
+    std::string largeStr(1000, 'x');
+    auto bsonDoc = BSON("a" << largeStr);
+    const auto docs =
+        std::deque<DocumentSource::GetNextResult>{Document(bsonDoc), Document(bsonDoc)};
+    const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
+
+    auto accessor = makeDefaultAccessor(mock, boost::none);
+    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+
+    // Pull in the first document, and verify the reported size of the iterator is roughly double
+    // the size of the document.
+    ASSERT_DOCUMENT_EQ(*accessor[0], docs[0].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
+
+    // The accessor will have marked the first document as expired, and thus freed on the next call
+    // to advance().
+    advance();
+    ASSERT_DOCUMENT_EQ(*_iter->current(), docs[1].getDocument());
+    ASSERT_GT(_iter->getApproximateSize(), initialDocSize * 2);
+    ASSERT_LT(_iter->getApproximateSize(), initialDocSize * 2 + 1024);
 }
 
 }  // namespace

@@ -31,15 +31,6 @@
 
 namespace mongo {
 
-namespace {
-// Convert expected error codes to BSONNULL, but uassert other unexpected codes.
-Value orNull(StatusWith<Value> val) {
-    if (val.getStatus().code() == ErrorCodes::BadValue)
-        return Value(BSONNULL);
-    return uassertStatusOK(val);
-}
-}  // namespace
-
 Value WindowFunctionExecDerivative::getNext() {
     auto endpoints = _iter.getEndpoints(_bounds);
     if (!endpoints)

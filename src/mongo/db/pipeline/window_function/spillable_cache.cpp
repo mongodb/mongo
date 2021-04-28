@@ -35,12 +35,6 @@
 #include "mongo/db/storage/record_data.h"
 
 namespace mongo {
-void SpillableCache::updateMemoryUsage() {
-    _memUsed = 0;
-    for (const auto& doc : _memCache) {
-        _memUsed += doc.getApproximateSize();
-    }
-}
 
 bool SpillableCache::isIdInCache(int id) {
     tassert(5643005,
@@ -57,15 +51,17 @@ void SpillableCache::verifyInCache(int id) {
             isIdInCache(id));
 }
 void SpillableCache::addDocument(Document input) {
-    updateMemoryUsage();
-    _memUsed += input.getApproximateSize();
+    _memTracker.update(input.getApproximateSize());
     _memCache.emplace_back(std::move(input));
-    if (_memUsed >= _maxMem && _expCtx->allowDiskUse) {
+    if (_memTracker.currentMemoryBytes() >=
+            static_cast<long long>(_memTracker.base->_maxAllowedMemoryUsageBytes) &&
+        _expCtx->allowDiskUse) {
         spillToDisk();
     }
     uassert(5643011,
             "Exceeded max memory. Set 'allowDiskUse: true' to spill to disk",
-            _memUsed < _maxMem);
+            _memTracker.currentMemoryBytes() <
+                static_cast<long long>(_memTracker.base->_maxAllowedMemoryUsageBytes));
     ++_nextIndex;
 }
 Document SpillableCache::getDocumentById(int id) {
@@ -76,7 +72,6 @@ Document SpillableCache::getDocumentById(int id) {
     return readDocumentFromMemCacheById(id);
 }
 void SpillableCache::freeUpTo(int id) {
-    updateMemoryUsage();
     for (int i = _nextFreedIndex; i <= id; ++i) {
         verifyInCache(i);
         // Deleting is expensive in WT. Only delete in memory documents, documents in the record
@@ -85,8 +80,7 @@ void SpillableCache::freeUpTo(int id) {
             tassert(5643010,
                     "Attempted to remove document from empty memCache in SpillableCache",
                     _memCache.size() > 0);
-            auto docToFree = _memCache.front();
-            _memUsed -= docToFree.getApproximateSize();
+            _memTracker.update(-1 * _memCache.front().getApproximateSize());
             _memCache.pop_front();
         }
         ++_nextFreedIndex;
@@ -100,7 +94,7 @@ void SpillableCache::clear() {
     _diskWrittenIndex = 0;
     _nextIndex = 0;
     _nextFreedIndex = 0;
-    _memUsed = 0;
+    _memTracker.set(0);
 }
 
 void SpillableCache::writeBatchToDisk(std::vector<Record>& records) {
@@ -146,7 +140,7 @@ void SpillableCache::spillToDisk() {
         ++_diskWrittenIndex;
     }
     _memCache.clear();
-    _memUsed = 0;
+    _memTracker.set(0);
     if (records.size() == 0) {
         return;
     }

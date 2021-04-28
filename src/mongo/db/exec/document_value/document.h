@@ -130,7 +130,12 @@ public:
     Document& operator=(const Document&) = default;
     Document& operator=(Document&&) = default;
 
-    /// Look up a field by key name. Returns Value() if no such field. O(1)
+    /**
+     * Look up a field by key name. Returns Value() if no such field. O(1).
+     *
+     * Note that this method does *not* traverse nested documents and arrays, use getNestedField()
+     * instead.
+     */
     const Value operator[](StringData key) const {
         return getField(key);
     }
@@ -232,6 +237,13 @@ public:
 
     friend std::ostream& operator<<(std::ostream& out, const Document& doc) {
         return out << doc.toString();
+    }
+
+    /**
+     * Populates the internal cache by recursively walking the underlying BSON.
+     */
+    void fillCache() const {
+        storage().fillCache();
     }
 
     /** Calculate a hash value.

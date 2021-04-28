@@ -303,6 +303,11 @@ public:
 
     void reset(const BSONObj& bson, bool stripMetadata);
 
+    /**
+     * Populates the cache by recursively walking the underlying BSON.
+     */
+    void fillCache() const;
+
     static const DocumentStorage& emptyDoc() {
         return kEmptyDoc;
     }

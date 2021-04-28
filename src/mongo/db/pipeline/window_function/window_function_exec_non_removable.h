@@ -39,12 +39,10 @@ namespace mongo {
 
 /**
  * An executor that specifically handles document-based window types which accumulate values with no
- * need to remove old ones. The 'WindowFunc' parameter must expose a 'process()' and corresponding
- * 'getValue()' method to get the accumulation result.
+ * need to remove old ones.
  *
  * Only the upper bound is needed as the lower bound is always considered to be unbounded.
  */
-template <class WindowFunc>
 class WindowFunctionExecNonRemovable final : public WindowFunctionExec {
 public:
     /**
@@ -57,10 +55,11 @@ public:
      */
     WindowFunctionExecNonRemovable(PartitionIterator* iter,
                                    boost::intrusive_ptr<Expression> input,
-                                   boost::intrusive_ptr<WindowFunc> function,
-                                   WindowBounds::Bound<int> upperDocumentBound)
-        : WindowFunctionExec(
-              PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential)),
+                                   boost::intrusive_ptr<AccumulatorState> function,
+                                   WindowBounds::Bound<int> upperDocumentBound,
+                                   MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kDefaultSequential),
+                             memTracker),
           _input(std::move(input)),
           _function(std::move(function)),
           _upperDocumentBound(upperDocumentBound){};
@@ -81,6 +80,7 @@ public:
             if (auto doc = (this->_iter)[upperIndex]) {
                 _function->process(
                     _input->evaluate(*doc, &_input->getExpressionContext()->variables), false);
+                _memTracker->set(_function->getMemUsage());
             } else {
                 // Upper bound is out of range, but may be because it's off of the end of the
                 // partition. For instance, for bounds [unbounded, -1] we won't be able to
@@ -91,18 +91,15 @@ public:
         return _function->getValue(false);
     }
 
-    size_t getApproximateSize() const final {
-        return _function->getMemUsage();
-    }
-
     void reset() final {
         _initialized = false;
         _function->reset();
+        _memTracker->set(0);
     }
 
 private:
     boost::intrusive_ptr<Expression> _input;
-    boost::intrusive_ptr<WindowFunc> _function;
+    boost::intrusive_ptr<AccumulatorState> _function;
     WindowBounds::Bound<int> _upperDocumentBound;
 
     // In one of two states: either the initial window has not been populated or we are sliding and
@@ -125,6 +122,7 @@ private:
             if (auto doc = (this->_iter)[i]) {
                 _function->process(
                     _input->evaluate(*doc, &_input->getExpressionContext()->variables), false);
+                _memTracker->set(_function->getMemUsage());
             } else {
                 // Already reached the end of partition for the first value to compute.
                 break;

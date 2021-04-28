@@ -472,6 +472,7 @@ env.CppUnitTest(
         'granularity_rounder_powers_of_two_test.cpp',
         'granularity_rounder_preferred_numbers_test.cpp',
         'lookup_set_cache_test.cpp',
+        'memory_usage_tracker_test.cpp',
         'pipeline_metadata_tree_test.cpp',
         'pipeline_test.cpp',
         'resharding_initial_split_policy_test.cpp',

@@ -59,7 +59,8 @@ public:
     static std::unique_ptr<WindowFunctionExec> create(ExpressionContext* expCtx,
                                                       PartitionIterator* iter,
                                                       const WindowFunctionStatement& functionStmt,
-                                                      const boost::optional<SortPattern>& sortBy);
+                                                      const boost::optional<SortPattern>& sortBy,
+                                                      MemoryUsageTracker* memTracker);
 
     virtual ~WindowFunctionExec() = default;
 
@@ -73,15 +74,13 @@ public:
      */
     virtual void reset() = 0;
 
-    /**
-     * Returns how much memory the accumulators or window functions being held are using.
-     */
-    virtual size_t getApproximateSize() const = 0;
-
 protected:
-    WindowFunctionExec(PartitionAccessor iter) : _iter(iter){};
+    WindowFunctionExec(PartitionAccessor iter,
+                       MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : _iter(iter), _memTracker(memTracker){};
 
     PartitionAccessor _iter;
+    MemoryUsageTracker::PerFunctionMemoryTracker* _memTracker;
 };
 
 /**
@@ -97,44 +96,42 @@ public:
         return _function->getValue();
     }
 
-    /**
-     * Return the byte size of the values being stored by this class. Does not include the constant
-     * size objects being held or the overhead of the data structures.
-     */
-    size_t getApproximateSize() const final {
-        return _function->getApproximateSize() + _memUsageBytes;
-    }
-
 protected:
     WindowFunctionExecRemovable(PartitionIterator* iter,
                                 PartitionAccessor::Policy policy,
                                 boost::intrusive_ptr<Expression> input,
-                                std::unique_ptr<WindowFunctionState> function)
-        : WindowFunctionExec(PartitionAccessor(iter, policy)),
+                                std::unique_ptr<WindowFunctionState> function,
+                                MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExec(PartitionAccessor(iter, policy), memTracker),
           _input(std::move(input)),
           _function(std::move(function)) {}
 
+    void reset() {
+        _function->reset();
+    }
+
     void addValue(Value v) {
+        long long prior = _function->getApproximateSize();
+        long long valueSize = v.getApproximateSize();
         _function->add(v);
         _values.push(v);
-        _memUsageBytes += v.getApproximateSize();
+        _memTracker->update(valueSize + static_cast<long long>(_function->getApproximateSize()) -
+                            prior);
     }
 
     void removeValue() {
         tassert(5429400, "Tried to remove more values than we added", !_values.empty());
         auto v = _values.front();
+        long long prior = _function->getApproximateSize();
         _function->remove(v);
+        _memTracker->update(static_cast<long long>(_function->getApproximateSize()) - prior -
+                            v.getApproximateSize());
         _values.pop();
-        _memUsageBytes -= v.getApproximateSize();
     }
 
     boost::intrusive_ptr<Expression> _input;
-    std::unique_ptr<WindowFunctionState> _function;
     // Keep track of values in the window function that will need to be removed later.
     std::queue<Value> _values;
-
-    // Track the byte size of the values being stored by this class.
-    size_t _memUsageBytes = 0;
 
 private:
     /**
@@ -144,6 +141,8 @@ private:
      * entered it? which have left it?) and call addValue(), removeValue() as needed.
      */
     virtual void update() = 0;
+
+    std::unique_ptr<WindowFunctionState> _function;
 };
 
 }  // namespace mongo

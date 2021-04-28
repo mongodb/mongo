@@ -110,7 +110,8 @@ public:
     }
 
     std::unique_ptr<SpillableCache> createSpillableCache(size_t maxMem) {
-        auto cache = std::make_unique<SpillableCache>(_expCtx.get(), maxMem);
+        _tracker = std::make_unique<MemoryUsageTracker>(false, maxMem);
+        auto cache = std::make_unique<SpillableCache>(_expCtx.get(), _tracker.get());
         return cache;
     }
 
@@ -128,6 +129,8 @@ public:
     }
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
+    std::unique_ptr<MemoryUsageTracker> _tracker;
+
     // Docs are ~200 each.
     std::vector<Document> _docSet;
     int _lastIndex = 0;

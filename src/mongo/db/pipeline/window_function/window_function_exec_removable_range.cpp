@@ -41,9 +41,13 @@ WindowFunctionExecRemovableRange::WindowFunctionExecRemovableRange(
     boost::intrusive_ptr<Expression> input,
     boost::intrusive_ptr<ExpressionFieldPath> sortBy,
     std::unique_ptr<WindowFunctionState> function,
-    WindowBounds bounds)
-    : WindowFunctionExecRemovable(
-          iter, PartitionAccessor::Policy::kEndpoints, std::move(input), std::move(function)),
+    WindowBounds bounds,
+    MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+    : WindowFunctionExecRemovable(iter,
+                                  PartitionAccessor::Policy::kEndpoints,
+                                  std::move(input),
+                                  std::move(function),
+                                  memTracker),
       _sortBy(std::move(sortBy)),
       _bounds(std::move(bounds)) {}
 

@@ -52,13 +52,14 @@ public:
     WindowFunctionExecRemovableDocument(PartitionIterator* iter,
                                         boost::intrusive_ptr<Expression> input,
                                         std::unique_ptr<WindowFunctionState> function,
-                                        WindowBounds::DocumentBased bounds);
+                                        WindowBounds::DocumentBased bounds,
+                                        MemoryUsageTracker::PerFunctionMemoryTracker* memTracker);
 
     void reset() final {
-        _function->reset();
         _values = std::queue<Value>();
         _initialized = false;
-        _memUsageBytes = sizeof(*this);
+        _memTracker->set(sizeof(*this));
+        WindowFunctionExecRemovable::reset();
     }
 
 private:
@@ -69,9 +70,7 @@ private:
         if (_values.size() == 0) {
             return;
         }
-        _memUsageBytes -= _values.front().getApproximateSize();
-        _function->remove(_values.front());
-        _values.pop();
+        removeValue();
     }
 
     // In one of two states: either the initial window has not been populated or we are sliding and

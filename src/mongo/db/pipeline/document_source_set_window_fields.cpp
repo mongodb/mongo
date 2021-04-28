@@ -336,8 +336,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
 void DocumentSourceInternalSetWindowFields::initialize() {
     for (auto& wfs : _outputFields) {
         _executableOutputs[wfs.fieldName] =
-            WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy);
-        _memoryTracker.set(wfs.fieldName, _executableOutputs[wfs.fieldName]->getApproximateSize());
+            WindowFunctionExec::create(pExpCtx.get(), &_iterator, wfs, _sortBy, &_memoryTracker);
     }
     _init = true;
 }
@@ -436,8 +435,6 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         return DocumentSource::GetNextResult::makeEOF();
 
     auto curDoc = _iterator.current();
-    _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
-
     // The only way we hit this case is if there are no documents, since otherwise _eof will be set.
     if (!curDoc) {
         _eof = true;
@@ -456,19 +453,20 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             throw;
         }
 
-        // Update the memory usage for this function after getNext().
-        _memoryTracker.set(fieldName, function->getApproximateSize());
-        // Account for the additional memory in the iterator cache.
-        _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
-        if (_memoryTracker.currentMemoryBytes() >= _memoryTracker._maxAllowedMemoryUsageBytes &&
+        if (_memoryTracker.currentMemoryBytes() >=
+                static_cast<long long>(_memoryTracker._maxAllowedMemoryUsageBytes) &&
             _memoryTracker._allowDiskUse) {
             // Attempt to spill where possible.
             _iterator.spillToDisk();
-            _memoryTracker.setInternal("PartitionIterator", _iterator.getApproximateSize());
         }
-        if (_memoryTracker.currentMemoryBytes() > _memoryTracker._maxAllowedMemoryUsageBytes) {
+        if (_memoryTracker.currentMemoryBytes() >
+            static_cast<long long>(_memoryTracker._maxAllowedMemoryUsageBytes)) {
             _iterator.finalize();
-            uasserted(5414201, "Exceeded memory limit in DocumentSourceSetWindowFields");
+            uasserted(5414201,
+                      str::stream()
+                          << "Exceeded memory limit in DocumentSourceSetWindowFields, used "
+                          << _memoryTracker.currentMemoryBytes() << " bytes but max allowed is "
+                          << _memoryTracker._maxAllowedMemoryUsageBytes);
         }
     }
 
@@ -483,6 +481,9 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
             for (auto&& [fieldName, function] : _executableOutputs) {
                 function->reset();
             }
+
+            // Account for the memory in the iterator for the new partition.
+            _memoryTracker.set(_iterator.getApproximateSize());
             break;
         case PartitionIterator::AdvanceResult::kEOF:
             _eof = true;

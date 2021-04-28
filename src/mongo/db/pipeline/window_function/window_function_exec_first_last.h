@@ -37,18 +37,14 @@
 namespace mongo {
 
 class WindowFunctionExecForEndpoint : public WindowFunctionExec {
-public:
-    // Endpoint executors are constant size and don't hold any of the values passing through.
-    size_t getApproximateSize() const final {
-        return 0;
-    }
-
 protected:
     WindowFunctionExecForEndpoint(PartitionIterator* iter,
                                   boost::intrusive_ptr<Expression> input,
                                   WindowBounds bounds,
-                                  const boost::optional<Value>& defaultValue = boost::none)
-        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints)),
+                                  const boost::optional<Value>& defaultValue,
+                                  MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExec(PartitionAccessor(iter, PartitionAccessor::Policy::kEndpoints),
+                             memTracker),
           _input(std::move(input)),
           _bounds(std::move(bounds)),
           _default(defaultValue.get_value_or(Value(BSONNULL))) {}
@@ -82,8 +78,10 @@ public:
     WindowFunctionExecFirst(PartitionIterator* iter,
                             boost::intrusive_ptr<Expression> input,
                             WindowBounds bounds,
-                            const boost::optional<Value>& defaultValue = boost::none)
-        : WindowFunctionExecForEndpoint(iter, std::move(input), std::move(bounds), defaultValue) {}
+                            const boost::optional<Value>& defaultValue,
+                            MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExecForEndpoint(
+              iter, std::move(input), std::move(bounds), defaultValue, memTracker) {}
 
     Value getNext() {
         return getFirst();
@@ -94,8 +92,10 @@ class WindowFunctionExecLast final : public WindowFunctionExecForEndpoint {
 public:
     WindowFunctionExecLast(PartitionIterator* iter,
                            boost::intrusive_ptr<Expression> input,
-                           WindowBounds bounds)
-        : WindowFunctionExecForEndpoint(iter, std::move(input), std::move(bounds)) {}
+                           WindowBounds bounds,
+                           MemoryUsageTracker::PerFunctionMemoryTracker* memTracker)
+        : WindowFunctionExecForEndpoint(
+              iter, std::move(input), std::move(bounds), boost::none, memTracker) {}
 
     Value getNext() {
         return getLast();

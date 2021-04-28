@@ -94,42 +94,40 @@ for (let i = 0; i < results.length; i++) {
     }
 }
 checkProfilerForDiskWrite(db);
-// Test that an explain that executes the query reports usedDisk correctly.
-let explainPipeline = [
-    {
-        $setWindowFields: {
-            partitionBy: "$partition",
-            sortBy: {partition: 1},
-            output: {arr: {$sum: "$val", window: {documents: [-21, 21]}}}
-        }
-    },
-    {$sort: {_id: 1}}
-];
 
 // We don't execute setWindowFields in a sharded explain.
 if (!FixtureHelpers.isMongos(db)) {
+    // Test that an explain that executes the query reports usedDisk correctly.
+    let explainPipeline = [
+        {
+            $setWindowFields: {
+                partitionBy: "$partition",
+                sortBy: {partition: 1},
+                output: {arr: {$sum: "$val", window: {documents: [-21, 21]}}}
+            }
+        },
+        {$sort: {_id: 1}}
+    ];
+
     let stages = getAggPlanStages(
         coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
         "$_internalSetWindowFields");
     assert(stages[0]["usedDisk"], stages);
-}
-setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
-                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       avgDocSize * largePartitionSize * 2);
-explainPipeline = [
-    {
-        $setWindowFields: {
-            partitionBy: "$partition",
-            sortBy: {partition: 1},
-            output: {arr: {$sum: "$val", window: {documents: [0, 0]}}}
-        }
-    },
-    {$sort: {_id: 1}}
-];
+    setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
+                           "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
+                           avgDocSize * largePartitionSize * 2);
+    explainPipeline = [
+        {
+            $setWindowFields: {
+                partitionBy: "$partition",
+                sortBy: {partition: 1},
+                output: {arr: {$sum: "$val", window: {documents: [0, 0]}}}
+            }
+        },
+        {$sort: {_id: 1}}
+    ];
 
-// We don't execute setWindowFields in a sharded explain.
-if (!FixtureHelpers.isMongos(db)) {
-    let stages = getAggPlanStages(
+    stages = getAggPlanStages(
         coll.explain("allPlansExecution").aggregate(explainPipeline, {allowDiskUse: true}),
         "$_internalSetWindowFields");
     assert(!stages[0]["usedDisk"], stages);
@@ -169,7 +167,7 @@ for (let i = 0; i < results.length; i++) {
 // $push uses about ~950 to store all the values in the second partition.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       750);
+                       avgDocSize * 2);
 assert.commandFailedWithCode(db.runCommand({
     aggregate: coll.getName(),
     pipeline: [

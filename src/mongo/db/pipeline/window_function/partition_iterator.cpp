@@ -80,16 +80,16 @@ static optional<boost::intrusive_ptr<ExpressionFieldPath>> exprFromSort(
 
 PartitionIterator::PartitionIterator(ExpressionContext* expCtx,
                                      DocumentSource* source,
+                                     MemoryUsageTracker* tracker,
                                      optional<boost::intrusive_ptr<Expression>> partitionExpr,
-                                     const optional<SortPattern>& sortPattern,
-                                     size_t maxMem)
+                                     const optional<SortPattern>& sortPattern)
     : _expCtx(expCtx),
       _source(source),
       _partitionExpr(std::move(partitionExpr)),
       _sortExpr(exprFromSort(_expCtx, sortPattern)),
-      _state(IteratorState::kNotInitialized) {
-    _cache = std::make_unique<SpillableCache>(_expCtx, maxMem);
-}
+      _state(IteratorState::kNotInitialized),
+      _cache(std::make_unique<SpillableCache>(_expCtx, tracker)),
+      _tracker(tracker) {}
 
 optional<Document> PartitionIterator::operator[](int index) {
     auto docDesired = _indexOfCurrentInPartition + index;
@@ -471,6 +471,11 @@ void PartitionIterator::getNextDocument() {
         return;
 
     auto doc = getNextRes.releaseDocument();
+
+    // Greedily populate the internal document cache to enable easier memory tracking versus
+    // detecting the changing document size during execution of each function.
+    doc.fillCache();
+
     if (_partitionExpr) {
         // Because partitioning is achieved by sorting in $setWindowFields, and missing fields and
         // nulls are considered equivalent in sorting, documents with missing fields and nulls may
@@ -486,9 +491,11 @@ void PartitionIterator::getNextDocument() {
                 !curKey.isArray());
         if (_state == IteratorState::kNotInitialized) {
             _nextPartition = NextPartitionState{std::move(doc), std::move(curKey)};
+            _tracker->update(getNextPartitionStateSize());
             advanceToNextPartition();
         } else if (_expCtx->getValueComparator().compare(curKey, _partitionKey) != 0) {
             _nextPartition = NextPartitionState{std::move(doc), std::move(curKey)};
+            _tracker->update(getNextPartitionStateSize());
             _state = IteratorState::kAwaitingAdvanceToNext;
         } else {
             _cache->addDocument(std::move(doc));

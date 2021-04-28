@@ -132,9 +132,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         set: 1144,                                // 1024 for the string, rest is constant state.
     };
     // Add one document for the NextPartitionState structure.
-    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
-    // recorded, remove the '-1' in this line.
-    expectedTotal = (nDocs / nPartitions - 1) * docSize;
+    expectedTotal = ((nDocs / nPartitions) + 1) * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }
@@ -154,22 +152,39 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
         {
             $setWindowFields: {
                 sortBy: {_id: 1},
-                output: {runningSum: {$sum: "$_id", window: {documents: [-5, 4]}}}
+                output: {runningSum: {$sum: "$_id", window: {documents: [0, 9]}}}
             }
         },
     ];
     const expectedFunctionMemUsages = {
-        // 10x64-bit integer values per window, and 72 and 144 for the $sum accumulator and executor
-        // state.
-        runningSum: windowSize * 16 + 136 + 144,
+        // 10 integer values per window, with some extra to account for the $sum accumulator and
+        // executor state.
+        runningSum: windowSize * 16 + 120,
     };
 
-    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
-    // recorded, remove the '-1' in this line.
-    let expectedTotal = (numDocsHeld - 1) * docSize;
+    let expectedTotal = windowSize * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
+
+    // Test that a window which also looks behind is able to release documents that are no longer
+    // needed, thus reducing the total memory footprint. In this example, only half of the window
+    // will be in memory at any point in time.
+    pipeline = [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {runningSum: {$sum: "$_id", window: {documents: [-5, 4]}}}
+            }
+        },
+    ];
+    expectedTotal = (windowSize / 2) * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
+
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 
@@ -202,9 +217,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     // large string.
     const expectedFunctionMemUsages = {pushArray: 1024 * maxDocsInWindow * 2};
 
-    // TODO SERVER-55786: Fix memory tracking so that the PartitionIterator max memory is correctly
-    // recorded, remove the '-1' in this line.
-    let expectedTotal = (maxDocsInWindow - 1) * docSize;
+    let expectedTotal = maxDocsInWindow * docSize;
     for (let func in expectedFunctionMemUsages) {
         expectedTotal += expectedFunctionMemUsages[func];
     }

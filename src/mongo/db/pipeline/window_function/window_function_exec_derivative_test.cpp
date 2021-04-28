@@ -52,11 +52,8 @@ public:
         WindowBounds bounds,
         boost::optional<TimeUnit> timeUnit = boost::none) {
         _docSource = DocumentSourceMock::createForTest(std::move(docs), getExpCtx());
-        _iter = std::make_unique<PartitionIterator>(getExpCtx().get(),
-                                                    _docSource.get(),
-                                                    boost::none,
-                                                    boost::none,
-                                                    100 * 1024 * 1024 /* default memory limit */);
+        _iter = std::make_unique<PartitionIterator>(
+            getExpCtx().get(), _docSource.get(), &_tracker, boost::none, boost::none);
 
         auto position = ExpressionFieldPath::parse(
             getExpCtx().get(), positionPath, getExpCtx()->variablesParseState);
@@ -67,7 +64,8 @@ public:
                                             std::move(position),
                                             std::move(time),
                                             std::move(bounds),
-                                            std::move(timeUnit));
+                                            std::move(timeUnit),
+                                            &_tracker["output"]);
     }
 
     auto advanceIterator() {
@@ -90,6 +88,7 @@ public:
 
 private:
     boost::intrusive_ptr<DocumentSourceMock> _docSource;
+    MemoryUsageTracker _tracker{false, 100 * 1024 * 1024 /* default memory limit */};
     std::unique_ptr<PartitionIterator> _iter;
 };
 
