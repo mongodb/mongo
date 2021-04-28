@@ -74,37 +74,47 @@ struct DocumentDiffTables {
 
     // Order in which new fields should be added to the pre image.
     std::vector<BSONElement> fieldsToInsert;
+    std::size_t sizeOfFieldsToInsert = 0;
+    // Diff only inserts fields, no deletes or updates
+    bool insertOnly = false;
 };
 
 DocumentDiffTables buildObjDiffTables(DocumentDiffReader* reader) {
     DocumentDiffTables out;
+    out.insertOnly = true;
 
     boost::optional<StringData> optFieldName;
     while ((optFieldName = reader->nextDelete())) {
         out.safeInsert(*optFieldName, Delete{});
+        out.insertOnly = false;
     }
 
     boost::optional<BSONElement> nextUpdate;
     while ((nextUpdate = reader->nextUpdate())) {
         out.safeInsert(nextUpdate->fieldNameStringData(), Update{*nextUpdate});
         out.fieldsToInsert.push_back(*nextUpdate);
+        out.insertOnly = false;
     }
 
     boost::optional<BSONElement> nextInsert;
     while ((nextInsert = reader->nextInsert())) {
         out.safeInsert(nextInsert->fieldNameStringData(), Insert{*nextInsert});
         out.fieldsToInsert.push_back(*nextInsert);
+        out.sizeOfFieldsToInsert += out.fieldsToInsert.back().size();
     }
 
     for (auto next = reader->nextSubDiff(); next; next = reader->nextSubDiff()) {
         out.safeInsert(next->first, SubDiff{next->second});
+        out.insertOnly = false;
     }
     return out;
 }
 
 class DiffApplier {
 public:
-    DiffApplier(const UpdateIndexData* indexData) : _indexData(indexData) {}
+    DiffApplier(const UpdateIndexData* indexData, bool mustCheckExistenceForInsertOperations)
+        : _indexData(indexData),
+          _mustCheckExistenceForInsertOperations{mustCheckExistenceForInsertOperations} {}
 
     void applyDiffToObject(const BSONObj& preImage,
                            FieldRef* path,
@@ -113,6 +123,17 @@ public:
         // First build some tables so we can quickly apply the diff. We shouldn't need to examine
         // the diff again once this is done.
         const DocumentDiffTables tables = buildObjDiffTables(reader);
+
+        if (!_mustCheckExistenceForInsertOperations && tables.insertOnly) {
+            builder->bb().reserveBytes(preImage.objsize() + tables.sizeOfFieldsToInsert);
+            builder->appendElements(preImage);
+            for (auto&& elt : tables.fieldsToInsert) {
+                builder->append(elt);
+                FieldRef::FieldRefTempAppend tempAppend(*path, elt.fieldNameStringData());
+                updateIndexesAffected(path);
+            }
+            return;
+        }
 
         // Keep track of what fields we already appended, so that we can insert the rest at the end.
         StringDataSet fieldsToSkipInserting;
@@ -316,14 +337,18 @@ private:
     }
 
     const UpdateIndexData* _indexData;
+    bool _mustCheckExistenceForInsertOperations = true;
     bool _indexesAffected = false;
 };
 }  // namespace
 
-ApplyDiffOutput applyDiff(const BSONObj& pre, const Diff& diff, const UpdateIndexData* indexData) {
+ApplyDiffOutput applyDiff(const BSONObj& pre,
+                          const Diff& diff,
+                          const UpdateIndexData* indexData,
+                          bool mustCheckExistenceForInsertOperations) {
     DocumentDiffReader reader(diff);
     BSONObjBuilder out;
-    DiffApplier applier(indexData);
+    DiffApplier applier(indexData, mustCheckExistenceForInsertOperations);
     FieldRef path;
     applier.applyDiffToObject(pre, &path, &reader, &out);
     return {out.obj(), applier.indexesAffected()};

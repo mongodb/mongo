@@ -703,7 +703,8 @@ TEST_F(ModifiedPathsTestFixture, DeltaUpdateNotAffectingIndex) {
     BSONObj spec = fromjson("{d: {a: false}}");
     mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
     runUpdate(&doc,
-              write_ops::UpdateModification::parseFromV2Delta(spec),
+              write_ops::UpdateModification::parseFromV2Delta(
+                  spec, write_ops::UpdateModification::DiffOptions{}),
               ""_sd,
               {},
               true /* fromOplog */);
@@ -712,7 +713,8 @@ TEST_F(ModifiedPathsTestFixture, DeltaUpdateNotAffectingIndex) {
     UpdateIndexData indexData;
     indexData.addPath(FieldRef("p"));
     runUpdate(&doc,
-              write_ops::UpdateModification::parseFromV2Delta(spec),
+              write_ops::UpdateModification::parseFromV2Delta(
+                  spec, write_ops::UpdateModification::DiffOptions{}),
               ""_sd,
               {},
               true /* fromOplog */,
@@ -727,7 +729,8 @@ TEST_F(ModifiedPathsTestFixture, DeltaUpdateAffectingIndex) {
     indexData.addPath(FieldRef("q"));
     indexData.addPath(FieldRef("a.p"));
     runUpdate(&doc,
-              write_ops::UpdateModification::parseFromV2Delta(spec),
+              write_ops::UpdateModification::parseFromV2Delta(
+                  spec, write_ops::UpdateModification::DiffOptions{}),
               ""_sd,
               {},
               true /* fromOplog */,

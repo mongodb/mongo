@@ -124,7 +124,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                         opCtx,
                                         ns,
                                         o2,
-                                        write_ops::UpdateModification::parseFromOplogEntry(o),
+                                        write_ops::UpdateModification::parseFromOplogEntry(
+                                            o, write_ops::UpdateModification::DiffOptions{}),
                                         upsert);
     } else if (opType == "d"_sd) {
 

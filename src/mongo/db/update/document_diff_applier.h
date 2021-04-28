@@ -43,8 +43,15 @@ struct ApplyDiffOutput {
 
 /**
  * Applies the diff to 'pre' and returns the post image. Throws if the diff is invalid. The
- * indexData' parameter is optional, if provided computes whether the indexes are affected.
+ * 'indexData' parameter is optional, if provided computes whether the indexes are affected.
+ * The final, 'mustCheckExistenceForInsertOperations' parameter signals whether we must check if an
+ * inserted field already exists within a (sub)document. This should generally be set to true,
+ * unless the caller has knowledge of the pre-image and the diff, and can guarantee that we will not
+ * re-insert anything.
  */
-ApplyDiffOutput applyDiff(const BSONObj& pre, const Diff& diff, const UpdateIndexData* indexData);
+ApplyDiffOutput applyDiff(const BSONObj& pre,
+                          const Diff& diff,
+                          const UpdateIndexData* indexData,
+                          bool mustCheckExistenceForInsertOperations);
 }  // namespace doc_diff
 }  // namespace mongo

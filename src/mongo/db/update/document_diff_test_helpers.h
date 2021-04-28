@@ -41,5 +41,7 @@ BSONObj createObjWithLargePrefix(const std::string& suffix);
 
 BSONObj generateDoc(PseudoRandom* rng, MutableDocument* doc, int depthLevel);
 
-BSONObj applyDiffTestHelper(BSONObj preImage, BSONObj diff);
+BSONObj applyDiffTestHelper(BSONObj preImage,
+                            BSONObj diff,
+                            bool mustCheckExistenceForInsertOperations = true);
 }  // namespace mongo::doc_diff

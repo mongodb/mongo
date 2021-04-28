@@ -43,6 +43,7 @@ namespace {
 TEST(DeltaExecutorTest, Delete) {
     BSONObj preImage(fromjson("{f1: {a: {b: {c: 1}, c: 1}}}"));
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef("p.a.b"));
     indexData.addPath(FieldRef("f1.a.b"));
     FieldRefSet fieldRefSet;
@@ -51,7 +52,8 @@ TEST(DeltaExecutorTest, Delete) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{d: {f1: false, f2: false, f3: false}}"));
+        DeltaExecutor test(fromjson("{d: {f1: false, f2: false, f3: false}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(), BSONObj());
         ASSERT(result.indexesAffected);
@@ -62,7 +64,8 @@ TEST(DeltaExecutorTest, Delete) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{sf1: {sa: {d: {p: false, c: false, b: false}}}}"));
+        DeltaExecutor test(fromjson("{sf1: {sa: {d: {p: false, c: false, b: false}}}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {}}}"));
@@ -73,7 +76,8 @@ TEST(DeltaExecutorTest, Delete) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {d: {c: false}}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {d: {c: false}}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {}, c: 1}}}"));
@@ -84,7 +88,8 @@ TEST(DeltaExecutorTest, Delete) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {d: {c: false}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {d: {c: false}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}}}}"));
@@ -95,6 +100,7 @@ TEST(DeltaExecutorTest, Delete) {
 TEST(DeltaExecutorTest, Update) {
     BSONObj preImage(fromjson("{f1: {a: {b: {c: 1}, c: 1}}}"));
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef("p.a.b"));
     indexData.addPath(FieldRef("f1.a.b"));
     FieldRefSet fieldRefSet;
@@ -103,7 +109,8 @@ TEST(DeltaExecutorTest, Update) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{u: {f1: false, f2: false, f3: false}}"));
+        DeltaExecutor test(fromjson("{u: {f1: false, f2: false, f3: false}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
@@ -114,7 +121,8 @@ TEST(DeltaExecutorTest, Update) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {p: false, c: false, b: false}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {p: false, c: false, b: false}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: false, c: false, p: false}}}"));
@@ -125,7 +133,8 @@ TEST(DeltaExecutorTest, Update) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {u: {c: false}}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {u: {c: false}}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: false}, c: 1}}}"));
@@ -136,7 +145,8 @@ TEST(DeltaExecutorTest, Update) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {c: false}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {u: {c: false}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: false}}}"));
@@ -146,6 +156,7 @@ TEST(DeltaExecutorTest, Update) {
 
 TEST(DeltaExecutorTest, Insert) {
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef("p.a.b"));
     // 'UpdateIndexData' will canonicalize the path and remove all numeric components. So the '2'
     // and '33' components should not matter.
@@ -156,7 +167,8 @@ TEST(DeltaExecutorTest, Insert) {
         auto doc = mutablebson::Document(BSONObj());
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{i: {f1: false, f2: false, f3: false}}"));
+        DeltaExecutor test(fromjson("{i: {f1: false, f2: false, f3: false}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: false, f2: false, f3: false}"));
@@ -167,7 +179,8 @@ TEST(DeltaExecutorTest, Insert) {
         auto doc = mutablebson::Document(fromjson("{f1: {a: {c: true}}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {p: false, c: false, b: false}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {p: false, c: false, b: false}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {p: false, c: false, b: false}}}"));
@@ -178,7 +191,8 @@ TEST(DeltaExecutorTest, Insert) {
         auto doc = mutablebson::Document(fromjson("{f1: {a: {b: {c: {e: 1}}}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {sc: {i : {d: 2} }}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {sc: {i : {d: 2} }}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: {e: 1, d: 2}}}}}"));
@@ -189,7 +203,8 @@ TEST(DeltaExecutorTest, Insert) {
         auto doc = mutablebson::Document(fromjson("{f1: {a: {b: {c: 1}}}}"));
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {c: 2}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {i: {c: 2}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: {c: 1}, c: 2}}}"));
@@ -200,6 +215,7 @@ TEST(DeltaExecutorTest, Insert) {
 TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
     BSONObj preImage;
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef{"1"});
     FieldRefSet fieldRefSet;
 
@@ -209,7 +225,8 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{i: {'0': false, '1': false, '2': false}}"));
+        DeltaExecutor test(fromjson("{i: {'0': false, '1': false, '2': false}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '1': false, '2': false}"));
@@ -219,7 +236,8 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{i: {'0': false, '2': false}}"));
+        DeltaExecutor test(fromjson("{i: {'0': false, '2': false}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{'0': false, '2': false}"));
@@ -230,6 +248,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesTopLevel) {
 TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
     BSONObj preImage{fromjson("{a: {}}")};
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef{"a.1"});
     FieldRefSet fieldRefSet;
 
@@ -239,7 +258,8 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '1': false, '2': false}}}"));
+        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '1': false, '2': false}}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '1': false, '2': false}}"));
@@ -249,7 +269,8 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '2': false}}}"));
+        DeltaExecutor test(fromjson("{sa: {i: {'0': false, '2': false}}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{a: {'0': false, '2': false}}"));
@@ -260,6 +281,7 @@ TEST(DeltaExecutorTest, InsertNumericFieldNamesNested) {
 TEST(DeltaExecutorTest, ArraysInIndexPath) {
     BSONObj preImage(fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1]}"));
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef("p.a.b"));
     // Numeric components will be ignored, so they should not matter.
     indexData.addPath(FieldRef("f1.9.a.10.b"));
@@ -269,7 +291,8 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{sf1: {a: true, l: 1}}"));
+        DeltaExecutor test(fromjson("{sf1: {a: true, l: 1}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}]}"));
@@ -281,7 +304,8 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {sb: {i: {d: 1} }}}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {sb: {i: {d: 1} }}}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1, d: 1}, c: 1}}, 1]}"));
@@ -292,7 +316,8 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {a: true, u2: {b: 1}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {a: true, u2: {b: 1}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}, c: 1}}, 1, {b:1}]}"));
@@ -303,7 +328,8 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {d: {c: false} }}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {a: true, s0: {sa: {d: {c: false} }}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: [{a: {b: {c: 1}}}, 1]}"));
@@ -314,6 +340,7 @@ TEST(DeltaExecutorTest, ArraysInIndexPath) {
 TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
     BSONObj preImage(fromjson("{f1: {a: {b: [{c: 1}, 2]}}}"));
     UpdateIndexData indexData;
+    constexpr bool mustCheckExistenceForInsertOperations = true;
     indexData.addPath(FieldRef("p.a.b"));
     // 'UpdateIndexData' will canonicalize the path and remove all numeric components. So the '9'
     // and '10' components should not matter.
@@ -324,7 +351,8 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        DeltaExecutor test(fromjson("{sf1: {sa: {sb: {a: true, l: 1}}}}"));
+        DeltaExecutor test(fromjson("{sf1: {sa: {sb: {a: true, l: 1}}}}"),
+                           mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 1}]}}}"));
@@ -335,7 +363,8 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, s0: {u: {c: 2}} }}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, s0: {u: {c: 2}} }}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [{c: 2}, 2]}}}"));
@@ -346,7 +375,8 @@ TEST(DeltaExecutorTest, ArraysAfterIndexPath) {
         auto doc = mutablebson::Document(preImage);
         UpdateExecutor::ApplyParams params(doc.root(), fieldRefSet);
         params.indexData = &indexData;
-        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, u0: 1 }}}}"));
+        auto test = DeltaExecutor(fromjson("{sf1: {sa: {sb: {a: true, u0: 1 }}}}"),
+                                  mustCheckExistenceForInsertOperations);
         auto result = test.applyUpdate(params);
         ASSERT_BSONOBJ_BINARY_EQ(params.element.getDocument().getObject(),
                                  fromjson("{f1: {a: {b: [1, 2]}}}"));

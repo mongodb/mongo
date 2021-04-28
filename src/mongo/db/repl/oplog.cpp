@@ -1364,7 +1364,17 @@ Status applyOperation_inlock(OperationContext* opCtx,
             auto request = UpdateRequest();
             request.setNamespaceString(requestNss);
             request.setQuery(updateCriteria);
-            auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o);
+            // If we are in steady state and the update is on a timeseries bucket collection, we can
+            // enable some optimizations in diff application. In some cases, during tenant
+            // migration, we can for some reason generate entries for timeseries bucket collections
+            // which still rely on the idempotency guarantee, which then means we shouldn't apply
+            // these optimizations.
+            write_ops::UpdateModification::DiffOptions options;
+            if (mode == OplogApplication::Mode::kSecondary && collection->getTimeseriesOptions() &&
+                !op.getFromTenantMigration()) {
+                options.mustCheckExistenceForInsertOperations = false;
+            }
+            auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(o, options);
 
             // TODO SERVER-51075: Remove FCV checks for $v:2 delta oplog entries.
             if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {

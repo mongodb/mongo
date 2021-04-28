@@ -99,55 +99,108 @@ std::vector<BSONObj> getDocumentsRepo() {
     return documents;
 }
 
-void runTest(std::vector<BSONObj> documents, size_t numSimulations) {
+std::vector<BSONObj> getDocumentsRepoAppendOnly() {
+    const static std::vector<BSONObj> documents = {
+        createObjWithLargePrefix(
+            "{field1: {level1Field1: {level1Field1: 1}}, field2: {level1Field1: {}}, field3: "
+            "{level1Field3: 'va2'}, field4: ['arrayVal1']}"),
+        createObjWithLargePrefix(
+            "{field1: {level1Field1: {level1Field1: 1}, level1Field2: 'val2'}, field2: "
+            "{level1Field1: {level2Field1: {}}}, field3: {level1Field3: 'va2'}, field4: "
+            "['arrayVal1', 'arrayVal2', 'arrayVal3', 'arrayVal4']}"),
+        createObjWithLargePrefix(
+            "{field1: {level1Field1: {level1Field1: 1}, level1Field2: 'val2'}, field2: "
+            "{level1Field1: {level2Field1: {}}}, field3: {level1Field3: 'va2', level1Field4: "
+            "'va4'}, field4: ['arrayVal1', 'arrayVal2', 'arrayVal3', 'arrayVal4', 'arrayVal5']}, "
+            "field5: {}, field6: 'va6'"),
+    };
+    return documents;
+}
+
+struct TestOptions {
+    std::vector<BSONObj> documents;
+    size_t numSimulations = 10;
+    bool shuffle = true;
+    bool mustCheckExistenceForInsertOperations = true;
+};
+
+void runTest(TestOptions* options) {
     // Shuffle them into a random order
     auto rng = getRNG();
-    LOGV2(4785301, "Seed used for the test ", "seed"_attr = getSeed());
-    for (size_t simulation = 0; simulation < numSimulations; ++simulation) {
-        std::shuffle(documents.begin(), documents.end(), rng->urbg());
+    if (options->shuffle) {
+        LOGV2(4785301, "Seed used for the test ", "seed"_attr = getSeed());
+    }
+    for (size_t simulation = 0; simulation < options->numSimulations; ++simulation) {
+        if (options->shuffle) {
+            std::shuffle(options->documents.begin(), options->documents.end(), rng->urbg());
+        }
 
-        auto preDoc = documents[0];
+        auto preDoc = options->documents[0];
         std::vector<BSONObj> diffs;
-        diffs.reserve(documents.size() - 1);
-        for (size_t i = 1; i < documents.size(); ++i) {
-            const auto diffOutput = computeDiff(
-                preDoc, documents[i], update_oplog_entry::kSizeOfDeltaOplogEntryMetadata, nullptr);
+        diffs.reserve(options->documents.size() - 1);
+        for (size_t i = 1; i < options->documents.size(); ++i) {
+            const auto diffOutput = computeDiff(preDoc,
+                                                options->documents[i],
+                                                update_oplog_entry::kSizeOfDeltaOplogEntryMetadata,
+                                                nullptr);
 
             ASSERT(diffOutput);
             diffs.push_back(diffOutput->diff);
-            const auto postObj = applyDiffTestHelper(preDoc, diffOutput->diff);
-            ASSERT_BSONOBJ_BINARY_EQ(documents[i], postObj);
+            const auto postObj = applyDiffTestHelper(
+                preDoc, diffOutput->diff, options->mustCheckExistenceForInsertOperations);
+            ASSERT_BSONOBJ_BINARY_EQ(options->documents[i], postObj);
 
-            // Applying the diff the second time also generates the same object.
-            ASSERT_BSONOBJ_BINARY_EQ(postObj, applyDiffTestHelper(postObj, diffOutput->diff));
+            if (options->mustCheckExistenceForInsertOperations) {
+                // Applying the diff the second time also generates the same object.
+                ASSERT_BSONOBJ_BINARY_EQ(
+                    postObj,
+                    applyDiffTestHelper(
+                        postObj, diffOutput->diff, options->mustCheckExistenceForInsertOperations));
+            }
 
-            preDoc = documents[i];
+            preDoc = options->documents[i];
         }
 
         // Verify that re-applying any suffix of the diffs in the sequence order will end produce
         // the same end state.
-        for (size_t start = 0; start < diffs.size(); ++start) {
-            auto endObj = documents.back();
-            for (size_t i = start; i < diffs.size(); ++i) {
-                endObj = applyDiffTestHelper(endObj, diffs[i]);
+        if (options->mustCheckExistenceForInsertOperations) {
+            for (size_t start = 0; start < diffs.size(); ++start) {
+                auto endObj = options->documents.back();
+                for (size_t i = start; i < diffs.size(); ++i) {
+                    endObj = applyDiffTestHelper(
+                        endObj, diffs[i], options->mustCheckExistenceForInsertOperations);
+                }
+                ASSERT_BSONOBJ_BINARY_EQ(endObj, options->documents.back());
             }
-            ASSERT_BSONOBJ_BINARY_EQ(endObj, documents.back());
         }
     }
 }
+
 TEST(DocumentDiffTest, PredefinedDocumentsTest) {
-    runTest(getDocumentsRepo(), 10);
+    TestOptions options;
+    options.documents = getDocumentsRepo();
+    runTest(&options);
+}
+
+TEST(DocumentDiffTest, PredefinedDocumentsAppendOnlyTest) {
+    TestOptions options;
+    options.documents = getDocumentsRepoAppendOnly();
+    options.shuffle = false;
+    options.numSimulations = 1;
+    options.mustCheckExistenceForInsertOperations = false;
+    runTest(&options);
 }
 
 TEST(DocumentDiffTest, RandomizedDocumentBuilderTest) {
+    TestOptions options;
     const auto numDocs = 20;
-    std::vector<BSONObj> documents(numDocs);
+    options.documents.reserve(numDocs);
     auto rng = getRNG();
     for (int i = 0; i < numDocs; ++i) {
         MutableDocument doc;
-        documents[i] = generateDoc(rng, &doc, 0);
+        options.documents.emplace_back(generateDoc(rng, &doc, 0));
     }
-    runTest(std::move(documents), 10);
+    runTest(&options);
 }
 
 }  // namespace

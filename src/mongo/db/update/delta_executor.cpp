@@ -41,7 +41,8 @@ DeltaExecutor::ApplyResult DeltaExecutor::applyUpdate(
     UpdateExecutor::ApplyParams applyParams) const {
     const auto originalDoc = applyParams.element.getDocument().getObject();
 
-    auto applyDiffOutput = doc_diff::applyDiff(originalDoc, _diff, applyParams.indexData);
+    auto applyDiffOutput = doc_diff::applyDiff(
+        originalDoc, _diff, applyParams.indexData, _mustCheckExistenceForInsertOperations);
     const auto& postImage = applyDiffOutput.postImage;
     auto postImageHasId = postImage.hasField("_id");
 

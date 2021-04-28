@@ -323,7 +323,8 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
             !idField.eoo());
 
     BSONObj idQuery = idField.wrap();
-    auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(oField);
+    auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(
+        oField, write_ops::UpdateModification::DiffOptions{});
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and update the doc from the stash collection.

@@ -59,6 +59,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -127,7 +128,9 @@ const int kTimeseriesControlVersion = 1;
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
 write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
-    std::shared_ptr<BucketCatalog::WriteBatch> batch, const BSONObj& metadata) {
+    OperationContext* opCtx,
+    std::shared_ptr<BucketCatalog::WriteBatch> batch,
+    const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
     {
         if (!batch->min().isEmpty() || !batch->max().isEmpty()) {
@@ -183,7 +186,10 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
             }
         }
     }
-    write_ops::UpdateModification u(updateBuilder.obj(), write_ops::UpdateModification::DiffTag{});
+    write_ops::UpdateModification::DiffOptions options;
+    options.mustCheckExistenceForInsertOperations =
+        static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx));
+    write_ops::UpdateModification u(updateBuilder.obj(), options);
     write_ops::UpdateOpEntry update(BSON("_id" << batch->bucket()->id()), std::move(u));
     invariant(!update.getMulti(), batch->bucket()->id().toString());
     invariant(!update.getUpsert(), batch->bucket()->id().toString());
@@ -581,11 +587,13 @@ public:
         }
 
         write_ops::UpdateCommandRequest _makeTimeseriesUpdateOp(
+            OperationContext* opCtx,
             std::shared_ptr<BucketCatalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
-            write_ops::UpdateCommandRequest op(ns().makeTimeseriesBucketsNamespace(),
-                                               {makeTimeseriesUpdateOpEntry(batch, metadata)});
+            write_ops::UpdateCommandRequest op(
+                ns().makeTimeseriesBucketsNamespace(),
+                {makeTimeseriesUpdateOpEntry(opCtx, batch, metadata)});
             op.setWriteCommandRequestBase(_makeTimeseriesWriteOpBase(std::move(stmtIds)));
             return op;
         }
@@ -616,7 +624,7 @@ public:
 
             return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
                 opCtx,
-                _makeTimeseriesUpdateOp(batch, metadata, std::move(stmtIds)),
+                _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)),
                 OperationSource::kTimeseries));
         }
 
@@ -716,7 +724,7 @@ public:
                         batch, metadata, std::move(stmtIds[batch.get()->bucket()])));
                 } else {
                     updateOps.push_back(_makeTimeseriesUpdateOp(
-                        batch, metadata, std::move(stmtIds[batch.get()->bucket()])));
+                        opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucket()])));
                 }
             }
 

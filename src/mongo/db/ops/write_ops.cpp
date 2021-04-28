@@ -270,7 +270,7 @@ void DeleteOp::validate(const DeleteCommandRequest& deleteOp) {
 }
 
 write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry(
-    const BSONObj& oField) {
+    const BSONObj& oField, const DiffOptions& options) {
     BSONElement vField = oField[kUpdateOplogEntryVersionFieldName];
 
     // If this field appears it should be an integer.
@@ -288,7 +288,7 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
                               << diff.type(),
                 diff.type() == BSONType::Object);
 
-        return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, DiffTag{});
+        return UpdateModification(doc_diff::Diff{diff.embeddedObject()}, options);
     } else if (!vField.ok() ||
                vField.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)) {
         // Treat it as a "classic" update which can either be a full replacement or a
@@ -303,8 +303,8 @@ write_ops::UpdateModification write_ops::UpdateModification::parseFromOplogEntry
                             << vField.numberInt());
 }
 
-write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffTag)
-    : _update(std::move(diff)) {}
+write_ops::UpdateModification::UpdateModification(doc_diff::Diff diff, DiffOptions options)
+    : _update(DeltaUpdate{std::move(diff), options}) {}
 
 write_ops::UpdateModification::UpdateModification(BSONElement update) {
     const auto type = update.type();
@@ -361,7 +361,7 @@ int write_ops::UpdateModification::objsize() const {
 
                 return size + kWriteCommandBSONArrayPerElementOverheadBytes;
             },
-            [](const doc_diff::Diff& diff) -> int { return diff.objsize(); }},
+            [](const DeltaUpdate& delta) -> int { return delta.diff.objsize(); }},
         _update);
 }
 
@@ -371,7 +371,7 @@ write_ops::UpdateModification::Type write_ops::UpdateModification::type() const 
         visit_helper::Overloaded{
             [](const ClassicUpdate& classic) { return Type::kClassic; },
             [](const PipelineUpdate& pipelineUpdate) { return Type::kPipeline; },
-            [](const doc_diff::Diff& diff) { return Type::kDelta; }},
+            [](const DeltaUpdate& delta) { return Type::kDelta; }},
         _update);
 }
 
@@ -392,7 +392,7 @@ void write_ops::UpdateModification::serializeToBSON(StringData fieldName,
                 }
                 arrayBuilder.doneFast();
             },
-            [fieldName, bob](const doc_diff::Diff& diff) { *bob << fieldName << diff; }},
+            [fieldName, bob](const DeltaUpdate& delta) { *bob << fieldName << delta.diff; }},
         _update);
 }
 

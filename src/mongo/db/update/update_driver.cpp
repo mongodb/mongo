@@ -145,7 +145,8 @@ void UpdateDriver::parse(
                 arrayFilters.empty());
 
         _updateType = UpdateType::kDelta;
-        _updateExecutor = std::make_unique<DeltaExecutor>(updateMod.getDiff());
+        _updateExecutor = std::make_unique<DeltaExecutor>(
+            updateMod.getDiff(), updateMod.mustCheckExistenceForInsertOperations());
         return;
     }
 

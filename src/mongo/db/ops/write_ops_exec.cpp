@@ -1193,10 +1193,13 @@ Status performAtomicTimeseriesWrites(
             }
 
             auto original = record->data.toBson();
+            const bool mustCheckExistenceForInsertOperations =
+                static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx));
             auto [updated, indexesAffected] =
                 doc_diff::applyDiff(original,
                                     update.getU().getDiff(),
-                                    &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx));
+                                    &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
+                                    mustCheckExistenceForInsertOperations);
 
             CollectionUpdateArgs args;
             if (const auto& stmtIds = op.getStmtIds()) {
