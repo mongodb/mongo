@@ -50,10 +50,12 @@ class TestCreateFuzzerTask(unittest.TestCase):
         buildvariant = config["buildvariants"][0]
         self.assertEqual(options.variant, buildvariant["name"])
         self.assertEqual(options.num_tasks, len(buildvariant["tasks"]))
-        self.assertEqual(options.num_tasks + 1,
-                         len(buildvariant["display_tasks"][0]["execution_tasks"]))
-        self.assertEqual(options.name, buildvariant["display_tasks"][0]["name"])
+        self.assertEqual(1, len(buildvariant["display_tasks"][0]["execution_tasks"]))
+        self.assertEqual(under_test.GEN_PARENT_TASK, buildvariant["display_tasks"][0]["name"])
         self.assertIn(options.name + "_gen", buildvariant["display_tasks"][0]["execution_tasks"])
+        self.assertEqual(options.num_tasks,
+                         len(buildvariant["display_tasks"][1]["execution_tasks"]))
+        self.assertEqual(options.name, buildvariant["display_tasks"][1]["name"])
 
     def test_evg_config_is_created_with_multiversion(self):
         build_variant = BuildVariant("build variant")

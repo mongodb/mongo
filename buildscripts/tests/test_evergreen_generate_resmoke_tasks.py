@@ -602,6 +602,7 @@ class EvergreenConfigGeneratorTest(unittest.TestCase):
         options.generated_config_dir = "config_dir"
         options.generate_display_task.return_value = DisplayTaskDefinition("task")
         options.create_misc_suite = True
+        options.display_task_name = "task_name"
 
         return options
 

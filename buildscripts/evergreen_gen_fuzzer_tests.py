@@ -11,6 +11,7 @@ import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
 
 CONFIG_DIRECTORY = "generated_resmoke_config"
+GEN_PARENT_TASK = "generator_tasks"
 
 ConfigOptions = namedtuple("ConfigOptions", [
     "num_files",
@@ -141,8 +142,9 @@ def create_fuzzer_task(options: ConfigOptions, build_variant: BuildVariant) -> N
     task_name = options.name
     sub_tasks = generate_fuzzer_sub_tasks(task_name, options)
 
-    build_variant.display_task(task_name, sub_tasks,
+    build_variant.display_task(GEN_PARENT_TASK,
                                execution_existing_tasks={ExistingTask(f"{options.name}_gen")})
+    build_variant.display_task(task_name, sub_tasks)
 
 
 def main():
