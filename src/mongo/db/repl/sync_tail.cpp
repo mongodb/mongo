@@ -122,6 +122,33 @@ public:
 
 } exportedWriterThreadCountParam;
 
+/**
+ * This variable determines the minimum number of writer threads SyncTail will have. It can be
+ * overridden
+ * using the "replWriterMinThreadCount" server parameter.
+ */
+int replWriterMinThreadCount = 0;
+
+class ExportedWriterMinThreadCountParameter
+    : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
+public:
+    ExportedWriterMinThreadCountParameter()
+        : ExportedServerParameter<int, ServerParameterType::kStartupOnly>(
+              ServerParameterSet::getGlobal(),
+              "replWriterMinThreadCount",
+              &replWriterMinThreadCount) {}
+
+    virtual Status validate(const int& potentialNewValue) {
+        if (potentialNewValue < 0 || potentialNewValue > 256) {
+            return Status(ErrorCodes::BadValue,
+                          "replWriterMinThreadCount must be between 0 and 256");
+        }
+
+        return Status::OK();
+    }
+
+} exportedWriterMinThreadCountParam;
+
 class ExportedBatchLimitOperationsParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
@@ -349,6 +376,10 @@ std::size_t SyncTail::calculateBatchLimitBytes(OperationContext* opCtx,
 }
 
 std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
+    if (replWriterThreadCount < replWriterMinThreadCount) {
+        severe() << "replWriterMinThreadCount must be less than or equal to replWriterThreadCount.";
+        fassertFailedNoTrace(5605400);
+    }
     return makeWriterPool(replWriterThreadCount);
 }
 
@@ -356,7 +387,9 @@ std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
     ThreadPool::Options options;
     options.threadNamePrefix = "repl writer worker ";
     options.poolName = "repl writer worker Pool";
-    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.minThreads =
+        replWriterMinThreadCount < threadCount ? replWriterMinThreadCount : threadCount;
+    options.maxThreads = static_cast<size_t>(threadCount);
     options.onCreateThread = [](const std::string&) {
         // Only do this once per thread
         if (!Client::getCurrent()) {
@@ -616,7 +649,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     // setup/teardown overhead across many writes.
     const size_t kMinOplogEntriesPerThread = 16;
     const bool enoughToMultiThread =
-        ops.size() >= kMinOplogEntriesPerThread * threadPool->getStats().numThreads;
+        ops.size() >= kMinOplogEntriesPerThread * threadPool->getStats().options.maxThreads;
 
     // Only doc-locking engines support parallel writes to the oplog because they are required to
     // ensure that oplog entries are ordered correctly, even if inserted out-of-order. Additionally,
@@ -630,7 +663,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     }
 
 
-    const size_t numOplogThreads = threadPool->getStats().numThreads;
+    const size_t numOplogThreads = threadPool->getStats().options.maxThreads;
     const size_t numOpsPerThread = ops.size() / numOplogThreads;
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
         size_t begin = thread * numOpsPerThread;
@@ -1555,7 +1588,7 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
     // Increment the batch size stat.
     oplogApplicationBatchSize.increment(ops.size());
 
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().numThreads);
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(_writerPool->getStats().options.maxThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
@@ -1605,7 +1638,8 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         //   and create a pseudo oplog.
         std::vector<MultiApplier::Operations> derivedOps;
 
-        std::vector<MultiApplier::OperationPtrs> writerVectors(_writerPool->getStats().numThreads);
+        std::vector<MultiApplier::OperationPtrs> writerVectors(
+            _writerPool->getStats().options.maxThreads);
         fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
@@ -1622,7 +1656,8 @@ StatusWith<OpTime> SyncTail::multiApply(OperationContext* opCtx, MultiApplier::O
         }
 
         {
-            std::vector<Status> statusVector(_writerPool->getStats().numThreads, Status::OK());
+            std::vector<Status> statusVector(_writerPool->getStats().options.maxThreads,
+                                             Status::OK());
             applyOps(writerVectors,
                      _writerPool,
                      _applyFunc,
