@@ -512,7 +512,8 @@ TEST_F(OplogApplierImplTest,
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
         writerPool.get());
 
-    std::vector<std::vector<const OplogEntry*>> writerVectors(writerPool->getStats().numThreads);
+    std::vector<std::vector<const OplogEntry*>> writerVectors(
+        writerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
     std::vector<OplogEntry> ops{firstRetryableOp, secondRetryableOp};
     oplogApplier.fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);

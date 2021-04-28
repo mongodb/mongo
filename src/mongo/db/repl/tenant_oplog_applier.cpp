@@ -435,7 +435,7 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         greatestOplogSlotUsed = *slotIter++;
     }
 
-    const size_t numOplogThreads = _writerPool->getStats().numThreads;
+    const size_t numOplogThreads = _writerPool->getStats().options.maxThreads;
     const size_t numOpsPerThread = std::max(std::size_t(minOplogEntriesPerThread.load()),
                                             (nonSessionOps.size() / numOplogThreads));
     LOGV2_DEBUG(4886003,
@@ -846,7 +846,8 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
 
 std::vector<std::vector<const OplogEntry*>> TenantOplogApplier::_fillWriterVectors(
     OperationContext* opCtx, TenantOplogBatch* batch) {
-    std::vector<std::vector<const OplogEntry*>> writerVectors(_writerPool->getStats().numThreads);
+    std::vector<std::vector<const OplogEntry*>> writerVectors(
+        _writerPool->getStats().options.maxThreads);
     CachedCollectionProperties collPropertiesCache;
 
     for (auto&& op : batch->ops) {
