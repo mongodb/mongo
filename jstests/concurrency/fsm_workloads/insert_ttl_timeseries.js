@@ -19,16 +19,21 @@ load("jstests/core/timeseries/libs/timeseries.js");
 var $config = (function() {
     const initData = {
         supportsTimeseriesCollections: false,
+
+        getCollectionName: function(collName) {
+            return "insert_ttl_timeseries_" + collName;
+        },
+
+        getCollection: function(db, collName) {
+            return db.getCollection(this.getCollectionName(collName));
+        },
     };
+
     const timeFieldName = "time";
     const metaFieldName = "tid";
     const ttlSeconds = 3;
     const defaultBucketMaxRangeMs = 3600 * 1000;
     const batchSize = 10;
-
-    const getCollectionName = function(collName) {
-        return "insert_ttl_timeseries_" + collName;
-    };
 
     // Generates a time in the past that will be expired soon. TTL for time-series collections only
     // expires buckets once the bucket minimum is past the maximum range of the bucket size, in this
@@ -45,8 +50,7 @@ var $config = (function() {
             }
             this.supportsTimeseriesCollections = true;
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const res = coll.insert({
                 [metaFieldName]: this.tid,
                 [timeFieldName]: getTime(),
@@ -64,8 +68,7 @@ var $config = (function() {
                 return;
             }
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const res = coll.insert({
                 [metaFieldName]: this.tid,
                 [timeFieldName]: getTime(),
@@ -84,8 +87,7 @@ var $config = (function() {
                 return;
             }
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
                 docs.push({
@@ -108,8 +110,7 @@ var $config = (function() {
                 return;
             }
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
                 docs.push({
@@ -133,8 +134,7 @@ var $config = (function() {
                 return;
             }
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const docs = [];
             for (let i = 0; i < batchSize; i++) {
                 docs.push({
@@ -157,8 +157,7 @@ var $config = (function() {
                 return;
             }
 
-            collName = getCollectionName(collName);
-            const coll = db.getCollection(collName);
+            const coll = this.getCollection(db, collName);
             const docs = [];
             const start = getTime();
             for (let i = 0; i < batchSize; i++) {
@@ -181,7 +180,7 @@ var $config = (function() {
             return;
         }
 
-        collName = getCollectionName(collName);
+        collName = this.getCollectionName(collName);
         assertAlways.commandWorked(db.createCollection(collName, {
             timeseries: {
                 timeField: timeFieldName,
@@ -207,7 +206,7 @@ var $config = (function() {
             (TestData.inEvergreen ? 10 : 2) * Math.max(ttlMonitorSleepSecs, ttlSeconds) * 1000;
 
         print("Waiting for data to be deleted by TTL monitor");
-        collName = getCollectionName(collName);
+        collName = this.getCollectionName(collName);
         assertAlways.soon(() => {
             return db[collName].find({first: true}).itcount() == 0;
         }, 'Expected oldest documents to be removed', timeoutMS);
@@ -233,6 +232,7 @@ var $config = (function() {
     return {
         threadCount: 20,
         iterations: 150,
+        startState: 'init',
         states: states,
         data: initData,
         transitions: transitions,
