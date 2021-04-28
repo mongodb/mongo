@@ -43,11 +43,11 @@ class ImplicitCollectionCreationTest : public ShardServerTestFixture {};
 
 TEST_F(ImplicitCollectionCreationTest, ImplicitCreateDisallowedByDefault) {
     NamespaceString nss("ImplicitCreateDisallowedByDefaultDB.TestColl");
-    AutoGetOrCreateDb db(operationContext(), nss.db(), MODE_IX);
-    Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    auto db = autoColl.ensureDbExists();
     WriteUnitOfWork wuow(operationContext());
     ASSERT_THROWS_CODE(
-        uassertStatusOK(db.getDb()->userCreateNS(operationContext(), nss, CollectionOptions{})),
+        uassertStatusOK(db->userCreateNS(operationContext(), nss, CollectionOptions{})),
         DBException,
         ErrorCodes::CannotImplicitlyCreateCollection);
     wuow.commit();
@@ -57,10 +57,10 @@ TEST_F(ImplicitCollectionCreationTest, AllowImplicitCollectionCreate) {
     NamespaceString nss("AllowImplicitCollectionCreateDB.TestColl");
     OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
         operationContext());
-    AutoGetOrCreateDb db(operationContext(), nss.db(), MODE_IX);
-    Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
+    AutoGetCollection autoColl(operationContext(), nss, MODE_IX);
+    auto db = autoColl.ensureDbExists();
     WriteUnitOfWork wuow(operationContext());
-    ASSERT_OK(db.getDb()->userCreateNS(operationContext(), nss, CollectionOptions{}));
+    ASSERT_OK(db->userCreateNS(operationContext(), nss, CollectionOptions{}));
     wuow.commit();
 }
 

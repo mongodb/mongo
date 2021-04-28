@@ -82,8 +82,8 @@ public:
         CatalogTestFixture::setUp();
 
         WriteUnitOfWork wuow(operationContext());
-        AutoGetOrCreateDb autoDb(operationContext(), "db", MODE_X);
-        _db = autoDb.getDb();
+        AutoGetDb autoDb(operationContext(), "db", MODE_X);
+        _db = autoDb.ensureDbExists();
         invariant(_db);
 
         auto durableViewCatalogUnique = std::make_unique<DurableViewCatalogImpl>(_db);
@@ -95,8 +95,8 @@ public:
             NamespaceString("db", NamespaceString::kSystemDotViewsCollectionName)));
 
         // Create any additional databases used throughout the test.
-        ASSERT(AutoGetOrCreateDb(operationContext(), "db1", MODE_X).getDb());
-        ASSERT(AutoGetOrCreateDb(operationContext(), "db2", MODE_X).getDb());
+        ASSERT(AutoGetDb(operationContext(), "db1", MODE_X).ensureDbExists());
+        ASSERT(AutoGetDb(operationContext(), "db2", MODE_X).ensureDbExists());
         wuow.commit();
     }
 

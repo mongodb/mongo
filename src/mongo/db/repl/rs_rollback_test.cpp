@@ -1817,13 +1817,13 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     CollectionOptions options;
     options.uuid = UUID::gen();
     {
-        AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
+        AutoGetDb autoDb(_opCtx.get(), "test", MODE_X);
         mongo::WriteUnitOfWork wuow(_opCtx.get());
         coll = CollectionCatalog::get(_opCtx.get())
                    ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t"));
         if (!coll) {
-            coll =
-                autoDb.getDb()->createCollection(_opCtx.get(), NamespaceString("test.t"), options);
+            auto db = autoDb.ensureDbExists();
+            coll = db->createCollection(_opCtx.get(), NamespaceString("test.t"), options);
         }
         ASSERT(coll);
         OpDebug* const nullOpDebug = nullptr;
