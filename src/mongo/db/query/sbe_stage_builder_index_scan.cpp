@@ -358,19 +358,35 @@ generateOptimizedMultiIntervalIndexScan(
     auto project =
         sbe::makeS<sbe::ProjectStage>(std::move(unwind), std::move(projects), planNodeId);
 
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
-                                                  indexName,
-                                                  forward,
-                                                  recordSlot,
-                                                  recordIdSlot,
-                                                  snapshotIdSlot,
-                                                  indexKeysToInclude,
-                                                  std::move(indexKeySlots),
-                                                  lowKeySlot,
-                                                  highKeySlot,
-                                                  yieldPolicy,
-                                                  planNodeId,
-                                                  std::move(lockAcquisitionCallback));
+    // Whereas 'snapshotIdSlot' is used by the caller to inspect the snapshot id of the latest index
+    // key, 'indexSnapshotSlot' is updated by the IndexScan below during yield to obtain the latest
+    // snapshot id.
+    boost::optional<sbe::value::SlotId> indexSnapshotSlot;
+    if (snapshotIdSlot) {
+        indexSnapshotSlot = slotIdGenerator->generate();
+    }
+
+    auto stage = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                 indexName,
+                                                 forward,
+                                                 recordSlot,
+                                                 recordIdSlot,
+                                                 indexSnapshotSlot,
+                                                 indexKeysToInclude,
+                                                 std::move(indexKeySlots),
+                                                 lowKeySlot,
+                                                 highKeySlot,
+                                                 yieldPolicy,
+                                                 planNodeId,
+                                                 std::move(lockAcquisitionCallback));
+
+    // Add a project on top of the index scan to remember the snapshotId of the most recent index
+    // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
+    // overwritten during yield.
+    if (snapshotIdSlot) {
+        stage = sbe::makeProjectStage(
+            std::move(stage), planNodeId, *snapshotIdSlot, makeVariable(*indexSnapshotSlot));
+    }
 
     auto outerSv = sbe::makeSV();
     if (indexIdSlot) {
@@ -384,7 +400,7 @@ generateOptimizedMultiIntervalIndexScan(
     // Finally, get the keys from the outer side and feed them to the inner side (ixscan).
     return {recordIdSlot,
             sbe::makeS<sbe::LoopJoinStage>(std::move(project),
-                                           std::move(ixscan),
+                                           std::move(stage),
                                            std::move(outerSv),
                                            sbe::makeSV(lowKeySlot, highKeySlot),
                                            nullptr,
@@ -823,22 +839,38 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
         std::move(projects),
         planNodeId);
 
+    // Whereas 'snapshotIdSlot' is used by the caller to inspect the snapshot id of the latest index
+    // key, 'indexSnapshotSlot' is updated by the IndexScan below during yield to obtain the latest
+    // snapshot id.
+    boost::optional<sbe::value::SlotId> indexSnapshotSlot;
+    if (snapshotIdSlot) {
+        indexSnapshotSlot = slotIdGenerator->generate();
+    }
+
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to
     // position into the collection.
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
-                                                  indexName,
-                                                  forward,
-                                                  recordSlot,
-                                                  recordIdSlot,
-                                                  snapshotIdSlot,
-                                                  indexKeysToInclude,
-                                                  std::move(indexKeySlots),
-                                                  lowKeySlot,
-                                                  highKeySlot,
-                                                  yieldPolicy,
-                                                  planNodeId,
-                                                  std::move(lockAcquisitionCallback));
+    auto stage = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                 indexName,
+                                                 forward,
+                                                 recordSlot,
+                                                 recordIdSlot,
+                                                 indexSnapshotSlot,
+                                                 indexKeysToInclude,
+                                                 std::move(indexKeySlots),
+                                                 lowKeySlot,
+                                                 highKeySlot,
+                                                 yieldPolicy,
+                                                 planNodeId,
+                                                 std::move(lockAcquisitionCallback));
+
+    // Add a project on top of the index scan to remember the snapshotId of the most recent index
+    // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
+    // overwritten during yield.
+    if (snapshotIdSlot) {
+        stage = sbe::makeProjectStage(
+            std::move(stage), planNodeId, *snapshotIdSlot, makeVariable(*indexSnapshotSlot));
+    }
 
     auto outerSv = sbe::makeSV();
     if (indexIdSlot) {
@@ -852,7 +884,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     // Finally, get the keys from the outer side and feed them to the inner side.
     return {recordIdSlot,
             sbe::makeS<sbe::LoopJoinStage>(std::move(project),
-                                           std::move(ixscan),
+                                           std::move(stage),
                                            std::move(outerSv),
                                            sbe::makeSV(lowKeySlot, highKeySlot),
                                            nullptr,

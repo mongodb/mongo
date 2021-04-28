@@ -185,6 +185,14 @@ void IndexScanStage::doRestoreState() {
     if (_cursor) {
         _cursor->restore();
     }
+
+    // Yield is the only time during plan execution that the snapshotId can change. As such, we
+    // update it accordingly as part of yield recovery.
+    if (_snapshotIdAccessor) {
+        _snapshotIdAccessor->reset(
+            value::TypeTags::NumberInt64,
+            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+    }
 }
 
 void IndexScanStage::doDetachFromOperationContext() {
