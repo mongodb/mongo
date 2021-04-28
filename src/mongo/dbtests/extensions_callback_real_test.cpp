@@ -53,8 +53,8 @@ public:
     }
 
     void setUp() final {
-        AutoGetOrCreateDb autoDb(&_opCtx, _nss.db(), MODE_X);
-        Database* database = autoDb.getDb();
+        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        auto database = autoDb.ensureDbExists();
         {
             WriteUnitOfWork wunit(&_opCtx);
             ASSERT(database->createCollection(&_opCtx, _nss));

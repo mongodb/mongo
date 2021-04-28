@@ -63,20 +63,20 @@ public:
     IndexBuildBase() {
         regenOpCtx();
 
-        AutoGetOrCreateDb db(_opCtx, _nss.db(), LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
-        Lock::CollectionLock lk(_opCtx, _nss, LockMode::MODE_IX);
-        db.getDb()->createCollection(_opCtx, _nss);
+        auto db = autoColl.ensureDbExists();
+        ASSERT(db->createCollection(_opCtx, _nss)) << _nss;
         wuow.commit();
     }
 
     ~IndexBuildBase() {
         getGlobalServiceContext()->unsetKillAllOperations();
 
-        AutoGetOrCreateDb db(_opCtx, _nss.db(), LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
         WriteUnitOfWork wuow(_opCtx);
-        Lock::CollectionLock lk(_opCtx, _nss, LockMode::MODE_X);
-        ASSERT_OK(db.getDb()->dropCollection(_opCtx, _nss, {}));
+        auto db = autoColl.ensureDbExists();
+        ASSERT_OK(db->dropCollection(_opCtx, _nss, {})) << _nss;
         wuow.commit();
     }
 
@@ -131,8 +131,9 @@ template <bool background>
 class InsertBuildIgnoreUnique : public IndexBuildBase {
 public:
     void run() {
-        AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
-        Lock::CollectionLock collLk(_opCtx, _nss, LockMode::MODE_X);
+        AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
+        auto db = autoColl.ensureDbExists();
+        ASSERT(db) << _nss;
         auto& coll = collection();
         {
             WriteUnitOfWork wunit(_opCtx);
@@ -183,51 +184,55 @@ class InsertBuildEnforceUnique : public IndexBuildBase {
 public:
     void run() {
         // Create a new collection.
-        AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
-        boost::optional<Lock::CollectionLock> collLk;
-        collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
-        auto& coll = collection();
         {
-            WriteUnitOfWork wunit(_opCtx);
-            OpDebug* const nullOpDebug = nullptr;
-            ASSERT_OK(coll->insertDocument(_opCtx,
-                                           InsertStatement(BSON("_id" << 1 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(_opCtx,
-                                           InsertStatement(BSON("_id" << 2 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            wunit.commit();
+            AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
+            auto db = autoColl.ensureDbExists();
+            ASSERT(db) << _nss;
+
+            auto& coll = collection();
+            {
+                WriteUnitOfWork wunit(_opCtx);
+                OpDebug* const nullOpDebug = nullptr;
+                ASSERT_OK(coll->insertDocument(_opCtx,
+                                               InsertStatement(BSON("_id" << 1 << "a"
+                                                                          << "dup")),
+                                               nullOpDebug,
+                                               true));
+                ASSERT_OK(coll->insertDocument(_opCtx,
+                                               InsertStatement(BSON("_id" << 2 << "a"
+                                                                          << "dup")),
+                                               nullOpDebug,
+                                               true));
+                wunit.commit();
+            }
         }
+        {
+            AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
+            MultiIndexBlock indexer;
 
-        MultiIndexBlock indexer;
+            const BSONObj spec = BSON("name"
+                                      << "a"
+                                      << "key" << BSON("a" << 1) << "v"
+                                      << static_cast<int>(kIndexVersion) << "unique" << true
+                                      << "background" << background);
+            auto abortOnExit = makeGuard([&] {
+                indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
+            });
 
-        const BSONObj spec = BSON("name"
-                                  << "a"
-                                  << "key" << BSON("a" << 1) << "v"
-                                  << static_cast<int>(kIndexVersion) << "unique" << true
-                                  << "background" << background);
+            ASSERT_OK(indexer.init(_opCtx, collection(), spec, MultiIndexBlock::kNoopOnInitFn)
+                          .getStatus());
 
-        collLk.emplace(_opCtx, _nss, LockMode::MODE_X);
-        auto abortOnExit = makeGuard([&] {
-            indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
-        });
+            auto& coll = collection();
+            auto desc =
+                coll->getIndexCatalog()->findIndexByName(_opCtx, "a", true /* includeUnfinished */);
+            ASSERT(desc);
 
-        ASSERT_OK(
-            indexer.init(_opCtx, collection(), spec, MultiIndexBlock::kNoopOnInitFn).getStatus());
+            // Hybrid index builds check duplicates explicitly.
+            ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
 
-        auto desc =
-            coll->getIndexCatalog()->findIndexByName(_opCtx, "a", true /* includeUnfinished */);
-        ASSERT(desc);
-
-        // Hybrid index builds check duplicates explicitly.
-        ASSERT_OK(indexer.insertAllDocumentsInCollection(_opCtx, coll.get()));
-
-        auto status = indexer.checkConstraints(_opCtx, coll.get());
-        ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
+            auto status = indexer.checkConstraints(_opCtx, coll.get());
+            ASSERT_EQUALS(status.code(), ErrorCodes::DuplicateKey);
+        }
     }
 };
 
@@ -236,9 +241,9 @@ class InsertBuildIndexInterrupt : public IndexBuildBase {
 public:
     void run() {
         {
-            AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
-            boost::optional<Lock::CollectionLock> collLk;
-            collLk.emplace(_opCtx, _nss, LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
+            auto db = autoColl.ensureDbExists();
+            ASSERT(db) << _nss;
 
             auto& coll = collection();
             {
@@ -285,10 +290,8 @@ public:
 
         {
             // Recreate the collection as capped, without an _id index.
-            AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
-            Database* db = dbRaii.getDb();
-            boost::optional<Lock::CollectionLock> collLk;
-            collLk.emplace(_opCtx, _nss, LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
+            auto db = autoColl.ensureDbExists();
 
             WriteUnitOfWork wunit(_opCtx);
             ASSERT_OK(db->dropCollection(_opCtx, _nss));
@@ -315,9 +318,7 @@ public:
             getGlobalServiceContext()->unsetKillAllOperations();
         }
         regenOpCtx();
-        AutoGetOrCreateDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
-        boost::optional<Lock::CollectionLock> collLk;
-        collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
+        AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
 
         // The new index is not listed in the index catalog because the index build failed.
         ASSERT(!collection().get()->getIndexCatalog()->findIndexByName(_opCtx, "_id_"));

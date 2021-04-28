@@ -58,23 +58,25 @@ public:
     MultikeyPathsTest() : _nss("unittests.multikey_paths") {}
 
     void setUp() final {
-        AutoGetOrCreateDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        Database* database = autoDb.getDb();
-        {
-            WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT(database->createCollection(_opCtx.get(), _nss));
-            wuow.commit();
-        }
+        AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
+        auto db = autoColl.ensureDbExists();
+
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT(db->createCollection(_opCtx.get(), _nss));
+        wuow.commit();
     }
 
     void tearDown() final {
-        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
-        Database* database = autoDb.getDb();
-        if (database) {
-            WriteUnitOfWork wuow(_opCtx.get());
-            ASSERT_OK(database->dropCollection(_opCtx.get(), _nss));
-            wuow.commit();
+        AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_X);
+        if (!autoColl) {
+            return;
         }
+
+        auto db = autoColl.getDb();
+
+        WriteUnitOfWork wuow(_opCtx.get());
+        ASSERT_OK(db->dropCollection(_opCtx.get(), _nss));
+        wuow.commit();
     }
 
     Status createIndex(const CollectionPtr& collection, BSONObj indexSpec) {

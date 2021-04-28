@@ -172,14 +172,16 @@ public:
     };
 
     ScopedCollectionDeleter makeCollectionClustered(const NamespaceString& ns) {
-        AutoGetOrCreateDb autoDb(&_opCtx, ns.db(), MODE_X);
+        AutoGetCollection autoColl(&_opCtx, ns, MODE_IX);
 
         {
+            auto db = autoColl.ensureDbExists();
+
             WriteUnitOfWork wuow(&_opCtx);
             CollectionOptions collOptions;
             collOptions.clusteredIndex = ClusteredIndexOptions{};
             const bool createIdIndex = false;
-            autoDb.getDb()->createCollection(&_opCtx, ns, collOptions, createIdIndex);
+            db->createCollection(&_opCtx, ns, collOptions, createIdIndex);
             wuow.commit();
         }
 

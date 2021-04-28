@@ -250,12 +250,13 @@ public:
                 return;
             }
 
-            AutoGetOrCreateDb dbRaii(_opCtx, nss.db(), LockMode::MODE_X);
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+            auto db = autoColl.ensureDbExists();
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                 ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
             }
-            invariant(dbRaii.getDb()->createCollection(_opCtx, nss));
+            invariant(db->createCollection(_opCtx, nss));
             wunit.commit();
         });
     }

@@ -100,14 +100,16 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 }
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
-    AutoGetOrCreateDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
+    AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
     Collection* coll;
     {
         WriteUnitOfWork wunit(opCtx);
         coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
             opCtx, CollectionCatalog::LifetimeMode::kInplace, NamespaceString(ns));
         if (!coll) {
-            coll = autoDb.getDb()->createCollection(opCtx, NamespaceString(ns));
+            auto db = autoDb.ensureDbExists();
+            invariant(db);
+            coll = db->createCollection(opCtx, NamespaceString(ns));
         }
         invariant(coll);
         wunit.commit();
@@ -157,19 +159,21 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
     : _opCtx(opCtx), _nss(ns) {
     // Lock the database and collection
-    _autoCreateDb.emplace(opCtx, _nss.db(), MODE_IX);
+    _autoDb.emplace(opCtx, _nss.db(), MODE_IX);
     _collLock.emplace(opCtx, _nss, MODE_IX);
 
     const bool doShardVersionCheck = false;
 
     _clientContext.emplace(opCtx, _nss.ns(), doShardVersionCheck);
-    invariant(_autoCreateDb->getDb() == _clientContext->db());
+    auto db = _autoDb->ensureDbExists();
+    invariant(db, _nss.ns());
+    invariant(db == _clientContext->db());
 
     // If the collection exists, there is no need to lock into stronger mode
     if (getCollection())
         return;
 
-    invariant(_autoCreateDb->getDb() == _clientContext->db());
+    invariant(db == _clientContext->db());
     _collLock.emplace(opCtx, _nss, MODE_X);
 }
 
