@@ -169,13 +169,30 @@ def get_certificate_and_private_key(pem_file_path):  # noqa: D205,D400
     return {"certificate": certificate, "privateKey": private_key}
 
 
+def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
+    """Return the primary from a replica set. Retries up to 'max_tries' times of it fails to get
+    the primary within the time limit.
+    """
+    num_tries = 0
+    while num_tries < max_tries:
+        num_tries += 1
+        try:
+            return rs.get_primary()
+        except errors.ServerFailure:
+            logger.info(
+                "Timed out while waiting for a primary for replica set '%s' on try %d." +
+                " Retrying." if num_tries < max_tries else "", rs.replset_name, num_tries)
+
+
 class _TenantMigrationOptions:
-    def __init__(self, donor_rs, recipient_rs, tenant_id, read_preference):
+    def __init__(  # pylint: disable=too-many-arguments
+            self, donor_rs, recipient_rs, tenant_id, read_preference, logger):
         self.donor_rs = donor_rs
         self.recipient_rs = recipient_rs
         self.migration_id = uuid.uuid4()
         self.tenant_id = tenant_id
         self.read_preference = read_preference
+        self.logger = logger
 
     def get_donor_name(self):
         """Return the replica set name for the donor."""
@@ -187,11 +204,11 @@ class _TenantMigrationOptions:
 
     def get_donor_primary(self):
         """Return a connection to the donor primary."""
-        return self.donor_rs.get_primary()
+        return get_primary(self.donor_rs, self.logger)
 
     def get_recipient_primary(self):
         """Return a connection to the recipient primary."""
-        return self.recipient_rs.get_primary()
+        return get_primary(self.recipient_rs, self.logger)
 
     def __str__(self):
         opts = {
@@ -354,7 +371,8 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
         recipient_rs = self._tenant_migration_fixture.get_replset(recipient_rs_index)
         read_preference = {"mode": "primary"} if random.randint(0, 1) else {"mode": "secondary"}
-        return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference)
+        return _TenantMigrationOptions(donor_rs, recipient_rs, self._tenant_id, read_preference,
+                                       self.logger)
 
     def _create_client(self, node):
         return fixture_interface.authenticate(node.mongo_client(), self._auth_options)
@@ -632,7 +650,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
     def _drop_tenant_databases(self, rs):
         self.logger.info("Dropping tenant databases from replica set '%s'.", rs.replset_name)
 
-        primary = rs.get_primary()
+        primary = get_primary(rs, self.logger)
         self.logger.info("Running dropDatabase commands against primary on port %d.", primary.port)
 
         while True:
@@ -645,7 +663,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                         primary_client.drop_database(db_name)
                 return
             except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
-                primary = rs.get_primary()
+                primary = get_primary(rs, self.logger)
                 self.logger.info("Retrying dropDatabase commands against primary on port %d.",
                                  primary.port)
                 continue
