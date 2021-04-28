@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
@@ -17,7 +17,7 @@ const debugBuild = testDB.adminCommand('buildInfo').debug;
 const nDocs = 1000;
 const nGroups = 50;
 
-let bulk = coll.initializeUnorderedBulkOp();
+const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 1; i <= nDocs; i++) {
     bulk.insert({_id: i, a: i, b: i % nGroups, bigStr: bigStr});
 }
@@ -25,6 +25,7 @@ assert.commandWorked(bulk.execute());
 
 const pipeline = [
     {$match: {a: {$gt: 0}}},
+    {$sort: {b: 1}},
     {$group: {_id: "$b", count: {$sum: 1}, push: {$push: "$bigStr"}, set: {$addToSet: "$bigStr"}}},
 ];
 
@@ -34,72 +35,83 @@ const expectedAccumMemUsages = {
     set: nGroups * 1024,
 };
 
+const expectedTotalMemoryUsage =
+    Object.values(expectedAccumMemUsages).reduce((acc, val) => acc + val, 0);
+const expectedSpillCount = Math.ceil(expectedTotalMemoryUsage / maxMemoryLimitForGroupStage);
+
 /**
  * Checks that the execution stats in the explain output for a $group stage are as expected.
- * - 'stages' is an array of the explain output of $group stages.
+ * - 'stage' is an explain output of $group stage.
  * - 'expectedAccumMemUsages' is used to check the memory footprint stats for each accumulator.
  * - 'isExecExplain' indicates that the explain output is run with verbosity "executionStats" or
  * "allPlansExecution".
- * - 'shouldSpillToDisk' indicates data was spilled to disk when executing $group stage.
+ * - 'expectedSpills' indicates how many times the data was spilled to disk when executing $group
+ * stage.
  */
-function checkGroupStages(stages, expectedAccumMemUsages, isExecExplain, shouldSpillToDisk) {
+function checkGroupStages(stage, expectedAccumMemUsages, isExecExplain, expectedSpills) {
     // Tracks the memory usage per accumulator in total as 'stages' passed in could be the explain
     // output across a cluster.
     let totalAccumMemoryUsageBytes = 0;
+    assert(stage.hasOwnProperty("$group"), stage);
 
-    for (let stage of stages) {
-        assert(stage.hasOwnProperty("$group"), stage);
+    if (isExecExplain) {
+        assert(stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
+        const maxAccmMemUsages = stage["maxAccumulatorMemoryUsageBytes"];
+        for (const field of Object.keys(maxAccmMemUsages)) {
+            totalAccumMemoryUsageBytes += maxAccmMemUsages[field];
 
-        if (isExecExplain) {
-            assert(stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
-            const maxAccmMemUsages = stage["maxAccumulatorMemoryUsageBytes"];
-            for (let field of Object.keys(maxAccmMemUsages)) {
-                totalAccumMemoryUsageBytes += maxAccmMemUsages[field];
-
-                // Ensures that the expected accumulators are all included and the corresponding
-                // memory usage is in a reasonable range. Note that in debug mode, data will be
-                // spilled to disk every time we add a new value to a pre-existing group.
-                if (!debugBuild && expectedAccumMemUsages.hasOwnProperty(field)) {
-                    assert.gt(maxAccmMemUsages[field], expectedAccumMemUsages[field]);
-                    assert.lt(maxAccmMemUsages[field], 5 * expectedAccumMemUsages[field]);
-                }
+            // Ensures that the expected accumulators are all included and the corresponding
+            // memory usage is in a reasonable range. Note that in debug mode, data will be
+            // spilled to disk every time we add a new value to a pre-existing group.
+            if (!debugBuild && expectedAccumMemUsages.hasOwnProperty(field)) {
+                assert.gt(maxAccmMemUsages[field], expectedAccumMemUsages[field]);
+                assert.lt(maxAccmMemUsages[field], 5 * expectedAccumMemUsages[field]);
             }
-        } else {
-            assert(!stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
         }
+
+        // Don't verify spill count for debug builds, since for debug builds a spill occurs on every
+        // duplicate id in a group.
+        if (!debugBuild) {
+            assert.eq(stage.usedDisk, expectedSpills > 0, stage);
+            assert.gte(stage.spills, expectedSpills, stage);
+            assert.lte(stage.spills, 2 * expectedSpills, stage);
+        }
+    } else {
+        assert(!stage.hasOwnProperty("usedDisk"), stage);
+        assert(!stage.hasOwnProperty("spills"), stage);
+        assert(!stage.hasOwnProperty("maxAccumulatorMemoryUsageBytes"), stage);
     }
 
     // Add some wiggle room to the total memory used compared to the limit parameter since the check
     // for spilling to disk happens after each document is processed.
-    if (shouldSpillToDisk)
-        assert.gt(
-            maxMemoryLimitForGroupStage + 3 * 1024, totalAccumMemoryUsageBytes, tojson(stages));
+    if (expectedSpills > 0)
+        assert.gt(maxMemoryLimitForGroupStage + 4 * 1024, totalAccumMemoryUsageBytes, stage);
 }
 
-let groupStages = getAggPlanStages(coll.explain("executionStats").aggregate(pipeline), "$group");
-checkGroupStages(groupStages, expectedAccumMemUsages, true, false);
+let groupStages = getAggPlanStage(coll.explain("executionStats").aggregate(pipeline), "$group");
+checkGroupStages(groupStages, expectedAccumMemUsages, true, 0);
 
-groupStages = getAggPlanStages(coll.explain("allPlansExecution").aggregate(pipeline), "$group");
-checkGroupStages(groupStages, expectedAccumMemUsages, true, false);
+groupStages = getAggPlanStage(coll.explain("allPlansExecution").aggregate(pipeline), "$group");
+checkGroupStages(groupStages, expectedAccumMemUsages, true, 0);
 
-groupStages = getAggPlanStages(coll.explain("queryPlanner").aggregate(pipeline), "$group");
-checkGroupStages(groupStages, {}, false, false);
+groupStages = getAggPlanStage(coll.explain("queryPlanner").aggregate(pipeline), "$group");
+checkGroupStages(groupStages, {}, false, 0);
 
 // Set MaxMemory low to force spill to disk.
 assert.commandWorked(testDB.adminCommand(
     {setParameter: 1, ["internalDocumentSourceGroupMaxMemoryBytes"]: maxMemoryLimitForGroupStage}));
 
-groupStages = getAggPlanStages(
+groupStages = getAggPlanStage(
     coll.explain("executionStats").aggregate(pipeline, {"allowDiskUse": true}), "$group");
-checkGroupStages(groupStages, {}, true, true);
+checkGroupStages(groupStages, {}, true, expectedSpillCount);
 
-groupStages = getAggPlanStages(
+groupStages = getAggPlanStage(
     coll.explain("allPlansExecution").aggregate(pipeline, {"allowDiskUse": true}), "$group");
-checkGroupStages(groupStages, {}, true, true);
+checkGroupStages(groupStages, {}, true, expectedSpillCount);
 
-groupStages = getAggPlanStages(
+groupStages = getAggPlanStage(
     coll.explain("queryPlanner").aggregate(pipeline, {"allowDiskUse": true}), "$group");
-checkGroupStages(groupStages, {}, false, false);
+checkGroupStages(groupStages, {}, false, 0);
 
 MongoRunner.stopMongod(conn);
 }());

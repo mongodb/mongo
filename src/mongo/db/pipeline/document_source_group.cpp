@@ -74,7 +74,7 @@ Document GroupFromFirstDocumentTransformation::applyTransformation(const Documen
 
     for (auto&& expr : _accumulatorExprs) {
         auto value = expr.second->evaluate(input, &expr.second->getExpressionContext()->variables);
-        output.addField(expr.first, value.missing() ? Value(BSONNULL) : value);
+        output.addField(expr.first, value.missing() ? Value(BSONNULL) : std::move(value));
     }
 
     return output.freeze();
@@ -315,7 +315,8 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
         out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
         out["totalOutputDataSizeBytes"] =
             Value(static_cast<long long>(_stats.totalOutputDataSizeBytes));
-        out["usedDisk"] = Value(_stats.usedDisk);
+        out["usedDisk"] = Value(_stats.spills > 0);
+        out["spills"] = Value(static_cast<long long>(_stats.spills));
     }
 
     return Value(out.freezeToValue());
@@ -646,7 +647,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
 }
 
 shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
-    _stats.usedDisk = true;
+    _stats.spills++;
+
     vector<const GroupsMap::value_type*> ptrs;  // using pointers to speed sorting
     ptrs.reserve(_groups->size());
     for (GroupsMap::const_iterator it = _groups->begin(), end = _groups->end(); it != end; ++it) {

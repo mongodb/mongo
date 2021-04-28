@@ -161,7 +161,7 @@ public:
      * Returns true if this $group stage used disk during execution and false otherwise.
      */
     bool usedDisk() final {
-        return _stats.usedDisk;
+        return _stats.spills > 0;
     }
 
     const SpecificStats* getSpecificStats() const final {

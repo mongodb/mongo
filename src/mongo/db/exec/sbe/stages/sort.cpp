@@ -242,6 +242,7 @@ std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const
         bob.appendNumber("totalDataSizeSorted",
                          static_cast<long long>(_specificStats.totalDataSizeBytes));
         bob.appendBool("usedDisk", _specificStats.spills > 0);
+        bob.appendNumber("spills", static_cast<long long>(_specificStats.spills));
 
         BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
         for (size_t idx = 0; idx < _obs.size(); ++idx) {

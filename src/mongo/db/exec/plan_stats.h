@@ -618,10 +618,7 @@ struct SortStats : public SpecificStats {
 
     void accumulate(PlanSummaryStats& summary) const final {
         summary.hasSortStage = true;
-
-        if (spills > 0) {
-            summary.usedDisk = true;
-        }
+        summary.usedDisk = summary.usedDisk || spills > 0;
     }
 
     // The pattern according to which we are sorting.
@@ -818,11 +815,15 @@ struct GroupStats : public SpecificStats {
         return sizeof(*this);
     }
 
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.usedDisk = summary.usedDisk || spills > 0;
+    }
+
     // Tracks an estimate of the total size of all documents output by the group stage in bytes.
     size_t totalOutputDataSizeBytes = 0;
 
-    // Flag to specify if data was spilled to disk while grouping the data.
-    bool usedDisk = false;
+    // The number of times that we spilled data to disk while grouping the data.
+    uint64_t spills = 0u;
 };
 
 struct DocumentSourceCursorStats : public SpecificStats {

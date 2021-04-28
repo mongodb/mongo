@@ -122,7 +122,8 @@ void DocumentSourceSort::serializeToArray(
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
             Value(static_cast<long long>(stats.totalDataSizeBytes));
-        mutDoc["usedDisk"] = Value(stats.spills > 0 ? true : false);
+        mutDoc["usedDisk"] = Value(stats.spills > 0);
+        mutDoc["spills"] = Value(static_cast<long long>(stats.spills));
     }
 
     array.push_back(Value(mutDoc.freeze()));
