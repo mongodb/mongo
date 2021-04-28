@@ -11,43 +11,61 @@
  */
 'use strict';
 
+const dbPrefix = 'fsmDB_';
+const dbCount = 2;
+const collPrefix = 'sharded_coll_';
+const collCount = 2;
+
+function getRandomDb(db) {
+    return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
+}
+
+function getRandomCollection(db) {
+    return getRandomDb(db)[collPrefix + Random.randInt(collCount)];
+}
+
 var $config = (function() {
-    var data = {
-        collPrefix: 'sharded_coll_for_test_',
-        collCount: 5,
+    var setup = function(db, collName, cluster) {
+        // Initialize databases
+        for (var i = 0; i < dbCount; i++) {
+            const dbName = dbPrefix + i;
+            db.adminCommand({enablesharding: dbName});
+        }
     };
 
     var states = (function() {
         function init(db, collName) {
-            this.collName = this.collPrefix + (this.tid % this.collCount);
         }
 
         function create(db, collName) {
-            jsTestLog('Executing create state');
-            const nss = db.getName() + '.' + this.collName;
-            assertAlways.commandWorked(db.adminCommand({shardCollection: nss, key: {_id: 1}}));
+            const coll = getRandomCollection(db);
+            jsTestLog("Executing create state on: " + coll.getFullName());
+            assertAlways.commandWorked(
+                db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
         }
 
         function drop(db, collName) {
-            jsTestLog('Executing drop state');
-            assertAlways.commandWorked(db.runCommand({drop: this.collName}));
+            const coll = getRandomCollection(db);
+            jsTestLog("Executing drop state on: " + coll.getFullName());
+            assertAlways.commandWorked(coll.getDB().runCommand({drop: coll.getName()}));
         }
 
         return {init: init, create: create, drop: drop};
     })();
 
     var transitions = {
-        init: {create: 1},
+        init: {create: 0.5, drop: 0.5},
         create: {create: 0.5, drop: 0.5},
         drop: {create: 0.5, drop: 0.5}
     };
 
     return {
-        threadCount: 5,
-        iterations: 50,
+        threadCount: 12,
+        iterations: 64,
         startState: 'init',
-        data: data,
+        data: {},
         states: states,
+        setup: setup,
         transitions: transitions
     };
 })();
