@@ -6,6 +6,7 @@ selector:
   exclude_files:
   # Expects oplog entries to be in $v:2 format.
   - jstests/replsets/v2_delta_oplog_entries.js
+  - jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
 
 executor:
   config:

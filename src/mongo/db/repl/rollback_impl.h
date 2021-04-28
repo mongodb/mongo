@@ -367,6 +367,17 @@ private:
     void _stopAndWaitForIndexBuilds(OperationContext* opCtx);
 
     /**
+     * Performs a forward scan of the oplog starting at 'stableTimestamp', exclusive. For every
+     * retryable write oplog entry that has a 'prevOpTime' <= 'stableTimestamp', update the
+     * transactions table with the appropriate information to detail the last executed operation. We
+     * do this because derived updates to the transactions table can be coalesced into one
+     * operation, and so certain session entry updates may not exist when restoring to the
+     * 'stableTimestamp'.
+     */
+    void _restoreTxnsTableEntryFromRetryableWrites(OperationContext* opCtx,
+                                                   Timestamp stableTimestamp);
+
+    /**
      * Recovers to the stable timestamp while holding the global exclusive lock.
      * Returns the stable timestamp that the storage engine recovered to.
      */

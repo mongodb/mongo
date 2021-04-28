@@ -410,6 +410,60 @@ OplogInterfaceMock::Operation makeOpAndRecordId(int count) {
 }
 
 /**
+ * Helper to create a noop entry that represents a migrated retryable write or transaction oplog
+ * entry.
+ */
+BSONObj makeMigratedNoop(OpTime opTime,
+                         boost::optional<BSONObj> o2,
+                         LogicalSessionId lsid,
+                         int txnNum,
+                         OpTime prevOpTime,
+                         boost::optional<int> stmtId,
+                         int wallClockMillis,
+                         bool isRetryableWrite) {
+    repl::MutableOplogEntry op;
+    op.setOpType(repl::OpTypeEnum::kNoop);
+    op.setNss(nss);
+    op.setObject(BSONObj());
+    op.setOpTime(opTime);
+    if (isRetryableWrite) {
+        op.setFromMigrate(true);
+    }
+    op.setObject2(o2);
+    if (stmtId) {
+        op.setStatementIds({*stmtId});
+    }
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+    op.setOperationSessionInfo(sessionInfo);
+    op.setPrevWriteOpTimeInTransaction(prevOpTime);
+    op.setWallClockTime(Date_t::fromMillisSinceEpoch(wallClockMillis));
+    return op.toBSON();
+}
+
+/**
+ * Helper to create a transaction command oplog entry.
+ */
+BSONObj makeTransactionOplogEntry(OpTime opTime,
+                                  LogicalSessionId lsid,
+                                  int txnNum,
+                                  OpTime prevOpTime) {
+    repl::MutableOplogEntry op;
+    op.setOpType(repl::OpTypeEnum::kCommand);
+    op.setNss(nss);
+    op.setObject(BSON("applyOps" << BSONArray()));
+    op.setOpTime(opTime);
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(lsid);
+    sessionInfo.setTxnNumber(txnNum);
+    op.setOperationSessionInfo(sessionInfo);
+    op.setPrevWriteOpTimeInTransaction(prevOpTime);
+    op.setWallClockTime(Date_t());
+    return op.toBSON();
+}
+
+/**
  * Asserts that the documents in the oplog have the given timestamps.
  */
 void _assertDocsInOplog(OperationContext* opCtx, std::vector<int> timestamps) {
@@ -1522,6 +1576,282 @@ TEST_F(RollbackImplTest, RollbackFixesCountForUnpreparedTransactionApplyOpsChain
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     ASSERT_EQ(_storageInterface->getFinalCollectionCount(collId), 1);
+}
+
+TEST_F(RollbackImplTest, RollbackRestoresTxnTableEntryToBeConsistentWithStableTimestamp) {
+    const auto collUuid = UUID::gen();
+    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    _initializeCollection(_opCtx.get(), collUuid, nss);
+    LogicalSessionFromClient fromClient{};
+    fromClient.setId(UUID::gen());
+    LogicalSessionId lsid = makeLogicalSessionId(fromClient, _opCtx.get());
+    LogicalSessionFromClient fromClient2{};
+    fromClient2.setId(UUID::gen());
+    LogicalSessionId lsid2 = makeLogicalSessionId(fromClient2, _opCtx.get());
+    LogicalSessionFromClient fromClient3{};
+    fromClient3.setId(UUID::gen());
+    LogicalSessionId lsid3 = makeLogicalSessionId(fromClient3, _opCtx.get());
+
+    auto commonOpTime = OpTime(Timestamp(4, 4), 4);
+    auto commonPoint = makeOpAndRecordId(commonOpTime);
+    _remoteOplog->setOperations({commonPoint});
+    _storageInterface->setStableTimestamp(nullptr, commonOpTime.getTimestamp());
+
+    auto insertObj1 = BSON("_id" << 1);
+    auto insertObj2 = BSON("_id" << 2);
+    const auto txnNumOne = 1LL;
+    // Create retryable write oplog entry before 'stableTimestamp'.
+    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, nss.ns(), collUuid);
+    const auto prevOpTime = OpTime(opBeforeStableTs["ts"].timestamp(), 1);
+    BSONObjBuilder opBeforeStableTsBuilder(opBeforeStableTs);
+    opBeforeStableTsBuilder.append("lsid", lsid.toBSON());
+    opBeforeStableTsBuilder.append("txnNumber", txnNumOne);
+    opBeforeStableTsBuilder.append("prevOpTime", OpTime().toBSON());
+    opBeforeStableTsBuilder.append("stmtId", 1);
+    BSONObj oplogEntryBeforeStableTs = opBeforeStableTsBuilder.done();
+
+    const auto txnNumTwo = 2LL;
+    // Create no-op retryable write entry before 'stableTimestamp'.
+    auto noopPrevOpTime = OpTime(Timestamp(2, 2), 2);
+    auto noopEntryBeforeStableTs = makeMigratedNoop(noopPrevOpTime,
+                                                    oplogEntryBeforeStableTs,
+                                                    lsid2,
+                                                    txnNumTwo,
+                                                    OpTime(),
+                                                    1 /* stmtId */,
+                                                    2 /* wallClockMillis */,
+                                                    true /* isRetryableWrite */);
+
+    // Create transactions entry after 'stableTimestamp'. Transactions entries are of 'command' op
+    // type.
+    auto txnOpTime = OpTime(Timestamp(3, 3), 3);
+    auto txnEntryBeforeStableTs = makeTransactionOplogEntry(txnOpTime, lsid3, 3, OpTime());
+
+    // Create retryable write oplog entry after 'stableTimestamp'.
+    auto firstOpAfterStableTs = makeInsertOplogEntry(5, insertObj2, nss.ns(), collUuid);
+    BSONObjBuilder opAfterStableTsBuilder(firstOpAfterStableTs);
+    opAfterStableTsBuilder.append("lsid", lsid.toBSON());
+    opAfterStableTsBuilder.append("txnNumber", txnNumOne);
+    // 'prevOpTime' points to 'oplogEntryBeforeStableTs'.
+    opAfterStableTsBuilder.append("prevOpTime", prevOpTime.toBSON());
+    opAfterStableTsBuilder.append("stmtId", 2);
+    BSONObj firstOplogEntryAfterStableTs = opAfterStableTsBuilder.done();
+
+    // Create no-op retryable write entry after 'stableTimestamp'.
+    auto noopEntryAfterStableTs = makeMigratedNoop(OpTime(Timestamp(6, 6), 6),
+                                                   firstOplogEntryAfterStableTs,
+                                                   lsid2,
+                                                   txnNumTwo,
+                                                   noopPrevOpTime,
+                                                   2 /* stmtId */,
+                                                   5 /* wallClockMillis */,
+                                                   true /* isRetryableWrite */);
+
+    // Create transactions entry after 'stableTimestamp'. Transactions entries are of 'command' op
+    // type.
+    auto txnEntryAfterStableTs =
+        makeTransactionOplogEntry(OpTime(Timestamp(7, 7), 7), lsid3, 3, txnOpTime);
+
+    ASSERT_OK(_insertOplogEntry(oplogEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(noopEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(txnEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(firstOplogEntryAfterStableTs));
+    ASSERT_OK(_insertOplogEntry(noopEntryAfterStableTs));
+    ASSERT_OK(_insertOplogEntry(txnEntryAfterStableTs));
+
+    auto status = _storageInterface->findSingleton(_opCtx.get(), nss);
+    // The 'config.transactions' table is currently empty.
+    ASSERT_NOT_OK(status);
+
+    // Doing a rollback should upsert two entries into the 'config.transactions' table.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    auto swDoc = _storageInterface->findById(
+        _opCtx.get(), nss, firstOplogEntryAfterStableTs.getField("lsid"));
+    ASSERT_OK(swDoc);
+    auto sessionsEntryBson = swDoc.getValue();
+    // New sessions entry should match the session information retrieved from the retryable writes
+    // oplog entry from before the 'stableTimestamp'.
+    ASSERT_EQUALS(sessionsEntryBson["txnNum"].numberInt(),
+                  oplogEntryBeforeStableTs["txnNumber"].numberInt());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteOpTime"].timestamp(),
+                  oplogEntryBeforeStableTs["prevOpTime"].timestamp());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteDate"].date(),
+                  oplogEntryBeforeStableTs["wall"].date());
+
+    swDoc =
+        _storageInterface->findById(_opCtx.get(), nss, noopEntryBeforeStableTs.getField("lsid"));
+    ASSERT_OK(swDoc);
+    sessionsEntryBson = swDoc.getValue();
+    // New sessions entry should match the session information retrieved from the noop retryable
+    // writes oplog entry from before the 'stableTimestamp'.
+    ASSERT_EQUALS(sessionsEntryBson["txnNum"].numberInt(),
+                  noopEntryBeforeStableTs["txnNumber"].numberInt());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteOpTime"].timestamp(),
+                  noopEntryBeforeStableTs["prevOpTime"].timestamp());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteDate"].date(),
+                  noopEntryBeforeStableTs["wall"].date());
+
+    // 'lsid3' does not get restored because it is not a retryable writes entry.
+    status = _storageInterface->findById(_opCtx.get(), nss, txnEntryAfterStableTs.getField("lsid"));
+    ASSERT_NOT_OK(status);
+}
+
+TEST_F(
+    RollbackImplTest,
+    RollbackRestoresTxnTableEntryToBeConsistentWithStableTimestampWithMissingPrevWriteOplogEntry) {
+    const auto collUuid = UUID::gen();
+    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    _initializeCollection(_opCtx.get(), collUuid, nss);
+    LogicalSessionFromClient fromClient{};
+    fromClient.setId(UUID::gen());
+    LogicalSessionId lsid = makeLogicalSessionId(fromClient, _opCtx.get());
+    LogicalSessionFromClient fromClient2{};
+    fromClient2.setId(UUID::gen());
+    LogicalSessionId lsid2 = makeLogicalSessionId(fromClient2, _opCtx.get());
+
+    auto commonOpTime = OpTime(Timestamp(2, 2), 1);
+    auto commonPoint = makeOpAndRecordId(OpTime(Timestamp(2, 2), 1));
+    _remoteOplog->setOperations({commonPoint});
+    _storageInterface->setStableTimestamp(nullptr, commonOpTime.getTimestamp());
+
+    // Create oplog entry after 'stableTimestamp'.
+    auto insertObj = BSON("_id" << 1);
+    auto firstOpAfterStableTs = makeInsertOplogEntry(3, insertObj, nss.ns(), collUuid);
+    BSONObjBuilder builder(firstOpAfterStableTs);
+    builder.append("lsid", lsid.toBSON());
+    builder.append("txnNumber", 2LL);
+    // 'prevOpTime' points to an opTime not found in the oplog. This can happen in practice
+    // due to the 'OplogCapMaintainerThread' truncating entries from before the 'stableTimestamp'.
+    builder.append("prevOpTime", OpTime(Timestamp(1, 0), 1).toBSON());
+    builder.append("stmtId", 2);
+    BSONObj firstOplogEntryAfterStableTs = builder.done();
+
+    // Create no-op entry after 'stableTimestamp'.
+    // 'prevOpTime' point sto an opTime not found in the oplog.
+    auto noopEntryAfterStableTs = makeMigratedNoop(OpTime(Timestamp(5, 5), 5),
+                                                   firstOplogEntryAfterStableTs,
+                                                   lsid2,
+                                                   3 /* txnNum */,
+                                                   OpTime(Timestamp(2, 1), 1),
+                                                   2 /* stmtId */,
+                                                   5 /* wallClockMillis */,
+                                                   true /*isRetryableWrite */);
+
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(firstOplogEntryAfterStableTs));
+    ASSERT_OK(_insertOplogEntry(noopEntryAfterStableTs));
+
+    auto status = _storageInterface->findSingleton(_opCtx.get(), nss);
+    // The 'config.transactions' table is currently empty.
+    ASSERT_NOT_OK(status);
+
+    // Doing a rollback should upsert two entries into the 'config.transactions' table.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    auto swDoc = _storageInterface->findById(
+        _opCtx.get(), nss, firstOplogEntryAfterStableTs.getField("lsid"));
+    ASSERT_OK(swDoc);
+    auto sessionsEntryBson = swDoc.getValue();
+    // New sessions entry should match the session information retrieved from the retryable writes
+    // oplog entry from after the 'stableTimestamp'.
+    ASSERT_EQUALS(sessionsEntryBson["txnNum"].numberInt(),
+                  firstOplogEntryAfterStableTs["txnNumber"].numberInt());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteOpTime"].timestamp(),
+                  firstOplogEntryAfterStableTs["prevOpTime"].timestamp());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteDate"].date(),
+                  firstOplogEntryAfterStableTs["wall"].date());
+
+    swDoc = _storageInterface->findById(_opCtx.get(), nss, noopEntryAfterStableTs.getField("lsid"));
+    ASSERT_OK(swDoc);
+    sessionsEntryBson = swDoc.getValue();
+    // New sessions entry should match the session information retrieved from the retryable writes
+    // no-op oplog entry from after the 'stableTimestamp'.
+    ASSERT_EQUALS(sessionsEntryBson["txnNum"].numberInt(),
+                  noopEntryAfterStableTs["txnNumber"].numberInt());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteOpTime"].timestamp(),
+                  noopEntryAfterStableTs["prevOpTime"].timestamp());
+    ASSERT_EQUALS(sessionsEntryBson["lastWriteDate"].date(), noopEntryAfterStableTs["wall"].date());
+}
+
+TEST_F(RollbackImplTest, RollbackDoesNotRestoreTxnsTableWhenNoRetryableWritesEntriesAfterStableTs) {
+    const auto collUuid = UUID::gen();
+    const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+    _initializeCollection(_opCtx.get(), collUuid, nss);
+    LogicalSessionFromClient fromClient{};
+    fromClient.setId(UUID::gen());
+    LogicalSessionId lsid = makeLogicalSessionId(fromClient, _opCtx.get());
+    LogicalSessionFromClient fromClient2{};
+    fromClient2.setId(UUID::gen());
+    LogicalSessionId lsid2 = makeLogicalSessionId(fromClient2, _opCtx.get());
+
+    auto commonOpTime = OpTime(Timestamp(4, 4), 4);
+    auto commonPoint = makeOpAndRecordId(commonOpTime);
+    _remoteOplog->setOperations({commonPoint});
+    _storageInterface->setStableTimestamp(nullptr, commonOpTime.getTimestamp());
+
+    auto insertObj1 = BSON("_id" << 1);
+    auto insertObj2 = BSON("_id" << 2);
+    const auto txnNumOne = 1LL;
+    // Create oplog entry before 'stableTimestamp'.
+    auto opBeforeStableTs = makeInsertOplogEntry(1, insertObj1, nss.ns(), collUuid);
+    BSONObjBuilder opBeforeStableTsBuilder(opBeforeStableTs);
+    opBeforeStableTsBuilder.append("lsid", lsid.toBSON());
+    opBeforeStableTsBuilder.append("txnNumber", txnNumOne);
+    opBeforeStableTsBuilder.append("prevOpTime", OpTime().toBSON());
+    opBeforeStableTsBuilder.append("stmtId", 1);
+    BSONObj oplogEntryBeforeStableTs = opBeforeStableTsBuilder.done();
+
+    const auto txnNumTwo = 2LL;
+    // Create no-op entry before 'stableTimestamp'.
+    auto noopEntryBeforeStableTs = makeMigratedNoop(OpTime(Timestamp(2, 2), 2),
+                                                    oplogEntryBeforeStableTs,
+                                                    lsid2,
+                                                    txnNumTwo,
+                                                    OpTime(),
+                                                    1 /* stmtId*/,
+                                                    2 /* wallClockMillis */,
+                                                    true /* isRetryableWrite */);
+
+    // Create migrated no-op transactions entry before 'stableTimestamp'.
+    auto txnOpTime = OpTime(Timestamp(3, 3), 3);
+    auto txnEntryBeforeStableTs = makeMigratedNoop(txnOpTime,
+                                                   BSONObj(),
+                                                   lsid,
+                                                   txnNumTwo,
+                                                   OpTime(),
+                                                   boost::none /* stmtId */,
+                                                   4 /* wallClockMillis */,
+                                                   false /* isRetryableWrite */);
+
+    // Create regular non-retryable write oplog entry after 'stableTimestamp'.
+    auto insertEntry = makeInsertOplogEntry(7, BSON("_id" << 3), nss.ns(), collUuid);
+
+    // Create migrated no-op transactions entry after 'stableTimestamp'.
+    auto txnEntryAfterStableTs = makeMigratedNoop(txnOpTime,
+                                                  BSONObj(),
+                                                  lsid,
+                                                  txnNumTwo,
+                                                  txnOpTime,
+                                                  boost::none /* stmtId */,
+                                                  10 /* wallClockMillis */,
+                                                  false /* isRetryableWrite */);
+
+    ASSERT_OK(_insertOplogEntry(oplogEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(noopEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(txnEntryBeforeStableTs));
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    ASSERT_OK(_insertOplogEntry(insertEntry));
+    ASSERT_OK(_insertOplogEntry(txnEntryAfterStableTs));
+
+    auto status = _storageInterface->findSingleton(_opCtx.get(), nss);
+    // The 'config.transactions' table is currently empty.
+    ASSERT_NOT_OK(status);
+
+    // Doing a rollback should not restore any entries into the 'config.transactions' table.
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+    status = _storageInterface->findSingleton(_opCtx.get(), nss);
+    // No upserts were made to the 'config.transactions' table.
+    ASSERT_NOT_OK(status);
 }
 
 /**

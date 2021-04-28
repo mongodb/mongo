@@ -60,6 +60,8 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(hangAfterOplogTruncationInRollback);
+
 namespace {
 
 const auto kRecoveryBatchLogLevel = logv2::LogSeverity::Debug(2);
@@ -448,6 +450,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
 
     // This may take an IS lock on the oplog collection.
     _truncateOplogIfNeededAndThenClearOplogTruncateAfterPoint(opCtx, &stableTimestamp);
+
+    hangAfterOplogTruncationInRollback.pauseWhileSet();
 
     auto topOfOplogSW = _getTopOfOplog(opCtx);
     if (topOfOplogSW.getStatus() == ErrorCodes::CollectionIsEmpty ||

@@ -43,7 +43,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/logical_time_validator.h"
@@ -457,6 +460,80 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
     return namespaces;
 }
 
+void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* opCtx,
+                                                             Timestamp stableTimestamp) {
+    auto client = std::make_unique<DBDirectClient>(opCtx);
+    // Query for retryable writes oplog entries with a non-null 'prevWriteOpTime' value
+    // less than or equal to the 'stableTimestamp'. This query intends to include no-op
+    // retryable writes oplog entries that have been applied through a migration process.
+    const auto filter = BSON("op" << BSON("$in" << BSON_ARRAY("i"
+                                                              << "u"
+                                                              << "d")));
+    // We use the 'fromMigrate' field to differentiate migrated retryable writes entries from
+    // transactions entries.
+    const auto filterFromMigration = BSON("op"
+                                          << "n"
+                                          << "fromMigrate" << true);
+    auto cursor = client->query(
+        NamespaceString::kRsOplogNamespace,
+        QUERY("ts" << BSON("$gt" << stableTimestamp) << "txnNumber" << BSON("$exists" << true)
+                   << "stmtId" << BSON("$exists" << true) << "prevOpTime.ts"
+                   << BSON("$gte" << Timestamp(1, 0) << "$lte" << stableTimestamp) << "$or"
+                   << BSON_ARRAY(filter << filterFromMigration)));
+    while (cursor->more()) {
+        auto doc = cursor->next();
+        auto swEntry = OplogEntry::parse(doc);
+        fassert(5530502, swEntry.isOK());
+        auto entry = swEntry.getValue();
+        auto prevWriteOpTime = *entry.getPrevWriteOpTimeInTransaction();
+        OperationSessionInfo opSessionInfo = entry.getOperationSessionInfo();
+        const auto sessionId = *opSessionInfo.getSessionId();
+        const auto txnNumber = *opSessionInfo.getTxnNumber();
+        const auto wallClockTime = entry.getWallClockTime();
+
+        invariant(!prevWriteOpTime.isNull() && prevWriteOpTime.getTimestamp() <= stableTimestamp);
+        // This is a retryable writes oplog entry with a non-null 'prevWriteOpTime' value that
+        // is less than or equal to the 'stableTimestamp'.
+        LOGV2(5530501,
+              "Restoring sessions entry to be consistent with 'stableTimestamp'",
+              "stableTimestamp"_attr = stableTimestamp,
+              "sessionId"_attr = sessionId,
+              "txnNumber"_attr = txnNumber,
+              "lastWriteOpTime"_attr = prevWriteOpTime);
+        SessionTxnRecord sessionTxnRecord;
+        sessionTxnRecord.setSessionId(sessionId);
+        sessionTxnRecord.setTxnNum(txnNumber);
+        try {
+            TransactionHistoryIterator iter(prevWriteOpTime);
+            auto nextOplogEntry = iter.next(opCtx);
+            sessionTxnRecord.setLastWriteOpTime(nextOplogEntry.getOpTime());
+            sessionTxnRecord.setLastWriteDate(nextOplogEntry.getWallClockTime());
+        } catch (ExceptionFor<ErrorCodes::IncompleteTransactionHistory>&) {
+            // It's possible that the next entry in the oplog chain has been truncated due to
+            // oplog cap maintenance.
+            sessionTxnRecord.setLastWriteOpTime(prevWriteOpTime);
+            sessionTxnRecord.setLastWriteDate(wallClockTime);
+        }
+        const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
+        writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss.ns(), [&] {
+            AutoGetCollection collection(opCtx, nss, MODE_IX);
+            auto filter = BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON());
+            UnreplicatedWritesBlock uwb(opCtx);
+            // Perform an untimestamped write so that it will not be rolled back on recovering
+            // to the 'stableTimestamp' if we were to crash. This is safe because this update is
+            // meant to be consistent with the 'stableTimestamp' and not the common point.
+            Helpers::upsert(
+                opCtx, nss.ns(), filter, sessionTxnRecord.toBSON(), /*fromMigrate=*/false);
+        });
+    }
+    // Take a stable checkpoint so that writes to the 'config.transactions' table are
+    // persisted to disk before truncating the oplog. If we were to take an unstable checkpoint, we
+    // would have to update replication metadata like 'minValid.appliedThrough' to be consistent
+    // with the oplog.
+    opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
+                                                             /*stableCheckpoint=*/true);
+}
+
 void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) noexcept {
     // Stop and wait for all background index builds to complete before starting the rollback
@@ -513,6 +590,12 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
           "insert"_attr = _observerInfo.rollbackCommandCounts[kInsertCmdName],
           "update"_attr = _observerInfo.rollbackCommandCounts[kUpdateCmdName],
           "delete"_attr = _observerInfo.rollbackCommandCounts[kDeleteCmdName]);
+
+    // Retryable writes create derived updates to the transactions table which can be coalesced into
+    // one operation, so certain session operations history may be lost after restoring to the
+    // 'stableTimestamp'. We must scan the oplog and restore the transactions table entries to
+    // detail the last executed writes.
+    _restoreTxnsTableEntryFromRetryableWrites(opCtx, stableTimestamp);
 
     // During replication recovery, we truncate all oplog entries with timestamps greater than the
     // oplog truncate after point. If we entered rollback, we are guaranteed to have at least one
