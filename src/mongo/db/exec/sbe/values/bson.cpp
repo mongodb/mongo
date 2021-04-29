@@ -60,7 +60,7 @@ static uint8_t advanceTable[] = {
 	0x80, // DBPointer - Deprecated
 	0xff, // JavaScript code
 	0xff, // Symbol - Deprecated
-	0x80, // JavaScript code with scope - Deprecated
+	0xfe, // JavaScript code with scope - Deprecated
 	4,    // 32-bit integer
 	8,    // Timestamp
 	8,    // 64-bit integer
@@ -266,6 +266,13 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             }
             return value::makeCopyBsonDBPointer(value::getBsonDBPointerView(value));
         }
+        case BSONType::CodeWScope: {
+            auto value = value::bitcastFrom<const char*>(be);
+            if (view) {
+                return {value::TypeTags::bsonCodeWScope, value};
+            }
+            return value::makeCopyBsonCodeWScope(value::getBsonCodeWScopeView(value));
+        }
         default:
             return {value::TypeTags::Nothing, 0};
     }
@@ -366,8 +373,13 @@ void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {
                 builder.appendCode(value::getBsonJavascriptView(val));
                 break;
             case value::TypeTags::bsonDBPointer: {
-                auto dbpointer = value::getBsonDBPointerView(val);
-                builder.append(BSONDBRef{dbpointer.ns, OID::from(dbpointer.id)});
+                auto dbptr = value::getBsonDBPointerView(val);
+                builder.append(BSONDBRef{dbptr.ns, OID::from(dbptr.id)});
+                break;
+            }
+            case value::TypeTags::bsonCodeWScope: {
+                auto cws = value::getBsonCodeWScopeView(val);
+                builder.append(BSONCodeWScope{cws.code, BSONObj(cws.scope)});
                 break;
             }
             default:
@@ -501,8 +513,13 @@ void appendValueToBsonObj(ObjBuilder& builder,
             builder.appendCode(name, value::getBsonJavascriptView(val));
             break;
         case value::TypeTags::bsonDBPointer: {
-            auto dbpointer = value::getBsonDBPointerView(val);
-            builder.appendDBRef(name, dbpointer.ns, OID::from(dbpointer.id));
+            auto dbptr = value::getBsonDBPointerView(val);
+            builder.appendDBRef(name, dbptr.ns, OID::from(dbptr.id));
+            break;
+        }
+        case value::TypeTags::bsonCodeWScope: {
+            auto cws = value::getBsonCodeWScopeView(val);
+            builder.appendCodeWScope(name, cws.code, BSONObj(cws.scope));
             break;
         }
         default:
