@@ -346,6 +346,10 @@ public:
         return Decimal128(Value{_value.low64, _value.high64 ^ (std::uint64_t{1} << 63)});
     }
 
+    Decimal128 round(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 round(std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
+
     /**
      * This set of functions converts a Decimal128 to a certain integer type with a
      * given rounding mode.
