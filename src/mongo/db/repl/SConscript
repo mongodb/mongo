@@ -295,6 +295,7 @@ env.Library(
         'oplog',
         'oplog_application',
         'oplog_interface_local',
+        'repl_server_parameters',
     ],
 )
 

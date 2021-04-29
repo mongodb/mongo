@@ -634,6 +634,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             str::stream()
                 << "Cannot take an unstable checkpoint on shutdown while using queryableBackupMode",
             !gTakeUnstableCheckpointOnShutdown);
+        uassert(5576603,
+                str::stream() << "Cannot specify both queryableBackupMode and "
+                              << "startupRecoveryForRestore at the same time",
+                !repl::startupRecoveryForRestore);
 
         auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
         invariant(replCoord);

@@ -492,6 +492,17 @@ server_parameters:
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
         default: false
 
+    startupRecoveryForRestore:
+        description: >-
+            When set, do startup recovery in such a way that the history of the recovered
+            operations is not preserved.  At the end of startup recovery, snapshot reads before
+            the recovered top of oplog will not be possible.  Reduces cache pressure when
+            recovering many oplog entries, as when restoring from backup in some scenarios.
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: startupRecoveryForRestore
+        default: false
+
 feature_flags:
     featureFlagTenantMigrations:
         description: >-

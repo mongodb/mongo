@@ -1816,7 +1816,7 @@ void WiredTigerKVEngine::checkpoint() {
         // Three cases:
         //
         // First, initialDataTimestamp is Timestamp(0, 1) -> Take full checkpoint. This is when
-        // there is no consistent view of the data (i.e: during initial sync).
+        // there is no consistent view of the data (e.g: during initial sync).
         //
         // Second, stableTimestamp < initialDataTimestamp: Skip checkpoints. The data on disk is
         // prone to being rolled back. Hold off on checkpoints.  Hope that the stable timestamp
@@ -1828,6 +1828,10 @@ void WiredTigerKVEngine::checkpoint() {
             UniqueWiredTigerSession session = _sessionCache->getSession();
             WT_SESSION* s = session->getSession();
             invariantWTOK(s->checkpoint(s, "use_timestamp=false"));
+            LOGV2_FOR_RECOVERY(5576602,
+                               2,
+                               "Completed unstable checkpoint.",
+                               "initialDataTimestamp"_attr = initialDataTimestamp.toString());
         } else if (stableTimestamp < initialDataTimestamp) {
             LOGV2_FOR_RECOVERY(
                 23985,

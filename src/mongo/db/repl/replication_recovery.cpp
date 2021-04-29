@@ -44,6 +44,7 @@
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_interface_local.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
@@ -160,8 +161,8 @@ public:
                 40293, "Couldn't find any entries in the oplog, which should be impossible", attrs);
         }
 
-        auto firstTimestampFound =
-            fassert(40291, OpTime::parseFromOplogEntry(_cursor->nextSafe())).getTimestamp();
+        _opTimeAtStartPoint = fassert(40291, OpTime::parseFromOplogEntry(_cursor->nextSafe()));
+        const auto firstTimestampFound = _opTimeAtStartPoint.getTimestamp();
         if (firstTimestampFound != _oplogApplicationStartPoint) {
             LOGV2_FATAL_NOTRACE(
                 40292,
@@ -215,6 +216,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    OpTime getOpTimeAtStartPoint() {
+        return _opTimeAtStartPoint;
+    }
+
 private:
     enum class Mode { kPeek, kPop };
     bool _peekOrPop(Value* value, Mode mode) {
@@ -228,6 +233,7 @@ private:
 
     const Timestamp _oplogApplicationStartPoint;
     const boost::optional<Timestamp> _oplogApplicationEndPoint;
+    OpTime _opTimeAtStartPoint;
     std::unique_ptr<DBDirectClient> _client;
     std::unique_ptr<DBClientCursor> _cursor;
 };
@@ -315,7 +321,14 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
     // Initialize the cached pointer to the oplog collection.
     acquireOplogCollectionForLogging(opCtx);
 
-    if (recoveryTS) {
+    if (recoveryTS || startupRecoveryForRestore) {
+        if (startupRecoveryForRestore && !recoveryTS) {
+            LOGV2_WARNING(5576601,
+                          "Replication startup parameter 'startupRecoveryForRestore' is set and "
+                          "recovering from an unstable checkpoint.  Assuming this is a resume of "
+                          "an earlier attempt to recover for restore.");
+        }
+
         // We pass in "none" for the stable timestamp so that recoverFromOplog asks storage
         // for the recoveryTimestamp just like on replica set recovery.
         const auto stableTimestamp = boost::none;
@@ -387,7 +400,8 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
                                 << endPoint.toString() << "' in the oplog.");
     }
 
-    Timestamp appliedUpTo = _applyOplogOperations(opCtx, *startPoint, endPoint);
+    Timestamp appliedUpTo = _applyOplogOperations(
+        opCtx, *startPoint, endPoint, RecoveryMode::kStartupFromStableTimestamp);
     if (appliedUpTo.isNull()) {
         LOGV2(21541,
               "No stored oplog entries to apply for recovery between {startPoint} (inclusive) and "
@@ -425,6 +439,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
     // recovery timestamp. If the storage engine returns a timestamp, we recover from that point.
     // However, if the storage engine returns "none", the storage engine does not have a stable
     // checkpoint and we must recover from an unstable checkpoint instead.
+    bool isRollbackRecovery = stableTimestamp != boost::none;
     const bool supportsRecoveryTimestamp =
         _storageInterface->supportsRecoveryTimestamp(opCtx->getServiceContext());
     if (!stableTimestamp && supportsRecoveryTimestamp) {
@@ -447,7 +462,9 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
 
     if (stableTimestamp) {
         invariant(supportsRecoveryTimestamp);
-        _recoverFromStableTimestamp(opCtx, *stableTimestamp, topOfOplog);
+        const auto recoveryMode = isRollbackRecovery ? RecoveryMode::kRollbackFromStableTimestamp
+                                                     : RecoveryMode::kStartupFromStableTimestamp;
+        _recoverFromStableTimestamp(opCtx, *stableTimestamp, topOfOplog, recoveryMode);
     } else {
         _recoverFromUnstableCheckpoint(
             opCtx, _consistencyMarkers->getAppliedThrough(opCtx), topOfOplog);
@@ -462,7 +479,8 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
 
 void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCtx,
                                                           Timestamp stableTimestamp,
-                                                          OpTime topOfOplog) {
+                                                          OpTime topOfOplog,
+                                                          RecoveryMode recoveryMode) {
     invariant(!stableTimestamp.isNull());
     invariant(!topOfOplog.isNull());
 
@@ -478,7 +496,22 @@ void ReplicationRecoveryImpl::_recoverFromStableTimestamp(OperationContext* opCt
           "Starting recovery oplog application at the stable timestamp: {stableTimestamp}",
           "Starting recovery oplog application at the stable timestamp",
           "stableTimestamp"_attr = stableTimestamp);
-    _applyToEndOfOplog(opCtx, stableTimestamp, topOfOplog.getTimestamp());
+
+    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp && startupRecoveryForRestore) {
+        LOGV2_WARNING(5576600,
+                      "Replication startup parameter 'startupRecoveryForRestore' is set, "
+                      "recovering without preserving history before top of oplog.");
+        // Take only unstable checkpoints during the recovery process.
+        _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   Timestamp::kAllowUnstableCheckpointsSentinel);
+        // Allow "oldest" timestamp to move forward freely.
+        _storageInterface->setStableTimestamp(opCtx->getServiceContext(), Timestamp::min());
+    }
+    _applyToEndOfOplog(opCtx, stableTimestamp, topOfOplog.getTimestamp(), recoveryMode);
+    if (recoveryMode == RecoveryMode::kStartupFromStableTimestamp && startupRecoveryForRestore) {
+        _storageInterface->setInitialDataTimestamp(opCtx->getServiceContext(),
+                                                   topOfOplog.getTimestamp());
+    }
 }
 
 void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* opCtx,
@@ -520,7 +553,17 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
         opCtx->getServiceContext()->getStorageEngine()->setOldestTimestamp(
             appliedThrough.getTimestamp());
 
-        _applyToEndOfOplog(opCtx, appliedThrough.getTimestamp(), topOfOplog.getTimestamp());
+        if (startupRecoveryForRestore) {
+            // When we're recovering for a restore, we may be recovering a large number of oplog
+            // entries, so we want to take unstable checkpoints to reduce cache pressure and allow
+            // resumption in case of a crash.
+            _storageInterface->setInitialDataTimestamp(
+                opCtx->getServiceContext(), Timestamp::kAllowUnstableCheckpointsSentinel);
+        }
+        _applyToEndOfOplog(opCtx,
+                           appliedThrough.getTimestamp(),
+                           topOfOplog.getTimestamp(),
+                           RecoveryMode::kStartupFromUnstableCheckpoint);
     }
 
     // `_recoverFromUnstableCheckpoint` is only expected to be called on startup.
@@ -548,7 +591,8 @@ void ReplicationRecoveryImpl::_recoverFromUnstableCheckpoint(OperationContext* o
 
 void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
                                                  const Timestamp& oplogApplicationStartPoint,
-                                                 const Timestamp& topOfOplog) {
+                                                 const Timestamp& topOfOplog,
+                                                 const RecoveryMode recoveryMode) {
     invariant(!oplogApplicationStartPoint.isNull());
     invariant(!topOfOplog.isNull());
 
@@ -567,7 +611,8 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
             "topOfOplog"_attr = topOfOplog.toBSON());
     }
 
-    Timestamp appliedUpTo = _applyOplogOperations(opCtx, oplogApplicationStartPoint, topOfOplog);
+    Timestamp appliedUpTo =
+        _applyOplogOperations(opCtx, oplogApplicationStartPoint, topOfOplog, recoveryMode);
     invariant(!appliedUpTo.isNull());
     invariant(appliedUpTo == topOfOplog,
               str::stream() << "Did not apply to top of oplog. Applied through: "
@@ -577,7 +622,8 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
 Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx,
                                                          const Timestamp& startPoint,
-                                                         const Timestamp& endPoint) {
+                                                         const Timestamp& endPoint,
+                                                         RecoveryMode recoveryMode) {
     // The oplog buffer will fetch all entries >= the startPoint timestamp, but it skips the first
     // op on startup, which is why the startPoint is described as "exclusive".
     LOGV2(21550,
@@ -592,10 +638,11 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     RecoveryOplogApplierStats stats;
 
     auto writerPool = makeReplWriterPool();
+    auto* replCoord = ReplicationCoordinator::get(opCtx);
     OplogApplierImpl oplogApplier(nullptr,
                                   &oplogBuffer,
                                   &stats,
-                                  ReplicationCoordinator::get(opCtx),
+                                  replCoord,
                                   _consistencyMarkers,
                                   _storageInterface,
                                   OplogApplier::Options(OplogApplication::Mode::kRecovering),
@@ -605,11 +652,36 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     batchLimits.bytes = getBatchLimitOplogBytes(opCtx, _storageInterface);
     batchLimits.ops = getBatchLimitOplogEntries();
 
+    // If we're doing unstable checkpoints during the recovery process (as we do during the special
+    // startupRecoveryForRestore mode), we need to advance the consistency marker for each batch so
+    // the next time we recover we won't start all the way over.  Further, we can advance the oldest
+    // timestamp to avoid keeping too much history.
+    //
+    // If we're recovering from a stable checkpoint (except the special startupRecoveryForRestore
+    // mode, which discards history before the top of oplog), we aren't doing new checkpoints during
+    // recovery so there is no point in advancing the consistency marker and we cannot advance
+    // "oldest" becaue it would be later than "stable".
+    const bool advanceTimestampsEachBatch = startupRecoveryForRestore &&
+        (recoveryMode == RecoveryMode::kStartupFromStableTimestamp ||
+         recoveryMode == RecoveryMode::kStartupFromUnstableCheckpoint);
+
     OpTime applyThroughOpTime;
     std::vector<OplogEntry> batch;
     while (
         !(batch = fassert(50763, oplogApplier.getNextApplierBatch(opCtx, batchLimits))).empty()) {
+        if (advanceTimestampsEachBatch && applyThroughOpTime.isNull()) {
+            // We must set appliedThrough before applying anything at all, so we know
+            // any unstable checkpoints we take are "dirty".  A null appliedThrough indicates
+            // a clean shutdown which may not be the case if we had started applying a batch.
+            _consistencyMarkers->setAppliedThrough(opCtx, oplogBuffer.getOpTimeAtStartPoint());
+        }
         applyThroughOpTime = uassertStatusOK(oplogApplier.applyOplogBatch(opCtx, std::move(batch)));
+        if (advanceTimestampsEachBatch) {
+            invariant(!applyThroughOpTime.isNull());
+            _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+            replCoord->getServiceContext()->getStorageEngine()->setOldestTimestamp(
+                applyThroughOpTime.getTimestamp());
+        }
     }
     stats.complete(applyThroughOpTime);
     invariant(oplogBuffer.isEmpty(),
@@ -627,9 +699,11 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
     // to that checkpoint at a replication consistent point, and applying the oplog is safe.
     // If we don't have a stable checkpoint, then we must be in startup recovery, and not rollback
     // recovery, because we only roll back to a stable timestamp when we have a stable checkpoint.
-    // Startup recovery from an unstable checkpoint only ever applies a single batch and it is safe
-    // to replay the batch from any point.
-    _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+    // It is safe to do startup recovery from an unstable checkpoint provided we recover to the
+    // end of the oplog and discard history before it, as _recoverFromUnstableCheckpoint does.
+    if (!advanceTimestampsEachBatch) {
+        _consistencyMarkers->setAppliedThrough(opCtx, applyThroughOpTime);
+    }
     return applyThroughOpTime.getTimestamp();
 }
 
