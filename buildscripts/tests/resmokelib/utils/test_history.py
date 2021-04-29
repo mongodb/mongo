@@ -61,36 +61,18 @@ History:
       object_value:
         foo: bar
   - time: 1
-    type: READ
-    value_written: null
+    type: WRITE
+    value_written:
+      object_class: dict
+      object_value:
+        foo: za
   - time: 2
     type: WRITE
     value_written:
       object_class: dict
       object_value:
-        foo: za
-  - time: 3
-    type: READ
-    value_written: null
-  - time: 4
-    type: WRITE
-    value_written:
-      object_class: dict
-      object_value:
         another_added: another_val
-        foo: za
-  - time: 5
-    type: READ
-    value_written: null
-  - time: 6
-    type: READ
-    value_written: null
-  - time: 7
-    type: READ
-    value_written: null
-  - time: 8
-    type: READ
-    value_written: null"""
+        foo: za"""
 
         test_dict_dumped = test_dict.dump_history()
         self.assertEqual(test_dict_dumped, expected_test_dict)
@@ -138,9 +120,6 @@ History:
       object_value:
         innerkey: innerval
   - time: 4
-    type: READ
-    value_written: null
-  - time: 5
     type: WRITE
     value_written:
       object_class: dict
@@ -181,6 +160,7 @@ History:
   - time: 2
     type: WRITE
     value_written: key2value1"""
+
         self.assertEqual(test_dict.dump_history(), expected_test_dict)
 
         test_dict["key2"] = "key2value2"
@@ -206,18 +186,12 @@ History:
   - time: 3
     type: DELETE
     value_written: null
-  - time: 4
-    type: READ
-    value_written: null
 
 
   key2:
   - time: 2
     type: WRITE
-    value_written: key2value1
-  - time: 5
-    type: READ
-    value_written: null"""
+    value_written: key2value1"""
 
         self.assertEqual(second_dict.dump_history(), expected_second_dict)
 
