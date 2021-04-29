@@ -258,7 +258,7 @@ public:
         const Timestamp requestedPinTs = cmdObj.firstElement().timestamp();
         const bool round = cmdObj["round"].booleanSafe();
 
-        AutoGetOrCreateDb db(opCtx, kDurableHistoryTestNss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, kDurableHistoryTestNss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, kDurableHistoryTestNss, MODE_IX);
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx,
@@ -266,8 +266,9 @@ public:
             uassertStatusOK(userAllowedCreateNS(opCtx, kDurableHistoryTestNss));
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
+            auto db = autoDb.ensureDbExists();
             uassertStatusOK(
-                db.getDb()->userCreateNS(opCtx, kDurableHistoryTestNss, defaultCollectionOptions));
+                db->userCreateNS(opCtx, kDurableHistoryTestNss, defaultCollectionOptions));
             wuow.commit();
         }
 
