@@ -276,7 +276,14 @@ private:
     struct BucketMetadata {
     public:
         BucketMetadata() = default;
-        BucketMetadata(BSONObj&& obj, const StringData::ComparatorInterface* comparator);
+        BucketMetadata(BSONElement elem, const StringData::ComparatorInterface* comparator);
+
+        // Constructs with a copy of the metadata.
+        BucketMetadata(BSONElement elem,
+                       BSONObj obj,
+                       const StringData::ComparatorInterface* comparator,
+                       bool normalized = false,
+                       bool copied = true);
 
         bool normalized() const {
             return _normalized;
@@ -287,21 +294,32 @@ private:
 
         const BSONObj& toBSON() const;
 
+        const BSONElement getMetaElement() const;
+
         StringData getMetaField() const;
 
         const StringData::ComparatorInterface* getComparator() const;
 
         template <typename H>
         friend H AbslHashValue(H h, const BucketMetadata& metadata) {
-            return H::combine(std::move(h),
-                              absl::Hash<absl::string_view>()(absl::string_view(
-                                  metadata._metadata.objdata(), metadata._metadata.objsize())));
+            return H::combine(
+                std::move(h),
+                absl::Hash<absl::string_view>()(absl::string_view(
+                    metadata._metadataElement.value(), metadata._metadataElement.valuesize())));
         }
 
     private:
+        // Only the value of '_metadataElement' is used for hashing and comparison.
+        // When BucketMetadata does not own the '_metadata', only '_metadataElement' will be present
+        // and used to look up buckets. After owning the '_metadata,' the field should refer to the
+        // BSONElement within '_metadata'.
+        BSONElement _metadataElement;
+
+        // Empty when just looking up buckets. Owns a copy when the field is present.
         BSONObj _metadata;
         const StringData::ComparatorInterface* _comparator = nullptr;
         bool _normalized = false;
+        bool _copied = false;
     };
 
     class MinMax {
@@ -601,8 +619,8 @@ private:
         /**
          * Creates a new BucketKey with a different internal metadata object.
          */
-        BucketKey withMetadata(BSONObj meta) const {
-            return {ns, {std::move(meta), metadata.getComparator()}};
+        BucketKey withCopiedMetadata(BSONObj meta) const {
+            return {ns, {meta.firstElement(), meta, metadata.getComparator()}};
         }
 
         bool operator==(const BucketKey& other) const {
@@ -728,7 +746,7 @@ private:
          */
         BucketState _findOpenBucketThenLockAndStoreKey(const HashedBucketKey& normalizedKey,
                                                        const HashedBucketKey& key,
-                                                       BSONObj&& metadata);
+                                                       BSONObj metadata);
 
         /**
          * Helper to determine the state of the bucket that is found by _findOpenBucketThenLock and

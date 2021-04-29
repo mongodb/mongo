@@ -103,6 +103,15 @@ void normalizeObject(BSONObjBuilder* builder, const BSONObj& obj) {
     }
 }
 
+void normalizeTopLevel(BSONObjBuilder* builder, const BSONElement& elem) {
+    if (elem.type() != BSONType::Object) {
+        builder->append(elem);
+    } else {
+        BSONObjBuilder subObject(builder->subobjStart(elem.fieldNameStringData()));
+        normalizeObject(&subObject, elem.Obj());
+    }
+}
+
 UUID getLsid(OperationContext* opCtx, BucketCatalog::CombineWithInsertsFromOtherClients combine) {
     static const UUID common{UUID::gen()};
     switch (combine) {
@@ -143,13 +152,12 @@ StatusWith<std::shared_ptr<BucketCatalog::WriteBatch>> BucketCatalog::insert(
     const BSONObj& doc,
     CombineWithInsertsFromOtherClients combine) {
 
-    BSONObjBuilder metadata;
-    if (auto metaField = options.getMetaField()) {
-        if (auto elem = doc[*metaField]) {
-            metadata.append(elem);
-        }
+    BSONElement metadata;
+    auto metaFieldName = options.getMetaField();
+    if (metaFieldName) {
+        metadata = doc[*metaFieldName];
     }
-    auto key = BucketKey{ns, BucketMetadata{metadata.obj(), comparator}};
+    auto key = BucketKey{ns, BucketMetadata{metadata, comparator}};
 
     auto stats = _getExecutionStats(ns);
     invariant(stats);
@@ -463,7 +471,7 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
     _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     _markBucketNotIdle(bucket, expiringBuckets /* locked */);
     _removeNonNormalizedKeysForBucket(bucket);
-    _openBuckets.erase({bucket->_ns, std::move(bucket->_metadata)});
+    _openBuckets.erase({bucket->_ns, bucket->_metadata});
     {
         stdx::lock_guard statesLk{_statesMutex};
         _bucketStates.erase(bucket->_id);
@@ -476,7 +484,7 @@ bool BucketCatalog::_removeBucket(Bucket* bucket, bool expiringBuckets) {
 void BucketCatalog::_removeNonNormalizedKeysForBucket(Bucket* bucket) {
     auto comparator = bucket->_metadata.getComparator();
     for (auto&& metadata : bucket->_nonNormalizedKeyMetadatas) {
-        _openBuckets.erase({bucket->_ns, {std::move(metadata), comparator}});
+        _openBuckets.erase({bucket->_ns, {metadata.firstElement(), metadata, comparator}});
     }
 }
 
@@ -644,31 +652,54 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(const
     return state;
 }
 
-BucketCatalog::BucketMetadata::BucketMetadata(BSONObj&& obj,
+BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
                                               const StringData::ComparatorInterface* comparator)
-    : _metadata(obj), _comparator(comparator) {}
+    : _metadataElement(elem), _comparator(comparator) {}
+
+BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
+                                              BSONObj obj,
+                                              const StringData::ComparatorInterface* comparator,
+                                              bool normalized,
+                                              bool copied)
+    : _metadataElement(elem),
+      _metadata(obj),
+      _comparator(comparator),
+      _normalized(normalized),
+      _copied(copied) {}
+
 
 void BucketCatalog::BucketMetadata::normalize() {
     if (!_normalized) {
-        BSONObjBuilder objBuilder;
-        // We will get an object of equal size, just with reordered fields.
-        objBuilder.bb().reserveBytes(_metadata.objsize());
-        normalizeObject(&objBuilder, _metadata);
-        _metadata = objBuilder.obj();
+        if (_metadataElement) {
+            BSONObjBuilder objBuilder;
+            // We will get an object of equal size, just with reordered fields.
+            objBuilder.bb().reserveBytes(_metadataElement.size());
+            normalizeTopLevel(&objBuilder, _metadataElement);
+            _metadata = objBuilder.obj();
+        }
+        // Updates the BSONElement to refer to the copied BSONObj.
+        _metadataElement = _metadata.firstElement();
         _normalized = true;
+        _copied = true;
     }
 }
 
 bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return _metadata.binaryEqual(other._metadata);
+    return _metadataElement.binaryEqualValues(other._metadataElement);
 }
 
 const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
+    // Should only be called after the metadata is owned.
+    invariant(_copied);
     return _metadata;
 }
 
+const BSONElement BucketCatalog::BucketMetadata::getMetaElement() const {
+    return _metadataElement;
+}
+
 StringData BucketCatalog::BucketMetadata::getMetaField() const {
-    return _metadata.firstElementFieldNameStringData();
+    return StringData(_metadataElement.fieldName());
 }
 
 const StringData::ComparatorInterface* BucketCatalog::BucketMetadata::getComparator() const {
@@ -753,14 +784,12 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
 
     // If not found, we normalize the metadata object and try to find it again.
     // Save a copy of the non-normalized metadata before normalizing so we can add this key if the
-    // bucket was found for the normalized metadata.
-    BSONObj nonNormalizedMetadata = key.metadata.toBSON();
+    // bucket was found for the normalized metadata. The BSON element is still refering to that of
+    // the document in current scope at this point. We will only make a copy of it when we decide to
+    // store it.
+    BSONElement nonNormalizedMetadata = key.metadata.getMetaElement();
     key.metadata.normalize();
     HashedBucketKey hashedNormalizedKey = BucketHasher{}.hashed_key(key);
-
-    // Re-construct the key as it were before normalization
-    auto originalBucketKey = key.withMetadata(nonNormalizedMetadata);
-    hashedKey.key = &originalBucketKey;
 
     if (bucketFound(_findOpenBucketThenLock(hashedNormalizedKey))) {
         // Bucket found, check if we have available slots to store the non-normalized key
@@ -772,16 +801,28 @@ BucketCatalog::BucketAccess::BucketAccess(BucketCatalog* catalog,
         // Release the bucket as we need to acquire the exclusive lock for the catalog.
         release();
 
+        // Re-construct the key as it were before normalization.
+        auto originalBucketKey = nonNormalizedMetadata
+            ? key.withCopiedMetadata(nonNormalizedMetadata.wrap())
+            : key.withCopiedMetadata(BSONObj());
+        hashedKey.key = &originalBucketKey;
+
         // Find the bucket under a catalog exclusive lock for the catalog. It may have been modified
         // since we released our locks. If found we store the key to avoid the need to normalize for
         // future lookups with this incoming field order.
+        BSONObj nonNormalizedMetadataObj =
+            nonNormalizedMetadata ? nonNormalizedMetadata.wrap() : BSONObj();
         if (bucketFound(_findOpenBucketThenLockAndStoreKey(
-                hashedNormalizedKey, hashedKey, std::move(nonNormalizedMetadata)))) {
+                hashedNormalizedKey, hashedKey, nonNormalizedMetadataObj))) {
             return;
         }
     }
 
-    // Bucket not found, grab exclusive lock and create bucket
+    // Bucket not found, grab exclusive lock and create bucket with the key before normalization.
+    auto originalBucketKey = nonNormalizedMetadata
+        ? key.withCopiedMetadata(nonNormalizedMetadata.wrap())
+        : key.withCopiedMetadata(BSONObj());
+    hashedKey.key = &originalBucketKey;
     auto lk = _catalog->_lockExclusive();
     _findOrCreateOpenBucketThenLock(hashedNormalizedKey, hashedKey);
 }
@@ -832,7 +873,9 @@ BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLock(
 }
 
 BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLockAndStoreKey(
-    const HashedBucketKey& normalizedKey, const HashedBucketKey& key, BSONObj&& metadata) {
+    const HashedBucketKey& normalizedKey,
+    const HashedBucketKey& nonNormalizedKey,
+    BSONObj nonNormalizedMetadata) {
     invariant(!isLocked());
     {
         auto lk = _catalog->_lockExclusive();
@@ -845,14 +888,16 @@ BucketCatalog::BucketState BucketCatalog::BucketAccess::_findOpenBucketThenLockA
         _bucket = it->second;
         _acquire();
 
-        // Store the key if we still have free slots
+        // Store the non-normalized key if we still have free slots
         if (_bucket->_nonNormalizedKeyMetadatas.size() <
             _bucket->_nonNormalizedKeyMetadatas.capacity()) {
-            auto [_, inserted] = _catalog->_openBuckets.insert(std::make_pair(key, _bucket));
+            auto [_, inserted] =
+                _catalog->_openBuckets.insert(std::make_pair(nonNormalizedKey, _bucket));
             if (inserted) {
-                _bucket->_nonNormalizedKeyMetadatas.push_back(metadata);
+                _bucket->_nonNormalizedKeyMetadatas.push_back(nonNormalizedMetadata);
                 // Increment the memory usage to store this key and value in _openBuckets
-                _bucket->_memoryUsage += key.key->ns.size() + metadata.objsize() + sizeof(_bucket);
+                _bucket->_memoryUsage += nonNormalizedKey.key->ns.size() +
+                    nonNormalizedMetadata.objsize() + sizeof(_bucket);
             }
         }
     }
@@ -875,11 +920,11 @@ BucketCatalog::BucketState BucketCatalog::BucketAccess::_confirmStateForAcquired
 }
 
 void BucketCatalog::BucketAccess::_findOrCreateOpenBucketThenLock(
-    const HashedBucketKey& normalizedKey, const HashedBucketKey& key) {
+    const HashedBucketKey& normalizedKey, const HashedBucketKey& nonNormalizedKey) {
     auto it = _catalog->_openBuckets.find(normalizedKey);
     if (it == _catalog->_openBuckets.end()) {
         // No open bucket for this metadata.
-        _create(normalizedKey, key);
+        _create(normalizedKey, nonNormalizedKey);
         return;
     }
 
@@ -898,7 +943,7 @@ void BucketCatalog::BucketAccess::_findOrCreateOpenBucketThenLock(
     }
 
     _catalog->_abort(_guard, _bucket, nullptr, boost::none);
-    _create(normalizedKey, key);
+    _create(normalizedKey, nonNormalizedKey);
 }
 
 void BucketCatalog::BucketAccess::_acquire() {
@@ -907,11 +952,11 @@ void BucketCatalog::BucketAccess::_acquire() {
 }
 
 void BucketCatalog::BucketAccess::_create(const HashedBucketKey& normalizedKey,
-                                          const HashedBucketKey& key,
+                                          const HashedBucketKey& nonNormalizedKey,
                                           bool openedDuetoMetadata) {
     _bucket = _catalog->_allocateBucket(normalizedKey, *_time, _stats, openedDuetoMetadata);
-    _catalog->_openBuckets[key] = _bucket;
-    _bucket->_nonNormalizedKeyMetadatas.push_back(key.key->metadata.toBSON());
+    _catalog->_openBuckets[nonNormalizedKey] = _bucket;
+    _bucket->_nonNormalizedKeyMetadatas.push_back(nonNormalizedKey.key->metadata.toBSON());
     _acquire();
 }
 
@@ -947,10 +992,11 @@ void BucketCatalog::BucketAccess::rollover(const std::function<bool(BucketAccess
     release();
 
     // Precompute the hash outside the lock, since it's expensive.
-    auto prevMetadata = _key->metadata.toBSON();
+    auto prevMetadata = _key->metadata.getMetaElement();
     _key->metadata.normalize();
     auto hashedNormalizedKey = BucketHasher{}.hashed_key(*_key);
-    auto prevBucketKey = _key->withMetadata(prevMetadata);
+    auto prevBucketKey = prevMetadata ? _key->withCopiedMetadata(prevMetadata.wrap())
+                                      : _key->withCopiedMetadata(BSONObj());
     auto hashedKey = BucketHasher{}.hashed_key(prevBucketKey);
 
     auto lk = _catalog->_lockExclusive();
