@@ -316,6 +316,9 @@ private:
         // Count of fetched docs during ARM processing of the current batch. Used to reduce the
         // batchSize in getMore when mongod returned less docs than the requested batchSize.
         long long fetchedCount = 0;
+
+        // If set to 'true', the cursor on this shard has been invalidated.
+        bool invalidated = false;
     };
 
     class MergingComparator {
@@ -437,6 +440,12 @@ private:
      * Returns true if this async cursor is waiting to receive another batch from a remote.
      */
     bool _haveOutstandingBatchRequests(WithLock);
+
+    /**
+     * Called internally when attempting to get a new event for the caller to wait on. Throws if
+     * the shard cursor from which the next result is due has already been invalidated.
+     */
+    void _assertNotInvalidated(WithLock);
 
     /**
      * If a promisedMinSortKey has been received from all remotes, returns the lowest such key.

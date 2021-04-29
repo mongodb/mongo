@@ -206,6 +206,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="change_stream_invalidation_info",
+    source=[
+        'change_stream_invalidation_info.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 pipelineEnv = env.Clone()
 pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
@@ -290,6 +300,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/logical_session_cache',
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_invalidation_info',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',

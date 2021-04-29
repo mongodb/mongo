@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
@@ -490,10 +491,21 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
 
     auto stages = buildPipeline(expCtx, spec, elem);
 
+    const bool csOptFeatureFlag =
+        feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
+
+    if (expCtx->inMongos && csOptFeatureFlag) {
+        // TODO SERVER-55491: replace with DocumentSourceUpdateOnAddShard.
+        stages.push_back(DocumentSourceChangeStreamPipelineSplitter::create(expCtx));
+    }
+
     if (!expCtx->needsMerge) {
-        // There should only be one close cursor stage. If we're on the shards and producing input
-        // to be merged, do not add a close cursor stage, since the mongos will already have one.
-        stages.push_back(DocumentSourceCloseCursor::create(expCtx));
+        if (!csOptFeatureFlag) {
+            // There should only be one close cursor stage. If we're on the shards and producing
+            // input to be merged, do not add a close cursor stage, since the mongos will already
+            // have one.
+            stages.push_back(DocumentSourceCloseCursor::create(expCtx));
+        }
 
         // We only create a pre-image lookup stage on a non-merging mongoD. We place this stage here
         // so that any $match stages which follow the $changeStream pipeline prefix may be able to

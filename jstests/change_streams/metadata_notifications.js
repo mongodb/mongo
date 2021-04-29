@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/change_stream_util.js");
+load("jstests/libs/change_stream_util.js");        // For isChangeStreamOptimizationEnabled.
 load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For isSharded.
@@ -125,6 +125,18 @@ assert.commandFailedWithCode(db.runCommand({
     collation: {locale: "simple"},
 }),
                              ErrorCodes.InvalidResumeToken);
+
+// Test that if change stream optimization is enabled, then even after the 'invalidate' event has
+// been filtered out, the cursor should hold the resume token of the 'invalidate' event.
+if (isChangeStreamOptimizationEnabled(db)) {
+    const resumeStream =
+        coll.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: resumeToken});
+    assert.soon(() => {
+        assert(!resumeStream.hasNext());
+        return resumeStream.isExhausted();
+    });
+    assert.eq(resumeStream.getResumeToken(), resumeTokenInvalidate);
+}
 
 // Test resuming the change stream from the collection drop using 'startAfter'.
 assertResumeExpected({

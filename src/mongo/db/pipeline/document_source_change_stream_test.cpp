@@ -51,6 +51,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/transaction_history_iterator.h"
@@ -206,12 +207,12 @@ public:
                              const std::vector<repl::OplogEntry> transactionEntries = {},
                              std::vector<Document> documentsForLookup = {}) {
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry.getEntry().toBSON(), spec);
-        auto closeCursor = stages.back();
+        auto lastStage = stages.back();
 
         getExpCtx()->mongoProcessInterface = std::make_unique<MockMongoInterface>(
             docKeyFields, transactionEntries, std::move(documentsForLookup));
 
-        auto next = closeCursor->getNext();
+        auto next = lastStage->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
         ASSERT_EQ(next.isAdvanced(), static_cast<bool>(expectedDoc));
         if (expectedDoc) {
@@ -219,11 +220,17 @@ public:
         }
 
         if (expectedInvalidate) {
-            next = closeCursor->getNext();
+            next = lastStage->getNext();
             ASSERT_TRUE(next.isAdvanced());
             ASSERT_DOCUMENT_EQ(next.releaseDocument(), *expectedInvalidate);
+
             // Then throw an exception on the next call of getNext().
-            ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+            if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+                ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+            } else {
+                ASSERT_THROWS(lastStage->getNext(),
+                              ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
+            }
         }
     }
 
@@ -259,16 +266,20 @@ public:
         auto mock = DocumentSourceMock::createForTest(D(entry), getExpCtx());
         stages.insert(stages.begin(), mock);
 
+        // Remove the DSEnsureResumeTokenPresent stage since it will swallow the result.
+        auto newEnd = std::remove_if(stages.begin(), stages.end(), [](auto& stage) {
+            return dynamic_cast<DocumentSourceEnsureResumeTokenPresent*>(stage.get());
+        });
+        stages.erase(newEnd, stages.end());
+
         // Wire up the stages by setting the source stage.
-        auto prevStage = stages[0].get();
+        auto prevIt = stages.begin();
         for (auto stageIt = stages.begin() + 1; stageIt != stages.end(); stageIt++) {
             auto stage = (*stageIt).get();
-            // Do not include the check resume token stage since it will swallow the result.
-            if (dynamic_cast<DocumentSourceEnsureResumeTokenPresent*>(stage))
-                continue;
-            stage->setSource(prevStage);
-            prevStage = stage;
+            stage->setSource((*prevIt).get());
+            prevIt = stageIt;
         }
+
         return stages;
     }
 
@@ -1964,7 +1975,11 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
     vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
-    ASSERT_EQ(allStages.size(), 5UL);
+
+    const size_t changeStreamStageSize =
+        (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV() ? 4 : 5);
+    ASSERT_EQ(allStages.size(), changeStreamStageSize);
+
     auto stage = allStages[2];
     ASSERT(dynamic_cast<DocumentSourceChangeStreamTransform*>(stage.get()));
 
@@ -1995,7 +2010,7 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
 TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
     auto stages = makeStages(dropColl);
-    auto closeCursor = stages.back();
+    auto lastStage = stages.back();
 
     Document expectedDrop{
         {DSChangeStream::kIdField, makeResumeToken(kDefaultTs, testUuid())},
@@ -2011,26 +2026,35 @@ TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {
         {DSChangeStream::kClusterTimeField, kDefaultTs},
     };
 
-    auto next = closeCursor->getNext();
+    auto next = lastStage->getNext();
     // Transform into drop entry.
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedDrop);
-    next = closeCursor->getNext();
+    next = lastStage->getNext();
     // Transform into invalidate entry.
     ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedInvalidate);
+
     // Then throw an exception on the next call of getNext().
-    ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+    if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+    } else {
+        ASSERT_THROWS(lastStage->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
+    }
 }
 
 TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) {
     OplogEntry dropColl = createCommand(BSON("drop" << nss.coll()), testUuid());
     auto stages = makeStages(dropColl);
-    auto closeCursor = stages.back();
+    auto lastStage = stages.back();
     // Add a match stage after change stream to filter out the invalidate entries.
     auto match = DocumentSourceMatch::create(fromjson("{operationType: 'insert'}"), getExpCtx());
-    match->setSource(closeCursor.get());
+    match->setSource(lastStage.get());
 
     // Throw an exception on the call of getNext().
-    ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+    if (!feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
+    } else {
+        ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::ChangeStreamInvalidated>);
+    }
 }
 
 TEST_F(ChangeStreamStageTest, DocumentKeyShouldIncludeShardKeyFromResumeToken) {

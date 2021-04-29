@@ -46,6 +46,7 @@
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/find_common.h"
@@ -338,6 +339,18 @@ public:
             } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
                 // This exception indicates that we should close the cursor without reporting an
                 // error.
+                return false;
+            } catch (const ExceptionFor<ErrorCodes::ChangeStreamInvalidated>& ex) {
+                // This exception is thrown when a change-stream cursor is invalidated. Set the PBRT
+                // to the resume token of the invalidating event, and mark the cursor response as
+                // invalidated. We always expect to have ExtraInfo for this error code.
+                const auto extraInfo = ex.extraInfo<ChangeStreamInvalidationInfo>();
+                tassert(5493700,
+                        "Missing ChangeStreamInvalidationInfo on exception",
+                        extraInfo != nullptr);
+
+                nextBatch->setPostBatchResumeToken(extraInfo->getInvalidateResumeToken());
+                nextBatch->setInvalidated();
                 return false;
             } catch (DBException& exception) {
                 nextBatch->abandon();

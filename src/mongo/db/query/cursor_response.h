@@ -95,6 +95,10 @@ public:
         _partialResultsReturned = partialResults;
     }
 
+    void setInvalidated() {
+        _invalidated = true;
+    }
+
     long long numDocs() const {
         return _numDocs;
     }
@@ -124,6 +128,7 @@ private:
     long long _numDocs = 0;
     BSONObj _postBatchResumeToken;
     bool _partialResultsReturned = false;
+    bool _invalidated = false;
 };
 
 /**
@@ -194,7 +199,8 @@ public:
                    boost::optional<long long> numReturnedSoFar = boost::none,
                    boost::optional<BSONObj> postBatchResumeToken = boost::none,
                    boost::optional<BSONObj> writeConcernError = boost::none,
-                   bool partialResultsReturned = false);
+                   bool partialResultsReturned = false,
+                   bool invalidated = false);
 
     CursorResponse(CursorResponse&& other) = default;
     CursorResponse& operator=(CursorResponse&& other) = default;
@@ -239,6 +245,10 @@ public:
         return _partialResultsReturned;
     }
 
+    bool getInvalidated() const {
+        return _invalidated;
+    }
+
     /**
      * Converts this response to its raw BSON representation.
      */
@@ -257,6 +267,7 @@ private:
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _writeConcernError;
     bool _partialResultsReturned = false;
+    bool _invalidated = false;
 };
 
 }  // namespace mongo

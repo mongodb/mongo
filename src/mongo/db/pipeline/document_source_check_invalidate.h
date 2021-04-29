@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
@@ -90,6 +91,7 @@ private:
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
     boost::optional<Document> _queuedInvalidate;
+    boost::optional<ChangeStreamInvalidationInfo> _queuedException;
 };
 
 }  // namespace mongo

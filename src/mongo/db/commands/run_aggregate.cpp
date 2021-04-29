@@ -49,6 +49,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
@@ -186,6 +187,20 @@ bool handleCursorCommand(OperationContext* opCtx,
         } catch (const ExceptionFor<ErrorCodes::CloseChangeStream>&) {
             // This exception is thrown when a $changeStream stage encounters an event that
             // invalidates the cursor. We should close the cursor and return without error.
+            cursor = nullptr;
+            exec = nullptr;
+            break;
+        } catch (const ExceptionFor<ErrorCodes::ChangeStreamInvalidated>& ex) {
+            // This exception is thrown when a change-stream cursor is invalidated. Set the PBRT
+            // to the resume token of the invalidating event, and mark the cursor response as
+            // invalidated. We expect ExtraInfo to always be present for this exception.
+            const auto extraInfo = ex.extraInfo<ChangeStreamInvalidationInfo>();
+            tassert(
+                5493701, "Missing ChangeStreamInvalidationInfo on exception", extraInfo != nullptr);
+
+            responseBuilder.setPostBatchResumeToken(extraInfo->getInvalidateResumeToken());
+            responseBuilder.setInvalidated();
+
             cursor = nullptr;
             exec = nullptr;
             break;

@@ -15,6 +15,15 @@ const ChangeStreamWatchMode = Object.freeze({
 });
 
 /**
+ * Returns true if feature flag 'featureFlagChangeStreamsOptimization' is enabled, false otherwise.
+ */
+function isChangeStreamOptimizationEnabled(db) {
+    const getParam = db.adminCommand({getParameter: 1, featureFlagChangeStreamsOptimization: 1});
+    return getParam.hasOwnProperty("featureFlagChangeStreamsOptimization") &&
+        getParam.featureFlagChangeStreamsOptimization.value;
+}
+
+/**
  * Helper function used internally by ChangeStreamTest. If no passthrough is active, it is exactly
  * the same as calling db.runCommand. If a passthrough is active and has defined a function
  * 'changeStreamPassthroughAwareRunCommand', then this method will be overridden to allow individual
@@ -52,6 +61,7 @@ function assertInvalidateOp({cursor, opType}) {
         assert.soon(() => cursor.hasNext());
         const invalidate = cursor.next();
         assert.eq(invalidate.operationType, "invalidate");
+        assert(!cursor.hasNext());
         assert(cursor.isExhausted());
         assert(cursor.isClosed());
         return invalidate;

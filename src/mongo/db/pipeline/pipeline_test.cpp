@@ -59,6 +59,7 @@
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/dbtests/dbtests.h"
@@ -73,6 +74,10 @@ using std::string;
 using std::vector;
 
 const NamespaceString kTestNss = NamespaceString("a.collection");
+
+size_t getChangeStreamStageSize() {
+    return (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV() ? 5 : 6);
+}
 
 void setMockReplicationCoordinatorOnOpCtx(OperationContext* opCtx) {
     repl::ReplicationCoordinator::set(
@@ -2054,7 +2059,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupSwapsWithIndependentMatch) {
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 6UL);
+    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 
@@ -2080,7 +2085,7 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     auto spec = BSON("$changeStream" << BSON("fullDocument"
                                              << "updateLookup"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 6UL);
+    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the change lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePostImage*>(stages.back().get()));
 
@@ -2105,7 +2110,7 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeLookupSwapsWithIndependen
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                              << "required"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 6UL);
+    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePreImage*>(stages.back().get()));
 
@@ -2131,7 +2136,7 @@ TEST(PipelineOptimizationTest, FullDocumentBeforeChangeDoesNotSwapWithMatchOnPre
     auto spec = BSON("$changeStream" << BSON("fullDocumentBeforeChange"
                                              << "required"));
     auto stages = DocumentSourceChangeStream::createFromBson(spec.firstElement(), expCtx);
-    ASSERT_EQ(stages.size(), 6UL);
+    ASSERT_EQ(stages.size(), getChangeStreamStageSize());
     // Make sure the pre-image lookup is at the end.
     ASSERT(dynamic_cast<DocumentSourceLookupChangePreImage*>(stages.back().get()));
 

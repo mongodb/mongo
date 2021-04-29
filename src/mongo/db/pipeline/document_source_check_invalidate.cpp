@@ -33,6 +33,8 @@
 
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_check_invalidate.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -58,10 +60,19 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 }  // namespace
 
 DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
+    // To declare a change stream as invalidated, this stage first emits an invalidate event and
+    // then throws a 'ChangeStreamInvalidated' exception on the next call to this method.
+
     if (_queuedInvalidate) {
         const auto res = DocumentSource::GetNextResult(std::move(_queuedInvalidate.get()));
         _queuedInvalidate.reset();
         return res;
+    }
+
+    if (_queuedException &&
+        feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        uasserted(static_cast<ChangeStreamInvalidationInfo>(*_queuedException),
+                  "Change stream invalidated");
     }
 
     auto nextInput = pSource->getNext();
@@ -108,6 +119,15 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
         result.metadata().setSortKey(Value{resumeTokenDoc}, isSingleElementKey);
 
         _queuedInvalidate = result.freeze();
+
+        // By this point, either the '_startAfterInvalidate' is absent or it is present and the
+        // current event matches the resume token. In the latter case, we do not want to close the
+        // change stream and should not throw an exception. Therefore, we only queue up an exception
+        // if '_startAfterInvalidate' is absent.
+        if (!_startAfterInvalidate) {
+            _queuedException = ChangeStreamInvalidationInfo(
+                _queuedInvalidate->metadata().getSortKey().getDocument().toBson());
+        }
     }
 
     // Regardless of whether the first document we see is an invalidating command, we only skip the

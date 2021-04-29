@@ -273,8 +273,11 @@ boost::optional<BSONObj> findSplitPoint(Pipeline::SourceContainer* shardPipe, Pi
             continue;
         }
 
-        // A source may not simultaneously be present on both sides of the split.
-        invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
+        // TODO SERVER-55491: remove this 'if' to make the invariant unconditional.
+        if (distributedPlanLogic->shardsStage && distributedPlanLogic->mergingStage) {
+            // A source may not simultaneously be present on both sides of the split.
+            invariant(distributedPlanLogic->shardsStage != distributedPlanLogic->mergingStage);
+        }
 
         if (distributedPlanLogic->shardsStage)
             shardPipe->push_back(std::move(distributedPlanLogic->shardsStage));

@@ -36,9 +36,11 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
+#include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -121,6 +123,10 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
 
         // A remote cannot be flagged as 'partialResultsReturned' if 'allowPartialResults' is false.
         invariant(!(_remotes.back().partialResultsReturned && !_params.getAllowPartialResults()));
+
+        // For the first batch, cursor should never be invalidated.
+        tassert(
+            5493704, "Found invalidated cursor on the first batch", !_remotes.back().invalidated);
 
         // We don't check the return value of _addBatchToBuffer here; if there was an error,
         // it will be stored in the remote and the first call to ready() will return true.
@@ -532,6 +538,11 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
                       "nextEvent() called before an outstanding event was signaled");
     }
 
+    // Check if the cursor should be invalidated.
+    if (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()) {
+        _assertNotInvalidated(lk);
+    }
+
     auto getMoresStatus = _scheduleGetMores(lk);
     if (!getMoresStatus.isOK()) {
         return getMoresStatus;
@@ -550,6 +561,15 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     // the new event.
     _signalCurrentEventIfReady(lk);
     return eventToReturn;
+}
+
+void AsyncResultsMerger::_assertNotInvalidated(WithLock lk) {
+    if (auto minPromisedSortKey = _getMinPromisedSortKey(lk)) {
+        const auto& minRemote = _remotes[minPromisedSortKey->second];
+        uassert(ChangeStreamInvalidationInfo{minPromisedSortKey->first.firstElement().Obj()},
+                "Change stream invalidated",
+                !(minRemote.invalidated && !_ready(lk)));
+    }
 }
 
 StatusWith<CursorResponse> AsyncResultsMerger::_parseCursorResponse(
@@ -579,6 +599,14 @@ void AsyncResultsMerger::_updateRemoteMetadata(WithLock lk,
     // Update the cursorId; it is sent as '0' when the cursor has been exhausted on the shard.
     auto& remote = _remotes[remoteIndex];
     remote.cursorId = response.getCursorId();
+
+    // If the response indicates that the cursor has been invalidated, mark the corresponding
+    // remote as invalidated. This also signifies that the shard cursor has been closed.
+    remote.invalidated = response.getInvalidated();
+    tassert(5493705,
+            "Unexpectedly encountered invalidated cursor with non-zero ID",
+            !(remote.invalidated && remote.cursorId > 0));
+
     if (response.getPostBatchResumeToken()) {
         // We only expect to see this for change streams.
         invariant(_params.getSort());

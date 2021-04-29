@@ -190,6 +190,7 @@ function runTest(collName, shardKey) {
     assert.eq(changeStream.next().operationType, "drop");
     assert.soon(() => changeStream.hasNext());
     assert.eq(changeStream.next().operationType, "invalidate");
+    assert(!changeStream.hasNext());
     assert(changeStream.isExhausted());
 
     jsTestLog('Testing aggregate command closes cursor for invalidate entries with shard key' +

@@ -51,6 +51,7 @@ const char kBatchDocSequenceField[] = "cursor.nextBatch";
 const char kBatchDocSequenceFieldInitial[] = "cursor.firstBatch";
 const char kPostBatchResumeTokenField[] = "postBatchResumeToken";
 const char kPartialResultsReturnedField[] = "partialResultsReturned";
+const char kInvalidatedField[] = "invalidated";
 
 }  // namespace
 
@@ -73,6 +74,11 @@ void CursorResponseBuilder::done(CursorId cursorId, StringData cursorNamespace) 
     if (_partialResultsReturned) {
         _cursorObject->append(kPartialResultsReturnedField, true);
     }
+
+    if (_invalidated) {
+        _cursorObject->append(kInvalidatedField, _invalidated);
+    }
+
     _cursorObject->append(kIdField, cursorId);
     _cursorObject->append(kNsField, cursorNamespace);
     if (_options.atClusterTime) {
@@ -123,7 +129,8 @@ CursorResponse::CursorResponse(NamespaceString nss,
                                boost::optional<long long> numReturnedSoFar,
                                boost::optional<BSONObj> postBatchResumeToken,
                                boost::optional<BSONObj> writeConcernError,
-                               bool partialResultsReturned)
+                               bool partialResultsReturned,
+                               bool invalidated)
     : _nss(std::move(nss)),
       _cursorId(cursorId),
       _batch(std::move(batch)),
@@ -131,7 +138,8 @@ CursorResponse::CursorResponse(NamespaceString nss,
       _numReturnedSoFar(numReturnedSoFar),
       _postBatchResumeToken(std::move(postBatchResumeToken)),
       _writeConcernError(std::move(writeConcernError)),
-      _partialResultsReturned(partialResultsReturned) {}
+      _partialResultsReturned(partialResultsReturned),
+      _invalidated(invalidated) {}
 
 std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
     const BSONObj& cmdResponse) {
@@ -246,6 +254,16 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
         }
     }
 
+    auto invalidatedElem = cursorObj[kInvalidatedField];
+    if (invalidatedElem) {
+        if (invalidatedElem.type() != BSONType::Bool) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << kInvalidatedField
+                                  << " format is invalid; expected Bool, but found: "
+                                  << invalidatedElem.type()};
+        }
+    }
+
     auto writeConcernError = cmdResponse["writeConcernError"];
 
     if (writeConcernError && writeConcernError.type() != BSONType::Object) {
@@ -262,7 +280,8 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
              postBatchResumeTokenElem ? postBatchResumeTokenElem.Obj().getOwned()
                                       : boost::optional<BSONObj>{},
              writeConcernError ? writeConcernError.Obj().getOwned() : boost::optional<BSONObj>{},
-             partialResultsReturned.trueValue()}};
+             partialResultsReturned.trueValue(),
+             invalidatedElem.trueValue()}};
 }
 
 void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
@@ -290,6 +309,10 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
 
     if (_partialResultsReturned) {
         cursorBuilder.append(kPartialResultsReturnedField, true);
+    }
+
+    if (_invalidated) {
+        cursorBuilder.append(kInvalidatedField, _invalidated);
     }
 
     cursorBuilder.doneFast();

@@ -59,6 +59,9 @@ structs:
             partialResultsReturned:
                 description: "Boolean represents whether partial results are being returned."
                 type: optionalBool
+            invalidated:
+                description: "Boolean represents if the cursor has been invalidated."
+                type: optionalBool
 
     InitialResponseCursor:
         description: "A struct representing an initial response cursor."
