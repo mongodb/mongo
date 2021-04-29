@@ -465,12 +465,9 @@ tiered_meta = common_meta + tiered_config + [
 ]
 
 tier_meta = file_meta + tiered_tree_config
-object_meta = file_meta + [
-    Config('bucket_prefix', '', r'''
-        unique string prefix to identify our objects in the bucket.
-        Multiple instances can share the storage bucket and this
-        identifier is used in naming objects'''),
-]
+# Objects need to have the readonly setting set and bucket_prefix.
+# The file_meta already contains those pieces.
+object_meta = file_meta
 
 table_only_config = [
     Config('colgroups', '', r'''

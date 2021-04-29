@@ -722,7 +722,7 @@ config_sanity(WTPERF *wtperf)
     if (opts->run_time > 0 &&
       ((opts->checkpoint_threads != 0 && opts->checkpoint_interval > opts->run_time) ||
         opts->report_interval > opts->run_time || opts->sample_interval > opts->run_time ||
-        opts->scan_interval > opts->run_time)) {
+        opts->scan_interval > opts->run_time || opts->backup_interval > opts->run_time)) {
         fprintf(stderr, "interval value longer than the run-time\n");
         return (EINVAL);
     }
@@ -966,6 +966,10 @@ config_opt_print(WTPERF *wtperf)
       "\t"
       "Scan interval: %" PRIu32 "\n",
       opts->scan_interval);
+    printf(
+      "\t"
+      "Backup interval: %" PRIu32 "\n",
+      opts->backup_interval);
 
     printf(
       "\t"

@@ -81,6 +81,8 @@
  * options are appended to existing content, whereas STRING options overwrite.
  */
 DEF_OPT_AS_UINT32(
+  backup_interval, 0, "backup the database every interval seconds during the workload phase, 0 to disable")
+DEF_OPT_AS_UINT32(
   checkpoint_interval, 120, "checkpoint every interval seconds during the workload phase.")
 DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
   "checkpoint every rate operations during the populate phase in the populate thread(s), 0 to "

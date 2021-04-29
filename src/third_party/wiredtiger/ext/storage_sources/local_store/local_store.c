@@ -100,7 +100,8 @@ typedef struct {
     WT_FILE_SYSTEM *wt_fs;
 
     char *auth_token; /* Identifier for key management system */
-    char *bucket;     /* Actually a directory path for local implementation */
+    char *bucket_dir; /* Directory that stands in for cloud storage bucket */
+    char *cache_dir;  /* Directory for pre-flushed objects and cached objects */
     char *fs_prefix;  /* File system prefix, allowing for a "directory" within a bucket */
 } LOCAL_FILE_SYSTEM;
 
@@ -113,8 +114,9 @@ typedef struct local_flush_item {
     /*
      * These fields would be used in performing a flush.
      */
-    char *auth_token; /* Identifier for key management system */
-    char *bucket;     /* Bucket name */
+    char *auth_token;               /* Identifier for key management system */
+    char *bucket;                   /* Bucket name */
+    WT_FS_OPEN_FILE_TYPE file_type; /* File type */
 
     TAILQ_ENTRY(local_flush_item) q; /* Queue of items */
 } LOCAL_FLUSH_ITEM;
@@ -138,6 +140,7 @@ static int local_configure_int(LOCAL_STORAGE *, WT_CONFIG_ARG *, const char *, u
 static int local_delay(LOCAL_STORAGE *);
 static int local_err(LOCAL_STORAGE *, WT_SESSION *, int, const char *, ...);
 static void local_flush_free(LOCAL_FLUSH_ITEM *);
+static int local_get_directory(const char *, ssize_t len, char **);
 static int local_location_path(WT_FILE_SYSTEM *, const char *, char **);
 static int local_writeable(LOCAL_STORAGE *, WT_SESSION *, const char *, bool *);
 
@@ -305,6 +308,34 @@ local_flush_free(LOCAL_FLUSH_ITEM *flush)
 }
 
 /*
+ * local_get_directory --
+ *     Return a copy of a directory name after verifying that it is a directory.
+ */
+static int
+local_get_directory(const char *s, ssize_t len, char **copy)
+{
+    struct stat sb;
+    int ret;
+    char *dirname;
+
+    if (len == -1)
+        len = (ssize_t)strlen(s);
+    dirname = strndup(s, (size_t)len + 1); /* Room for null */
+    if (dirname == NULL)
+        return (ENOMEM);
+    ret = stat(dirname, &sb);
+    if (ret != 0)
+        ret = errno;
+    else if ((sb.st_mode & S_IFMT) != S_IFDIR)
+        ret = EINVAL;
+    if (ret != 0)
+        free(dirname);
+    else
+        *copy = dirname;
+    return (ret);
+}
+
+/*
  * local_writeable --
  *     Check if a file is local and writeable.
  */
@@ -327,7 +358,7 @@ local_writeable(LOCAL_STORAGE *local, WT_SESSION *session, const char *name, boo
          * not an error.
          */
         ret = 0;
-    } else if (ret != 0)
+    } else
         ret = local_err(local, session, errno, "%s: stat", name);
 
     return (ret);
@@ -348,10 +379,10 @@ local_location_path(WT_FILE_SYSTEM *file_system, const char *name, char **pathp)
     ret = 0;
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
 
-    len = strlen(local_fs->bucket) + strlen(local_fs->fs_prefix) + strlen(name) + 2;
+    len = strlen(local_fs->cache_dir) + strlen(local_fs->fs_prefix) + strlen(name) + 2;
     if ((p = malloc(len)) == NULL)
         return (local_err(FS2LOCAL(file_system), NULL, ENOMEM, "local_location_path"));
-    snprintf(p, len, "%s/%s%s", local_fs->bucket, local_fs->fs_prefix, name);
+    snprintf(p, len, "%s/%s%s", local_fs->cache_dir, local_fs->fs_prefix, name);
     *pathp = p;
     return (ret);
 }
@@ -367,6 +398,7 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
 {
     LOCAL_STORAGE *local;
     LOCAL_FILE_SYSTEM *fs;
+    WT_CONFIG_ITEM cachedir;
     WT_FILE_SYSTEM *wt_fs;
     int ret;
 
@@ -374,8 +406,23 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
 
     fs = NULL;
     ret = 0;
-    if (config != NULL)
-        return local_err(local, session, EINVAL, "customize file system: config must be NULL");
+
+    /* Parse configuration string. */
+    if ((ret = local->wt_api->config_get_string(
+           local->wt_api, session, config, "cache_directory", &cachedir)) != 0) {
+        if (ret == WT_NOTFOUND) {
+            ret = 0;
+            cachedir.len = 0;
+        } else {
+            ret = local_err(local, session, ret, "customize_file_system: config parsing");
+            goto err;
+        }
+    }
+    /* Default is "." directory. */
+    if (cachedir.len == 0) {
+        cachedir.str = ".";
+        cachedir.len = 1;
+    }
 
     if ((ret = local->wt_api->file_system_get(local->wt_api, session, &wt_fs)) != 0) {
         ret =
@@ -393,8 +440,15 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         ret = local_err(local, session, ENOMEM, "local_file_system.auth_token");
         goto err;
     }
-    if ((fs->bucket = strdup(bucket_name)) == NULL) {
-        ret = local_err(local, session, ENOMEM, "local_file_system.bucket_name");
+    /*
+     * Get the bucket directory and the cache directory.
+     */
+    if ((ret = local_get_directory(bucket_name, -1, &fs->bucket_dir)) != 0) {
+        ret = local_err(local, session, ret, "%s: bucket directory", bucket_name);
+        goto err;
+    }
+    if ((ret = local_get_directory(cachedir.str, (ssize_t)cachedir.len, &fs->cache_dir)) != 0) {
+        ret = local_err(local, session, ret, "%*s: cache directory", cachedir.len, cachedir.str);
         goto err;
     }
     if ((fs->fs_prefix = strdup(prefix)) == NULL) {
@@ -412,9 +466,13 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
     fs->file_system.terminate = local_fs_terminate;
 
 err:
-    if (ret != 0)
+    if (ret != 0) {
+        free(fs->auth_token);
+        free(fs->bucket_dir);
+        free(fs->cache_dir);
+        free(fs->fs_prefix);
         free(fs);
-    else
+    } else
         *file_systemp = &fs->file_system;
     return (ret);
 }
@@ -541,28 +599,84 @@ err:
 static int
 local_flush_one(LOCAL_STORAGE *local, WT_SESSION *session, LOCAL_FLUSH_ITEM *flush)
 {
-    int ret;
+    WT_FILE_HANDLE *dest, *src;
+    WT_FILE_SYSTEM *wt_fs;
+    wt_off_t copy_size, file_size, left;
+    int ret, t_ret;
     char *object_name;
+    char buffer[1024 * 64];
+    char dest_path[1024];
+    ssize_t pos;
 
     ret = 0;
+    src = dest = NULL;
 
     object_name = strrchr(flush->src_path, '/');
-    if (object_name == NULL)
+    if (object_name == NULL) {
         ret = local_err(local, session, errno, "%s: unexpected src path", flush->src_path);
-    else {
-        object_name++;
-
-        /* Here's where we would copy the file to a cloud object. */
-        VERBOSE(local, "Flush object: from=%s, bucket=%s, object=%s, auth_token=%s, \n",
-          flush->src_path, flush->bucket, object_name, flush->auth_token);
-        local->object_flushes++;
-
-        if ((ret = local_delay(local)) != 0)
-            return (ret);
+        goto err;
     }
+    object_name++;
+
+    /*
+     * Here's where we flush the file to the cloud. This "local" implementation copies the file to
+     * the bucket directory.
+     */
+    VERBOSE(local, "Flush object: from=%s, bucket=%s, object=%s, auth_token=%s, \n",
+      flush->src_path, flush->bucket, object_name, flush->auth_token);
+
+    if ((ret = local_delay(local)) != 0)
+        goto err;
+
+    if ((ret = local->wt_api->file_system_get(local->wt_api, session, &wt_fs)) != 0) {
+        ret =
+          local_err(local, session, ret, "local_file_system: cannot get WiredTiger file system");
+        goto err;
+    }
+    snprintf(dest_path, sizeof(dest_path), "%s/%s", flush->bucket, object_name);
+
+    if ((ret = wt_fs->fs_open_file(
+           wt_fs, session, flush->src_path, flush->file_type, WT_FS_OPEN_READONLY, &src)) != 0) {
+        ret = local_err(local, session, ret, "%s: cannot open for read", flush->src_path);
+        goto err;
+    }
+
+    if ((ret = wt_fs->fs_open_file(
+           wt_fs, session, dest_path, flush->file_type, WT_FS_OPEN_CREATE, &dest)) != 0) {
+        ret = local_err(local, session, ret, "%s: cannot create", dest_path);
+        goto err;
+    }
+    if ((ret = wt_fs->fs_size(wt_fs, session, flush->src_path, &file_size)) != 0) {
+        ret = local_err(local, session, ret, "%s: cannot get size", flush->src_path);
+        goto err;
+    }
+    for (pos = 0, left = file_size; left > 0; pos += copy_size, left -= copy_size) {
+        copy_size = left < (wt_off_t)sizeof(buffer) ? left : (wt_off_t)sizeof(buffer);
+        if ((ret = src->fh_read(src, session, pos, (size_t)copy_size, buffer)) != 0) {
+            ret = local_err(local, session, ret, "%s: cannot read", flush->src_path);
+            goto err;
+        }
+        if ((ret = dest->fh_write(dest, session, pos, (size_t)copy_size, buffer)) != 0) {
+            ret = local_err(local, session, ret, "%s: cannot write", dest_path);
+            goto err;
+        }
+    }
+    if ((ret = dest->fh_sync(dest, session)) != 0) {
+        ret = local_err(local, session, ret, "%s: cannot sync", dest_path);
+        goto err;
+    }
+    local->object_flushes++;
+
+err:
     /* When we're done with flushing this file, set the file to readonly. */
     if (ret == 0 && (ret = chmod(flush->src_path, 0444)) < 0)
         ret = local_err(local, session, errno, "%s: chmod flushed file failed", flush->src_path);
+    if (src != NULL && (t_ret = src->close(src, session)) != 0)
+        if (ret == 0)
+            ret = t_ret;
+    if (dest != NULL && (t_ret = dest->close(dest, session)) != 0)
+        if (ret == 0)
+            ret = t_ret;
 
     return (ret);
 }
@@ -582,7 +696,7 @@ local_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const cha
 
 /*
  * local_directory_list_single --
- *     Return a single file name for the given ....
+ *     Return a single file name for the given location.
  */
 static int
 local_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *directory,
@@ -642,11 +756,12 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
     *dirlistp = NULL;
     *countp = 0;
 
-    if ((dirp = opendir(local_fs->bucket)) == NULL) {
+    if ((dirp = opendir(local_fs->cache_dir)) == NULL) {
         ret = errno;
         if (ret == 0)
             ret = EINVAL;
-        return (local_err(local, session, ret, "%s: ss_directory_list: opendir", local_fs->bucket));
+        return (
+          local_err(local, session, ret, "%s: ss_directory_list: opendir", local_fs->cache_dir));
     }
 
     for (count = 0; (dp = readdir(dirp)) != NULL && (limit == 0 || count < limit);) {
@@ -691,7 +806,7 @@ local_directory_list_internal(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 err:
     if (closedir(dirp) != 0) {
         t_ret =
-          local_err(local, session, errno, "%s: ss_directory_list: closedir", local_fs->bucket);
+          local_err(local, session, errno, "%s: ss_directory_list: closedir", local_fs->cache_dir);
         if (ret == 0)
             ret = t_ret;
     }
@@ -720,7 +835,8 @@ local_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
     local_fs = (LOCAL_FILE_SYSTEM *)file_system;
     FS2LOCAL(file_system)->op_count++;
     free(local_fs->auth_token);
-    free(local_fs->bucket);
+    free(local_fs->bucket_dir);
+    free(local_fs->cache_dir);
     free(local_fs->fs_prefix);
     free(file_system);
 
@@ -802,10 +918,11 @@ local_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *name,
             ret = local_err(local, session, ENOMEM, "open.auth_token");
             goto err;
         }
-        if ((flush->bucket = strdup(local_fs->bucket)) == NULL) {
+        if ((flush->bucket = strdup(local_fs->bucket_dir)) == NULL) {
             ret = local_err(local, session, ENOMEM, "open.bucket");
             goto err;
         }
+        flush->file_type = file_type;
     }
 
     if ((wt_fs->fs_open_file(wt_fs, session, local_fh->path, file_type, flags, &wt_fh)) < 0) {
@@ -923,7 +1040,7 @@ local_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *from,
                 ret = ENOMEM;
             else {
                 free(flush->src_path);
-                flush->src_path = to_path;
+                flush->src_path = copy;
             }
             break;
         }

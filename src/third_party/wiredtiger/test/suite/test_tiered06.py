@@ -195,30 +195,71 @@ class test_tiered06(wttest.WiredTigerTestCase):
         fh.fh_write(session, 0, 'some stuff'.encode())
         fh.close(session)
 
+    objectdir1 = "./objects1"
+    objectdir2 = "./objects2"
+
+    cachedir1 = "./cache1"
+    cachedir2 = "./cache2"
+
     def check(self, fs, prefix, expect):
-        # We don't require any sorted output for location lists,
+        # We don't require any sorted output for directory lists,
         # so we'll sort before comparing.'
         got = sorted(fs.fs_directory_list(self.session, '', prefix))
         expect = sorted(expect)
         self.assertEquals(got, expect)
 
-    def test_local_locations(self):
+    # Check that objects are "in the cloud" after a flush.
+    # Using the local storage module, they are actually going to be in either
+    # objectdir1 or objectdir2
+    def check_objects(self, expect1, expect2):
+        got = sorted(list(os.listdir(self.objectdir1)))
+        expect = sorted(expect1)
+        self.assertEquals(got, expect)
+        got = sorted(list(os.listdir(self.objectdir2)))
+        expect = sorted(expect2)
+        self.assertEquals(got, expect)
+
+    def test_local_file_systems(self):
         # Test using various buckets, hosts
 
         session = self.session
         local = self.conn.get_storage_source('local_store')
         self.local = local
-        os.mkdir("objects1")
-        os.mkdir("objects2")
+        os.mkdir(self.objectdir1)
+        os.mkdir(self.objectdir2)
+        os.mkdir(self.cachedir1)
+        os.mkdir(self.cachedir2)
+        config1 = "cache_directory=" + self.cachedir1
+        config2 = "cache_directory=" + self.cachedir2
+        bad_config = "cache_directory=BAD"
 
-        # Any of the activity that happens in the various locations
-        # should be independent.
-        fs1 = local.ss_customize_file_system(session, "./objects1", "cluster1-", "k1", None)
-        fs2 = local.ss_customize_file_system(session, "./objects2", "cluster1-", "k2", None)
-        fs3 = local.ss_customize_file_system(session, "./objects1", "cluster2-", "k3", None)
-        fs4 = local.ss_customize_file_system(session, "./objects2", "cluster2-", "k4", None)
+        # Create file system objects. First try some error cases.
+        errmsg = '/No such file or directory/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: local.ss_customize_file_system(
+                session, "./objects1", "pre1-", "k1", bad_config), errmsg)
 
-        # Create files in the locations with some name overlap
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: local.ss_customize_file_system(
+                session, "./objects_BAD", "pre1-", "k1", config1), errmsg)
+
+        # Create an empty file, try to use it as a directory.
+        with open("some_file", "w"):
+            pass
+        errmsg = '/Invalid argument/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: local.ss_customize_file_system(
+                session, "some_file", "pre1-", "k1", config1), errmsg)
+
+        # Now create some file systems that should succeed.
+        # Use either different bucket directories or different prefixes,
+        # so activity that happens in the various file systems should be independent.
+        fs1 = local.ss_customize_file_system(session, "./objects1", "pre1-", "k1", config1)
+        fs2 = local.ss_customize_file_system(session, "./objects2", "pre1-", "k2", config2)
+        fs3 = local.ss_customize_file_system(session, "./objects1", "pre2-", "k3", config1)
+        fs4 = local.ss_customize_file_system(session, "./objects2", "pre2-", "k4", config2)
+
+        # Create files in the file systems with some name overlap
         self.create_with_fs(fs1, 'alpaca')
         self.create_with_fs(fs2, 'bear')
         self.create_with_fs(fs3, 'crab')
@@ -257,18 +298,90 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check(fs4, 'c', [])
         self.check(fs4, 'd', ['deer'])
 
-        # Flushing doesn't do anything that's visible, but calling it still exercises code paths.
-        # At some point, we'll have statistics we can check.
+        # Flushing copies files to one of the subdirectories:
+        #    "./objects1" (for fs1 and fs3)
+        #    "./objects2" (for fs2 and fs4)
         #
-        # For now, we can turn on the verbose config option for the local_store extension to verify.
+        # After every flush, we'll check that the right objects appear in the right directory.
+        # check_objects takes two lists: objects expected to be in ./objects1,
+        # and objects expected to be in ./objects2 .
+        self.check_objects([], [])
+
         local.ss_flush(session, fs4, None, '')
+        self.check_objects([], ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
         local.ss_flush(session, fs3, 'badger', '')
+        self.check_objects(['pre2-badger'],
+                           ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
         local.ss_flush(session, fs3, 'c', '')     # make sure we don't flush prefixes
+        self.check_objects(['pre2-badger'],
+                           ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
         local.ss_flush(session, fs3, 'b', '')     # or suffixes
+        self.check_objects(['pre2-badger'],
+                           ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
         local.ss_flush(session, fs3, 'crab', '')
+        self.check_objects(['pre2-crab', 'pre2-badger'],
+                           ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
         local.ss_flush(session, fs3, 'crab', '')  # should do nothing
-        local.ss_flush(session, None, None, '')         # flush everything else
-        local.ss_flush(session, None, None, '')         # should do nothing
+        self.check_objects(['pre2-crab', 'pre2-badger'],
+                           ['pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
+        local.ss_flush(session, None, None, '')   # flush everything else
+        self.check_objects(['pre1-alpaca', 'pre1-beagle', 'pre1-bird', 'pre1-bison', 'pre1-bat',
+                            'pre2-crab', 'pre2-bison', 'pre2-bat', 'pre2-badger', 'pre2-baboon'],
+                           ['pre1-bear', 'pre1-bird', 'pre1-bison', 'pre1-bat', 'pre1-badger',
+                           'pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
+        local.ss_flush(session, None, None, '')   # should do nothing
+        self.check_objects(['pre1-alpaca', 'pre1-beagle', 'pre1-bird', 'pre1-bison', 'pre1-bat',
+                            'pre2-crab', 'pre2-bison', 'pre2-bat', 'pre2-badger', 'pre2-baboon'],
+                           ['pre1-bear', 'pre1-bird', 'pre1-bison', 'pre1-bat', 'pre1-badger',
+                           'pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
+        self.create_with_fs(fs4, 'zebra')         # should do nothing in the objects directories
+        self.create_with_fs(fs4, 'yeti')          # should do nothing in the objects directories
+        self.check_objects(['pre1-alpaca', 'pre1-beagle', 'pre1-bird', 'pre1-bison', 'pre1-bat',
+                            'pre2-crab', 'pre2-bison', 'pre2-bat', 'pre2-badger', 'pre2-baboon'],
+                           ['pre1-bear', 'pre1-bird', 'pre1-bison', 'pre1-bat', 'pre1-badger',
+                           'pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle'])
+
+        # Try remove and rename, should be possible until we flush
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle', 'yeti', 'zebra'])
+        fs4.fs_remove(session, 'yeti', 0)
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle', 'zebra'])
+        fs4.fs_rename(session, 'zebra', 'okapi', 0)
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle', 'okapi'])
+        local.ss_flush(session, None, None, '')
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle', 'okapi'])
+        self.check_objects(['pre1-alpaca', 'pre1-beagle', 'pre1-bird', 'pre1-bison', 'pre1-bat',
+                            'pre2-crab', 'pre2-bison', 'pre2-bat', 'pre2-badger', 'pre2-baboon'],
+                           ['pre1-bear', 'pre1-bird', 'pre1-bison', 'pre1-bat', 'pre1-badger',
+                            'pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle',
+                            'pre2-okapi'])
+
+        errmsg = '/rename of flushed file not allowed/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: fs4.fs_rename(session, 'okapi', 'zebra', 0), errmsg)
+
+        # XXX
+        # At the moment, removal of flushed files is not allowed - as flushed files are immutable.
+        # We may need to explicitly evict flushed files from cache directory via the API, if so,
+        # the API to do that might be on the local store object, not the file system.
+        errmsg = '/remove of flushed file not allowed/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: fs4.fs_remove(session, 'okapi', 0), errmsg)
+
+        # No change since last time.
+        self.check(fs4, '', ['deer', 'bat', 'badger', 'baboon', 'beagle', 'okapi'])
+        self.check_objects(['pre1-alpaca', 'pre1-beagle', 'pre1-bird', 'pre1-bison', 'pre1-bat',
+                            'pre2-crab', 'pre2-bison', 'pre2-bat', 'pre2-badger', 'pre2-baboon'],
+                           ['pre1-bear', 'pre1-bird', 'pre1-bison', 'pre1-bat', 'pre1-badger',
+                            'pre2-deer', 'pre2-bat', 'pre2-badger', 'pre2-baboon', 'pre2-beagle',
+                            'pre2-okapi'])
 
 if __name__ == '__main__':
     wttest.run()

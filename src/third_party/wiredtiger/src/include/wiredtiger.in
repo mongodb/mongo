@@ -4782,7 +4782,10 @@ struct __wt_storage_source {
 	 *    objects with this prefix will be visible, and the prefix will be removed when
 	 *    listed. Prefixes may contain '/' as a separator.
 	 * @param auth_token the authorization identifier.
-	 * @param config additional configuration, currently must be NULL.
+	 * @configstart{WT_STORAGE_SOURCE.customize_file_system, manually maintained}
+	 * @config{cache_directory, name of directory holding cached objects and other objects
+         * not yet flushed\, directory must already exist, a string; default \c ".".}
+	 * @configend
 	 * @param[out] file_system the customized file system returned
 	 */
 	int (*ss_customize_file_system)(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session,

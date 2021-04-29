@@ -49,6 +49,24 @@ sum_pop_ops(WTPERF *wtperf)
 }
 
 /*
+ * Return total backup operations.
+ */
+uint64_t
+sum_backup_ops(WTPERF *wtperf)
+{
+    CONFIG_OPTS *opts;
+    uint64_t total;
+
+    opts = wtperf->opts;
+
+    if (opts->backup_interval > 0)
+        total = wtperf->backupthreads->backup.ops;
+    else
+        total = 0;
+    return (total);
+}
+
+/*
  * Return total checkpoint operations.
  */
 uint64_t

@@ -35,6 +35,12 @@ void (*custom_die)(void) = NULL;
 const char *progname = "program name not set";
 
 /*
+ * Backup directory initialize command, remove and re-create the primary backup directory, plus a
+ * copy we maintain for recovery testing.
+ */
+#define HOME_BACKUP_INIT_CMD "rm -rf %s/BACKUP %s/BACKUP.copy && mkdir %s/BACKUP %s/BACKUP.copy"
+
+/*
  * testutil_die --
  *     Report an error and abort.
  */
@@ -254,6 +260,46 @@ testutil_timestamp_parse(const char *str, uint64_t *tsp)
 
     *tsp = __wt_strtouq(str, &p, 16);
     testutil_assert(p - str <= 16);
+}
+
+void
+testutil_create_backup_directory(const char *home)
+{
+    size_t len;
+    char *cmd;
+
+    len = strlen(home) * 4 + strlen(HOME_BACKUP_INIT_CMD) + 1;
+    cmd = dmalloc(len);
+    testutil_check(__wt_snprintf(cmd, len, HOME_BACKUP_INIT_CMD, home, home, home, home));
+    testutil_checkfmt(system(cmd), "%s", "backup directory creation failed");
+    free(cmd);
+}
+
+/*
+ * copy_file --
+ *     Copy a single file into the backup directories.
+ */
+void
+testutil_copy_file(WT_SESSION *session, const char *name)
+{
+    size_t len;
+    char *first, *second;
+
+    len = strlen("BACKUP") + strlen(name) + 10;
+    first = dmalloc(len);
+    testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
+    testutil_check(__wt_copy_and_sync(session, name, first));
+
+    /*
+     * Save another copy of the original file to make debugging recovery errors easier.
+     */
+    len = strlen("BACKUP.copy") + strlen(name) + 10;
+    second = dmalloc(len);
+    testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
+    testutil_check(__wt_copy_and_sync(session, first, second));
+
+    free(first);
+    free(second);
 }
 
 /*

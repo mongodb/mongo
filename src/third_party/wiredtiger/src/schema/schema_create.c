@@ -817,6 +817,7 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
     const char *metadata;
 
     metadata = NULL;
+    tiered = NULL;
 
     /* Check if the tiered table already exists. */
     if ((ret = __wt_metadata_search(session, uri, &meta_value)) != WT_NOTFOUND) {

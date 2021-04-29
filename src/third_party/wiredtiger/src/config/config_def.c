@@ -583,7 +583,6 @@ static const WT_CONFIG_CHECK confchk_object_meta[] = {
   {"assert", "category", NULL, NULL, confchk_assert_subconfigs, 4},
   {"block_allocation", "string", NULL, "choices=[\"best\",\"first\",\"log-structured\"]", NULL, 0},
   {"block_compressor", "string", NULL, NULL, NULL, 0},
-  {"bucket_prefix", "string", NULL, NULL, NULL, 0},
   {"cache_resident", "boolean", NULL, NULL, NULL, 0}, {"checkpoint", "string", NULL, NULL, NULL, 0},
   {"checkpoint_backup_info", "string", NULL, NULL, NULL, 0},
   {"checkpoint_lsn", "string", NULL, NULL, NULL, 0},
@@ -1261,22 +1260,22 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "access_pattern_hint=none,allocation_size=4KB,app_metadata=,"
     "assert=(commit_timestamp=none,durable_timestamp=none,"
     "read_timestamp=none,write_timestamp=off),block_allocation=best,"
-    "block_compressor=,bucket_prefix=,cache_resident=false,"
-    "checkpoint=,checkpoint_backup_info=,checkpoint_lsn=,"
-    "checksum=uncompressed,collator=,columns=,dictionary=0,"
-    "encryption=(keyid=,name=),format=btree,huffman_key=,"
-    "huffman_value=,id=,ignore_in_memory_cache_size=false,"
-    "internal_item_max=0,internal_key_max=0,"
-    "internal_key_truncate=true,internal_page_max=4KB,key_format=u,"
-    "key_gap=10,leaf_item_max=0,leaf_key_max=0,leaf_page_max=32KB,"
-    "leaf_value_max=0,log=(enabled=true),memory_page_image_max=0,"
-    "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
-    "prefix_compression=false,prefix_compression_min=4,readonly=false"
-    ",split_deepen_min_child=0,split_deepen_per_child=0,split_pct=90,"
+    "block_compressor=,cache_resident=false,checkpoint=,"
+    "checkpoint_backup_info=,checkpoint_lsn=,checksum=uncompressed,"
+    "collator=,columns=,dictionary=0,encryption=(keyid=,name=),"
+    "format=btree,huffman_key=,huffman_value=,id=,"
+    "ignore_in_memory_cache_size=false,internal_item_max=0,"
+    "internal_key_max=0,internal_key_truncate=true,"
+    "internal_page_max=4KB,key_format=u,key_gap=10,leaf_item_max=0,"
+    "leaf_key_max=0,leaf_page_max=32KB,leaf_value_max=0,"
+    "log=(enabled=true),memory_page_image_max=0,memory_page_max=5MB,"
+    "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=false,"
+    "prefix_compression_min=4,readonly=false,split_deepen_min_child=0"
+    ",split_deepen_per_child=0,split_pct=90,"
     "tiered_storage=(auth_token=,bucket=,bucket_prefix=,"
     "local_retention=300,name=,object_target_size=10M),value_format=u"
     ",verbose=[],version=(major=0,minor=0),write_timestamp_usage=none",
-    confchk_object_meta, 47},
+    confchk_object_meta, 46},
   {"table.meta",
     "app_metadata=,assert=(commit_timestamp=none,"
     "durable_timestamp=none,read_timestamp=none,write_timestamp=off),"

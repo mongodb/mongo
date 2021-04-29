@@ -131,9 +131,10 @@ struct __wtperf {         /* Per-database structure */
     const char *compress_ext;   /* Compression extension for conn */
     const char *compress_table; /* Compression arg to table create */
 
-    WTPERF_THREAD *ckptthreads; /* Checkpoint threads */
-    WTPERF_THREAD *popthreads;  /* Populate threads */
-    WTPERF_THREAD *scanthreads; /* Scan threads */
+    WTPERF_THREAD *backupthreads; /* Backup threads */
+    WTPERF_THREAD *ckptthreads;   /* Checkpoint threads */
+    WTPERF_THREAD *popthreads;    /* Populate threads */
+    WTPERF_THREAD *scanthreads;   /* Scan threads */
 
 #define WORKLOAD_MAX 50
     WTPERF_THREAD *workers; /* Worker threads */
@@ -143,6 +144,7 @@ struct __wtperf {         /* Per-database structure */
     u_int workload_cnt;
 
     /* State tracking variables. */
+    uint64_t backup_ops;   /* backup operations */
     uint64_t ckpt_ops;     /* checkpoint operations */
     uint64_t scan_ops;     /* scan operations */
     uint64_t insert_ops;   /* insert operations */
@@ -154,6 +156,7 @@ struct __wtperf {         /* Per-database structure */
     uint64_t insert_key;         /* insert key */
     uint64_t log_like_table_key; /* used to allocate IDs for log table */
 
+    volatile bool backup;    /* backup in progress */
     volatile bool ckpt;      /* checkpoint in progress */
     volatile bool scan;      /* scan in progress */
     volatile bool error;     /* thread error */
@@ -247,6 +250,7 @@ struct __wtperf_thread {    /* Per-thread structure */
 
     TRUNCATE_CONFIG trunc_cfg; /* Truncate configuration */
 
+    TRACK backup;         /* Backup operations */
     TRACK ckpt;           /* Checkpoint operations */
     TRACK insert;         /* Insert operations */
     TRACK modify;         /* Modify operations */
@@ -279,6 +283,7 @@ void setup_truncate(WTPERF *, WTPERF_THREAD *, WT_SESSION *);
 void start_idle_table_cycle(WTPERF *, wt_thread_t *);
 void stop_idle_table_cycle(WTPERF *, wt_thread_t);
 void worker_throttle(WTPERF_THREAD *);
+uint64_t sum_backup_ops(WTPERF *);
 uint64_t sum_ckpt_ops(WTPERF *);
 uint64_t sum_scan_ops(WTPERF *);
 uint64_t sum_insert_ops(WTPERF *);

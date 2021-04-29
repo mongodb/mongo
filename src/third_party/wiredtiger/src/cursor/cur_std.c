@@ -757,18 +757,35 @@ err:
 }
 
 /*
+ * __wt_cursor_get_hash --
+ *     Get hash value from the given uri.
+ */
+void
+__wt_cursor_get_hash(
+  WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_dup, uint64_t *hash_value)
+{
+    if (to_dup != NULL) {
+        WT_ASSERT(session, uri == NULL);
+        *hash_value = to_dup->uri_hash;
+    } else {
+        WT_ASSERT(session, uri != NULL);
+        *hash_value = __wt_hash_city64(uri, strlen(uri));
+    }
+}
+
+/*
  * __wt_cursor_cache_get --
  *     Open a matching cursor from the cache.
  */
 int
-__wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_dup,
-  const char *cfg[], WT_CURSOR **cursorp)
+__wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_value,
+  WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
 {
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_RET;
-    uint64_t bucket, hash_value;
+    uint64_t bucket;
     uint32_t overwrite_flag;
     bool have_config;
 
@@ -818,18 +835,8 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *to_d
             return (WT_NOTFOUND);
     }
 
-    /*
-     * Caller guarantees that exactly one of the URI and the duplicate cursor is non-NULL.
-     */
-    if (to_dup != NULL) {
-        WT_ASSERT(session, uri == NULL);
+    if (to_dup != NULL)
         uri = to_dup->uri;
-        hash_value = to_dup->uri_hash;
-    } else {
-        WT_ASSERT(session, uri != NULL);
-        hash_value = __wt_hash_city64(uri, strlen(uri));
-    }
-
     /*
      * Walk through all cursors, if there is a cached cursor that matches uri and configuration, use
      * it.
