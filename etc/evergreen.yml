@@ -7933,6 +7933,34 @@ tasks:
           $python buildscripts/validate_commit_message.py "$commit_message_content"
         fi
 
+- name: check_for_todos
+  exec_timeout_secs: 600 # 10 minute timeout
+  commands:
+    - func: "set task expansion macros"
+    - func: "set up venv"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o verbose
+          set -o errexit
+
+          if [ "${is_commit_queue}" = "true" ]; then
+            # Since `commit_message` is an evergreen expansion, we need a way to ensure we
+            # properly deal with any special characters that could cause issues (like "). To
+            # do this, we will write it out to a file, then read that file into a variable.
+            cat > commit_message.txt <<END_OF_COMMIT_MSG
+          ${commit_message}
+          END_OF_COMMIT_MSG
+
+            commit_message_content=$(cat commit_message.txt)
+
+            ${activate_virtualenv}
+            $python buildscripts/todo_check.py --commit-message "$commit_message_content"
+          fi
+
 - <<: *task_template
   name: mqlrun
   commands:
@@ -12396,6 +12424,7 @@ buildvariants:
   stepback: false
   tasks:
   - name: validate_commit_message
+  - name: check_for_todos
 
 - name: live-record
   display_name: "~ RHEL 8.0 Shared Library (with UndoDB live-record)"
