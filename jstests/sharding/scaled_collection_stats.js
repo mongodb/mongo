@@ -26,6 +26,9 @@ assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
 assert.commandWorked(st.s.adminCommand(
     {moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
 
+// Ensure that all the inserted docs are on disk so that stats() returns up to date info.
+assert.commandWorked(st.s.adminCommand({fsync: 1}));
+
 // Determine the unscaled index size.
 let res = assert.commandWorked(coll.stats());
 const totalIndexSize = res.totalIndexSize;
