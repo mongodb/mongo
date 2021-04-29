@@ -54,9 +54,11 @@ cursor = collection.aggregate([{$sort: {_id: 1}}],
                               {readConcern: {level: "snapshot", atClusterTime: insertTimestamp}});
 assert.eq(cursor.getClusterTime(), insertTimestamp);
 
-// Test aggregate with snapshot readConcern.
+// Test aggregate with snapshot readConcern. Similarly to the find with snapshot readConcern and no
+// 'atClusterTime', it's possible that this aggregate can read at a newer snapshot than
+// 'insertTimestamp'.
 cursor = collection.aggregate([{$sort: {_id: 1}}], {readConcern: {level: "snapshot"}});
-assert.eq(cursor.getClusterTime(), insertTimestamp);
+assert.gte(cursor.getClusterTime(), insertTimestamp);
 
 // Test aggregate with non-snapshot readConcern.
 cursor = collection.aggregate([{$sort: {_id: 1}}]);
