@@ -1,6 +1,9 @@
 // $toUpper, $toLower tests.
 (function() {
 'use strict';
+
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+
 const coll = db.jstests_aggregation_upperlower;
 coll.drop();
 assert.commandWorked(coll.insert({}));
