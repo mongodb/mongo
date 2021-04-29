@@ -86,7 +86,10 @@ TEST_F(SBEKeyStringTest, Basic) {
     APPEND_TWICE(bob, "date", Date_t::fromMillisSinceEpoch(123));
     APPEND_TWICE(bob, "timestamp", Timestamp(123));
     APPEND_TWICE(bob, "binData", BSONBinData("\xde\xad\xbe\xef", 4, BinDataGeneral));
+    APPEND_TWICE(bob, "code", BSONCode("function test() { return 'Hello world!'; }"));
     APPEND_TWICE(bob, "dbref", BSONDBRef("db.c", OID("010203040506070809101112")));
+    APPEND_TWICE(
+        bob, "cws", BSONCodeWScope("function test() { return 'Hello world!'; }", BSONObj()));
 
     bob.appendNull("null-ascending");
     bob.appendNull("null-descending");

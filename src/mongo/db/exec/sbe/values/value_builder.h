@@ -128,7 +128,12 @@ public:
     }
 
     void append(const BSONCodeWScope& in) {
-        unsupportedType("javascriptWithScope");
+        appendValueBufferOffset(TypeTags::bsonCodeWScope);
+        _valueBufferBuilder->appendNum(
+            static_cast<uint32_t>(4 + in.code.size() + 1 + in.scope.objsize()));
+        _valueBufferBuilder->appendNum(static_cast<int32_t>(in.code.size() + 1));
+        _valueBufferBuilder->appendStr(in.code, true /* includeEndingNull */);
+        _valueBufferBuilder->appendBuf(in.scope.objdata(), in.scope.objsize());
     }
 
     void append(const BSONBinData& in) {
@@ -217,7 +222,8 @@ public:
                 case TypeTags::bsonBinData:
                 case TypeTags::bsonRegex:
                 case TypeTags::bsonJavascript:
-                case TypeTags::bsonDBPointer: {
+                case TypeTags::bsonDBPointer:
+                case TypeTags::bsonCodeWScope: {
                     auto offset = bitcastTo<decltype(bufferLen)>(val);
                     invariant(offset < bufferLen);
                     val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);

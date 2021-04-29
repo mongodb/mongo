@@ -183,6 +183,14 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {
             std::tie(tag, val) = makeNewBsonDBPointer({nsStart, nsLen}, id);
             break;
         }
+        case TypeTags::bsonCodeWScope: {
+            auto codeLen = buf.read<LittleEndian<uint32_t>>();
+            auto codeStart = reinterpret_cast<const char*>(buf.skip(codeLen));
+            auto scopeLen = buf.peek<LittleEndian<uint32_t>>();
+            auto scope = reinterpret_cast<const char*>(buf.skip(scopeLen));
+            std::tie(tag, val) = makeNewBsonCodeWScope({codeStart, codeLen}, scope);
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -334,6 +342,14 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendBuf(dbptr.id, sizeof(ObjectIdType));
             break;
         }
+        case TypeTags::bsonCodeWScope: {
+            auto cws = getBsonCodeWScopeView(val);
+            buf.appendNum(static_cast<uint32_t>(cws.code.size()));
+            buf.appendStr(cws.code, false /* includeEndingNull */);
+            auto scopeLen = ConstDataView(cws.scope).read<LittleEndian<uint32_t>>();
+            buf.appendBuf(cws.scope, scopeLen);
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -415,11 +431,12 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += ConstDataView(ptr).read<LittleEndian<uint32_t>>();
             break;
         }
-        case TypeTags::bsonBinData: {
-            auto binData = getRawPointerView(val);
-            result += ConstDataView(binData).read<LittleEndian<uint32_t>>();
+        case TypeTags::bsonBinData:
+            // The 32-bit 'length' at the beginning of a BinData does _not_ account for the
+            // 'length' field itself or the 'subtype' field, so we account for that here.
+            result += sizeof(uint32_t) + sizeof(char) +
+                ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
-        }
         case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             result += ks->getSize();
@@ -437,6 +454,11 @@ int getApproximateSize(TypeTags tag, Value val) {
         }
         case TypeTags::bsonDBPointer:
             result += getBsonDBPointerView(val).byteSize();
+            break;
+        case TypeTags::bsonCodeWScope:
+            // CodeWScope's 'length' field accounts for the full length of the CodeWScope
+            // including the 'length' field itself.
+            result += ConstDataView(getRawPointerView(val)).read<LittleEndian<uint32_t>>();
             break;
         default:
             MONGO_UNREACHABLE;

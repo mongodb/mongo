@@ -80,8 +80,8 @@ std::pair<TypeTags, Value> makeCopyBsonJavascript(StringData code) {
 }
 
 std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id) {
-    auto const nsLen = ns.size();
-    auto const nsLenWithNull = nsLen + sizeof(char);
+    const auto nsLen = ns.size();
+    const auto nsLenWithNull = nsLen + sizeof(char);
     auto buffer = std::make_unique<char[]>(sizeof(uint32_t) + nsLenWithNull + sizeof(ObjectIdType));
     char* ptr = buffer.get();
 
@@ -98,6 +98,33 @@ std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id
     memcpy(ptr, id, sizeof(ObjectIdType));
 
     return {TypeTags::bsonDBPointer, bitcastFrom<char*>(buffer.release())};
+}
+
+std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* scope) {
+    const auto codeLen = code.size();
+    const auto codeLenWithNull = codeLen + sizeof(char);
+    const auto scopeLen = ConstDataView(scope).read<LittleEndian<uint32_t>>();
+    const auto numBytes = 2 * sizeof(uint32_t) + codeLenWithNull + scopeLen;
+    auto buffer = std::make_unique<char[]>(numBytes);
+    char* ptr = buffer.get();
+
+    // Write length of 'numBytes' as a little-endian uint32_t.
+    DataView(ptr).write<LittleEndian<uint32_t>>(numBytes);
+    ptr += sizeof(uint32_t);
+
+    // Write length of 'code' as a little-endian uint32_t.
+    DataView(ptr).write<LittleEndian<uint32_t>>(codeLenWithNull);
+    ptr += sizeof(uint32_t);
+
+    // Write 'code' followed by a null terminator.
+    memcpy(ptr, code.rawData(), codeLen);
+    ptr[codeLen] = '\0';
+    ptr += codeLenWithNull;
+
+    // Write 'scope'.
+    memcpy(ptr, scope, scopeLen);
+
+    return {TypeTags::bsonCodeWScope, bitcastFrom<char*>(buffer.release())};
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
@@ -225,14 +252,13 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::bsonRegex:
         case TypeTags::bsonJavascript:
         case TypeTags::bsonDBPointer:
+        case TypeTags::bsonCodeWScope:
             delete[] getRawPointerView(val);
             break;
-
         case TypeTags::bsonArray:
-        case TypeTags::bsonObject: {
+        case TypeTags::bsonObject:
             UniqueBuffer::reclaim(getRawPointerView(val));
             break;
-        }
         case TypeTags::ksValue:
             delete getKeyStringView(val);
             break;
@@ -360,6 +386,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::bsonDBPointer:
             stream << "bsonDBPointer";
+            break;
+        case TypeTags::bsonCodeWScope:
+            stream << "bsonCodeWScope";
             break;
         case TypeTags::ftsMatcher:
             stream << "ftsMatcher";
@@ -584,6 +613,13 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << ')';
             break;
         }
+        case TypeTags::bsonCodeWScope: {
+            const auto cws = getBsonCodeWScopeView(val);
+            stream << "CodeWScope(" << cws.code << ", ";
+            writeObjectToStream(stream, TypeTags::bsonObject, bitcastFrom<const char*>(cws.scope));
+            stream << ')';
+            break;
+        }
         case value::TypeTags::ftsMatcher: {
             auto ftsMatcher = getFtsMatcherView(val);
             stream << "FtsMatcher(";
@@ -683,6 +719,8 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::Code;
         case TypeTags::bsonDBPointer:
             return BSONType::DBRef;
+        case TypeTags::bsonCodeWScope:
+            return BSONType::CodeWScope;
         default:
             MONGO_UNREACHABLE;
     }
@@ -844,6 +882,16 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
         case TypeTags::bsonDBPointer: {
             auto dbptr = getBsonDBPointerView(val);
             return hashCombine(hashCombine(hashInit(), abslHash(dbptr.ns)), hashObjectId(dbptr.id));
+        }
+        case TypeTags::bsonCodeWScope: {
+            auto cws = getBsonCodeWScopeView(val);
+
+            // Collation semantics do not apply to strings nested inside the CodeWScope scope
+            // object, so we do not pass through the collator when computing the hash of the
+            // scope object.
+            return hashCombine(
+                hashCombine(hashInit(), abslHash(cws.code)),
+                hashValue(TypeTags::bsonObject, bitcastFrom<const char*>(cws.scope)));
         }
         default:
             break;
@@ -1043,6 +1091,19 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
 
         auto result = memcmp(lhsDBPtr.id, rhsDBPtr.id, sizeof(ObjectIdType));
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
+    } else if (lhsTag == TypeTags::bsonCodeWScope && rhsTag == TypeTags::bsonCodeWScope) {
+        auto lhsCws = getBsonCodeWScopeView(lhsValue);
+        auto rhsCws = getBsonCodeWScopeView(rhsValue);
+        if (auto result = lhsCws.code.compare(rhsCws.code); result != 0) {
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
+        }
+
+        // Special string comparison semantics do not apply to strings nested inside the
+        // CodeWScope scope object, so we do not pass through the string comparator.
+        return compareValue(TypeTags::bsonObject,
+                            bitcastFrom<const char*>(lhsCws.scope),
+                            TypeTags::bsonObject,
+                            bitcastFrom<const char*>(rhsCws.scope));
     } else {
         // Different types.
         auto lhsType = tagToType(lhsTag);

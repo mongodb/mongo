@@ -120,6 +120,7 @@ enum class TypeTags : uint8_t {
     bsonRegex,
     bsonJavascript,
     bsonDBPointer,
+    bsonCodeWScope,
 
     // KeyString::Value
     ksValue,
@@ -923,12 +924,12 @@ inline SortSpec* getSortSpecView(Value val) noexcept {
 struct BsonRegex {
     explicit BsonRegex(const char* rawValue) {
         pattern = rawValue;
-        // We add sizeof(char) to account NULL byte after pattern.
+        // Add sizeof(char) to account for the NULL byte after 'pattern'.
         flags = pattern.rawData() + pattern.size() + sizeof(char);
     }
 
     size_t byteSize() const {
-        // We add 2 * sizeof(char) to account NULL bytes after each string.
+        // Add 2 * sizeof(char) to account for the NULL bytes after 'pattern' and 'flags'.
         return pattern.size() + sizeof(char) + flags.size() + sizeof(char);
     }
 
@@ -964,15 +965,16 @@ struct BsonDBPointer {
     explicit BsonDBPointer(const char* rawValue) {
         uint32_t lenWithNull = ConstDataView(rawValue).read<LittleEndian<uint32_t>>();
         ns = {rawValue + sizeof(uint32_t), lenWithNull - sizeof(char)};
-        id = reinterpret_cast<const uint8_t*>(rawValue) + 4 + lenWithNull;
+        id = reinterpret_cast<const uint8_t*>(rawValue) + sizeof(uint32_t) + lenWithNull;
     }
 
     size_t byteSize() const {
+        // Add sizeof(char) to account for the NULL byte after 'ns'.
         return sizeof(uint32_t) + ns.size() + sizeof(char) + sizeof(value::ObjectIdType);
     }
 
     StringData ns;
-    const uint8_t* id = nullptr;
+    const uint8_t* id{nullptr};
 };
 
 inline BsonDBPointer getBsonDBPointerView(Value val) noexcept {
@@ -983,6 +985,43 @@ std::pair<TypeTags, Value> makeNewBsonDBPointer(StringData ns, const uint8_t* id
 
 inline std::pair<TypeTags, Value> makeCopyBsonDBPointer(const BsonDBPointer& dbptr) {
     return makeNewBsonDBPointer(dbptr.ns, dbptr.id);
+}
+
+/**
+ * The BsonCodeWScope class is used to represent the CodeWScope BSON type.
+ *
+ * In BSON, a CodeWScope is encoded as a little-endian 32-bit integer ('numBytes'), followed by a
+ * bsonString ('code'), followed by a bsonObject ('scope').
+ */
+struct BsonCodeWScope {
+    explicit BsonCodeWScope(const char* rawValue) {
+        auto dataView = ConstDataView(rawValue);
+
+        numBytes = dataView.read<LittleEndian<uint32_t>>();
+        uint32_t lenWithNull = dataView.read<LittleEndian<uint32_t>>(sizeof(uint32_t));
+
+        auto ptr = rawValue + 2 * sizeof(uint32_t);
+        code = {ptr, lenWithNull - sizeof(char)};
+        scope = ptr + lenWithNull;
+    }
+
+    size_t byteSize() const {
+        return numBytes;
+    }
+
+    uint32_t numBytes{0};
+    StringData code;
+    const char* scope{nullptr};
+};
+
+inline BsonCodeWScope getBsonCodeWScopeView(Value val) noexcept {
+    return BsonCodeWScope(getRawPointerView(val));
+}
+
+std::pair<TypeTags, Value> makeNewBsonCodeWScope(StringData code, const char* scope);
+
+inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& cws) {
+    return makeNewBsonCodeWScope(cws.code, cws.scope);
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
@@ -1062,6 +1101,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyBsonJavascript(getBsonJavascriptView(val));
         case TypeTags::bsonDBPointer:
             return makeCopyBsonDBPointer(getBsonDBPointerView(val));
+        case TypeTags::bsonCodeWScope:
+            return makeCopyBsonCodeWScope(getBsonCodeWScopeView(val));
         case TypeTags::ftsMatcher:
             return makeCopyFtsMatcher(*getFtsMatcherView(val));
         case TypeTags::sortSpec:

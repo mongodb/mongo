@@ -154,6 +154,24 @@ std::pair<value::TypeTags, value::Value> genericCompare(
         auto rhsCode = value::getBsonJavascriptView(rhsValue);
         return {value::TypeTags::Boolean,
                 value::bitcastFrom<bool>(op(lhsCode.compare(rhsCode), 0))};
+    } else if (lhsTag == value::TypeTags::bsonCodeWScope &&
+               rhsTag == value::TypeTags::bsonCodeWScope) {
+        auto lhsCws = value::getBsonCodeWScopeView(lhsValue);
+        auto rhsCws = value::getBsonCodeWScopeView(rhsValue);
+        if (auto threeWayResult = lhsCws.code.compare(rhsCws.code); threeWayResult != 0) {
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(op(threeWayResult, 0))};
+        }
+
+        // Special string comparison semantics do not apply to strings nested inside the
+        // CodeWScope scope object, so we do not pass through the string comparator.
+        auto [tag, val] = value::compareValue(value::TypeTags::bsonObject,
+                                              value::bitcastFrom<const char*>(lhsCws.scope),
+                                              value::TypeTags::bsonObject,
+                                              value::bitcastFrom<const char*>(rhsCws.scope));
+        if (tag == value::TypeTags::NumberInt32) {
+            auto result = op(value::bitcastTo<int32_t>(val), 0);
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+        }
     }
 
     return {value::TypeTags::Nothing, 0};
