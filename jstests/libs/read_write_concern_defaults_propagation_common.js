@@ -100,14 +100,6 @@ var ReadWriteConcernDefaultsPropagation = (function() {
                             return false;
                         }
                     }
-
-                    // localUpdateWallClockTime reflects which the conn updated its cache.  Since
-                    // all the conns (including setConn) are running on a single host, we can check
-                    // that this is later than when setDefaultRWConcern was run.
-                    if (!(connDefault[kLocalUpdateWallClockTimeField] >=
-                          connDefault[kUpdateWallClockTimeField])) {
-                        return false;
-                    }
                 }
                 return true;
             },
