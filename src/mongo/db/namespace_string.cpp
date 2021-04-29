@@ -328,6 +328,11 @@ NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
     return {db(), kTimeseriesBucketsCollectionPrefix.toString() + coll()};
 }
 
+NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
+    invariant(isTimeseriesBucketsCollection());
+    return {db(), coll().substr(kTimeseriesBucketsCollectionPrefix.size())};
+}
+
 bool NamespaceString::isReplicated() const {
     if (isLocal()) {
         return false;

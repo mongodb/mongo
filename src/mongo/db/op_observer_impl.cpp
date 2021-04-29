@@ -827,6 +827,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
     if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
     }
+
+    BucketCatalog::get(opCtx).clear(dbName);
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -871,6 +873,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();
+    } else if (collectionName.isTimeseriesBucketsCollection()) {
+        BucketCatalog::get(opCtx).clear(collectionName.getTimeseriesViewNamespace());
     }
 
     return {};

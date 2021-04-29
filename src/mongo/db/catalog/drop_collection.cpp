@@ -45,7 +45,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -72,8 +71,7 @@ Status _checkNssAndReplState(OperationContext* opCtx, const CollectionPtr& coll)
 Status _dropView(OperationContext* opCtx,
                  Database* db,
                  const NamespaceString& collectionName,
-                 DropReply* reply,
-                 bool clearBucketCatalog = false) {
+                 DropReply* reply) {
     if (!db) {
         Status status = Status(ErrorCodes::NamespaceNotFound, "ns not found");
         audit::logDropView(opCtx->getClient(), collectionName, "", {}, status.code());
@@ -124,10 +122,6 @@ Status _dropView(OperationContext* opCtx,
         return status;
     }
     wunit.commit();
-
-    if (clearBucketCatalog) {
-        BucketCatalog::get(opCtx).clear(collectionName);
-    }
 
     reply->setNs(collectionName);
     return Status::OK();
@@ -340,8 +334,7 @@ Status dropCollection(OperationContext* opCtx,
                     [opCtx, dropView, &collectionName, &reply](Database* db,
                                                                const NamespaceString& bucketsNs) {
                         if (dropView) {
-                            auto status = _dropView(
-                                opCtx, db, collectionName, reply, true /* clearBucketCatalog */);
+                            auto status = _dropView(opCtx, db, collectionName, reply);
                             if (!status.isOK()) {
                                 return status;
                             }

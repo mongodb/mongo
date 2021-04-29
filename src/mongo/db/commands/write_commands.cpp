@@ -667,13 +667,7 @@ public:
                 return;
             }
 
-            if (batch->numPreviouslyCommittedMeasurements() != 0 &&
-                result.getValue().getNModified() == 0) {
-                // No document in the buckets collection was found to update, meaning that it was
-                // removed.
-                docsToRetry->push_back(index);
-                return;
-            }
+            invariant(result.getValue().getN() == 1 || result.getValue().getNModified() == 1);
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
