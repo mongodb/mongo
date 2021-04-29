@@ -76,7 +76,7 @@ Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
                    CollectionOptions&& collectionOptions) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
@@ -84,7 +84,7 @@ Status _createView(OperationContext* opCtx,
             NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
 
-        Database* db = autoDb.getDb();
+        auto db = autoDb.ensureDbExists();
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
@@ -400,7 +400,7 @@ Status _createCollection(OperationContext* opCtx,
                          CollectionOptions&& collectionOptions,
                          boost::optional<BSONObj> idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         // This is a top-level handler for collection creation name conflicts. New commands coming
         // in, or commands that generated a WriteConflict must return a NamespaceExists error here
@@ -409,7 +409,8 @@ Status _createCollection(OperationContext* opCtx,
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection already exists. NS: " << nss);
         }
-        if (auto view = ViewCatalog::get(autoDb.getDb())->lookup(opCtx, nss.ns()); view) {
+        auto db = autoDb.ensureDbExists();
+        if (auto view = ViewCatalog::get(db)->lookup(opCtx, nss.ns()); view) {
             if (view->timeseries()) {
                 return Status(ErrorCodes::NamespaceExists,
                               str::stream()
@@ -456,11 +457,10 @@ Status _createCollection(OperationContext* opCtx,
         // because 'userCreateNS' may throw a WriteConflictException.
         Status status = Status::OK();
         if (idIndex == boost::none || collectionOptions.clusteredIndex) {
-            status = autoDb.getDb()->userCreateNS(
-                opCtx, nss, collectionOptions, /*createIdIndex=*/false);
+            status = db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/false);
         } else {
-            status = autoDb.getDb()->userCreateNS(
-                opCtx, nss, collectionOptions, /*createIdIndex=*/true, *idIndex);
+            status =
+                db->userCreateNS(opCtx, nss, collectionOptions, /*createIdIndex=*/true, *idIndex);
         }
         if (!status.isOK()) {
             return status;
