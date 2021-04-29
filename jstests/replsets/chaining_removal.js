@@ -23,6 +23,11 @@ replTest.initiate({
 });
 replTest.awaitNodesAgreeOnPrimary(replTest.kDefaultTimeoutMS, nodes, nodes[0]);
 var primary = replTest.getPrimary();
+// The default WC is majority and stopServerReplication could prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 replTest.awaitReplication();
 
 // When setting up chaining on slow machines, we do not want slow writes or delayed heartbeats

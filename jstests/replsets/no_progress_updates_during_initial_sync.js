@@ -20,6 +20,10 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 assert.commandWorked(primaryDb.test.insert({"starting": "doc"}, {writeConcern: {w: 2}}));
 
 jsTestLog("Adding a new node to the replica set");

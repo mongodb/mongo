@@ -29,6 +29,12 @@ doTest = function(signal) {
     replTest.initiate(config);
 
     var primary = replTest.getPrimary().getDB(name);
+
+    // The default WC is majority and this test can't satisfy majority writes.
+    assert.commandWorked(primary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    replTest.awaitReplication();
+
     var secondaryConns = replTest.getSecondaries();
     var secondaries = [];
     for (var i in secondaryConns) {

@@ -37,6 +37,12 @@ jsTestLog("Make sure node 0 is primary.");
 var primary = rst.getPrimary();
 var secondaries = rst.getSecondaries();
 assert.eq(nodes[0], primary);
+
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
+
 // Wait for all data bearing nodes to get up to date.
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(
     {a: 1}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));

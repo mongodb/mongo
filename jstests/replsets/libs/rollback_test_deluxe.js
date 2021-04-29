@@ -188,6 +188,10 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
         // Make sure we have a primary.
         curPrimary = replSet.getPrimary();
 
+        // The default WC is majority and we must use w:1 to be able to properly test rollback.
+        assert.commandWorked(curPrimary.adminCommand(
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+        replSet.awaitReplication();
         // Extract the other nodes and wait for them to be ready.
         arbiters = replSet.getArbiters();
         arbiters.forEach(arbiter => waitForState(arbiter, ReplSetTest.State.ARBITER));

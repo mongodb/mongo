@@ -46,6 +46,10 @@ var testPrepareRecoverFromOplogAsStandalone = function(name, commitBeforeRecover
 
     assert.eq(rst.getPrimary(), node);
 
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(node.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
     // Create both collections with {w: majority}.
     assert.commandWorked(node.getDB(dbName).runCommand({
         create: nonTxnCollName,

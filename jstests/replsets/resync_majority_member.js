@@ -35,6 +35,10 @@ rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 const primaryDb = primary.getDB(dbName);
 const primaryColl = primaryDb.getCollection(collName);
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
 assert.commandWorked(primaryColl.insert({"starting": "doc", writeConcern: {w: 3}}));
 
 /**

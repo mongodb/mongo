@@ -58,6 +58,10 @@ let secondary = nodes[1];
 rst.initiate(
     {_id: name, members: [{_id: 0, host: node.host}, {_id: 1, host: secondary.host, priority: 0}]});
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Create two collections with w:majority and then perform a clean restart to ensure that
 // the collections are in a stable checkpoint.
 assert.commandWorked(getColl1(node).insert({_id: 3}, {writeConcern: {w: "majority"}}));

@@ -27,6 +27,10 @@ var primaryColl = primaryDB[collName];
 var secondaryColl = secondaryDB[collName];
 var nss = primaryColl.getFullName();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // This function adds data to the collection, restarts the secondary node with the given
 // parameters and setting the given failpoint, waits for the failpoint to be hit,
 // drops the collection, then disables the failpoint.  It then optionally waits for the

@@ -30,6 +30,11 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorTestColl = donorPrimary.getDB(dbName).getCollection(collName);
 
+// The default WC is majority and stopReplicationOnSecondaries will prevent satisfying any majority
+assert.commandWorked(recipientPrimary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+tenantMigrationTest.getRecipientRst().awaitReplication();
+
 // Populate the donor replica set with some initial data and make sure it is majority committed.
 const majorityCommittedDocs = [{_id: 0, x: 0}, {_id: 1, x: 1}];
 assert.commandWorked(donorTestColl.insert(majorityCommittedDocs, {writeConcern: {w: "majority"}}));

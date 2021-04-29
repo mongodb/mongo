@@ -35,6 +35,9 @@ replSet.initiateWithAnyNodeAsPrimary({
 // Wait until node 2 becomes primary.
 replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
 jsTestLog('node 2 is now primary');
+// The default WC is majority and this test can't test catchup properly if it used majority writes.
+assert.commandWorked(replSet.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 replSet.awaitReplication();
 replSet.waitForConfigReplication(nodes[2]);

@@ -81,6 +81,10 @@ replTest.initiate();
 let primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
+// The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 ////////////////////////////////////////////////////////////////////////
 // Test insert command
 

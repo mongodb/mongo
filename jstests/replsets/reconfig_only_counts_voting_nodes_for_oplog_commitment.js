@@ -30,6 +30,10 @@ nodes.forEach(node => {
 replTest.initiateWithHighElectionTimeout();
 var primary = replTest.getPrimary();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 // Do a write that should not be able to replicate to node1 since we stopped replication.
 stopServerReplication(nodes[1]);
 assert.commandWorked(primary.getDB("test")["test"].insert({x: 1}));

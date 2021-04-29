@@ -19,6 +19,9 @@ const primary = rst.getPrimary();
 const secondary = rst.getSecondary();
 const testDB = primary.getDB(dbName);
 const coll = testDB[collName];
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 function runTest(sessionOptions) {
     testDB.runCommand({drop: collName, writeConcern: {w: "majority"}});

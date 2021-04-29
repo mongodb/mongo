@@ -89,6 +89,10 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Record the base oplogGetMoresProcessed on primary and the base oplog getmores on secondary.
 const primaryBaseOplogGetMoresProcessedNum =
     primary.getDB("test").serverStatus().metrics.repl.network.oplogGetMoresProcessed.num;

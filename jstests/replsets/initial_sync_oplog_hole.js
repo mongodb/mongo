@@ -32,6 +32,10 @@ const nss = primaryColl.getFullName();
 TestData.testName = testName;
 TestData.collectionName = collName;
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 jsTestLog("Writing data before oplog hole to collection.");
 assert.commandWorked(primaryColl.insert({_id: "a"}));
 // Make sure it gets written out.

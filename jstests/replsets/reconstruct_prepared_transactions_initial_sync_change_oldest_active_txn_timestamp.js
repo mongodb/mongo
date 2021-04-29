@@ -28,7 +28,10 @@ replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
-
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 const dbName = "test";
 const collName = jsTestName();
 const testDB = primary.getDB(dbName);

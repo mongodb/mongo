@@ -25,6 +25,11 @@ config.settings = {
 };
 rst.initiate(config);
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
+
 const nodeA = rst.nodes[0];
 const nodeB = rst.nodes[1];
 const nodeC = rst.nodes[2];

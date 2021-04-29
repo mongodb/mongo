@@ -72,6 +72,11 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
     });
     donorRst.startSet();
     donorRst.initiate();
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(donorRst.getPrimary().adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    donorRst.awaitReplication();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});

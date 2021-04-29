@@ -11,10 +11,12 @@ var rst = new ReplSetTest({name: name, nodes: 2});
 
 rst.startSet();
 rst.initiate();
-rst.awaitReplication();
 
 var primary = rst.getPrimary();
 var secondary = rst.getSecondary();
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 const initialSecondaryStatus = assert.commandWorked(secondary.adminCommand({serverStatus: 1}));
 

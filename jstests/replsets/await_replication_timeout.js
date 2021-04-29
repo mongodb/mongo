@@ -13,6 +13,11 @@ var testDB = primary.getDB('test');
 const collName = 'foo';
 var testColl = testDB.getCollection(collName);
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
+
 // Insert a document and implicitly create the collection.
 let resetCollection = function(w) {
     assert.commandWorked(

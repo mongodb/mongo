@@ -29,6 +29,10 @@ const nodes = rst.startSet();
 // take so much time that the second cannot succeed.
 rst.initiate();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const oldPrimary = nodes[0];
 const newPrimary = nodes[1];
 const secondary = rst.add({rsConfig: {priority: 0}});

@@ -77,6 +77,10 @@ var secondary = replTest.getSecondary();
 var coll = primary.getDB(name)[name];
 var secondaryColl = secondary.getDB(name)[name];
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 function log(arg) {
     jsTest.log(tojson(arg));
 }

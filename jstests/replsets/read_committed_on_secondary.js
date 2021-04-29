@@ -92,6 +92,11 @@ function doCommittedRead(lastOp) {
     return new DBCommandCursor(dbSecondary, res).toArray()[0].state;
 }
 
+// The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 // Do a write, wait for it to replicate, and ensure it is visible.
 var op0 = saveDoc(0);
 assert.eq(doDirtyRead(op0), 0);

@@ -24,6 +24,10 @@ const primaryColl = primaryDB[collName];
 const nss = primaryColl.getFullName();
 TestData.collectionName = collName;
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Turn on checkpoint logging.
 assert.commandWorked(primary.adminCommand(
     {"setParameter": 1, "logComponentVerbosity": {"storage": {"recovery": 2, "verbosity": 1}}}));

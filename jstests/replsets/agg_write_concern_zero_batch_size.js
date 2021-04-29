@@ -12,6 +12,10 @@ const rst = new ReplSetTest({nodes: [{}, {rsConfig: {priority: 0}}]});
 rst.startSet();
 rst.initiate();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const testDB = rst.getPrimary().getDB("test");
 const source = testDB.agg_write_concern_zero_batch_size;
 const target = testDB.agg_write_concern_zero_batch_size_target;

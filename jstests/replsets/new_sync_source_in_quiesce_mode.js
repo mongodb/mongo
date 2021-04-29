@@ -33,6 +33,10 @@ assert.commandWorked(syncSource.adminCommand({
 rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
 
 // Stop replication on the syncingNode so that the primary and syncSource will both
 // definitely be ahead of it.

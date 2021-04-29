@@ -81,6 +81,10 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
 
     let originalRecipientPrimary = recipientRst.getPrimary();
     const originalRecipientSecondaries = recipientRst.getSecondaries();
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(originalRecipientPrimary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
     recipientRst.awaitLastOpCommitted();
 
     // Disable replication on the secondaries so that writes during this step will be rolled back.

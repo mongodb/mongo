@@ -244,6 +244,10 @@ replTest.initiate(config);
 var primary = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 // This is the DB that all of the tests will use.
 var mainDB = primary.getDB('mainDB');
 

@@ -17,6 +17,10 @@ replTest.awaitSecondaryNodes();
 var primary = replTest.getPrimary();
 var secondary = replTest.getSecondary();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Error codes we expect to see.
 
 // If the secondary is not caught up.

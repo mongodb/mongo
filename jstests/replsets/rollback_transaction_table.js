@@ -73,6 +73,10 @@ let replTest = new ReplSetTest({
 let nodes = replTest.startSet();
 replTest.initiate();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(replTest.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 let downstream = nodes[0];
 let upstream = nodes[1];
 let arbiter = nodes[2];

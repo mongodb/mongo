@@ -30,6 +30,9 @@ const secondaries = replSet.getSecondaries();
 const secondary = secondaries[0];
 
 const primaryDB = primary.getDB(dbName);
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 // Create capped collection on primary and allow it to be committed.
 assert.commandWorked(primaryDB.createCollection(collName, {capped: true, size: 2048}));

@@ -128,6 +128,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // Make sure we have a primary.
         curPrimary = replSet.getPrimary();
+        // The default WC is majority and we must use w:1 to be able to properly test rollback.
+        assert.commandWorked(curPrimary.adminCommand(
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+        replSet.awaitReplication();
 
         // Extract the other two nodes and wait for them to be ready.
         let secondaries = replSet.getSecondaries();

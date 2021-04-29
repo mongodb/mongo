@@ -20,9 +20,16 @@ var nodes = replTest.nodeList();
 replTest.startSet();
 replTest.initiate();
 replTest.awaitNodesAgreeOnPrimary();
-
 var primary = replTest.getPrimary();
 var secondaries = replTest.getSecondaries();
+
+// The default WC is majority and stopServerReplication could prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
+replTest.awaitReplication();
+
 syncFrom(secondaries[0], primary, replTest);
 syncFrom(secondaries[1], primary, replTest);
 primary.getDB("foo").bar.save({a: 1});

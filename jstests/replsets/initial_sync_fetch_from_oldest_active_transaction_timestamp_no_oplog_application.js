@@ -32,6 +32,10 @@ replTest.initiate();
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const dbName = "test";
 const collName = "initial_sync_fetch_from_oldest_active_transaction_timestamp_no_oplog_application";
 const testDB = primary.getDB(dbName);

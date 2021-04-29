@@ -17,6 +17,10 @@ const primary = rst.getPrimary();
 const primaryDb = primary.getDB("test");
 const initialSyncSource = rst.getSecondary();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Add some data to be cloned.
 assert.commandWorked(primaryDb.test.insert([{a: 1}, {b: 2}, {c: 3}]));
 rst.awaitReplication();

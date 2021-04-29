@@ -27,6 +27,10 @@ var secondaryColl = secondaryDB[collName];
 var dbNss = primaryDB.getName();
 var collNss = primaryColl.getFullName();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 function setupTest({
     failPoint,
     nss: nss = '',

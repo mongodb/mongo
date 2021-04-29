@@ -40,6 +40,11 @@ function disableFailPoint(node) {
     assert.commandWorked(node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
 }
 
+// The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Do an initial insert to prevent the secondary from going into recovery
 var numDocuments = 20;
 var coll = primary.getDB("foo").foo;

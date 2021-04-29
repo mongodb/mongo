@@ -25,6 +25,10 @@ rst.awaitSecondaryNodes();
 var primary = rst.getPrimary();
 var primaryColl = primary.getDB("test").coll;
 
+// The default WC is majority and this test can't test catchup properly if it used majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Set verbosity for replication on all nodes.
 var verbosity = {
     "setParameter": 1,

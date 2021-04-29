@@ -24,6 +24,10 @@ rst.initiate({
 let primary = rst.getPrimary();
 let secondary = rst.getSecondary();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 /**
  * Part 1: Issue a fast op and make sure that we do *not* log it.
  * We ensure the op is always considered fast by vastly increasing the "slowMS" threshold.

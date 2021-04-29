@@ -41,6 +41,10 @@ replSet.nodes[2].setSecondaryOk();
 var member2 = replSet.nodes[1].getDB("admin");
 var member3 = replSet.nodes[2].getDB("admin");
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Do an initial write
 primary.getDB("foo").bar.insert({x: 1});
 replSet.awaitReplication();

@@ -25,6 +25,12 @@ var testDB = "applyOps-wc-test";
 
 // Get test collection.
 var primary = replTest.getPrimary();
+
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
+
 var db = primary.getDB(testDB);
 var coll = db.apply_ops_wc;
 

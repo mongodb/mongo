@@ -26,6 +26,10 @@ replTest.initiate();
 replTest.waitForState(nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replTest.getPrimary();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // do a write
 print("\ndo a write");
 assert.commandWorked(primary.getDB("foo").bar.insert({x: 1}));

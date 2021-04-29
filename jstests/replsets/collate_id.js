@@ -32,6 +32,10 @@ var secondary = replTest.getSecondary();
 var secondaryDB = secondary.getDB("test");
 var secondaryColl = secondaryDB.collate_id;
 
+// The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 // Stop the secondary from syncing. This will ensure that the writes on the primary get applied
 // on the secondary in a large batch.
 assert.commandWorked(

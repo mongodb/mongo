@@ -44,13 +44,17 @@ config.settings = {
 replTest.startSet();
 replTest.initiate(config);
 
+var primary = replTest.getPrimary();
+var secondaries = replTest.getSecondaries();
+
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Without a sync source the heartbeat interval will be half of the election timeout, 30
 // seconds. It thus will take almost 30 seconds for the secondaries to set the primary as
 // their sync source and begin replicating.
 replTest.awaitReplication();
-var primary = replTest.getPrimary();
-var secondaries = replTest.getSecondaries();
-
 // Do a write to have something to read.
 assert.commandWorked(primary.getDB("test").foo.insert(
     {"number": 7}, {"writeConcern": {"w": "majority", "wtimeout": ReplSetTest.kDefaultTimeoutMS}}));

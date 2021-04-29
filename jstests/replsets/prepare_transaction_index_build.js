@@ -21,6 +21,10 @@ replTest.initiate();
 const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const dbName = "test";
 const collName = "prepared_transactions_index_build";
 const testDB = primary.getDB(dbName);

@@ -52,6 +52,11 @@ function checkDocNotCommitted(node, doc) {
 jsTestLog("Make sure node 0 is primary.");
 var primary = rst.getPrimary();
 var secondaries = rst.getSecondaries();
+
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
 assert.eq(nodes[0], primary);
 // Wait for all data bearing nodes to get up to date.
 assert.commandWorked(nodes[0].getDB(dbName).getCollection(collName).insert(

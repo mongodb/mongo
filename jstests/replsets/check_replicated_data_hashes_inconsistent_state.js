@@ -21,6 +21,10 @@ const primaryDB1 = primary.getDB("db1");
 const primaryDB2 = primary.getDB("db2");
 const collName = "testColl";
 
+// The default WC is majority and godinsert command on a secondary is incompatible with wc:majority.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB("db0");
 

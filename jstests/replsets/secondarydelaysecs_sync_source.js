@@ -21,6 +21,12 @@ config.members[2].priority = 0;
 
 replTest.initiate(config);
 var primary = replTest.getPrimary().getDB(jsTestName());
+// The default WC is majority and stopServerReplication could prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
+replTest.awaitReplication();
 
 var secondaryConns = replTest.getSecondaries();
 var secondaries = [];

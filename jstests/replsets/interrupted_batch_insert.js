@@ -32,6 +32,10 @@ replTest.initiate({
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replTest.nodes[0];
 var collName = primary.getDB("db")[name].getFullName();
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 
 var getParameterResult =
     primary.getDB("admin").runCommand({getParameter: 1, internalInsertMaxBatchSize: 1});

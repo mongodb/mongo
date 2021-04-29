@@ -26,6 +26,9 @@ replSet.initiate({
 
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 var primary = replSet.getPrimary();
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 var secondary = replSet.getSecondary();
 jsTestLog('Disable replication on the SECONDARY ' + secondary.host);

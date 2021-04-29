@@ -25,6 +25,9 @@ rst.initiate(replSetConfig);
 const primary = rst.getPrimary();
 const dbName = 'foo';
 const collName = 'bar';
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 assert.commandWorked(primary.getDB(dbName).getCollection(collName).insert({a: 1}));
 

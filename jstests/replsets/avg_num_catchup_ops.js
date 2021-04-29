@@ -17,6 +17,10 @@ const rst = new ReplSetTest(
 rst.startSet();
 rst.initiateWithHighElectionTimeout();
 rst.awaitSecondaryNodes();
+
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 rst.awaitReplication();
 
 const testNode = rst.getSecondaries()[0];

@@ -19,6 +19,10 @@ replTest.initiateWithHighElectionTimeout();
 
 const primary = replTest.getPrimary();
 let secondary = replTest.getSecondary();
+// The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 const dbName = "test";
 const collName = "recover_prepared_transactions_startup_secondary_application";

@@ -37,6 +37,11 @@ assert.commandWorked(testColl.insert({_id: 1}));
 const session = primary.startSession();
 const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
+
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 session.startTransaction();
 assert.commandWorked(sessionColl.insert({_id: 2}));
 

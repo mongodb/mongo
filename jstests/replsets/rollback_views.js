@@ -64,6 +64,10 @@ let nodeA = conns[0];
 let nodeB = conns[1];
 let arbiter = conns[2];
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(nodeA.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 let a1 = nodeA.getDB("test1");
 let b1 = nodeB.getDB("test1");
 

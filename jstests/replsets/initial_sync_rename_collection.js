@@ -24,6 +24,10 @@ const primaryDB = primary.getDB(dbName);
 const primaryColl = primaryDB[collName];
 const pRenameColl = primaryDB["r_" + collName];
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Used for cross-DB renames.
 const secondDbName = testName + "_cross";
 const primarySecondDB = primary.getDB(secondDbName);

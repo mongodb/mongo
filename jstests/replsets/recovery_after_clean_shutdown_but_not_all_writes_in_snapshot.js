@@ -17,6 +17,11 @@ rst.initiate();
 
 const dbName = "recovery_clean_shutdown";
 let primaryDB = rst.getPrimary().getDB(dbName);
+// The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primaryDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const wMajority = {
     writeConcern: {w: "majority", wtimeout: ReplSetTest.kDefaultTimeoutMS}
 };

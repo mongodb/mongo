@@ -50,6 +50,10 @@ replTest.initiate(config);
 var oldPrimary = replTest.getPrimary();
 var [newPrimary, pureSecondary, ...arbiters] = replTest.getSecondaries();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(oldPrimary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
 // This is the collection that all of the tests will use.
 var collName = name + '.collection';
 var oldPrimaryColl = oldPrimary.getCollection(collName);

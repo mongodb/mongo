@@ -125,6 +125,11 @@ class TwoPhaseDropCollectionTest {
         // Initiate the replica set.
         this.replTest.startSet();
         this.replTest.initiate();
+
+        // The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any
+        // majority writes.
+        assert.commandWorked(this.replTest.getPrimary().adminCommand(
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
         this.replTest.awaitReplication();
 
         return this.replTest;

@@ -48,6 +48,11 @@ const setUpMigrationSyncSourceTest = function() {
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const delayedSecondary = donorRst.getSecondaries()[0];
     const donorSecondary = donorRst.getSecondaries()[1];
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(donorPrimary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    donorRst.awaitReplication();
 
     const recipientRst = tenantMigrationTest.getRecipientRst();
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

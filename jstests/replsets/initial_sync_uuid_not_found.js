@@ -21,6 +21,10 @@ const primary = rst.getPrimary();
 const primaryDB = primary.getDB('d');
 const primaryColl = primaryDB.coll;
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 jsTestLog('Create a collection (with a UUID) and insert a document.');
 assert.commandWorked(primaryColl.insert({_id: 0}));
 
