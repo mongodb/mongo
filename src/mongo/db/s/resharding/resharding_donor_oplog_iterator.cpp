@@ -50,6 +50,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -212,6 +213,11 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                             ->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                                 pipeline.release());
         }
+        ON_BLOCK_EXIT([this] {
+            if (_pipeline) {
+                _pipeline->detachFromOperationContext();
+            }
+        });
 
         auto batch = _fillBatch(*_pipeline);
 
@@ -226,8 +232,6 @@ ExecutorFuture<std::vector<repl::OplogEntry>> ReshardingDonorOplogIterator::getN
                 // Skip returning the final oplog entry because it is known to be a no-op.
                 batch.pop_back();
                 _pipeline.reset();
-            } else {
-                _pipeline->detachFromOperationContext();
             }
         }
 

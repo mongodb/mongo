@@ -62,6 +62,7 @@
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -192,6 +193,8 @@ SemiFuture<void> ReshardingTxnCloner::run(
                    auto opCtx = factory.makeOperationContext(&cc());
                    chainCtx->donorRecord = [&]() {
                        chainCtx->pipeline->reattachToOperationContext(opCtx.get());
+                       ON_BLOCK_EXIT(
+                           [&chainCtx] { chainCtx->pipeline->detachFromOperationContext(); });
 
                        // The BlockingResultsMerger underlying by the $mergeCursors stage records
                        // how long the recipient spent waiting for documents from the donor shards.
@@ -201,7 +204,6 @@ SemiFuture<void> ReshardingTxnCloner::run(
                        ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
                        auto doc = chainCtx->pipeline->getNext();
-                       chainCtx->pipeline->detachFromOperationContext();
 
                        return doc ? SessionTxnRecord::parse(
                                         {"resharding config.transactions cloning"}, doc->toBson())
