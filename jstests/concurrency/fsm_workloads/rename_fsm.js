@@ -21,8 +21,6 @@
  *   does_not_support_add_remove_shards,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
- *   # TODO (SERVER-54905): ensure all DDL are resilient.
- *   does_not_support_stepdowns,
  *   featureFlagShardingFullDDLSupport
  *  ]
  */
