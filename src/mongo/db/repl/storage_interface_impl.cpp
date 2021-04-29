@@ -236,7 +236,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
-        AutoGetOrCreateDb db(opCtx.get(), nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_IX);
         AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
         if (coll) {
             return Status(ErrorCodes::NamespaceExists,
@@ -245,7 +245,8 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         {
             // Create the collection.
             WriteUnitOfWork wunit(opCtx.get());
-            fassert(40332, db.getDb()->createCollection(opCtx.get(), nss, options, false));
+            auto db = autoDb.ensureDbExists();
+            fassert(40332, db->createCollection(opCtx.get(), nss, options, false));
             wunit.commit();
         }
 
@@ -479,8 +480,8 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const CollectionOptions& options) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
-        AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
-        auto db = databaseWriteGuard.getDb();
+        AutoGetDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
+        auto db = databaseWriteGuard.ensureDbExists();
         invariant(db);
         if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return Status(ErrorCodes::NamespaceExists,
