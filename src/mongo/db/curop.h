@@ -201,6 +201,18 @@ public:
      */
     BSONObj makeMongotDebugStatsObject() const;
 
+    /**
+     * Accumulate resolved views.
+     */
+    void addResolvedViews(const std::vector<NamespaceString>& namespaces,
+                          const std::vector<BSONObj>& pipeline);
+
+    /**
+     * Get or append the array with resolved views' info.
+     */
+    BSONArray getResolvedViewsInfo() const;
+    void appendResolvedViewsInfo(BSONObjBuilder& builder) const;
+
     // -------------------
 
     // basic options
@@ -279,6 +291,12 @@ public:
 
     // Whether this is an oplog getMore operation for replication oplog fetching.
     bool isReplOplogGetMore{false};
+
+    // Maps namespace of a resolved view to its dependency chain and the fully unrolled pipeline. To
+    // make log line deterministic and easier to test, use ordered map. As we don't expect many
+    // resolved views per query, a hash map would unlikely provide any benefits.
+    std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
+        resolvedViews;
 };
 
 /**

@@ -43,6 +43,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -695,6 +696,8 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
         // 'resolvedNss'.
         std::shared_ptr<ViewDefinition> lastViewDefinition;
 
+        std::vector<NamespaceString> dependencyChain{nss};
+
         int depth = 0;
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
             auto view =
@@ -710,6 +713,10 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                             str::stream() << "View pipeline exceeds maximum size; maximum size is "
                                           << ViewGraph::kMaxViewPipelineSizeBytes};
                 }
+
+                auto curOp = CurOp::get(opCtx);
+                curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
+
                 return StatusWith<ResolvedView>(
                     {*resolvedNss,
                      std::move(resolvedPipeline),
@@ -717,6 +724,7 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
             }
 
             resolvedNss = &view->viewOn();
+            dependencyChain.push_back(*resolvedNss);
             if (!collation) {
                 collation = view->defaultCollator() ? view->defaultCollator()->getSpec().toBSON()
                                                     : CollationSpec::kSimpleSpec;
@@ -728,6 +736,9 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
 
             // If the first stage is a $collStats, then we return early with the viewOn namespace.
             if (toPrepend.size() > 0 && !toPrepend[0]["$collStats"].eoo()) {
+                auto curOp = CurOp::get(opCtx);
+                curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
+
                 return StatusWith<ResolvedView>(
                     {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
             }
