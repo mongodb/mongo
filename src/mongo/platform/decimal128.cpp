@@ -322,6 +322,32 @@ Decimal128 Decimal128::toAbs() const {
     return Decimal128(libraryTypeToValue(dec128));
 }
 
+Decimal128 Decimal128::round(RoundingMode roundMode) const {
+    std::uint32_t throwAwayFlag = 0;
+    return round(&throwAwayFlag, roundMode);
+}
+
+Decimal128 Decimal128::round(std::uint32_t* signalingFlags, RoundingMode roundMode) const {
+    BID_UINT128 current = decimal128ToLibraryType(_value);
+    current = [&]() {
+        switch (roundMode) {
+            case kRoundTiesToEven:
+                return bid128_round_integral_nearest_even(current, signalingFlags);
+            case kRoundTowardNegative:
+                return bid128_round_integral_negative(current, signalingFlags);
+            case kRoundTowardPositive:
+                return bid128_round_integral_positive(current, signalingFlags);
+            case kRoundTowardZero:
+                return bid128_round_integral_zero(current, signalingFlags);
+            case kRoundTiesToAway:
+                return bid128_round_integral_nearest_away(current, signalingFlags);
+        }
+        MONGO_UNREACHABLE;
+    }();
+
+    return Decimal128{libraryTypeToValue(current)};
+}
+
 std::int32_t Decimal128::toInt(RoundingMode roundMode) const {
     std::uint32_t throwAwayFlag = 0;
     return toInt(&throwAwayFlag, roundMode);

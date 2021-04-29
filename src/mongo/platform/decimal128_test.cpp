@@ -1075,6 +1075,171 @@ TEST(Decimal128Test, TestDecimal128Quantize) {
     ASSERT_EQUALS(result.getValue().high64, expected.getValue().high64);
 }
 
+struct RoundingModeInfo {
+    Decimal128::RoundingMode mode;
+    StringData name;
+};
+
+static constexpr std::array<RoundingModeInfo, 5> roundingModes{
+    {{Decimal128::kRoundTiesToEven, "kRoundTiesToEven"_sd},
+     {Decimal128::kRoundTowardNegative, "kRoundTowardNegative"_sd},
+     {Decimal128::kRoundTowardPositive, "kRoundTowardPositive"_sd},
+     {Decimal128::kRoundTowardZero, "kRoundTowardZero"_sd},
+     {Decimal128::kRoundTiesToAway, "kRoundTiesToAway"_sd}}};
+
+std::string convertUint64ToString(uint64_t value) {
+    constexpr int hexStrLength = sizeof(uint64_t) * 2;
+    char buffer[hexStrLength + 1];
+    int n = snprintf(buffer, sizeof(buffer), "%016llX", static_cast<unsigned long long>(value));
+    invariant(n >= 0);
+    return std::string(buffer);
+}
+
+void assertRoundingTestCase(const Decimal128& actual,
+                            const Decimal128& expected,
+                            StringData roundingModeName,
+                            int testCaseLineNumber) {
+    auto const& actualVal = actual.getValue();
+    auto const& expectedVal = expected.getValue();
+
+    if (actualVal.low64 != expectedVal.low64 || actualVal.high64 != expectedVal.high64) {
+        FAIL(str::stream() << "Rounding test case defined on line " << testCaseLineNumber
+                           << " failed. Rounding mode: "
+                           << roundingModeName
+                           << ". "
+                           << "Expected: {"
+                           << convertUint64ToString(expectedVal.low64)
+                           << ", "
+                           << convertUint64ToString(expectedVal.high64)
+                           << "}. Actual: {"
+                           << convertUint64ToString(actualVal.low64)
+                           << ", "
+                           << convertUint64ToString(actualVal.high64)
+                           << "}");
+    }
+}
+
+TEST(Decimal128Test, TestDecimal128RoundingFractionalValues) {
+    auto d = [](auto x) { return Decimal128{x}; };
+
+    // 'pBig' is the largest positive integer value where Decimal128 can represent pBig + 0.1
+    // without losing precision.
+    auto pBig = d(std::string(33, '9'));
+    auto nBig = -pBig;
+
+    auto pBigPlus1 = pBig.add(d(1));
+    auto nBigMinus1 = nBig.add(d(-1));
+
+    // 'epsilon' is the smallest positive value where Decimal128 can represent 1.0 + epsilon
+    // without losing precision.
+    auto epsilon = d("1E-33");
+
+    struct TestCase {
+        int lineNumber;
+        Decimal128 val;
+        Decimal128 expected[5];
+    };
+
+    std::array<TestCase, 36> cases = {{
+        {__LINE__, d(0.5).add(d("-1E-34")), {d(0), d(0), d(1), d(0), d(0)}},
+        {__LINE__, d(0.5), {d(0), d(0), d(1), d(0), d(1)}},
+        {__LINE__, d(0.5).add(d("1E-34")), {d(1), d(0), d(1), d(0), d(1)}},
+        {__LINE__, d(1.5).add(-epsilon), {d(1), d(1), d(2), d(1), d(1)}},
+        {__LINE__, d(1.5), {d(2), d(1), d(2), d(1), d(2)}},
+        {__LINE__, d(1.5).add(epsilon), {d(2), d(1), d(2), d(1), d(2)}},
+        {__LINE__, d(2.5).add(-epsilon), {d(2), d(2), d(3), d(2), d(2)}},
+        {__LINE__, d(2.5), {d(2), d(2), d(3), d(2), d(3)}},
+        {__LINE__, d(2.5).add(epsilon), {d(3), d(2), d(3), d(2), d(3)}},
+        {__LINE__, d(3.5).add(-epsilon), {d(3), d(3), d(4), d(3), d(3)}},
+        {__LINE__, d(3.5), {d(4), d(3), d(4), d(3), d(4)}},
+        {__LINE__, d(3.5).add(epsilon), {d(4), d(3), d(4), d(3), d(4)}},
+        {__LINE__, d(9.5).add(-epsilon), {d(9), d(9), d(10), d(9), d(9)}},
+        {__LINE__, d(9.5), {d(10), d(9), d(10), d(9), d(10)}},
+        {__LINE__, d(9.5).add(epsilon), {d(10), d(9), d(10), d(9), d(10)}},
+        {__LINE__, d(-0.5).add(d("1E-34")), {d(-0.0), d(-1), d(-0.0), d(-0.0), d(-0.0)}},
+        {__LINE__, d(-0.5), {d(-0.0), d(-1), d(-0.0), d(-0.0), d(-1)}},
+        {__LINE__, d(-0.5).add(d("-1E-34")), {d(-1), d(-1), d(-0.0), d(-0.0), d(-1)}},
+        {__LINE__, d(-1.5).add(epsilon), {d(-1), d(-2), d(-1), d(-1), d(-1)}},
+        {__LINE__, d(-1.5), {d(-2), d(-2), d(-1), d(-1), d(-2)}},
+        {__LINE__, d(-1.5).add(-epsilon), {d(-2), d(-2), d(-1), d(-1), d(-2)}},
+        {__LINE__, d(-2.5).add(epsilon), {d(-2), d(-3), d(-2), d(-2), d(-2)}},
+        {__LINE__, d(-2.5), {d(-2), d(-3), d(-2), d(-2), d(-3)}},
+        {__LINE__, d(-2.5).add(-epsilon), {d(-3), d(-3), d(-2), d(-2), d(-3)}},
+        {__LINE__, d(-3.5).add(epsilon), {d(-3), d(-4), d(-3), d(-3), d(-3)}},
+        {__LINE__, d(-3.5), {d(-4), d(-4), d(-3), d(-3), d(-4)}},
+        {__LINE__, d(-3.5).add(-epsilon), {d(-4), d(-4), d(-3), d(-3), d(-4)}},
+        {__LINE__, d(-9.5).add(epsilon), {d(-9), d(-10), d(-9), d(-9), d(-9)}},
+        {__LINE__, d(-9.5), {d(-10), d(-10), d(-9), d(-9), d(-10)}},
+        {__LINE__, d(-9.5).add(-epsilon), {d(-10), d(-10), d(-9), d(-9), d(-10)}},
+        {__LINE__, pBig.add(d("0.4")), {pBig, pBig, pBigPlus1, pBig, pBig}},
+        {__LINE__, pBig.add(d("0.5")), {pBigPlus1, pBig, pBigPlus1, pBig, pBigPlus1}},
+        {__LINE__, pBig.add(d("0.6")), {pBigPlus1, pBig, pBigPlus1, pBig, pBigPlus1}},
+        {__LINE__, nBig.add(d("-0.4")), {nBig, nBigMinus1, nBig, nBig, nBig}},
+        {__LINE__, nBig.add(d("-0.5")), {nBigMinus1, nBigMinus1, nBig, nBig, nBigMinus1}},
+        {__LINE__, nBig.add(d("-0.6")), {nBigMinus1, nBigMinus1, nBig, nBig, nBigMinus1}},
+    }};
+
+    for (auto testCase : cases) {
+        for (size_t i = 0; i < roundingModes.size(); ++i) {
+            auto actual = testCase.val.round(roundingModes[i].mode);
+            assertRoundingTestCase(
+                actual, testCase.expected[i], roundingModes[i].name, testCase.lineNumber);
+        }
+    }
+}
+
+TEST(Decimal128Test, TestDecimal128RoundingIntegerValues) {
+    struct TestCase {
+        int lineNumber;
+        Decimal128 val;
+    };
+
+    std::array<TestCase, 16> cases = {{{__LINE__, Decimal128{"0"}},
+                                       {__LINE__, Decimal128{"1"}},
+                                       {__LINE__, Decimal128{"2"}},
+                                       {__LINE__, Decimal128{"3"}},
+                                       {__LINE__, Decimal128{"4"}},
+                                       {__LINE__, Decimal128{DBL_MAX}},
+                                       {__LINE__, Decimal128{std::string(34, '9')}},
+                                       {__LINE__, Decimal128{"-0"}},
+                                       {__LINE__, Decimal128{"-1"}},
+                                       {__LINE__, Decimal128{"-2"}},
+                                       {__LINE__, Decimal128{"-3"}},
+                                       {__LINE__, Decimal128{"-4"}},
+                                       {__LINE__, Decimal128{-DBL_MAX}},
+                                       {__LINE__, Decimal128{"-" + std::string(34, '9')}},
+                                       {__LINE__, Decimal128::kLargestPositive},
+                                       {__LINE__, Decimal128::kLargestNegative}}};
+
+    for (auto testCase : cases) {
+        for (size_t i = 0; i < roundingModes.size(); ++i) {
+            auto actual = testCase.val.round(roundingModes[i].mode);
+            auto const& expected = testCase.val;
+            assertRoundingTestCase(actual, expected, roundingModes[i].name, testCase.lineNumber);
+        }
+    }
+}
+
+TEST(Decimal128Test, TestDecimal128RoundingInfinityAndNan) {
+    struct TestCase {
+        int lineNumber;
+        Decimal128 val;
+    };
+
+    std::array<TestCase, 4> cases = {{{__LINE__, Decimal128::kPositiveInfinity},
+                                      {__LINE__, Decimal128::kNegativeInfinity},
+                                      {__LINE__, Decimal128::kPositiveNaN},
+                                      {__LINE__, Decimal128::kNegativeNaN}}};
+
+    for (auto testCase : cases) {
+        for (size_t i = 0; i < roundingModes.size(); ++i) {
+            auto actual = testCase.val.round(roundingModes[i].mode);
+            auto const& expected = testCase.val;
+            assertRoundingTestCase(actual, expected, roundingModes[i].name, testCase.lineNumber);
+        }
+    }
+}
+
 TEST(Decimal128Test, TestDecimal128NormalizeSmallVals) {
     Decimal128 d1("500E-2");
     Decimal128 d2("5");
