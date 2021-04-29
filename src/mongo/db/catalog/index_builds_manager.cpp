@@ -393,7 +393,9 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
     const NamespaceString& nss,
     const NamespaceString& lostAndFoundNss,
     RecordId dupRecord) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX), nss.ns());
+    invariant(opCtx->lockState()->isCollectionLockedForMode(lostAndFoundNss, MODE_IX),
+              lostAndFoundNss.ns());
 
     auto catalog = CollectionCatalog::get(opCtx);
     auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
@@ -403,12 +405,13 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
     if (!localCollection) {
         Status status =
             writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss.ns(), [&]() {
-                WriteUnitOfWork wuow(opCtx);
-                AutoGetOrCreateDb autoDb(opCtx, NamespaceString::kLocalDb, MODE_X);
-                Database* db = autoDb.getDb();
+                AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
 
                 // Ensure the database exists.
-                invariant(db);
+                auto db = autoColl.ensureDbExists();
+                invariant(db, lostAndFoundNss.ns());
+
+                WriteUnitOfWork wuow(opCtx);
 
                 // Since we are potentially deleting a document with duplicate _id values, we need
                 // to be able to insert into the lost and found collection without generating any
@@ -418,7 +421,7 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
                 localCollection = db->createCollection(opCtx, lostAndFoundNss, collOptions);
 
                 // Ensure the collection exists.
-                invariant(localCollection);
+                invariant(localCollection, lostAndFoundNss.ns());
 
                 wuow.commit();
                 return Status::OK();

@@ -165,32 +165,30 @@ Status update(OperationContext* opCtx, const BSONObj& filter, const BSONObj& upd
 namespace indexbuildentryhelpers {
 
 void ensureIndexBuildEntriesNamespaceExists(OperationContext* opCtx) {
-    writeConflictRetry(opCtx,
-                       "createIndexBuildCollection",
-                       NamespaceString::kIndexBuildEntryNamespace.ns(),
-                       [&]() -> void {
-                           AutoGetOrCreateDb autoDb(
-                               opCtx, NamespaceString::kIndexBuildEntryNamespace.db(), MODE_X);
-                           Database* db = autoDb.getDb();
+    writeConflictRetry(
+        opCtx,
+        "createIndexBuildCollection",
+        NamespaceString::kIndexBuildEntryNamespace.ns(),
+        [&]() -> void {
+            AutoGetDb autoDb(opCtx, NamespaceString::kIndexBuildEntryNamespace.db(), MODE_X);
+            auto db = autoDb.ensureDbExists();
 
-                           // Ensure the database exists.
-                           invariant(db);
+            // Ensure the database exists.
+            invariant(db);
 
-                           // Create the collection if it doesn't exist.
-                           if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                                   opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
-                               WriteUnitOfWork wuow(opCtx);
-                               CollectionOptions defaultCollectionOptions;
-                               CollectionPtr collection =
-                                   db->createCollection(opCtx,
-                                                        NamespaceString::kIndexBuildEntryNamespace,
-                                                        defaultCollectionOptions);
+            // Create the collection if it doesn't exist.
+            if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace)) {
+                WriteUnitOfWork wuow(opCtx);
+                CollectionOptions defaultCollectionOptions;
+                CollectionPtr collection = db->createCollection(
+                    opCtx, NamespaceString::kIndexBuildEntryNamespace, defaultCollectionOptions);
 
-                               // Ensure the collection exists.
-                               invariant(collection);
-                               wuow.commit();
-                           }
-                       });
+                // Ensure the collection exists.
+                invariant(collection);
+                wuow.commit();
+            }
+        });
 }
 
 Status persistCommitReadyMemberInfo(OperationContext* opCtx,

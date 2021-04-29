@@ -263,8 +263,8 @@ void logStartup(OperationContext* opCtx) {
     BSONObj o = toLog.obj();
 
     Lock::GlobalWrite lk(opCtx);
-    AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
-    Database* db = autoDb.getDb();
+    AutoGetDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
+    auto db = autoDb.ensureDbExists();
     CollectionPtr collection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startupLogCollectionName);
     WriteUnitOfWork wunit(opCtx);
