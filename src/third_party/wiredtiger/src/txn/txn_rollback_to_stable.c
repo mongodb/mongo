@@ -646,32 +646,55 @@ __rollback_abort_ondisk_kv(WT_SESSION_IMPL *session, WT_REF *ref, WT_COL *cip, W
          */
         WT_RET(__wt_page_cell_data_ref(session, page, vpack, &buf));
 
-        WT_ERR(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, NULL));
         /*
-         * Set the transaction id of updates to WT_TXN_NONE when called from recovery, because the
-         * connections write generation will be initialized after rollback to stable and the updates
-         * in the cache will be problematic. The transaction id of pages which are in disk will be
-         * automatically reset as part of unpacking cell when loaded to cache.
+         * For prepared transactions, it is possible that both the on-disk key start and stop time
+         * windows can be the same. To abort these updates, check for any stable update from history
+         * store or remove the key.
          */
-        if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
-            upd->txnid = WT_TXN_NONE;
-        else
-            upd->txnid = vpack->tw.start_txn;
-        upd->durable_ts = vpack->tw.durable_start_ts;
-        upd->start_ts = vpack->tw.start_ts;
-        F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
-        WT_STAT_CONN_DATA_INCR(session, txn_rts_keys_restored);
-        __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
-          "key restored with commit timestamp: %s, durable timestamp: %s, stable timestamp: %s, "
-          "txnid: %" PRIu64
-          " and removed commit timestamp: %s, durable timestamp: %s, txnid: %" PRIu64
-          ", prepared: %s",
-          __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
-          __wt_timestamp_to_string(upd->durable_ts, ts_string[1]),
-          __wt_timestamp_to_string(rollback_timestamp, ts_string[2]), upd->txnid,
-          __wt_timestamp_to_string(vpack->tw.stop_ts, ts_string[3]),
-          __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[4]), vpack->tw.stop_txn,
-          prepared ? "true" : "false");
+        if (vpack->tw.start_ts == vpack->tw.stop_ts &&
+          vpack->tw.durable_start_ts == vpack->tw.durable_stop_ts &&
+          vpack->tw.start_txn == vpack->tw.stop_txn) {
+            WT_ASSERT(session, prepared == true);
+            if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+                return (__rollback_ondisk_fixup_key(
+                  session, ref, NULL, cip, rip, rollback_timestamp, true, recno));
+            else {
+                /*
+                 * In-memory database don't have a history store to provide a stable update, so
+                 * remove the key.
+                 */
+                WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
+                WT_STAT_CONN_DATA_INCR(session, txn_rts_keys_removed);
+            }
+        } else {
+            WT_ERR(__wt_upd_alloc(session, &buf, WT_UPDATE_STANDARD, &upd, NULL));
+            /*
+             * Set the transaction id of updates to WT_TXN_NONE when called from recovery, because
+             * the connections write generation will be initialized after rollback to stable and the
+             * updates in the cache will be problematic. The transaction id of pages which are in
+             * disk will be automatically reset as part of unpacking cell when loaded to cache.
+             */
+            if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+                upd->txnid = WT_TXN_NONE;
+            else
+                upd->txnid = vpack->tw.start_txn;
+            upd->durable_ts = vpack->tw.durable_start_ts;
+            upd->start_ts = vpack->tw.start_ts;
+            F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
+            WT_STAT_CONN_DATA_INCR(session, txn_rts_keys_restored);
+            __wt_verbose(session, WT_VERB_RECOVERY_RTS(session),
+              "key restored with commit timestamp: %s, durable timestamp: %s, stable timestamp: "
+              "%s, "
+              "txnid: %" PRIu64
+              " and removed commit timestamp: %s, durable timestamp: %s, txnid: %" PRIu64
+              ", prepared: %s",
+              __wt_timestamp_to_string(upd->start_ts, ts_string[0]),
+              __wt_timestamp_to_string(upd->durable_ts, ts_string[1]),
+              __wt_timestamp_to_string(rollback_timestamp, ts_string[2]), upd->txnid,
+              __wt_timestamp_to_string(vpack->tw.stop_ts, ts_string[3]),
+              __wt_timestamp_to_string(vpack->tw.durable_stop_ts, ts_string[4]), vpack->tw.stop_txn,
+              prepared ? "true" : "false");
+        }
     } else
         /* Stable version according to the timestamp. */
         return (0);
