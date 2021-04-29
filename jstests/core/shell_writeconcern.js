@@ -68,7 +68,7 @@ if (!db.getMongo().useWriteCommands()) {
     assert.eq(0, res.nRemoved, tojson(res));
 }
 
-var res = assert.commandWorked(collA.remove({}, {justOne: true, writeConcern: {w: 1}}));
+var res = assert.commandWorked(collA.remove({_id: 1}, {writeConcern: {w: 1}}));
 if (!db.getMongo().useWriteCommands()) {
     assert.eq(1, res.n, tojson(res));
 } else {
