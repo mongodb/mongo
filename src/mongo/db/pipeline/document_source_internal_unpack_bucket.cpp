@@ -777,7 +777,14 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
         // group.
         container->erase(std::next(itr));
         *itr = std::move(newGroup);
-        return {true, std::prev(itr)};
+
+        if (itr == container->begin()) {
+            // Optimize group stage.
+            return {true, itr};
+        } else {
+            // Give chance of the previous stage to optimize against group stage.
+            return {true, std::prev(itr)};
+        }
     }
 
     return {};
