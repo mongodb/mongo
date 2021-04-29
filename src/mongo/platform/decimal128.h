@@ -336,6 +336,9 @@ public:
         return Decimal128(negated);
     }
 
+    Decimal128 round(RoundingMode roundMode = kRoundTiesToEven) const;
+    Decimal128 round(std::uint32_t* signalingFlags,
+                     RoundingMode roundMode = kRoundTiesToEven) const;
 
     /**
      * This set of functions converts a Decimal128 to a certain integer type with a
@@ -512,6 +515,10 @@ public:
      */
     bool isBinaryEqual(const Decimal128& other) const {
         return _value.high64 == other._value.high64 && _value.low64 == other._value.low64;
+    }
+
+    Decimal128 operator-() const {
+        return negate();
     }
 
 private:
