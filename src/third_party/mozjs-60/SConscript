@@ -190,6 +190,6 @@ env.Library(
     source=sources,
     LIBDEPS_TAGS=[
         # Depends on allocation symbols defined elsewhere
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        'illegal_cyclic_or_unresolved_dependencies_allowlisted',
     ],
 )

@@ -1694,7 +1694,7 @@ if link_model.startswith("dynamic"):
     # ensure that missing symbols due to unnamed dependency edges
     # result in link errors.
     #
-    # NOTE: The `illegal_cyclic_or_unresolved_dependencies_whitelisted`
+    # NOTE: The `illegal_cyclic_or_unresolved_dependencies_allowlisted`
     # tag can be applied to a library to indicate that it does not (or
     # cannot) completely express all of its required link dependencies.
     # This can occur for four reasons:
@@ -1741,7 +1741,7 @@ if link_model.startswith("dynamic"):
             def libdeps_tags_expand_incomplete(source, target, env, for_signature):
                 # On darwin, since it is strict by default, we need to add a flag
                 # when libraries are tagged incomplete.
-                if ('illegal_cyclic_or_unresolved_dependencies_whitelisted'
+                if ('illegal_cyclic_or_unresolved_dependencies_allowlisted'
                     in target[0].get_env().get("LIBDEPS_TAGS", [])):
                     return ["-Wl,-undefined,dynamic_lookup"]
                 return []
@@ -1754,7 +1754,7 @@ if link_model.startswith("dynamic"):
             def libdeps_tags_expand_incomplete(source, target, env, for_signature):
                 # On windows, since it is strict by default, we need to add a flag
                 # when libraries are tagged incomplete.
-                if ('illegal_cyclic_or_unresolved_dependencies_whitelisted'
+                if ('illegal_cyclic_or_unresolved_dependencies_allowlisted'
                     in target[0].get_env().get("LIBDEPS_TAGS", [])):
                     return ["/FORCE:UNRESOLVED"]
                 return []
@@ -1772,7 +1772,7 @@ if link_model.startswith("dynamic"):
                 # default, we need to add a flag when libraries are not
                 # tagged incomplete.
                 def libdeps_tags_expand_incomplete(source, target, env, for_signature):
-                    if ('illegal_cyclic_or_unresolved_dependencies_whitelisted'
+                    if ('illegal_cyclic_or_unresolved_dependencies_allowlisted'
                         not in target[0].get_env().get("LIBDEPS_TAGS", [])):
                         return ["-Wl,-z,defs"]
                     return []
