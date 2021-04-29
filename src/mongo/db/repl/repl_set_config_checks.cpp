@@ -384,6 +384,15 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
+    if (newConfig.containsCustomizedGetLastErrorDefaults()) {
+        fassertFailedWithStatusNoTrace(
+            5624100,
+            {ErrorCodes::IllegalOperation,
+             str::stream() << "Failed to start up: Replica set config contains customized "
+                              "getLastErrorDefaults, which "
+                              "has been deprecated and is now ignored. Use setDefaultRWConcern "
+                              "instead to set a cluster-wide default writeConcern."});
+    }
     return findSelfInConfig(externalState, newConfig, ctx);
 }
 
@@ -400,10 +409,14 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
         return StatusWith<int>(status);
     }
 
-    status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
-    if (!status.isOK()) {
-        return status.withContext(
-            "Found invalid default write concern in 'getLastErrorDefaults' field");
+    if (newConfig.containsCustomizedGetLastErrorDefaults()) {
+        fassertFailedWithStatusNoTrace(
+            5624101,
+            {ErrorCodes::IllegalOperation,
+             str::stream() << "Failed to initiate: Replica set config contains customized "
+                              "getLastErrorDefaults, which "
+                              "has been deprecated and is now ignored. Use setDefaultRWConcern "
+                              "instead to set a cluster-wide default writeConcern."});
     }
 
     status = validateArbiterPriorities(newConfig);
@@ -449,11 +462,12 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
         }
     }
 
-    status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
-    if (!status.isOK()) {
-        return status.withContext(
-            "Found invalid default write concern in 'getLastErrorDefaults' field");
-    }
+    uassert(5624102,
+            "Failed to reconfig: Replica set config contains customized "
+            "getLastErrorDefaults, which has "
+            "been deprecated and is now ignored. Use setDefaultRWConcern instead to "
+            "set a cluster-wide default writeConcern.",
+            !newConfig.containsCustomizedGetLastErrorDefaults());
 
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
     if (!status.isOK()) {
@@ -486,6 +500,13 @@ StatusWith<int> validateConfigForHeartbeatReconfig(
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
+
+    tassert(5624103,
+            "Replica set config during heartbeat reconfig contains "
+            "customized getLastErrorDefaults, which has "
+            "been deprecated and is now ignored. Use setDefaultRWConcern instead to "
+            "set a cluster-wide default writeConcern.",
+            !newConfig.containsCustomizedGetLastErrorDefaults());
 
     return findSelfInConfig(externalState, newConfig, ctx);
 }
