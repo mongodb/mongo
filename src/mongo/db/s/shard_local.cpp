@@ -144,7 +144,6 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
     try {
         // TODO SERVER-50983: Create abstraction for creating collection when using
         // AutoGetCollection
-        AutoGetOrCreateDb autoDb(opCtx, ns.db(), MODE_IX);
         AutoGetCollection autoColl(opCtx, ns, MODE_X);
         const Collection* collection = autoColl.getCollection().get();
         if (!collection) {
@@ -152,7 +151,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             options.uuid = UUID::gen();
             writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
-                auto db = autoDb.getDb();
+                auto db = autoColl.ensureDbExists();
                 collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
                           str::stream() << "Failed to create collection " << ns.ns()

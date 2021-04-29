@@ -97,9 +97,10 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     }
 
     {
-        // We use AutoGetOrCreateDb the first time just in case movePrimary was called before any
-        // data was inserted into the database.
-        AutoGetOrCreateDb autoDb(opCtx, getNss().toString(), MODE_X);
+        // We use AutoGetDb::ensureDbExists() the first time just in case movePrimary was called
+        // before any data was inserted into the database.
+        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+        invariant(autoDb.ensureDbExists(), getNss().toString());
 
         auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
         auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);

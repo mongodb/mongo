@@ -228,9 +228,10 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
         }
 
         WriteUnitOfWork wuow(opCtx);
-        AutoGetOrCreateDb db(opCtx, nss.db(), LockMode::MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.db(), LockMode::MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        db.getDb()->createCollection(opCtx, nss);
+        auto db = autoDb.ensureDbExists();
+        db->createCollection(opCtx, nss);
         wuow.commit();
     });
 }

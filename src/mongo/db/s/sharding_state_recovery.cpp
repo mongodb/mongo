@@ -144,9 +144,8 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
                               const WriteConcernOptions& writeConcern) {
     try {
         // Use boost::optional so we can release the locks early
-        boost::optional<AutoGetOrCreateDb> autoGetOrCreateDb;
-        autoGetOrCreateDb.emplace(
-            opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
+        boost::optional<AutoGetDb> autoGetDb;
+        autoGetDb.emplace(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
         auto const grid = Grid::get(opCtx);
         BSONObj updateObj = RecoveryDocument::createChangeObj(grid->configOpTime(), change);
@@ -164,12 +163,12 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
             write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
         updateReq.setUpsert();
 
-        UpdateResult result = update(opCtx, autoGetOrCreateDb->getDb(), updateReq);
+        UpdateResult result = update(opCtx, autoGetDb->ensureDbExists(), updateReq);
         invariant(result.numDocsModified == 1 || !result.upsertedId.isEmpty());
         invariant(result.numMatched <= 1);
 
         // Wait until the majority write concern has been satisfied, but do it outside of lock
-        autoGetOrCreateDb = boost::none;
+        autoGetDb = boost::none;
 
         WriteConcernResult writeConcernResult;
         return waitForWriteConcern(opCtx,
