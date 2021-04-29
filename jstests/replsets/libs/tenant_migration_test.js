@@ -326,7 +326,8 @@ function TenantMigrationTest({
     this.isDonorNodeInExpectedState = function(node, migrationId, tenantId, expectedState) {
         const configDonorsColl =
             this.getDonorPrimary().getCollection(TenantMigrationTest.kConfigDonorsNS);
-        if (configDonorsColl.findOne({_id: migrationId}).state !== expectedState) {
+        const configDoc = configDonorsColl.findOne({_id: migrationId});
+        if (!configDoc || configDoc.state !== expectedState) {
             return false;
         }
 
@@ -370,7 +371,8 @@ function TenantMigrationTest({
         node, migrationId, tenantId, expectedState, expectedAccessState) {
         const configRecipientsColl =
             this.getRecipientPrimary().getCollection("config.tenantMigrationRecipients");
-        if (configRecipientsColl.findOne({_id: migrationId}).state !== expectedState) {
+        const configDoc = configRecipientsColl.findOne({_id: migrationId});
+        if (!configDoc || configDoc.state !== expectedState) {
             return false;
         }
 
