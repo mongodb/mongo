@@ -71,8 +71,12 @@ var CheckOrphansAreDeletedHelpers = (function() {
                                                     : {ns: ns, shard: {$ne: shardId}};
             mongosConn.getDB('config').chunks.find(chunksQuery).forEach(chunkDoc => {
                 // Use $min/$max so this will also work with hashed and compound shard keys.
-                const orphans =
-                    coll.find({}).hint(collDoc.key).min(chunkDoc.min).max(chunkDoc.max).toArray();
+                const orphans = coll.find({})
+                                    .collation({locale: "simple"})
+                                    .hint(collDoc.key)
+                                    .min(chunkDoc.min)
+                                    .max(chunkDoc.max)
+                                    .toArray();
                 assert.eq(0,
                           orphans.length,
                           'found orphans @ ' + shardId + ' within chunk: ' + tojson(chunkDoc) +

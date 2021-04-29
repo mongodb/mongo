@@ -72,6 +72,8 @@ last-lts:
       test_file: jstests/sharding/database_versioning_all_commands.js
     - ticket: SERVER-49988
       test_file: jstests/sharding/hello_response_validation.js
+    - ticket: SERVER-53335
+      test_file: jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
     - ticket: SERVER-50640
       test_file: jstests/sharding/read_write_concern_defaults_application.js
     - ticket: SERVER-50640

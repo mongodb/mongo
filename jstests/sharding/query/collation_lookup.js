@@ -17,9 +17,6 @@ load("jstests/aggregation/extras/utils.js");                     // for arrayEq
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
-// Shard key index has collation, which is not compatible with $min/$max
-TestData.skipCheckOrphans = true;
-
 function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collation) {
     // Test that the $lookup stage respects the inherited collation.
     let res = withDefaultCollationColl

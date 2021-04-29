@@ -2,9 +2,6 @@
 (function() {
 "use strict";
 
-// Shard key index has collation, which is not compatible with $min/$max
-TestData.skipCheckOrphans = true;
-
 const caseInsensitive = {
     locale: "en_US",
     strength: 2
