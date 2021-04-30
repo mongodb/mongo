@@ -8,24 +8,18 @@ LOGGER = logging.getLogger(__name__)
 class ProcessControl(object):
     """Process control class.
 
-    Control processes either by name or a list of pids. If name is supplied, then
-    all matching pids are controlled.
+    Control processes by name. All matching by supplied name
+    pids are controlled.
     """
 
-    def __init__(self, name=None, pids=None):
-        """Provide either 'name' or 'pids' to control the process."""
-        if not name and not pids:
-            raise Exception("Either 'process_name' or 'pids' must be specifed")
+    def __init__(self, name):
+        """Provide 'name' to control the process."""
         self.name = name
         self.pids = []
-        if pids:
-            self.pids = pids
         self.procs = []
 
     def get_pids(self):
         """Return list of process ids for process 'self.name'."""
-        if not self.name:
-            return self.pids
         self.pids = []
         for proc in psutil.process_iter():
             try:
@@ -34,16 +28,6 @@ class ProcessControl(object):
             except psutil.NoSuchProcess:
                 pass
         return self.pids
-
-    def get_name(self):
-        """Return process name or name of first running process from pids."""
-        if not self.name:
-            for pid in self.get_pids():
-                proc = psutil.Process(pid)
-                if psutil.pid_exists(pid):
-                    self.name = proc.name()
-                    break
-        return self.name
 
     def get_procs(self):
         """Return a list of 'proc' for the associated pids."""
@@ -56,7 +40,7 @@ class ProcessControl(object):
         return procs
 
     def is_running(self):
-        """Return true if any process is running that either matches on name or pids."""
+        """Return true if any process is running that matches pids."""
         for pid in self.get_pids():
             if psutil.pid_exists(pid):
                 return True
