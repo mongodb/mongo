@@ -22,7 +22,7 @@ env.Library(
         'libs/system/src/error_code.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/shim_boost_assert',
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
     ],
 )
 
@@ -41,7 +41,7 @@ env.Library(
         'libs/filesystem/src/windows_file_codecvt.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/shim_boost_assert',
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
         'boost_system',
     ],
 )
@@ -67,7 +67,7 @@ env.Library(
         'illegal_cyclic_or_unresolved_dependencies_allowlisted',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/shim_boost_assert',
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
     ],
 )
 
@@ -78,7 +78,7 @@ env.Library(
         'libs/iostreams/src/mapped_file.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/util/shim_boost_assert',
+            '$BUILD_DIR/mongo/util/boost_assert_shim',
             'boost_system',
         ])
 
@@ -108,7 +108,7 @@ threadlib_env.Library(
         'libs/thread/src/future.cpp',
     ] + boost_thread_source,
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/shim_boost_assert',
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
     ]
 )
 
@@ -169,7 +169,7 @@ loglib_env.Library(
         'libs/log/src/trivial.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/shim_boost_assert',
+        '$BUILD_DIR/mongo/util/boost_assert_shim',
         'boost_filesystem',
         'boost_thread',
     ]

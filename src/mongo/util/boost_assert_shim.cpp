@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "shim_boost_assert.h"
+#include "boost_assert_shim.h"
 
 #if defined(BOOST_ENABLE_ASSERT_DEBUG_HANDLER) && !defined(NDEBUG)
 
