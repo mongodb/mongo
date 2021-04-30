@@ -75,6 +75,11 @@ public:
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialStateDoc) final;
 
+    /**
+     * Sends an abort to all tenant migration instances on this recipient.
+     */
+    void abortAllMigrations(OperationContext* opCtx);
+
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
         explicit Instance(ServiceContext* const serviceContext,
@@ -89,6 +94,11 @@ public:
          * 'status'.
          */
         void interrupt(Status status) override;
+
+        /*
+         * Cancels the running instance but permits waiting for forgetMigration.
+         */
+        void cancelMigration();
 
         /**
          * Interrupts the migration for garbage collection.

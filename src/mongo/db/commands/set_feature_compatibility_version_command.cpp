@@ -55,6 +55,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
+#include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -668,6 +669,11 @@ private:
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
             donorService->abortAllMigrations(opCtx);
+            auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
+                                              kTenantMigrationRecipientServiceName));
+            recipientService->abortAllMigrations(opCtx);
         }
     }
 

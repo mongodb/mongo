@@ -245,6 +245,16 @@ ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const 
     return limits;
 }
 
+void TenantMigrationRecipientService::abortAllMigrations(OperationContext* opCtx) {
+    LOGV2(5356303, "Aborting all tenant migrations on recipient");
+    auto instances = getAllInstances(opCtx);
+    for (auto& instance : instances) {
+        auto typedInstance =
+            checked_pointer_cast<TenantMigrationRecipientService::Instance>(instance);
+        typedInstance->cancelMigration();
+    }
+}
+
 ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
@@ -1671,6 +1681,12 @@ void TenantMigrationRecipientService::Instance::interrupt(Status status) {
     _interrupt(status, /*skipWaitingForForgetMigration=*/true);
 }
 
+void TenantMigrationRecipientService::Instance::cancelMigration() {
+    auto status = Status(ErrorCodes::TenantMigrationAborted,
+                         "Interrupted all tenant migrations on recipient");
+    _interrupt(status, /*skipWaitingForForgetMigration=*/false);
+}
+
 void TenantMigrationRecipientService::Instance::onReceiveRecipientForgetMigration(
     OperationContext* opCtx) {
     LOGV2(4881400,
@@ -1828,10 +1844,22 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
           "readPreference"_attr = _readPreference);
 
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
+
+    bool cancelWhenDurable = false;
+
+    // We must abort the migration if we try to start or resume while upgrading or downgrading.
+    // We defer this until after the state doc is persisted in a started so as to make sure it it
+    // safe to abort and forget the migration.
+    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
+        LOGV2(5356304, "Must abort tenant migration as recipient is upgrading or downgrading");
+        cancelWhenDurable = true;
+    }
+
     // The 'AsyncTry' is run on the cleanup executor as opposed to the scoped executor  as we rely
     // on the 'PrimaryService' to interrupt the operation contexts based on thread pool and not the
     // executor.
-    return AsyncTry([this, self = shared_from_this(), executor, token] {
+    return AsyncTry([this, self = shared_from_this(), executor, token, cancelWhenDurable] {
                return ExecutorFuture(**executor)
                    .then([this, self = shared_from_this()] {
                        stdx::unique_lock lk(_mutex);
@@ -1890,7 +1918,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
                        return _initializeStateDoc(lk);
                    })
-                   .then([this, self = shared_from_this()] {
+                   .then([this, self = shared_from_this(), cancelWhenDurable] {
                        if (_stateDocPersistedPromise.getFuture().isReady()) {
                            // This is a retry of the future chain due to donor failure.
                            auto opCtx = cc().makeOperationContext();
@@ -1911,6 +1939,12 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                str::stream() << "Migration " << getMigrationUUID()
                                              << " already marked for garbage collect",
                                !_stateDoc.getExpireAt());
+
+                       // Must abort if flagged for cancellation above.
+                       uassert(ErrorCodes::TenantMigrationAborted,
+                               "Interrupted tenant migration on recipient",
+                               !cancelWhenDurable);
+
                        _stopOrHangOnFailPoint(
                            &fpAfterPersistingTenantMigrationRecipientInstanceStateDoc);
                        return _createAndConnectClients();
