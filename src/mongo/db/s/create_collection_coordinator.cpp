@@ -49,12 +49,9 @@
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
-#include "mongo/util/future_util.h"
 
 namespace mongo {
 namespace {
-
-const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 struct OptionsAndIndexes {
     BSONObj options;
@@ -471,14 +468,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
                     _createCollectionOnNonPrimaryShards(opCtx);
 
-                    _commitWithRetries(executor, token).get(opCtx);
+                    _commit(opCtx);
                 }
 
                 sharding_ddl_util::releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (!_splitPolicy->isOptimized()) {
-                    _commitWithRetries(executor, token).get(opCtx);
+                    _commit(opCtx);
                 }
 
                 _finalize(opCtx);
@@ -739,20 +736,6 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
     }
 
     updateCatalogEntry(opCtx, nss(), coll);
-}
-
-ExecutorFuture<void> CreateCollectionCoordinator::_commitWithRetries(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    return AsyncTry([this] {
-               auto opCtxHolder = cc().makeOperationContext();
-               auto* opCtx = opCtxHolder.get();
-               getForwardableOpMetadata().setOn(opCtx);
-
-               _commit(opCtx);
-           })
-        .until([token](Status status) { return status.isOK() || token.isCanceled(); })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, CancellationToken::uncancelable());
 }
 
 void CreateCollectionCoordinator::_finalize(OperationContext* opCtx) noexcept {
