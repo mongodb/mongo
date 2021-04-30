@@ -16,7 +16,9 @@
  *   # TODO (SERVER-54905): ensure all DDL are resilient.
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
- *   does_not_support_transactions
+ *   does_not_support_transactions,
+ *   # Requires all nodes to be running the latest binary.
+ *   multiversion_incompatible,
  *  ]
  */
 
