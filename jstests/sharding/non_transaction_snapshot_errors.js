@@ -25,6 +25,8 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
 
+const kMinSnapshotHistoryWindowInSeconds = 300;
+
 const kCommandTestCases = [
     {name: "aggregate", command: {aggregate: collName, pipeline: [], cursor: {}}},
     {name: "find", command: {find: collName}},
@@ -89,7 +91,15 @@ function runTest(st, numShardsToError, errorCode, isSharded) {
     }
 }
 
-const st = new ShardingTest({shards: 2, mongos: 1, config: 1});
+const st = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    config: 1,
+    other: {
+        shardOptions:
+            {setParameter: {minSnapshotHistoryWindowInSeconds: kMinSnapshotHistoryWindowInSeconds}}
+    }
+});
 
 jsTestLog("Unsharded snapshot read");
 
