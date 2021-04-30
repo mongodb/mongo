@@ -428,9 +428,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             getCollation(opCtx, nss(), _doc.getCollation()),
                             _doc.getUnique().value_or(false))) {
                     _result = createCollectionResponseOpt;
-                    // Early return before holding the critical section, the
-                    // collection was already created and commited but there was a
-                    // stepdown before removing the coordinator document.
+                    // The collection was already created and commited but there was a
+                    // stepdown after the commit.
+                    sharding_ddl_util::releaseRecoverableCriticalSection(
+                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
                     return;
                 }
 
