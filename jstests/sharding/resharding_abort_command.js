@@ -177,6 +177,11 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
     const topology = DiscoverTopology.findConnectedNodes(mongos);
     const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
+    let reshardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
+    const reshardingOperationsInitialCount = reshardingMetrics.countReshardingOperations;
+    const reshardingSuccessesInitialCount = reshardingMetrics.countReshardingSuccessful;
+    const reshardingCanceledInitialCount = reshardingMetrics.countReshardingCanceled;
+
     let expectedAbortErrorCodes = ErrorCodes.OK;
     let expectedReshardingErrorCode = ErrorCodes.ReshardCollectionAborted;
 
@@ -275,6 +280,22 @@ const runAbortWithFailpoint = (failpointName, failpointNodeType, abortLocation, 
                 }
             }
         });
+
+    reshardingMetrics = configsvr.getDB('admin').serverStatus({}).shardingStatistics.resharding;
+    const reshardingOperationsFinalCount = reshardingMetrics.countReshardingOperations;
+    const reshardingSuccessesFinalCount = reshardingMetrics.countReshardingSuccessful;
+    const reshardingCanceledFinalCount = reshardingMetrics.countReshardingCanceled;
+
+    assert(reshardingOperationsFinalCount == reshardingOperationsInitialCount + 1);
+
+    if (expectedReshardingErrorCode == ErrorCodes.OK) {
+        assert.eq(reshardingSuccessesFinalCount, reshardingSuccessesInitialCount + 1);
+        assert.eq(reshardingCanceledInitialCount, reshardingCanceledFinalCount);
+    } else if (expectedAbortErrorCodes == ErrorCodes.OK) {
+        assert.eq(reshardingCanceledFinalCount, reshardingCanceledInitialCount + 1);
+        assert.eq(reshardingSuccessesInitialCount, reshardingSuccessesFinalCount);
+    }
+
     reshardingTest.teardown();
 
     abortThread.join();

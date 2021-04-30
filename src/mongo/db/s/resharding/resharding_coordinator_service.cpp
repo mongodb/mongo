@@ -967,9 +967,10 @@ ExecutorFuture<void> waitForMinimumOperationDuration(
 
 void markCompleted(const Status& status) {
     auto metrics = ReshardingMetrics::get(cc().getServiceContext());
-    // TODO SERVER-52770 to process the cancellation of resharding operations.
     if (status.isOK())
         metrics->onCompletion(ReshardingOperationStatusEnum::kSuccess);
+    else if (status == ErrorCodes::ReshardCollectionAborted)
+        metrics->onCompletion(ReshardingOperationStatusEnum::kCanceled);
     else
         metrics->onCompletion(ReshardingOperationStatusEnum::kFailure);
 }

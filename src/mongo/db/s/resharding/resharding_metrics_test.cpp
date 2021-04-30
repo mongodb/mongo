@@ -236,6 +236,27 @@ TEST_F(ReshardingMetricsTest, CumulativeOpMetricsAreRetainedAfterCompletion) {
         kTag, kDocumentsToCopy, "Cumulative metrics are reset", OpReportType::CumulativeReport);
 }
 
+TEST_F(ReshardingMetricsTest, CumulativeOpMetricsAreRetainedAfterCancellation) {
+    auto constexpr kTag = "documentsCopied";
+    getMetrics()->onStart();
+    const auto kDocumentsToCopy = 2;
+    const auto kBytesToCopy = 200;
+    getMetrics()->setRecipientState(RecipientStateEnum::kCloning);
+    getMetrics()->onDocumentsCopied(kDocumentsToCopy, kBytesToCopy);
+    advanceTime();
+    getMetrics()->onCompletion(ReshardingOperationStatusEnum::kCanceled);
+    advanceTime();
+
+    checkMetrics(kTag,
+                 kDocumentsToCopy,
+                 "Cumulative metrics are not retained",
+                 OpReportType::CumulativeReport);
+
+    getMetrics()->onStart();
+    checkMetrics(
+        kTag, kDocumentsToCopy, "Cumulative metrics are reset", OpReportType::CumulativeReport);
+}
+
 TEST_F(ReshardingMetricsTest, CurrentOpMetricsAreResetAfterCompletion) {
     auto constexpr kTag = "documentsCopied";
     getMetrics()->onStart();
