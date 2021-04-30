@@ -1521,16 +1521,36 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                   "Applied a delete which did not delete anything in steady state "
                                   "replication",
                                   "op"_attr = redact(op.toBSONForLogging()));
-                    if (collection)
+
+                    // In FCV 4.4, each node is responsible for deleting the excess documents in
+                    // capped collections. This implies that capped deletes may not be synchronized
+                    // between nodes at times. When upgraded to FCV 5.0, the primary will generate
+                    // delete oplog entries for capped collections. However, if any secondary was
+                    // behind in deleting excess documents while in FCV 4.4, the primary would have
+                    // no way of knowing and it would delete the first document it sees locally.
+                    // Eventually, when secondaries step up and start deleting capped documents,
+                    // they will first delete previously missed documents that may already be
+                    // deleted on other nodes. For this reason we skip returning NoSuchKey for
+                    // capped collections when oplog application is enforcing steady state
+                    // constraints.
+                    bool isCapped = false;
+                    if (collection) {
+                        isCapped = collection->isCapped();
                         opCounters->gotDeleteWasEmpty();
-                    else
+                    } else {
                         opCounters->gotDeleteFromMissingNamespace();
-                    // This error is fatal when we are enforcing steady state constraints.
-                    uassert(collection ? ErrorCodes::NoSuchKey : ErrorCodes::NamespaceNotFound,
-                            str::stream() << "Applied a delete which did not delete anything in "
-                                             "steady state replication : "
-                                          << redact(op.toBSONForLogging()),
-                            !oplogApplicationEnforcesSteadyStateConstraints);
+                    }
+
+                    if (!isCapped) {
+                        // This error is fatal when we are enforcing steady state constraints for
+                        // non-capped collections.
+                        uassert(collection ? ErrorCodes::NoSuchKey : ErrorCodes::NamespaceNotFound,
+                                str::stream()
+                                    << "Applied a delete which did not delete anything in "
+                                       "steady state replication : "
+                                    << redact(op.toBSONForLogging()),
+                                !oplogApplicationEnforcesSteadyStateConstraints);
+                    }
                 }
                 wuow.commit();
             });

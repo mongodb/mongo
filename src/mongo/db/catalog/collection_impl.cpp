@@ -110,6 +110,8 @@ MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 // This fail point introduces corruption to documents during insert.
 MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 
+MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
+
 /**
  * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
  * the insert should fail. Returns Status::OK if The function should proceed with the insertion.
@@ -831,6 +833,10 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 }
 
 bool CollectionImpl::_cappedAndNeedDelete(OperationContext* opCtx) const {
+    if (MONGO_unlikely(skipCappedDeletes.shouldFail())) {
+        return false;
+    }
+
     if (!isCapped()) {
         return false;
     }
