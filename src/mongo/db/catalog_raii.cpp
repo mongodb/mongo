@@ -428,14 +428,6 @@ LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMod
     return nss.isSystemDotViews() ? MODE_X : mode;
 }
 
-AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
-                                     StringData dbName,
-                                     LockMode mode,
-                                     Date_t deadline)
-    : _autoDb(opCtx, dbName, mode, deadline), _db(_autoDb.ensureDbExists()) {
-    invariant(mode == MODE_IX || mode == MODE_X);
-}
-
 ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
                                  boost::optional<Timestamp> provided)

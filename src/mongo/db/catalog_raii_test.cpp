@@ -118,16 +118,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
                          Milliseconds(0));
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetOrCreateDbDeadline) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    failsWithLockTimeout(
-        [&] {
-            AutoGetOrCreateDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs);
-        },
-        timeoutMs);
-}
-
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
