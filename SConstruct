@@ -3539,50 +3539,50 @@ def doConfigure(myenv):
                 myenv.ConfError('Failed to enable -fsanitize-coverage with flag: {0}', sanitize_coverage_option )
 
 
-        blackfiles_map = {
-            "address" : myenv.File("#etc/asan.blacklist"),
-            "thread" : myenv.File("#etc/tsan.blacklist"),
-            "undefined" : myenv.File("#etc/ubsan.blacklist"),
+        denyfiles_map = {
+            "address" : myenv.File("#etc/asan.denylist"),
+            "thread" : myenv.File("#etc/tsan.denylist"),
+            "undefined" : myenv.File("#etc/ubsan.denylist"),
         }
 
-        # Select those unique black files that are associated with the
+        # Select those unique deny files that are associated with the
         # currently enabled sanitizers, but filter out those that are
         # zero length.
-        blackfiles = {v for (k, v) in blackfiles_map.items() if k in sanitizer_list}
-        blackfiles = [f for f in blackfiles if os.stat(f.path).st_size != 0]
+        denyfiles = {v for (k, v) in denyfiles_map.items() if k in sanitizer_list}
+        denyfiles = [f for f in denyfiles if os.stat(f.path).st_size != 0]
 
-        # Filter out any blacklist options that the toolchain doesn't support.
-        supportedBlackfiles = []
-        blackfilesTestEnv = myenv.Clone()
-        for blackfile in blackfiles:
-            if AddToCCFLAGSIfSupported(blackfilesTestEnv, f"-fsanitize-blacklist={blackfile}"):
-                supportedBlackfiles.append(blackfile)
-        blackfilesTestEnv = None
-        supportedBlackfiles = sorted(supportedBlackfiles)
+        # Filter out any denylist options that the toolchain doesn't support.
+        supportedDenyfiles = []
+        denyfilesTestEnv = myenv.Clone()
+        for denyfile in denyfiles:
+            if AddToCCFLAGSIfSupported(denyfilesTestEnv, f"-fsanitize-blacklist={denyfile}"):
+                supportedDenyfiles.append(denyfile)
+        denyfilesTestEnv = None
+        supportedDenyfiles = sorted(supportedDenyfiles)
 
-        # If we ended up with any blackfiles after the above filters,
+        # If we ended up with any denyfiles after the above filters,
         # then expand them into compiler flag arguments, and use a
         # generator to return at command line expansion time so that
         # we can change the signature if the file contents change.
-        if supportedBlackfiles:
+        if supportedDenyfiles:
             # Unconditionally using the full path can affect SCons cached builds, so we only do
             # this in cases where we know it's going to matter.
             if 'ICECC' in env and env['ICECC']:
                 # Make these files available to remote icecream builds if requested.
                 # These paths *must* be absolute to match the paths in the remote
                 # toolchain archive.
-                blacklist_options=[
-                    f"-fsanitize-blacklist={blackfile.get_abspath()}"
-                    for blackfile in supportedBlackfiles
+                denylist_options=[
+                    f"-fsanitize-blacklist={denyfile.get_abspath()}"
+                    for denyfile in supportedDenyfiles
                 ]
-                # If a sanitizer is in use with a blacklist file, we have to ensure they get
+                # If a sanitizer is in use with a denylist file, we have to ensure they get
                 # added to the toolchain package that gets sent to the remote hosts so they
                 # can be found by the remote compiler.
-                env.Append(ICECC_CREATE_ENV_ADDFILES=supportedBlackfiles)
+                env.Append(ICECC_CREATE_ENV_ADDFILES=supportedDenyfiles)
             else:
-                blacklist_options=[
-                    f"-fsanitize-blacklist={blackfile.path}"
-                    for blackfile in supportedBlackfiles
+                denylist_options=[
+                    f"-fsanitize-blacklist={denyfile.path}"
+                    for denyfile in supportedDenyfiles
                 ]
 
             if 'CCACHE' in env and env['CCACHE']:
@@ -3590,22 +3590,22 @@ def doConfigure(myenv):
                 # -fsanitize-blacklist at all or only support one instance of it. This will
                 # work on any version of ccache because the point is only to ensure that the
                 # resulting hash for any compiled object is guaranteed to take into account
-                # the effect of any sanitizer blacklist files used as part of the build.
+                # the effect of any sanitizer denylist files used as part of the build.
                 # TODO: This will no longer be required when the following pull requests/
                 # issues have been merged and deployed.
                 # https://github.com/ccache/ccache/pull/258
                 # https://github.com/ccache/ccache/issues/318
-                env.Append(CCACHE_EXTRAFILES=supportedBlackfiles)
+                env.Append(CCACHE_EXTRAFILES=supportedDenyfiles)
 
-            def SanitizerBlacklistGenerator(source, target, env, for_signature):
+            def SanitizerDenylistGenerator(source, target, env, for_signature):
                 if for_signature:
-                    return [f.get_csig() for f in supportedBlackfiles]
-                return blacklist_options
+                    return [f.get_csig() for f in supportedDenyfiles]
+                return denylist_options
 
             myenv.AppendUnique(
-                SANITIZER_BLACKLIST_GENERATOR=SanitizerBlacklistGenerator,
-                CCFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
-                LINKFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
+                SANITIZER_DENYLIST_GENERATOR=SanitizerDenylistGenerator,
+                CCFLAGS="${SANITIZER_DENYLIST_GENERATOR}",
+                LINKFLAGS="${SANITIZER_DENYLIST_GENERATOR}",
             )
 
         symbolizer_option = ""
