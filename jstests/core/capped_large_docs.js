@@ -1,13 +1,10 @@
 /**
  * Tests inserting large documents into a capped collection.
  *
- * TODO SERVER-56262 remove 'requires_non_retryable_writes' tag.
- *
  * @tags: [
  *     requires_capped,
  *     requires_collstats,
  *     requires_fastcount,
- *     requires_non_retryable_writes,
  *     requires_fcv_49,
  *     # Capped collections cannot be sharded
  *     assumes_unsharded_collection,

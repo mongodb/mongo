@@ -761,7 +761,8 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
     if (_shared->_needCappedLock) {
         // X-lock the metadata resource for this capped collection until the end of the WUOW. This
-        // prevents the primary from executing with more concurrency than secondaries.
+        // prevents the primary from executing with more concurrency than secondaries and protects
+        // '_cappedFirstRecord'.
         // See SERVER-21646.
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
@@ -889,10 +890,26 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_shared->_cappedDeleterMutex);
+    stdx::unique_lock<Latch> cappedFirstRecordMutex(_shared->_cappedFirstRecordMutex,
+                                                    stdx::defer_lock);
+    if (_shared->_needCappedLock) {
+        // As capped deletes can be part of a larger WriteUnitOfWork, we need a way to protect
+        // '_cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking the
+        // metadata resource exclusively on the collection gives us that guarantee as it uses
+        // two-phase locking semantics.
+        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, _ns.ns())) ==
+                  MODE_X);
+    } else {
+        // Capped deletes not performed under the capped lock need the '_cappedFirstRecordMutex'
+        // mutex.
+        cappedFirstRecordMutex.lock();
+    }
 
     boost::optional<CappedDeleteSideTxn> cappedDeleteSideTxn;
-    if (useOldCappedDeleteBehaviour) {
+    if (useOldCappedDeleteBehaviour || !_shared->_needCappedLock) {
+        // In FCV < 5.0, all capped deletes are performed in a side transaction. Additionally, any
+        // capped deletes not performed under the capped lock need to commit the innermost
+        // WriteUnitOfWork while '_cappedFirstRecordMutex' is locked.
         cappedDeleteSideTxn.emplace(opCtx);
     }
     const long long currentDataSize = dataSize(opCtx);
@@ -913,12 +930,15 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
     boost::optional<Record> record;
     auto cursor = getCursor(opCtx, /*forward=*/true);
 
-    // If the next RecordId to be deleted is known, navigate to it using seekExact(). Using a cursor
+    // If the next RecordId to be deleted is known, navigate to it using seekNear(). Using a cursor
     // and advancing it to the first element by calling next() will be slow for capped collections
     // on particular storage engines, such as WiredTiger. In WiredTiger, there may be many
     // tombstones (invisible deleted records) to traverse at the beginning of the table.
     if (!_shared->_cappedFirstRecord.isNull()) {
-        record = cursor->seekExact(_shared->_cappedFirstRecord);
+        // Use seekNear instead of seekExact. If this node steps down and a new primary starts
+        // deleting capped documents then this node's cached record will become stale. If this node
+        // steps up again afterwards, then the cached record will be an already deleted document.
+        record = cursor->seekNear(_shared->_cappedFirstRecord);
     } else {
         record = cursor->next();
     }
@@ -972,20 +992,21 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         }
     }
 
-    // Save the RecordId of the next record to be deleted, if it exists.
-    if (!record) {
-        _shared->_cappedFirstRecord = RecordId();
+    if (cappedDeleteSideTxn) {
+        // Save the RecordId of the next record to be deleted, if it exists.
+        if (!record) {
+            _shared->_cappedFirstRecord = RecordId();
+        } else {
+            _shared->_cappedFirstRecord = record->id;
+        }
     } else {
-        _shared->_cappedFirstRecord = record->id;
+        // Update the next record to be deleted. The next record must exist as we're using the same
+        // snapshot the insert was performed on and we can't delete newly inserted records.
+        invariant(record);
+        opCtx->recoveryUnit()->onCommit([this, recordId = record->id](boost::optional<Timestamp>) {
+            _shared->_cappedFirstRecord = recordId;
+        });
     }
-
-    // Capped deletes can be part of a larger transaction. If that transaction ultimately gets
-    // rolled back, we need to reset the cached value of the next record to be deleted otherwise
-    // we'll skip deleting records at the beginning of the capped collection.
-    opCtx->recoveryUnit()->onRollback([this]() {
-        stdx::lock_guard<Latch> lk(_shared->_cappedDeleterMutex);
-        _shared->_cappedFirstRecord = RecordId();
-    });
 
     wuow.commit();
 }
@@ -1044,17 +1065,11 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     bool fromMigrate,
                                     bool noWarn,
                                     Collection::StoreDeletedDoc storeDeletedDoc) const {
-    stdx::unique_lock<Latch> cappedDeleterLock(_shared->_cappedDeleterMutex, stdx::defer_lock);
-    if (isCapped()) {
+    if (isCapped() && opCtx->isEnforcingConstraints()) {
         // System operations such as tenant migration or secondary batch application can delete from
         // capped collections.
-        if (opCtx->isEnforcingConstraints()) {
-            LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
-            uasserted(10089, "cannot remove from a capped collection");
-            return;
-        } else {
-            cappedDeleterLock.lock();
-        }
+        LOGV2(20291, "failing remove on a capped ns", "namespace"_attr = _ns);
+        uasserted(10089, "cannot remove from a capped collection");
     }
 
     getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
@@ -1109,7 +1124,8 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     if (_shared->_needCappedLock) {
         // X-lock the metadata resource for this capped collection until the end of the WUOW. This
-        // prevents the primary from executing with more concurrency than secondaries.
+        // prevents the primary from executing with more concurrency than secondaries and protects
+        // '_cappedFirstRecord'.
         // See SERVER-21646.
         Lock::ResourceLock heldUntilEndOfWUOW{
             opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};

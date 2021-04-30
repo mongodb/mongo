@@ -477,9 +477,11 @@ private:
         const long long _cappedMaxDocs;
         long long _cappedMaxSize;
 
-        // Only one operation can do capped deletes at a time and protects the state below.
-        mutable Mutex _cappedDeleterMutex =
-            MONGO_MAKE_LATCH("CollectionImpl::SharedState::_cappedDeleterMutex");
+        // For capped deletes performed on collections where '_needCappedLock' is false, the mutex
+        // below protects '_cappedFirstRecord'. Otherwise, when '_needCappedLock' is true, the
+        // exclusive metadata resource protects '_cappedFirstRecord'.
+        mutable Mutex _cappedFirstRecordMutex =
+            MONGO_MAKE_LATCH("CollectionImpl::SharedState::_cappedFirstRecordMutex");
         RecordId _cappedFirstRecord;
     };
 

@@ -7,9 +7,7 @@
  * occurs once the collection reaches a certain size or contains a
  * certain number of documents.
  *
- * TODO SERVER-56262 remove 'requires_non_retryable_writes' tag.
- *
- * @tags: [requires_capped, requires_non_retryable_writes]
+ * @tags: [requires_capped]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
 load('jstests/concurrency/fsm_workloads/create_capped_collection.js');  // for $config
