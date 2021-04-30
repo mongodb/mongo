@@ -444,10 +444,13 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                       RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
                   "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())));
         } catch (DBException& ex) {
-            if (ex.code() == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
+            if (ex.code() == ErrorCodes::ReadConcernMajorityNotAvailableYet ||
+                ex.code() == ErrorCodes::CappedPositionLost) {
                 // Forced replica set re-configs will clear the majority committed snapshot,
                 // which may be used by the collection scan. The collection scan will restart
-                // from the beginning in this case.
+                // from the beginning in this case. Capped cursors are invalidated when the document
+                // they were positioned on gets deleted. The collection scan will restart in both
+                // cases.
                 restartCollectionScan = true;
                 logAndBackoff(
                     5470300,
