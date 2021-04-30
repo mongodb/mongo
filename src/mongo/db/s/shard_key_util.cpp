@@ -179,7 +179,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
     return hasUsefulIndexForKey;
 }
 
-void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
+bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
@@ -187,7 +187,7 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const ShardKeyValidationBehaviors& behaviors) {
     if (validShardKeyIndexExists(
             opCtx, nss, shardKeyPattern, defaultCollation, unique, behaviors)) {
-        return;
+        return false;
     }
 
 
@@ -199,6 +199,7 @@ void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
     //    whenever a migrate occurs. If the collection has a default collation, explicitly send
     //    the simple collation as part of the createIndex request.
     behaviors.createShardKeyIndex(nss, shardKeyPattern.toBSON(), defaultCollation, unique);
+    return true;
 }
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(

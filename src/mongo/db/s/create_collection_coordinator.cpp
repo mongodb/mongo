@@ -603,7 +603,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
         return;
     }
 
-    shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+    const auto indexCreated = shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
         opCtx,
         nss(),
         *_shardKeyPattern,
@@ -611,12 +611,18 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
         _doc.getUnique().value_or(false),
         shardkeyutil::ValidationBehaviorsShardCollection(opCtx));
 
+    auto replClientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+
+    if (!indexCreated) {
+        replClientInfo.setLastOpToSystemLastOpTime(opCtx);
+    }
     // Wait until the index is majority written, to prevent having the collection commited to the
     // config server, but the index creation rolled backed on stepdowns.
     WriteConcernResult ignoreResult;
-    auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(
-        opCtx, latestOpTime, ShardingCatalogClient::kMajorityWriteConcern, &ignoreResult));
+    uassertStatusOK(waitForWriteConcern(opCtx,
+                                        replClientInfo.getLastOp(),
+                                        ShardingCatalogClient::kMajorityWriteConcern,
+                                        &ignoreResult));
 
     _collectionUUID = *getUUIDFromPrimaryShard(opCtx, nss());
 }

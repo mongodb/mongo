@@ -142,8 +142,10 @@ private:
  *
  * 5. If the collection is empty and we are not refining the collection's shard key, and it's
  *    still possible to create an index on the proposed key, we go ahead and do so.
+ *
+ * Returns true if the index has been created, false otherwise.
  */
-void validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
+bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    const ShardKeyPattern& shardKeyPattern,
                                                    const boost::optional<BSONObj>& defaultCollation,
