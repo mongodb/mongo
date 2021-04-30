@@ -40,7 +40,7 @@ assert.commandFailedWithCode(coll.runCommand({
 // The same query passes with a higher memory limit.
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       3170);
+                       3000);
 assert.commandWorked(coll.runCommand({
     aggregate: coll.getName(),
     pipeline: [{$setWindowFields: {sortBy: {partitionKey: 1}, output: {val: {$sum: "$_id"}}}}],
