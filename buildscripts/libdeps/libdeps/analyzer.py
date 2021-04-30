@@ -328,22 +328,6 @@ class InterfaceEdgeCounter(Counter):
                                          int(self.get_deptype('Interface')))
 
 
-class ShimCounter(Counter):
-    """Counts and reports number of shim nodes in the graph."""
-
-    def __init__(self, graph):
-        """Store graph and set type."""
-
-        super().__init__(graph)
-        self._count_type = CountTypes.SHIM.name
-
-    @schema_check(schema_version=1)
-    def run(self):
-        """Count the graphs shim nodes."""
-
-        return self.node_type_count(NodeProps.shim.name, True)
-
-
 class LibCounter(Counter):
     """Counts and reports number of library nodes in the graph."""
 
@@ -388,7 +372,6 @@ def counter_factory(graph, counters, progressbar=True):
         CountTypes.PUB_EDGE.name: PublicEdgeCounter,
         CountTypes.PRIV_EDGE.name: PrivateEdgeCounter,
         CountTypes.IF_EDGE.name: InterfaceEdgeCounter,
-        CountTypes.SHIM.name: ShimCounter,
         CountTypes.LIB.name: LibCounter,
         CountTypes.PROG.name: ProgCounter,
     }
@@ -490,6 +473,37 @@ class ExcludeDependents(Analyzer):
         if DependsReportTypes.EXCLUDE_DEPENDS.name not in report:
             report[DependsReportTypes.EXCLUDE_DEPENDS.name] = {}
         report[DependsReportTypes.EXCLUDE_DEPENDS.name][tuple(self._nodes)] = self.run()
+
+
+class InDegreeOne(Analyzer):
+    """
+    Finds library nodes which have 1 or 0 dependers.
+
+    Such libraries are good candidates for merging or deletion.
+    """
+
+    @schema_check(schema_version=1)
+    def run(self):
+        """Search the graph for in degree 1 or 0 nodes."""
+
+        in_degree_one_nodes = []
+        for node, data in self._dependency_graph.nodes(data=True):
+            if (len(self._dependents_graph[node]) < 2
+                    and data[NodeProps.bin_type.name] == 'SharedLibrary'):
+
+                if len(self._dependents_graph[node]) == 1:
+                    depender = list(self._dependents_graph[node].items())[0][0]
+                else:
+                    depender = None
+
+                in_degree_one_nodes.append([node, depender])
+
+        return sorted(in_degree_one_nodes)
+
+    def report(self, report):
+        """Add the indegree one list to the report."""
+
+        report[DependsReportTypes.IN_DEGREE_ONE.name] = self.run()
 
 
 class GraphPaths(Analyzer):
@@ -631,11 +645,10 @@ class UnusedPublicLinter(Analyzer):
         for edge in self._dependents_graph.edges:
             edge_attribs = self._dependents_graph[edge[0]][edge[1]]
 
-            if (edge_attribs.get(EdgeProps.direct.name) and edge_attribs.get(
-                    EdgeProps.visibility.name) == int(self.get_deptype('Public'))
-                    and not self._dependents_graph.nodes()[edge[0]].get(NodeProps.shim.name)
-                    and self._dependents_graph.nodes()[edge[1]].get(
-                        NodeProps.bin_type.name) == 'SharedLibrary'):
+            if (edge_attribs.get(EdgeProps.direct.name)
+                    and edge_attribs.get(EdgeProps.visibility.name) == int(
+                        self.get_deptype('Public')) and self._dependents_graph.nodes()[edge[1]].get(
+                            NodeProps.bin_type.name) == 'SharedLibrary'):
 
                 # First we will get all the transitive libdeps the dependent node
                 # induces, while we are getting those we also check if the depender
@@ -760,7 +773,6 @@ class GaPrettyPrinter(GaPrinter):
         CountTypes.PUB_EDGE.name: "Public Edges in Graph: {}",
         CountTypes.PRIV_EDGE.name: "Private Edges in Graph: {}",
         CountTypes.IF_EDGE.name: "Interface Edges in Graph: {}",
-        CountTypes.SHIM.name: "Shim Nodes in Graph: {}",
         CountTypes.LIB.name: "Library Nodes in Graph: {}",
         CountTypes.PROG.name: "Program Nodes in Graph: {}",
     }
@@ -812,6 +824,11 @@ class GaPrettyPrinter(GaPrinter):
                 self._print_results_node_list(
                     f"=>critical edges between {nodes[0]} and {nodes[1]}:",
                     results[DependsReportTypes.CRITICAL_EDGES.name][nodes])
+
+        if DependsReportTypes.IN_DEGREE_ONE.name in results:
+            print("\nLibrary nodes with 1 or 0 dependers:")
+            for count, nodes in enumerate(results[DependsReportTypes.IN_DEGREE_ONE.name], start=1):
+                print(f"    {count}: '{nodes[0]}' <- '{nodes[1]}'")
 
     def print(self):
         """Print the result data."""

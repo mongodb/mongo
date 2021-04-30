@@ -33,10 +33,10 @@ import libdeps.analyzer
 from libdeps.graph import LibdepsGraph, EdgeProps, NodeProps, CountTypes
 
 
-def add_node(graph, node, builder, shim):
+def add_node(graph, node, builder):
     """Add a node to the graph."""
 
-    graph.add_nodes_from([(node, {NodeProps.bin_type.name: builder, NodeProps.shim.name: shim})])
+    graph.add_nodes_from([(node, {NodeProps.bin_type.name: builder})])
 
 
 def add_edge(graph, from_node, to_node, **kwargs):
@@ -74,15 +74,15 @@ def get_double_diamond_mock_graph():
     #                  \lib4.so               \lib8.so
     #
 
-    add_node(graph, 'lib1.so', 'SharedLibrary', False)
-    add_node(graph, 'lib2.so', 'SharedLibrary', False)
-    add_node(graph, 'lib3.so', 'SharedLibrary', False)
-    add_node(graph, 'lib4.so', 'SharedLibrary', False)
-    add_node(graph, 'lib5.so', 'SharedLibrary', False)
-    add_node(graph, 'lib6.so', 'SharedLibrary', False)
-    add_node(graph, 'lib7.so', 'SharedLibrary', False)
-    add_node(graph, 'lib8.so', 'SharedLibrary', False)
-    add_node(graph, 'lib9.so', 'SharedLibrary', False)
+    add_node(graph, 'lib1.so', 'SharedLibrary')
+    add_node(graph, 'lib2.so', 'SharedLibrary')
+    add_node(graph, 'lib3.so', 'SharedLibrary')
+    add_node(graph, 'lib4.so', 'SharedLibrary')
+    add_node(graph, 'lib5.so', 'SharedLibrary')
+    add_node(graph, 'lib6.so', 'SharedLibrary')
+    add_node(graph, 'lib7.so', 'SharedLibrary')
+    add_node(graph, 'lib8.so', 'SharedLibrary')
+    add_node(graph, 'lib9.so', 'SharedLibrary')
 
     add_edge(graph, 'lib1.so', 'lib2.so', direct=True, visibility=graph.get_deptype('Public'))
     add_edge(graph, 'lib2.so', 'lib3.so', direct=True, visibility=graph.get_deptype('Public'))
@@ -159,12 +159,12 @@ def get_basic_mock_graph():
     #                         \-lib6.so
 
     # nodes
-    add_node(graph, 'lib1.so', 'SharedLibrary', False)
-    add_node(graph, 'lib2.so', 'SharedLibrary', False)
-    add_node(graph, 'lib3.so', 'SharedLibrary', False)
-    add_node(graph, 'lib4.so', 'SharedLibrary', False)
-    add_node(graph, 'lib5.so', 'SharedLibrary', False)
-    add_node(graph, 'lib6.so', 'SharedLibrary', False)
+    add_node(graph, 'lib1.so', 'SharedLibrary')
+    add_node(graph, 'lib2.so', 'SharedLibrary')
+    add_node(graph, 'lib3.so', 'SharedLibrary')
+    add_node(graph, 'lib4.so', 'SharedLibrary')
+    add_node(graph, 'lib5.so', 'SharedLibrary')
+    add_node(graph, 'lib6.so', 'SharedLibrary')
 
     # direct edges
     add_edge(graph, 'lib1.so', 'lib2.so', direct=True, visibility=graph.get_deptype('Public'))
@@ -428,7 +428,7 @@ class Tests(unittest.TestCase):
 
         expected_result = {
             "NODE": 6, "EDGE": 13, "DIR_EDGE": 7, "TRANS_EDGE": 6, "DIR_PUB_EDGE": 6,
-            "PUB_EDGE": 12, "PRIV_EDGE": 1, "IF_EDGE": 0, "SHIM": 0, "PROG": 0, "LIB": 6
+            "PUB_EDGE": 12, "PRIV_EDGE": 1, "IF_EDGE": 0, "PROG": 0, "LIB": 6
         }
         self.run_counts(expected_result, libdeps_graph)
 
@@ -439,7 +439,7 @@ class Tests(unittest.TestCase):
 
         expected_result = {
             "NODE": 9, "EDGE": 34, "DIR_EDGE": 10, "TRANS_EDGE": 24, "DIR_PUB_EDGE": 10,
-            "PUB_EDGE": 34, "PRIV_EDGE": 0, "IF_EDGE": 0, "SHIM": 0, "PROG": 0, "LIB": 9
+            "PUB_EDGE": 34, "PRIV_EDGE": 0, "IF_EDGE": 0, "PROG": 0, "LIB": 9
         }
         self.run_counts(expected_result, libdeps_graph)
 

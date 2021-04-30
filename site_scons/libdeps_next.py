@@ -964,7 +964,6 @@ def add_node_from(env, node):
         str(node.abspath),
         {
             NodeProps.bin_type.name: node.builder.get_name(env),
-            NodeProps.shim.name: getattr(node.attributes, "is_shim", False)
         })])
 
 def add_edge_from(env, from_node, to_node, visibility, direct):
@@ -1438,7 +1437,7 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on', san
 
         env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
         env['LIBDEPS_GRAPH_FILE'] = env.File("${BUILD_DIR}/libdeps/libdeps.graphml")
-        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 2
+        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 3
         env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
 
         libdeps_graph = LibdepsGraph()

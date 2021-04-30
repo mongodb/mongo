@@ -54,7 +54,6 @@ class CountTypes(Enum):
     PUB_EDGE = auto()
     PRIV_EDGE = auto()
     IF_EDGE = auto()
-    SHIM = auto()
     PROG = auto()
     LIB = auto()
 
@@ -67,6 +66,7 @@ class DependsReportTypes(Enum):
     EXCLUDE_DEPENDS = auto()
     GRAPH_PATHS = auto()
     CRITICAL_EDGES = auto()
+    IN_DEGREE_ONE = auto()
 
 
 class LinterTypes(Enum):
@@ -87,7 +87,6 @@ class EdgeProps(Enum):
 class NodeProps(Enum):
     """Enums for node properties."""
 
-    shim = auto()
     bin_type = auto()
 
 
