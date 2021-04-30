@@ -145,7 +145,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
     // Source to cancel the timeout if the operation completed in time.
     CancellationSource cancelTimeoutSource;
     // Source to cancel waiting on the 'canReadFutures'.
-    CancellationSource cancelCanReadSource;
+    CancellationSource cancelCanReadSource(opCtx->getCancellationToken());
     const auto donorMtab = mtabPair->getAccessBlocker(MtabType::kDonor);
     const auto recipientMtab = mtabPair->getAccessBlocker(MtabType::kRecipient);
     // A vector of futures where the donor access blocker's 'getCanReadFuture' will always precede
@@ -207,20 +207,34 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
             }
             return donorMtabStatus;
         })
-        .onError<ErrorCodes::CallbackCanceled>([cancelCanReadSource,
+        .onError<ErrorCodes::CallbackCanceled>([cancelTimeoutSource,
+                                                cancelCanReadSource,
                                                 donorMtab,
                                                 recipientMtab,
                                                 timeoutError = opCtx->getTimeoutError()](
                                                    Status status) mutable {
-            cancelCanReadSource.cancel();
-            // At least one of 'donorMtab' or 'recipientMtab' must exist if we timed out here.
+            auto isCanceledDueToTimeout = cancelTimeoutSource.token().isCanceled();
+
+            if (!isCanceledDueToTimeout) {
+                cancelTimeoutSource.cancel();
+            }
+
+            // At least one of 'donorMtab' or 'recipientMtab' must exist if we were canceled here.
             BSONObj info = donorMtab ? donorMtab->getDebugInfo() : recipientMtab->getDebugInfo();
             if (recipientMtab) {
                 info =
                     info.addField(recipientMtab->getDebugInfo().getField("donorConnectionString"));
             }
-            return Status(
-                timeoutError, "Read timed out waiting for tenant migration blocker", info);
+
+            if (isCanceledDueToTimeout) {
+                return Status(
+                    timeoutError,
+                    "Blocked read timed out waiting for tenant migration to commit or abort",
+                    info);
+            }
+
+            return status.withContext(str::stream() << "Canceled read blocked by tenant migration "
+                                                    << info.toString());
         })
         .semi();  // To require continuation in the user executor.
 }
