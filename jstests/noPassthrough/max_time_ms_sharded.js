@@ -215,6 +215,24 @@ configureMaxTimeAlwaysTimeOut("off");
 assert.commandWorked(coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
                      "expected aggregate to not hit time limit in mongod");
 
+// Positive test for "setFeatureCompatibilityVersion"
+configureMaxTimeAlwaysTimeOut("alwaysOn");
+assert.commandFailedWithCode(
+    admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
+    ErrorCodes.MaxTimeMSExpired,
+    "expected setFeatureCompatibilityVersion to fail due to maxTimeAlwaysTimeOut fail point");
+
+// Negative test for "setFeatureCompatibilityVersion"
+configureMaxTimeAlwaysTimeOut("off");
+assert.commandWorked(
+    admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
+    "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
+
+// Negative test for "setFeatureCompatibilityVersion" to upgrade
+assert.commandWorked(
+    admin.runCommand({setFeatureCompatibilityVersion: latestFCV, maxTimeMS: 1000 * 60 * 60 * 24}),
+    "expected setFeatureCompatibilityVersion to not hit time limit in mongod");
+
 // Test that the maxTimeMS is still enforced on the shards even if we do not spend much time in
 // mongos blocking.
 
