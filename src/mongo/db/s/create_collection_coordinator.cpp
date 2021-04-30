@@ -362,21 +362,19 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then(_executePhase(Phase::kCheck,
-                            [this, anchor = shared_from_this()] {
-                                _shardKeyPattern = ShardKeyPattern(*_doc.getShardKey());
-                                auto opCtxHolder = cc().makeOperationContext();
-                                auto* opCtx = opCtxHolder.get();
-                                getForwardableOpMetadata().setOn(opCtx);
+        .then([this, anchor = shared_from_this()] {
+            _shardKeyPattern = ShardKeyPattern(*_doc.getShardKey());
+            if (_doc.getPhase() < Phase::kCommit) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
 
-                                _checkCommandArguments(opCtx);
-                            }))
+                _checkCommandArguments(opCtx);
+            }
+        })
         .then(_executePhase(
             Phase::kCommit,
             [this, executor = executor, token, anchor = shared_from_this()] {
-                if (!_shardKeyPattern) {
-                    _shardKeyPattern = ShardKeyPattern(*_doc.getShardKey());
-                }
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
