@@ -224,7 +224,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
-        AutoGetOrCreateDb db(opCtx, ns.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
         assertCanWrite_inlock(opCtx, ns);
@@ -236,7 +236,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
-            uassertStatusOK(db.getDb()->userCreateNS(opCtx, ns, defaultCollectionOptions));
+            auto db = autoDb.ensureDbExists();
+            uassertStatusOK(db->userCreateNS(opCtx, ns, defaultCollectionOptions));
             wuow.commit();
         }
     });
