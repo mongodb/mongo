@@ -30,7 +30,6 @@
 #include <limits>
 
 #include "mongo/platform/basic.h"
-#undef MONGO_PCH_WHITELISTED  // for malloc/realloc pulled from bson
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"

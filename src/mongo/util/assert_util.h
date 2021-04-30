@@ -41,9 +41,9 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit_code.h"
 
-#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#define MONGO_ALLOW_INCLUDE_INVARIANT_H
 #include "mongo/util/invariant.h"
-#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#undef MONGO_ALLOW_INCLUDE_INVARIANT_H
 
 namespace mongo {
 

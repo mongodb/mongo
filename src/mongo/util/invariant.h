@@ -45,7 +45,7 @@ namespace mongo {
  * directly in any other files.
  */
 
-#if !defined(MONGO_INCLUDE_INVARIANT_H_WHITELISTED)
+#if !defined(MONGO_ALLOW_INCLUDE_INVARIANT_H)
 #error "Include assert_util.h instead of invariant.h."
 #endif
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#ifndef MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
+#ifndef MONGO_ALLOW_INCLUDE_UTIL_DNS_QUERY_PLATFORM
 #error Do not include the DNS Query platform implementation headers.  Please use "mongo/util/dns_query.h" instead.
 #endif
 
