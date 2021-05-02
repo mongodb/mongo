@@ -268,13 +268,15 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoAt(OperationConte
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     StringData dbName) {
-    _databaseCache.invalidate(dbName);
+    _databaseCache.advanceTimeInStore(
+        dbName, ComparableDatabaseVersion::makeComparableDatabaseVersionForForcedRefresh());
     return getDatabase(opCtx, dbName);
 }
 
 StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
-    _collectionCache.invalidate(nss);
+    _collectionCache.advanceTimeInStore(
+        nss, ComparableChunkVersion::makeComparableChunkVersionForForcedRefresh());
     setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, true);
     return getCollectionRoutingInfo(opCtx, nss);
 }
@@ -696,16 +698,17 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
 
         if (isIncremental && existingHistory->optRt->getVersion() == newVersion) {
             invariant(newRoutingHistory.sameAllowMigrations(*existingHistory->optRt),
-                      str::stream() << "allowMigrations field of " << nss
-                                    << "collection changed without changing the collection version "
-                                    << newVersion.toString()
-                                    << ". Old value: " << existingHistory->optRt->allowMigrations()
-                                    << ", new value: " << newRoutingHistory.allowMigrations());
+                      str::stream()
+                          << "allowMigrations field of " << nss
+                          << " collection changed without changing the collection version "
+                          << newVersion.toString()
+                          << ". Old value: " << existingHistory->optRt->allowMigrations()
+                          << ", new value: " << newRoutingHistory.allowMigrations());
 
             invariant(newRoutingHistory.sameReshardingFields(*existingHistory->optRt),
                       str::stream()
                           << "reshardingFields field of " << nss
-                          << "collection changed without changing the collection version "
+                          << " collection changed without changing the collection version "
                           << newVersion.toString() << ". Old value: "
                           << existingHistory->optRt->getReshardingFields()->toBSON()
                           << ", new value: " << newRoutingHistory.getReshardingFields()->toBSON());

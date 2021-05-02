@@ -13,6 +13,10 @@ load("jstests/sharding/libs/find_chunks_util.js");
 
 Random.setRandomSeed();
 
+// We have to disable this check because a test manually crafts a sharded timeseries
+// collection, which are frozen in 5.0 so we cannot verify anything from it.
+TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+
 const st = new ShardingTest({shards: 2});
 
 const dbName = 'test';
@@ -116,13 +120,6 @@ if (!TimeseriesTest.timeseriesCollectionsEnabled(st.shard0)) {
     check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {a: 1}, limit: 1}]}));
     check(st.s.getDB(dbName).runCommand({delete: 'coll', deletes: [{q: {}, limit: 0}]}));
     check(st.s.getDB(dbName).runCommand({drop: 'coll'}), ErrorCodes.IllegalOperation);
-
-    // Hacky code again to restore the previous environment to finish this test properly
-    modifyTimeseriesMetadata({$unset: {timeseriesFields: 1}});
-    bumpCollectionVersionThroughMoveChunk(st.shard0.shardName);
-    forceRefreshOnShards();
-
-    assert.commandWorked(sDB.dropDatabase());
 })();
 
 st.stop();
