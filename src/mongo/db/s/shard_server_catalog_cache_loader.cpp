@@ -112,7 +112,6 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         updateShardCollectionsEntry(opCtx,
                                     BSON(ShardCollectionType::kNssFieldName << nss.ns()),
                                     update.toBSON(),
-                                    BSONObj(),
                                     true /*upsert*/);
     if (!status.isOK()) {
         return status;

@@ -100,8 +100,7 @@ Status unsetPersistedRefreshFlags(OperationContext* opCtx,
 
     return updateShardCollectionsEntry(opCtx,
                                        BSON(ShardCollectionType::kNssFieldName << nss.ns()),
-                                       updateBuilder.obj(),
-                                       BSONObj(),
+                                       BSON("$set" << updateBuilder.obj()),
                                        false /*upsert*/);
 }
 
@@ -201,35 +200,23 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
-                                   const BSONObj& inc,
                                    const bool upsert) {
     invariant(query.hasField("_id"));
     if (upsert) {
         // If upserting, this should be an update from the config server that does not have shard
         // refresh / migration inc signal information.
         invariant(!update.hasField(ShardCollectionType::kLastRefreshedCollectionVersionFieldName));
-        invariant(inc.isEmpty());
     }
 
     try {
         DBDirectClient client(opCtx);
-
-        BSONObjBuilder builder;
-        if (!update.isEmpty()) {
-            // Want to modify the document if it already exists, not replace it.
-            builder.append("$set", update);
-        }
-        if (!inc.isEmpty()) {
-            builder.append("$inc", inc);
-        }
-
         auto commandResponse = client.runCommand([&] {
             write_ops::UpdateCommandRequest updateOp(
                 NamespaceString::kShardConfigCollectionsNamespace);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
                 entry.setQ(query);
-                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(builder.obj()));
+                entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
                 entry.setUpsert(upsert);
                 return entry;
             }()});

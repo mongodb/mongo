@@ -72,7 +72,6 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         ASSERT_OK(updateShardCollectionsEntry(operationContext(),
                                               BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
                                               shardCollectionType.toBSON(),
-                                              BSONObj(),
                                               true /*upsert*/));
 
         return shardCollectionType;
@@ -204,11 +203,11 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     ASSERT(!shardCollectionsEntry.getLastRefreshedCollectionVersion());
 
     // Signal refresh start again to make sure nothing changes
-    ASSERT_OK(updateShardCollectionsEntry(operationContext(),
-                                          BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
-                                          BSON(ShardCollectionType::kRefreshingFieldName << true),
-                                          BSONObj(),
-                                          false));
+    ASSERT_OK(updateShardCollectionsEntry(
+        operationContext(),
+        BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
+        BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
+        false));
 
     RefreshState state = assertGet(getPersistedRefreshFlags(operationContext(), kNss));
 

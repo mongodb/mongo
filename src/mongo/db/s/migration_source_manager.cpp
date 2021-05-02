@@ -346,8 +346,7 @@ Status MigrationSourceManager::enterCriticalSection() {
     Status signalStatus = shardmetadatautil::updateShardCollectionsEntry(
         _opCtx,
         BSON(ShardCollectionType::kNssFieldName << getNss().ns()),
-        BSONObj(),
-        BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1),
+        BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
         false /*upsert*/);
     if (!signalStatus.isOK()) {
         return {

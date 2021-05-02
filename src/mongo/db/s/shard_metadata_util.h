@@ -135,18 +135,12 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
  * Updates the collections collection entry matching 'query' with 'update' using local write
  * concern.
  *
- * Uses the $set operator on the update so that updates can be applied without resetting everything.
- * 'inc' can be used to specify fields and their increments: it will be assigned to the $inc
- * operator.
- *
  * If 'upsert' is true, expects 'lastRefreshedCollectionVersion' to be absent in the update:
  * these refreshing fields should only be added to an existing document.
- * Similarly, 'inc' should not specify 'upsert' true.
  */
 Status updateShardCollectionsEntry(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update,
-                                   const BSONObj& inc,
                                    const bool upsert);
 
 /**
