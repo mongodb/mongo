@@ -12288,3 +12288,10 @@ buildvariants:
   - name: visibility_test_TG
     distros:
     - windows-vsCurrent-large
+
+- <<: *macos-debug-template
+  name: macos-dynamic-visibility-test
+  display_name: "~ Shared Library macOS DEBUG (visibility test)"
+  expansions:
+    <<: *macos-debug-expansions
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic --experimental-visibility-support=on
