@@ -174,13 +174,15 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
 
         try:
             primary_client.admin.command({
-                "createRole": "tenantMigrationRecipientRole", "privileges":
-                    [{"resource": {"cluster": True}, "actions": ["listDatabases", "useUUID"]},
-                     {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
-                     {
-                         "resource": {"anyResource": True},
-                         "actions": ["dbStats", "collStats", "find", "listIndexes"]
-                     }], "roles": []
+                "createRole": "tenantMigrationRecipientRole",
+                "privileges": [{
+                    "resource": {"cluster": True},
+                    "actions": ["listDatabases", "useUUID", "advanceClusterTime"]
+                }, {"resource": {"db": "", "collection": ""}, "actions": ["listCollections"]},
+                               {
+                                   "resource": {"anyResource": True},
+                                   "actions": ["dbStats", "collStats", "find", "listIndexes"]
+                               }], "roles": []
             })
         except:
             self.logger.exception(

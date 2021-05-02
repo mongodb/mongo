@@ -389,7 +389,10 @@ var TenantMigrationUtil = (function() {
         assert.commandWorked(adminDB.runCommand({
             createRole: "tenantMigrationRecipientRole",
             privileges: [
-                {resource: {cluster: true}, actions: ["listDatabases", "useUUID"]},
+                {
+                    resource: {cluster: true},
+                    actions: ["listDatabases", "useUUID", "advanceClusterTime"]
+                },
                 {resource: {db: "", collection: ""}, actions: ["listCollections"]},
                 {
                     resource: {anyResource: true},
