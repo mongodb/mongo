@@ -2,7 +2,11 @@
  * Tests crash recovery with the history store. Runs a workload while repeatedly killing all the
  * nodes of the replica set. Finally ensures that the db hashes match.
  *
- * @tags: [multiversion_incompatible, requires_persistence]
+ * @tags: [
+ *    incompatible_with_macos,
+ *    multiversion_incompatible,
+ *    requires_persistence,
+ * ]
  */
 (function() {
 "use strict";
