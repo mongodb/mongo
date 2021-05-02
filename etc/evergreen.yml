@@ -9653,6 +9653,35 @@ buildvariants:
     distros:
     - rhel70-small
 
+- &macos-debug-template
+  name: macos-debug-suggested
+  display_name: "* Shared Library macOS DEBUG"
+  batchtime: 240 # 4 hours
+  run_on:
+  - macos-1014
+  expansions: &macos-debug-expansions
+    test_flags: --excludeWithAnyTags=incompatible_with_macos
+    resmoke_jobs_max: 6
+    compile_env: DEVELOPER_DIR=/Applications/Xcode10.2.app
+    compile_flags: --ssl --dbg=on --opt=on -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars --link-model=dynamic
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  - name: compile_build_tools_next_TG
+  - name: aggregation
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: .jscore .common !.auth !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: mongosTest
+  - name: replica_sets
+  - name: replica_sets_large_txns_format_gen
+  - name: .ssl
+  - name: .stitch
+  - name: unittest_shell_hang_analyzer_gen
+
 - name: enterprise-macos
   display_name: Enterprise macOS
   modules:
