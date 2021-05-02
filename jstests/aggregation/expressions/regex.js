@@ -19,16 +19,10 @@ function testRegex(expression, inputObj, expectedOutput) {
     assert.eq(result, expectedOutput);
 }
 function testRegexForKey(expression, key, inputObj, expectedMatchObj) {
-    // TODO SERVER-54189: $_internalInhibitOptimization stage is added to prevent $match from being
-    // pushed into the query layer. $match with a single _id filter results in IDHack stage in the
-    // resulting plan, which is not supported by SBE. It should be removed once IDHack stage is
-    // supported in SBE.
-    const result = coll.aggregate([
-                           {"$_internalInhibitOptimization": {}},
-                           {"$match": {"_id": key}},
-                           {"$project": {"matches": {[expression]: inputObj}}}
-                       ])
-                       .toArray();
+    const result =
+        coll.aggregate(
+                [{"$match": {"_id": key}}, {"$project": {"matches": {[expression]: inputObj}}}])
+            .toArray();
     const expectedOutput = [{"_id": key, "matches": expectedMatchObj}];
     assert.eq(result, expectedOutput);
 }
