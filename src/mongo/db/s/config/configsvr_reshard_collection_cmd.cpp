@@ -141,6 +141,7 @@ public:
             coordinatorDoc.setZones(request().getZones());
             coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
             auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(

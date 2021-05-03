@@ -22,6 +22,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
  *     each RST will contain, and 'setParameter' <object>, an object with various server parameters.
  * @param {boolean} [allowDonorReadAfterMigration] whether donor would allow reads after a committed
  *     migration.
+ * @param {boolean} [initiateRstWithHighElectionTimeout] whether donor and recipient replica sets
+ *     should be initiated with high election timeout.
  */
 function TenantMigrationTest({
     name = "TenantMigrationTest",
@@ -31,6 +33,7 @@ function TenantMigrationTest({
     sharedOptions = {},
     // Default this to true so it is easier for data consistency checks.
     allowStaleReadsOnDonor = true,
+    initiateRstWithHighElectionTimeout = true
 }) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
@@ -81,7 +84,11 @@ function TenantMigrationTest({
         const rstName = `${name}_${(isDonor ? "donor" : "recipient")}`;
         const rst = new ReplSetTest({name: rstName, nodes, nodeOptions});
         rst.startSet();
-        rst.initiateWithHighElectionTimeout();
+        if (initiateRstWithHighElectionTimeout) {
+            rst.initiateWithHighElectionTimeout();
+        } else {
+            rst.initiate();
+        }
 
         return rst;
     }
