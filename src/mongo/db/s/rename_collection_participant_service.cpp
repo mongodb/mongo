@@ -271,10 +271,14 @@ SemiFuture<void> RenameParticipantInstance::run(
                                     "Collection locally renamed, waiting for CRUD to be unblocked",
                                     "fromNs"_attr = fromNss(),
                                     "toNs"_attr = toNss());
-
-                              // TODO SERVER-56380 Wait asynchronously
-                              _canUnblockCRUDPromise.getFuture().get(opCtx);
                           }))
+        .then([this, anchor = shared_from_this()] {
+            if (_doc.getPhase() < Phase::kUnblockCRUD) {
+                return _canUnblockCRUDPromise.getFuture();
+            }
+
+            return SemiFuture<void>::makeReady().share();
+        })
         .then(_executePhase(
             Phase::kUnblockCRUD,
             [this, anchor = shared_from_this()] {
