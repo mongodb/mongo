@@ -10195,7 +10195,7 @@ buildvariants:
     # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
     gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    exec_timeout_secs: 14400 # 4 hour timeout
+    exec_timeout_secs: 16200 # 4.5 hour timeout
     use_scons_cache: false
   tasks:
     - name: compile_test_and_package_serial_TG
