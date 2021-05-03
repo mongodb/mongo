@@ -72,7 +72,7 @@ TimeseriesTest.run((insert) => {
 
     // Now let's check that min and max appropriately ignore collation for field names, but not
     // values.
-    const buckets = bucketsColl.find().toArray();
+    const buckets = bucketsColl.find().sort({'control.min._id': 1}).toArray();
     jsTestLog('Checking buckets: ' + tojson(buckets));
     assert.eq(buckets.length, 3);
     assert.eq(buckets[0].control.min.x, '10');
