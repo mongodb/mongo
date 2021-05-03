@@ -165,13 +165,9 @@ TEST(ValueSerializeForSorter, Serialize) {
         testData->push_back(copyTag, copyVal);
     }
 
-    auto [dbptrTag, dbptrVal] = value::makeNewBsonDBPointer(
+    auto [dbpointerTag, dbpointerVal] = value::makeNewBsonDBPointer(
         "db.c", value::ObjectIdType{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}.data());
-    testData->push_back(dbptrTag, dbptrVal);
-
-    auto [cwsTag, cwsVal] = value::makeNewBsonCodeWScope(
-        "function test() { return 'Hello world!'; }", BSONObj().objdata());
-    testData->push_back(cwsTag, cwsVal);
+    testData->push_back(dbpointerTag, dbpointerVal);
 
     value::MaterializedRow originalRow{testData->size()};
     for (size_t i = 0; i < testData->size(); i++) {
