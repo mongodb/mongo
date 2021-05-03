@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"
 
@@ -1235,7 +1236,8 @@ BSONObj BucketCatalog::MinMax::minUpdates() {
     invariant(_min.type() == Type::kObject);
 
     BSONObjBuilder builder;
-    _appendUpdates(&builder, GetMin());
+    // Return constructed document even if empty.
+    MONGO_COMPILER_VARIABLE_UNUSED auto appended = _appendUpdates(&builder, GetMin());
     return builder.obj();
 }
 
@@ -1243,7 +1245,8 @@ BSONObj BucketCatalog::MinMax::maxUpdates() {
     invariant(_max.type() == Type::kObject);
 
     BSONObjBuilder builder;
-    _appendUpdates(&builder, GetMax());
+    // Return constructed document even if empty.
+    MONGO_COMPILER_VARIABLE_UNUSED auto appended = _appendUpdates(&builder, GetMax());
     return builder.obj();
 }
 
