@@ -181,6 +181,7 @@ public:
 
             const auto& cmd = request();
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);

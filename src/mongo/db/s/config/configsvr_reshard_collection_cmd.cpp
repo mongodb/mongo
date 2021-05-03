@@ -141,6 +141,7 @@ public:
             coordinatorDoc.setPresetReshardedChunks(request().get_presetReshardedChunks());
             coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service =
                 registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);

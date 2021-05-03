@@ -70,10 +70,12 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
     if (!service) {
         return;
     }
-    // Passing OK() as an argument does not invoke the interrupt() method on the instance.
-    // TODO(SERVER-54460): when state document deletion race is fixed in resharding, release with
-    // error as in 'onDropCollection()'.
-    service->releaseInstance(documentId, Status::OK());
+    opCtx->recoveryUnit()->onCommit(
+        [service, documentId, nss](boost::optional<Timestamp> unusedCommitTime) {
+            // Release the instance without interrupting it since for some primary-only services
+            // there is still work to be done after the state document is removed.
+            service->releaseInstance(documentId, Status::OK());
+        });
 }
 
 
@@ -84,11 +86,13 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             const CollectionDropType dropType) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
-        // Dropping the state doc collection also interrups all the instances with 'interrupted'
-        // status.
-        service->releaseAllInstances(Status(ErrorCodes::Interrupted,
-                                            str::stream() << collectionName << " is dropped",
-                                            BSON("collection" << collectionName.toString())));
+        opCtx->recoveryUnit()->onCommit(
+            [service, collectionName](boost::optional<Timestamp> unusedCommitTime) {
+                // Release and interrupt all the instances since the state document collection is
+                // not supposed to be dropped.
+                service->releaseAllInstances(Status(
+                    ErrorCodes::Interrupted, str::stream() << collectionName << " is dropped"));
+            });
     }
     return {};
 }

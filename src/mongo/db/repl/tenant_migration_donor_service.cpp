@@ -68,6 +68,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterFetchingAndStoringKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileUpdatingStateDoc);
@@ -1226,6 +1227,9 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         })
         .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
+        })
+        .then([this, self = shared_from_this()] {
+            pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable.pauseWhileSet();
         });
 }
 
