@@ -21,6 +21,8 @@ const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
 let assertMetricsExist = function(metrics) {
     try {
         assert.neq(metrics, undefined);
+        assert(metrics.hasOwnProperty("db"));
+        assert(metrics.hasOwnProperty("localTime"));
         let primaryMetrics = metrics.primaryMetrics;
         let secondaryMetrics = metrics.secondaryMetrics;
         [primaryMetrics, secondaryMetrics].forEach((readMetrics) => {
@@ -39,6 +41,7 @@ let assertMetricsExist = function(metrics) {
         assert.gte(metrics.docUnitsWritten, 0);
         assert.gte(metrics.idxEntryBytesWritten, 0);
         assert.gte(metrics.idxEntryUnitsWritten, 0);
+        assert.gte(metrics.totalUnitsWritten, 0);
     } catch (e) {
         print("caught exception while checking metrics output: " + tojson(metrics));
         throw e;

@@ -88,6 +88,7 @@ assertMetrics(primary, (metrics) => {
     // Document size is 29 bytes.
     assert.gte(metrics[dbName].docBytesWritten, 29 * 3);
     assert.gte(metrics[dbName].docUnitsWritten, 3);
+    assert.gte(metrics[dbName].totalUnitsWritten, 3);
 });
 
 // Clear metrics and wait for a TTL pass to delete the documents.
@@ -104,6 +105,7 @@ assertMetrics(primary, (metrics) => {
     assert.gte(metrics[dbName].primaryMetrics.docUnitsRead, 2);
     assert.gte(metrics[dbName].docBytesWritten, 29 * 2);
     assert.gte(metrics[dbName].docUnitsWritten, 2);
+    assert.gte(metrics[dbName].totalUnitsWritten, 2);
     // Key size is 12 bytes.
     assert.gte(metrics[dbName].primaryMetrics.idxEntryBytesRead, 12 * 2);
     assert.gte(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 2);

@@ -44,6 +44,8 @@ const getDBMetrics = (adminDB) => {
     let allMetrics = {};
     while (cursor.hasNext()) {
         let doc = cursor.next();
+        // Remove localTime field as it stymies us from comparing objects since it always changes.
+        delete doc.localTime;
         allMetrics[doc.db] = doc;
     }
     return allMetrics;

@@ -492,6 +492,67 @@ TEST_F(ResourceConsumptionMetricsTest, DocumentUnitsWritten) {
     ASSERT_EQ(metricsCopy["db1"].writeMetrics.docsWritten.units(), expectedUnits);
 }
 
+TEST_F(ResourceConsumptionMetricsTest, TotalUnitsWritten) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    int expectedUnits = 0;
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        // Each of these should be counted as 1 total unit (unit size = 128).
+        operationMetrics.incrementOneDocWritten(2);
+        operationMetrics.incrementOneDocWritten(4);
+        operationMetrics.incrementOneDocWritten(8);
+        operationMetrics.incrementOneDocWritten(16);
+        operationMetrics.incrementOneDocWritten(32);
+        operationMetrics.incrementOneDocWritten(64);
+        operationMetrics.incrementOneDocWritten(128);
+        expectedUnits += 7;
+
+        // Each of these should be counted as 2 total units (unit size = 128).
+        operationMetrics.incrementOneDocWritten(129);
+        operationMetrics.incrementOneDocWritten(200);
+        operationMetrics.incrementOneDocWritten(255);
+        operationMetrics.incrementOneDocWritten(256);
+        expectedUnits += 8;
+
+        // Each of these groups should be counted as 1 total unit, combining documents with index
+        // bytes written.
+
+        // Index writes prior to document write.
+        operationMetrics.incrementOneDocWritten(0);
+        operationMetrics.incrementOneIdxEntryWritten(2);
+        operationMetrics.incrementOneDocWritten(5);
+        expectedUnits += 1;
+
+        // Index writes after document write.
+        operationMetrics.incrementOneDocWritten(2);
+        operationMetrics.incrementOneIdxEntryWritten(126);
+        expectedUnits += 1;
+
+        // No index writes.
+        operationMetrics.incrementOneDocWritten(129);
+        expectedUnits += 2;
+
+        operationMetrics.incrementOneDocWritten(127);
+        operationMetrics.incrementOneIdxEntryWritten(1);
+        expectedUnits += 1;
+
+        // Exceeds unit size and thus counts as 2 units.
+        operationMetrics.incrementOneDocWritten(1);
+        operationMetrics.incrementOneIdxEntryWritten(1);
+        operationMetrics.incrementOneIdxEntryWritten(1);
+        operationMetrics.incrementOneIdxEntryWritten(1);
+        operationMetrics.incrementOneIdxEntryWritten(128);
+        expectedUnits += 2;
+    }
+
+    auto metricsCopy = globalResourceConsumption.getDbMetrics();
+    ASSERT_EQ(metricsCopy["db1"].writeMetrics.totalWritten.units(), expectedUnits);
+}
+
 TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsRead) {
     auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
     auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());

@@ -25,6 +25,7 @@ const aggregateMetricsBackground = function(host) {
             "docUnitsWritten",
             "idxEntryBytesWritten",
             "idxEntryUnitsWritten",
+            "totalUnitsWritten",
             "cpuNanos",
             "db",
             "primaryMetrics",

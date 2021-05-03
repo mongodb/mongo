@@ -65,3 +65,13 @@ server_parameters:
     default: 16
     validator:
       gte: 1
+
+  totalUnitWriteSizeBytes:
+    description: "The size of a (doc + index) unit in written bytes for resource consumption metrics collection"
+    set_at:
+      - startup
+    cpp_varname: gTotalUnitWriteSizeBytes
+    cpp_vartype: int32_t
+    default: 128
+    validator:
+      gte: 1
