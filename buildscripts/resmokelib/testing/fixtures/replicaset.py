@@ -180,8 +180,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         client = self.nodes[0].mongo_client()
         interface.authenticate(client, self.auth_options)
 
-        if client.local.system.replset.count():
+        if client.local.system.replset.count_documents(filter={}):
             # Skip initializing the replset if there is an existing configuration.
+            self.logger.info("Configuration exists. Skipping initializing the replset.")
             return
 
         if self.write_concern_majority_journal_default is not None:
