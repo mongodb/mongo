@@ -56,6 +56,7 @@ static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
 static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
 static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
 static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
+static const char kTotalUnitsWritten[] = "totalUnitsWritten";
 static const char kKeysSorted[] = "keysSorted";
 static const char kMemUsage[] = "memUsage";
 static const char kNumMetrics[] = "numMetrics";
@@ -125,12 +126,43 @@ void ResourceConsumption::UnitCounter::observeOne(size_t datumBytes) {
     _bytes += datumBytes;
 }
 
+void ResourceConsumption::TotalUnitWriteCounter::observeOneDocument(size_t datumBytes) {
+    // If we have accumulated document bytes, calculate units along with any past index bytes.
+    // Accumulate the current document bytes for use in a later unit calculation.
+    if (_accumulatedDocumentBytes > 0) {
+        _units += std::ceil((_accumulatedIndexBytes + _accumulatedDocumentBytes) /
+                            static_cast<float>(unitSize()));
+        _accumulatedIndexBytes = 0;
+        _accumulatedDocumentBytes = datumBytes;
+        return;
+    }
+
+    // If we have accumulated index bytes, associate them with the current document and calculate
+    // units.
+    if (_accumulatedIndexBytes > 0) {
+        _units += std::ceil((_accumulatedIndexBytes + datumBytes) / static_cast<float>(unitSize()));
+        _accumulatedIndexBytes = 0;
+        return;
+    }
+
+    // Nothing has yet accumulated; accumulate this document for use in a later unit calculation.
+    _accumulatedDocumentBytes = datumBytes;
+}
+
+void ResourceConsumption::TotalUnitWriteCounter::observeOneIndexEntry(size_t datumBytes) {
+    _accumulatedIndexBytes += datumBytes;
+}
+
 int ResourceConsumption::DocumentUnitCounter::unitSize() const {
     return gDocumentUnitSizeBytes;
 }
 
 int ResourceConsumption::IdxEntryUnitCounter::unitSize() const {
     return gIndexEntryUnitSizeBytes;
+}
+
+int ResourceConsumption::TotalUnitWriteCounter::unitSize() const {
+    return gTotalUnitWriteSizeBytes;
 }
 
 void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
@@ -149,6 +181,7 @@ void ResourceConsumption::WriteMetrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocUnitsWritten, docsWritten.units());
     builder->appendNumber(kIdxEntryBytesWritten, idxEntriesWritten.bytes());
     builder->appendNumber(kIdxEntryUnitsWritten, idxEntriesWritten.units());
+    builder->appendNumber(kTotalUnitsWritten, totalWritten.units());
 }
 
 void ResourceConsumption::AggregatedMetrics::toBson(BSONObjBuilder* builder) const {
@@ -193,6 +226,7 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kDocUnitsWritten, writeMetrics.docsWritten.units());
     appendNonZeroMetric(builder, kIdxEntryBytesWritten, writeMetrics.idxEntriesWritten.bytes());
     appendNonZeroMetric(builder, kIdxEntryUnitsWritten, writeMetrics.idxEntriesWritten.units());
+    appendNonZeroMetric(builder, kTotalUnitsWritten, writeMetrics.totalWritten.units());
 }
 
 template <typename Func>
@@ -225,11 +259,17 @@ void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
-    _doIfCollecting([&] { _metrics.writeMetrics.docsWritten.observeOne(bytesWritten); });
+    _doIfCollecting([&] {
+        _metrics.writeMetrics.docsWritten.observeOne(bytesWritten);
+        _metrics.writeMetrics.totalWritten.observeOneDocument(bytesWritten);
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t bytesWritten) {
-    _doIfCollecting([&] { _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten); });
+    _doIfCollecting([&] {
+        _metrics.writeMetrics.idxEntriesWritten.observeOne(bytesWritten);
+        _metrics.writeMetrics.totalWritten.observeOneIndexEntry(bytesWritten);
+    });
 }
 
 void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,

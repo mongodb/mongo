@@ -113,6 +113,35 @@ public:
         int unitSize() const final;
     };
 
+    /** TotalUnitWriteCounter records the number of units of document plus associated indexes
+     * observed. */
+    class TotalUnitWriteCounter {
+    public:
+        void observeOneDocument(size_t datumBytes);
+        void observeOneIndexEntry(size_t datumBytes);
+
+        TotalUnitWriteCounter& operator+=(TotalUnitWriteCounter other) {
+            // Flush the accumulators, in case there is anything still pending.
+            other.observeOneDocument(0);
+            observeOneDocument(0);
+            _units += other._units;
+            return *this;
+        }
+
+        long long units() const {
+            // Flush the accumulators, in case there is anything still pending.
+            TotalUnitWriteCounter copy(*this);
+            copy.observeOneDocument(0);
+            return copy._units;
+        }
+
+    private:
+        int unitSize() const;
+        long long _accumulatedDocumentBytes = 0;
+        long long _accumulatedIndexBytes = 0;
+        long long _units = 0;
+    };
+
     /** ReadMetrics maintains metrics for read operations. */
     class ReadMetrics {
     public:
@@ -158,6 +187,7 @@ public:
         void add(const WriteMetrics& other) {
             docsWritten += other.docsWritten;
             idxEntriesWritten += other.idxEntriesWritten;
+            totalWritten += other.totalWritten;
         }
 
         WriteMetrics& operator+=(const WriteMetrics& other) {
@@ -174,6 +204,8 @@ public:
         DocumentUnitCounter docsWritten;
         // Number of index entries written
         IdxEntryUnitCounter idxEntriesWritten;
+        // Number of total units written
+        TotalUnitWriteCounter totalWritten;
     };
 
     /**

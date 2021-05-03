@@ -47,6 +47,7 @@ const assertMetricsExist = (profilerEntry) => {
     assert.gte(metrics.docUnitsWritten, 0);
     assert.gte(metrics.idxEntryBytesWritten, 0);
     assert.gte(metrics.idxEntryUnitsWritten, 0);
+    assert.gte(metrics.totalUnitsWritten, 0);
 };
 
 const runInLegacyQueryMode = (db, func) => {
@@ -97,6 +98,7 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.gt(profileDoc.totalUnitsWritten, 0);
             assert.gt(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -121,6 +123,7 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.gt(profileDoc.totalUnitsWritten, 0);
             assert.gt(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -145,6 +148,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -167,6 +171,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 7);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -200,6 +205,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -222,6 +228,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -244,6 +251,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -266,6 +274,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -298,6 +307,7 @@ const operations = [
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 9);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -330,6 +340,7 @@ const operations = [
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -371,6 +382,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -414,6 +426,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -436,6 +449,7 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.gt(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -470,6 +484,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -501,6 +516,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -529,6 +545,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -557,6 +574,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -577,6 +595,7 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.gt(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -605,6 +624,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 5);
@@ -629,6 +649,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 150);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 10);
@@ -654,6 +675,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -679,6 +701,7 @@ const operations = [
             // Deletes one entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -708,6 +731,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 4);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -746,6 +770,7 @@ const operations = [
             // Removes one entry and inserts another.
             assert.eq(profileDoc.idxEntryBytesWritten, 11);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -783,9 +808,11 @@ const operations = [
                 // comment about WT_MODIFY above.
                 assert.eq(profileDoc.docBytesWritten, 13);
                 assert.eq(profileDoc.docUnitsWritten, 1);
+                assert.eq(profileDoc.totalUnitsWritten, 1);
             } else {
                 assert.eq(profileDoc.docBytesWritten, 1061);
                 assert.eq(profileDoc.docUnitsWritten, 9);
+                assert.eq(profileDoc.totalUnitsWritten, 9);
             }
             // Removes one entry and inserts another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
@@ -827,6 +854,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -853,6 +881,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -876,6 +905,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -909,6 +939,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -938,6 +969,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -965,6 +997,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -993,6 +1026,11 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 100);
             assert.eq(profileDoc.idxEntryBytesWritten, 299);
             assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            // This is 102 instead of 100 because all of the index bytes for the batch insert are
+            // lumped together and associated with the last document written in the batch, instead
+            // of being associated with each document written.  This causes the last document+index
+            // bytes to exceed the unit size.
+            assert.eq(profileDoc.totalUnitsWritten, 102);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -1017,6 +1055,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 100);
@@ -1041,6 +1080,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 100);
@@ -1063,6 +1103,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 100);
@@ -1086,6 +1127,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 1);
@@ -1109,6 +1151,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 5);
@@ -1144,6 +1187,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 101);
             assert.eq(profileDoc.docUnitsReturned, 100);
@@ -1168,6 +1212,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             if (isDebugBuild(db)) {
                 // In debug builds we sort and spill for each of the first 20 documents. Once we
                 // reach that limit, we stop spilling as often. This 26 is the sum of 20 debug sorts
@@ -1203,6 +1248,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.keysSorted, 100);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 10);
@@ -1227,6 +1273,7 @@ const operations = [
             // The key size varies from 2 to 3 bytes.
             assert.gte(profileDoc.idxEntryBytesWritten, 2 * 100);
             assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            assert.gte(profileDoc.totalUnitsWritten, 100);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -1252,6 +1299,7 @@ const operations = [
             // The key size varies from 2 to 3 bytes.
             assert.gte(profileDoc.idxEntryBytesWritten, 2 * 100);
             assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            assert.gte(profileDoc.totalUnitsWritten, 100);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
             assert.eq(profileDoc.docUnitsReturned, 0);
@@ -1276,6 +1324,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 2);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.totalUnitsWritten, 1);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -1301,6 +1350,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 9);
             assert.eq(profileDoc.idxEntryBytesWritten, 27);
             assert.eq(profileDoc.idxEntryUnitsWritten, 9);
+            assert.eq(profileDoc.totalUnitsWritten, 9);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -1331,6 +1381,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 5);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.totalUnitsWritten, 2);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -1366,6 +1417,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 18);
             assert.eq(profileDoc.idxEntryBytesWritten, 54);
             assert.eq(profileDoc.idxEntryUnitsWritten, 18);
+            assert.eq(profileDoc.totalUnitsWritten, 18);
             assert.eq(profileDoc.docUnitsReturned, 0);
         }
     },
@@ -1391,6 +1443,7 @@ const operations = [
             assert.gte(profileDoc.docUnitsWritten, 0);
             assert.gte(profileDoc.idxEntryBytesWritten, 0);
             assert.gte(profileDoc.idxEntryUnitsWritten, 0);
+            assert.gte(profileDoc.totalUnitsWritten, 0);
             assert.gt(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -1415,6 +1468,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 2);
             assert.eq(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -1464,6 +1518,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 2);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 2);
             assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
@@ -1511,6 +1566,7 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.totalUnitsWritten, 0);
             assert.eq(profileDoc.cursorSeeks, 0);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);

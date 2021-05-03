@@ -81,6 +81,12 @@ assert.commandWorked(primaryDB.createCollection(collName));
         assert.eq(metrics[dbName].docBytesWritten, 29 * nDocs);
         assert.eq(metrics[dbName].docUnitsWritten, nDocs);
 
+        // With batch inserts, the index updates are all performed together after all the documents
+        // are inserted, so this has the effect of associating all the index bytes for the batch
+        // with one document, for the purposes of totalUnitsWritten.  This effect causes the last
+        // document to have 3 units instead of 1 like the first 99.
+        assert.eq(metrics[dbName].totalUnitsWritten, nDocs + 2);
+
         // The inserted keys will vary in size from 2 to 4 bytes depending on their value. Assert
         // that the number of bytes fall within that range.
         assert.gt(metrics[dbName].idxEntryBytesWritten, 2 * nDocs);
@@ -133,6 +139,7 @@ let nextId = nDocs;
         assert.eq(metrics[dbName].docUnitsWritten, 1);
         assert.eq(metrics[dbName].idxEntryBytesWritten, 3);
         assert.eq(metrics[dbName].idxEntryUnitsWritten, 1);
+        assert.eq(metrics[dbName].totalUnitsWritten, 1);
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 0);
         assert.eq(metrics[dbName].primaryMetrics.cursorSeeks, 0);
@@ -166,6 +173,7 @@ let nextId = nDocs;
     assertMetrics(primary, (metrics) => {
         assert.eq(metrics[dbName].docBytesWritten, 40);
         assert.eq(metrics[dbName].docUnitsWritten, 1);
+        assert.eq(metrics[dbName].totalUnitsWritten, 1);
         assert.eq(metrics[dbName].primaryMetrics.docBytesRead, 29);
         assert.eq(metrics[dbName].primaryMetrics.docUnitsRead, 1);
         assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 3);
