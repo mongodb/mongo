@@ -47,6 +47,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
@@ -54,107 +55,12 @@
 namespace mongo {
 namespace {
 
-class OpObserverForTest;
-class PauseDuringStateTransitions;
-
-class DonorStateTransitionController {
-public:
-    DonorStateTransitionController() = default;
-
-    void waitUntilStateIsReached(DonorStateEnum state) {
-        stdx::unique_lock lk(_mutex);
-        _waitUntilUnpausedCond.wait(lk, [this, state] { return _state == state; });
-    }
-
-private:
-    friend OpObserverForTest;
-    friend PauseDuringStateTransitions;
-
-    void setPauseDuringTransition(DonorStateEnum state) {
-        stdx::lock_guard lk(_mutex);
-        _pauseDuringTransition.insert(state);
-    }
-
-    void unsetPauseDuringTransition(DonorStateEnum state) {
-        stdx::lock_guard lk(_mutex);
-        _pauseDuringTransition.erase(state);
-        _pauseDuringTransitionCond.notify_all();
-    }
-
-    void notifyNewStateAndWaitUntilUnpaused(OperationContext* opCtx, DonorStateEnum newState) {
-        stdx::unique_lock lk(_mutex);
-        _state = newState;
-        _waitUntilUnpausedCond.notify_all();
-        opCtx->waitForConditionOrInterrupt(_pauseDuringTransitionCond, lk, [this, newState] {
-            return _pauseDuringTransition.count(newState) == 0;
-        });
-    }
-
-    Mutex _mutex = MONGO_MAKE_LATCH("DonorStateTransitionController::_mutex");
-    stdx::condition_variable _pauseDuringTransitionCond;
-    stdx::condition_variable _waitUntilUnpausedCond;
-
-    std::set<DonorStateEnum> _pauseDuringTransition;
-    DonorStateEnum _state = DonorStateEnum::kUnused;
-};
-
-class PauseDuringStateTransitions {
-public:
-    PauseDuringStateTransitions(DonorStateTransitionController* controller, DonorStateEnum state)
-        : PauseDuringStateTransitions(controller, std::vector<DonorStateEnum>{state}) {}
-
-    PauseDuringStateTransitions(DonorStateTransitionController* controller,
-                                std::vector<DonorStateEnum> states)
-        : _controller{controller}, _states{std::move(states)} {
-        for (auto state : _states) {
-            _controller->setPauseDuringTransition(state);
-        }
-    }
-
-    ~PauseDuringStateTransitions() {
-        for (auto state : _states) {
-            _controller->unsetPauseDuringTransition(state);
-        }
-    }
-
-    PauseDuringStateTransitions(const PauseDuringStateTransitions&) = delete;
-    PauseDuringStateTransitions& operator=(const PauseDuringStateTransitions&) = delete;
-
-    PauseDuringStateTransitions(PauseDuringStateTransitions&&) = delete;
-    PauseDuringStateTransitions& operator=(PauseDuringStateTransitions&&) = delete;
-
-    void wait(DonorStateEnum state) {
-        _controller->waitUntilStateIsReached(state);
-    }
-
-    void unset(DonorStateEnum state) {
-        _controller->unsetPauseDuringTransition(state);
-    }
-
-private:
-    DonorStateTransitionController* const _controller;
-    const std::vector<DonorStateEnum> _states;
-};
-
-class OpObserverForTest : public OpObserverNoop {
-public:
-    OpObserverForTest(std::shared_ptr<DonorStateTransitionController> controller)
-        : _controller{std::move(controller)} {}
-
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
-        if (args.nss != NamespaceString::kDonorReshardingOperationsNamespace) {
-            return;
-        }
-
-        auto doc =
-            ReshardingDonorDocument::parse({"OpObserverForTest"}, args.updateArgs.updatedDoc);
-
-        _controller->notifyNewStateAndWaitUntilUnpaused(opCtx, doc.getMutableState().getState());
-    }
-
-private:
-    std::shared_ptr<DonorStateTransitionController> _controller;
-};
+using DonorStateTransitionController =
+    resharding_service_test_helpers::StateTransitionController<DonorStateEnum>;
+using OpObserverForTest =
+    resharding_service_test_helpers::OpObserverForTest<DonorStateEnum, ReshardingDonorDocument>;
+using PauseDuringStateTransitions =
+    resharding_service_test_helpers::PauseDuringStateTransitions<DonorStateEnum>;
 
 class ExternalStateForTest : public ReshardingDonorService::DonorStateMachineExternalState {
 public:
@@ -169,6 +75,17 @@ public:
     void updateCoordinatorDocument(OperationContext* opCtx,
                                    const BSONObj& query,
                                    const BSONObj& update) override {}
+};
+
+class DonorOpObserverForTest : public OpObserverForTest {
+public:
+    DonorOpObserverForTest(std::shared_ptr<DonorStateTransitionController> controller)
+        : OpObserverForTest(std::move(controller),
+                            NamespaceString::kDonorReshardingOperationsNamespace) {}
+
+    DonorStateEnum getState(const ReshardingDonorDocument& donorDoc) override {
+        return donorDoc.getMutableState().getState();
+    }
 };
 
 class ReshardingDonorServiceForTest : public ReshardingDonorService {
@@ -202,7 +119,7 @@ public:
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
 
         _controller = std::make_shared<DonorStateTransitionController>();
-        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(_controller));
+        _opObserverRegistry->addObserver(std::make_unique<DonorOpObserverForTest>(_controller));
     }
 
     void stepUp() {
