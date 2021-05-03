@@ -262,6 +262,8 @@ Value DocumentSourceInternalSetWindowFields::serialize(
         }
 
         out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
+        out["maxTotalMemoryUsageBytes"] =
+            Value(static_cast<long long>(_memoryTracker.maxMemoryBytes()));
     }
 
     return Value(out.freezeToValue());
@@ -351,7 +353,7 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         case PartitionIterator::AdvanceResult::kNewPartition:
             // We've advanced to a new partition, reset the state of every function as well as the
             // memory tracker.
-            _memoryTracker.reset();
+            _memoryTracker.resetCurrent();
             for (auto&& [fieldName, function] : _executableOutputs) {
                 function->reset();
             }

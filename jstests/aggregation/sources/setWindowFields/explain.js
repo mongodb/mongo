@@ -1,6 +1,8 @@
 /**
  * Tests that $setWindowFields stage reports memory footprint per function when explain is run
- * with verbosities "executionStats" and "allPlansExecution".
+ * with verbosities "executionStats" and "allPlansExecution". Also tests that the explain output
+ * includes a metric for peak memory usage across the entire stage, including each individual
+ * function as well as any other internal state.
  *
  * @tags: [assumes_against_mongod_not_mongos]
  */
@@ -35,9 +37,10 @@ assert.commandWorked(bulk.execute());
  * expected.
  * - 'stages' is an array of the explain output of $setWindowFields stages.
  * - 'expectedFunctionMemUsages' is used to check the memory footprint stats for each function.
+ * - 'expectedTotalMemUsage' is used to check the peak memory footprint for the entire stage.
  * - 'verbosity' indicates the explain verbosity used.
  */
-function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
+function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMemUsage, verbosity) {
     const stages =
         getAggPlanStages(coll.explain(verbosity).aggregate(pipeline), "$_internalSetWindowFields");
     for (let stage of stages) {
@@ -58,8 +61,15 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
                               "mismatch for function '" + field + "': " + tojson(stage));
                 }
             }
+            assert.gt(stage["maxTotalMemoryUsageBytes"],
+                      expectedTotalMemUsage,
+                      "Incorrect total mem usage: " + tojson(stage));
+            assert.lt(stage["maxTotalMemoryUsageBytes"],
+                      2 * expectedTotalMemUsage,
+                      "Incorrect total mem usage: " + tojson(stage));
         } else {
             assert(!stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
+            assert(!stage.hasOwnProperty("maxTotalMemoryUsageBytes"), stage);
         }
     }
 }
@@ -73,7 +83,7 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
     ];
     const stages = getAggPlanStages(coll.explain("queryPlanner").aggregate(pipeline),
                                     "$_internalSetWindowFields");
-    checkExplainResult(stages, {}, "queryPlanner");
+    checkExplainResult(stages, {}, 0, "queryPlanner");
 })();
 
 (function testUnboundedMemUsage() {
@@ -93,8 +103,15 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
         set: 1024,
     };
 
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "executionStats");
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "allPlansExecution");
+    // The total mem usage for unbounded windows is the total from each function as well as the size
+    // of all documents in the partition.
+    let expectedTotal = nDocs * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
+
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 
     // Test that the memory footprint is reduced with partitioning.
     pipeline = [
@@ -110,9 +127,13 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
         push: (nDocs / nPartitions) * 1024,
         set: 1024,
     };
+    expectedTotal = (nDocs / nPartitions) * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
 
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "executionStats");
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "allPlansExecution");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 })();
 
 (function testSlidingWindowMemUsage() {
@@ -130,8 +151,16 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
             160,  // 10x64-bit integer values per window, and 160 for the $sum state.
     };
 
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "executionStats");
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "allPlansExecution");
+    // TODO SERVER-55786: Fix memory tracking in PartitionIterator when documents are
+    // released from the in-memory cache. This should be proportional to the size of the window not
+    // the number of documents in the partition.
+    let expectedTotal = nDocs * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
+
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 
     // Adding partitioning doesn't change the peak memory usage.
     pipeline = [
@@ -143,7 +172,41 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, verbosity) {
             }
         },
     ];
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "executionStats");
-    checkExplainResult(pipeline, expectedFunctionMemUsages, "allPlansExecution");
+
+    // TODO SERVER-55786: This should not be needed once the memory tracking is fixed in the
+    // iterator. For now, the iterator handles the tracking correctly across partition boundaries so
+    // we need to adjust the expected total.
+    expectedTotal = (nDocs / nPartitions) * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
+})();
+
+(function testRangeBasedWindowMemUsage() {
+    const maxDocsInWindow = 20;
+    let pipeline = [
+        {
+            $setWindowFields: {
+                sortBy: {_id: 1},
+                output: {pushArray: {$push: "$bigStr", window: {range: [-10, 9]}}}
+            }
+        },
+    ];
+    // The memory usage is doubled since both the executor and the function state have copies of the
+    // large string.
+    const expectedFunctionMemUsages = {pushArray: 1024 * maxDocsInWindow * 2};
+
+    // TODO SERVER-55786: Fix memory tracking in PartitionIterator when documents are
+    // released from the in-memory cache. This should be proportional to the size of the window not
+    // the number of documents in the partition.
+    let expectedTotal = nDocs * docSize;
+    for (let func in expectedFunctionMemUsages) {
+        expectedTotal += expectedFunctionMemUsages[func];
+    }
+
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
+    checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 })();
 }());

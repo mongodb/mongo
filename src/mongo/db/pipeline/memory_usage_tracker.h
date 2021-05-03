@@ -82,7 +82,7 @@ public:
     void set(StringData functionName, uint64_t total) {
         auto oldFuncUsage = _functionMemoryTracker[functionName].currentMemoryBytes();
         _functionMemoryTracker[functionName].set(total);
-        _memoryUsageBytes += total - oldFuncUsage;
+        update(total - oldFuncUsage);
     }
 
     /**
@@ -90,12 +90,16 @@ public:
      */
     void set(uint64_t total) {
         _memoryUsageBytes = total;
+        if (_memoryUsageBytes > _maxMemoryUsageBytes) {
+            _maxMemoryUsageBytes = _memoryUsageBytes;
+        }
     }
 
     /**
-     * Resets both the total memory usage as well as the per-function memory usage.
+     * Resets both the total memory usage as well as the per-function memory usage, but retains the
+     * current value for maximum total memory usage.
      */
-    void reset() {
+    void resetCurrent() {
         _memoryUsageBytes = 0;
         for (auto& [_, funcTracker] : _functionMemoryTracker) {
             funcTracker.set(0);
@@ -119,11 +123,21 @@ public:
      */
     void update(StringData name, int diff) {
         _functionMemoryTracker[name].update(diff);
-        _memoryUsageBytes += diff;
+        update(diff);
+    }
+
+    /**
+     * Updates total memory usage.
+     */
+    void update(int diff) {
+        set(_memoryUsageBytes + diff);
     }
 
     auto currentMemoryBytes() const {
         return _memoryUsageBytes;
+    }
+    auto maxMemoryBytes() const {
+        return _maxMemoryUsageBytes;
     }
 
     const bool _allowDiskUse;
@@ -132,6 +146,7 @@ public:
 private:
     // Tracks current memory used.
     size_t _memoryUsageBytes = 0;
+    size_t _maxMemoryUsageBytes = 0;
 
     // Tracks memory consumption per function using the output field name as a key.
     StringMap<PerFunctionMemoryTracker> _functionMemoryTracker;
