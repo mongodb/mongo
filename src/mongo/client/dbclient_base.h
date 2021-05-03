@@ -780,6 +780,12 @@ public:
     virtual bool isUsingTransientSSLParams() const {
         return false;
     }
+
+    virtual bool isTLS() = 0;
+#else
+    virtual bool isTLS() {
+        return false;
+    }
 #endif
 
     const ClientAPIVersionParameters& getApiParameters() const {

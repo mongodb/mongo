@@ -392,7 +392,11 @@ jsTest.basicUserRoles = ["dbOwner"];
 jsTest.adminUserRoles = ["root"];
 
 jsTest.authenticate = function(conn) {
-    if (!jsTest.options().auth && !jsTest.options().keyFile) {
+    const connOptions = conn.fullOptions || {};
+    const authMode =
+        connOptions.clusterAuthMode || conn.clusterAuthMode || jsTest.options().clusterAuthMode;
+
+    if (!jsTest.options().auth && !jsTest.options().keyFile && authMode !== "x509") {
         conn.authenticated = true;
         return true;
     }
@@ -402,12 +406,25 @@ jsTest.authenticate = function(conn) {
             // Set authenticated to stop an infinite recursion from getDB calling
             // back into authenticate.
             conn.authenticated = true;
-            print("Authenticating as user " + jsTestOptions().authUser + " with mechanism " +
-                  DB.prototype._getDefaultAuthenticationMechanism() + " on connection: " + conn);
-            conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
-                user: jsTestOptions().authUser,
-                pwd: jsTestOptions().authPassword,
-            });
+            let mech = DB.prototype._getDefaultAuthenticationMechanism();
+            if (authMode === 'x509') {
+                mech = 'MONGODB-X509';
+            }
+
+            print("Authenticating as user " + jsTestOptions().authUser + " with mechanism " + mech +
+                  " on connection: " + conn);
+
+            if (authMode !== 'x509') {
+                conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
+                    user: jsTestOptions().authUser,
+                    pwd: jsTestOptions().authPassword,
+                });
+            } else {
+                authutil.assertAuthenticate(conn, '$external', {
+                    mechanism: 'MONGODB-X509',
+                });
+            }
+
             return conn.authenticated;
             // Dont' run the hang analyzer because we expect that this might fail in the normal
             // course of events.

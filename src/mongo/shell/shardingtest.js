@@ -781,7 +781,8 @@ var ShardingTest = function(params) {
 
                 const x509AuthRequired = (conn.fullOptions && conn.fullOptions.clusterAuthMode &&
                                           conn.fullOptions.clusterAuthMode === "x509" &&
-                                          currNode.fullOptions.sslMode === "requireSSL");
+                                          (currNode.fullOptions.sslMode === "requireSSL" ||
+                                           currNode.fullOptions.tlsMode === "requireTLS"));
 
                 if (keyFileUsed) {
                     authutil.asCluster(currNode, keyFileUsed, () => {

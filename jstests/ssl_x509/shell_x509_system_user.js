@@ -28,10 +28,7 @@ const rst = new ReplSetTest({nodes: 1, nodeOptions: x509Options, waitForKeys: fa
 
 rst.startSet();
 
-// ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
-// TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-rst.initiateWithAnyNodeAsPrimary(Object.extend(
-    rst.getReplSetConfig(), {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
+rst.initiate();
 
 const primaryConnString = rst.getPrimary().host;
 

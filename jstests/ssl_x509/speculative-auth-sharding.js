@@ -108,9 +108,5 @@ if (st.configRS) {
     });
 }
 
-// Orphan checks needs a privileged user to auth as.
-st.shard0.getDB('$external')
-    .createUser({user: CLIENT_NAME, roles: [{role: '__system', db: 'admin'}]});
-
 st.stop();
 }());

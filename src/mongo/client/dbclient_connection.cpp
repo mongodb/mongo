@@ -858,6 +858,10 @@ bool DBClientConnection::isUsingTransientSSLParams() const {
     return _transientSSLParams.has_value();
 }
 
+bool DBClientConnection::isTLS() {
+    return SSLPeerInfo::forSession(_session).isTLS;
+}
+
 #endif
 
 AtomicWord<int> DBClientConnection::_numConnections;

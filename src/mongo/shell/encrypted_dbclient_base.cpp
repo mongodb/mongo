@@ -662,6 +662,10 @@ std::shared_ptr<SymmetricKey> EncryptedDBClientBase::getDataKeyFromDisk(const UU
 const SSLConfiguration* EncryptedDBClientBase::getSSLConfiguration() {
     return _conn->getSSLConfiguration();
 }
+
+bool EncryptedDBClientBase::isTLS() {
+    return _conn->isTLS();
+}
 #endif
 
 namespace {

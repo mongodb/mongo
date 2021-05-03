@@ -143,6 +143,8 @@ public:
 
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;
+
+    bool isTLS() final;
 #endif
 
 protected:

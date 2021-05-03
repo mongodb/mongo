@@ -107,6 +107,10 @@ public:
         return false;
     }
 
+    bool isTLS() final {
+        return false;
+    }
+
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override {
         invariant(false);

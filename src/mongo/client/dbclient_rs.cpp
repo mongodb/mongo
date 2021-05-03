@@ -1219,6 +1219,11 @@ void DBClientReplicaSet::resetSecondaryOkConn() {
 const SSLConfiguration* DBClientReplicaSet::getSSLConfiguration() {
     return checkPrimary()->getSSLConfiguration();
 }
+
+bool DBClientReplicaSet::isTLS() {
+    return checkPrimary()->isTLS();
+}
+
 #endif
 
 }  // namespace mongo

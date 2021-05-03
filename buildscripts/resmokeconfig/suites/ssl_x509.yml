@@ -2,7 +2,7 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/ssl/*.js
+  - jstests/ssl_x509/*.js
 
 # ssl tests start their own mongod's.
 executor:
@@ -12,7 +12,8 @@ executor:
       ssl: ''
       sslAllowInvalidCertificates: ''
       sslCAFile: jstests/libs/ca.pem
-      sslPEMKeyFile: jstests/libs/client.pem
+      # We use server.pem so that shell can auth as __system.
+      sslPEMKeyFile: jstests/libs/server.pem
       readMode: commands
       global_vars:
         TestData:

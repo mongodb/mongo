@@ -69,10 +69,18 @@ function authAndTest(port, expectSuccess) {
     runTest(CLIENT_EMAIL_CERT, "jstests/ssl/libs/ssl_x509_role_auth_email.js");
 }
 
+function isConnAuthenticated(conn) {
+    const connStatus = conn.adminCommand({connectionStatus: 1, showPrivileges: true});
+    const connIsAuthenticated = connStatus.authInfo.authenticatedUsers.length > 0;
+    return connIsAuthenticated;
+}
+
 const prepConn = function(conn) {
-    const admin = conn.getDB('admin');
-    admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
-    assert(admin.auth('admin', 'admin'));
+    if (!isConnAuthenticated(conn)) {
+        const admin = conn.getDB('admin');
+        admin.createUser({user: "admin", pwd: "admin", roles: ["root"]});
+        assert(admin.auth('admin', 'admin'));
+    }
 
     const external = conn.getDB('$external');
     external.createUser({user: CLIENT_USER_NO_ROLES, roles: [{'role': 'readWrite', 'db': 'test'}]});

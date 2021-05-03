@@ -81,13 +81,14 @@ authutil.assertAuthenticateFails = function(conns, dbName, authParams) {
 authutil.asCluster = function(conn, keyfile, action) {
     var ex;
 
-    const connOptions = conn.fullOptions || {};
-    const authMode = connOptions.clusterAuthMode || jsTest.options().clusterAuthMode;
-
     // put a connection in an array for uniform processing.
     let connArray = conn;
     if (conn.length == null)
         connArray = [conn];
+
+    const connOptions = connArray[0].fullOptions || {};
+    const authMode = connOptions.clusterAuthMode || connArray[0].clusterAuthMode ||
+        jsTest.options().clusterAuthMode;
 
     let clusterTimes = connArray.map(connElem => {
         const connClusterTime = connElem.getClusterTime();
@@ -102,14 +103,24 @@ authutil.asCluster = function(conn, keyfile, action) {
     });
 
     let authDB = 'admin';
-    if ((authMode === 'keyFile') || (authMode === 'sendKeyFile') || (authMode === 'sendX509')) {
+    if ((authMode === 'keyFile') || (authMode === 'sendKeyFile') ||
+        (authMode === 'sendX509' && keyfile !== undefined)) {
+        if (keyfile === undefined) {
+            keyfile = connOptions.keyFile || connArray[0].keyFile;
+            assert(keyfile !== undefined,
+                   `Cannot find a keyfile to use for authentication from the connection: ${
+                       tojson(connOptions)} ==== ${tojson(connArray[0])}`);
+        }
+
         authutil.assertAuthenticate(conn, 'admin', {
             user: '__system',
             mechanism: 'SCRAM-SHA-1',
             pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
         });
-    } else if (authMode === 'x509') {
-        authDB = '$external';
+    } else if (authMode === 'x509' || authMode === 'sendX509') {
+        // When we login as __system, it gets registered internally as __system@local as the user
+        // name
+        authDB = 'local';
         authutil.assertAuthenticate(conn, '$external', {
             mechanism: 'MONGODB-X509',
         });

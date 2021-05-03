@@ -198,7 +198,25 @@ var ReplSetTest = function(opts) {
             return !connIsAuthenticated;
         });
 
-        if (keyFileParam && unauthenticatedConns.length > 0) {
+        const connOptions = connArray[0].fullOptions || {};
+        const authMode = connOptions.clusterAuthMode || connArray[0].clusterAuthMode ||
+            jsTest.options().clusterAuthMode;
+
+        let needsAuth = (keyFileParam || authMode === "x509" || authMode === "sendX509" ||
+                         authMode === "sendKeyFile") &&
+            unauthenticatedConns.length > 0;
+
+        // There are few cases where we do not auth
+        // 1. When transitiong to auth
+        // 2. When cluster is running in x509 but shell was not started with TLS (i.e. sslSpecial
+        // suite)
+        if (needsAuth &&
+            (connOptions.transitionToAuth !== undefined ||
+             (authMode === "x509" && !connArray[0].isTLS()))) {
+            needsAuth = false;
+        }
+
+        if (needsAuth) {
             return authutil.asCluster(unauthenticatedConns, keyFileParam, fn);
         } else {
             return fn();
@@ -1525,9 +1543,14 @@ var ReplSetTest = function(opts) {
         }
 
         // Setup authentication if running test with authentication
-        if ((jsTestOptions().keyFile) && cmdKey == 'replSetInitiate') {
+        if ((jsTestOptions().keyFile || self.clusterAuthMode === "x509") &&
+            cmdKey === 'replSetInitiate') {
             primary = this.getPrimary();
-            jsTest.authenticateNodes(this.nodes);
+            // The sslSpecial suite sets up cluster with x509 but the shell was not started with TLS
+            // so we need to rely on the test to auth if needed.
+            if (!(self.clusterAuthMode === "x509" && !primary.isTLS())) {
+                jsTest.authenticateNodes(this.nodes);
+            }
         }
 
         // Wait for initial sync to complete on all nodes. Use a faster polling interval so we can
@@ -3207,6 +3230,12 @@ var ReplSetTest = function(opts) {
         self.oplogSize = opts.oplogSize || 40;
         self.useSeedList = opts.useSeedList || false;
         self.keyFile = opts.keyFile;
+
+        self.clusterAuthMode = undefined;
+        if (opts.clusterAuthMode) {
+            self.clusterAuthMode = opts.clusterAuthMode;
+        }
+
         self.protocolVersion = opts.protocolVersion;
         self.waitForKeys = opts.waitForKeys;
 
@@ -3251,6 +3280,13 @@ var ReplSetTest = function(opts) {
             }
 
             numNodes = opts.nodes;
+        }
+
+        for (let i = 0; i < numNodes; i++) {
+            if (self.nodeOptions["n" + i] !== undefined &&
+                self.nodeOptions["n" + i].clusterAuthMode == "x509") {
+                self.clusterAuthMode = "x509";
+            }
         }
 
         if (_useBridge) {

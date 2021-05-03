@@ -30,23 +30,19 @@ function runInitialSyncTest() {
     });
     var conns = replTest.startSet();
 
-    // ReplSetTest.initiate() requires all nodes to be to be authorized to run replSetGetStatus.
-    // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-    replTest.initiateWithAnyNodeAsPrimary(
-        Object.extend(replTest.getReplSetConfig(),
-                      {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
+    replTest.initiate();
 
     var primary = replTest.getPrimary();
     var foo = primary.getDB("foo");
     var admin = primary.getDB("admin");
 
     var secondary1 = replTest.getSecondary();
-    var admin_s1 = secondary1.getDB("admin");
 
     print("2. Create a root user.");
     admin.createUser({user: "root", pwd: "pass", roles: ["root"]});
-    admin.auth("root", "pass");
-    admin_s1.auth("root", "pass");
+    authutil.assertAuthenticate(replTest.getPrimary(), '$external', {
+        mechanism: 'MONGODB-X509',
+    });
 
     print("3. Insert some data");
     var bulk = foo.bar.initializeUnorderedBulkOp();
@@ -70,6 +66,7 @@ function runInitialSyncTest() {
     print("6. Everyone happy eventually");
     replTest.awaitReplication(300000);
 
+    admin.logout();
     replTest.stopSet();
 }
 
@@ -105,4 +102,11 @@ var conns = replTest.startSet();
 assert.throws(function() {
     replTest.initiate();
 });
-replTest.stopSet();
+
+// stopSet will also fail because we cannot authenticate to stop it properly.
+// Ignore the error around unterminated processes.
+TestData.failIfUnterminatedProcesses = false;
+
+assert.throws(function() {
+    replTest.stopSet();
+});

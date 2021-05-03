@@ -27,12 +27,15 @@ rst.initiate();
 
 const admin = rst.getPrimary().getDB('admin');
 admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
-admin.auth('admin', 'pwd');
 
 function getMechStats(db) {
     return assert.commandWorked(db.runCommand({serverStatus: 1}))
         .security.authentication.mechanisms;
 }
+
+authutil.assertAuthenticate(rst.getPrimary(), '$external', {
+    mechanism: 'MONGODB-X509',
+});
 
 // Capture statistics after a fresh instantiation of a 1-node replica set.
 const initialMechStats = getMechStats(admin);
@@ -47,9 +50,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
     const clusterStats = initialMechStats[mech].clusterAuthenticate;
 
     if (mech === 'MONGODB-X509') {
-        // It appears that replication helpers use SCRAM-SHA-1, preventing SCRAM-SHA-256 cluster
-        // stats from being incremented during test setup.
-        assert.eq(clusterStats.received, 0);
+        assert.eq(clusterStats.received, 1);
     }
 
     // No speculation has occured
@@ -72,7 +73,7 @@ Object.keys(initialMechStats).forEach(function(mech) {
 
     rst.stop(newNode);
     rst.remove(newNode);
-    admin.auth('admin', 'pwd');
+
     singleNodeConfig.version = rst.getReplSetConfigFromNode(0).version + 1;
     assert.commandWorked(admin.runCommand({replSetReconfig: singleNodeConfig, force: true}));
 }

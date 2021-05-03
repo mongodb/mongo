@@ -83,6 +83,7 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getMaxWireVersion, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isReplicaSetMember, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isTLS, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getApiParameters, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoExternalInfo),
     JS_FS_END,
@@ -834,6 +835,12 @@ void MongoBase::Functions::isMongos::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
 
     args.rval().setBoolean(conn->isMongos());
+}
+
+void MongoBase::Functions::isTLS::call(JSContext* cx, JS::CallArgs args) {
+    auto conn = getConnection(args);
+
+    args.rval().setBoolean(conn->isTLS());
 }
 
 void MongoBase::Functions::getApiParameters::call(JSContext* cx, JS::CallArgs args) {
