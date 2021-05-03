@@ -186,10 +186,7 @@ public:
         return NamespaceString::kConfigReshardingOperationsNamespace;
     }
 
-    ThreadPool::Limits getThreadPoolLimits() const override {
-        // TODO Limit the size of ReshardingCoordinatorService thread pool.
-        return ThreadPool::Limits();
-    }
+    ThreadPool::Limits getThreadPoolLimits() const override;
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
 

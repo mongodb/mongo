@@ -183,6 +183,12 @@ public:
 
 }  // namespace
 
+ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
+    ThreadPool::Limits threadPoolLimit;
+    threadPoolLimit.maxThreads = resharding::gReshardingDonorServiceMaxThreadCount;
+    return threadPoolLimit;
+}
+
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<DonorStateMachine>(

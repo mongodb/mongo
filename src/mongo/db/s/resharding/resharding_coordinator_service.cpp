@@ -861,6 +861,13 @@ void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFi
                 opCtx, updatedCoordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
+
+ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
+    ThreadPool::Limits threadPoolLimit;
+    threadPoolLimit.maxThreads = resharding::gReshardingCoordinatorServiceMaxThreadCount;
+    return threadPoolLimit;
+}
+
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(

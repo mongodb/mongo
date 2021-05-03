@@ -35,6 +35,36 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 server_parameters:
+    reshardingCoordinatorServiceMaxThreadCount:
+        description: The max number of threads in the resharding coordinator's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingCoordinatorServiceMaxThreadCount
+        default: 3
+        validator:
+            gte: 1
+            lte: 256
+
+    reshardingDonorServiceMaxThreadCount:
+        description: The max number of threads in the resharding donor's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingDonorServiceMaxThreadCount
+        default: 2
+        validator:
+            gte: 1
+            lte: 256
+
+    reshardingRecipientServiceMaxThreadCount:
+        description: The max number of threads in the resharding recipient's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingRecipientServiceMaxThreadCount
+        default: 8
+        validator:
+            gte: 1
+            lte: 256
+
     reshardingCollectionClonerBatchSizeInBytes:
         description: >-
             Limit for the number of bytes of data inserted per storage transaction (WriteUnitOfWork)
@@ -65,7 +95,9 @@ server_parameters:
         set_at: startup
         cpp_vartype: int
         cpp_varname: gReshardingOplogBatchTaskCount
-        default: 4
+        default:
+            expr: (gReshardingRecipientServiceMaxThreadCount + 1) / 2
+            is_constexpr: false
         validator:
             gte: 1
             lte: 256

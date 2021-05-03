@@ -94,6 +94,12 @@ void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, T value) {
 
 }  // namespace
 
+ThreadPool::Limits ReshardingRecipientService::getThreadPoolLimits() const {
+    ThreadPool::Limits threadPoolLimit;
+    threadPoolLimit.maxThreads = resharding::gReshardingRecipientServiceMaxThreadCount;
+    return threadPoolLimit;
+}
+
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<RecipientStateMachine>(
