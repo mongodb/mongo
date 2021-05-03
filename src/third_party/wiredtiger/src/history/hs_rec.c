@@ -87,6 +87,16 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     counter = 0;
 
     /*
+     * We might be entering this code from application thread's context. We should make sure that we
+     * are not using snapshot associated with application session to perform visibility checks on
+     * history store records. Note that the history store cursor performs visibility checks based on
+     * snapshot if none of WT_CURSTD_HS_READ_ALL or WT_CURSTD_HS_READ_COMMITTED flags are set.
+     */
+    WT_ASSERT(session,
+      F_ISSET(session, WT_SESSION_INTERNAL) ||
+        F_ISSET(cursor, WT_CURSTD_HS_READ_ALL | WT_CURSTD_HS_READ_COMMITTED));
+
+    /*
      * Keep track if the caller had set WT_CURSTD_HS_READ_ALL flag on the history store cursor. We
      * want to preserve the flags set by the caller when we exit from this function. Also, we want
      * to explicitly set the flag WT_CURSTD_HS_READ_ALL only for the search_near operations on the
