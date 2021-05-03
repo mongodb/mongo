@@ -214,7 +214,7 @@ private:
     const NamespaceString _crudNss{"test.foo"};
     const UUID _uuid{UUID::gen()};
 
-    RAIIServerParameterControllerForTest controller{"reshardingBatchLimitOperations", 1};
+    RAIIServerParameterControllerForTest controller{"reshardingOplogBatchLimitOperations", 1};
 };
 
 TEST_F(ReshardingDonorOplogIterTest, BasicExhaust) {

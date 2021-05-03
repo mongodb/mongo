@@ -188,8 +188,8 @@ std::vector<repl::OplogEntry> ReshardingDonorOplogIterator::_fillBatch(Pipeline&
         }
 
         numBytes += obj.objsize();
-    } while (numBytes < resharding::gReshardingBatchLimitBytes &&
-             batch.size() < std::size_t(resharding::gReshardingBatchLimitOperations));
+    } while (numBytes < resharding::gReshardingOplogBatchLimitBytes.load() &&
+             batch.size() < std::size_t(resharding::gReshardingOplogBatchLimitOperations.load()));
 
     return batch;
 }

@@ -235,7 +235,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
                }
 
                chainCtx->progressCounter = (chainCtx->progressCounter + 1) %
-                   resharding::gReshardingTxnClonerProgressBatchSize;
+                   resharding::gReshardingTxnClonerProgressBatchSize.load();
 
                if (chainCtx->progressCounter == 0) {
                    auto opCtx = factory.makeOperationContext(&cc());

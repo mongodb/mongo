@@ -69,8 +69,8 @@ server_parameters:
         description: >-
             Limit for the number of bytes of data inserted per storage transaction (WriteUnitOfWork)
             by ReshardingCollectionCloner.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingCollectionClonerBatchSizeInBytes
         default:
             expr: 100 * 1024
@@ -81,8 +81,8 @@ server_parameters:
         description: >-
             Number of config.transactions records from a donor shard to process before recording the
             lsid locally to resume from on primary failover or server restart.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingTxnClonerProgressBatchSize
         default: 1000
         validator:
@@ -92,8 +92,8 @@ server_parameters:
         description: >-
             The number of subtasks to divide a single oplog batch into so that it may be applied
             concurrently by different threads.
-        set_at: startup
-        cpp_vartype: int
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
         cpp_varname: gReshardingOplogBatchTaskCount
         default:
             expr: (gReshardingRecipientServiceMaxThreadCount + 1) / 2
@@ -102,12 +102,12 @@ server_parameters:
             gte: 1
             lte: 256
 
-    reshardingBatchLimitOperations:
+    reshardingOplogBatchLimitOperations:
         description: >-
             The maximum number of operations for ReshardingOplogApplier to apply in a single batch.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: gReshardingBatchLimitOperations
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogBatchLimitOperations
         default:
             expr: 5 * 1000
         validator:
@@ -115,12 +115,12 @@ server_parameters:
             lte:
                 expr: 1000 * 1000
 
-    reshardingBatchLimitBytes:
+    reshardingOplogBatchLimitBytes:
         description: >-
             The maximum size in bytes for ReshardingOplogApplier to apply in a single batch.
-        set_at: startup
-        cpp_vartype: int
-        cpp_varname: gReshardingBatchLimitBytes
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogBatchLimitBytes
         default:
             expr: 100 * 1024 * 1024
         validator:
