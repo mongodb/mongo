@@ -1,6 +1,8 @@
 /**
  * Test that tenant migration commands only require and use certificate fields, and require SSL to
  * to be enabled when 'tenantMigrationDisableX509Auth' server parameter is false (default).
+ * Note: If a migration is started and SSL is not enabled on the recipient, we will repeatedly get
+ * back HostUnreachable on the donor side.
  *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_macos, requires_persistence]
@@ -143,46 +145,6 @@ const kExpiredMigrationCertificates = {
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.IllegalOperation);
-
-    recipientRst.stopSet();
-    tenantMigrationTest.stop();
-})();
-
-(() => {
-    jsTest.log("Test that donorStartMigration fails if SSL is not enabled on the recipient and " +
-               "tenantMigrationDisableX509Auth=false");
-    const recipientRst = new ReplSetTest({nodes: 1, name: "recipient"});
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
-    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-        recipientRst.stopSet();
-        return;
-    }
-
-    const donorRst = tenantMigrationTest.getDonorRst();
-
-    const donorStartMigrationCmdObj = {
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
-        readPreference: kReadPreference,
-        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-    };
-
-    const stateRes = assert.commandWorked(TenantMigrationUtil.runTenantMigrationCommand(
-        donorStartMigrationCmdObj,
-        donorRst,
-        false /* retryOnRetryableErrors */,
-        TenantMigrationUtil.isMigrationCompleted /* shouldStopFunc */));
-    assert.eq(stateRes.state, TenantMigrationTest.DonorState.kAborted);
-    // The command should fail with HostUnreachable since the donor was unable to establish an SSL
-    // connection with the recipient.
-    assert.eq(stateRes.abortReason.code, ErrorCodes.HostUnreachable);
 
     recipientRst.stopSet();
     tenantMigrationTest.stop();

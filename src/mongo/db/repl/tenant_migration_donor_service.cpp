@@ -98,12 +98,10 @@ bool shouldStopSendingRecipientCommand(Status status) {
 }
 
 bool shouldStopFetchingRecipientClusterTimeKeyDocs(Status status) {
-    // TODO (SERVER-54926): Convert HostUnreachable error in
-    // _fetchAndStoreRecipientClusterTimeKeyDocs to specific error.
     return status.isOK() ||
-        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status)) ||
-        status.code() == ErrorCodes::HostUnreachable;
+        !(ErrorCodes::isRetriableError(status) || ErrorCodes::isInterruption(status));
 }
+
 void checkForTokenInterrupt(const CancellationToken& token) {
     uassert(ErrorCodes::CallbackCanceled, "Donor service interrupted", !token.isCanceled());
 }
