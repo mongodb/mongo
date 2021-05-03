@@ -61,7 +61,7 @@ void logProcessDetails(std::ostream* os) {
     auto&& vii = VersionInfoInterface::instance();
     if (ProcessInfo::getMemSizeMB() < ProcessInfo::getSystemMemSizeMB()) {
         LOGV2_WARNING(20720,
-                      "Available memory is less than system memory",
+                      "Memory available to mongo process is less than total system memory",
                       "availableMemSizeMB"_attr = ProcessInfo::getMemSizeMB(),
                       "systemMemSizeMB"_attr = ProcessInfo::getSystemMemSizeMB());
     }
