@@ -119,7 +119,7 @@ variables:
 
 # Templates used by powercycle
 - &powercycle_remote_credentials
-  private_key_file: $(${posix_workdir})/src/powercycle.pem
+  private_key_file: src/powercycle.pem
   private_key_remote: ${__project_aws_ssh_key_value}
   aws_key_remote: ${powercycle_aws_key}
   aws_secret_remote: ${powercycle_aws_secret}
@@ -594,17 +594,16 @@ functions:
       env:
         workdir: ${workdir}
 
-  "set up win mount script": &set_up_win_mount_script
-    command: shell.exec
-    params:
-      working_dir: src
-      shell: bash
-      silent: true
-      script: |
-        cat <<EOF > win_mount.sh
-        net use X: '\\\\${win_scons_endpoint}\\share' /USER:"wincache.build.com\${win_scons_user}" '${win_scons_pass}'
-        EOF
-        chmod +x win_mount.sh
+  "set up win mount script":
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        silent: true
+        args:
+          - "./src/evergreen/functions/win_mount_script_setup.sh"
+        env:
+          workdir: ${workdir}
 
   "set up notary client credentials":
     - *f_expansions_write
@@ -789,65 +788,6 @@ functions:
     command: expansions.update
     params:
       updates:
-      - key: activate_virtualenv
-        value: |
-          # check if virtualenv is set up
-          if [ -d "${workdir}/venv" ]; then
-            if [ "Windows_NT" = "$OS" ]; then
-              # Need to quote the path on Windows to preserve the separator.
-              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
-            else
-              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
-            fi
-            if [ $? -ne 0 ]; then
-              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
-            fi
-            python=python
-          else
-            python=${python|/opt/mongodbtoolchain/v3/bin/python3}
-          fi
-
-          if [ "Windows_NT" = "$OS" ]; then
-            export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
-          else
-            export PYTHONPATH="$PYTHONPATH:${workdir}/src"
-          fi
-
-          echo "python set to $(which $python)"
-      - key: add_nodejs_to_path
-        value: |
-          # Add node and npm binaries to PATH
-          if [ "Windows_NT" = "$OS" ]; then
-            # An "npm" directory might not have been created in %APPDATA% by the Windows installer.
-            # Work around the issue by specifying a different %APPDATA% path.
-            # See: https://github.com/nodejs/node-v0.x-archive/issues/8141
-            export APPDATA=${workdir}/npm-app-data
-            export PATH="$PATH:/cygdrive/c/Program Files (x86)/nodejs" # Windows location
-            # TODO: this is to work around BUILD-8652
-            cd "$(pwd -P | sed 's,cygdrive/c/,cygdrive/z/,')"
-          else
-            export PATH="$PATH:/opt/node/bin"
-          fi
-      - key: posix_workdir
-        value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
-      - key: set_sudo
-        value: |
-          set -o > /tmp/settings.log
-          set +o errexit
-          grep errexit /tmp/settings.log | grep on
-          errexit_on=$?
-          # Set errexit "off".
-          set +o errexit
-          sudo=
-          # Use sudo, if it is supported.
-          sudo date > /dev/null 2>&1
-          if [ $? -eq 0 ]; then
-            sudo=sudo
-          fi
-          # Set errexit "on", if previously enabled.
-          if [ $errexit_on -eq 0 ]; then
-            set -o errexit
-          fi
       - key: mongo_binaries
         value: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
       - key: mongo_cryptd
@@ -938,96 +878,18 @@ functions:
   - *set_up_credentials
   - *fetch_benchmarks
 
-  "do multiversion setup": &do_multiversion_setup
-    command: shell.exec
+  "f_multiversion_setup_exec": &do_multiversion_setup
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
+      binary: bash
+      args:
+        - "./src/evergreen/multiversion_setup.sh"
+      env:
+        workdir: ${workdir}
 
-        ${activate_virtualenv}
-
-        rm -rf /data/install /data/multiversion
-
-        edition="${multiversion_edition|base}"
-        platform="${multiversion_platform|linux_x86_64}"
-        architecture="${multiversion_architecture|x86_64}"
-
-        $python buildscripts/resmoke.py setup-multiversion   \
-          --installDir /data/install                         \
-          --linkDir /data/multiversion                       \
-          --edition $edition                                 \
-          --platform $platform                               \
-          --architecture $architecture                       \
-          --githubOauthToken "${github_token}"               \
-          --useLatest 3.6 4.0
-
-        # The platform and architecture for how some of the binaries are reported in
-        # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
-        # Certain build variants define additional multiversion_*_42_or_later expansions in order to
-        # be able to fetch a complete set of versions.
-
-        if [ ! -z "${multiversion_edition_42_or_later}" ]; then
-          edition="${multiversion_edition_42_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_platform_42_or_later}" ]; then
-          platform="${multiversion_platform_42_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
-          architecture="${multiversion_architecture_42_or_later}"
-        fi
-
-        $python buildscripts/resmoke.py setup-multiversion   \
-          --installDir /data/install                         \
-          --linkDir /data/multiversion                       \
-          --edition $edition                                 \
-          --platform $platform                               \
-          --architecture $architecture                       \
-          --githubOauthToken "${github_token}"               \
-          --useLatest 4.2 4.2.1
-
-        # The platform and architecture for how some of the binaries are reported in
-        # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
-        # Certain build variants define additional multiversion_*_44_or_later expansions in order to
-        # be able to fetch a complete set of versions.
-
-        if [ ! -z "${multiversion_edition_44_or_later}" ]; then
-          edition="${multiversion_edition_44_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_platform_44_or_later}" ]; then
-          platform="${multiversion_platform_44_or_later}"
-        fi
-
-        if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
-          architecture="${multiversion_architecture_44_or_later}"
-        fi
-
-        $python buildscripts/resmoke.py setup-multiversion   \
-          --installDir /data/install                         \
-          --linkDir /data/multiversion                       \
-          --edition $edition                                 \
-          --platform $platform                               \
-          --architecture $architecture                       \
-          --githubOauthToken "${github_token}"               \
-          --useLatest 4.4 4.7 4.8 4.9
-
-        # This is primarily for tests for infrastructure which don't always need the latest
-        # binaries.
-        if [ ! -z "${install_master_bin}" ]; then
-          $python buildscripts/resmoke.py setup-multiversion   \
-            --installDir /data/install                         \
-            --linkDir /data/multiversion                       \
-            --edition $edition                                 \
-            --platform $platform                               \
-            --architecture $architecture                       \
-            --githubOauthToken "${github_token}"               \
-            --useLatest master
-        fi
+  "do multiversion setup":
+    - *f_expansions_write
+    - *do_multiversion_setup
 
   "move multiversion binaries": &move_multiversion_binaries
     command: subprocess.exec
@@ -1037,172 +899,14 @@ functions:
         - "./src/evergreen/move_multiversion_binaries.sh"
 
   "execute resmoke tests": &execute_resmoke_tests
-    command: shell.exec
+    command: subprocess.exec
     type: test
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        # Export these before verbose is set to avoid sharing sensitive info.
-        export CEDAR_USERNAME=${cedar_user}
-        export CEDAR_API_KEY=${cedar_api_key}
-
-        set -o errexit
-        set -o verbose
-
-        if [[ ${disable_unit_tests|false} = "false" && ! -f ${skip_tests|/dev/null} ]]; then
-
-        # activate the virtualenv if it has been set up
-        ${activate_virtualenv}
-
-        # on *SAN builds, extract the debug symbols so they're available
-        # to the symbolizer
-        if [[ -n "${san_options}" ]]; then
-          # the debug symbols archive isn't always available (not every *SAN
-          # task requires compile)
-          if [[ -f "mongo-debugsymbols.tgz" ]]; then
-            tar xf mongo-debugsymbols.tgz
-          else
-            echo "mongo-debugsymbols.tgz is not available. If you're seeing this message in a task that uses mongod or mongos binaries, please ensure debug symbols have been generated, otherwise the llvm-symbolizer may not correctly symbolize the sanitizer output."
-          fi
-        fi
-
-
-        # Set the TMPDIR environment variable to be a directory in the task's working
-        # directory so that temporary files created by processes spawned by resmoke.py get
-        # cleaned up after the task completes. This also ensures the spawned processes
-        # aren't impacted by limited space in the mount point for the /tmp directory.
-        export TMPDIR="${workdir}/tmp"
-        mkdir -p $TMPDIR
-
-        if [ -f /proc/self/coredump_filter ]; then
-          # Set the shell process (and its children processes) to dump ELF headers (bit 4),
-          # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
-          echo 0x13 > /proc/self/coredump_filter
-
-          if [ -f /sbin/sysctl ]; then
-            # Check that the core pattern is set explicitly on our distro image instead
-            # of being the OS's default value. This ensures that coredump names are consistent
-            # across distros and can be picked up by Evergreen.
-            core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
-            if [ "$core_pattern" = "dump_%e.%p.core" ]; then
-              echo "Enabling coredumps"
-              ulimit -c unlimited
-            fi
-          fi
-        fi
-
-        if [ $(uname -s) == "Darwin" ]; then
-            core_pattern_mac=$(/usr/sbin/sysctl -n "kern.corefile")
-            if [ "$core_pattern_mac" = "dump_%N.%P.core" ]; then
-              echo "Enabling coredumps"
-              ulimit -c unlimited
-            fi
-        fi
-
-        extra_args="$extra_args --jobs=${resmoke_jobs|1}"
-
-        if [ ${should_shuffle|true} = true ]; then
-          extra_args="$extra_args --shuffle"
-        fi
-
-        if [ ${continue_on_failure|true} = true ]; then
-          extra_args="$extra_args --continueOnFailure"
-        fi
-
-        # We reduce the storage engine's cache size to reduce the likelihood of a mongod process
-        # being killed by the OOM killer. The --storageEngineCacheSizeGB command line option is only
-        # filled in with a default value here if one hasn't already been specified in the task's
-        # definition or build variant's definition.
-        set +o errexit
-        echo "${resmoke_args} ${test_flags}" | grep -q storageEngineCacheSizeGB
-        if [ $? -eq 1 ]; then
-          echo "${resmoke_args} ${test_flags}" | grep -q "\-\-storageEngine=inMemory"
-          if [ $? -eq 0 ]; then
-            # We use a default of 4GB for the InMemory storage engine.
-            extra_args="$extra_args --storageEngineCacheSizeGB=4"
-          else
-            # We use a default of 1GB for all other storage engines.
-            extra_args="$extra_args --storageEngineCacheSizeGB=1"
-          fi
-        fi
-        set -o errexit
-
-
-        # Reduce the JSHeapLimit for the serial_run task task on Code Coverage builder variant.
-        if [[ "${build_variant}" = "enterprise-rhel-80-64-bit-coverage" && "${task_name}" = "serial_run" ]]; then
-          extra_args="$extra_args --mongodSetParameter {'jsHeapLimitMB':10}"
-        fi
-
-        path_value="$PATH"
-        if [ ${variant_path_suffix} ]; then
-          path_value="$path_value:${variant_path_suffix}"
-        fi
-        if [ ${task_path_suffix} ]; then
-          path_value="$path_value:${task_path_suffix}"
-        fi
-
-        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-        # invocation. It doesn't set any environment variables and should therefore come last in
-        # this list of expansions.
-        set +o errexit
-        PATH="$path_value"                                \
-            AWS_PROFILE=${aws_profile_remote}             \
-            ${gcov_environment}                           \
-            ${lang_environment}                           \
-            ${san_options}                                \
-            ${snmp_config_path}                           \
-            ${resmoke_wrapper}                            \
-            $python buildscripts/resmoke.py run           \
-                ${record_with}                            \
-                ${resmoke_args}                           \
-                $extra_args                               \
-                ${test_flags}                             \
-                --log=buildlogger                         \
-                --staggerJobs=on                          \
-                --installDir=${install_dir|dist-test/bin} \
-                --buildId=${build_id}                     \
-                --distroId=${distro_id}                   \
-                --executionNumber=${execution}            \
-                --projectName=${project}                  \
-                --gitRevision=${revision}                 \
-                --revisionOrderId=${revision_order_id}    \
-                --taskId=${task_id}                       \
-                --taskName=${task_name}                   \
-                --variantName=${build_variant}            \
-                --versionId=${version_id}                 \
-                --reportFile=report.json                  \
-                --perfReportFile=perf.json
-        resmoke_exit_code=$?
-        set -o errexit
-
-        if [[ -n "${record_with}" ]]; then
-          recording_size=$(du -ch *.undo | grep total)
-          echo "UndoDB produced recordings that were $recording_size (uncompressed) on disk"
-          if [[ $resmoke_exit_code = 0 ]]; then
-            echo "Resmoke exited successfully. UndoDB recordings will not be saved."
-            rm *.undo || true
-          fi
-        fi
-
-        # 74 is exit code for IOError on POSIX systems, which is raised when the machine is
-        # shutting down.
-        #
-        # 75 is exit code resmoke.py uses when the log output would be incomplete due to failing
-        # to communicate with logkeeper.
-        if [[ $resmoke_exit_code = 74 || $resmoke_exit_code = 75 ]]; then
-          echo $resmoke_exit_code > run_tests_infrastructure_failure
-          exit 0
-        elif [ $resmoke_exit_code != 0 ]; then
-          # On failure save the resmoke exit code.
-          echo $resmoke_exit_code > resmoke_error_code
-        elif [ $resmoke_exit_code = 0 ]; then
-          # On success delete core files.
-          core_files=$(/usr/bin/find -H .. \( -name "*.core" -o -name "*.mdmp" \) 2> /dev/null)
-          rm -rf $core_files
-        fi
-        exit $resmoke_exit_code
-        fi # end if [[ ${disable_unit_tests} && ! -f ${skip_tests|/dev/null} ]]
+      binary: bash
+      args:
+        - "./src/evergreen/resmoke_tests_execute.sh"
+      env:
+        workdir: ${workdir}
 
   "retrieve generated test configuration": &retrieve_generated_test_configuration
     command: s3.get
@@ -1228,20 +932,12 @@ functions:
         file: expansions.yml
     - *configure_evergreen_api_credentials
     - *configure_selected_tests_credentials
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          # Only run on master branch
-          if [ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]; then
-            ${activate_virtualenv}
-            PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file ../expansions.yml --selected-tests-config .selected_tests.yml
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/selected_tests_generate.sh"
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -1272,20 +968,14 @@ functions:
         file: src/expansions.yml
     - *f_expansions_write
     - *configure_evergreen_api_credentials
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-
-          ${activate_virtualenv}
-
-          # Multiversion exclusions can be used when selecting tests.
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
-
-          PATH=$PATH:$HOME $python buildscripts/burn_in_tags.py --expansion-file ../expansions.yml
+        binary: bash
+        args:
+          - "./src/evergreen/burn_in_tests_generate.sh"
+        env:
+          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: burn_in_tags_gen.tgz
@@ -1316,27 +1006,23 @@ functions:
     - *configure_evergreen_api_credentials
     - *f_expansions_write
 
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
+        binary: bash
+        args:
+          - "./src/evergreen/randomized_multiversion_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
 
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
     - *do_multiversion_setup
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${use_multiversion}
+        binary: bash
+        args:
+          - "./src/evergreen/randomized_multiversion_tasks_generate_exclude_tags.sh"
+        env:
+          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: generate_tasks_config.tgz
@@ -1382,16 +1068,14 @@ functions:
       params:
         file: src/expansions.yml
 
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
+        binary: bash
+        args:
+          - "./src/evergreen/resmoke_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1430,6 +1114,7 @@ functions:
   - *f_expansions_write
   - *retrieve_generated_test_configuration
   - *extract_generated_test_configuration
+  - *f_expansions_write
   - command: expansions.update
     params:
       updates:
@@ -1516,71 +1201,14 @@ functions:
           patch_compile_flags: ${patch_compile_flags}
 
   "generate compile expansions":
-    command: shell.exec
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        # We get the raw version string (r1.2.3-45-gabcdef) from git
-        MONGO_VERSION=$(git describe --abbrev=7)
-        # If this is a patch build, we add the patch version id to the version string so we know
-        # this build was a patch, and which evergreen task it came from
-        if [ "${is_patch}" = "true" ]; then
-          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-        fi
-
-        echo "MONGO_VERSION = ${MONGO_VERSION}"
-
-        ${activate_virtualenv}
-
-        # shared scons cache testing
-        # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
-        # 'scons_cache_scope' is set on a per variant basis
-        # 'disable_shared_scons_cache' is set on a project level and applies to all variants
-
-        # Shared - if scons_cache_scope is set, then use new shared scons cache settings
-        if [ ! -z ${scons_cache_scope} ]; then
-
-          if [ "${disable_shared_scons_cache}" = "true" ]; then
-
-            echo "SCons Cache disabled. All shared scons settings will be ignored"
-            scons_cache_scope=none
-
-          else
-            scons_cache_scope=${scons_cache_scope}
-          fi
-
-          if [ "$scons_cache_scope" = "shared" ]; then
-            set +o errexit
-            if [ "Windows_NT" = "$OS" ]; then
-              ./win_mount.sh
-            else
-              mount | grep "\/efs" > /dev/null
-              if [ $? -eq 0 ]; then
-                echo "Shared cache is already mounted"
-              else
-                echo "Shared cache - mounting file system"
-                ${set_sudo}
-                $sudo mount /efs
-              fi
-            fi
-            set -o errexit
-          fi
-
-          echo "Shared Cache with setting: ${scons_cache_scope}"
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} IS_COMMIT_QUEUE=${is_commit_queue|false} $python buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
-
-        # Legacy Expansion generation
-        else
-          echo "Using legacy expansion generation"
-          # Proceed with regular expansions generated
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
-          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-        fi
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "src/evergreen/functions/compile_expansions_generate.sh"
+        env:
+          workdir: ${workdir}
 
   "apply compile expansions":
     - command: expansions.update
@@ -1600,14 +1228,13 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/do_jepsen_setup/install_jepsen.sh"
-    - command: shell.exec
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          ${activate_virtualenv}
-          $python -c 'import socket; num_nodes = 5; print("\n".join(["%s:%d" % (socket.gethostname(), port) for port in range(20000, 20000 + num_nodes)]))' > nodes.txt
+        binary: bash
+        args:
+          - "./src/evergreen/do_jepsen_setup/nodes.sh"
+        env:
+          workdir: ${workdir}
     - command: subprocess.exec
       params:
         binary: bash
@@ -1615,98 +1242,34 @@ functions:
           - "./src/evergreen/do_jepsen_setup/move_binaries.sh"
 
   "run jepsen test":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
-        working_dir: src/jepsen-mongodb
-        shell: bash
-        script: |
-          set -o verbose
-
-          # Set the TMPDIR environment variable to be a directory in the task's working
-          # directory so that temporary files created by processes spawned by jepsen get
-          # cleaned up after the task completes. This also ensures the spawned processes
-          # aren't impacted by limited space in the mount point for the /tmp directory.
-          # We also need to set the _JAVA_OPTIONS environment variable so that lein will
-          # recognize this as the default temp directory.
-          export TMPDIR="${workdir}/tmp"
-          mkdir -p $TMPDIR
-          export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
-
-          start_time=$(date +%s)
-          lein run test --test ${jepsen_test_name}                                           \
-                        --mongodb-dir ../                                                    \
-                        --working-dir ${workdir}/src/jepsen-workdir                          \
-                        --clock-skew faketime                                                \
-                        --libfaketime-path ${workdir}/src/libfaketime/build/libfaketime.so.1 \
-                        --mongod-conf mongod_verbose.conf                                    \
-                        --virtualization none                                                \
-                        --nodes-file ../nodes.txt                                            \
-                        ${jepsen_key_time_limit}                                             \
-                        ${jepsen_protocol_version}                                           \
-                        ${jepsen_read_concern}                                               \
-                        ${jepsen_read_with_find_and_modify}                                  \
-                        ${jepsen_storage_engine}                                             \
-                        ${jepsen_time_limit}                                                 \
-                        ${jepsen_write_concern}                                              \
-                        2>&1                                                                 \
-          | tee jepsen_${task_name}_${execution}.log
-          end_time=$(date +%s)
-          elapsed_secs=$((end_time-start_time))
-          # Since we cannot use PIPESTATUS to get the exit code from the "lein run ..." pipe in dash shell,
-          # we will check the output for success, failure or setup error. Note that 'grep' returns with exit code
-          # 0 if it finds a match, and exit code 1 if no match is found.
-          grep -q "Everything looks good" jepsen_${task_name}_${execution}.log
-          grep_exit_code=$?
-          if [ $grep_exit_code -eq 0 ]; then
-            status='"pass"'
-            failures=0
-            final_exit_code=0
-          else
-            grep -q "Analysis invalid" jepsen_${task_name}_${execution}.log
-            grep_exit_code=$?
-            if [ $grep_exit_code -eq 0 ]; then
-              status='"fail"'
-              failures=1
-              final_exit_code=1
-            else
-              # If the failure is due to setup, then this is considered a system failure.
-              echo $grep_exit_code > jepsen_system_failure_${task_name}_${execution}
-              exit 0
-            fi
-          fi
-          # Create report.json
-          echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $final_exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > ../report.json
-          exit $final_exit_code
-    - command: shell.exec
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_test_run.sh"
+        env:
+          workdir: ${workdir}
+    - command: subprocess.exec
       params:
-        working_dir: src/jepsen-mongodb
-        shell: bash
-        script: |
-          set -o verbose
-          # Jepsen system failure if file exists.
-          if [ -f jepsen_system_failure_${task_name}_${execution} ]; then
-            exit $(cat jepsen_system_failure_${task_name}_${execution})
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/jepsen_test_fail.sh"
+        env:
+          workdir: ${workdir}
 
   "load aws test credentials":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
+        binary: bash
         silent: true
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          echo "const AWS_KMS_SECRET_ID = '${aws_kms_access_key_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-          echo "const AWS_KMS_SECRET_KEY = '${aws_kms_secret_access_key}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-
-          echo "const KMS_GCP_EMAIL = '${kms_gcp_email}'; " >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-          echo "const KMS_GCP_PRIVATEKEY = '${kms_gcp_privatekey}'; " >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-
-          echo "const KMS_AZURE_TENANT_ID = '${kms_azure_tenant_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-          echo "const KMS_AZURE_CLIENT_ID = '${kms_azure_client_id}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
-          echo "const KMS_AZURE_CLIENT_SECRET = '${kms_azure_client_secret}';" >> src/mongo/db/modules/enterprise/jstests/fle/lib/aws_secrets.js
+        args:
+          - "./src/evergreen/functions/aws_test_credentials_load.sh"
+        env:
+          workdir: ${workdir}
 
 
   "generate explicit multiversion tasks":
@@ -1722,17 +1285,14 @@ functions:
     - *configure_evergreen_api_credentials
     - *do_multiversion_setup
 
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_generate_resmoke_tasks.py --expansion-file ../expansions.yml --verbose
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${use_multiversion}
+        binary: bash
+        args:
+          - "./src/evergreen/explicit_multiversion_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1777,18 +1337,17 @@ functions:
       params:
         file: expansions.yml
     - *configure_evergreen_api_credentials
+    - *f_expansions_write
     - *do_multiversion_setup
-    - command: shell.exec
-      params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
 
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_multiversion_tests.py run --expansion-file ../expansions.yml
-          $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=${task_path_suffix}
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/implicit_multiversions_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1834,16 +1393,14 @@ functions:
         file: expansions.yml
     - *upload_pip_requirements
 
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          $python buildscripts/evergreen_gen_fuzzer_tests.py --expansion-file ../expansions.yml
+        binary: bash
+        args:
+          - "./src/evergreen/fuzzer_tasks_generate.sh"
+        env:
+          workdir: ${workdir}
 
     - command: archive.targz_pack
       params:
@@ -1875,53 +1432,36 @@ functions:
           - src/generated_resmoke_config/${name}.json
 
   "setup jstestfuzz":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${add_nodejs_to_path}
-
-          git clone git@github.com:10gen/jstestfuzz.git
-
-          pushd jstestfuzz
-            npm install
-            npm run prepare
-          popd
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_setup.sh"
+        env:
+          workdir: ${workdir}
 
   "lint fuzzer sanity patch":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -eo pipefail
-          set -o verbose
-
-          ${add_nodejs_to_path}
-
-          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-          # Grep returns 1 if it fails to find a match.
-          (grep -v "\.tpl\.js$" modified_and_created_patch_files.txt | grep "\.js$" || true) | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+        binary: bash
+        args:
+          - "./src/evergreen/lint_fuzzer_sanity_patch.sh"
+        env:
+          workdir: ${workdir}
 
   "lint fuzzer sanity all":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -eo pipefail
-          set -o verbose
-
-          ${add_nodejs_to_path}
-
-          # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -name "*.js" -print | xargs -P 32 -L 50 npm run --prefix jstestfuzz parse-jsfiles --
+        binary: bash
+        args:
+          - "./src/evergreen/lint_fuzzer_sanity_all.sh"
+        env:
+          workdir: ${workdir}
 
   # Used by generator
   "run jstestfuzz":
@@ -1931,18 +1471,15 @@ functions:
         binary: bash
         args:
           - "./src/evergreen/run_jstestfuzz/clone_repos.sh"
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src/jstestfuzz
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${add_nodejs_to_path}
-
-          npm run ${npm_command|jstestfuzz} -- ${jstestfuzz_vars} --branch ${branch_name}
+        binary: bash
+        args:
+          - "./src/evergreen/jstestfuzz_run.sh"
+        env:
+          workdir: ${workdir}
     - command: archive.targz_pack
       params:
         target: "jstests.tgz"
@@ -1962,43 +1499,26 @@ functions:
         display_name: Generated Tests - Execution ${execution}
 
   "run idl tests":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o verbose
-          set -o errexit
-
-          ${activate_virtualenv}
-          $python buildscripts/idl/run_tests.py
+        binary: bash
+        args:
+          - "./src/evergreen/idl_tests_run.sh"
+        env:
+          workdir: ${workdir}
 
   "run powercycle test":
     - *f_expansions_write
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o verbose
-          set -o errexit
-
-          if [ "Windows_NT" = "$OS" ]; then
-            user=Administrator
-          else
-            user=$USER
-          fi
-
-          ${activate_virtualenv}
-          # Set an exit trap so we can save the real exit status (see SERVER-34033).
-          trap 'echo $? > error_exit.txt; exit 0' EXIT
-          set +o errexit
-          eval $python -u buildscripts/resmoke.py powercycle run \
-            "--sshUserHost=$(printf "%s@%s" "$user" "${private_ip_address}") \
-            --sshConnection=\"-i ${private_key_file}\" \
-            --taskName=${task_name}"
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_run_test.sh"
+        env:
+          workdir: ${workdir}
 
     - command: expansions.update
       params:
@@ -2010,50 +1530,32 @@ functions:
       params:
         file: expansions.yml
 
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          # Trigger a system failure if powercycle failed due to ssh access.
-          if [ -n "${ec2_ssh_failure}" ]; then
-            echo "ec2_ssh_failure detected - $(cat powercycle_exit.yml)"
-            exit ${exit_code}
-          fi
-
-    - command: shell.exec
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_system_exit.sh"
+        env:
+          workdir: ${workdir}
+    - command: subprocess.exec
       type: test
       params:
-        shell: bash
-        script: |
-          # Test exits from here with specified exit_code.
-          if [ -n "${exit_code}" ]; then
-            # Python program saved exit_code
-            exit_code=${exit_code}
-          elif [ -f error_exit.txt ]; then
-            # Bash trap exit_code
-            exit_code=$(cat error_exit.txt)
-          else
-            exit_code=0
-          fi
-          echo "Exiting powercycle with code $exit_code"
-          exit $exit_code
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_exit.sh"
+        env:
+          workdir: ${workdir}
 
   "run packager.py":
-    command: shell.exec
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        if [ "${has_packages|}" = "true" ] ; then
-            cd buildscripts
-            $python ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-dist.tgz -s ${version} -m HEAD -a ${packager_arch}
-            cd ..
-        fi
+    - *f_expansions_write
+    - command: subprocess.exec
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/packager.py_run.sh"
+        env:
+          workdir: ${workdir}
 
   "do snmp setup":
     command: subprocess.exec
@@ -2085,44 +1587,15 @@ functions:
         - "./src/evergreen/kill_processes.sh"
 
   "run kitchen":
-    command: shell.exec
-    type: test
-    params:
-      shell: bash
-      working_dir: src/buildscripts/package_test
-      script: |
-        set -o errexit
-
-        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
-        export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
-        export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
-        export KITCHEN_SUBNET="${kitchen_subnet}"
-        export KITCHEN_VPC="${kitchen_vpc}"
-
-        if [[ "${packager_arch}" == "aarch64" || "${packager_arch}" == "arm64" ]]; then
-          kitchen_packager_distro="${packager_distro}-arm64"
-        else
-          kitchen_packager_distro="${packager_distro}-x86-64"
-        fi
-
-        ${activate_virtualenv}
-        # set expiration tag 2 hours in the future, since no test should take this long
-        export KITCHEN_EXPIRE="$($python -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
-
-        for i in {1..3}
-        do
-          if ! kitchen verify $kitchen_packager_distro; then
-            verified="false"
-            kitchen destroy $kitchen_packager_distro || true
-            sleep 30
-          else
-            verified="true"
-            break
-          fi
-        done
-
-        kitchen destroy $kitchen_packager_distro || true
-        test "$verified" = "true"
+    - *f_expansions_write
+    - command: subprocess.exec
+      type: test
+      params:
+        binary: bash
+        args:
+          - "./src/evergreen/kitchen_run.sh"
+        env:
+          workdir: ${workdir}
 
   "set up EC2 instance": &set_up_ec2_instance
     - *f_expansions_write
@@ -2144,42 +1617,14 @@ functions:
         num_hosts: 1
         path: src/hosts.yml
 
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        shell: bash
-        script: |
-          if [ "Windows_NT" = "$OS" ]; then
-            user=Administrator
-          else
-            user=$USER
-          fi
-          hostname=$(tr -d '"[]{}' < src/hosts.yml | cut -d , -f 1 | awk -F : '{print $2}')
-
-          # To add the hostname to expansions.
-          echo "private_ip_address: $hostname" >> src/powercycle_ip_address.yml
-
-          echo $hostname
-          echo $user
-
-          attempts=0
-          connection_attempts=${connection_attempts|60}
-
-          # Check for remote connectivity
-          while ! ssh \
-            -i ${private_key_file} \
-            -o ConnectTimeout=10 \
-            -o ForwardAgent=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=no \
-            "$(printf "%s@%s" "$user" "$hostname")" \
-            exit 2> /dev/null
-          do
-            [ "$attempts" -ge "$connection_attempts" ] && exit 1
-            ((attempts++))
-            printf "SSH connection attempt %d/%d failed. Retrying...\n" "$attempts" "$connection_attempts"
-            # sleep for Permission denied (publickey) errors
-            sleep 10
-          done
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_check_host.sh"
+        env:
+          workdir: ${workdir}
 
     - command: expansions.update
       params:
@@ -2190,32 +1635,24 @@ functions:
       params:
         file: src/expansions.yml
 
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        shell: bash
-        working_dir: src
-        script: |
-          set -o verbose
-          set -o errexit
-
-          ${activate_virtualenv}
-          $python buildscripts/resmoke.py powercycle setup-host
+        binary: bash
+        args:
+          - "./src/evergreen/powercycle_setup_host.sh"
+        env:
+          workdir: ${workdir}
 
   ### Process & archive remote EC2 artifacts ###
   "save powercycle artifacts": &save_powercycle_artifacts
-    command: shell.exec
+    command: subprocess.exec
     params:
-      shell: bash
-      working_dir: src
-      script: |
-        set -o verbose
-
-        if [ ! -f powercycle_ip_address.yml ]; then
-          exit 0
-        fi
-
-        ${activate_virtualenv}
-        $python buildscripts/resmoke.py powercycle save-diagnostics
+      binary: bash
+      args:
+        - "./src/evergreen/powercycle_save_artifacts.sh"
+      env:
+        workdir: ${workdir}
 
   "archive remote EC2 artifacts": &archive_remote_ec2_artifacts
     command: s3.put
@@ -2256,15 +1693,13 @@ functions:
 
   ### Process & archive local client logs ###
   "tar local client logs": &tar_local_client_logs
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        client_logs=$(ls crud*.log fsm*.log 2> /dev/null)
-        if [ ! -z "$client_logs" ]; then
-          ${tar|tar} czf client-logs.tgz $client_logs
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/local_client_logs_tar.sh"
+      env:
+        workdir: ${workdir}
 
   "archive local client logs": &archive_local_client_logs
     command: s3.put
@@ -2280,6 +1715,7 @@ functions:
       optional: true
 
   "save local client logs":
+    - *f_expansions_write
     - *tar_local_client_logs
     - *archive_local_client_logs
 
@@ -2412,78 +1848,13 @@ functions:
 
   ### Process & archive failed unittest artifacts ###
   "gather failed unittests": &gather_failed_unittests
-    command: shell.exec
+    command: subprocess.exec
     params:
-      shell: bash
-      working_dir: "src"
-      script: |
-        set -eou pipefail
-
-        # Only run on unit test tasks so we don't target mongod binaries from cores.
-        if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ]; then
-            exit 0
-        fi
-
-        unittest_bin_dir=dist-unittests/bin
-        mkdir -p $unittest_bin_dir || true
-
-        # Find all core files
-        core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
-        for core_file in $core_files
-        do
-          # A core file name does not always have the executable name that generated it.
-          # See http://stackoverflow.com/questions/34801353/core-dump-filename-gets-thread-name-instead-of-executable-name-with-core-pattern
-          # On platforms with GDB, we get the binary name from core file
-          gdb=/opt/mongodbtoolchain/gdb/bin/gdb
-          if [ -f $gdb ]; then
-            binary_file=$($gdb -batch --quiet -ex "core $core_file" 2> /dev/null | grep "Core was generated" | cut -f2 -d "\`" | cut -f1 -d "'" | cut -f1 -d " ")
-            binary_file_locations=$binary_file
-          else
-            # Find the base file name from the core file name, note it may be truncated.
-            # Remove leading 'dump_' and trailing '.<pid>.core' or '.<pid or time>.mdmp'
-            binary_file=$(echo "$core_file" | sed "s/.*\///;s/dump_//;s/\..*\.core//;s/\..*\.mdmp//")
-            # Locate the binary file. Since the base file name might be truncated, the find
-            # may return more than 1 file.
-            binary_file_locations=$(/usr/bin/find -H . -executable -name "$binary_file*${exe}" 2> /dev/null)
-          fi
-          if [ -z "$binary_file_locations" ]; then
-            echo "Cannot locate the unittest binary file ($binary_file) that generated the core file $core_file"
-          fi
-          for binary_file_location in $binary_file_locations
-          do
-            new_binary_file=$unittest_bin_dir/$(echo "$binary_file_location" | sed "s/.*\///")
-            if [ -f "$binary_file_location" ] && [ ! -f "$new_binary_file" ]; then
-              cp "$binary_file_location" "$new_binary_file"
-            fi
-
-            # On Windows if a .pdb symbol file exists, include it in the archive.
-            pdb_file=$(echo "$binary_file_location" | sed "s/\.exe/.pdb/")
-            if [ -f "$pdb_file" ]; then
-              new_pdb_file=$unittest_bin_dir/$(echo "$pdb_file" | sed "s/.*\///")
-              cp "$pdb_file" "$new_pdb_file"
-            fi
-
-            # On binutils platforms, if a .debug symbol file exists, include it
-            # in the archive
-            debug_file=$binary_file_location.debug
-            if [ -f "$debug_file" ]; then
-              cp "$debug_file" "$unittest_bin_dir"
-            fi
-
-            # On macOS, these are called .dSYM and they are directories
-            dsym_dir=$binary_file_location.dSYM
-            if [ -d "$dsym_dir" ]; then
-              cp -r "$dsym_dir" "$unittest_bin_dir"
-            fi
-
-          done
-        done
-
-        # Copy debug symbols for dynamic builds
-        lib_dir=build/install/lib
-        if [ -d "$lib_dir" ] && [[ -n "$core_files" ]]; then
-          cp -r "$lib_dir" dist-unittests
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/failed_unittests_gather.sh"
+      env:
+        workdir: ${workdir}
 
   "tar failed unittests": &tar_failed_unittests
     command: archive.targz_pack
@@ -2507,6 +1878,7 @@ functions:
       optional: true
 
   "save failed unittests":
+  - *f_expansions_write
   - *gather_failed_unittests
   - *tar_failed_unittests
   - *archive_failed_unittests
@@ -2543,29 +1915,13 @@ functions:
 
   ### Process & archive artifacts from hung processes ###
   "run hang analyzer":
-    command: shell.exec
+    command: subprocess.exec
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-
-        # Set what processes to look for. For most tasks, we rely on resmoke to figure out its subprocesses
-        # and run the hang analyzer on those. For non-resmoke tasks, we enumerate the process list here.
-        if [[ ${task_name} == *"jepsen"* ]]; then
-          hang_analyzer_option="-o file -o stdout -p dbtest,java,mongo,mongod,mongos,python,_test";
-        else
-          hang_analyzer_option="-o file -o stdout -m exact -p python"
-        fi
-
-        ${activate_virtualenv}
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $python buildscripts/resmoke.py hang-analyzer $hang_analyzer_option
-
-        # Call hang analyzer for tasks that are running remote mongo processes
-        if [ -n "${private_ip_address}" ]; then
-          $python buildscripts/resmoke.py powercycle remote-hang-analyzer
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/hang_analyzer.sh"
+      env:
+        workdir: ${workdir}
 
   "wait for resmoke to shutdown":
     command: subprocess.exec
@@ -2708,12 +2064,13 @@ functions:
         permissions: public-read
         display_name: SCons cache debug log
 
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        optional: true
-        shell: bash
-        script: |
-          curator splunk --json --url=${scons_splunk_server} --token=${scons_splunk_token} --annotation=project:${project} --annotation=task_id:${task_id} --annotation=build_variant:${build_variant} --annotation=git_revision:${revision} command --exec="cat src/scons_cache.log.json" > splunk_stdout.txt || cat splunk_stdout.txt
+        continue_on_err: true
+        binary: bash
+        args:
+          - "./src/evergreen/scons_splunk.sh"
 
   "attach report":
     command: attach.results
@@ -2729,20 +2086,14 @@ functions:
         - ${archive_file|src/archive.json}
 
   "attach wiki page":
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          $python -c 'import json; print(json.dumps([{
-            "name": "Wiki: Running Tests from Evergreen Tasks Locally",
-            "link": "https://github.com/mongodb/mongo/wiki/Running-Tests-from-Evergreen-Tasks-Locally",
-            "visibility": "public",
-            "ignore_for_fetch": True
-          }]))' > wiki_page_location.json
+        binary: bash
+        args:
+          - "./src/evergreen/wiki_page.sh"
+        env:
+          workdir: ${workdir}
     - command: attach.artifacts
       params:
         files:
@@ -2920,24 +2271,14 @@ tasks:
           --ninja
         targets:
           generate-ninja
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          python -m pip install ninja
-          if [ "Windows_NT" = "$OS" ]; then
-            vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
-            echo "ninja install-core" >> msvc.bat
-            cmd /C msvc.bat
-          else
-            ninja install-core
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/ninja_compile.sh"
+        env:
+          workdir: ${workdir}
 
 - name: compile_ninja_next
   commands:
@@ -2951,24 +2292,14 @@ tasks:
           --ninja
         targets:
           generate-ninja
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          set -o errexit
-          set -o verbose
-
-          ${activate_virtualenv}
-          python -m pip install ninja
-          if [ "Windows_NT" = "$OS" ]; then
-            vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
-            echo "ninja install-core" >> msvc.bat
-            cmd /C msvc.bat
-          else
-            ninja install-core
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/ninja_compile.sh"
+        env:
+          workdir: ${workdir}
 
 - name: compile_build_tools_next
   commands:
@@ -7139,20 +6470,14 @@ tasks:
         aws_key_remote: ${repo_aws_key}
         aws_secret_remote: ${repo_aws_secret}
     - func: "set up notary client credentials"
-    - command: shell.exec
+    - *f_expansions_write
+    - command: subprocess.exec
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          . ./notary_env.sh
-
-          set -o errexit
-          set -o verbose
-
-          CURATOR_RELEASE=${curator_release|"latest"}
-          curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-          tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-          ./curator repo submit --service ${barque_url} --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
+        binary: bash
+        args:
+          - "./src/evergreen/packages_publish.sh"
+        env:
+          workdir: ${workdir}
 
 - name: push
   tags: ["publish"]
@@ -7208,27 +6533,14 @@ tasks:
       vars:
         aws_key_remote: ${repo_aws_key}
         aws_secret_remote: ${repo_aws_secret}
+    - func: "f_expansions_write"
     - func: "set up notary client credentials"
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          . ./notary_env.sh
-
-          set -o errexit
-          set -o verbose
-
-          mv mongo-binaries.tgz mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-          mv mongo-shell.tgz mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-          mv mongo-cryptd.tgz mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
-          mv mh.tgz mh-${push_name}-${push_arch}-${suffix}.${ext|tgz} || true
-          mv mongo-debugsymbols.tgz mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
-          mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
-          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-${push_name}-${push_arch}-${suffix}.msi || true
-
-          /usr/local/bin/notary-client.py --key-name "server-5.0" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz} mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        binary: bash
+        args:
+          - "./src/evergreen/notary_client_run.sh"
 
     # Put the binaries tarball/zipfile
     - command: s3.put
@@ -7770,27 +7082,15 @@ tasks:
   - func: "set task expansion macros"
   - *f_expansions_write
   - func: "set up venv"
-  - command: shell.exec
+  - *f_expansions_write
+  - command: subprocess.exec
     type: test
     params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-        if [ "${is_commit_queue}" = "true" ]; then
-          # Since `commit_message` is an evergreen expansion, we need a way to ensure we
-          # properly deal with any special characters that could cause issues (like "). To
-          # do this, we will write it out to a file, then read that file into a variable.
-          cat > commit_message.txt <<END_OF_COMMIT_MSG
-        ${commit_message}
-        END_OF_COMMIT_MSG
-
-          commit_message_content=$(cat commit_message.txt)
-
-          ${activate_virtualenv}
-          $python buildscripts/validate_commit_message.py "$commit_message_content"
-        fi
+      binary: bash
+      args:
+        - "./src/evergreen/commit_message_validate.sh"
+      env:
+        workdir: ${workdir}
 
 - name: check_for_todos
   exec_timeout_secs: 600 # 10 minute timeout
@@ -7800,32 +7100,14 @@ tasks:
     - *f_expansions_write
     - func: "configure evergreen api credentials"
     - func: "set up venv"
-    - command: shell.exec
+    - command: subprocess.exec
       type: test
       params:
-        working_dir: src
-        shell: bash
-        script: |
-          ${activate_virtualenv}
-
-          set -o verbose
-          set -o errexit
-
-          # Since `commit_message` is an evergreen expansion, we need a way to ensure we
-          # properly deal with any special characters that could cause issues (like "). To
-          # do this, we will write it out to a file, then read that file into a variable.
-          if [ "${is_commit_queue}" = "true" ]; then
-            cat > commit_message.txt <<END_OF_COMMIT_MSG
-          ${commit_message}
-          END_OF_COMMIT_MSG
-
-            commit_message_content=$(cat commit_message.txt)
-            rm commit_message.txt
-
-            $python buildscripts/todo_check.py --commit-message "$commit_message_content"
-          else
-            $python buildscripts/todo_check.py --patch-build ${version_id}
-          fi
+        binary: bash
+        args:
+          - "./src/evergreen/todos_check.sh"
+        env:
+          workdir: ${workdir}
 
 - <<: *task_template
   name: mqlrun

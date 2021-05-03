@@ -330,11 +330,9 @@ RULES: Dict[str, LintRule] = {
     #"invalid-function-name": invalid_function_name,
     # TODO: after SERVER-54315
     #"no-keyval-inc": no_keyval_inc,
-    #"no-working-dir-on-shell": no_working_dir_on_shell,
-    "shell-exec-explicit-shell": shell_exec_explicit_shell,
-    # this rule contradicts the above. When you turn it on, delete shell_exec_explicit_shell
-    #"no-shell-exec": no_shell_exec
-    #"no-multiline-expansions-update": no_multiline_expansions_update,
+    "no-working-dir-on-shell": no_working_dir_on_shell,
+    #"no-shell-exec": no_shell_exec,
+    "no-multiline-expansions-update": no_multiline_expansions_update,
     "invalid-build-parameter": invalid_build_parameter,
     "required-expansions-write": required_expansions_write,
 }
