@@ -313,6 +313,10 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                 if (auto abortReason = coordinatorDoc.getAbortReason()) {
                     // If the abortReason exists, include it in the update.
                     setBuilder.append("reshardingFields.abortReason", *abortReason);
+
+                    auto abortStatus = getStatusFromAbortReason(coordinatorDoc);
+                    setBuilder.append("reshardingFields.userCanceled",
+                                      abortStatus == ErrorCodes::ReshardCollectionAborted);
                 }
             }
 
@@ -412,6 +416,10 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
 
                     if (auto abortReason = coordinatorDoc.getAbortReason()) {
                         setBuilder.append("reshardingFields.abortReason", *abortReason);
+
+                        auto abortStatus = getStatusFromAbortReason(coordinatorDoc);
+                        setBuilder.append("reshardingFields.userCanceled",
+                                          abortStatus == ErrorCodes::ReshardCollectionAborted);
                     }
                 }
 

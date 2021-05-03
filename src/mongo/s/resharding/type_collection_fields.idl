@@ -99,6 +99,11 @@ structs:
             state:
                 type: CoordinatorState
                 default: kUnused
+            userCanceled:
+                type: bool
+                optional: true
+                description: >-
+                    If emplaced, indicates whether an abort originated from a user cancellation.
             donorFields:
                 type: TypeCollectionDonorFields
                 optional: true
