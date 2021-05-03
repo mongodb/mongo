@@ -54,7 +54,9 @@ public:
     }
 
     ThreadPool::Limits getThreadPoolLimits() const override {
-        return ThreadPool::Limits();
+        ThreadPool::Limits limits;
+        limits.maxThreads = ThreadPool::Options::kUnlimited;
+        return limits;
     }
 
     std::shared_ptr<Instance> constructInstance(BSONObj initialState) override;
