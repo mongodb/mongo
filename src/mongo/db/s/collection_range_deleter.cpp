@@ -341,7 +341,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     invariant(collection != nullptr);
     invariant(!isEmpty());
 
-    auto const& nss = collection->ns();
+    auto const nss = collection->ns();
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
@@ -392,15 +392,13 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
                                                      min,
                                                      max,
                                                      BoundInclusion::kIncludeStartKeyOnly,
-                                                     PlanExecutor::YIELD_MANUAL,
+                                                     PlanExecutor::YIELD_AUTO,
                                                      InternalPlanner::FORWARD);
 
     if (MONGO_FAIL_POINT(hangBeforeDoingDeletion)) {
         LOG(0) << "Hit hangBeforeDoingDeletion failpoint";
         MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, hangBeforeDoingDeletion);
     }
-
-    PlanYieldPolicy planYieldPolicy(exec.get(), PlanExecutor::YIELD_MANUAL);
 
     int numDeleted = 0;
     do {
