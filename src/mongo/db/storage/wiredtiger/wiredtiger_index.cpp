@@ -510,7 +510,7 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
                                       << versionStatus.reason() << " Index: {name: "
                                       << desc->indexName() << ", ns: " << collectionNamespace
                                       << "} - version either too old or too new for this mongod.");
-        fassertFailedWithStatusNoTrace(28579, indexVersionStatus);
+        fassertFailedWithStatus(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
 
