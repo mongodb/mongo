@@ -43,6 +43,8 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(topologyVersionObserverExpectsInterruption);
 MONGO_FAIL_POINT_DEFINE(topologyVersionObserverExpectsShutdown);
+MONGO_FAIL_POINT_DEFINE(topologyVersionObserverBeforeCheckingForShutdown);
+MONGO_FAIL_POINT_DEFINE(topologyVersionObserverShutdownShouldWait);
 
 void TopologyVersionObserver::init(ServiceContext* serviceContext,
                                    ReplicationCoordinator* replCoordinator) noexcept {
@@ -87,6 +89,7 @@ void TopologyVersionObserver::shutdown() noexcept {
             _serviceContext->killOperation(clientLk, _workerOpCtx, ErrorCodes::ShutdownInProgress);
         }
 
+        topologyVersionObserverShutdownShouldWait.pauseWhileSet();
         _cv.wait(lk, [&] { return _state.load() != State::kRunning; });
 
         invariant(_state.load() == State::kShutdown);
@@ -197,6 +200,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
         {
             stdx::lock_guard lk(_mutex);
             invariant(_state.load() == State::kRunning);
+            invariant(_workerOpCtx == nullptr);
             _state.store(State::kShutdown);
 
             // Invalidate the cache as it is no longer updated
@@ -213,12 +217,17 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
         topologyVersionObserverExpectsShutdown.pauseWhileSet();
     });
 
-    while (!_shouldShutdown.load()) {
+    while (true) {
         auto opCtxHandle = tc->makeOperationContext();
+        topologyVersionObserverBeforeCheckingForShutdown.pauseWhileSet();
 
         {
             // Set the _workerOpCtx to our newly formed opCtxHandle before we unlock.
             stdx::lock_guard lk(_mutex);
+            // Checking `_shouldShutdown` under the lock is necessary to ensure the shutdown
+            // method can interrupt the new operation.
+            if (_shouldShutdown.load())
+                break;
             _workerOpCtx = opCtxHandle.get();
         }
 

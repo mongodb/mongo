@@ -42,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/topology_version_observer.h"
+#include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
@@ -236,6 +237,50 @@ TEST_F(TopologyVersionObserverTest, HandleQuiesceMode) {
 
     // In quiescence, the observer should be shutdown and have nothing in cache.
     ASSERT(!observer->getCached());
+    ASSERT(observer->isShutdown());
+}
+
+class TopologyVersionObserverInterruptedTest : public TopologyVersionObserverTest {
+public:
+    void setUp() override {
+        auto configObj = getConfigObj();
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    }
+
+    void tearDown() override {}
+};
+
+TEST_F(TopologyVersionObserverInterruptedTest, ShutdownAlwaysInterruptsWorkerOperation) {
+
+    std::unique_ptr<TopologyVersionObserver> observer;
+    unittest::Barrier b1(2), b2(2);
+    boost::optional<stdx::thread> observerThread;
+    boost::optional<stdx::thread> blockerThread;
+    {
+        FailPointEnableBlock workerFailBlock("topologyVersionObserverBeforeCheckingForShutdown");
+
+        observer = std::make_unique<TopologyVersionObserver>();
+        observer->init(getServiceContext(), getReplCoord());
+
+        workerFailBlock->waitForTimesEntered(workerFailBlock.initialTimesEntered() + 1);
+        blockerThread = stdx::thread([&] {
+            FailPointEnableBlock requestFailBlock("topologyVersionObserverExpectsInterruption");
+            b1.countDownAndWait();
+            // Keeps the failpoint enabled until it receives a signal from themain thread.
+            b2.countDownAndWait();
+        });
+        b1.countDownAndWait();  // Wait for blocker thread to enable thefailpoint
+        {
+            FailPointEnableBlock shutdownFailBlock("topologyVersionObserverShutdownShouldWait");
+            observerThread = stdx::thread([&] { observer->shutdown(); });
+
+            shutdownFailBlock->waitForTimesEntered(shutdownFailBlock.initialTimesEntered() + 1);
+        }
+    }
+    observerThread->join();
+    b2.countDownAndWait();  // Unblock the blocker thread so that it can join
+    blockerThread->join();
+
     ASSERT(observer->isShutdown());
 }
 
