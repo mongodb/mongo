@@ -80,7 +80,6 @@ public:
      * index/collection data will be safe to drop unversioned.
      */
     void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             const NamespaceString& nss,
                              std::shared_ptr<Ident> ident,
                              StorageEngine::DropIdentCallback&& onDrop = nullptr);
 
@@ -113,9 +112,6 @@ private:
     // Contains information identifying what collection/index data to drop as well as determining
     // when to do so.
     using IdentInfo = struct {
-        // Used for logging purposes.
-        NamespaceString nss;
-
         // Identifier for the storage to drop the associated collection or index data.
         std::string identName;
 

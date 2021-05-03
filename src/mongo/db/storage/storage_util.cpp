@@ -134,7 +134,7 @@ void removeIndex(OperationContext* opCtx,
                   "uuid"_attr = collectionUUID,
                   "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
+            storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
         } else {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to
             // the collection, we should never see it again anyway.
@@ -186,7 +186,7 @@ Status dropCollection(OperationContext* opCtx,
                       logAttrs(nss),
                       "ident"_attr = ident->getIdent(),
                       "commitTimestamp"_attr = commitTimestamp);
-                storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
+                storageEngine->addDropPendingIdent(*commitTimestamp, ident, std::move(onDrop));
             } else {
                 // Intentionally ignoring failure here. Since we've removed the metadata pointing to
                 // the collection, we should never see it again anyway.

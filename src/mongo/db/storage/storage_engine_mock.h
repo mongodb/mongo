@@ -170,7 +170,6 @@ public:
         return {};
     }
     void addDropPendingIdent(const Timestamp& dropTimestamp,
-                             const NamespaceString& nss,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}
     void checkpoint() final {}

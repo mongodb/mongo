@@ -45,7 +45,6 @@ namespace mongo {
 KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(engine) {}
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestamp,
-                                                   const NamespaceString& nss,
                                                    std::shared_ptr<Ident> ident,
                                                    StorageEngine::DropIdentCallback&& onDrop) {
     stdx::lock_guard<Latch> lock(_mutex);
@@ -55,7 +54,6 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
     auto matcher = [ident](const auto& pair) { return pair.second.identName == ident->getIdent(); };
     if (std::find_if(lowerBound, upperBound, matcher) == upperBound) {
         IdentInfo info;
-        info.nss = nss;
         info.identName = ident->getIdent();
         info.dropToken = ident;
         info.onDrop = std::move(onDrop);
@@ -64,7 +62,6 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
         LOGV2_FATAL_NOTRACE(51023,
                             "Failed to add drop-pending ident, duplicate timestamp and ident pair",
                             "ident"_attr = ident->getIdent(),
-                            logAttrs(nss),
                             "dropTimestamp"_attr = dropTimestamp);
     }
 }
@@ -116,12 +113,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
         const auto& dropTimestamp = timestampAndIdentInfo.first;
         auto& identInfo = timestampAndIdentInfo.second;
-        const auto& nss = identInfo.nss;
         const auto& identName = identInfo.identName;
         LOGV2(22237,
               "Completing drop for ident",
               "ident"_attr = identName,
-              logAttrs(nss),
               "dropTimestamp"_attr = dropTimestamp);
         WriteUnitOfWork wuow(opCtx);
         auto status =
@@ -130,7 +125,6 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             LOGV2_FATAL_NOTRACE(51022,
                                 "Failed to remove drop-pending ident",
                                 "ident"_attr = identName,
-                                logAttrs(nss),
                                 "dropTimestamp"_attr = dropTimestamp,
                                 "error"_attr = status);
         }

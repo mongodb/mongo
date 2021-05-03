@@ -194,7 +194,6 @@ TEST_F(KVDropPendingIdentReaperTest, GetEarliestDropTimestampReturnsBoostNoneOnE
 
 TEST_F(KVDropPendingIdentReaperTest, AddDropPendingIdentAcceptsNullDropTimestamp) {
     Timestamp nullDropTimestamp;
-    NamespaceString nss("test.foo");
     const std::string identName = "myident";
     auto engine = getEngine();
 
@@ -202,7 +201,7 @@ TEST_F(KVDropPendingIdentReaperTest, AddDropPendingIdentAcceptsNullDropTimestamp
     {
         // The reaper must have the only reference to the ident before it will drop it.
         std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
-        reaper.addDropPendingIdent(nullDropTimestamp, nss, ident);
+        reaper.addDropPendingIdent(nullDropTimestamp, ident);
     }
     ASSERT_EQUALS(nullDropTimestamp, *reaper.getEarliestDropTimestamp());
 
@@ -218,17 +217,15 @@ TEST_F(KVDropPendingIdentReaperTest,
     KVDropPendingIdentReaper reaper(engine);
 
     Timestamp dropTimestamp{Seconds(100), 0};
-    NamespaceString nss1("test.foo");
     std::string identName1 = "ident1";
-    NamespaceString nss2("test.bar");
     std::string identName2 = "ident2";
 
     {
         // The reaper must have the only references to the idents before it will drop them.
         std::shared_ptr<Ident> ident1 = std::make_shared<Ident>(identName1);
         std::shared_ptr<Ident> ident2 = std::make_shared<Ident>(identName2);
-        reaper.addDropPendingIdent(dropTimestamp, nss1, ident1);
-        reaper.addDropPendingIdent(dropTimestamp, nss2, ident2);
+        reaper.addDropPendingIdent(dropTimestamp, ident1);
+        reaper.addDropPendingIdent(dropTimestamp, ident2);
     }
 
     // getAllIdentNames() returns a set of drop-pending idents known to the reaper.
@@ -256,14 +253,13 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
              AddDropPendingIdentTerminatesOnDuplicateDropTimestampAndIdent,
              "Failed to add drop-pending ident") {
     Timestamp dropTimestamp{Seconds(100), 0};
-    NamespaceString nss("test.foo");
 
     KVDropPendingIdentReaper reaper(getEngine());
 
     {
         std::shared_ptr<Ident> ident = std::make_shared<Ident>("myident");
-        reaper.addDropPendingIdent(dropTimestamp, nss, ident);
-        reaper.addDropPendingIdent(dropTimestamp, nss, ident);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
     }
 }
 
@@ -274,11 +270,9 @@ TEST_F(KVDropPendingIdentReaperTest,
     // Generate timestamps with secs: 10, 20, ..., 50.
     const int n = 5U;
     Timestamp ts[n];
-    NamespaceString nss[n];
     std::string identName[n];
     for (int i = 0; i < n; ++i) {
         ts[i] = {Seconds((i + 1) * 10), 0};
-        nss[i] = NamespaceString("test", str::stream() << "coll" << i);
         identName[i] = str::stream() << "ident" << i;
     }
 
@@ -294,11 +288,11 @@ TEST_F(KVDropPendingIdentReaperTest,
             ident[i] = std::make_shared<Ident>(identName[i]);
         }
 
-        reaper.addDropPendingIdent(ts[1], nss[1], ident[1]);
-        reaper.addDropPendingIdent(ts[0], nss[0], ident[0]);
-        reaper.addDropPendingIdent(ts[2], nss[2], ident[2]);
-        reaper.addDropPendingIdent(ts[3], nss[3], ident[3]);
-        reaper.addDropPendingIdent(ts[4], nss[4], ident[4]);
+        reaper.addDropPendingIdent(ts[1], ident[1]);
+        reaper.addDropPendingIdent(ts[0], ident[0]);
+        reaper.addDropPendingIdent(ts[2], ident[2]);
+        reaper.addDropPendingIdent(ts[3], ident[3]);
+        reaper.addDropPendingIdent(ts[4], ident[4]);
     }
     ASSERT_EQUALS(ts[0], *reaper.getEarliestDropTimestamp());
 
@@ -334,8 +328,6 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanSkipsIdentsStillReferenc
     auto engine = getEngine();
     const Timestamp dropTimestamp{Seconds(100), 0};
     const Timestamp laterThanDropTimestamp{Seconds(200), 0};
-    NamespaceString nss1("test.foo");
-    NamespaceString nss2("test.bar");
     std::string identNames[4] = {"ident1", "ident2", "ident3", "ident4"};
 
     KVDropPendingIdentReaper reaper(engine);
@@ -351,10 +343,10 @@ TEST_F(KVDropPendingIdentReaperTest, DropIdentsOlderThanSkipsIdentsStillReferenc
             std::shared_ptr<Ident> ident3 = std::make_shared<Ident>(identNames[3]);
             // The reaper must have the only references to the idents before it will drop them.
 
-            reaper.addDropPendingIdent(dropTimestamp, nss1, ident0);
-            reaper.addDropPendingIdent(dropTimestamp, nss2, ident1);
-            reaper.addDropPendingIdent(dropTimestamp, nss1, ident2);
-            reaper.addDropPendingIdent(dropTimestamp, nss2, ident3);
+            reaper.addDropPendingIdent(dropTimestamp, ident0);
+            reaper.addDropPendingIdent(dropTimestamp, ident1);
+            reaper.addDropPendingIdent(dropTimestamp, ident2);
+            reaper.addDropPendingIdent(dropTimestamp, ident3);
         }
 
         // All the idents have dropTimestamps old enough to drop, but only ident2 and ident3 should
@@ -379,7 +371,6 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
              DropIdentsOlderThanTerminatesIfKVEngineFailsToDropIdent,
              "Failed to remove drop-pending ident") {
     Timestamp dropTimestamp{Seconds{1}, 0};
-    NamespaceString nss("test.foo");
     std::string identName = "myident";
 
     auto engine = getEngine();
@@ -387,7 +378,7 @@ DEATH_TEST_F(KVDropPendingIdentReaperTest,
     {
         // The reaper must have the only reference to the ident before it will drop it.
         std::shared_ptr<Ident> ident = std::make_shared<Ident>(identName);
-        reaper.addDropPendingIdent(dropTimestamp, nss, ident);
+        reaper.addDropPendingIdent(dropTimestamp, ident);
     }
     ASSERT_EQUALS(dropTimestamp, *reaper.getEarliestDropTimestamp());
 

@@ -45,7 +45,6 @@ const runTest = function(dropDatabase) {
     assert.commandWorked(primary.adminCommand({fsync: 1}));
 
     // Ensure that the empty database directory was removed.
-    checkLog.containsJson(primary, 22237, {namespace: dbToDropName + "." + collToDrop.getName()});
     checkLog.containsJson(primary, 4888200, {db: dbToDropName});
     const files = listFiles(rst.getDbPath(primary));
     assert(!files.some(file => file.baseName === dbToDropName),

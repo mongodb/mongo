@@ -474,7 +474,6 @@ public:
      * - and no holders of 'ident' remain (the index/collection is no longer in active use)
      */
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
-                                     const NamespaceString& nss,
                                      std::shared_ptr<Ident> ident,
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 
