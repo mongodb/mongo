@@ -1621,11 +1621,24 @@ var ReplSetTest = function(opts) {
                     const binVersionLatest =
                         MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
                                                           MongoRunner.getBinVersionFor("latest"));
-                    if (binVersionLatest) {
-                        assert.commandWorked(node.adminCommand({
-                            setParameter: 1,
-                            enableDefaultWriteConcernUpdatesForInitiate: false,
-                        }));
+
+                    // Only set the following server parameters for nodes running on the latest
+                    // binary version.
+                    if (!binVersionLatest) {
+                        continue;
+                    }
+
+                    assert.commandWorked(node.adminCommand({
+                        setParameter: 1,
+                        enableDefaultWriteConcernUpdatesForInitiate: false,
+                    }));
+
+                    // Re-enable the reconfig check to ensure that committed writes cannot be rolled
+                    // back. We disabled this check during initialization to ensure that replica
+                    // sets will not fail to start up.
+                    if (jsTestOptions().enableTestCommands) {
+                        assert.commandWorked(node.adminCommand(
+                            {setParameter: 1, enableReconfigRollbackCommittedWritesCheck: true}));
                     }
                 }
             }
@@ -2832,6 +2845,12 @@ var ReplSetTest = function(opts) {
         // with a single node, and reconfig the full membership set in.
         // We need to recalculate the DWC after each reconfig until the full set is included.
         options.setParameter.enableDefaultWriteConcernUpdatesForInitiate = true;
+
+        // Disable a check in reconfig that will prevent certain configs with arbiters from
+        // spinning up. We will re-enable this check after the replica set has finished initiating.
+        if (jsTestOptions().enableTestCommands) {
+            options.setParameter.enableReconfigRollbackCommittedWritesCheck = false;
+        }
 
         if (tojson(options) != tojson({}))
             printjson(options);

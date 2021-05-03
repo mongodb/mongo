@@ -132,6 +132,13 @@ public:
     }
 
     /**
+     * Gets this member's base priority, without considering the 'newlyAdded' field.
+     */
+    double getBasePriority() const {
+        return MemberConfigBase::getPriority();
+    }
+
+    /**
      * Gets the amount of time behind the primary that this member will atempt to
      * remain.  Zero seconds means stay as caught up as possible.
      */
@@ -158,6 +165,13 @@ public:
      */
     int getNumVotes() const {
         return isVoter() ? 1 : 0;
+    }
+
+    /**
+     * Returns the number of votes the member has, without considering the 'newlyAdded' field.
+     */
+    int getBaseNumVotes() const {
+        return (getVotes() == 0) ? 0 : 1;
     }
 
     /**

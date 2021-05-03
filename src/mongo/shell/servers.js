@@ -693,6 +693,7 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "failpoint.PrimaryOnlyServiceSkipRebuildingInstances", "4.8.0");
     _removeSetParameterIfBeforeVersion(
         opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
+    _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

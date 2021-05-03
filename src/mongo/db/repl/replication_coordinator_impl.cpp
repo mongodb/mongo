@@ -605,8 +605,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     }
     LOGV2_DEBUG(4280509, 1, "Local configuration validated for startup");
 
-    if (serverGlobalParams.enableMajorityReadConcern && localConfig.getNumMembers() == 3 &&
-        localConfig.getNumDataBearingMembers() == 2) {
+    if (serverGlobalParams.enableMajorityReadConcern && localConfig.isPSASet()) {
         LOGV2_OPTIONS(21315, {logv2::LogTag::kStartupWarnings}, "");
         LOGV2_OPTIONS(
             21316,
@@ -3478,7 +3477,8 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                     "replSetReconfig got {error} while validating {newConfig}",
                     "replSetReconfig error while validating new config",
                     "error"_attr = validateStatus,
-                    "newConfig"_attr = newConfigObj);
+                    "newConfig"_attr = newConfigObj,
+                    "oldConfig"_attr = oldConfigObj);
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, validateStatus.reason());
     }
 

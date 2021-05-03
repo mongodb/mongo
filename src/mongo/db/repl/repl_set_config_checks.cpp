@@ -312,6 +312,53 @@ Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
             }
         }
     }
+
+    if (!enableReconfigRollbackCommittedWritesCheck.load()) {
+        // Skip the following check. This parameter can only be set to false in tests.
+        return Status::OK();
+    }
+
+    const int numVotersOldConfig =
+        std::count_if(oldConfig.membersBegin(),
+                      oldConfig.membersEnd(),
+                      // Use 'getBaseNumVotes()' since a node may be newly added at this point,
+                      // which would indicate that it temporarily has 'votes: 0'.
+                      [](const auto& x) { return x.getBaseNumVotes() > 0; });
+    const int numArbitersOldConfig = std::count_if(oldConfig.membersBegin(),
+                                                   oldConfig.membersEnd(),
+                                                   [](const auto& x) { return x.isArbiter(); });
+    const int majorityVoteCountOldConfig = numVotersOldConfig / 2 + 1;
+    const int writableVotingMembersCountOldConfig = numVotersOldConfig - numArbitersOldConfig;
+
+    // An overlap between an election and write quorum is guaranteed to exist if the number of
+    // writable voting members is greater than or equal to the majority of voters. This is because
+    // at least one writable voting member will be a part of the majority in any election. This
+    // overlap is important so that if a candidate node that has not replicated recently committed
+    // writes decides to run for election, the writable voting member participating in the election
+    // will not vote for the candidate. As a result, the candidate cannot successfully become the
+    // primary.
+    const auto overlapBetweenElectionAndWriteQuorumOldConfig =
+        majorityVoteCountOldConfig <= writableVotingMembersCountOldConfig;
+    const auto numElectableNodesNewConfig = std::count_if(
+        newConfig.membersBegin(),
+        newConfig.membersEnd(),
+        // Use 'getBasePriority()' since newly added nodes also temporarily have 'priority: 0'.
+        [](const MemberConfig& mem) { return mem.getBasePriority() > 0.0; });
+
+    // If the aforementioned overlap doesn't exist, and we have a PSA set where the secondary can
+    // run for election, there is a risk that the secondary will not have replicated recent majority
+    // committed writes, but will be elected primary with the help of the arbiter. To prevent this
+    // from happening,, we fail the reconfig and refer the user to the appropriate next steps.
+    if (!overlapBetweenElectionAndWriteQuorumOldConfig && newConfig.isPSASet() &&
+        numElectableNodesNewConfig > 1) {
+        return Status(
+            ErrorCodes::NewReplicaSetConfigurationIncompatible,
+            // TODO (SERVER-56801): Add placeholder link.
+            str::stream()
+                << "Rejecting reconfig where the new config has a PSA topology and the secondary "
+                   "is electable, but the old config contains only one writable node");
+    }
+
     return Status::OK();
 }
 }  // namespace

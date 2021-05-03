@@ -1462,35 +1462,42 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
 
 rs.help = function() {
     print(
-        "\trs.status()                                { replSetGetStatus : 1 } checks repl set status");
+        "\trs.status()                                     { replSetGetStatus : 1 } checks repl set status");
     print(
-        "\trs.initiate()                              { replSetInitiate : null } initiates set with default settings");
+        "\trs.initiate()                                   { replSetInitiate : null } initiates set with default settings");
     print(
-        "\trs.initiate(cfg)                           { replSetInitiate : cfg } initiates set with configuration cfg");
+        "\trs.initiate(cfg)                                { replSetInitiate : cfg } initiates set with configuration cfg");
     print(
-        "\trs.conf()                                  get the current configuration object from local.system.replset");
+        "\trs.conf()                                       get the current configuration object from local.system.replset");
     print(
-        "\trs.reconfig(cfg)                           updates the configuration of a running replica set with cfg (disconnects)");
+        "\trs.reconfig(cfg, opts)                          updates the configuration of a running replica set with cfg, using the given opts (disconnects)");
     print(
-        "\trs.add(hostportstr)                        add a new member to the set with default attributes (disconnects)");
+        "\trs.reconfigForPSASet(memberIndex, cfg, opts)    updates the configuration of a Primary-Secondary-Arbiter (PSA) replica set while preserving majority writes");
     print(
-        "\trs.add(membercfgobj)                       add a new member to the set with extra attributes (disconnects)");
+        "\t                                                    memberIndex: index of the node being updated; cfg: the desired new config; opts: options passed in with the reconfig");
+    // TODO (SERVER-56801): Add placeholder link.
     print(
-        "\trs.addArb(hostportstr)                     add a new member which is arbiterOnly:true (disconnects)");
-    print("\trs.stepDown([stepdownSecs, catchUpSecs])   step down as primary (disconnects)");
+        "\t                                                    Not to be used with every configuration");
     print(
-        "\trs.syncFrom(hostportstr)                   make a secondary sync from the given member");
+        "\trs.add(hostportstr)                             add a new member to the set with default attributes (disconnects)");
     print(
-        "\trs.freeze(secs)                            make a node ineligible to become primary for the time specified");
+        "\trs.add(membercfgobj)                            add a new member to the set with extra attributes (disconnects)");
     print(
-        "\trs.remove(hostportstr)                     remove a host from the replica set (disconnects)");
-    print("\trs.secondaryOk()                               allow queries on secondary nodes");
+        "\trs.addArb(hostportstr)                          add a new member which is arbiterOnly:true (disconnects)");
+    print("\trs.stepDown([stepdownSecs, catchUpSecs])        step down as primary (disconnects)");
+    print(
+        "\trs.syncFrom(hostportstr)                        make a secondary sync from the given member");
+    print(
+        "\trs.freeze(secs)                                 make a node ineligible to become primary for the time specified");
+    print(
+        "\trs.remove(hostportstr)                          remove a host from the replica set (disconnects)");
+    print("\trs.secondaryOk()                                allow queries on secondary nodes");
     print();
-    print("\trs.printReplicationInfo()                  check oplog size and time range");
+    print("\trs.printReplicationInfo()                       check oplog size and time range");
     print(
-        "\trs.printSecondaryReplicationInfo()             check replica set members and replication lag");
-    print("\tdb.isMaster()                              check who is primary");
-    print("\tdb.hello()                              check who is primary");
+        "\trs.printSecondaryReplicationInfo()              check replica set members and replication lag");
+    print("\tdb.isMaster()                                   check who is primary");
+    print("\tdb.hello()                                      check who is primary");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
@@ -1559,6 +1566,22 @@ rs.reconfig = function(cfg, options) {
         cmd[i] = options[i];
     }
     return this._runCmd(cmd);
+};
+rs.reconfigForPSASet = function(memberIndex, cfg, options) {
+    const memberPriority = cfg.members[memberIndex].priority;
+    print(
+        `Running first reconfig to give member at index ${memberIndex} { votes: 1, priority: 0 }`);
+    cfg.members[memberIndex].votes = 1;
+    cfg.members[memberIndex].priority = 0;
+    const res = rs.reconfig(cfg, options);
+    if (!res.ok) {
+        return res;
+    }
+
+    print(`Running second reconfig to give member at index ${memberIndex} { priority: ${
+        memberPriority} }`);
+    cfg.members[memberIndex].priority = memberPriority;
+    return rs.reconfig(cfg, options);
 };
 rs.add = function(hostport, arb) {
     let res;
