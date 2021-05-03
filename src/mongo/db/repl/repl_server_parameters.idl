@@ -486,7 +486,7 @@ server_parameters:
         description: >-
             When enabled, allow the default write concern to be updated in the replica set
             initiate process. This parameter should only ever be enabled in our testing
-            infrastructure, as using it in production may lead to undefined behavior. 
+            infrastructure, as using it in production may lead to undefined behavior.
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<bool>
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
@@ -502,6 +502,14 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: startupRecoveryForRestore
         default: false
+
+    storeFindAndModifyImagesInOplog:
+        description: >-
+            Determines where document images for retryable find and modifies are to be stored.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: gStoreFindAndModifyImagesInOplog
+        default: true
 
 feature_flags:
     featureFlagTenantMigrations:
@@ -523,4 +531,11 @@ feature_flags:
             When enabled, default write concern might be set to majority following the default write
             concern formula if there is no cluster wide write concern (CWWC).
         cpp_varname: feature_flags::gDefaultWCMajority
+        default: false
+
+    featureFlagRetryableFindAndModify:
+        description: >-
+            When enabled, storeFindAndModifyImagesInOplog=false will change the location of any
+            document images for retryable find and modifies.
+        cpp_varname: feature_flags::gFeatureFlagRetryableFindAndModify
         default: false
