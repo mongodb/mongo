@@ -119,6 +119,9 @@ SemiFuture<void> ReshardingOplogApplier::run(std::shared_ptr<executor::TaskExecu
                    })
                    .then([this, factory] {
                        if (_currentBatchToApply.empty()) {
+                           // Increment the number of entries applied by 1 in order to account for
+                           // the final oplog entry.
+                           _env->metrics()->onOplogEntriesApplied(1);
                            return false;
                        }
 

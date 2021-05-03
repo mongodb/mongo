@@ -89,14 +89,13 @@ reshardingTest.withReshardingInBackground(  //
 const mongos = inputCollection.getMongo();
 const topology = DiscoverTopology.findConnectedNodes(mongos);
 
-// There's one terminating "nop" oplog entry from each donor marking the
+// There's one terminating "no-op" oplog entry from each donor marking the
 // boundary between the cloning phase and the applying phase. So there's a
-// baseline of 2 fetches on each recipient (one "nop" for each donor).
+// baseline of 2 fetches/applies on each recipient (one "no-op" for each donor).
 // Additionally, recipientShard[1] gets the 10 late inserts above, so expect 12
-// total fetches on that shard, and obviously the 10 corresponding
 // oplogEntry applies for those late inserts.
-[{shardName: recipientShardNames[0], documents: 2, fetched: 2, applied: 0},
- {shardName: recipientShardNames[1], documents: 2, fetched: 12, applied: 10},
+[{shardName: recipientShardNames[0], documents: 2, fetched: 2, applied: 2},
+ {shardName: recipientShardNames[1], documents: 2, fetched: 12, applied: 12},
 ].forEach(e => {
     const mongo = new Mongo(topology.shards[e.shardName].primary);
     const doc = mongo.getDB('admin').serverStatus({});

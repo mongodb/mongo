@@ -188,7 +188,7 @@ var finalServerStatusMetrics = {
     "countReshardingCanceled": 0,
     "documentsCopied": 2,
     "bytesCopied": Object.bsonsize(documentsInserted[1]) + Object.bsonsize(documentsInserted[2]),
-    "oplogEntriesApplied": 0,
+    "oplogEntriesApplied": 2,
     "countWritesDuringCriticalSection": 0,
 };
 

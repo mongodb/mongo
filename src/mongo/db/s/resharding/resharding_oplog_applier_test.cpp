@@ -814,7 +814,9 @@ TEST_F(ReshardingOplogApplierTest, MetricsAreReported) {
     auto future = applier.run(executor, cancelToken, factory);
     ASSERT_OK(future.getNoThrow());
 
-    ASSERT_EQ(metricsAppliedCount(), 5);
+    // The in-memory metrics should show the 5 ops above + the final oplog entry, but on disk should
+    // not include the final entry in its count.
+    ASSERT_EQ(metricsAppliedCount(), 6);
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(5, progressDoc->getNumEntriesApplied());
