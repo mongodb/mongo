@@ -54,12 +54,10 @@ class timestamp_manager : public component {
     void
     load()
     {
-        testutil_assert(_config != nullptr);
-        testutil_check(_config->get_int(OLDEST_LAG, _oldest_lag));
+        _oldest_lag = _config->get_int(OLDEST_LAG);
         testutil_assert(_oldest_lag >= 0);
-        testutil_check(_config->get_int(STABLE_LAG, _stable_lag));
+        _stable_lag = _config->get_int(STABLE_LAG);
         testutil_assert(_stable_lag >= 0);
-        testutil_check(_config->get_bool(ENABLED, _enabled));
         component::load();
     }
 

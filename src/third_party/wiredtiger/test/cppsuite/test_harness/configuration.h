@@ -35,6 +35,8 @@ extern "C" {
 #include "test_util.h"
 }
 
+enum class types { BOOL, INT, STRING, STRUCT };
+
 namespace test_harness {
 class configuration {
     public:
@@ -74,68 +76,103 @@ class configuration {
     }
 
     /*
-     * Wrapper functions for retrieving basic configuration values. Ideally the tests can avoid
-     * using the config item struct provided by wiredtiger. However if they still wish to use it the
-     * get and next functions can be used.
+     * Wrapper functions for retrieving basic configuration values. Ideally tests can avoid using
+     * the config item struct provided by wiredtiger.
+     *
+     * When getting a configuration value that may not exist for that configuration string or
+     * component, the optional forms of the functions can be used. In this case a default value must
+     * be passed and it will be set to that value.
      */
-    int
-    get_string(const std::string &key, std::string &value) const
+    std::string
+    get_string(const std::string &key)
     {
-        WT_CONFIG_ITEM temp_value;
-        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
-        if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING &&
-          temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID)
-            return (-1);
-        value = std::string(temp_value.str, temp_value.len);
-        return (0);
+        return get<std::string>(key, false, types::STRING, "", config_item_to_string);
     }
 
-    int
-    get_bool(const std::string &key, bool &value) const
+    std::string
+    get_optional_string(const std::string &key, const std::string &def)
     {
-        WT_CONFIG_ITEM temp_value;
-        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
-        if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL)
-            return (-1);
-        value = (temp_value.val != 0);
-        return (0);
+        return get<std::string>(key, true, types::STRING, def, config_item_to_string);
     }
 
-    int
-    get_int(const std::string &key, int64_t &value) const
+    bool
+    get_bool(const std::string &key)
     {
-        WT_CONFIG_ITEM temp_value;
-        testutil_check(_config_parser->get(_config_parser, key.c_str(), &temp_value));
-        if (temp_value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM)
-            return (-1);
-        value = temp_value.val;
-        return (0);
+        return get<bool>(key, false, types::BOOL, false, config_item_to_bool);
+    }
+
+    bool
+    get_optional_bool(const std::string &key, const bool def)
+    {
+        return get<bool>(key, true, types::BOOL, def, config_item_to_bool);
+    }
+
+    int64_t
+    get_int(const std::string &key)
+    {
+        return get<int64_t>(key, false, types::INT, 0, config_item_to_int);
+    }
+
+    int64_t
+    get_optional_int(const std::string &key, const int64_t def)
+    {
+        return get<int64_t>(key, true, types::INT, def, config_item_to_int);
     }
 
     configuration *
-    get_subconfig(const std::string &key) const
+    get_subconfig(const std::string &key)
     {
-        WT_CONFIG_ITEM subconfig;
-        testutil_check(get(key, &subconfig));
-        return new configuration(subconfig);
-    }
-
-    /*
-     * Basic configuration parsing helper functions.
-     */
-    int
-    next(WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value) const
-    {
-        return (_config_parser->next(_config_parser, key, value));
-    }
-
-    int
-    get(const std::string &key, WT_CONFIG_ITEM *value) const
-    {
-        return (_config_parser->get(_config_parser, key.c_str(), value));
+        return get<configuration *>(key, false, types::STRUCT, nullptr,
+          [](WT_CONFIG_ITEM item) { return new configuration(item); });
     }
 
     private:
+    static bool
+    config_item_to_bool(const WT_CONFIG_ITEM item)
+    {
+        return (item.val != 0);
+    }
+
+    static int64_t
+    config_item_to_int(const WT_CONFIG_ITEM item)
+    {
+        return (item.val);
+    }
+
+    static std::string
+    config_item_to_string(const WT_CONFIG_ITEM item)
+    {
+        return std::string(item.str, item.len);
+    }
+
+    template <typename T>
+    T
+    get(const std::string &key, bool optional, types type, T def, T (*func)(WT_CONFIG_ITEM item))
+    {
+        WT_DECL_RET;
+        WT_CONFIG_ITEM value;
+        const char *error_msg = "Configuration value doesn't match requested type";
+
+        ret = _config_parser->get(_config_parser, key.c_str(), &value);
+        if (ret == WT_NOTFOUND && optional)
+            return (def);
+        else if (ret != 0)
+            testutil_die(ret, "Error while finding config");
+
+        if (type == types::STRING &&
+          (value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRING &&
+            value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_ID))
+            testutil_die(-1, error_msg);
+        else if (type == types::BOOL && value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL)
+            testutil_die(-1, error_msg);
+        else if (type == types::INT && value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_NUM)
+            testutil_die(-1, error_msg);
+        else if (type == types::STRUCT && value.type != WT_CONFIG_ITEM::WT_CONFIG_ITEM_STRUCT)
+            testutil_die(-1, error_msg);
+
+        return func(value);
+    }
+
     std::string _config;
     WT_CONFIG_PARSER *_config_parser;
 };

@@ -66,7 +66,7 @@ class database_operation {
         /* Get a session. */
         session = connection_manager::instance().create_session();
         /* Create n collections as per the configuration and store each collection name. */
-        testutil_check(config->get_int(COLLECTION_COUNT, collection_count));
+        collection_count = config->get_int(COLLECTION_COUNT);
         for (int i = 0; i < collection_count; ++i) {
             collection_name = "table:collection" + std::to_string(i);
             database.collections[collection_name] = {};
@@ -78,10 +78,10 @@ class database_operation {
         debug_print(std::to_string(collection_count) + " collections created", DEBUG_TRACE);
 
         /* Open a cursor on each collection and use the configuration to insert key/value pairs. */
-        testutil_check(config->get_int(KEY_COUNT, key_count));
-        testutil_check(config->get_int(VALUE_SIZE, value_size));
+        key_count = config->get_int(KEY_COUNT);
+        value_size = config->get_int(VALUE_SIZE);
         testutil_assert(value_size > 0);
-        testutil_check(config->get_int(KEY_SIZE, key_size));
+        key_size = config->get_int(KEY_SIZE);
         testutil_assert(key_size > 0);
         /* Keys must be unique. */
         testutil_assert(key_count <= pow(10, key_size));

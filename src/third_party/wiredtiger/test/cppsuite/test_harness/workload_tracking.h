@@ -81,7 +81,7 @@ class workload_tracking : public component {
     {
         WT_SESSION *session;
 
-        testutil_check(_config->get_bool(ENABLED, _enabled));
+        _enabled = _config->get_bool(ENABLED);
         if (!_enabled)
             return;
 

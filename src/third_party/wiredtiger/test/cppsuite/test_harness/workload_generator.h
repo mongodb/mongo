@@ -73,13 +73,13 @@ class workload_generator : public component {
         _database_operation->populate(_database, _timestamp_manager, _config, _tracking);
 
         /* Retrieve useful parameters from the test configuration. */
-        testutil_check(_config->get_int(READ_THREADS, read_threads));
-        testutil_check(_config->get_int(UPDATE_THREADS, update_threads));
+        read_threads = _config->get_int(READ_THREADS);
+        update_threads = _config->get_int(UPDATE_THREADS);
         sub_config = _config->get_subconfig(OPS_PER_TRANSACTION);
-        testutil_check(sub_config->get_int(MIN, min_operation_per_transaction));
-        testutil_check(sub_config->get_int(MAX, max_operation_per_transaction));
+        min_operation_per_transaction = sub_config->get_int(MIN);
+        max_operation_per_transaction = sub_config->get_int(MAX);
         testutil_assert(max_operation_per_transaction >= min_operation_per_transaction);
-        testutil_check(_config->get_int(VALUE_SIZE, value_size));
+        value_size = _config->get_int(VALUE_SIZE);
         testutil_assert(value_size >= 0);
 
         delete sub_config;

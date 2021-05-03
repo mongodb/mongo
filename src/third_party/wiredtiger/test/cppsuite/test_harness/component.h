@@ -56,6 +56,7 @@ class component {
     virtual void
     load()
     {
+        _enabled = _config->get_optional_bool(ENABLED, true);
         _running = true;
     }
 

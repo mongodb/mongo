@@ -58,16 +58,14 @@ class test : public database_operation {
         : _runtime_monitor(nullptr), _thread_manager(nullptr), _timestamp_manager(nullptr),
           _workload_generator(nullptr), _workload_tracking(nullptr)
     {
-        _configuration = new configuration(name, config);
-        _runtime_monitor = new runtime_monitor(_configuration->get_subconfig(RUNTIME_MONITOR));
-        _timestamp_manager =
-          new timestamp_manager(_configuration->get_subconfig(TIMESTAMP_MANAGER));
-        _workload_tracking = new workload_tracking(_configuration->get_subconfig(WORKLOAD_TRACKING),
+        _config = new configuration(name, config);
+        _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR));
+        _timestamp_manager = new timestamp_manager(_config->get_subconfig(TIMESTAMP_MANAGER));
+        _workload_tracking = new workload_tracking(_config->get_subconfig(WORKLOAD_TRACKING),
           OPERATION_TRACKING_TABLE_CONFIG, TABLE_OPERATION_TRACKING, SCHEMA_TRACKING_TABLE_CONFIG,
           TABLE_SCHEMA_TRACKING);
-        _workload_generator =
-          new workload_generator(_configuration->get_subconfig(WORKLOAD_GENERATOR), this,
-            _timestamp_manager, _workload_tracking);
+        _workload_generator = new workload_generator(
+          _config->get_subconfig(WORKLOAD_GENERATOR), this, _timestamp_manager, _workload_tracking);
         _thread_manager = new thread_manager();
         /*
          * Ordering is not important here, any dependencies between components should be resolved
@@ -79,13 +77,13 @@ class test : public database_operation {
 
     ~test()
     {
-        delete _configuration;
+        delete _config;
         delete _runtime_monitor;
         delete _timestamp_manager;
         delete _thread_manager;
         delete _workload_generator;
         delete _workload_tracking;
-        _configuration = nullptr;
+        _config = nullptr;
         _runtime_monitor = nullptr;
         _timestamp_manager = nullptr;
         _thread_manager = nullptr;
@@ -111,9 +109,10 @@ class test : public database_operation {
         /* Build the database creation config string. */
         std::string db_create_config = CONNECTION_CREATE;
 
-        testutil_check(_configuration->get_int(CACHE_SIZE_MB, cache_size_mb));
+        /* Get the cache size, and turn logging on or off. */
+        cache_size_mb = _config->get_int(CACHE_SIZE_MB);
         db_create_config += ",statistics=(fast),cache_size=" + std::to_string(cache_size_mb) + "MB";
-        testutil_check(_configuration->get_bool(ENABLE_LOGGING, enable_logging));
+        enable_logging = _config->get_bool(ENABLE_LOGGING);
         db_create_config += ",log=(enabled=" + std::string(enable_logging ? "true" : "false") + ")";
 
         /* Set up the test environment. */
@@ -127,12 +126,12 @@ class test : public database_operation {
         for (const auto &it : _components)
             _thread_manager->add_thread(&component::run, it);
 
-        /* Sleep duration seconds. */
-        testutil_check(_configuration->get_int(DURATION_SECONDS, duration_seconds));
+        /* The test will run for the duration as defined in the config. */
+        duration_seconds = _config->get_int(DURATION_SECONDS);
         testutil_assert(duration_seconds >= 0);
         std::this_thread::sleep_for(std::chrono::seconds(duration_seconds));
 
-        /* End the test. */
+        /* End the test by calling finish on all known components. */
         for (const auto &it : _components)
             it->finish();
         _thread_manager->join();
@@ -179,7 +178,7 @@ class test : public database_operation {
     private:
     std::string _name;
     std::vector<component *> _components;
-    configuration *_configuration;
+    configuration *_config;
     runtime_monitor *_runtime_monitor;
     thread_manager *_thread_manager;
     timestamp_manager *_timestamp_manager;

@@ -55,8 +55,7 @@ class statistic {
     public:
     statistic(configuration *config)
     {
-        testutil_assert(config != nullptr);
-        testutil_check(config->get_bool(ENABLED, _enabled));
+        _enabled = config->get_bool(ENABLED);
     }
 
     /* Check that the given statistic is within bounds. */
@@ -79,7 +78,7 @@ class cache_limit_statistic : public statistic {
     public:
     cache_limit_statistic(configuration *config) : statistic(config)
     {
-        testutil_check(config->get_int(LIMIT, limit));
+        limit = config->get_int(LIMIT);
     }
 
     void
@@ -136,7 +135,7 @@ class runtime_monitor : public component {
         configuration *sub_config;
         std::string statistic_list;
         /* Parse the configuration for the runtime monitor. */
-        testutil_check(_config->get_int(RATE_PER_SECOND, _ops));
+        _ops = _config->get_int(RATE_PER_SECOND);
 
         /* Load known statistics. */
         sub_config = _config->get_subconfig(STAT_CACHE_SIZE);
