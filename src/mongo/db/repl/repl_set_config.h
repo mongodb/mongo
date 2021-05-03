@@ -489,6 +489,13 @@ public:
      */
     bool containsArbiter() const;
 
+    /**
+     * Returns true if the config consists of a Primary-Secondary-Arbiter (PSA) architecture.
+     */
+    bool isPSASet() const {
+        return getNumMembers() == 3 && getNumDataBearingMembers() == 2;
+    }
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.
