@@ -2859,31 +2859,33 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
-        task_install_action:
-            default
         task_compile_flags: >-
           --ninja
         targets:
-          build.ninja
+          generate-ninja
     - command: shell.exec
       params:
         working_dir: src
         shell: bash
         script: |
+          set -o errexit
+          set -o verbose
+
           ${activate_virtualenv}
+          python -m pip install ninja
           if [ "Windows_NT" = "$OS" ]; then
             vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            cd "$vcvars" && cmd /K "vcvarsall.bat amd64 && cd ${workdir}\src"
+            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
+            echo "ninja install-core" >> msvc.bat
+            cmd /C msvc.bat
+          else
+            ninja install-core
           fi
-          python -m pip install ninja
-          ninja install-core
 
 - name: compile_ninja_next
   commands:
     - func: "scons compile"
       vars:
-        task_install_action:
-            default
         task_compile_flags: >-
           --build-tools=next
           --ninja
@@ -2894,21 +2896,24 @@ tasks:
         working_dir: src
         shell: bash
         script: |
+          set -o errexit
+          set -o verbose
+
           ${activate_virtualenv}
+          python -m pip install ninja
           if [ "Windows_NT" = "$OS" ]; then
             vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
-            cd "$vcvars" && cmd /K "vcvarsall.bat amd64 && cd ${workdir}\src"
+            echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
+            echo "ninja install-core" >> msvc.bat
+            cmd /C msvc.bat
+          else
+            ninja install-core
           fi
-          python -m pip install ninja
-          ninja install-core
-
 
 - name: compile_build_tools_next
   commands:
     - func: "scons compile"
       vars:
-        task_install_action:
-            default
         task_compile_flags: >-
           --build-tools=next
         targets:

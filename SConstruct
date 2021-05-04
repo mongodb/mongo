@@ -1580,6 +1580,9 @@ link_model = get_option('link-model')
 if link_model == "auto":
     link_model = "static"
 
+if link_model.startswith('dynamic') and get_option('install-action') == 'symlink':
+    env.FatalError(f"Options '--link-model={link_model}' not supported with '--install-action={get_option('install-action')}'.")
+
 # libunwind configuration.
 # In which the following globals are set and normalized to bool:
 #     - use_libunwind
@@ -2039,7 +2042,7 @@ if link_model.startswith("dynamic"):
 if env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
     # The following platforms probably aren't using the binutils
     # toolchain, or may be using it for the archiver but not the
-    # linker, and binutils currently is the olny thing that supports
+    # linker, and binutils currently is the only thing that supports
     # thin archives. Don't even try on those platforms.
     if not env.TargetOSIs('solaris', 'darwin', 'windows', 'openbsd'):
         env.Tool('thin_archive')
