@@ -5,8 +5,6 @@
  *
  * This test is based on "tenant_migration_retryable_write_retry.js".
  *
- * TODO (SERVER-56370): Make sure the test passes with {ordered: true} as well.
- *
  * @tags: [requires_fcv_47, requires_majority_read_concern, incompatible_with_eft,
  * incompatible_with_windows_tls]
  */
@@ -19,142 +17,140 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/uuid_util.js");
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
-const kGarbageCollectionParams = {
-    // Set the delay before a donor state doc is garbage collected to be short to speed up
-    // the test.
-    tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
+function testOplogCloning(ordered) {
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const kGarbageCollectionParams = {
+        // Set the delay before a donor state doc is garbage collected to be short to speed up
+        // the test.
+        tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
 
-    // Set the TTL monitor to run at a smaller interval to speed up the test.
-    ttlMonitorSleepSecs: 1,
-};
+        // Set the TTL monitor to run at a smaller interval to speed up the test.
+        ttlMonitorSleepSecs: 1,
+    };
 
-const donorRst = new ReplSetTest({
-    nodes: 1,
-    name: "donor",
-    nodeOptions: Object.assign(migrationX509Options.donor, {setParameter: kGarbageCollectionParams})
-});
-const recipientRst = new ReplSetTest({
-    nodes: 1,
-    name: "recipient",
-    nodeOptions:
-        Object.assign(migrationX509Options.recipient, {setParameter: kGarbageCollectionParams})
-});
+    const donorRst = new ReplSetTest({
+        nodes: 1,
+        name: "donor",
+        nodeOptions:
+            Object.assign(migrationX509Options.donor, {setParameter: kGarbageCollectionParams})
+    });
+    const recipientRst = new ReplSetTest({
+        nodes: 1,
+        name: "recipient",
+        nodeOptions:
+            Object.assign(migrationX509Options.recipient, {setParameter: kGarbageCollectionParams})
+    });
 
-donorRst.startSet();
-donorRst.initiate();
+    donorRst.startSet();
+    donorRst.initiate();
 
-recipientRst.startSet();
-recipientRst.initiate();
+    recipientRst.startSet();
+    recipientRst.initiate();
 
-const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-if (!tenantMigrationTest.isFeatureFlagEnabled()) {
-    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
-    donorRst.stopSet();
-    recipientRst.stopSet();
-    return;
-}
-
-const donorPrimary = donorRst.getPrimary();
-if (!TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
-    jsTestLog("Skipping test because the time-series collection feature flag is disabled");
-    tenantMigrationTest.stop();
-    return;
-}
-
-const kTenantId = "testTenantId";
-const kDbName = kTenantId + "_" +
-    "tsDb";
-const kCollName = "tsColl";
-const kNs = `${kDbName}.${kCollName}`;
-
-const configTxnColl = donorPrimary.getCollection("config.transactions");
-
-const tsDB = donorPrimary.getDB(kDbName);
-assert.commandWorked(
-    tsDB.createCollection(kCollName, {timeseries: {timeField: "time", metaField: "meta"}}));
-const tag1 = "regular insert";
-assert.commandWorked(donorPrimary.getCollection(kNs).insert(
-    [
-        {_id: 0, time: ISODate(), x: 0, tag: tag1, meta: 0},
-        {_id: 1, time: ISODate(), x: 1, tag: tag1, meta: 0},
-        {_id: 2, time: ISODate(), x: 2, tag: tag1, meta: 0},
-    ],
-    {writeConcern: {w: "majority"}}));
-
-// Each retryable insert and update below is identified by a unique 'tag'. This function returns the
-// value of the 'tag' field inside the 'o' field of the given 'oplogEntry'.
-function getTagsFromOplog(oplogEntry) {
-    if (oplogEntry.op == "i") {
-        return Object.values(oplogEntry.o.data.tag);
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
     }
-    if (oplogEntry.op == "u") {
-        return Object.values(oplogEntry.o.diff.sdata.stag.i);
+
+    const donorPrimary = donorRst.getPrimary();
+    if (!TimeseriesTest.timeseriesCollectionsEnabled(donorPrimary)) {
+        jsTestLog("Skipping test because the time-series collection feature flag is disabled");
+        tenantMigrationTest.stop();
+        return;
     }
-    throw Error("Unknown op type " + oplogEntry.op);
-}
 
-jsTest.log("Run retryable writes prior to the migration");
+    const kTenantId = "testTenantId";
+    const kDbName = kTenantId + "_" +
+        "tsDb";
+    const kCollName = "tsColl";
+    const kNs = `${kDbName}.${kCollName}`;
 
-const lsid1 = {
-    id: UUID()
-};
-const insertTag = "retryable insert";
-const updateTag = "retryable update";
-assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
-    insert: kCollName,
-    documents: [
-        // Test batched inserts resulting in "insert" oplog entries.
-        {time: ISODate(), x: 0, tag: insertTag, meta: 1},
-        {time: ISODate(), x: 1, tag: insertTag, meta: 1},
-        {time: ISODate(), x: 2, tag: insertTag, meta: 1},
-        // Test batched inserts resulting in "update" oplog entries.
-        {time: ISODate(), x: 3, tag: updateTag, meta: 0},
-        {time: ISODate(), x: 4, tag: updateTag, meta: 0},
-        {time: ISODate(), x: 5, tag: updateTag, meta: 0},
-    ],
-    txnNumber: NumberLong(0),
-    lsid: lsid1,
-    ordered: false,
-}));
+    const tsDB = donorPrimary.getDB(kDbName);
+    assert.commandWorked(
+        tsDB.createCollection(kCollName, {timeseries: {timeField: "time", metaField: "meta"}}));
+    const tag1 = "regular insert";
+    assert.commandWorked(donorPrimary.getCollection(kNs).insert(
+        [
+            {_id: 0, time: ISODate(), x: 0, tag: tag1, meta: 0},
+            {_id: 1, time: ISODate(), x: 1, tag: tag1, meta: 0},
+            {_id: 2, time: ISODate(), x: 2, tag: tag1, meta: 0},
+        ],
+        {writeConcern: {w: "majority"}}));
 
-jsTest.log("Run a migration to completion");
-const migrationId = UUID();
-const migrationOpts = {
-    migrationIdString: extractUUIDFromObject(migrationId),
-    tenantId: kTenantId,
-};
-assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    // Each retryable insert and update below is identified by a unique 'tag'. This function returns
+    // the value of the 'tag' field inside the 'o' field of the given 'oplogEntry'.
+    function getTagsFromOplog(oplogEntry) {
+        if (oplogEntry.op == "i") {
+            return Object.values(oplogEntry.o.data.tag);
+        }
+        if (oplogEntry.op == "u") {
+            return Object.values(oplogEntry.o.diff.sdata.stag.i);
+        }
+        throw Error("Unknown op type " + oplogEntry.op);
+    }
 
-const donorDoc =
-    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
+    jsTest.log("Run retryable writes prior to the migration");
 
-tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
+    const lsid1 = {id: UUID()};
+    const insertTag = "retryable insert";
+    const updateTag = "retryable update";
+    assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
+        insert: kCollName,
+        documents: [
+            // Test batched inserts resulting in "insert" oplog entries.
+            {time: ISODate(), x: 0, tag: insertTag, meta: 1},
+            {time: ISODate(), x: 1, tag: insertTag, meta: 1},
+            {time: ISODate(), x: 2, tag: insertTag, meta: 1},
+            // Test batched inserts resulting in "update" oplog entries.
+            {time: ISODate(), x: 3, tag: updateTag, meta: 0},
+            {time: ISODate(), x: 4, tag: updateTag, meta: 0},
+            {time: ISODate(), x: 5, tag: updateTag, meta: 0},
+        ],
+        txnNumber: NumberLong(0),
+        lsid: lsid1,
+        ordered: ordered,
+    }));
 
-// Test the aggregation pipeline the recipient would use for getting the oplog chain where
-// "ts" < "startFetchingOpTime" for all retryable writes entries in config.transactions. The
-// recipient would use the real "startFetchingOpTime", but this test uses the donor's commit
-// timestamp as a substitute.
-const startFetchingTimestamp = donorDoc.commitOrAbortOpTime.ts;
+    jsTest.log("Run a migration to completion");
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: kTenantId,
+    };
+    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
-jsTest.log("Run retryable write after the migration");
-const lsid2 = {
-    id: UUID()
-};
-const sessionTag2 = "retryable insert after migration";
-// Make sure this write is in the majority snapshot.
-assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
-    insert: kCollName,
-    documents: [{_id: 6, time: ISODate(), x: 6, tag: sessionTag2}],
-    txnNumber: NumberLong(0),
-    lsid: lsid2,
-    writeConcern: {w: "majority"},
-}));
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: kTenantId
+    });
 
-// The aggregation pipeline will return an array of retryable writes oplog entries (pre-image/
-// post-image oplog entries included) with "ts" < "startFetchingTimestamp" and sorted in ascending
-// order of "ts".
-const aggRes = donorPrimary.getDB("config").runCommand({
+    tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
+
+    // Test the aggregation pipeline the recipient would use for getting the oplog chain where
+    // "ts" < "startFetchingOpTime" for all retryable writes entries in config.transactions. The
+    // recipient would use the real "startFetchingOpTime", but this test uses the donor's commit
+    // timestamp as a substitute.
+    const startFetchingTimestamp = donorDoc.commitOrAbortOpTime.ts;
+
+    jsTest.log("Run retryable write after the migration");
+    const lsid2 = {id: UUID()};
+    const sessionTag2 = "retryable insert after migration";
+    // Make sure this write is in the majority snapshot.
+    assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
+        insert: kCollName,
+        documents: [{_id: 6, time: ISODate(), x: 6, tag: sessionTag2}],
+        txnNumber: NumberLong(0),
+        lsid: lsid2,
+        writeConcern: {w: "majority"},
+    }));
+
+    // The aggregation pipeline will return an array of retryable writes oplog entries (pre-image/
+    // post-image oplog entries included) with "ts" < "startFetchingTimestamp" and sorted in
+    // ascending order of "ts".
+    const aggRes = donorPrimary.getDB("config").runCommand({
     aggregate: "transactions",
     pipeline: [
         // Fetch the config.transactions entries that do not have a "state" field, which indicates a
@@ -263,27 +259,32 @@ const aggRes = donorPrimary.getDB("config").runCommand({
     cursor: {},
 });
 
-// Verify that the aggregation command returned the expected number of oplog entries.
-assert.eq(aggRes.cursor.firstBatch.length, 2);
+    // Verify that the aggregation command returned the expected number of oplog entries.
+    assert.eq(aggRes.cursor.firstBatch.length, 2);
 
-// Verify that the oplog docs are sorted in ascending order of "ts".
-for (let i = 1; i < aggRes.cursor.firstBatch.length; i++) {
-    assert.lt(0, bsonWoCompare(aggRes.cursor.firstBatch[i].ts, aggRes.cursor.firstBatch[i - 1].ts));
+    // Verify that the oplog docs are sorted in ascending order of "ts".
+    for (let i = 1; i < aggRes.cursor.firstBatch.length; i++) {
+        assert.lt(
+            0, bsonWoCompare(aggRes.cursor.firstBatch[i].ts, aggRes.cursor.firstBatch[i - 1].ts));
+    }
+
+    const docs = aggRes.cursor.firstBatch;
+    // Verify the number of statement ids is correct.
+    assert.eq(docs[0].stmtId.length, 3);
+    assert.eq(docs[1].stmtId.length, 3);
+
+    // Verify that docs contain the right oplog entry.
+    getTagsFromOplog(docs[0]).forEach(tag => {
+        assert.eq(tag, insertTag);
+    });
+    getTagsFromOplog(docs[1]).forEach(tag => {
+        assert.eq(tag, updateTag);
+    });
+
+    donorRst.stopSet();
+    recipientRst.stopSet();
 }
 
-const docs = aggRes.cursor.firstBatch;
-// Verify the number of statement ids is correct.
-assert.eq(docs[0].stmtId.length, 3);
-assert.eq(docs[1].stmtId.length, 3);
-
-// Verify that docs contain the right oplog entry.
-getTagsFromOplog(docs[0]).forEach(tag => {
-    assert.eq(tag, insertTag);
-});
-getTagsFromOplog(docs[1]).forEach(tag => {
-    assert.eq(tag, updateTag);
-});
-
-donorRst.stopSet();
-recipientRst.stopSet();
+testOplogCloning(true);
+testOplogCloning(false);
 })();

@@ -1155,6 +1155,15 @@ Status performAtomicTimeseriesWrites(
         slot = oplogSlots.begin();
     }
 
+    auto participant = TransactionParticipant::get(opCtx);
+    // Since we are manually updating the "lastWriteOpTime" before committing, we'll also need to
+    // manually reset if the storage transaction is aborted.
+    if (slot && participant) {
+        opCtx->recoveryUnit()->onRollback([opCtx, &participant, &slot]() {
+            participant.setLastWriteOpTime(opCtx, repl::OpTime());
+        });
+    }
+
     std::vector<InsertStatement> inserts;
     inserts.reserve(insertOps.size());
 
@@ -1171,6 +1180,11 @@ Status performAtomicTimeseriesWrites(
         auto status = coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), &curOp->debug());
         if (!status.isOK()) {
             return status;
+        }
+        if (slot && participant) {
+            // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
+            // correctly chained to the previous operations.
+            participant.setLastWriteOpTime(opCtx, *(std::prev(*slot)));
         }
     }
 
@@ -1199,12 +1213,20 @@ Status performAtomicTimeseriesWrites(
         args.criteria = update.getQ();
         args.source = OperationSource::kTimeseries;
         if (slot) {
-            args.oplogSlot = *(*slot)++;
+            args.oplogSlot = **slot;
             fassert(5481600, opCtx->recoveryUnit()->setTimestamp(args.oplogSlot->getTimestamp()));
         }
 
         coll->updateDocument(
             opCtx, recordId, original, updated, indexesAffected, &curOp->debug(), &args);
+        if (slot) {
+            if (participant) {
+                // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is
+                // correctly chained to the previous operations.
+                participant.setLastWriteOpTime(opCtx, **slot);
+            }
+            ++(*slot);
+        }
     }
 
     if (MONGO_unlikely(failAtomicTimeseriesWrites.shouldFail())) {

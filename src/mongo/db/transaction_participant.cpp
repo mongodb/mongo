@@ -1524,6 +1524,14 @@ APIParameters TransactionParticipant::Participant::getAPIParameters(OperationCon
     return APIParameters::get(opCtx);
 }
 
+void TransactionParticipant::Participant::setLastWriteOpTime(OperationContext* opCtx,
+                                                             const repl::OpTime& lastWriteOpTime) {
+    stdx::lock_guard<Client> lg(*opCtx->getClient());
+    auto& curLastWriteOpTime = o(lg).lastWriteOpTime;
+    invariant(lastWriteOpTime.isNull() || lastWriteOpTime > curLastWriteOpTime);
+    curLastWriteOpTime = lastWriteOpTime;
+}
+
 bool TransactionParticipant::Observer::expiredAsOf(Date_t when) const {
     return o().txnState.isInProgress() && o().transactionExpireDate &&
         o().transactionExpireDate < when;

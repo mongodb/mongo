@@ -189,7 +189,7 @@ public:
         TxnResources(WithLock, OperationContext* opCtx, StashStyle stashStyle) noexcept;
         ~TxnResources();
 
-        // Rule of 5: because we have a class-defined destructor, we need to explictly specify
+        // Rule of 5: because we have a class-defined destructor, we need to explicitly specify
         // the move operator and move assignment operator.
         TxnResources(TxnResources&&) = default;
         TxnResources& operator=(TxnResources&&) = default;
@@ -614,6 +614,13 @@ public:
          * are not in a retryable write. Otherwise, returns the API parameters decorating the opCtx.
          */
         APIParameters getAPIParameters(OperationContext* opCtx) const;
+
+        /**
+         * Locks and sets "lastWriteOpTime". The function should only advance the "lastWriteOpTime"
+         * with the only exception of reseting it to null timestamp if the storage transaction is
+         * aborted.
+         */
+        void setLastWriteOpTime(OperationContext* opCtx, const repl::OpTime& lastWriteOpTime);
 
         //
         // Methods for use in C++ unit tests, only. Beware: these methods may not adhere to the
