@@ -114,6 +114,11 @@ add_option('ninja',
     help='Enable the build.ninja generator tool stable or canary version',
 )
 
+add_option('force-jobs',
+    help='Allow more jobs than available cpu\'s when icecream is not enabled.',
+    nargs=0
+)
+
 add_option('build-tools',
     choices=['stable', 'next'],
     default='stable',
@@ -4580,13 +4585,13 @@ if 'ICECC' in env and env['ICECC']:
 initial_num_jobs = env.GetOption('num_jobs')
 altered_num_jobs = initial_num_jobs + 1
 env.SetOption('num_jobs', altered_num_jobs)
+cpu_count = psutil.cpu_count()
 if env.GetOption('num_jobs') == altered_num_jobs:
     # psutil.cpu_count returns None when it can't determine the
     # number. This always fails on BSD's for example. If the user
     # didn't specify, and we can't determine for a parallel build, it
     # is better to make the user restart and be explicit, rather than
     # give them a very slow build.
-    cpu_count = psutil.cpu_count()
     if cpu_count is None:
         if get_option("ninja") != "disabled":
             env.FatalError("Cannot auto-determine the appropriate size for the Ninja local_job pool. Please regenerate with an explicit -j argument to SCons")
@@ -4604,6 +4609,22 @@ if env.GetOption('num_jobs') == altered_num_jobs:
         # Ninja, in which case num_jobs controls the size of the local
         # pool. Scale that up to the number of local CPUs.
         env.SetOption('num_jobs', cpu_count)
+else:
+    if (not has_option('force-jobs')
+        and ('ICECC' not in env or not env['ICECC'])
+        and env.GetOption('num_jobs') > cpu_count):
+
+        env.FatalError("ERROR: Icecream not enabled while using -j higher than available cpu's. " +
+            "Use --force-jobs to override.")
+
+if (get_option('ninja') != "disabled"
+    and ('ICECC' not in env or not env['ICECC'])
+    and not has_option('force-jobs')):
+
+    print(f"WARNING: Icecream not enabled - Ninja concurrency will be capped at {cpu_count} jobs " +
+        "without regard to the -j value passed to it. " +
+        "Generate your ninja file with --force-jobs to disable this behavior.")
+    env['NINJA_MAX_JOBS'] = cpu_count
 
 if get_option('ninja') != 'disabled':
 
