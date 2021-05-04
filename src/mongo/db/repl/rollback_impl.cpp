@@ -347,7 +347,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     invariant(opCtx);
 
     // Aborts all active, two-phase index builds.
-    MONGO_COMPILER_VARIABLE_UNUSED auto stoppedIndexBuilds =
+    [[maybe_unused]] auto stoppedIndexBuilds =
         IndexBuildsCoordinator::get(opCtx)->stopIndexBuildsForRollback(opCtx);
 
     // Get a list of all databases.

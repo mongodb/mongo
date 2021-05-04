@@ -1400,7 +1400,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         try {
             // This spawns a new thread and returns immediately. These index builds will resume and
             // wait for a commit or abort to be replicated.
-            MONGO_COMPILER_VARIABLE_UNUSED auto fut = uassertStatusOK(resumeIndexBuild(
+            [[maybe_unused]] auto fut = uassertStatusOK(resumeIndexBuild(
                 opCtx, nss->db().toString(), collUUID, indexSpecs, buildUUID, resumeInfo));
             successfullyResumed.insert(buildUUID);
         } catch (const DBException& e) {
@@ -1462,14 +1462,13 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         indexBuildOptions.applicationMode = ApplicationMode::kStartupRepair;
         // This spawns a new thread and returns immediately. These index builds will start and wait
         // for a commit or abort to be replicated.
-        MONGO_COMPILER_VARIABLE_UNUSED auto fut =
-            uassertStatusOK(startIndexBuild(opCtx,
-                                            nss->db().toString(),
-                                            build.collUUID,
-                                            build.indexSpecs,
-                                            buildUUID,
-                                            IndexBuildProtocol::kTwoPhase,
-                                            indexBuildOptions));
+        [[maybe_unused]] auto fut = uassertStatusOK(startIndexBuild(opCtx,
+                                                                    nss->db().toString(),
+                                                                    build.collUUID,
+                                                                    build.indexSpecs,
+                                                                    buildUUID,
+                                                                    IndexBuildProtocol::kTwoPhase,
+                                                                    indexBuildOptions));
     }
 }
 

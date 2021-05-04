@@ -2277,14 +2277,14 @@ Document::Document(const BSONObj& value, InPlaceMode inPlaceMode)
 
 void Document::reset() {
     _impl->reset(Document::kInPlaceDisabled);
-    MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement();
+    [[maybe_unused]] const Element newRoot = makeRootElement();
     dassert(newRoot._repIdx == _root._repIdx);
     dassert(_root._repIdx == kRootRepIdx);
 }
 
 void Document::reset(const BSONObj& value, InPlaceMode inPlaceMode) {
     _impl->reset(inPlaceMode);
-    MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement(value);
+    [[maybe_unused]] const Element newRoot = makeRootElement(value);
     dassert(newRoot._repIdx == _root._repIdx);
     dassert(_root._repIdx == kRootRepIdx);
 }

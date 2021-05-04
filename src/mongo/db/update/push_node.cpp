@@ -270,7 +270,7 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
     // TODO: The use of std::accumulate here is maybe questionable
     // given that we are ignoring the return value. MSVC flagged this,
     // and we worked around by tagging the result as unused.
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored =
+    [[maybe_unused]] auto ignored =
         std::accumulate(std::next(valuesToPush.begin()),
                         valuesToPush.end(),
                         firstElementToInsert,

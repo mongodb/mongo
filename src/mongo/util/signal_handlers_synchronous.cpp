@@ -268,7 +268,7 @@ extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
 
 extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
     // For convenient debugger access.
-    MONGO_COMPILER_VARIABLE_UNUSED auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
+    [[maybe_unused]] auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
 
     MallocFreeOStreamGuard lk{};
 

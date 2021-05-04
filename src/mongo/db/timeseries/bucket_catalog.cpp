@@ -1237,7 +1237,7 @@ BSONObj BucketCatalog::MinMax::minUpdates() {
 
     BSONObjBuilder builder;
     // Return constructed document even if empty.
-    MONGO_COMPILER_VARIABLE_UNUSED auto appended = _appendUpdates(&builder, GetMin());
+    [[maybe_unused]] auto appended = _appendUpdates(&builder, GetMin());
     return builder.obj();
 }
 
@@ -1246,7 +1246,7 @@ BSONObj BucketCatalog::MinMax::maxUpdates() {
 
     BSONObjBuilder builder;
     // Return constructed document even if empty.
-    MONGO_COMPILER_VARIABLE_UNUSED auto appended = _appendUpdates(&builder, GetMax());
+    [[maybe_unused]] auto appended = _appendUpdates(&builder, GetMax());
     return builder.obj();
 }
 

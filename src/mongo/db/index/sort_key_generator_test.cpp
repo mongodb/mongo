@@ -347,7 +347,7 @@ DEATH_TEST_REGEX_F(SortKeyGeneratorWorkingSetTest,
     auto sortKeyGen = makeSortKeyGen(pattern, nullptr);
     setRecordIdAndIdx(BSON("a" << 1 << "b" << 1), BSON("" << 2 << "" << 3));
     member().metadata().setTextScore(9.9);
-    MONGO_COMPILER_VARIABLE_UNUSED auto ignored = sortKeyGen->computeSortKey(member());
+    [[maybe_unused]] auto ignored = sortKeyGen->computeSortKey(member());
 }
 
 }  // namespace
