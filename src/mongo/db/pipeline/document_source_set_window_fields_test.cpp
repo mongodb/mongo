@@ -134,5 +134,83 @@ TEST_F(DocumentSourceSetWindowFieldsTest, HandlesEmptyInputCorrectly) {
               (int)parsedStage->getNext().getStatus());
 }
 
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesDependencyWithArrayExpression) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$a', sortBy: {b: 1}, output: {myCov:
+        {$covariancePop: ['$c', '$d']}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_EQUALS(parsedStage->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQUALS(deps.fields.size(), 4U);
+    ASSERT_EQUALS(deps.fields.count("a"), 1U);
+    ASSERT_EQUALS(deps.fields.count("b"), 1U);
+    ASSERT_EQUALS(deps.fields.count("c"), 1U);
+    ASSERT_EQUALS(deps.fields.count("d"), 1U);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesDependencyWithNoSort) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {partitionBy: '$a', output: {myAvg:
+        {$avg: '$c'}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_EQUALS(parsedStage->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQUALS(deps.fields.size(), 2U);
+    ASSERT_EQUALS(deps.fields.count("a"), 1U);
+    ASSERT_EQUALS(deps.fields.count("c"), 1U);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesDependencyWithNoPartitionBy) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {output: {myAvg:
+        {$avg: '$c'}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_EQUALS(parsedStage->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQUALS(deps.fields.size(), 1U);
+    ASSERT_EQUALS(deps.fields.count("c"), 1U);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesDependencyWithNoInputDependency) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {output: {myCount:
+        {$sum: 1}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_EQUALS(parsedStage->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQUALS(deps.fields.size(), 0U);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, HandlesImplicitDependencyForDottedOutputField) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {output: {'x.y.z':
+        {$sum: 1}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    DepsTracker deps(DepsTracker::kAllMetadata);
+    ASSERT_EQUALS(parsedStage->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQUALS(deps.fields.size(), 2U);
+    ASSERT_EQUALS(deps.fields.count("x"), 1U);
+    ASSERT_EQUALS(deps.fields.count("x.y"), 1U);
+    ASSERT_EQUALS(deps.fields.count("x.y.z"), 0U);
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, ReportsModifiedFields) {
+    auto spec = fromjson(R"(
+        {$_internalSetWindowFields: {output: {a:
+        {$sum: 1}, b: {$sum: 1}}}})");
+    auto parsedStage =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    auto modified = parsedStage->getModifiedPaths();
+    ASSERT_TRUE(modified.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
+    ASSERT_EQUALS(modified.paths.size(), 2U);
+    ASSERT_EQUALS(modified.paths.count("a"), 1U);
+    ASSERT_EQUALS(modified.paths.count("b"), 1U);
+    ASSERT_TRUE(modified.renames.empty());
+}
 }  // namespace
 }  // namespace mongo

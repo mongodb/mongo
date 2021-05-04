@@ -86,6 +86,8 @@ public:
         return _sortPattern.empty();
     }
 
+    void addDependencies(DepsTracker* deps) const;
+
     /**
      * Singleton sort patterns are a special case. In memory, sort keys for singleton patterns get
      * stored as a single Value, corresponding to the single component of the sort pattern. By

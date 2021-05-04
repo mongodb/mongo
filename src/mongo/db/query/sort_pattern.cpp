@@ -132,4 +132,14 @@ Document SortPattern::serialize(SortKeySerialization serializationMode) const {
     }
     return keyObj.freeze();
 }
+
+void SortPattern::addDependencies(DepsTracker* deps) const {
+    for (auto&& keyPart : _sortPattern) {
+        if (keyPart.expression) {
+            keyPart.expression->addDependencies(deps);
+        } else {
+            deps->fields.insert(keyPart.fieldPath->fullPath());
+        }
+    }
+}
 }  // namespace mongo

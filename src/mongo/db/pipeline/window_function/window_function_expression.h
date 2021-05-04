@@ -143,6 +143,12 @@ public:
 
     virtual std::unique_ptr<WindowFunctionState> buildRemovable() const = 0;
 
+    void addDependencies(DepsTracker* deps) const {
+        if (_input) {
+            _input->addDependencies(deps);
+        }
+    };
+
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
         MutableDocument args;
 

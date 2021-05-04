@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_bounds.h"
@@ -54,6 +55,21 @@ struct WindowFunctionStatement {
     static WindowFunctionStatement parse(BSONElement elem,
                                          const boost::optional<SortPattern>& sortBy,
                                          ExpressionContext* expCtx);
+
+    void addDependencies(DepsTracker* deps) const {
+        if (expr) {
+            expr->addDependencies(deps);
+        }
+
+        const FieldPath path(fieldName);
+
+        // We do this because acting on "a.b" where a is an object also depends on "a" not being
+        // changed (e.g. to a non-object).
+        for (size_t i = 0; i < path.getPathLength() - 1; i++) {
+            deps->fields.insert(path.getSubpath(i).toString());
+        }
+    }
+
     void serialize(MutableDocument& outputFields,
                    boost::optional<ExplainOptions::Verbosity> explain) const;
 };
@@ -99,20 +115,47 @@ public:
           _iterator(expCtx.get(), pSource, std::move(partitionBy), _sortBy),
           _memoryTracker{false /* allowDiskUse */, maxMemoryBytes} {};
 
+    GetModPathsReturn getModifiedPaths() const final {
+        std::set<std::string> outputPaths;
+        for (auto&& outputField : _outputFields) {
+            outputPaths.insert(outputField.fieldName);
+        }
+
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(outputPaths), {}};
+    }
+
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        return StageConstraints(StreamType::kBlocking,
-                                PositionRequirement::kNone,
-                                HostTypeRequirement::kNone,
-                                DiskUseRequirement::kNoDiskUse,
-                                FacetRequirement::kAllowed,
-                                TransactionRequirement::kAllowed,
-                                LookupRequirement::kAllowed,
-                                UnionRequirement::kAllowed);
+        StageConstraints constraints(StreamType::kBlocking,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kNone,
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed,
+                                     LookupRequirement::kAllowed,
+                                     UnionRequirement::kAllowed);
+        return constraints;
     }
 
     const char* getSourceName() const {
         return kStageName.rawData();
     };
+
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        if (_sortBy) {
+            _sortBy->addDependencies(deps);
+        }
+
+        if (_partitionBy && (*_partitionBy)) {
+            (*_partitionBy)->addDependencies(deps);
+        }
+
+        for (auto&& outputField : _outputFields) {
+            outputField.addDependencies(deps);
+        }
+
+        return DepsTracker::State::SEE_NEXT;
+    }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() {
         // Force to run on the merging half for now.

@@ -172,13 +172,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
 }
 
 DepsTracker::State DocumentSourceSort::getDependencies(DepsTracker* deps) const {
-    for (auto&& keyPart : _sortExecutor->sortPattern()) {
-        if (keyPart.expression) {
-            keyPart.expression->addDependencies(deps);
-        } else {
-            deps->fields.insert(keyPart.fieldPath->fullPath());
-        }
-    }
+    _sortExecutor->sortPattern().addDependencies(deps);
+
     if (pExpCtx->needsMerge) {
         // Include the sort key if we will merge several sorted streams later.
         deps->setNeedsMetadata(DocumentMetadataFields::kSortKey, true);
