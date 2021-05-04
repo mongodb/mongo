@@ -211,6 +211,9 @@ selector:
   - jstests/core/json_schema/misc_validation.js
   - jstests/core/views/views_all_commands.js
 
+  # dropDatabase is not resilient to stepdowns on sharded cluster
+  - jstests/core/validate_db_metadata_command.js
+
   # Committing a transaction when the server is fsync locked fails.
   - jstests/core/fsync.js
 
