@@ -3152,4 +3152,18 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
         BSON("ignoredField" << expression->serialize(false)));
 }
 
+TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {
+    auto expCtx = ExpressionContextForTest{};
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"input\": {a: 1}, \"value\": 24}}");
+    auto expression = ExpressionSetField::parse(&expCtx, expr.firstElement(), vps);
+    ASSERT_BSONOBJ_EQ(
+        BSON("ignoredField" << BSON("$setField"
+                                    << BSON("field" << BSON("$const"
+                                                            << "foo")
+                                                    << "input" << BSON("a" << BSON("$const" << 1))
+                                                    << "value" << BSON("$const" << 24)))),
+        BSON("ignoredField" << expression->serialize(false)));
+}
+
 }  // namespace ExpressionTests

@@ -3543,4 +3543,47 @@ private:
     boost::intrusive_ptr<Expression>& _field;
     boost::intrusive_ptr<Expression>& _input;
 };
+
+class ExpressionSetField final : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement exprElement,
+                                                  const VariablesParseState& vps);
+
+    /**
+     * Constructs a $setField expression where 'field' is a constant string, 'input' is an
+     * expression resolving to an object Value (or null), and 'value' is any expression.
+     */
+    ExpressionSetField(ExpressionContext* const expCtx,
+                       boost::intrusive_ptr<Expression> field,
+                       boost::intrusive_ptr<Expression> input,
+                       boost::intrusive_ptr<Expression> value)
+        : Expression(expCtx, {std::move(field), std::move(input), std::move(value)}),
+          _field(_children[0]),
+          _input(_children[1]),
+          _value(_children[2]) {
+        expCtx->sbeCompatible = false;
+    }
+
+    Value serialize(const bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    boost::intrusive_ptr<Expression> optimize() final;
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    static constexpr auto kExpressionName = "$setField"_sd;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final override;
+
+private:
+    boost::intrusive_ptr<Expression>& _field;
+    boost::intrusive_ptr<Expression>& _input;
+    boost::intrusive_ptr<Expression>& _value;
+};
+
 }  // namespace mongo

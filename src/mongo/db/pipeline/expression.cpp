@@ -7328,6 +7328,122 @@ Value ExpressionGetField::serialize(const bool explain) const {
                                     {"input"_sd, _input->serialize(explain)}}}});
 }
 
+/* -------------------------- ExpressionSetField ------------------------------ */
+REGISTER_FEATURE_FLAG_GUARDED_EXPRESSION(setField,
+                                         ExpressionSetField::parse,
+                                         feature_flags::gFeatureFlagDotsAndDollars);
+
+intrusive_ptr<Expression> ExpressionSetField::parse(ExpressionContext* const expCtx,
+                                                    BSONElement expr,
+                                                    const VariablesParseState& vps) {
+    uassert(4161100,
+            "$setField only supports an object as its argument",
+            expr.type() == BSONType::Object);
+
+    boost::intrusive_ptr<Expression> fieldExpr;
+    boost::intrusive_ptr<Expression> inputExpr;
+    boost::intrusive_ptr<Expression> valueExpr;
+
+    for (auto&& elem : expr.embeddedObject()) {
+        const auto fieldName = elem.fieldNameStringData();
+        if (fieldName == "field"_sd) {
+            fieldExpr = Expression::parseOperand(expCtx, elem, vps);
+        } else if (fieldName == "input"_sd) {
+            inputExpr = Expression::parseOperand(expCtx, elem, vps);
+        } else if (fieldName == "value"_sd) {
+            valueExpr = Expression::parseOperand(expCtx, elem, vps);
+        } else {
+            uasserted(4161101,
+                      str::stream()
+                          << kExpressionName << " found an unknown argument: " << fieldName);
+        }
+    }
+
+    if (!inputExpr) {
+        inputExpr = ExpressionFieldPath::parse(expCtx, "$$CURRENT", vps);
+    }
+
+    uassert(4161102,
+            str::stream() << kExpressionName << " requires 'field' to be specified",
+            fieldExpr);
+    uassert(4161103,
+            str::stream() << kExpressionName << " requires 'value' to be specified",
+            valueExpr);
+
+    // The 'field' argument to '$setField' must evaluate to a constant string, for example,
+    // {$const: "$a.b"}. In case the user has forgotten to wrap the value into a '$const' or
+    // '$literal' expression, we will raise an error with a more meaningful description.
+    if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(fieldExpr.get()); fieldPathExpr) {
+        auto fp = fieldPathExpr->getFieldPath().fullPathWithPrefix();
+        uasserted(4161108,
+                  str::stream() << "'" << fp
+                                << "' is a field path reference which is not allowed "
+                                   "in this context. Did you mean {$literal: '"
+                                << fp << "'}?");
+    }
+
+    auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
+    uassert(4161106,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to a constant, "
+                             "but got a non-constant argument",
+            constFieldExpr);
+    uassert(4161107,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to type String, "
+                             "but got "
+                          << typeName(constFieldExpr->getValue().getType()),
+            constFieldExpr->getValue().getType() == BSONType::String);
+
+
+    return make_intrusive<ExpressionSetField>(expCtx, fieldExpr, inputExpr, valueExpr);
+}
+
+Value ExpressionSetField::evaluate(const Document& root, Variables* variables) const {
+    auto field = _field->evaluate(root, variables);
+
+    // The parser guarantees that the '_field' expression evaluates to a constant string.
+    tassert(4161104,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to type String, "
+                             "but got "
+                          << typeName(field.getType()),
+            field.getType() == BSONType::String);
+
+    auto input = _input->evaluate(root, variables);
+    if (input.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(4161105,
+            str::stream() << kExpressionName << " requires 'input' to evaluate to type Object",
+            input.getType() == BSONType::Object);
+
+    auto value = _value->evaluate(root, variables);
+
+    // Build output document and modify 'field'.
+    MutableDocument outputDoc(input.getDocument());
+    outputDoc.setField(field.getString(), value);
+    return outputDoc.freezeToValue();
+}
+
+intrusive_ptr<Expression> ExpressionSetField::optimize() {
+    return intrusive_ptr<Expression>(this);
+}
+
+void ExpressionSetField::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+    _field->addDependencies(deps);
+    _value->addDependencies(deps);
+}
+
+Value ExpressionSetField::serialize(const bool explain) const {
+    return Value(Document{{"$setField"_sd,
+                           Document{{"field"_sd, _field->serialize(explain)},
+                                    {"input"_sd, _input->serialize(explain)},
+                                    {"value"_sd, _value->serialize(explain)}}}});
+}
+
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
     // defined by REGISTER_EXPRESSION / REGISTER_EXPRESSION_WITH_MIN_VERSION.

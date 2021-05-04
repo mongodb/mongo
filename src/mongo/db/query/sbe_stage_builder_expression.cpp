@@ -474,6 +474,7 @@ public:
     void visit(ExpressionDateAdd* expr) final {}
     void visit(ExpressionDateSubtract* expr) final {}
     void visit(ExpressionGetField* expr) final {}
+    void visit(ExpressionSetField* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -674,6 +675,7 @@ public:
     void visit(ExpressionDateAdd* expr) final {}
     void visit(ExpressionDateSubtract* expr) final {}
     void visit(ExpressionGetField* expr) final {}
+    void visit(ExpressionSetField* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -2666,6 +2668,10 @@ public:
 
     void visit(ExpressionGetField* expr) final {
         unsupportedExpression("$getField");
+    }
+
+    void visit(ExpressionSetField* expr) final {
+        unsupportedExpression("$setField");
     }
 
 private:
