@@ -1353,7 +1353,7 @@ __txn_mod_compare(const void *a, const void *b)
      */
     if (aopt->type == WT_TXN_OP_BASIC_ROW || aopt->type == WT_TXN_OP_INMEM_ROW)
         return (aopt->btree->collator == NULL ?
-            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key) :
+            __wt_lex_compare(&aopt->u.op_row.key, &bopt->u.op_row.key, false) :
             0);
     return (aopt->u.op_col.recno < bopt->u.op_col.recno);
 }

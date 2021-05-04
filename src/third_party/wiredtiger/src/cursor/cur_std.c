@@ -855,7 +855,8 @@ __wt_cursor_cache_get(WT_SESSION_IMPL *session, const char *uri, uint64_t hash_v
              * For these configuration values, there is no difference in the resulting cursor other
              * than flag values, so fix them up according to the given configuration.
              */
-            F_CLR(cursor, WT_CURSTD_APPEND | WT_CURSTD_RAW | WT_CURSTD_OVERWRITE);
+            F_CLR(cursor,
+              WT_CURSTD_APPEND | WT_CURSTD_PREFIX_SEARCH | WT_CURSTD_RAW | WT_CURSTD_OVERWRITE);
             F_SET(cursor, overwrite_flag);
             /*
              * If this is a btree cursor, clear its read_once flag.
@@ -1056,6 +1057,22 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
             F_SET(cursor, WT_CURSTD_OVERWRITE);
         else
             F_CLR(cursor, WT_CURSTD_OVERWRITE);
+    } else
+        WT_ERR_NOTFOUND_OK(ret, false);
+
+    /* Set the prefix search near flag. */
+    if ((ret = __wt_config_getones(session, config, "prefix_key", &cval)) == 0) {
+        if (cval.val) {
+            /* Prefix search near configuration can only be used for row-store. */
+            if (WT_CURSOR_RECNO(cursor))
+                WT_ERR_MSG(
+                  session, EINVAL, "cannot use prefix key search near for column store formats");
+            if (CUR2BT(cursor)->collator != NULL)
+                WT_ERR_MSG(
+                  session, EINVAL, "cannot use prefix key search near with a custom collator");
+            F_SET(cursor, WT_CURSTD_PREFIX_SEARCH);
+        } else
+            F_CLR(cursor, WT_CURSTD_PREFIX_SEARCH);
     } else
         WT_ERR_NOTFOUND_OK(ret, false);
 

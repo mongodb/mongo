@@ -305,7 +305,8 @@ restart_read:
  *     Move to the next row-store item.
  */
 static inline int
-__cursor_row_next(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_row_next(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, WT_ITEM *prefix)
 {
     WT_CELL_UNPACK_KV kpack;
     WT_INSERT *ins;
@@ -402,6 +403,17 @@ restart_read_insert:
 restart_read_page:
         rip = &page->pg_row[cbt->slot];
         WT_RET(__cursor_row_slot_key_return(cbt, rip, &kpack, &kpack_used));
+        /*
+         * If the cursor has prefix search configured we can early exit here if the key that we are
+         * visiting is after our prefix.
+         */
+        if (F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH) && prefix != NULL &&
+          __wt_prefix_match(prefix, &cbt->iface.key) < 0) {
+            /* It is not okay for the user to have a custom collator. */
+            WT_ASSERT(session, CUR2BT(cbt)->collator == NULL);
+            WT_STAT_CONN_DATA_INCR(session, cursor_search_near_prefix_fast_paths);
+            return (WT_NOTFOUND);
+        }
         WT_RET(__wt_txn_read(
           session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip), NULL));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
@@ -622,11 +634,12 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __wt_btcur_next --
- *     Move to the next record in the tree.
+ * __wt_btcur_next_prefix --
+ *     Move to the next record in the tree. Taking an optional prefix item for a special case of
+ *     search near.
  */
 int
-__wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
+__wt_btcur_next_prefix(WT_CURSOR_BTREE *cbt, WT_ITEM *prefix, bool truncating)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -692,8 +705,14 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
                 total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
-                ret = __cursor_row_next(cbt, newpage, restart, &skipped);
+                ret = __cursor_row_next(cbt, newpage, restart, &skipped, prefix);
                 total_skipped += skipped;
+                /*
+                 * We can directly return WT_NOTFOUND here as the caller expects the cursor to be
+                 * positioned when traversing keys for prefix search near.
+                 */
+                if (ret == WT_NOTFOUND && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH))
+                    return (WT_NOTFOUND);
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, page->type));
@@ -773,4 +792,14 @@ err:
     }
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_PREV);
     return (ret);
+}
+
+/*
+ * __wt_btcur_next --
+ *     Move to the next record in the tree.
+ */
+int
+__wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
+{
+    return (__wt_btcur_next_prefix(cbt, NULL, truncating));
 }

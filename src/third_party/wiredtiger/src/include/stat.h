@@ -742,6 +742,7 @@ struct __wt_connection_stats {
     int64_t cursor_next_skip_total;
     int64_t cursor_prev_skip_total;
     int64_t cursor_skip_hs_cur_position;
+    int64_t cursor_search_near_prefix_fast_paths;
     int64_t cursor_next_hs_tombstone;
     int64_t cursor_next_skip_ge_100;
     int64_t cursor_next_skip_lt_100;
@@ -960,6 +961,7 @@ struct __wt_dsrc_stats {
     int64_t cursor_next_skip_total;
     int64_t cursor_prev_skip_total;
     int64_t cursor_skip_hs_cur_position;
+    int64_t cursor_search_near_prefix_fast_paths;
     int64_t cursor_next_hs_tombstone;
     int64_t cursor_next_skip_ge_100;
     int64_t cursor_next_skip_lt_100;
