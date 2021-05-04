@@ -294,6 +294,22 @@ execute commands.
 [Here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session_impl.cpp#L126)
 is the authorization session calling into the authorization manager to acquire a user.
 
+Clients are expected to authenticate at most one time on a connection, and a
+client which opts into API Version 1 will receive an error if it attempts to
+authenticate more than once.  However, legacy clients which have not opted into
+an API Version may authenticate multiple times.  If a legacy client
+authenticates as UserA on a database and then authenticates as UserB on the
+same database, its AuthorizationSession will implicitly logout UserA and
+replace its cached User object with that of UserB. Alternatively, if a legacy
+client authenticates as UserA on one database and then authenticates as UserB
+on a second database, its AuthorizationSession will store User objects for both
+UserA and UserB, and will consider itself authorized for the union of the two
+users' privileges.  Because modern drivers no longer allow applications to
+authenticate with multiple user identities, this behavior in
+AuthorizationSession is deprecated, and support for it will eventually be
+removed.
+
+
 ### User
 
 `User` objects contain authorization information with regards to a specific user in a database. The
