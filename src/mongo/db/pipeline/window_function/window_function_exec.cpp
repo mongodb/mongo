@@ -145,17 +145,19 @@ std::unique_ptr<WindowFunctionExec> WindowFunctionExec::create(
                         part.fieldPath != boost::none && !part.expression);
                 auto sortByExpr = ExpressionFieldPath::createPathFromString(
                     expCtx, part.fieldPath->fullPath(), expCtx->variablesParseState);
+
+                auto inputExpr = translateInputExpression(functionStmt.expr, sortBy);
                 if (stdx::holds_alternative<WindowBounds::Unbounded>(rangeBounds.lower)) {
                     return std::make_unique<WindowFunctionExecNonRemovableRange>(
                         iter,
-                        functionStmt.expr->input(),
+                        inputExpr,
                         std::move(sortByExpr),
                         functionStmt.expr->buildAccumulatorOnly(),
                         bounds);
                 } else {
                     return std::make_unique<WindowFunctionExecRemovableRange>(
                         iter,
-                        functionStmt.expr->input(),
+                        inputExpr,
                         std::move(sortByExpr),
                         functionStmt.expr->buildRemovable(),
                         bounds);

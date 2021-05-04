@@ -177,7 +177,8 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              5423902);
 
-// Test various type of window. Only test the stability not testing the actual result.
+// Test various type of document-based window. Only test the stability not testing the actual
+// result.
 coll.drop();
 assert.commandWorked(coll.insert([
     {x: 0, y: 0},
@@ -201,4 +202,62 @@ documentBounds.forEach(function(bounds) {
     }));
     assert.eq(res.cursor.firstBatch.length, 3);
 });
+
+//
+// Testing range-based $integral.
+//
+coll.drop();
+assert.commandWorked(coll.insert([
+    {time: ISODate("2020-01-01T00:00:00.000Z"), y: 0.0, integral: 0.002},
+    {time: ISODate("2020-01-01T00:00:04.000Z"), y: 2.4, integral: 0.008},
+    {time: ISODate("2020-01-01T00:00:10.000Z"), y: 5.6, integral: 0.016},
+    {time: ISODate("2020-01-01T00:00:18.000Z"), y: 6.8, integral: 0.010},
+]));
+
+function runRangeBasedIntegral(bounds) {
+    return coll
+        .aggregate([
+            {
+                $setWindowFields: {
+                    sortBy: {time: 1},
+                    output: {
+                        integral: {
+                            $integral: {input: "$y", outputUnit: "second"},
+                            window: {range: bounds, unit: "second"}
+                        },
+                    }
+                }
+            },
+            {$unset: "_id"},
+        ])
+        .toArray();
+}
+
+// Empty window.
+assert.sameMembers(runRangeBasedIntegral([-1, -1]), [
+    {time: ISODate("2020-01-01T00:00:00.000Z"), y: 0.0, integral: null},
+    {time: ISODate("2020-01-01T00:00:04.000Z"), y: 2.4, integral: null},
+    {time: ISODate("2020-01-01T00:00:10.000Z"), y: 5.6, integral: null},
+    {time: ISODate("2020-01-01T00:00:18.000Z"), y: 6.8, integral: null},
+]);
+
+// Window contains only one doc.
+assert.sameMembers(runRangeBasedIntegral([-2, 0]), [
+    {time: ISODate("2020-01-01T00:00:00.000Z"), y: 0.0, integral: 0},
+    {time: ISODate("2020-01-01T00:00:04.000Z"), y: 2.4, integral: 0},
+    {time: ISODate("2020-01-01T00:00:10.000Z"), y: 5.6, integral: 0},
+    {time: ISODate("2020-01-01T00:00:18.000Z"), y: 6.8, integral: 0},
+]);
+
+// Window contains multiple docs.
+assert.sameMembers(runRangeBasedIntegral([-6, 6]), [
+    // doc[0] and doc[1] are in the window.
+    {time: ISODate("2020-01-01T00:00:00.000Z"), y: 0.0, integral: 4.8},
+    // doc[0], doc[1] and doc[2] are in the window.
+    {time: ISODate("2020-01-01T00:00:04.000Z"), y: 2.4, integral: 28.8},
+    // doc[1] and doc[2] are in the window.
+    {time: ISODate("2020-01-01T00:00:10.000Z"), y: 5.6, integral: 24.0},
+    // Empty window.
+    {time: ISODate("2020-01-01T00:00:18.000Z"), y: 6.8, integral: 0.0},
+]);
 })();
