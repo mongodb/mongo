@@ -29,7 +29,7 @@
 import fnmatch, os, shutil, time
 from helper import simulate_crash_restart
 from test_rollback_to_stable01 import test_rollback_to_stable_base
-from wiredtiger import stat
+from wiredtiger import stat, WT_NOTFOUND
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
@@ -102,9 +102,16 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        evict_cursor.search()
+        self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
+        self.session.commit_transaction()
+
+        # Search to make sure the data is not visible
+        self.session.begin_transaction("ignore_prepare = true")
+        cursor2 = self.session.open_cursor(uri)
+        cursor2.set_key(1)
+        self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
 
         # Pin stable timestamp to 20.
@@ -175,9 +182,16 @@ class test_rollback_to_stable19(test_rollback_to_stable_base):
         # Search for the key so we position our cursor on the page that we want to evict.
         self.session.begin_transaction("ignore_prepare = true")
         evict_cursor.set_key(1)
-        evict_cursor.search()
+        self.assertEquals(evict_cursor.search(), WT_NOTFOUND)
         evict_cursor.reset()
         evict_cursor.close()
+        self.session.commit_transaction()
+
+        # Search to make sure the data is not visible
+        self.session.begin_transaction("ignore_prepare = true")
+        cursor2 = self.session.open_cursor(uri)
+        cursor2.set_key(1)
+        self.assertEquals(cursor2.search(), WT_NOTFOUND)
         self.session.commit_transaction()
 
         # Pin stable timestamp to 40.
