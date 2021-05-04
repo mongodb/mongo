@@ -205,13 +205,14 @@ __create_file(
     }
 
     /*
-     * If creating an ordinary file, append the file ID and current version numbers to the passed-in
-     * configuration and insert the resulting configuration into the metadata.
+     * If creating an ordinary file, update the file ID and current version numbers and strip the
+     * incremental backup information and checkpoint LSN from the extracted metadata.
      */
     if (!is_metadata) {
         if (!import_repair) {
             WT_ERR(__wt_scr_alloc(session, 0, &val));
-            WT_ERR(__wt_buf_fmt(session, val, "id=%" PRIu32 ",version=(major=%d,minor=%d)",
+            WT_ERR(__wt_buf_fmt(session, val,
+              "id=%" PRIu32 ",version=(major=%d,minor=%d),checkpoint_backup_info=,checkpoint_lsn=",
               ++S2C(session)->next_file_id, WT_BTREE_MAJOR_VERSION_MAX,
               WT_BTREE_MINOR_VERSION_MAX));
             for (p = filecfg; *p != NULL; ++p)
