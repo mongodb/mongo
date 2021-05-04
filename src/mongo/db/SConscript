@@ -802,6 +802,7 @@ env.Library(
         "$BUILD_DIR/mongo/s/grid",
     ],
     LIBDEPS_PRIVATE=[
+        'repl/repl_server_parameters',
         'transaction',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",

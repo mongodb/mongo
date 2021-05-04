@@ -52,6 +52,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -200,20 +201,20 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& 
  */
 OpTimeBundle replLogDelete(OperationContext* opCtx,
                            const NamespaceString& nss,
+                           MutableOplogEntry* oplogEntry,
                            OptionalCollectionUUID uuid,
                            StmtId stmtId,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
+    oplogEntry->setNss(nss);
+    oplogEntry->setUuid(uuid);
 
     repl::OplogLink oplogLink;
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, stmtId);
 
     OpTimeBundle opTimes;
     if (deletedDoc) {
-        MutableOplogEntry noopEntry = oplogEntry;
+        MutableOplogEntry noopEntry = *oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(*deletedDoc);
         auto noteOplog = logOperation(opCtx, &noopEntry);
@@ -221,13 +222,13 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         oplogLink.preImageOpTime = noteOplog;
     }
 
-    oplogEntry.setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry.setObject(documentKeyDecoration(opCtx));
-    oplogEntry.setFromMigrateIfTrue(fromMigrate);
+    oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
+    oplogEntry->setObject(documentKeyDecoration(opCtx));
+    oplogEntry->setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
-    opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
-    opTimes.wallClockTime = oplogEntry.getWallClockTime();
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, stmtId);
+    opTimes.writeOpTime = logOperation(opCtx, oplogEntry);
+    opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
 
@@ -506,7 +507,18 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
+        MutableOplogEntry oplogEntry;
+        if (opCtx->getTxnNumber() && repl::gStoreFindAndModifyImagesInSideCollection.load()) {
+            if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
+            } else if (args.updateArgs.storeDocOption ==
+                       CollectionUpdateArgs::StoreDocOption::PostImage) {
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPostImage});
+            }
+        }
+
         opTime = replLogUpdate(opCtx, args);
+
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
@@ -555,8 +567,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
-                              bool fromMigrate,
-                              const boost::optional<BSONObj>& deletedDoc) {
+                              const OplogDeleteEntryArgs& args) {
     auto& documentKey = documentKeyDecoration(opCtx);
     invariant(!documentKey.isEmpty());
 
@@ -567,13 +578,24 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     OpTimeBundle opTime;
     if (inMultiDocumentTransaction) {
         auto operation = MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey);
-        if (deletedDoc) {
-            operation.setPreImage(deletedDoc->getOwned());
+        if (args.deletedDoc) {
+            operation.setPreImage(args.deletedDoc->getOwned());
         }
 
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+        MutableOplogEntry oplogEntry;
+        if (args.deletedDoc) {
+            if (repl::gStoreFindAndModifyImagesInSideCollection.load()) {
+                invariant(opCtx->getTxnNumber());
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
+            }
+        }
+
+        boost::optional<BSONObj> deletedDoc =
+            args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
+        opTime = replLogDelete(opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDoc);
+
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
@@ -581,7 +603,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!fromMigrate) {
+        if (!args.fromMigrate) {
             shardObserveDeleteOp(opCtx,
                                  nss,
                                  documentKey,

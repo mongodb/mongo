@@ -425,8 +425,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      OptionalCollectionUUID uuid,
                                      StmtId stmtId,
-                                     bool fromMigrate,
-                                     const boost::optional<BSONObj>& deletedDoc) {
+                                     const OplogDeleteEntryArgs& args) {
     auto& documentKey = getDocumentKey(opCtx);
 
     if (nss == NamespaceString::kShardConfigCollectionsNamespace) {

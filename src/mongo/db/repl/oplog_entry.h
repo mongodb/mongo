@@ -218,6 +218,7 @@ public:
     using MutableOplogEntry::getDurableReplOperation;
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getHash;
+    using MutableOplogEntry::getNeedsRetryImage;
     using MutableOplogEntry::getNss;
     using MutableOplogEntry::getObject;
     using MutableOplogEntry::getObject2;

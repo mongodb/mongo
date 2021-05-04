@@ -726,8 +726,11 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     _indexCatalog->unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
     _recordStore->deleteRecord(opCtx, loc);
 
-    getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), stmtId, fromMigrate, deletedDoc);
+    OpObserver::OplogDeleteEntryArgs deleteArgs{nullptr, fromMigrate, getRecordPreImages()};
+    if (deletedDoc) {
+        deleteArgs.deletedDoc = &(deletedDoc.get());
+    }
+    getGlobalServiceContext()->getOpObserver()->onDelete(opCtx, ns(), uuid(), stmtId, deleteArgs);
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);
