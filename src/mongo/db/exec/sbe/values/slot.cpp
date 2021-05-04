@@ -422,7 +422,7 @@ int getApproximateSize(TypeTags tag, Value val) {
         }
         case TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
-            result += ks->memUsageForSorter();
+            result += ks->getSize();
             break;
         }
         case TypeTags::bsonRegex: {
