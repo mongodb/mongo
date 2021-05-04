@@ -51,11 +51,13 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_shard_version_helpers.h"
@@ -129,7 +131,18 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
           options.maxThreads = 1;
           return options;
       }())),
-      _dataReplicationFactory{std::move(dataReplicationFactory)} {
+      _dataReplicationFactory{std::move(dataReplicationFactory)},
+      _critSecReason(BSON("command"
+                          << "resharding_recipient"
+                          << "collection" << _metadata.getSourceNss().toString())),
+      _isAlsoDonor([&]() {
+          auto myShardId = _externalState->myShardId(getGlobalServiceContext());
+          return std::find_if(_donorShards.begin(),
+                              _donorShards.end(),
+                              [&](const DonorShardFetchTimestamp& donor) {
+                                  return donor.getShardId() == myShardId;
+                              }) != _donorShards.end();
+      }()) {
     invariant(_externalState);
 }
 
@@ -259,6 +272,22 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
+
+    // TODO SERVER-56040: this if-stmt must be removed.
+    if (status.isA<ErrorCategory::NotPrimaryError>() ||
+        status.isA<ErrorCategory::ShutdownError>()) {
+        auto client = cc().getServiceContext()->makeClient("ReshardingRecipientCleanupClient");
+        AlternativeClientRegion acr(client);
+        auto opCtxHolder = cc().makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(),
+                                                                _metadata.getSourceNss());
+        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+        csr->exitCriticalSection(csrLock);
+        csr->clearFilteringMetadata(opCtx);
+    }
 }
 
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
@@ -285,7 +314,14 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         }
 
         _onAbortOrStepdown(lk, status);
-        _critSec.reset();
+
+        if (!_isAlsoDonor) {
+            sharding_ddl_util::releaseRecoverableCriticalSection(
+                opCtx,
+                _metadata.getSourceNss(),
+                _critSecReason,
+                ShardingCatalogClient::kMajorityWriteConcern);
+        }
         return;
     }
 
@@ -481,20 +517,16 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
             }
         })
         .then([this] {
-            _transitionState(RecipientStateEnum::kStrictConsistency);
-
-            const bool isAlsoDonor = [&] {
-                auto myShardId = _externalState->myShardId(cc().getServiceContext());
-                return std::find_if(_donorShards.begin(),
-                                    _donorShards.end(),
-                                    [&](const DonorShardFetchTimestamp& donor) {
-                                        return donor.getShardId() == myShardId;
-                                    }) != _donorShards.end();
-            }();
-
-            if (!isAlsoDonor) {
-                _critSec.emplace(cc().getServiceContext(), _metadata.getSourceNss());
+            if (!_isAlsoDonor) {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
+                    opCtx.get(),
+                    _metadata.getSourceNss(),
+                    _critSecReason,
+                    ShardingCatalogClient::kMajorityWriteConcern);
             }
+
+            _transitionState(RecipientStateEnum::kStrictConsistency);
         });
 }
 
@@ -517,23 +549,25 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
         return;
     }
 
-    const bool isAlsoDonor = [&] {
-        auto myShardId = _externalState->myShardId(cc().getServiceContext());
-        return std::find_if(_donorShards.begin(),
-                            _donorShards.end(),
-                            [&](const DonorShardFetchTimestamp& donor) {
-                                return donor.getShardId() == myShardId;
-                            }) != _donorShards.end();
-    }();
-
-    if (!isAlsoDonor) {
+    if (!_isAlsoDonor) {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+
+        sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
+            opCtx.get(),
+            _metadata.getSourceNss(),
+            _critSecReason,
+            ShardingCatalogClient::kLocalWriteConcern);
+
         RenameCollectionOptions options;
         options.dropTarget = true;
         uassertStatusOK(renameCollection(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
 
-        _critSec.reset();
+        sharding_ddl_util::releaseRecoverableCriticalSection(
+            opCtx.get(),
+            _metadata.getSourceNss(),
+            _critSecReason,
+            ShardingCatalogClient::kLocalWriteConcern);
     }
 
     {

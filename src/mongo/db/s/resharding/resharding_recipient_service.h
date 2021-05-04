@@ -31,7 +31,6 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
-#include "mongo/db/s/resharding/resharding_critical_section.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
@@ -224,7 +223,11 @@ private:
     // Contains the status with which the operation was aborted.
     boost::optional<Status> _abortStatus;
 
-    boost::optional<ReshardingCriticalSection> _critSec;
+    // The identifier associated to the recoverable critical section.
+    const BSONObj _critSecReason;
+
+    // It states whether the current node has also the donor role.
+    const bool _isAlsoDonor;
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.

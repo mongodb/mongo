@@ -32,7 +32,6 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
-#include "mongo/db/s/resharding/resharding_critical_section.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
@@ -155,6 +154,10 @@ private:
                                           int64_t bytesToClone,
                                           int64_t documentsToClone);
 
+    // Transitions the on-disk and in-memory state to DonorStateEnum::kDone, releasing the
+    // recoverable critical section.
+    void _transitionToDone();
+
     // Transitions the on-disk and in-memory state to DonorStateEnum::kError.
     void _transitionToError(Status abortReason);
 
@@ -208,7 +211,11 @@ private:
     // operation to fail.
     boost::optional<Status> _abortReason;
 
-    boost::optional<ReshardingCriticalSection> _critSec;
+    // The identifier associated to the recoverable critical section.
+    const BSONObj _critSecReason;
+
+    // It states whether the current node has also the recipient role.
+    const bool _isAlsoRecipient;
 
     // Each promise below corresponds to a state on the donor state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled -
