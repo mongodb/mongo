@@ -60,6 +60,8 @@ public:
 
     void appendInfo(BSONObjBuilder* builder) const;
 
+    BSONObj toBSON() const;
+
     const boost::optional<std::string>& getAPIVersion() const {
         return _apiVersion;
     }

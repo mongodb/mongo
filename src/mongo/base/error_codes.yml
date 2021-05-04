@@ -436,6 +436,8 @@ error_codes:
     
     - {code: 346,name: ChangeStreamInvalidated, extra: ChangeStreamInvalidationInfo}
 
+    - {code: 347, name: APIMismatchError, categories: [VersionedAPIError,VoteAbortError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

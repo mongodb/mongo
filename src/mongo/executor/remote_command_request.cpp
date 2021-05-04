@@ -87,8 +87,7 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
         cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.get()).firstElement());
     }
 
-    if (opCtx && APIParameters::get(opCtx).getParamsPassed() &&
-        !opCtx->isContinuingMultiDocumentTransaction()) {
+    if (opCtx && APIParameters::get(opCtx).getParamsPassed()) {
         BSONObjBuilder bob(std::move(cmdObj));
         APIParameters::get(opCtx).appendInfo(&bob);
         cmdObj = bob.obj();

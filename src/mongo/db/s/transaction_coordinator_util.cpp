@@ -419,14 +419,17 @@ Future<void> sendCommit(ServiceContext* service,
                         txn::AsyncWorkScheduler& scheduler,
                         const LogicalSessionId& lsid,
                         TxnNumber txnNumber,
+                        const APIParameters& apiParams,
                         const txn::ParticipantsList& participants,
                         Timestamp commitTimestamp) {
     CommitTransaction commitTransaction;
     commitTransaction.setDbName(NamespaceString::kAdminDb);
     commitTransaction.setCommitTimestamp(commitTimestamp);
-    auto commitObj = commitTransaction.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+                                   << false << WriteConcernOptions::kWriteConcernField
+                                   << WriteConcernOptions::Majority));
+    apiParams.appendInfo(&bob);
+    auto commitObj = commitTransaction.toBSON(bob.obj());
 
     OperationContextFn operationContextFn = [lsid, txnNumber](OperationContext* opCtx) {
         invariant(opCtx);
@@ -451,12 +454,15 @@ Future<void> sendAbort(ServiceContext* service,
                        txn::AsyncWorkScheduler& scheduler,
                        const LogicalSessionId& lsid,
                        TxnNumber txnNumber,
+                       const APIParameters& apiParams,
                        const txn::ParticipantsList& participants) {
     AbortTransaction abortTransaction;
     abortTransaction.setDbName(NamespaceString::kAdminDb);
-    auto abortObj = abortTransaction.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+                                   << false << WriteConcernOptions::kWriteConcernField
+                                   << WriteConcernOptions::Majority));
+    apiParams.appendInfo(&bob);
+    auto abortObj = abortTransaction.toBSON(bob.obj());
 
     OperationContextFn operationContextFn = [lsid, txnNumber](OperationContext* opCtx) {
         invariant(opCtx);

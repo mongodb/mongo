@@ -97,7 +97,38 @@ let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {commandName: "_mergeAuthzCollections", skip: "internal API"},
-        {commandName: "abortTransaction", skip: "prohibits API parameters"},
+        {
+            commandName: "abortTransaction",
+            run: {
+                inAPIVersion1: true,
+                runsAgainstAdminDb: true,
+                shardCommandName: "abortTransaction",
+                permittedInTxn: false,  // We handle the transaction manually in this test.
+                setUp: (context) => {
+                    // Start a session and transaction.
+                    const session = st.s0.startSession();
+                    context.lsid = session.getSessionId();
+                    const cmd = {
+                        insert: "collection",
+                        // A doc on each shard in the 2-shard configuration.
+                        documents: [{_id: 1}, {_id: 21}],
+                        lsid: context.lsid,
+                        txnNumber: NumberLong(1),
+                        autocommit: false,
+                        startTransaction: true
+                    };
+
+                    assert.commandWorked(
+                        st.s0.getDB("db").runCommand(Object.assign(cmd, context.apiParameters)));
+                },
+                command: (context) => ({
+                    abortTransaction: 1,
+                    lsid: context.lsid,
+                    txnNumber: NumberLong(1),
+                    autocommit: false
+                })
+            }
+        },
         {
             commandName: "addShard",
             run: {
@@ -191,7 +222,38 @@ let MongosAPIParametersUtil = (function() {
                 command: () => ({collStats: "collection"}),
             }
         },
-        {commandName: "commitTransaction", skip: "prohibits API parameters"},
+        {
+            commandName: "commitTransaction",
+            run: {
+                inAPIVersion1: true,
+                runsAgainstAdminDb: true,
+                shardCommandName: "commitTransaction",
+                permittedInTxn: false,  // We handle the transaction manually in this test.
+                setUp: (context) => {
+                    // Start a session and transaction.
+                    const session = st.s0.startSession();
+                    context.lsid = session.getSessionId();
+                    const cmd = {
+                        insert: "collection",
+                        // A doc on each shard in the 2-shard configuration.
+                        documents: [{_id: 1}, {_id: 21}],
+                        lsid: context.lsid,
+                        txnNumber: NumberLong(1),
+                        autocommit: false,
+                        startTransaction: true
+                    };
+
+                    assert.commandWorked(
+                        st.s0.getDB("db").runCommand(Object.assign(cmd, context.apiParameters)));
+                },
+                command: (context) => ({
+                    commitTransaction: 1,
+                    lsid: context.lsid,
+                    txnNumber: NumberLong(1),
+                    autocommit: false
+                })
+            }
+        },
         {commandName: "compact", skip: "not allowed through mongos"},
         {
             commandName: "configureFailPoint",
@@ -1338,7 +1400,9 @@ let MongosAPIParametersUtil = (function() {
                 }
 
                 if (lastCommandInvocation === undefined) {
-                    msg = `Primary didn't log ${commandName}`;
+                    msg = `Primary didn't log ${commandName} with apiVersion ${apiVersion},` +
+                        ` apiStrict ${apiStrict},` +
+                        ` apiDeprecationErrors ${apiDeprecationErrors}.`;
                     return false;
                 }
 
@@ -1441,7 +1505,13 @@ let MongosAPIParametersUtil = (function() {
 
             const configPrimary = st.configRS.getPrimary();
             const shardZeroPrimary = st.rs0.getPrimary();
-            const context = {};
+            const context = {
+                apiParameters: {
+                    apiVersion: apiVersion,
+                    apiStrict: apiStrict,
+                    apiDeprecationErrors: apiDeprecationErrors
+                }
+            };
 
             if (runOrExplain.setUp) {
                 jsTestLog(`setUp function for ${commandName}`);

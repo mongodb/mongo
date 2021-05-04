@@ -47,8 +47,9 @@ function runTest(db, supportsTransctions, isMongos, writeConcern = {}, secondari
 
     if (supportsTransctions) {
         /*
-         * Transaction-starting commands must have apiVersion, transaction-continuing commands must
-         * not.
+         * Transaction-starting commands must have apiVersion, transaction-continuing commands may.
+         *
+         * TODO (SERVER-56550): Test that transaction-continuing commands fail *without* API params.
          */
         const session = db.getMongo().startSession({causalConsistency: false});
         const sessionDb = session.getDatabase(db.getName());
@@ -76,16 +77,8 @@ function runTest(db, supportsTransctions, isMongos, writeConcern = {}, secondari
             stmtId: NumberInt(2),
             autocommit: false
         }));
-        const commitTxnWithApiVersionErrorCode = isMongos ? 4937702 : 4937700;
-        assert.commandFailedWithCode(sessionDb.runCommand({
-            commitTransaction: 1,
-            apiVersion: "1",
-            txnNumber: NumberLong(0),
-            autocommit: false
-        }),
-                                     commitTxnWithApiVersionErrorCode);
         assert.commandWorked(sessionDb.runCommand(
-            {commitTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+            {commitTransaction: 1, apiVersion: "1", txnNumber: NumberLong(0), autocommit: false}));
 
         // Start a new txn so we can test abortTransaction.
         reply = sessionDb.runCommand({
@@ -97,16 +90,8 @@ function runTest(db, supportsTransctions, isMongos, writeConcern = {}, secondari
             autocommit: false
         });
         assert.commandWorked(reply);
-        const abortTxnWithApiVersionErrorCode = isMongos ? 4937701 : 4937700;
-        assert.commandFailedWithCode(sessionDb.runCommand({
-            abortTransaction: 1,
-            apiVersion: "1",
-            txnNumber: NumberLong(1),
-            autocommit: false
-        }),
-                                     abortTxnWithApiVersionErrorCode);
         assert.commandWorked(sessionDb.runCommand(
-            {abortTransaction: 1, txnNumber: NumberLong(1), autocommit: false}));
+            {abortTransaction: 1, apiVersion: "1", txnNumber: NumberLong(1), autocommit: false}));
     }
 
     assert.commandWorked(

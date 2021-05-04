@@ -224,6 +224,10 @@ class CoordinateCommitTransactionCmd : public TypedCommand<CoordinateCommitTrans
 public:
     using Request = CoordinateCommitTransaction;
 
+    bool acceptsAnyApiVersionParameters() const override {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;

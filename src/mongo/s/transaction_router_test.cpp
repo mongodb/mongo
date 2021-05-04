@@ -719,7 +719,8 @@ TEST_F(TransactionRouterTestWithDefaultSession, AttachTxnValidatesReadConcernIfA
     }
 }
 
-TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyAPIParametersAfterFirstStatement) {
+// TODO (SERVER-56550): Test that API parameters are required in txn-continuing commands.
+TEST_F(TransactionRouterTestWithDefaultSession, SameAPIParametersAfterFirstStatement) {
     APIParameters apiParameters = APIParameters();
     apiParameters.setAPIVersion("1");
     APIParameters::get(operationContext()) = apiParameters;
@@ -730,11 +731,31 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyAPIParametersAfterF
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
 
+    // Continuing with the same API params succeeds. (Must reset readConcern from "snapshot".)
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession, DifferentAPIParametersAfterFirstStatement) {
+    APIParameters apiParameters = APIParameters();
+    apiParameters.setAPIVersion("1");
+    APIParameters::get(operationContext()) = apiParameters;
+    TxnNumber txnNum{3};
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    // Can't continue with different params. (Must reset readConcern from "snapshot".)
+    APIParameters::get(operationContext()).setAPIStrict(true);
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     ASSERT_THROWS_CODE(
         txnRouter.beginOrContinueTxn(
             operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue),
         DBException,
-        4937701);
+        ErrorCodes::APIMismatchError);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession, CannotSpecifyReadConcernAfterFirstStatement) {

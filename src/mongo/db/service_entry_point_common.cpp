@@ -900,6 +900,19 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
     _txnParticipant.emplace(TransactionParticipant::get(opCtx));
 
+    // TODO (SERVER-56550): Do this check even if !apiParamsFromClient.getParamsPassed().
+    auto apiParamsFromClient = APIParameters::get(opCtx);
+    if (apiParamsFromClient.getParamsPassed()) {
+        auto apiParamsFromTxn = _txnParticipant->getAPIParameters(opCtx);
+        uassert(
+            ErrorCodes::APIMismatchError,
+            "API param conflict: {} used params {}, the transaction's first command used {}"_format(
+                invocation->definition()->getName(),
+                apiParamsFromClient.toBSON().toString(),
+                apiParamsFromTxn.toBSON().toString()),
+            apiParamsFromTxn == apiParamsFromClient);
+    }
+
     if (!opCtx->getClient()->isInDirectClient()) {
         bool beganOrContinuedTxn{false};
         // This loop allows new transactions on a session to block behind a previous prepared
@@ -1545,13 +1558,6 @@ void ExecCommandDatabase::_initiateCommand() {
     if (startTransaction) {
         opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
         opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-    }
-
-    if (opCtx->inMultiDocumentTransaction() && !startTransaction) {
-        uassert(4937700,
-                "API parameters are only allowed in the first command of a multi-document "
-                "transaction",
-                !APIParameters::get(opCtx).getParamsPassed());
     }
 
     // Remember whether or not this operation is starting a transaction, in case something later in

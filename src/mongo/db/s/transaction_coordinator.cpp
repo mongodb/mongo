@@ -102,6 +102,7 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
           std::make_unique<TransactionCoordinatorMetricsObserver>()),
       _deadline(deadline) {
 
+    auto apiParams = APIParameters::get(operationContext);
     auto kickOffCommitPF = makePromiseFuture<void>();
     _kickOffCommitPromise = std::move(kickOffCommitPF.promise);
 
@@ -282,7 +283,7 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                                                     "hangBeforeWaitingForDecisionWriteConcern",
                                                     std::move(opTime));
         })
-        .then([this] {
+        .then([this, apiParams] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
                 _decisionDurable = true;
@@ -309,12 +310,13 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                                            *_scheduler,
                                            _lsid,
                                            _txnNumber,
+                                           apiParams,
                                            *_participants,
                                            *_decision->getCommitTimestamp());
                 }
                 case CommitDecision::kAbort: {
                     return txn::sendAbort(
-                        _serviceContext, *_scheduler, _lsid, _txnNumber, *_participants);
+                        _serviceContext, *_scheduler, _lsid, _txnNumber, apiParams, *_participants);
                 }
                 default:
                     MONGO_UNREACHABLE;

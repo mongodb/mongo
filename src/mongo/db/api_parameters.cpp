@@ -87,6 +87,12 @@ void APIParameters::appendInfo(BSONObjBuilder* builder) const {
     }
 }
 
+BSONObj APIParameters::toBSON() const {
+    BSONObjBuilder bob;
+    appendInfo(&bob);
+    return bob.obj();
+}
+
 std::size_t APIParameters::Hash::operator()(const APIParameters& params) const {
     size_t seed = 0;
     if (params.getAPIVersion()) {

@@ -2168,7 +2168,8 @@ void TransactionParticipant::Participant::_setNewTxnNumber(OperationContext* opC
         "{lsid}",
         "New transaction started",
         "txnNumber"_attr = txnNumber,
-        "lsid"_attr = _sessionId().getId());
+        "lsid"_attr = _sessionId().getId(),
+        "apiParameters"_attr = APIParameters::get(opCtx).toBSON());
 
     // Abort the existing transaction if it's not prepared, committed, or aborted.
     if (o().txnState.isInProgress()) {

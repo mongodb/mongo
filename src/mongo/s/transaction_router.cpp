@@ -423,9 +423,6 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
     bool mustStartTransaction = isFirstStatementInThisParticipant && !isTransactionCommand(cmdName);
 
     if (!mustStartTransaction) {
-        dassert(!cmd.hasField(APIParameters::kAPIVersionFieldName));
-        dassert(!cmd.hasField(APIParameters::kAPIStrictFieldName));
-        dassert(!cmd.hasField(APIParameters::kAPIDeprecationErrorsFieldName));
         dassert(!cmd.hasField(repl::ReadConcernArgs::kReadConcernFieldName));
     }
 
@@ -902,6 +899,16 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                                 << o().txnNumber << " seen in session " << _sessionId());
     } else if (txnNumber == o().txnNumber) {
         // This is the same transaction as the one in progress.
+        auto apiParamsFromClient = APIParameters::get(opCtx);
+        // TODO (SERVER-56550): Do this check even if !apiParamsFromClient.getParamsPassed().
+        if (apiParamsFromClient.getParamsPassed() &&
+            (action == TransactionActions::kContinue || action == TransactionActions::kCommit)) {
+            uassert(ErrorCodes::APIMismatchError,
+                    "A transaction-continuing command must use the same API parameters as "
+                    "the first command in the transaction",
+                    apiParamsFromClient == o().apiParameters);
+        }
+
         switch (action) {
             case TransactionActions::kStart: {
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -909,9 +916,6 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                                         << _sessionId() << " already started");
             }
             case TransactionActions::kContinue: {
-                uassert(4937701,
-                        "Only the first command in a transaction may specify API parameters",
-                        !APIParameters::get(opCtx).getParamsPassed());
                 uassert(ErrorCodes::InvalidOptions,
                         "Only the first command in a transaction may specify a readConcern",
                         repl::ReadConcernArgs::get(opCtx).isEmpty());
@@ -924,9 +928,6 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                 break;
             }
             case TransactionActions::kCommit:
-                uassert(4937702,
-                        "Only the first command in a transaction may specify API parameters",
-                        !APIParameters::get(opCtx).getParamsPassed());
                 ++p().latestStmtId;
                 _onContinue(opCtx);
                 break;
@@ -1204,8 +1205,6 @@ BSONObj TransactionRouter::Router::abortTransaction(OperationContext* opCtx) {
                 "txnNumber"_attr = o().txnNumber,
                 "numParticipantShards"_attr = o().participants.size());
 
-    // Omit API parameters from abortTransaction.
-    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
     const auto responses = gatherResponses(opCtx,
                                            NamespaceString::kAdminDb,
                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
