@@ -350,7 +350,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     invariant(collection != nullptr);
     invariant(!isEmpty());
 
-    auto const& nss = collection->ns();
+    auto const nss = collection->ns();
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
@@ -389,12 +389,12 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     }
 
     auto halfOpen = BoundInclusion::kIncludeStartKeyOnly;
-    auto manual = PlanExecutor::YIELD_MANUAL;
+    auto yieldPolicy = PlanExecutor::YIELD_AUTO;
     auto forward = InternalPlanner::FORWARD;
     auto fetch = InternalPlanner::IXSCAN_FETCH;
 
     auto exec = InternalPlanner::indexScan(
-        opCtx, collection, descriptor, min, max, halfOpen, manual, forward, fetch);
+        opCtx, collection, descriptor, min, max, halfOpen, yieldPolicy, forward, fetch);
 
     int numDeleted = 0;
     do {
@@ -406,9 +406,8 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         }
         if (state == PlanExecutor::FAILURE || state == PlanExecutor::DEAD) {
             warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                      << redact(min) << " to " << redact(max) << " in " << nss << ": "
-                      << redact(WorkingSetCommon::toStatusString(obj))
-                      << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                      << redact(min) << " to " << redact(max) << " in " << nss
+                      << ": FAILURE, stats: " << Explain::getWinningPlanStats(exec.get());
             break;
         }
         invariant(PlanExecutor::ADVANCED == state);
