@@ -2183,6 +2183,8 @@ def link_guard_libdeps_tag_expand(source, target, env, for_signature):
 
 env['LIBDEPS_TAG_EXPANSIONS'].append(link_guard_libdeps_tag_expand)
 
+env.Tool('forceincludes')
+
 # ---- other build setup -----
 if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
