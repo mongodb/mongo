@@ -499,8 +499,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 }
 
 void CreateCollectionCoordinator::_interrupt(Status status) noexcept {
-    if (status.isA<ErrorCategory::NotPrimaryError>() ||
-        status.isA<ErrorCategory::ShutdownError>()) {
+    // Only free the in memory critical section if we reached the commit phase (in which we might've
+    // acquired it).
+    if (_doc.getPhase() >= Phase::kCommit &&
+        (status.isA<ErrorCategory::NotPrimaryError>() ||
+         status.isA<ErrorCategory::ShutdownError>())) {
         auto client = cc().getServiceContext()->makeClient("CreateCollectionCleanupClient");
         AlternativeClientRegion acr(client);
         auto opCtxHolder = cc().makeOperationContext();
