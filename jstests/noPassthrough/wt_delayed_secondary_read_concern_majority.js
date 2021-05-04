@@ -64,6 +64,10 @@ if (storageEngine !== "wiredTiger") {
     });
     var primary = rst.getPrimary();  // Waits for PRIMARY state.
 
+    // The default WC is majority and we want the delayed secondary to fall behind in replication.
+    assert.commandWorked(primary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: 1}}));
+
     // Reconfigure primary with a small cache size so less data needs to be
     // inserted to make the cache full while trying to trigger a stall.
     assert.commandWorked(primary.adminCommand(

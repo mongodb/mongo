@@ -18,6 +18,10 @@ var replTest = new ReplSetTest({nodes: 3});
 var nodes = replTest.startSet({shardsvr: ''});
 replTest.initiate();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 var priConn = replTest.getPrimary();
 var secondaries = replTest.getSecondaries();
 var configConnStr = st.configRS.getURL();

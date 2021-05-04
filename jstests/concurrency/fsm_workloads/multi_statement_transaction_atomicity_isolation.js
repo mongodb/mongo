@@ -191,6 +191,14 @@ var $config = (function() {
     const states = (function() {
         return {
             init: function init(db, collName) {
+                // The default WC is majority and this workload may not be able to satisfy majority
+                // writes.
+                assert.commandWorked(db.adminCommand({
+                    setDefaultRWConcern: 1,
+                    defaultWriteConcern: {w: 1},
+                    writeConcern: {w: "majority"}
+                }));
+
                 this.iteration = 0;
                 // Set causalConsistency = true to ensure that in the checkConsistency state
                 // function, we will be able to read our own writes that were committed as a

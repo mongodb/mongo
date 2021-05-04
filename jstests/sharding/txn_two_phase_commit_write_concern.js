@@ -38,6 +38,10 @@ const lsid = {
 let txnNumber = 0;
 
 assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 st.ensurePrimaryShard(kDbName, st.shard0.shardName);
 assert.commandWorked(st.s.adminCommand({shardCollection: kNs, key: {x: 1}}));
 

@@ -516,6 +516,9 @@ let staleMongos = st.s1;
 
 let res = st.s.adminCommand({listCommands: 1});
 assert.commandWorked(res);
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(staleMongos.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 let commands = Object.keys(res.commands);
 for (let command of commands) {

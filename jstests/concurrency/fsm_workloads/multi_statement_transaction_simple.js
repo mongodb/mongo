@@ -28,6 +28,12 @@ var $config = (function() {
         }
 
         function init(db, collName) {
+            // The default WC is majority and this test can't satisfy majority writes.
+            assert.commandWorked(db.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"}
+            }));
             this.session = db.getMongo().startSession({causalConsistency: true});
         }
 

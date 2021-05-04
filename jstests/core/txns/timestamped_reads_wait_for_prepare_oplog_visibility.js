@@ -69,6 +69,9 @@ const readThreadFunc = function(readFunc, _collName, hangTimesEntered, logTimesE
 function runTest(prefix, readFunc) {
     // Reset the log history between tests.
     assert.commandWorked(db.adminCommand({clearLog: 'global'}));
+    // The default WC is majority and this test can't satisfy majority writes.
+    assert.commandWorked(db.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
     jsTestLog('Testing oplog visibility for ' + prefix);
     const collName = baseCollName + '_' + prefix;

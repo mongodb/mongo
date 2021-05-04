@@ -39,13 +39,21 @@ function stopServerReplication(conn, retryIntervalMS) {
 }
 
 // Stops replication at all replicaset secondaries.
-function stopReplicationOnSecondaries(rs) {
+function stopReplicationOnSecondaries(rs, changeReplicaSetDefaultWCToLocal = true) {
+    if (changeReplicaSetDefaultWCToLocal == true) {
+        // The default WC is majority and this test can't satisfy majority writes.
+        assert.commandWorked(rs.getPrimary().adminCommand(
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    }
     stopServerReplication(rs.getSecondaries());
 }
 
 // Stops replication at all shard secondaries.
 function stopReplicationOnSecondariesOfAllShards(st) {
-    st._rsObjects.forEach(stopReplicationOnSecondaries);
+    // The default WC is majority and this test can't satisfy majority writes.
+    assert.commandWorked(st.s.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    st._rsObjects.forEach(rs => stopReplicationOnSecondaries(rs, false));
 }
 
 // Restarts replication on the given server(s).
@@ -111,6 +119,11 @@ function checkWriteConcernTimedOut(res) {
 function runWriteConcernRetryabilityTest(priConn, secConn, cmd, kNodes, dbName, setupFunc) {
     dbName = dbName || "test";
     jsTestLog(`Testing ${tojson(cmd)} on ${dbName}.`);
+
+    // The default WC is majority and stopServerReplication will prevent the replica set from
+    // fulfilling any majority writes
+    assert.commandWorked(priConn.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
     // Send a dummy write to this connection so it will have the Client object initialized.
     const secondPriConn = new Mongo(priConn.host);

@@ -18,6 +18,11 @@ var replTest = new ReplSetTest(
 replTest.startSet();
 replTest.initiate();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(replTest.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+replTest.awaitReplication();
+
 var res;
 var testDB = replTest.getPrimary().getDB(name);
 var collectionName = "foo";
@@ -32,7 +37,7 @@ res = assert.commandWorked(testDB.runCommand(
     {insert: collectionName, documents: [majorityDoc], writeConcern: {w: "majority"}}));
 var majorityWriteOperationTime = res.operationTime;
 
-stopReplicationOnSecondaries(replTest);
+stopReplicationOnSecondaries(replTest, false /* changeReplicaSetDefaultWCToLocal */);
 
 res = assert.commandWorked(
     testDB.runCommand({insert: collectionName, documents: [localDoc], writeConcern: {w: 1}}));
@@ -102,7 +107,7 @@ res = assert.commandWorked(testDB.runCommand(
     {insert: collectionName, documents: [successfulDoc], writeConcern: {w: "majority"}}));
 var majorityWriteOperationTime = res.operationTime;
 
-stopReplicationOnSecondaries(replTest);
+stopReplicationOnSecondaries(replTest, false /* changeReplicaSetDefaultWCToLocal */);
 
 res = testDB.runCommand({
     insert: collectionName,

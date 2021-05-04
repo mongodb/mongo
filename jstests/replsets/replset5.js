@@ -23,7 +23,7 @@ replTest.awaitSecondaryNodes();
 var testDB = "foo";
 
 // Initial replication
-// TODO SERVER-55703: Remove manual write concern once we start using the new implicit default write
+// TODO SERVER-56633: Remove manual write concern once we start using the new implicit default write
 // concern.
 primary.getDB("barDB").bar.save({a: 1},
                                 {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}});
@@ -39,7 +39,7 @@ for (var n = 0; n < docNum; n++) {
 // If you want to test failure, just add values for w and wtimeout (e.g. w=1)
 // to the following command. This will override the default set above and
 // prevent replication from happening in time for the count tests below.
-// TODO SERVER-55703: Remove manual write concern once we start using the new implicit default write
+// TODO SERVER-56633: Remove manual write concern once we start using the new implicit default write
 // concern.
 var result = bulk.execute({w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS});
 var wcError = result.getWriteConcernError();

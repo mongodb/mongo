@@ -305,6 +305,10 @@ function runReplicaSetTest(downgradeVersion) {
     let primary = rst.getPrimary();
     primaryAdminDB = primary.getDB("admin");
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(primary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
     let secondary = rst.getSecondary();
 

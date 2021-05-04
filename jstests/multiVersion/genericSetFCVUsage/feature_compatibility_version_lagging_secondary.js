@@ -21,6 +21,11 @@ function runTest(downgradeVersion) {
     let primary = rst.getPrimary();
     let latestSecondary = rst.getSecondary();
 
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(primary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
     // Set the featureCompatibilityVersion to the downgrade version so that a downgrade node can
     // join the set.
     assert.commandWorked(

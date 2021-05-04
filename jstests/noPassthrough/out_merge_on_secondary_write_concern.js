@@ -21,6 +21,10 @@ const primary = replTest.getPrimary();
 const secondary = replTest.getSecondary();
 const primaryDB = primary.getDB("test");
 const secondaryDB = secondary.getDB("test");
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 assert.commandWorked(primaryDB.setProfilingLevel(2));
 secondaryDB.getMongo().setReadPref("secondary");
 

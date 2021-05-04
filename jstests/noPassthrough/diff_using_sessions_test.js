@@ -19,6 +19,11 @@ const collName = "mycoll";
 const primaryDB = rst.getPrimary().startSession().getDatabase(dbName);
 const secondaryDB = rst.getSecondary().startSession().getDatabase(dbName);
 
+// The default WC is majority and rsSyncApplyStop failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 assert.commandWorked(primaryDB[collName].insert(
     Array.from({length: 100}, (_, i) => ({_id: i, num: i * 2})), {writeConcern: {w: 2}}));
 

@@ -15,6 +15,12 @@ var $config = (function() {
     const states = {
         init: function init(db, collName) {
             let session = db.getMongo().startSession({causalConsistency: true});
+            // The default WC is majority and this test can't satisfy majority writes.
+            assert.commandWorked(db.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"}
+            }));
             // Store the session ID in the database so any unterminated transactions can be aborted
             // at teardown.
             insertSessionDoc(db, collName, this.tid, session.getSessionId().id);

@@ -43,6 +43,9 @@ let checkReads = (session, collExpected, coll2Expected) => {
 // Clear ramlog so checkLog can't find log messages from previous times this fail point was
 // enabled.
 assert.commandWorked(testDB.adminCommand({clearLog: 'global'}));
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(testDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 jsTest.log("Prepopulate the collections.");
 assert.commandWorked(testColl.insert([{_id: 0}], {writeConcern: {w: "majority"}}));

@@ -40,6 +40,10 @@ let st = new ShardingTest({
     manualAddShard: true,
 });
 assert.commandWorked(st.s.adminCommand({addShard: rst.getURL()}));
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 testReadCommittedLookup(st.s.getDB("test"), shardSecondary, rst);
 
 // Confirm read committed works on a cluster with:

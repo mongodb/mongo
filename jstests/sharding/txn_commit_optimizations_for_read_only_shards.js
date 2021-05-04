@@ -239,6 +239,13 @@ const failureModes = {
     },
     participantCannotMajorityCommitWritesClientSendsWriteConcernMajority: {
         beforeStatements: () => {
+            // The default WC is majority and stopServerReplication will prevent satisfying any
+            // majority writes.
+            assert.commandWorked(st.s.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"}
+            }));
             // Participant cannot majority commit writes.
             stopServerReplication(st.rs0.getSecondaries());
 
@@ -262,6 +269,12 @@ const failureModes = {
     },
     participantCannotMajorityCommitWritesClientSendsWriteConcern1: {
         beforeStatements: () => {
+            // stopServerReplication will prevent fulfil any majority writes.
+            assert.commandWorked(st.s.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: 1},
+                writeConcern: {w: "majority"}
+            }));
             // Participant cannot majority commit writes.
             stopServerReplication(st.rs0.getSecondaries());
 

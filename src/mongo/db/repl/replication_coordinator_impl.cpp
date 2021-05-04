@@ -907,7 +907,6 @@ void ReplicationCoordinatorImpl::_setImplicitDefaultWriteConcern(OperationContex
                                                                  WithLock lk) {
     auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx);
     bool isImplicitDefaultWriteConcernMajority = _rsConfig.isImplicitDefaultWriteConcernMajority();
-    // TODO (SERVER-55689): Add validation for shard and config servers
     rwcDefaults.setImplicitDefaultWriteConcernMajority(isImplicitDefaultWriteConcernMajority);
 }
 

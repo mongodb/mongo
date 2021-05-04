@@ -25,6 +25,11 @@ if (!rst.getPrimary().adminCommand("serverStatus").storageEngine.supportsSnapsho
     return;
 }
 
+// The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 let testDB = rst.getPrimary().getDB("indexRebuild");
 let collName = "coll";
 let coll = testDB.getCollection(collName);

@@ -102,6 +102,9 @@ const collName = jsTestName();
 const testDB = db.getSiblingDB(dbName);
 
 testDB.runCommand({drop: collName});
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(testDB.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 assert.commandWorked(testDB.runCommand({create: collName, writeConcern: {w: "majority"}}));
 
 const session = testDB.getMongo().startSession();

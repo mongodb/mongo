@@ -41,6 +41,11 @@ const primary = rst.getPrimary();
 const mydb = primary.getDB('test');
 const coll = mydb.getCollection('t');
 
+// The default WC is majority and disableSnapshotting failpoint will prevent satisfying any majority
+// writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const numDocs = 2;
 const minDocSizeMB = 10;
 

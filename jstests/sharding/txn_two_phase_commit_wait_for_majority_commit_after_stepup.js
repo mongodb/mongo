@@ -54,6 +54,11 @@ const setUp = function() {
     // shard1: [0, 10)
     // shard2: [10, +inf)
     assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
+    // The default WC is majority and stopServerReplication will prevent satisfying any majority
+    // writes.
+    assert.commandWorked(st.s.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: participant0.shardName}));
     assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));

@@ -43,6 +43,9 @@ var primary = replTest.getPrimary();
 var primaryId = replTest.getNodeId(primary);
 var secondary = secondaries[0];
 var secondaryId = replTest.getNodeId(secondary);
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 // Wait for primary to detect that the arbiter is up so that it won't step down when we later take
 // the secondary offline.

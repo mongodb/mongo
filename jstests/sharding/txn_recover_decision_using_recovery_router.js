@@ -188,6 +188,10 @@ const waitForCommitTransactionToComplete = function(coordinatorRs, lsid, txnNumb
 let st =
     new ShardingTest({shards: 2, rs: {nodes: 2}, mongos: 2, other: {mongosOptions: {verbose: 3}}});
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
 st.ensurePrimaryShard('test', st.shard0.name);
@@ -278,7 +282,8 @@ assert.commandFailedWithCode(sendCommitViaOriginalMongos(lsid, txnNumber, recove
 
 const recoveryShardReplSetTest = st.rs1;
 
-stopReplicationOnSecondaries(recoveryShardReplSetTest);
+stopReplicationOnSecondaries(recoveryShardReplSetTest,
+                             false /* changeReplicaSetDefaultWCToLocal */);
 
 // Do a write on the recovery node to bump the recovery node's system last OpTime.
 recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert({dummy: 1});
@@ -308,7 +313,8 @@ assert.commandWorked(sendCommitViaOriginalMongos(lsid, txnNumber, recoveryToken)
 
 const recoveryShardReplSetTest = st.rs1;
 
-stopReplicationOnSecondaries(recoveryShardReplSetTest);
+stopReplicationOnSecondaries(recoveryShardReplSetTest,
+                             false /* changeReplicaSetDefaultWCToLocal */);
 
 // Do a write on the recovery node to bump the recovery node's system last OpTime.
 recoveryShardReplSetTest.getPrimary().getDB("dummy").getCollection("dummy").insert({dummy: 1});

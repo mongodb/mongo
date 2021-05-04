@@ -202,7 +202,7 @@ function testValidWriteConcern(wc, cmd) {
     // Stop replication at all config server secondaries and all shard secondaries.
     stopReplicationOnSecondariesOfAllShards(st);
     st.configRS.awaitReplication();
-    stopReplicationOnSecondaries(st.configRS);
+    stopReplicationOnSecondaries(st.configRS, false /* changeReplicaSetDefaultWCToLocal */);
 
     // Command should fail after two config servers are not replicating.
     req.writeConcern.wtimeout = 3000;

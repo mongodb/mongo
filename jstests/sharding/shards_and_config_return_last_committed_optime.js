@@ -92,6 +92,9 @@ function assertReturnsLastCommittedOpTime(testDB, collName, connType) {
 const st = new ShardingTest({shards: 1, rs: {nodes: 2}, config: 2});
 assert.commandWorked(st.s.adminCommand({enableSharding: "test"}));
 assert.commandWorked(st.s.adminCommand({shardCollection: "test.foo", key: {x: 1}}));
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
 
 // Sharded collection.
 assertDoesNotReturnLastCommittedOpTime(

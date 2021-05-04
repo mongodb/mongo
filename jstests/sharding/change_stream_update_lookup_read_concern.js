@@ -53,6 +53,10 @@ rst.awaitSecondaryNodes();
 const st = new ShardingTest({manualAddShard: true});
 assert.commandWorked(st.s.adminCommand({addShard: replSetName + "/" + rst.getPrimary().host}));
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(st.s.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
 

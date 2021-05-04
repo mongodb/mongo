@@ -18,6 +18,11 @@ const rst = new ReplSetTest({nodes: 3, settings: {chainingAllowed: false}});
 rst.startSet();
 rst.initiate();
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(rst.getPrimary().adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
+
 const primarySession =
     rst.getPrimary().getDB(dbName).getMongo().startSession({causalConsistency: false});
 const primaryDB = primarySession.getDatabase(dbName);
