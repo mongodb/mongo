@@ -306,6 +306,15 @@ var TagsTest = function(options) {
         assert.neq(null, result.getWriteConcernError());
         assert(result.getWriteConcernError().errInfo.wtimeout);
 
+        jsTestLog('Setting custom write concern via a cluster-wide write concern');
+        assert.commandWorked(primary.adminCommand({
+            setDefaultRWConcern: 1,
+            defaultWriteConcern: {w: "3 and 4", wtimeout: ReplSetTest.kDefaultTimeoutMS}
+        }));
+
+        jsTestLog('Custom write concern "3 and 4" should work');
+        assert.commandWorked(primary.getDB('foo').bar.insert(doc));
+
         replTest.stopSet();
     };
 };
