@@ -10,6 +10,7 @@ from typing import Iterable, Callable, Optional, NamedTuple, Dict, List
 import click
 
 BASE_SEARCH_DIR = "."
+IGNORED_PATHS = [".git"]
 ISSUE_RE = re.compile('(BUILD|SERVER|WT|PM|TOOLS|TIG|PERF|BF)-[0-9]+')
 
 
@@ -183,6 +184,9 @@ def walk_fs(root: str, action: Callable[[str, Iterable[str]], None]) -> None:
         for file_name in files:
             try:
                 file_path = os.path.join(base, file_name)
+                if any(ignore in file_path for ignore in IGNORED_PATHS):
+                    continue
+
                 with open(file_path) as search_file:
                     action(file_path, search_file)
             except UnicodeDecodeError:

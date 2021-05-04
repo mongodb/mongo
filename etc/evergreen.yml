@@ -8276,6 +8276,7 @@ tasks:
           END_OF_COMMIT_MSG
 
             commit_message_content=$(cat commit_message.txt)
+            rm commit_message.txt
 
             ${activate_virtualenv}
             $python buildscripts/todo_check.py --commit-message "$commit_message_content"
