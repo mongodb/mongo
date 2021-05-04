@@ -70,11 +70,10 @@ struct ExpressionVisitorContext {
             : variablesToBind{std::forward<Args>(args)...}, slotsForLetVariables{} {}
     };
 
-    ExpressionVisitorContext(std::unique_ptr<sbe::PlanStage> inputStage,
+    ExpressionVisitorContext(EvalStage inputStage,
                              sbe::value::SlotIdGenerator* slotIdGenerator,
                              sbe::value::FrameIdGenerator* frameIdGenerator,
                              sbe::value::SlotId rootSlot,
-                             const sbe::value::SlotVector& relevantSlots,
                              sbe::RuntimeEnvironment* env,
                              PlanNodeId planNodeId)
         : slotIdGenerator(slotIdGenerator),
@@ -82,7 +81,7 @@ struct ExpressionVisitorContext {
           rootSlot(rootSlot),
           runtimeEnvironment(env),
           planNodeId(planNodeId) {
-        evalStack.emplaceFrame(EvalStage{std::move(inputStage), relevantSlots});
+        evalStack.emplaceFrame(std::move(inputStage));
     }
 
     void ensureArity(size_t arity) {
@@ -144,8 +143,6 @@ struct ExpressionVisitorContext {
     std::map<Variables::Id, sbe::value::SlotId> environment;
     std::stack<VarsFrame> varsFrameStack;
 
-    // See the comment above the generateExpression() declaration for an explanation of the
-    // 'relevantSlots' list.
     sbe::RuntimeEnvironment* runtimeEnvironment;
 
     // The id of the QuerySolutionNode to which the expression we are converting to SBE is attached.
@@ -1102,7 +1099,7 @@ public:
                             _context->planNodeId,
                             outputSlot,
                             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
-            return EvalExprStagePair{outputSlot, std::move(nullEvalStage)};
+            return std::make_pair(outputSlot, std::move(nullEvalStage));
         };
 
         // Build a union stage to consolidate array input branches into a stream.
@@ -1135,20 +1132,18 @@ public:
 
         // Create a limit stage to EOF once numChildren results have been obtained.
         auto limitNumChildren =
-            makeLimitTree(std::move(unionWithNullStage.stage), _context->planNodeId, numChildren);
+            makeLimitSkip(std::move(unionWithNullStage), _context->planNodeId, numChildren);
 
         // Create a group stage to aggregate elements into a single array.
         auto collatorSlot = _context->runtimeEnvironment->getSlotIfExists("collator"_sd);
         auto addToArrayExpr =
             makeFunction("addToArray", sbe::makeE<sbe::EVariable>(unionWithNullSlot));
         auto groupSlot = _context->slotIdGenerator->generate();
-        auto groupStage =
-            sbe::makeS<sbe::HashAggStage>(std::move(limitNumChildren),
-                                          sbe::makeSV(),
-                                          sbe::makeEM(groupSlot, std::move(addToArrayExpr)),
-                                          collatorSlot,
-                                          _context->planNodeId);
-        EvalStage groupEvalStage = {std::move(groupStage), sbe::makeSV(groupSlot)};
+        auto groupStage = makeHashAgg(std::move(limitNumChildren),
+                                      sbe::makeSV(),
+                                      sbe::makeEM(groupSlot, std::move(addToArrayExpr)),
+                                      collatorSlot,
+                                      _context->planNodeId);
 
         // Build subtree to handle nulls. If an input is null, return null. Otherwise, unwind the
         // input twice, and concatenate it into an array using addToArray. This is necessary to
@@ -1171,30 +1166,31 @@ public:
         auto finalAddToArrayExpr =
             makeFunction("addToArray", sbe::makeE<sbe::EVariable>(unwindSlot));
         auto finalGroupSlot = _context->slotIdGenerator->generate();
-        auto finalGroupStage = sbe::makeS<sbe::HashAggStage>(
-            std::move(unwindEvalStage.stage),
-            sbe::makeSV(),
-            sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
-            collatorSlot,
-            _context->planNodeId);
+        auto finalGroupStage =
+            makeHashAgg(std::move(unwindEvalStage),
+                        sbe::makeSV(),
+                        sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
+                        collatorSlot,
+                        _context->planNodeId);
 
         // Create a branch stage to select between the branch that produces one null if any elements
         // in the original input were null or missing, or otherwise select the branch that unwinds
         // and concatenates elements into the output array.
-        auto [nullExpr, nullStage] = makeNullLimitCoscanTree();
+        auto [nullSlot, nullStage] = makeNullLimitCoscanTree();
         auto nullIsMemberExpr =
             makeIsMember(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
                          sbe::makeE<sbe::EVariable>(groupSlot));
-        auto branchNullEvalStage =
-            makeBranch(std::move(nullIsMemberExpr),
-                       std::move(nullStage),
-                       {std::move(finalGroupStage), sbe::makeSV(finalGroupSlot)},
-                       _context->slotIdGenerator,
-                       _context->planNodeId);
-        auto branchSlot = branchNullEvalStage.outSlots.front();
+        auto branchSlot = _context->slotIdGenerator->generate();
+        auto branchNullEvalStage = makeBranch(std::move(nullStage),
+                                              std::move(finalGroupStage),
+                                              std::move(nullIsMemberExpr),
+                                              sbe::makeSV(nullSlot),
+                                              sbe::makeSV(finalGroupSlot),
+                                              sbe::makeSV(branchSlot),
+                                              _context->planNodeId);
 
         // Create nlj to connect outer group with inner branch that handles null input.
-        auto nljStage = makeLoopJoin(std::move(groupEvalStage),
+        auto nljStage = makeLoopJoin(std::move(groupStage),
                                      std::move(branchNullEvalStage),
                                      _context->planNodeId,
                                      _context->getLexicalEnvironment());
@@ -3545,26 +3541,17 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
             makeBinaryOp(sbe::EPrimBinary::logicAnd, makeNeqFalseCheck(), makeNeqZeroCheck())));
 }
 
-std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
-generateExpression(OperationContext* opCtx,
-                   Expression* expr,
-                   std::unique_ptr<sbe::PlanStage> stage,
-                   sbe::value::SlotIdGenerator* slotIdGenerator,
-                   sbe::value::FrameIdGenerator* frameIdGenerator,
-                   sbe::value::SlotId rootSlot,
-                   sbe::RuntimeEnvironment* env,
-                   PlanNodeId planNodeId,
-                   sbe::value::SlotVector* relevantSlots) {
-    auto tempRelevantSlots = sbe::makeSV(rootSlot);
-    relevantSlots = relevantSlots ? relevantSlots : &tempRelevantSlots;
-
-    ExpressionVisitorContext context(std::move(stage),
-                                     slotIdGenerator,
-                                     frameIdGenerator,
-                                     rootSlot,
-                                     *relevantSlots,
-                                     env,
-                                     planNodeId);
+std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> generateExpression(
+    OperationContext* opCtx,
+    Expression* expr,
+    EvalStage stage,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    sbe::value::SlotId rootSlot,
+    sbe::RuntimeEnvironment* env,
+    PlanNodeId planNodeId) {
+    ExpressionVisitorContext context(
+        std::move(stage), slotIdGenerator, frameIdGenerator, rootSlot, env, planNodeId);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};
@@ -3573,7 +3560,6 @@ generateExpression(OperationContext* opCtx,
     expression_walker::walk(&walker, expr);
 
     auto [slotId, resultExpr, resultStage] = context.done();
-    *relevantSlots = std::move(resultStage.outSlots);
-    return {slotId, std::move(resultExpr), std::move(resultStage.stage)};
+    return {slotId, std::move(resultExpr), std::move(resultStage)};
 }
 }  // namespace mongo::stage_builder

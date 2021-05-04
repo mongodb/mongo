@@ -34,31 +34,22 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 
 namespace mongo::stage_builder {
 /**
- * Translates an input Expression into an SBE EExpression, along with a chain of PlanStages whose
- * output will be necessary to evaluate the EExpression. The 'stage' input will be attached to the
- * end of the resulting chain of PlanStages.
- *
- * Note that any slot whose value must be visible to the parent of the PlanStage output by this
- * function should be included in the 'relevantSlots' list. Some stages (notably LoopJoin) do not
- * forward all of the slots visible to them to their parents; they need an explicit list of which
- * slots to forward.
- *
- * The 'relevantSlots' is an input/output parameter. Execution of this function may add additional
- * relevant slots to the list.
+ * Translates an input Expression into an SBE EExpression. The 'stage' parameter provides the input
+ * subtree to build on top of.
  */
-std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::PlanStage>>
-generateExpression(OperationContext* opCtx,
-                   Expression* expr,
-                   std::unique_ptr<sbe::PlanStage> stage,
-                   sbe::value::SlotIdGenerator* slotIdGenerator,
-                   sbe::value::FrameIdGenerator* frameIdGenerator,
-                   sbe::value::SlotId inputVar,
-                   sbe::RuntimeEnvironment* env,
-                   PlanNodeId planNodeId,
-                   sbe::value::SlotVector* relevantSlots = nullptr);
+std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> generateExpression(
+    OperationContext* opCtx,
+    Expression* expr,
+    EvalStage stage,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    sbe::value::SlotId inputVar,
+    sbe::RuntimeEnvironment* env,
+    PlanNodeId planNodeId);
 
 /**
  * Generate an EExpression that converts a value (contained in a variable bound to 'branchRef') that

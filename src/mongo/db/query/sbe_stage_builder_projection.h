@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 
 namespace mongo::stage_builder {
 /**
@@ -41,15 +42,13 @@ namespace mongo::stage_builder {
  * defines an input stage to the generated SBE plan stage sub-tree. The 'inputVar' defines a
  * variable to read the input document from.
  */
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateProjection(
+std::pair<sbe::value::SlotId, EvalStage> generateProjection(
     OperationContext* opCtx,
     const projection_ast::Projection* proj,
-    std::unique_ptr<sbe::PlanStage> stage,
+    EvalStage stage,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputVar,
     sbe::RuntimeEnvironment* env,
-    sbe::value::SlotVector relevantSlots,
     PlanNodeId planNodeId);
-
 }  // namespace mongo::stage_builder

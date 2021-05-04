@@ -36,6 +36,7 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/stage_types.h"
@@ -263,19 +264,13 @@ EvalStage makeFilter(EvalStage stage,
             std::move(stage.outSlots)};
 }
 
+EvalStage makeProject(EvalStage stage,
+                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects,
+                      PlanNodeId planNodeId);
+
 template <typename... Ts>
 EvalStage makeProject(EvalStage stage, PlanNodeId planNodeId, Ts&&... pack) {
-    stage = stageOrLimitCoScan(std::move(stage), planNodeId);
-
-    auto outSlots = std::move(stage.outSlots);
-    auto projects = makeEM(std::forward<Ts>(pack)...);
-
-    for (auto& [slot, expr] : projects) {
-        outSlots.push_back(slot);
-    }
-
-    return {sbe::makeS<sbe::ProjectStage>(std::move(stage.stage), std::move(projects), planNodeId),
-            std::move(outSlots)};
+    return makeProject(std::move(stage), makeEM(std::forward<Ts>(pack)...), planNodeId);
 }
 
 /**
@@ -301,14 +296,14 @@ EvalStage makeUnwind(EvalStage inputEvalStage,
                      bool preserveNullAndEmptyArrays = true);
 
 /**
- * Creates a branch stage with the specified condition ifExpr and creates output slots for the
- * branch stage. This forwards the outputs of the thenStage to the output slots of the branchStage
- * if the condition evaluates to true, and forwards the elseStage outputs if the condition is false.
+ * Creates a branch stage with the specified condition ifExpr.
  */
-EvalStage makeBranch(std::unique_ptr<sbe::EExpression> ifExpr,
-                     EvalStage thenStage,
+EvalStage makeBranch(EvalStage thenStage,
                      EvalStage elseStage,
-                     sbe::value::SlotIdGenerator* slotIdGenerator,
+                     std::unique_ptr<sbe::EExpression> ifExpr,
+                     sbe::value::SlotVector thenVals,
+                     sbe::value::SlotVector elseVals,
+                     sbe::value::SlotVector outputVals,
                      PlanNodeId planNodeId);
 
 /**
@@ -335,6 +330,23 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
                     std::vector<sbe::value::SlotVector> inputVals,
                     sbe::value::SlotVector outputVals,
                     PlanNodeId planNodeId);
+
+EvalStage makeHashAgg(EvalStage stage,
+                      sbe::value::SlotVector gbs,
+                      sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs,
+                      boost::optional<sbe::value::SlotId> collatorSlot,
+                      PlanNodeId planNodeId);
+
+EvalStage makeMkBsonObj(EvalStage stage,
+                        sbe::value::SlotId objSlot,
+                        boost::optional<sbe::value::SlotId> rootSlot,
+                        boost::optional<sbe::MakeObjFieldBehavior> fieldBehavior,
+                        std::vector<std::string> fields,
+                        std::vector<std::string> projectFields,
+                        sbe::value::SlotVector projectVars,
+                        bool forceNewObject,
+                        bool returnOldObject,
+                        PlanNodeId planNodeId);
 
 using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
     EvalExpr expr,

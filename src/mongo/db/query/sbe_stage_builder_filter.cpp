@@ -1410,13 +1410,12 @@ public:
         auto currentStage = stageOrLimitCoScan(frame.extractStage(), _context->planNodeId);
         auto&& [_, expr, stage] = generateExpression(_context->opCtx,
                                                      matchExpr->getExpression().get(),
-                                                     std::move(currentStage.stage),
+                                                     std::move(currentStage),
                                                      _context->slotIdGenerator,
                                                      _context->frameIdGenerator,
                                                      *frame.data().inputSlot,
                                                      _context->env,
-                                                     _context->planNodeId,
-                                                     &currentStage.outSlots);
+                                                     _context->planNodeId);
         auto frameId = _context->frameIdGenerator->generate();
 
         // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
@@ -1427,7 +1426,7 @@ public:
             frameId, sbe::makeEs(std::move(expr)), std::move(logicExpr));
 
         frame.pushExpr(_context->stateHelper.makeState(std::move(localBindExpr)));
-        frame.setStage(EvalStage{std::move(stage), std::move(currentStage.outSlots)});
+        frame.setStage(std::move(stage));
     }
 
     void visit(const GTEMatchExpression* expr) final {
@@ -1893,15 +1892,14 @@ private:
 };
 }  // namespace
 
-std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::PlanStage>> generateFilter(
+std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     OperationContext* opCtx,
     const MatchExpression* root,
-    std::unique_ptr<sbe::PlanStage> stage,
+    EvalStage stage,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputSlot,
     sbe::RuntimeEnvironment* env,
-    sbe::value::SlotVector relevantSlots,
     PlanNodeId planNodeId,
     bool trackIndex) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
@@ -1910,16 +1908,11 @@ std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::PlanStage>> 
         return {boost::none, std::move(stage)};
     }
 
-    // If 'inputSlot' is not present within 'relevantSlots', add it now.
-    if (!std::count(relevantSlots.begin(), relevantSlots.end(), inputSlot)) {
-        relevantSlots.push_back(inputSlot);
-    }
-
     auto stateHelper = makeFilterStateHelper(trackIndex);
     MatchExpressionVisitorContext context{opCtx,
                                           slotIdGenerator,
                                           frameIdGenerator,
-                                          EvalStage{std::move(stage), std::move(relevantSlots)},
+                                          std::move(stage),
                                           inputSlot,
                                           root,
                                           env,
@@ -1932,30 +1925,22 @@ std::pair<boost::optional<sbe::value::SlotId>, std::unique_ptr<sbe::PlanStage>> 
     tree_walker::walk<true, MatchExpression>(root, &walker);
 
     auto [resultSlot, resultStage] = context.done();
-    return {resultSlot, std::move(resultStage.stage)};
+    return {resultSlot, std::move(resultStage)};
 }
 
-std::unique_ptr<sbe::PlanStage> generateIndexFilter(OperationContext* opCtx,
-                                                    const MatchExpression* root,
-                                                    std::unique_ptr<sbe::PlanStage> stage,
-                                                    sbe::value::SlotIdGenerator* slotIdGenerator,
-                                                    sbe::value::FrameIdGenerator* frameIdGenerator,
-                                                    sbe::value::SlotVector keySlots,
-                                                    std::vector<std::string> keyFields,
-                                                    sbe::RuntimeEnvironment* env,
-                                                    sbe::value::SlotVector relevantSlots,
-                                                    PlanNodeId planNodeId) {
+EvalStage generateIndexFilter(OperationContext* opCtx,
+                              const MatchExpression* root,
+                              EvalStage stage,
+                              sbe::value::SlotIdGenerator* slotIdGenerator,
+                              sbe::value::FrameIdGenerator* frameIdGenerator,
+                              sbe::value::SlotVector keySlots,
+                              std::vector<std::string> keyFields,
+                              sbe::RuntimeEnvironment* env,
+                              PlanNodeId planNodeId) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
     if (root->matchType() == MatchExpression::AND && root->numChildren() == 0) {
         return stage;
-    }
-
-    // If 'keySlots' are not present within 'relevantSlots', add them now.
-    for (auto keySlot : keySlots) {
-        if (!std::count(relevantSlots.begin(), relevantSlots.end(), keySlot)) {
-            relevantSlots.push_back(keySlot);
-        }
     }
 
     // Index filters never need to track the index of a matching element in the array as they cannot
@@ -1965,7 +1950,7 @@ std::unique_ptr<sbe::PlanStage> generateIndexFilter(OperationContext* opCtx,
     MatchExpressionVisitorContext context{opCtx,
                                           slotIdGenerator,
                                           frameIdGenerator,
-                                          EvalStage{std::move(stage), std::move(relevantSlots)},
+                                          std::move(stage),
                                           std::move(keySlots),
                                           std::move(keyFields),
                                           root,
@@ -1980,6 +1965,6 @@ std::unique_ptr<sbe::PlanStage> generateIndexFilter(OperationContext* opCtx,
 
     auto [resultSlot, resultStage] = context.done();
     tassert(5273411, "Index filter must not track a matching element index", !resultSlot);
-    return std::move(resultStage.stage);
+    return std::move(resultStage);
 }
 }  // namespace mongo::stage_builder

@@ -12,7 +12,8 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/aggregation/extras/utils.js");  // arrayEq
 
 const isSBEEnabled = checkSBEEnabled(db);
 
@@ -123,5 +124,15 @@ assert.eq(resultDoc, {x: {y: {y: null, z: null}, z: null}});
     assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
     assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)));
     assert.eq(coll.findOne(filter, {_id: 0, "a.b": 1}), {a: {b: {c: 1, d: 1}}});
+}
+
+{
+    assert(coll.drop());
+
+    assert.commandWorked(coll.insert({a: {x: 1, b: {x: 2}}, b: {c: 3}}));
+
+    assert(arrayEq(coll.find({}, {_id: 0, "a": "$p", "b.c": "$q"}).toArray(), [{b: {}}]));
+    assert(arrayEq(coll.find({}, {_id: 0, "a.x": "$a.x", "a.b.x": "$a.x"}).toArray(),
+                   [{a: {x: 1, b: {x: 1}}}]));
 }
 }());

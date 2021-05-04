@@ -337,15 +337,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
             relevantSlots.push_back(*tsSlot);
         }
 
-        std::tie(std::ignore, stage) = generateFilter(opCtx,
-                                                      csn->filter.get(),
-                                                      std::move(stage),
-                                                      slotIdGenerator,
-                                                      frameIdGenerator,
-                                                      resultSlot,
-                                                      env,
-                                                      std::move(relevantSlots),
-                                                      csn->nodeId());
+        auto [_, outputStage] = generateFilter(opCtx,
+                                               csn->filter.get(),
+                                               {std::move(stage), std::move(relevantSlots)},
+                                               slotIdGenerator,
+                                               frameIdGenerator,
+                                               resultSlot,
+                                               env,
+                                               csn->nodeId());
+        stage = std::move(outputStage.stage);
 
         // We may be requested to stop applying the filter after the first match. This can happen
         // if the query is just a lower bound on 'ts' on a forward scan. In this case every document
@@ -571,15 +571,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
 
         auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
 
-        std::tie(std::ignore, stage) = generateFilter(opCtx,
-                                                      csn->filter.get(),
-                                                      std::move(stage),
-                                                      slotIdGenerator,
-                                                      frameIdGenerator,
-                                                      resultSlot,
-                                                      env,
-                                                      std::move(relevantSlots),
-                                                      csn->nodeId());
+        auto [_, outputStage] = generateFilter(opCtx,
+                                               csn->filter.get(),
+                                               {std::move(stage), std::move(relevantSlots)},
+                                               slotIdGenerator,
+                                               frameIdGenerator,
+                                               resultSlot,
+                                               env,
+                                               csn->nodeId());
+        stage = std::move(outputStage.stage);
     }
 
     PlanStageSlots outputs;

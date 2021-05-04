@@ -1050,16 +1050,20 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         // the fields of the index key pattern that are depended on to compute the predicate.
         auto indexFilterKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
             ixn->index.keyPattern, indexFilterKeyBitset, indexKeyBitset, indexKeySlots);
-        stage = generateIndexFilter(opCtx,
-                                    ixn->filter.get(),
-                                    std::move(stage),
-                                    slotIdGenerator,
-                                    frameIdGenerator,
-                                    std::move(indexFilterKeySlots),
-                                    std::move(indexFilterKeyFields),
-                                    env,
-                                    relevantSlots,
-                                    ixn->nodeId());
+
+        relevantSlots.insert(
+            relevantSlots.end(), indexFilterKeySlots.begin(), indexFilterKeySlots.end());
+
+        auto outputStage = generateIndexFilter(opCtx,
+                                               ixn->filter.get(),
+                                               {std::move(stage), std::move(relevantSlots)},
+                                               slotIdGenerator,
+                                               frameIdGenerator,
+                                               std::move(indexFilterKeySlots),
+                                               std::move(indexFilterKeyFields),
+                                               env,
+                                               ixn->nodeId());
+        stage = std::move(outputStage.stage);
     }
 
     outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(
