@@ -94,7 +94,6 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
 
     bool clientSuppliedWriteConcern = !writeConcern.usedDefault;
     bool customDefaultWasApplied = false;
-    bool getLastErrorDefaultsWasApplied = false;
 
     // If no write concern is specified in the command, then use the cluster-wide default WC (if
     // there is one), or else the default WC {w:1}.
@@ -139,8 +138,6 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
         } else if (customDefaultWasApplied) {
             provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
-        } else if (getLastErrorDefaultsWasApplied) {
-            provenance.setSource(ReadWriteConcernProvenance::Source::getLastErrorDefaults);
         } else if (opCtx->getClient()->isInDirectClient() || isInternalClient) {
             provenance.setSource(ReadWriteConcernProvenance::Source::internalWriteDefault);
         } else {
