@@ -302,6 +302,13 @@ void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
                                                   const BSONObj& reason,
                                                   const WriteConcernOptions& writeConcern,
                                                   const boost::optional<BSONObj>& additionalInfo) {
+    LOGV2_DEBUG(5656600,
+                3,
+                "Acquiring recoverable critical section blocking writes",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
+
     invariant(!opCtx->lockState()->isLocked());
 
     {
@@ -326,7 +333,13 @@ void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
                           << " but it is already taken by another operation with different reason "
                           << collCSDoc.getReason());
 
-            // Do nothing, the persisted document is already there!
+            LOGV2_DEBUG(
+                5656601,
+                3,
+                "The recoverable critical section was already acquired to block writes, do nothing",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
             return;
         }
 
@@ -360,12 +373,25 @@ void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+    LOGV2_DEBUG(5656602,
+                2,
+                "Acquired recoverable critical section blocking writes",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
 }
 
 void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
                                                  const NamespaceString& nss,
                                                  const BSONObj& reason,
                                                  const WriteConcernOptions& writeConcern) {
+    LOGV2_DEBUG(5656603,
+                3,
+                "Promoting recoverable critical section to also block reads",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
+
     invariant(!opCtx->lockState()->isLocked());
 
     {
@@ -394,8 +420,16 @@ void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
 
         // if there is a document with the same nss, reason and blocking reads -> do nothing, the CS
         // is already taken!
-        if (collCSDoc.getBlockReads())
+        if (collCSDoc.getBlockReads()) {
+            LOGV2_DEBUG(5656604,
+                        3,
+                        "The recoverable critical section was already promoted to also block "
+                        "reads, do nothing",
+                        "namespace"_attr = nss,
+                        "reason"_attr = reason,
+                        "writeConcern"_attr = writeConcern);
             return;
+        }
 
         // The CS is in the catch-up phase, try to advance it to the commit phase.
 
@@ -436,13 +470,25 @@ void acquireRecoverableCriticalSectionBlockReads(OperationContext* opCtx,
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+    LOGV2_DEBUG(5656605,
+                2,
+                "Promoted recoverable critical section to also block reads",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
 }
-
 
 void releaseRecoverableCriticalSection(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const BSONObj& reason,
                                        const WriteConcernOptions& writeConcern) {
+    LOGV2_DEBUG(5656606,
+                3,
+                "Releasing recoverable critical section",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
+
     invariant(!opCtx->lockState()->isLocked());
 
     {
@@ -456,8 +502,15 @@ void releaseRecoverableCriticalSection(OperationContext* opCtx,
             dbClient.query(NamespaceString::kCollectionCriticalSectionsNamespace, queryNss);
 
         // if there is no document with the same nss -> do nothing!
-        if (!cursor->more())
+        if (!cursor->more()) {
+            LOGV2_DEBUG(5656607,
+                        3,
+                        "The recoverable critical section was already released, do nothing",
+                        "namespace"_attr = nss,
+                        "reason"_attr = reason,
+                        "writeConcern"_attr = writeConcern);
             return;
+        }
 
         BSONObj bsonObj = cursor->next();
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
@@ -507,6 +560,13 @@ void releaseRecoverableCriticalSection(OperationContext* opCtx,
     WriteConcernResult ignoreResult;
     const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
     uassertStatusOK(waitForWriteConcern(opCtx, latestOpTime, writeConcern, &ignoreResult));
+
+    LOGV2_DEBUG(5656608,
+                2,
+                "Released recoverable critical section",
+                "namespace"_attr = nss,
+                "reason"_attr = reason,
+                "writeConcern"_attr = writeConcern);
 }
 
 void retakeInMemoryRecoverableCriticalSections(OperationContext* opCtx) {
