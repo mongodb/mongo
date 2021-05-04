@@ -600,6 +600,8 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
     }
 
+    enforceRequireAPIVersion(opCtx, command);
+
     auto& apiParams = APIParameters::get(opCtx);
     auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
     if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
@@ -813,9 +815,6 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     // Remember whether or not this operation is starting a transaction, in case something later in
     // the execution needs to adjust its behavior based on this.
     opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
-
-    // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
-    enforceRequireAPIVersion(opCtx, command);
 
     command->incrementCommandsExecuted();
 

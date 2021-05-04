@@ -38,8 +38,7 @@ for (const initParams of apiParamCombos) {
     for (const continueParams of apiParamCombos) {
         const findCmd = addApiParams({find: testColl.getName(), batchSize: 1}, initParams);
         const cursorId = assert.commandWorked(testDB.runCommand(findCmd)).cursor.id;
-        // TODO (SERVER-56550): Remove "!continueParams.apiVersion".
-        const compatibleParams = !continueParams.apiVersion || continueParams === initParams;
+        const compatibleParams = (continueParams === initParams);
 
         const getMoreCmd =
             addApiParams({getMore: cursorId, collection: testColl.getName()}, continueParams);

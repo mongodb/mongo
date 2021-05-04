@@ -177,7 +177,7 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                 std::move(opTime));
         })
         .thenRunOn(Grid::get(_serviceContext)->getExecutorPool()->getFixedExecutor())
-        .then([this] {
+        .then([this, apiParams] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
                 _participantsDurable = true;
@@ -204,8 +204,12 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                     return Future<void>::makeReady();
             }
 
-            return txn::sendPrepare(
-                       _serviceContext, *_sendPrepareScheduler, _lsid, _txnNumber, *_participants)
+            return txn::sendPrepare(_serviceContext,
+                                    *_sendPrepareScheduler,
+                                    _lsid,
+                                    _txnNumber,
+                                    apiParams,
+                                    *_participants)
                 .then([this](PrepareVoteConsensus consensus) mutable {
                     {
                         stdx::lock_guard<Latch> lg(_mutex);

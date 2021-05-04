@@ -5,7 +5,7 @@
  *
  * @tags: [
  *   requires_fcv_50,
- *   uses_api_parameters,
+ *   uses_api_parameters
  * ]
  */
 
@@ -44,7 +44,7 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.NoQueryExecutionPlans);
 
-// Can not hint a sparse index which is exclued from API version 1 with 'apiStrict: true'.
+// Can not hint a sparse index which is excluded from API version 1 with 'apiStrict: true'.
 assert.commandFailedWithCode(db.runCommand({
     "find": collName,
     "filter": {views: 50},

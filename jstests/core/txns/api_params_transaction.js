@@ -38,9 +38,7 @@ function addApiParams(obj, params) {
 for (const txnInitiatingParams of apiParamCombos) {
     for (const txnContinuingParams of apiParamCombos) {
         for (const txnEndingCmdName of ["commitTransaction", "abortTransaction"]) {
-            // TODO (SERVER-56550): Remove "!txnContinuingParams.apiVersion".
-            const compatibleParams =
-                !txnContinuingParams.apiVersion || txnContinuingParams === txnInitiatingParams;
+            const compatibleParams = (txnContinuingParams === txnInitiatingParams);
             const session = db.getMongo().startSession();
             const sessionDb = session.getDatabase(dbName);
 
@@ -80,8 +78,20 @@ for (const txnInitiatingParams of apiParamCombos) {
 
             checkCommand(session.getDatabase("admin"), txnEndingCmd);
 
-            // Clean up.
-            session.abortTransaction();
+            if (!compatibleParams) {
+                jsTestLog('Cleaning up');
+                // Clean up by calling abortTransaction with the right API parameters.
+                const abortCmd = {
+                    abortTransaction: 1,
+                    txnNumber: session.getTxnNumber_forTesting(),
+                    autocommit: false
+                };
+                const cleanupReply = session.getDatabase("admin").runCommand(
+                    addApiParams(abortCmd, txnInitiatingParams));
+                jsTestLog(`Cleanup reply ${tojson(cleanupReply)}`);
+            }
+
+            session.endSession();
         }
     }
 }

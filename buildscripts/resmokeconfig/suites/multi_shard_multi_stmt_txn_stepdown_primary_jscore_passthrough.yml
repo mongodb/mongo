@@ -341,7 +341,9 @@ selector:
   # Retrying a query can change whether a plan cache entry is active.
   - inspects_whether_plan_cache_entry_is_active
   - does_not_support_transactions
-
+  # Transaction-continuing commands must use the same API parameters as the first command, so tests
+  # that use API parameters cannot be run with transactions.
+  - uses_api_parameters
 executor:
   archive:
     hooks:

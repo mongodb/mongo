@@ -51,6 +51,10 @@ MONGO_FAIL_POINT_DEFINE(participantReturnNetworkErrorForPrepareAfterExecutingPre
 
 class PrepareTransactionCmd : public TypedCommand<PrepareTransactionCmd> {
 public:
+    bool acceptsAnyApiVersionParameters() const override {
+        return true;
+    }
+
     class PrepareTimestamp {
     public:
         PrepareTimestamp(Timestamp timestamp) : _timestamp(std::move(timestamp)) {}

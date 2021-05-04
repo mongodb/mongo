@@ -273,8 +273,8 @@ selector:
   # it, since we won't know whether the cursor was advanced or not.
   - requires_getmore
   - does_not_support_transactions
-  # Transaction-continuing commands cannot specify API parameters, so tests that use API parameters
-  # cannot be run with transactions.
+  # Transaction-continuing commands must use the same API parameters as the first command, so tests
+  # that use API parameters cannot be run with transactions.
   - uses_api_parameters
 
 executor:

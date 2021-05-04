@@ -409,7 +409,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenFirstParticipantVotesAbortAndSecondVotesCommit) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) { return kPrepareOk; }});
@@ -424,7 +425,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenFirstParticipantVotesCommitAndSecondVotesAbort) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess();
     assertPrepareSentAndRespondWithNoSuchTransaction();
@@ -438,7 +440,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsAbortDecisionWhenBothParticipantsVoteAbort) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     onCommands({[&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; },
                 [&](const executor::RemoteCommandRequest& request) { return kNoSuchTransaction; }});
@@ -455,7 +458,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
@@ -472,7 +476,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
@@ -489,7 +494,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto maxPrepareTimestamp = Timestamp(2, 1);
 
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(firstPrepareTimestamp);
     assertPrepareSentAndRespondWithSuccess(maxPrepareTimestamp);
@@ -505,7 +511,8 @@ TEST_F(TransactionCoordinatorDriverTest,
     const auto timestamp = Timestamp(1, 1);
 
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(timestamp);
     assertCommandSentAndRespondWith(
@@ -521,7 +528,8 @@ TEST_F(TransactionCoordinatorDriverTest,
 TEST_F(TransactionCoordinatorDriverTest,
        SendPrepareReturnsErrorWhenOneShardReturnsReadConcernMajorityNotEnabled) {
     txn::AsyncWorkScheduler aws(getServiceContext());
-    auto future = txn::sendPrepare(getServiceContext(), aws, _lsid, _txnNumber, kTwoShardIdList);
+    auto future = txn::sendPrepare(
+        getServiceContext(), aws, _lsid, _txnNumber, APIParameters(), kTwoShardIdList);
 
     assertPrepareSentAndRespondWithSuccess(Timestamp(100, 1));
     assertCommandSentAndRespondWith(

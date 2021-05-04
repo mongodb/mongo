@@ -901,18 +901,15 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
     _txnParticipant.emplace(TransactionParticipant::get(opCtx));
 
-    // TODO (SERVER-56550): Do this check even if !apiParamsFromClient.getParamsPassed().
     auto apiParamsFromClient = APIParameters::get(opCtx);
-    if (apiParamsFromClient.getParamsPassed()) {
-        auto apiParamsFromTxn = _txnParticipant->getAPIParameters(opCtx);
-        uassert(
-            ErrorCodes::APIMismatchError,
-            "API param conflict: {} used params {}, the transaction's first command used {}"_format(
-                invocation->definition()->getName(),
-                apiParamsFromClient.toBSON().toString(),
-                apiParamsFromTxn.toBSON().toString()),
-            apiParamsFromTxn == apiParamsFromClient);
-    }
+    auto apiParamsFromTxn = _txnParticipant->getAPIParameters(opCtx);
+    uassert(
+        ErrorCodes::APIMismatchError,
+        "API parameter mismatch: {} used params {}, the transaction's first command used {}"_format(
+            invocation->definition()->getName(),
+            apiParamsFromClient.toBSON().toString(),
+            apiParamsFromTxn.toBSON().toString()),
+        apiParamsFromTxn == apiParamsFromClient);
 
     if (!opCtx->getClient()->isInDirectClient()) {
         bool beganOrContinuedTxn{false};
@@ -1000,9 +997,6 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
             }
         }
     }
-
-    // Use the API parameters that were stored when the transaction was initiated.
-    APIParameters::get(opCtx) = _txnParticipant->getAPIParameters(opCtx);
 }
 
 void CheckoutSessionAndInvokeCommand::_tapError(Status status) {

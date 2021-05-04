@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include "mongo/s/transaction_router.h"
 
 #include "mongo/client/read_preference.h"
@@ -59,6 +61,8 @@
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
 
 // TODO SERVER-39704: Remove this fail point once the router can safely retry within a transaction
 // on stale version and snapshot errors.
@@ -900,13 +904,13 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
     } else if (txnNumber == o().txnNumber) {
         // This is the same transaction as the one in progress.
         auto apiParamsFromClient = APIParameters::get(opCtx);
-        // TODO (SERVER-56550): Do this check even if !apiParamsFromClient.getParamsPassed().
-        if (apiParamsFromClient.getParamsPassed() &&
-            (action == TransactionActions::kContinue || action == TransactionActions::kCommit)) {
-            uassert(ErrorCodes::APIMismatchError,
-                    "A transaction-continuing command must use the same API parameters as "
-                    "the first command in the transaction",
-                    apiParamsFromClient == o().apiParameters);
+        if (action == TransactionActions::kContinue || action == TransactionActions::kCommit) {
+            uassert(
+                ErrorCodes::APIMismatchError,
+                "API parameter mismatch: transaction-continuing command used {}, the transaction's"
+                " first command used {}"_format(apiParamsFromClient.toBSON().toString(),
+                                                o().apiParameters.toBSON().toString()),
+                apiParamsFromClient == o().apiParameters);
         }
 
         switch (action) {

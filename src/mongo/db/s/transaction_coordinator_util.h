@@ -98,6 +98,7 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,
                                          const LogicalSessionId& lsid,
                                          TxnNumber txnNumber,
+                                         const APIParameters& apiParams,
                                          const txn::ParticipantsList& participants);
 
 /**

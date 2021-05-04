@@ -233,12 +233,15 @@ Future<PrepareVoteConsensus> sendPrepare(ServiceContext* service,
                                          txn::AsyncWorkScheduler& scheduler,
                                          const LogicalSessionId& lsid,
                                          TxnNumber txnNumber,
+                                         const APIParameters& apiParams,
                                          const txn::ParticipantsList& participants) {
     PrepareTransaction prepareTransaction;
     prepareTransaction.setDbName(NamespaceString::kAdminDb);
-    auto prepareObj = prepareTransaction.toBSON(
-        BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit" << false
-                    << WriteConcernOptions::kWriteConcernField << WriteConcernOptions::Majority));
+    BSONObjBuilder bob(BSON("lsid" << lsid.toBSON() << "txnNumber" << txnNumber << "autocommit"
+                                   << false << WriteConcernOptions::kWriteConcernField
+                                   << WriteConcernOptions::Majority));
+    apiParams.appendInfo(&bob);
+    auto prepareObj = prepareTransaction.toBSON(bob.obj());
 
     std::vector<Future<PrepareResponse>> responses;
 
