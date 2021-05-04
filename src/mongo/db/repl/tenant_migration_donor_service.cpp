@@ -1152,9 +1152,13 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
 
     auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
         _serviceContext, _tenantId);
-    if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
+    if ((status == ErrorCodes::ConflictingOperationInProgress &&
+         !_initialDonorStateDurablePromise.getFuture().isReady()) ||
+        !mtab) {
+        // The migration failed either before or during inserting the state doc. Use the status to
+        // fulfill the _initialDonorStateDurablePromise to fail the donorStartMigration command
+        // immediately.
         stdx::lock_guard<Latch> lg(_mutex);
-        // Fulfill the promise since the state doc failed to insert.
         setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
 
         return ExecutorFuture(**executor);

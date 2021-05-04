@@ -47,6 +47,7 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
     dropRecipientsCollection = false,
     retryWithDifferentMigrationId = false,
     expectedRunMigrationError,
+    expectedForgetMigrationError,
     expectedAbortReason
 }) {
     assert(dropDonorsCollection || dropRecipientsCollection);
@@ -130,10 +131,15 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
             assert.eq(runMigrationRes.state, TenantMigrationTest.DonorState.kCommitted);
         }
 
-        assert.commandWorked(
-            tenantMigrationTest.forgetMigration(migrationOptsAfterDrop.migrationIdString));
-        tenantMigrationTest.waitForMigrationGarbageCollection(
-            UUID(migrationOptsAfterDrop.migrationIdString));
+        const forgetMigrationRes =
+            tenantMigrationTest.forgetMigration(migrationOptsAfterDrop.migrationIdString);
+        if (expectedForgetMigrationError) {
+            assert.commandFailedWithCode(forgetMigrationRes, expectedForgetMigrationError);
+        } else {
+            assert.commandWorked(forgetMigrationRes);
+            tenantMigrationTest.waitForMigrationGarbageCollection(
+                UUID(migrationOptsAfterDrop.migrationIdString));
+        }
     }
 
     if (retryWithDifferentMigrationId && !dropDonorsCollection) {
@@ -204,6 +210,20 @@ kMigrationFpNames.forEach(fpName => {
         // The retry causes the donor to restart the migration and send a different
         // returnAfterReachingTimestamp/blockTimestamp to the recipient, which is illegal.
         expectedAbortReason: sentBlockTimestampToRecipient ? ErrorCodes.IllegalOperation : null
+    });
+
+    const originalMigrationStartedOnRecipient =
+        fpName != "pauseTenantMigrationAfterPersistingInitialDonorStateDoc";
+    testDroppingStateDocCollections(tenantMigrationTest, fpName, {
+        dropDonorsCollection: true,
+        dropRecipientsCollection: false,
+        retryWithDifferentMigrationId: true,
+        // If the original migration has started running on the recipient, the retry will lead to
+        // a conflicting migration.
+        expectedAbortReason:
+            originalMigrationStartedOnRecipient ? ErrorCodes.ConflictingOperationInProgress : null,
+        expectedForgetMigrationError:
+            originalMigrationStartedOnRecipient ? ErrorCodes.ConflictingOperationInProgress : null
     });
 });
 

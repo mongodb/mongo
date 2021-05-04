@@ -1835,6 +1835,21 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     return AsyncTry([this, self = shared_from_this(), executor, token] {
                return ExecutorFuture(**executor)
                    .then([this, self = shared_from_this()] {
+                       stdx::unique_lock lk(_mutex);
+                       // Instance task can be started only once for the current term on a primary.
+                       invariant(!_taskState.isDone());
+                       // If the task state is interrupted, then don't start the task.
+                       if (_taskState.isInterrupted()) {
+                           uassertStatusOK(_taskState.getInterruptStatus());
+                       }
+
+                       // The task state will already have been set to 'kRunning' if we restarted
+                       // the future chain on donor failover.
+                       if (!_taskState.isRunning()) {
+                           _taskState.setState(TaskState::kRunning);
+                       }
+                       pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
+
                        auto mtab = tenant_migration_access_blocker::
                            getTenantMigrationRecipientAccessBlocker(_serviceContext,
                                                                     _stateDoc.getTenantId());
@@ -1855,22 +1870,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                                        << "\" with migration id " << mtab->getMigrationId(),
                                    deleted);
                        }
-                   })
-                   .then([this, self = shared_from_this()] {
-                       stdx::unique_lock lk(_mutex);
-                       // Instance task can be started only once for the current term on a primary.
-                       invariant(!_taskState.isDone());
-                       // If the task state is interrupted, then don't start the task.
-                       if (_taskState.isInterrupted()) {
-                           uassertStatusOK(_taskState.getInterruptStatus());
-                       }
-
-                       // The task state will already have been set to 'kRunning' if we restarted
-                       // the future chain on donor failover.
-                       if (!_taskState.isRunning()) {
-                           _taskState.setState(TaskState::kRunning);
-                       }
-                       pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
 
                        if (_stateDoc.getState() !=
                                TenantMigrationRecipientStateEnum::kUninitialized &&
