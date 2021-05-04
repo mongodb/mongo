@@ -773,23 +773,23 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/transport/service_entry_point',
-        'auth/auth',
-        'command_can_run_here',
-        'concurrency/lock_manager',
         'curop',
         'curop_metrics',
-        'lasterror',
         'rw_concern_d',
         'storage/storage_engine_common',
         'storage/storage_engine_lock_file',
         'storage/storage_engine_metadata',
-        'storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
+        'auth/auth',
+        'command_can_run_here',
         'commands/fsync_locked',
+        'concurrency/lock_manager',
+        'lasterror',
         'read_concern_d_impl',
         's/sharding_runtime_d',
         'service_entry_point_common',
+        'storage/storage_options',
     ],
 )
 

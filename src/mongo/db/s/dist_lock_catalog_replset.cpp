@@ -37,6 +37,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/type_lockpings.h"
 #include "mongo/db/s/type_locks.h"
@@ -106,10 +107,14 @@ StatusWith<OID> extractElectionId(const BSONObj& responseObj) {
         if (electionIdStatus.code() == ErrorCodes::NoSuchKey) {
             // Verify that the from replSubObj that this is indeed not a primary.
             bool isPrimary = false;
-            auto isPrimaryStatus = bsonExtractBooleanField(replSubObj, "ismaster", &isPrimary);
-
+            auto isPrimaryStatus = bsonExtractBooleanField(
+                replSubObj, HelloCommandReply::kIsWritablePrimaryFieldName, &isPrimary);
             if (!isPrimaryStatus.isOK()) {
-                return {ErrorCodes::UnsupportedFormat, isPrimaryStatus.reason()};
+                isPrimaryStatus = bsonExtractBooleanField(
+                    replSubObj, HelloCommandReply::kIsmasterFieldName, &isPrimary);
+                if (!isPrimaryStatus.isOK()) {
+                    return {ErrorCodes::UnsupportedFormat, isPrimaryStatus.reason()};
+                }
             }
 
             if (isPrimary) {
