@@ -87,8 +87,7 @@ public:
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
-                  bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) override;
+                  const OplogDeleteEntryArgs& args) override;
 
     /**
      * This function is called whenever OplogApplierImpl updates a document in a collection.
@@ -122,8 +121,7 @@ public:
                        const NamespaceString&,
                        OptionalCollectionUUID,
                        StmtId,
-                       bool,
-                       const boost::optional<BSONObj>&)>
+                       const OpObserver::OplogDeleteEntryArgs&)>
         onDeleteFn;
 
     std::function<void(OperationContext*, const OplogUpdateEntryArgs&)> onUpdateFn;

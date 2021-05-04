@@ -829,9 +829,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
-        "$BUILD_DIR/mongo/db/timeseries/bucket_catalog",
+        '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/s/coreshard',
-        "$BUILD_DIR/mongo/s/grid",
+        '$BUILD_DIR/mongo/s/grid',
         'catalog/collection_options',
         'catalog/database_holder',
         'op_observer',
@@ -842,8 +842,9 @@ env.Library(
         'views/views_mongod',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
+        'repl/repl_server_parameters',
         'transaction',
     ],
 )

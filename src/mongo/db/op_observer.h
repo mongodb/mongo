@@ -131,24 +131,32 @@ public:
     virtual void aboutToDelete(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const BSONObj& doc) = 0;
+
+    /**
+     * "fromMigrate" indicates whether the delete was induced by a chunk migration, and so should be
+     * ignored by the user as an internal maintenance operation and not a real delete.
+     */
+    struct OplogDeleteEntryArgs {
+        const BSONObj* deletedDoc = nullptr;
+        bool fromMigrate = false;
+        bool preImageRecordingEnabledForCollection = false;
+    };
+
     /**
      * Handles logging before document is deleted.
      *
      * "ns" name of the collection from which deleteState.idDoc will be deleted.
-     * "fromMigrate" indicates whether the delete was induced by a chunk migration, and
-     * so should be ignored by the user as an internal maintenance operation and not a
-     * real delete.
      *
-     * "deletedDoc" is a reference to an optional copy of the pre-image of the doc before deletion.
-     * If deletedDoc != boost::none, then the opObserver should assume that the caller intended
-     * the pre-image to be stored/logged in addition to the documentKey.
+     * "args" is a reference to information detailing whether the pre-image of the doc should be
+     * preserved with deletion.  If `args.deletedDoc != nullptr`, then the opObserver must store the
+     * pre-image to be stored in addition to the documentKey.
      */
     virtual void onDelete(OperationContext* opCtx,
                           const NamespaceString& nss,
                           OptionalCollectionUUID uuid,
                           StmtId stmtId,
-                          bool fromMigrate,
-                          const boost::optional<BSONObj>& deletedDoc) = 0;
+                          const OplogDeleteEntryArgs& args) = 0;
+
     /**
      * Logs a no-op with "msgObj" in the o field into oplog.
      *

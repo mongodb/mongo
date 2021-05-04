@@ -251,6 +251,7 @@ public:
     using MutableOplogEntry::getFromMigrate;
     using MutableOplogEntry::getFromTenantMigration;
     using MutableOplogEntry::getHash;
+    using MutableOplogEntry::getNeedsRetryImage;
     using MutableOplogEntry::getNss;
     using MutableOplogEntry::getObject;
     using MutableOplogEntry::getObject2;
@@ -545,6 +546,7 @@ public:
     const boost::optional<mongo::UUID>& getFromTenantMigration() const&;
     const boost::optional<mongo::repl::OpTime>& getPrevWriteOpTimeInTransaction() const&;
     const boost::optional<mongo::repl::OpTime>& getPostImageOpTime() const&;
+    const boost::optional<RetryImageEnum> getNeedsRetryImage() const;
     OpTime getOpTime() const;
     bool isCommand() const;
     bool isPartialTransaction() const;

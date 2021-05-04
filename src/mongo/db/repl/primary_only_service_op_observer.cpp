@@ -61,8 +61,7 @@ void PrimaryOnlyServiceOpObserver::onDelete(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             OptionalCollectionUUID uuid,
                                             StmtId stmtId,
-                                            bool fromMigrate,
-                                            const boost::optional<BSONObj>& deletedDoc) {
+                                            const OplogDeleteEntryArgs& args) {
     auto& documentId = documentIdDecoration(opCtx);
     invariant(!documentId.isEmpty());
 

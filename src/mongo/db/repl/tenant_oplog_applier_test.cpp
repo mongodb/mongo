@@ -526,8 +526,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DatabaseMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  bool,
-                                  const boost::optional<BSONObj>&) { onDeleteCalled = true; };
+                                  const OpObserver::OplogDeleteEntryArgs&) {
+        onDeleteCalled = true;
+    };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -550,8 +551,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_CollectionMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  bool,
-                                  const boost::optional<BSONObj>&) { onDeleteCalled = true; };
+                                  const OpObserver::OplogDeleteEntryArgs&) {
+        onDeleteCalled = true;
+    };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -575,8 +577,9 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_DocumentMissing) {
                                   const NamespaceString&,
                                   OptionalCollectionUUID,
                                   StmtId,
-                                  bool,
-                                  const boost::optional<BSONObj>&) { onDeleteCalled = true; };
+                                  const OpObserver::OplogDeleteEntryArgs&) {
+        onDeleteCalled = true;
+    };
     pushOps({entry});
     auto writerPool = makeTenantMigrationWriterPool();
 
@@ -601,14 +604,13 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
                                   const NamespaceString& nss,
                                   OptionalCollectionUUID observer_uuid,
                                   StmtId,
-                                  bool fromMigrate,
-                                  const boost::optional<BSONObj>& o) {
+                                  const OpObserver::OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
-        ASSERT_FALSE(fromMigrate);
+        ASSERT_FALSE(args.fromMigrate);
         ASSERT_EQUALS(nss.db(), dbName);
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, observer_uuid);

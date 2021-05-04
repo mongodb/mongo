@@ -676,6 +676,10 @@ const boost::optional<mongo::repl::OpTime>& OplogEntry::getPostImageOpTime() con
     return _entry.getPostImageOpTime();
 }
 
+const boost::optional<RetryImageEnum> OplogEntry::getNeedsRetryImage() const {
+    return _entry.getNeedsRetryImage();
+}
+
 OpTime OplogEntry::getOpTime() const {
     return _entry.getOpTime();
 }

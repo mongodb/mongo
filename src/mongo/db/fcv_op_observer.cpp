@@ -161,8 +161,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
                              const NamespaceString& nss,
                              OptionalCollectionUUID uuid,
                              StmtId stmtId,
-                             bool fromMigrate,
-                             const boost::optional<BSONObj>& deletedDoc) {
+                             const OplogDeleteEntryArgs& args) {
     // documentKeyDecoration is set in OpObserverImpl::aboutToDelete. So the FcvOpObserver
     // relies on the OpObserverImpl also being in the opObserverRegistry.
     auto optDocKey = documentKeyDecoration(opCtx);

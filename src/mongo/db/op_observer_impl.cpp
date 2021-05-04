@@ -53,6 +53,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
@@ -221,24 +222,24 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
  */
 OpTimeBundle replLogDelete(OperationContext* opCtx,
                            const NamespaceString& nss,
+                           MutableOplogEntry* oplogEntry,
                            OptionalCollectionUUID uuid,
                            StmtId stmtId,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
-    MutableOplogEntry oplogEntry;
-    oplogEntry.setNss(nss);
-    oplogEntry.setUuid(uuid);
-    oplogEntry.setDestinedRecipient(destinedRecipientDecoration(opCtx));
+    oplogEntry->setNss(nss);
+    oplogEntry->setUuid(uuid);
+    oplogEntry->setDestinedRecipient(destinedRecipientDecoration(opCtx));
 
     repl::OplogLink oplogLink;
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
 
     OpTimeBundle opTimes;
     // We never want to store pre-images when we're migrating oplog entries from another
     // replica set.
     const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
     if (deletedDoc && !migrationRecipientInfo) {
-        MutableOplogEntry noopEntry = oplogEntry;
+        MutableOplogEntry noopEntry = *oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
         noopEntry.setObject(*deletedDoc);
         auto noteOplog = logOperation(opCtx, &noopEntry);
@@ -246,13 +247,13 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         oplogLink.preImageOpTime = noteOplog;
     }
 
-    oplogEntry.setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry.setObject(documentKeyDecoration(opCtx).get().getShardKeyAndId());
-    oplogEntry.setFromMigrateIfTrue(fromMigrate);
+    oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
+    oplogEntry->setObject(documentKeyDecoration(opCtx).get().getShardKeyAndId());
+    oplogEntry->setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
-    repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
-    opTimes.writeOpTime = logOperation(opCtx, &oplogEntry);
-    opTimes.wallClockTime = oplogEntry.getWallClockTime();
+    repl::appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
+    opTimes.writeOpTime = logOperation(opCtx, oplogEntry);
+    opTimes.wallClockTime = oplogEntry->getWallClockTime();
     return opTimes;
 }
 
@@ -590,6 +591,17 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                                 oplogEntry.getDurableReplOperation(),
                                 css,
                                 collDesc);
+        if (opCtx->getTxnNumber() && !repl::gStoreFindAndModifyImagesInOplog.load()) {
+            invariant(
+                repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV());
+            if (args.updateArgs.storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
+            } else if (args.updateArgs.storeDocOption ==
+                       CollectionUpdateArgs::StoreDocOption::PostImage) {
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPostImage});
+            }
+        }
+
         opTime = replLogUpdate(opCtx, args, std::move(oplogEntry));
 
         SessionTxnRecord sessionTxnRecord;
@@ -654,8 +666,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
-                              bool fromMigrate,
-                              const boost::optional<BSONObj>& deletedDoc) {
+                              const OplogDeleteEntryArgs& args) {
     auto optDocKey = documentKeyDecoration(opCtx);
     invariant(optDocKey, nss.ns());
     auto& documentKey = optDocKey.get();
@@ -668,15 +679,28 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (inMultiDocumentTransaction) {
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid.get(), documentKey.getShardKeyAndId());
-        if (deletedDoc) {
-            operation.setPreImage(deletedDoc->getOwned());
+        if (args.deletedDoc) {
+            operation.setPreImage(args.deletedDoc->getOwned());
         }
 
         operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
-
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+        MutableOplogEntry oplogEntry;
+        if (args.deletedDoc) {
+            if (!repl::gStoreFindAndModifyImagesInOplog.load()) {
+                invariant(opCtx->getTxnNumber());
+                invariant(repl::feature_flags::gFeatureFlagRetryableFindAndModify
+                              .isEnabledAndIgnoreFCV());
+
+                oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
+            }
+        }
+
+        boost::optional<BSONObj> deletedDoc =
+            args.deletedDoc ? boost::optional<BSONObj>(*(args.deletedDoc)) : boost::none;
+        opTime = replLogDelete(opCtx, nss, &oplogEntry, uuid, stmtId, args.fromMigrate, deletedDoc);
+
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
@@ -684,7 +708,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     }
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
-        if (!fromMigrate) {
+        if (!args.fromMigrate) {
             auto* const css = CollectionShardingState::get(opCtx, nss);
             shardObserveDeleteOp(opCtx,
                                  nss,

@@ -153,8 +153,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   OptionalCollectionUUID uuid,
                                                   StmtId stmtId,
-                                                  bool fromMigrate,
-                                                  const boost::optional<BSONObj>& deletedDoc) {
+                                                  const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         tenantIdToDeleteDecoration(opCtx) &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {

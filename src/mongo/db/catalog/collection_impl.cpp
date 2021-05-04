@@ -969,13 +969,12 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
                 OpObserver* opObserver = opCtx->getServiceContext()->getOpObserver();
                 opObserver->aboutToDelete(opCtx, ns(), doc);
 
+                OpObserver::OplogDeleteEntryArgs args;
+                // Explicitly setting values despite them being the defaults.
+                args.deletedDoc = nullptr;
+                args.fromMigrate = false;
                 // Reserves an optime for the deletion and sets the timestamp for future writes.
-                opObserver->onDelete(opCtx,
-                                     ns(),
-                                     uuid(),
-                                     kUninitializedStmtId,
-                                     /*fromMigrate=*/false,
-                                     /*deletedDoc=*/boost::none);
+                opObserver->onDelete(opCtx, ns(), uuid(), kUninitializedStmtId, args);
             }
 
             int64_t unusedKeysDeleted = 0;
@@ -1090,8 +1089,11 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     _indexCatalog->unindexRecord(opCtx, doc.value(), loc, noWarn, &keysDeleted);
     _shared->_recordStore->deleteRecord(opCtx, loc);
 
-    getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), stmtId, fromMigrate, deletedDoc);
+    OpObserver::OplogDeleteEntryArgs deleteArgs{nullptr, fromMigrate, getRecordPreImages()};
+    if (deletedDoc) {
+        deleteArgs.deletedDoc = &(deletedDoc.get());
+    }
+    getGlobalServiceContext()->getOpObserver()->onDelete(opCtx, ns(), uuid(), stmtId, deleteArgs);
 
     if (opDebug) {
         opDebug->additiveMetrics.incrementKeysDeleted(keysDeleted);

@@ -72,12 +72,11 @@ void OplogApplierImplOpObserver::onDelete(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           OptionalCollectionUUID uuid,
                                           StmtId stmtId,
-                                          bool fromMigrate,
-                                          const boost::optional<BSONObj>& deletedDoc) {
+                                          const OpObserver::OplogDeleteEntryArgs& args) {
     if (!onDeleteFn) {
         return;
     }
-    onDeleteFn(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+    onDeleteFn(opCtx, nss, uuid, stmtId, args);
 }
 
 void OplogApplierImplOpObserver::onUpdate(OperationContext* opCtx,
@@ -205,13 +204,12 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
                                   const NamespaceString& nss,
                                   OptionalCollectionUUID uuid,
                                   StmtId stmtId,
-                                  bool fromMigrate,
-                                  const boost::optional<BSONObj>& deletedDoc) {
+                                  const OpObserver::OplogDeleteEntryArgs& args) {
         applyOpCalled = true;
         checkOpCtx(opCtx);
         ASSERT_EQUALS(NamespaceString("test.t"), nss);
-        ASSERT(deletedDoc);
-        ASSERT_BSONOBJ_EQ(op.getObject(), *deletedDoc);
+        ASSERT(args.deletedDoc);
+        ASSERT_BSONOBJ_EQ(op.getObject(), *(args.deletedDoc));
         return Status::OK();
     };
 
