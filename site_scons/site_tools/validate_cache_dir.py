@@ -20,6 +20,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import json
 import os
 import pathlib
 import shutil
@@ -29,9 +30,10 @@ import SCons
 cache_debug_suffix = " (target: %s, cachefile: %s) "
 
 class InvalidChecksum(SCons.Errors.BuildError):
-    def __init__(self, src, dst, reason):
+    def __init__(self, src, dst, reason, cache_csig='', computed_csig=''):
         self.message = f"ERROR: md5 checksum {reason} for {src} ({dst})"
-
+        self.cache_csig = cache_csig
+        self.computed_csig = computed_csig
     def __str__(self):
         return self.message
 
@@ -50,6 +52,10 @@ class UnsupportedError(SCons.Errors.BuildError):
         return self.message
 
 class CacheDirValidate(SCons.CacheDir.CacheDir):
+
+    def __init__(self, path):
+        self.json_log = None
+        super().__init__(path)
 
     @staticmethod
     def get_ext():
@@ -75,27 +81,26 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             raise UnsupportedError(cls.__name__, "timestamp-newer")
 
         csig = None
-        invalid_cksum = InvalidChecksum(cls.get_hash_path(src), dst, "failed to read hash file")
         try:
             with open(cls.get_hash_path(src), 'rb') as f_out:
                 csig = f_out.read().decode().strip()
         except OSError as ex:
-            raise invalid_cksum from ex
+            raise InvalidChecksum(cls.get_hash_path(src), dst, f"failed to read hash file: {ex}") from ex
         finally:
             if not csig:
-                raise invalid_cksum from ex
+                raise InvalidChecksum(cls.get_hash_path(src), dst, f"no content_hash data found")
 
         try:
             shutil.copy2(src, dst)
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, "failed to copy from cache") from ex
+            raise CacheTransferFailed(src, dst, f"failed to copy from cache: {ex}") from ex
 
         new_csig = SCons.Util.MD5filesignature(dst,
             chunksize=SCons.Node.FS.File.md5_chunksize*1024)
 
         if csig != new_csig:
             raise InvalidChecksum(
-                cls.get_hash_path(src), dst, f"checksums don't match {csig} != {new_csig}")
+                cls.get_hash_path(src), dst, f"checksums don't match {csig} != {new_csig}", cache_csig=csig, computed_csig=new_csig)
 
     @classmethod
     def copy_to_cache(cls, env, src, dst):
@@ -107,31 +112,64 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         try:
             shutil.copy2(src, dst)
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, "failed to copy to cache") from ex
+            raise CacheTransferFailed(src, dst, f"failed to copy to cache: {ex}") from ex
 
         try:
             with open(cls.get_hash_path(dst), 'w') as f_out:
                 f_out.write(env.File(src).get_content_hash())
         except OSError as ex:
-            raise CacheTransferFailed(src, dst, "failed to create hash file") from ex
+            raise CacheTransferFailed(src, dst, f"failed to create hash file: {ex}") from ex
+
+    def log_json_cachedebug(self, node, pushing=False):
+        if (pushing
+            and (node.nocache or SCons.CacheDir.cache_readonly or 'conftest' in str(node))):
+                return
+
+        cachefile = self.cachepath(node)[1]
+        if node.fs.exists(cachefile):
+            cache_event = 'double_push' if pushing else 'hit'
+        else:
+            cache_event = 'push' if pushing else 'miss'
+
+        self.CacheDebugJson({'type': cache_event}, node, cachefile)
 
     def retrieve(self, node):
+        self.log_json_cachedebug(node)
         try:
             return super().retrieve(node)
         except InvalidChecksum as ex:
             self.print_cache_issue(node, str(ex))
-            self.clean_bad_cachefile(node)
+            self.clean_bad_cachefile(node, ex.cache_csig, ex.computed_csig)
             return False
         except (UnsupportedError, CacheTransferFailed) as ex:
             self.print_cache_issue(node, str(ex))
             return False
 
     def push(self, node):
+        self.log_json_cachedebug(node, pushing=True)
         try:
             return super().push(node)
         except CacheTransferFailed as ex:
             self.print_cache_issue(node, str(ex))
             return False
+
+    def CacheDebugJson(self, json_data, target, cachefile):
+
+        if SCons.CacheDir.cache_debug and SCons.CacheDir.cache_debug != '-' and self.json_log is None:
+            self.json_log = open(SCons.CacheDir.cache_debug + '.json', 'w')
+
+        if self.json_log is not None:
+            cksum_cachefile = str(pathlib.Path(cachefile).parent)
+            if cksum_cachefile.endswith(self.get_ext()):
+                cachefile = cksum_cachefile
+
+            json_data.update({
+                'realfile': str(target),
+                'cachefile': pathlib.Path(cachefile).name,
+                'cache_dir': str(pathlib.Path(cachefile).parent.parent),
+            })
+
+            self.json_log.write(json.dumps(json_data) + '\n')
 
     def CacheDebug(self, fmt, target, cachefile):
         # The target cachefile will live in a directory with the special
@@ -148,8 +186,9 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
         print(msg)
         self.CacheDebug(msg + cache_debug_suffix, node, cksum_dir)
+        self.CacheDebugJson({'type': 'error', 'error': msg}, node, cksum_dir)
 
-    def clean_bad_cachefile(self, node):
+    def clean_bad_cachefile(self, node, cache_csig, computed_csig):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
         if cksum_dir.is_dir():
@@ -160,6 +199,12 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
             clean_msg = f"Removed bad cachefile {cksum_dir} from cache."
             print(clean_msg)
             self.CacheDebug(clean_msg + cache_debug_suffix, node, cksum_dir)
+            self.CacheDebugJson({
+                'type': 'invalid_checksum',
+                'cache_csig': cache_csig,
+                'computed_csig': computed_csig
+            }, node, cksum_dir)
+
 
     def get_cachedir_csig(self, node):
         cachedir, cachefile = self.cachepath(node)

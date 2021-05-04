@@ -2665,6 +2665,13 @@ functions:
         permissions: public-read
         display_name: SCons cache debug log
 
+    - command: shell.exec
+      params:
+        optional: true
+        shell: bash
+        script: |
+          curator splunk --json --url=${scons_splunk_server} --token=${scons_splunk_token} --annotation=project:${project} --annotation=task_id:${task_id} --annotation=build_variant:${build_variant} --annotation=git_revision:${revision} command --exec="cat src/scons_cache.log.json" > splunk_stdout.txt || cat splunk_stdout.txt
+
   "attach report":
     command: attach.results
     params:
