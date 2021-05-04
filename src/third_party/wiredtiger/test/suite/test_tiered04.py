@@ -33,8 +33,8 @@ StorageSource = wiredtiger.StorageSource  # easy access to constants
 # test_tiered04.py
 #    Basic tiered storage API test.
 class test_tiered04(wttest.WiredTigerTestCase):
-    uri = "table:test_tiered04_sys"
-    uri1 = "table:test_tiered04"
+    uri = "table:test_tiered04"
+    uri1 = "table:test_other_tiered04"
     uri_none = "table:test_local04"
 
     auth_token = "test_token"
@@ -42,6 +42,7 @@ class test_tiered04(wttest.WiredTigerTestCase):
     bucket1 = "otherbucket"
     extension_name = "local_store"
     prefix = "this_pfx"
+    prefix1 = "other_pfx"
     object_sys = "9M"
     object_sys_val = 9 * 1024 * 1024
     object_uri = "15M"
@@ -83,14 +84,15 @@ class test_tiered04(wttest.WiredTigerTestCase):
         conf = \
           ',tiered_storage=(auth_token=%s,' % self.auth_token + \
           'bucket=%s,' % self.bucket1 + \
+          'bucket_prefix=%s,' % self.prefix1 + \
           'local_retention=%d,' % self.retention1 + \
           'name=%s,' % self.extension_name + \
           'object_target_size=%s)' % self.object_uri
-        #self.pr("create non-sys tiered")
-        #self.session.create(self.uri1, base_create + conf)
+        self.pr("create non-sys tiered")
+        self.session.create(self.uri1, base_create + conf)
         conf = ',tiered_storage=(name=none)'
-        #self.pr("create non tiered/local")
-        #self.session.create(self.uri_none, base_create + conf)
+        self.pr("create non tiered/local")
+        self.session.create(self.uri_none, base_create + conf)
 
         #self.pr("open cursor")
         #c = self.session.open_cursor(self.uri)

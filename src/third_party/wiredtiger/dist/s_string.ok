@@ -540,6 +540,7 @@ boolean
 br
 breakpoint
 bs
+bstorage
 bswap
 bt
 btcur

@@ -811,12 +811,15 @@ __wt_tiered_tree_create(
 static int
 __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     WT_TIERED *tiered;
     char *meta_value;
-    const char *cfg[4] = {WT_CONFIG_BASE(session, tiered_meta), config, NULL, NULL};
+    const char *cfg[5] = {WT_CONFIG_BASE(session, tiered_meta), NULL, NULL, NULL, NULL};
     const char *metadata;
 
+    conn = S2C(session);
     metadata = NULL;
     tiered = NULL;
 
@@ -832,8 +835,17 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
      * We're creating a tiered table. Set the initial tiers list to empty. Opening the table will
      * cause us to create our first file or tiered object.
      */
-    if (!F_ISSET(S2C(session), WT_CONN_READONLY)) {
-        cfg[2] = "tiers=()";
+    if (!F_ISSET(conn, WT_CONN_READONLY)) {
+        WT_RET(__wt_scr_alloc(session, 0, &tmp));
+        /*
+         * By default use the connection level bucket and prefix. Then we add in any user
+         * configuration that may override the system one.
+         */
+        WT_ERR(__wt_buf_fmt(session, tmp, ",tiered_storage=(bucket=%s,bucket_prefix=%s)",
+          conn->bstorage->bucket, conn->bstorage->bucket_prefix));
+        cfg[1] = tmp->data;
+        cfg[2] = config;
+        cfg[3] = "tiers=()";
         WT_ERR(__wt_config_merge(session, cfg, NULL, &metadata));
         WT_ERR(__wt_metadata_insert(session, uri, metadata));
     }
@@ -846,6 +858,7 @@ __create_tiered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const
 
 err:
     WT_TRET(__wt_schema_release_tiered(session, &tiered));
+    __wt_scr_free(session, &tmp);
     __wt_free(session, meta_value);
     __wt_free(session, metadata);
     return (ret);

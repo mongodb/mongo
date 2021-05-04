@@ -33,10 +33,11 @@ extern WT_PROCESS __wt_process;
 
 /*
  * WT_BUCKET_STORAGE --
- *	A list entry for a storage source with a unique (name, bucket).
+ *	A list entry for a storage source with a unique name (bucket, prefix).
  */
 struct __wt_bucket_storage {
-    const char *bucket;                /* Bucket location */
+    const char *bucket;                /* Bucket name */
+    const char *bucket_prefix;         /* Bucket prefix */
     int owned;                         /* Storage needs to be terminated */
     uint64_t object_size;              /* Tiered object size */
     uint64_t retain_secs;              /* Tiered period */
@@ -402,12 +403,10 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
-    WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
-    wt_thread_t tiered_tid;          /* Tiered thread */
-    bool tiered_tid_set;             /* Tiered thread set */
-    WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
-
-    const char *tiered_prefix;        /* Tiered storage naming prefix */
+    WT_SESSION_IMPL *tiered_session;  /* Tiered thread session */
+    wt_thread_t tiered_tid;           /* Tiered thread */
+    bool tiered_tid_set;              /* Tiered thread set */
+    WT_CONDVAR *tiered_cond;          /* Tiered wait mutex */
     WT_TIERED_MANAGER tiered_manager; /* Tiered worker thread information */
     bool tiered_server_running;       /* Internal tiered server operating */
 
