@@ -11,7 +11,8 @@ load("jstests/libs/check_unique_indexes.js");
 const latestBinary = "latest";
 
 let setFCV = function(adminDB, version) {
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
+    assert.commandWorked(
+        adminDB.runCommand({setFeatureCompatibilityVersion: version, writeConcern: {w: 1}}));
     checkFCV(adminDB, version);
 };
 
@@ -28,7 +29,7 @@ let insertDataForConn = function(conn, dbs, nodeOptions) {
                 assert.commandWorked(
                     conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: "majority"}}));
             } else {
-                assert.commandWorked(conn.getDB(dbs[j]).foo.insert(doc));
+                assert.commandWorked(conn.getDB(dbs[j]).foo.insert(doc, {writeConcern: {w: 1}}));
             }
         }
     }
@@ -40,9 +41,16 @@ let insertDataForConn = function(conn, dbs, nodeOptions) {
         let testDB = conn.getDB(dbs[j]);
         testDB.getCollectionInfos().forEach(function(c) {
             if (c.name === "foo") {
-                let foo = testDB.getCollection(c.name);
-                assert.commandWorked(foo.createIndex({id: 1}, {unique: true}));
-                assert.commandWorked(foo.createIndex({sno: 1}, {unique: true, v: 1}));
+                assert.commandWorked(testDB.runCommand({
+                    createIndexes: "foo",
+                    indexes: [{key: {id: 1}, name: "id_1", unique: true}],
+                    writeConcern: {w: 1}
+                }));
+                assert.commandWorked(testDB.runCommand({
+                    createIndexes: "foo",
+                    indexes: [{key: {sno: 1}, name: "sno_1", unique: true, v: 1}],
+                    writeConcern: {w: 1}
+                }));
             }
         });
     }
@@ -86,11 +94,13 @@ let recreateUniqueIndexes = function(db, secondary) {
         const ns = pair.ns;
         const idx = pair.spec;
         let [dbName, collName] = ns.split(".");
-        let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name});
+        let res = db.getSiblingDB(dbName).runCommand(
+            {dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({
             createIndexes: collName,
-            indexes: [{"key": idx.key, "name": idx.name, "unique": true}]
+            indexes: [{"key": idx.key, "name": idx.name, "unique": true}],
+            writeConcern: {w: 1}
         });
         assert.commandWorked(res);
     }
@@ -100,11 +110,13 @@ let recreateUniqueIndexes = function(db, secondary) {
         const ns = pair.ns;
         const idx = pair.spec;
         let [dbName, collName] = ns.split(".");
-        let res = db.getSiblingDB(dbName).runCommand({dropIndexes: collName, index: idx.name});
+        let res = db.getSiblingDB(dbName).runCommand(
+            {dropIndexes: collName, index: idx.name, writeConcern: {w: 1}});
         assert.commandWorked(res);
         res = db.getSiblingDB(dbName).runCommand({
             createIndexes: collName,
-            indexes: [{"key": idx.key, "name": idx.name, "unique": true, "v": 1}]
+            indexes: [{"key": idx.key, "name": idx.name, "unique": true, "v": 1}],
+            writeConcern: {w: 1}
         });
         assert.commandWorked(res);
     }
@@ -158,8 +170,11 @@ let standaloneTest = function(nodeOptions, downgradeVersion) {
 
         // Transitioning from last-lts to last-continuous is only allowed when
         // setFeatureCompatibilityVersion is called with fromConfigServer: true.
-        assert.commandWorked(adminDB.runCommand(
-            {setFeatureCompatibilityVersion: downgradeFCV, fromConfigServer: true}));
+        assert.commandWorked(adminDB.runCommand({
+            setFeatureCompatibilityVersion: downgradeFCV,
+            fromConfigServer: true,
+            writeConcern: {w: 1}
+        }));
         checkFCV(adminDB, downgradeFCV);
     }
 
@@ -255,8 +270,11 @@ let replicaSetTest = function(nodeOptions, downgradeVersion) {
 
         // Transitioning from last-lts to last-continuous is only allowed when
         // setFeatureCompatibilityVersion is called with fromConfigServer: true.
-        assert.commandWorked(primaryAdminDB.runCommand(
-            {setFeatureCompatibilityVersion: downgradeFCV, fromConfigServer: true}));
+        assert.commandWorked(primaryAdminDB.runCommand({
+            setFeatureCompatibilityVersion: downgradeFCV,
+            fromConfigServer: true,
+            writeConcern: {w: 1}
+        }));
     }
 
     // Ensure featureCompatibilityVersion is 'downgradeVersion' and all collections still have

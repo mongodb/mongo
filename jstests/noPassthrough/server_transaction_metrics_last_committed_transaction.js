@@ -8,6 +8,8 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
+assert.commandWorked(primary.adminCommand({setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}}));
+let newDefaultWC = {"w": 1, "wtimeout": 0, "provenance": "customDefault"};
 
 const dbName = "test";
 const collName = "coll";
@@ -59,7 +61,7 @@ assert(!res.transactions.hasOwnProperty("lastCommittedTransaction"), () => tojso
 
 // Commit the transaction. The 'lastCommittedTransaction' section should be updated.
 assert.commandWorked(PrepareHelpers.commitTransaction(session, prepareTimestampForCommit));
-checkLastCommittedTransaction(1, {});
+checkLastCommittedTransaction(1, newDefaultWC);
 
 // Check that we are able to exclude 'lastCommittedTransaction'. FTDC uses this to filter out
 // the section as it frequently triggers scheme changes.
@@ -86,13 +88,13 @@ function runTests(prepare) {
     assert.commandWorked(sessionColl.insert({}));
     assert.commandWorked(sessionColl.insert({}));
     commitTransaction();
-    checkLastCommittedTransaction(2, {});
+    checkLastCommittedTransaction(2, newDefaultWC);
 
     // Run a read-only transaction.
     session.startTransaction();
     sessionColl.findOne();
     commitTransaction();
-    checkLastCommittedTransaction(0, {});
+    checkLastCommittedTransaction(0, newDefaultWC);
 
     // Run a transaction with non-default writeConcern.
     session.startTransaction({writeConcern: {w: 1}});
