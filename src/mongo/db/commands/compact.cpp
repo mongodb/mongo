@@ -101,7 +101,15 @@ public:
 
         StatusWith<int64_t> status = compactCollection(opCtx, nss);
         uassertStatusOK(status.getStatus());
-        result.appendNumber("bytesFreed", static_cast<long long>(status.getValue()));
+
+        int64_t bytesFreed = status.getValue();
+        if (bytesFreed < 0) {
+            // When compacting a collection that is actively being written to, it is possible that
+            // the collection is larger at the completion of compaction than when it started.
+            bytesFreed = 0;
+        }
+
+        result.appendNumber("bytesFreed", static_cast<long long>(bytesFreed));
 
         return true;
     }
