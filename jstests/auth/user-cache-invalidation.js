@@ -137,8 +137,16 @@ function runTest(writeNode, readNode, awaitReplication, lock, unlock) {
     }
 
     // Set the failpoint before we start the parallel thread.
-    let fp = configureFailPoint(
+    const fp = configureFailPoint(
         readNode, 'waitForUserCacheInvalidation', {userName: {db: testDB, user: testUser}});
+
+    // We need some time to mutate the auth state before the acquisition completes.
+    const kResolveRolesDelayMS = 5 * 1000;
+    assert.commandWorked(readAdmin.runCommand({
+        configureFailPoint: 'authLocalGetUser',
+        mode: 'alwaysOn',
+        data: {resolveRolesDelayMS: NumberInt(kResolveRolesDelayMS)}
+    }));
 
     const thread = new Thread(function(port, testUser, testDB) {
         const mongo = new Mongo('localhost:' + port);
