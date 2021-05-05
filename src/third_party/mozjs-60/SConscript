@@ -35,13 +35,18 @@ if get_option('spider-monkey-dbg') == "on":
             'JS_GC_ZEAL',
             ])
 
-# js-confdefs.h has to get in front on windows or wherever
-if env.TargetOSIs('windows'):
-    env.Prepend(CCFLAGS=[
-            '/FI', 'js-confdefs.h',
 
-            #  'declaration' : no matching operator delete found; memory will not be freed if
-            #  initialization throws an exception
+env.Append(
+    FORCEINCLUDES=[
+        'js-confdefs.h'
+    ],
+)
+
+if env.TargetOSIs('windows'):
+    env.Append(
+        CCFLAGS=[
+            # 'declaration' : no matching operator delete found; memory will not be freed if
+            # initialization throws an exception
             '/wd4291',
 
             # name" : the inline specifier cannot be used when a friend declaration refers to a
@@ -63,13 +68,10 @@ if env.TargetOSIs('windows'):
 
             # 'operator': unsafe use of type 'type' in operation
             '/wd4804',
-    ])
+        ]
+    )
 else:
-
     env.Append(
-        CCFLAGS=[
-            '-include', 'js-confdefs.h',
-        ],
         CXXFLAGS=[
             '-Wno-non-virtual-dtor',
             '-Wno-invalid-offsetof',
