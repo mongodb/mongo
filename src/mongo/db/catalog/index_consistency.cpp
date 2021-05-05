@@ -307,24 +307,33 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
                                  const KeyString::Value& ks,
                                  IndexInfo* indexInfo,
                                  RecordId recordId) {
-    const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    auto rawHash = ks.hash(indexInfo->indexNameHash);
+    auto hashLower = rawHash % kNumHashBuckets;
+    auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
+    auto& lower = _indexKeyBuckets[hashLower];
+    auto& upper = _indexKeyBuckets[hashUpper];
 
     if (_firstPhase) {
         // During the first phase of validation we only keep track of the count for the document
         // keys encountered.
-        _indexKeyBuckets[hash].indexKeyCount++;
-        _indexKeyBuckets[hash].bucketSizeBytes += ks.getSize();
+        lower.indexKeyCount++;
+        lower.bucketSizeBytes += ks.getSize();
+        upper.indexKeyCount++;
+        upper.bucketSizeBytes += ks.getSize();
         indexInfo->numRecords++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-            LOGV2(4666602, "[validate](record) {hash_num}", "hash_num"_attr = hash);
+            LOGV2(4666602,
+                  "[validate](record) Adding with hashes",
+                  "hashUpper"_attr = hashUpper,
+                  "hashLower"_attr = hashLower);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
             StorageDebugUtil::printKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](record)");
         }
-    } else if (_indexKeyBuckets[hash].indexKeyCount) {
+    } else if (lower.indexKeyCount || upper.indexKeyCount) {
         // Found a document key for a hash bucket that had mismatches.
 
         // Get the documents _id index key.
@@ -351,24 +360,33 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
                                    IndexInfo* indexInfo,
                                    RecordId recordId,
                                    ValidateResults* results) {
-    const uint32_t hash = _hashKeyString(ks, indexInfo->indexNameHash);
+    auto rawHash = ks.hash(indexInfo->indexNameHash);
+    auto hashLower = rawHash % kNumHashBuckets;
+    auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
+    auto& lower = _indexKeyBuckets[hashLower];
+    auto& upper = _indexKeyBuckets[hashUpper];
 
     if (_firstPhase) {
         // During the first phase of validation we only keep track of the count for the index entry
         // keys encountered.
-        _indexKeyBuckets[hash].indexKeyCount--;
-        _indexKeyBuckets[hash].bucketSizeBytes += ks.getSize();
+        lower.indexKeyCount--;
+        lower.bucketSizeBytes += ks.getSize();
+        upper.indexKeyCount--;
+        upper.bucketSizeBytes += ks.getSize();
         indexInfo->numKeys++;
 
         if (MONGO_unlikely(_validateState->extraLoggingForTest())) {
-            LOGV2(4666603, "[validate](index) {hash_num}", "hash_num"_attr = hash);
+            LOGV2(4666603,
+                  "[validate](index) Adding with hashes",
+                  "hashUpper"_attr = hashUpper,
+                  "hashLower"_attr = hashLower);
             const BSONObj& keyPatternBson = indexInfo->keyPattern;
             auto keyStringBson = KeyString::toBsonSafe(
                 ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
             StorageDebugUtil::printKeyString(
                 recordId, ks, keyPatternBson, keyStringBson, "[validate](index)");
         }
-    } else if (_indexKeyBuckets[hash].indexKeyCount) {
+    } else if (lower.indexKeyCount || upper.indexKeyCount) {
         // Found an index key for a bucket that has inconsistencies.
         // If there is a corresponding document key for the index entry key, we remove the key from
         // the '_missingIndexEntries' map. However if there was no document key for the index entry
@@ -426,7 +444,8 @@ bool IndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
                             return bucket.indexKeyCount ? bytes + bucket.bucketSizeBytes : bytes;
                         });
 
-    if (totalMemoryNeededBytes <= maxMemoryUsageBytes) {
+    // Allows twice the "maxValidateMemoryUsageMB" because each KeyString has two hashes stored.
+    if (totalMemoryNeededBytes <= maxMemoryUsageBytes * 2) {
         // The amount of memory we need is under the limit, so no need to do anything else.
         return true;
     }
@@ -442,8 +461,9 @@ bool IndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
 
         smallestBucketBytes = std::min(smallestBucketBytes, bucket.bucketSizeBytes);
         if (bucket.bucketSizeBytes + memoryUsedSoFarBytes > maxMemoryUsageBytes) {
-            // Including this bucket would put us over the memory limit, so zero
-            // this bucket.
+            // Including this bucket would put us over the memory limit, so zero this bucket. We
+            // don't want to keep any entry that will exceed the memory limit in the second phase so
+            // we don't double the 'maxMemoryUsageBytes' here.
             bucket.indexKeyCount = 0;
             return;
         }

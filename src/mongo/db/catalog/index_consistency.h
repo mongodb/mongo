@@ -172,7 +172,7 @@ public:
 
     /**
      * Sets up this IndexConsistency object to limit memory usage in the second phase of index
-     * validation. Returns whether the memory limit is sufficient to report at least on index entry
+     * validation. Returns whether the memory limit is sufficient to report at least one index entry
      * inconsistency and continue with the second phase of validation.
      */
     bool limitMemoryUsageForSecondPhase(ValidateResults* result);

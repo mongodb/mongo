@@ -3186,7 +3186,7 @@ public:
                 wunit.commit();
             }
 
-            // Update multikey document with a different multikey documents (not coverd by multikey
+            // Update multikey document with a different multikey documents (not covered by multikey
             // paths).   {a: [1, 2], b: 1}   ->   {a: 1, b: [4, 5]}
             BSONObj doc2 = BSON("_id" << 1 << "a" << 1 << "b" << BSON_ARRAY(4 << 5));
             {
