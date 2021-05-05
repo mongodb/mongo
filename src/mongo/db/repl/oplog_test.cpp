@@ -113,7 +113,8 @@ TEST_F(OplogTest, LogOpReturnsOpTimeOnSuccessfulInsertIntoOplogCollection) {
                        {},
                        kUninitializedStmtId,
                        {},
-                       OplogSlot());
+                       OplogSlot(),
+                       {});
         ASSERT_FALSE(opTime.isNull());
         wunit.commit();
     }
@@ -236,7 +237,8 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
                         {},
                         kUninitializedStmtId,
                         {},
-                        OplogSlot());
+                        OplogSlot(),
+                        {});
     ASSERT_FALSE(opTime.isNull());
 
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())

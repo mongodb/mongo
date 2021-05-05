@@ -291,7 +291,8 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                                            sessionInfo,
                                            stmtId,
                                            oplogLink,
-                                           OplogSlot());
+                                           OplogSlot(),
+                                           {});
 
             const auto& oplogOpTime = result.oplogTime;
             uassert(40633,

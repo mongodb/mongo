@@ -360,7 +360,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
                             Date_t wallTime,
                             const OperationSessionInfo& sessionInfo,
                             StmtId statementId,
-                            const OplogLink& oplogLink) {
+                            const OplogLink& oplogLink,
+                            boost::optional<repl::RetryImageEnum> needsRetryImage) {
     BSONObjBuilder b(256);
 
     b.append("ts", optime.getTimestamp());
@@ -378,6 +379,10 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 
     if (o2)
         b.append("o2", *o2);
+
+    if (needsRetryImage) {
+        b.append("needsRetryImage", repl::RetryImage_serializer(*needsRetryImage));
+    }
 
     invariant(wallTime != Date_t{});
     b.appendDate("wall", wallTime);
@@ -458,7 +463,8 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              StmtId statementId,
              const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot) {
+             const OplogSlot& oplogSlot,
+             boost::optional<repl::RetryImageEnum> needsRetryImage) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     // For commands, the test below is on the command ns and therefore does not check for
     // specific namespaces such as system.profile. This is the caller's responsibility.
@@ -499,7 +505,8 @@ OpTime logOp(OperationContext* opCtx,
                                wallClockTime,
                                sessionInfo,
                                statementId,
-                               oplogLink);
+                               oplogLink,
+                               needsRetryImage);
     const DocWriter* basePtr = &writer;
     auto timestamp = slot.opTime.getTimestamp();
     _logOpsInner(opCtx, nss, &basePtr, &timestamp, 1, oplog, slot.opTime);
@@ -571,7 +578,8 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
                                           wallClockTime,
                                           sessionInfo,
                                           begin[i].stmtId,
-                                          oplogLink));
+                                          oplogLink,
+                                          {}));
         oplogLink.prevOpTime = insertStatementOplogSlot.opTime;
         timestamps[i] = oplogLink.prevOpTime.getTimestamp();
         opTimes.push_back(insertStatementOplogSlot.opTime);

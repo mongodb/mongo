@@ -38,6 +38,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/stdx/functional.h"
@@ -144,7 +145,8 @@ OpTime logOp(OperationContext* opCtx,
              const OperationSessionInfo& sessionInfo,
              StmtId stmtId,
              const OplogLink& oplogLink,
-             const OplogSlot& oplogSlot);
+             const OplogSlot& oplogSlot,
+             boost::optional<repl::RetryImageEnum> needsRetryImage);
 
 // Flush out the cached pointer to the oplog.
 // Used by the closeDatabase command to ensure we don't cache closed things.

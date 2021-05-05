@@ -481,7 +481,8 @@ private:
                                                   {},
                                                   kUninitializedStmtId,
                                                   {},
-                                                  OplogSlot());
+                                                  OplogSlot(),
+                                                  {});
                 uow.commit();
                 return result;
             });
