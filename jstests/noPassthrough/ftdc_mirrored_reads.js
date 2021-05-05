@@ -65,7 +65,7 @@ jsTestLog("Verifying diagnostic collection for mirrored reads");
         let seenAfterReads = getDiagnosticData(rst).seen;
         jsTestLog(`Seen ${seenAfterReads} mirrored reads so far`);
         return seenBeforeReads + kOperations <= seenAfterReads;
-    }, "Failed to update FTDC metrics within time limit", 5000);
+    }, "Failed to update FTDC metrics within time limit", 30000);
 }
 
 jsTestLog("Verifying diagnostic collection when mirrorMaestroExpectsResponse");
@@ -73,7 +73,7 @@ jsTestLog("Verifying diagnostic collection when mirrorMaestroExpectsResponse");
     activateFailPoint(rst);
     assert.soon(() => {
         return getDiagnosticData(rst).hasOwnProperty('resolved');
-    }, "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit", 5000);
+    }, "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit", 30000);
     let resolvedBeforeReads = getDiagnosticData(rst).resolved;
     sendAndCheckReads(rst);
     assert.soon(() => {
