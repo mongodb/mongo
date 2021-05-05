@@ -62,8 +62,6 @@
 
 #endif
 
-#define MONGO_COMPILER_VARIABLE_UNUSED __attribute__((__unused__))
-
 #define MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT) __attribute__((__aligned__(ALIGNMENT)))
 
 #define MONGO_COMPILER_ALIGN_VARIABLE(ALIGNMENT) __attribute__((__aligned__(ALIGNMENT)))

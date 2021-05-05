@@ -52,15 +52,6 @@
  *   Correct: MONGO_COMPILER_NORETURN void myAbortFunction();
  *
  *
- * MONGO_COMPILER_VARIABLE_UNUSED
- *
- *   Instructs the compiler not to warn if it detects no use of the decorated variable.
- *   Typically only useful for variables that are always declared but only used in
- *   conditionally-compiled code.
- *
- *   Correct: MONGO_COMPILER_VARIABLE_UNUSED int ignored;
- *
- *
  * MONGO_COMPILER_ALIGN_TYPE(ALIGNMENT)
  *
  *   Instructs the compiler to use the given minimum alignment for the decorated type.
