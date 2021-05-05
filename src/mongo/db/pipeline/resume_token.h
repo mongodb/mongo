@@ -145,13 +145,8 @@ public:
 
     Document toDocument() const;
 
-    /**
-     * Because we use the IDL we require a serializer. However, the serialization format depends on
-     * the feature compatibility version, so a serializer without an argument doesn't make sense.
-     * This should never be used.
-     */
-    BSONObj toBSON_do_not_use() const {
-        MONGO_UNREACHABLE;
+    BSONObj toBSON() const {
+        return toDocument().toBson();
     }
 
     ResumeTokenData getData() const;

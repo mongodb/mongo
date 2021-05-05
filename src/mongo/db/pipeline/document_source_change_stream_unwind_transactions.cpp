@@ -38,17 +38,34 @@
 
 namespace mongo {
 
+REGISTER_INTERNAL_DOCUMENT_SOURCE(
+    _internalChangeStreamUnwindTransaction,
+    LiteParsedDocumentSourceChangeStreamInternal::parse,
+    DocumentSourceChangeStreamUnwindTransaction::createFromBson,
+    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+
 boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
 DocumentSourceChangeStreamUnwindTransaction::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    return new DocumentSourceChangeStreamUnwindTransaction(expCtx);
+    return new DocumentSourceChangeStreamUnwindTransaction(
+        DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns), expCtx);
+}
+
+boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction>
+DocumentSourceChangeStreamUnwindTransaction::createFromBson(
+    const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(5467605,
+            str::stream() << "the '" << kStageName << "' stage spec must be an object",
+            elem.type() == BSONType::Object);
+    auto parsedSpec = DocumentSourceChangeStreamUnwindTransactionSpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamUnwindTransactionSpec"), elem.Obj());
+    return new DocumentSourceChangeStreamUnwindTransaction(parsedSpec.getNsRegex().toString(),
+                                                           expCtx);
 }
 
 DocumentSourceChangeStreamUnwindTransaction::DocumentSourceChangeStreamUnwindTransaction(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(kStageName, expCtx) {
-    _nsRegex.emplace(DocumentSourceChangeStream::getNsRegexForChangeStream(expCtx->ns));
-}
+    std::string nsRegex, const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(kStageName, expCtx), _nsRegex(std::move(nsRegex)) {}
 
 StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
     Pipeline::SplitState pipeState) const {
@@ -63,15 +80,19 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                             ChangeStreamRequirement::kChangeStreamStage);
 }
 
-Value DocumentSourceChangeStreamUnwindTransaction::serialize(
+Value DocumentSourceChangeStreamUnwindTransaction::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // TODO SERVER-54676 serialize this stage when the feature flag is enabled.
+    tassert(5467604, "nsRegex has not been initialized", _nsRegex != boost::none);
+
     if (explain) {
-        tassert(5543800, "nsRegex has not been initialized", _nsRegex != boost::none);
-        return Value(Document{{kStageName, Value(Document{{"nsRegex", _nsRegex->pattern()}})}});
+        return Value(DOC(DocumentSourceChangeStream::kStageName
+                         << DOC("stage"
+                                << "internalUnwindTransaction"_sd
+                                << "nsRegex" << _nsRegex->pattern())));
     }
 
-    return Value();
+    DocumentSourceChangeStreamUnwindTransactionSpec spec(_nsRegex->pattern());
+    return Value(Document{{kStageName, Value(spec.toBSON())}});
 }
 
 DepsTracker::State DocumentSourceChangeStreamUnwindTransaction::getDependencies(

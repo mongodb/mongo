@@ -38,9 +38,10 @@ namespace mongo {
  * Part of the change stream API machinery used to look up the post-image of a document. Uses the
  * "documentKey" field of the input to look up the new version of the document.
  */
-class DocumentSourceLookupChangePostImage final : public DocumentSource {
+class DocumentSourceLookupChangePostImage final : public DocumentSource,
+                                                  public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalLookupChangePostImage"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamLookupPostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
         DocumentSourceChangeStream::kFullDocumentField;
 
@@ -51,6 +52,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
         return new DocumentSourceLookupChangePostImage(expCtx);
     }
+
+    static boost::intrusive_ptr<DocumentSourceLookupChangePostImage> createFromBson(
+        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Only modifies a single path: "fullDocument".
@@ -95,10 +99,7 @@ public:
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        if (explain) {
-            return Value{Document{{kStageName, Document()}}};
-        }
-        return Value();  // Do not serialize this stage unless we're explaining.
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
     const char* getSourceName() const final {
@@ -126,6 +127,9 @@ private:
      * function verifies that the only the database names match.
      */
     NamespaceString assertValidNamespace(const Document& inputDoc) const;
+
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 };
 
 }  // namespace mongo

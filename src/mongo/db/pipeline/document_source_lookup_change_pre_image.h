@@ -41,9 +41,10 @@ namespace mongo {
  * its "fullDocumentBeforeChange" field shall be the optime of the noop oplog entry containing the
  * pre-image. This stage replaces that field with the actual pre-image document.
  */
-class DocumentSourceLookupChangePreImage final : public DocumentSource {
+class DocumentSourceLookupChangePreImage final : public DocumentSource,
+                                                 public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalLookupChangePreImage"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamLookupPreImage"_sd;
     static constexpr StringData kFullDocumentBeforeChangeFieldName =
         DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
 
@@ -53,6 +54,9 @@ public:
     static boost::intrusive_ptr<DocumentSourceLookupChangePreImage> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const DocumentSourceChangeStreamSpec& spec);
+
+    static boost::intrusive_ptr<DocumentSourceLookupChangePreImage> createFromBson(
+        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     DocumentSourceLookupChangePreImage(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        FullDocumentBeforeChangeModeEnum mode)
@@ -100,7 +104,7 @@ public:
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        return (explain ? Value{Document{{kStageName, Document()}}} : Value());
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
     const char* getSourceName() const final {
@@ -121,6 +125,9 @@ private:
      */
     boost::optional<Document> lookupPreImage(const Document& inputDoc,
                                              const repl::OpTime& opTime) const;
+
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     // Determines whether pre-images are strictly required or may be included only when available.
     FullDocumentBeforeChangeModeEnum _fullDocumentBeforeChangeMode =

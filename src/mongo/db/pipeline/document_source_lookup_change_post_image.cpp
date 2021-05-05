@@ -39,6 +39,13 @@ constexpr StringData DocumentSourceLookupChangePostImage::kStageName;
 constexpr StringData DocumentSourceLookupChangePostImage::kFullDocumentFieldName;
 
 namespace {
+REGISTER_INTERNAL_DOCUMENT_SOURCE(
+    _internalChangeStreamLookupPostImage,
+    LiteParsedDocumentSourceChangeStreamInternal::parse,
+    DocumentSourceLookupChangePostImage::createFromBson,
+    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+
+
 Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType expectedType) {
     auto val = fullDoc[fieldName];
     uassert(40578,
@@ -50,6 +57,21 @@ Value assertFieldHasType(const Document& fullDoc, StringData fieldName, BSONType
     return val;
 }
 }  // namespace
+
+boost::intrusive_ptr<DocumentSourceLookupChangePostImage>
+DocumentSourceLookupChangePostImage::createFromBson(
+    const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(5467608,
+            str::stream() << "the '" << kStageName << "' stage spec must be an object",
+            elem.type() == BSONType::Object);
+    auto parsedSpec = DocumentSourceChangeStreamLookUpPostImageSpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamLookUpPostImageSpec"), elem.Obj());
+    uassert(5467609,
+            str::stream() << "the 'fullDocument' field can only be 'updateLookup'",
+            parsedSpec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
+
+    return new DocumentSourceLookupChangePostImage(expCtx);
+}
 
 DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::doGetNext() {
     auto input = pSource->getNext();
@@ -123,6 +145,18 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
     // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
     // not have returned any results if the document was deleted in the time since the update op.
     return (lookedUpDoc ? Value(*lookedUpDoc) : Value(BSONNULL));
+}
+
+Value DocumentSourceLookupChangePostImage::serializeLatest(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    return explain
+        ? Value(Document{{DocumentSourceChangeStream::kStageName,
+                          Document{{"stage"_sd, "internalLookUpPostImage"_sd},
+                                   {"fullDocumentBeforeChange"_sd, "updateLookUp"_sd}}}})
+        : Value(Document{
+              {kStageName,
+               DocumentSourceChangeStreamLookUpPostImageSpec(FullDocumentModeEnum::kUpdateLookup)
+                   .toBSON()}});
 }
 
 }  // namespace mongo

@@ -333,8 +333,11 @@ env.Library(
     target="change_stream_pipeline",
     source=[
         'change_stream_document_diff_parser.cpp',
+        'change_stream_helpers_legacy.cpp',
         'document_source_change_stream.cpp',
         'document_source_change_stream_close_cursor.cpp',
+        'document_source_change_stream_ensure_resume_token_present.cpp',
+        'document_source_change_stream_oplog_match.cpp',
         'document_source_change_stream_transform.cpp',
         'document_source_change_stream_unwind_transactions.cpp',
         'document_source_check_invalidate.cpp',

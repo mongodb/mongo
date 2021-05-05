@@ -44,9 +44,15 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_oplog_match.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transactions.h"
+#include "mongo/db/pipeline/document_source_check_invalidate.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_lookup_change_post_image.h"
+#include "mongo/db/pipeline/document_source_lookup_change_pre_image.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -55,6 +61,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
@@ -430,6 +437,34 @@ public:
     }
 };
 
+bool getCSOptimizationFeatureFlagValue() {
+    return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV();
+}
+
+/**
+ * Runs the tests with feature flag 'featureFlagChangeStreamsOptimization' true and false.
+ */
+class ChangeStreamStageWithDualFeatureFlagValueTest : public ChangeStreamStageTest {
+public:
+    ChangeStreamStageWithDualFeatureFlagValueTest() : ChangeStreamStageTest() {}
+
+
+    void run() {
+        {
+            RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsOptimization",
+                                                            true);
+            ASSERT(getCSOptimizationFeatureFlagValue());
+            ChangeStreamStageTest::run();
+        }
+        {
+            RAIIServerParameterControllerForTest controller("featureFlagChangeStreamsOptimization",
+                                                            false);
+            ASSERT_FALSE(getCSOptimizationFeatureFlagValue());
+            ChangeStreamStageTest::run();
+        }
+    }
+};
+
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
     auto expCtx = getExpCtx();
 
@@ -483,7 +518,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                            .firstElement(),
                                        expCtx),
         AssertionException,
-        40575);
+        ErrorCodes::BadValue);
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {
@@ -2002,15 +2037,22 @@ TEST_F(ChangeStreamStageTest, MatchFiltersNoOp) {
     checkTransformation(noOp, boost::none);
 }
 
-TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage) {
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
+       TransformationShouldBeAbleToReParseSerializedStage) {
     auto expCtx = getExpCtx();
+    const auto featureFlag = getCSOptimizationFeatureFlagValue();
+    const auto serializedStageName =
+        featureFlag ? DocumentSourceChangeStreamTransform::kStageName : DSChangeStream::kStageName;
 
-    auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
+    DocumentSourceChangeStreamSpec spec;
+    spec.setStartAtOperationTime(kDefaultTs);
+    auto originalSpec = BSON("" << spec.toBSON());
+
     auto result = DSChangeStream::createFromBson(originalSpec.firstElement(), expCtx);
+
     vector<intrusive_ptr<DocumentSource>> allStages(std::begin(result), std::end(result));
 
-    const size_t changeStreamStageSize =
-        (feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV() ? 4 : 5);
+    const size_t changeStreamStageSize = featureFlag ? 5 : 6;
     ASSERT_EQ(allStages.size(), changeStreamStageSize);
 
     auto stage = allStages[2];
@@ -2024,7 +2066,8 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     ASSERT_EQ(serialization.size(), 1UL);
     ASSERT_EQ(serialization[0].getType(), BSONType::Object);
     auto serializedDoc = serialization[0].getDocument();
-    ASSERT_BSONOBJ_EQ(serializedDoc.toBson(), originalSpec);
+    ASSERT_BSONOBJ_EQ(serializedDoc[serializedStageName].getDocument().toBson(),
+                      originalSpec[""].Obj());
 
     //
     // Create a new stage from the serialization. Serialize the new stage and confirm that it is
@@ -2033,11 +2076,162 @@ TEST_F(ChangeStreamStageTest, TransformationShouldBeAbleToReParseSerializedStage
     auto serializedBson = serializedDoc.toBson();
     auto roundTripped = Pipeline::create(
         DSChangeStream::createFromBson(serializedBson.firstElement(), expCtx), expCtx);
-
     auto newSerialization = roundTripped->serialize();
 
-    ASSERT_EQ(newSerialization.size(), 1UL);
-    ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+    // When optimiziation is enabled, we should serialize all the internal stages.
+    if (featureFlag) {
+        ASSERT_EQ(newSerialization.size(), 5UL);
+
+        // DSCSTransform stage should be the third stage after DSCSOplogMatch and
+        // DSCSUnwindTransactions stages.
+        ASSERT_VALUE_EQ(newSerialization[2], serialization[0]);
+    } else {
+        ASSERT_EQ(newSerialization.size(), 1UL);
+        ASSERT_VALUE_EQ(newSerialization[0], serialization[0]);
+    }
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest,
+       DSCSTransformStageEmptySpecSerializeResumeAfter) {
+    auto expCtx = getExpCtx();
+    const auto serializedStageName = getCSOptimizationFeatureFlagValue()
+        ? DocumentSourceChangeStreamTransform::kStageName
+        : DSChangeStream::kStageName;
+
+    auto originalSpec = BSON(DSChangeStream::kStageName << BSONObj());
+
+    // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
+    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ON_BLOCK_EXIT([&expCtx] {
+        // Reset for the next run.
+        expCtx->initialPostBatchResumeToken = BSONObj();
+    });
+
+    auto stage =
+        DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
+    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+
+    // Verify that an additional 'startAtOperationTime' is populated while serializing.
+    vector<Value> serialization;
+    stage->serializeToArray(serialization);
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT(!serialization[0]
+                .getDocument()[serializedStageName]
+                .getDocument()[DocumentSourceChangeStreamSpec::kResumeAfterFieldName]
+                .missing());
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSTransformStageWithResumeTokenSerialize) {
+    auto expCtx = getExpCtx();
+    const auto serializedStageName = getCSOptimizationFeatureFlagValue()
+        ? DocumentSourceChangeStreamTransform::kStageName
+        : DSChangeStream::kStageName;
+
+    DocumentSourceChangeStreamSpec spec;
+    spec.setResumeAfter(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
+    auto originalSpec = BSON("" << spec.toBSON());
+
+    // Verify that the 'initialPostBatchResumeToken' is populated while parsing.
+    ASSERT(expCtx->initialPostBatchResumeToken.isEmpty());
+    ON_BLOCK_EXIT([&expCtx] {
+        // Reset for the next run.
+        expCtx->initialPostBatchResumeToken = BSONObj();
+    });
+
+    auto stage =
+        DocumentSourceChangeStreamTransform::createFromBson(originalSpec.firstElement(), expCtx);
+    ASSERT(!expCtx->initialPostBatchResumeToken.isEmpty());
+
+    vector<Value> serialization;
+    stage->serializeToArray(serialization);
+    ASSERT_EQ(serialization.size(), 1UL);
+    ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+    ASSERT_BSONOBJ_EQ(serialization[0].getDocument()[serializedStageName].getDocument().toBson(),
+                      originalSpec[""].Obj());
+}
+
+template <typename Stage, typename StageSpec>
+void validateDocumentSourceStageSerialization(
+    StageSpec spec, BSONObj specAsBSON, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto stage = Stage::createFromBson(specAsBSON.firstElement(), expCtx);
+
+    vector<Value> serialization;
+    stage->serializeToArray(serialization);
+    if (getCSOptimizationFeatureFlagValue()) {
+        ASSERT_EQ(serialization.size(), 1UL);
+        ASSERT_EQ(serialization[0].getType(), BSONType::Object);
+        ASSERT_BSONOBJ_EQ(serialization[0].getDocument().toBson(),
+                          BSON(Stage::kStageName << spec.toBSON()));
+    } else {
+        ASSERT(serialization.empty());
+    }
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSOplogMatchStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    DocumentSourceChangeStreamOplogMatchSpec spec;
+    auto dummyFilter = BSON("a" << 1);
+    spec.setFilter(dummyFilter);
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceOplogMatch>(
+        std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSUnwindTransactionStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    std::string nsRegex = "*.ns";
+    DocumentSourceChangeStreamUnwindTransactionSpec spec(nsRegex);
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceChangeStreamUnwindTransaction>(
+        std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSCheckInvalidateStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    DocumentSourceChangeStreamCheckInvalidateSpec spec;
+    spec.setStartAfterInvalidate(ResumeToken::parse(makeResumeToken(
+        kDefaultTs, testUuid(), Value(), ResumeTokenData::FromInvalidate::kFromInvalidate)));
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceCheckInvalidate>(
+        std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSResumabilityStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    DocumentSourceChangeStreamCheckResumabilitySpec spec;
+    spec.setResumeToken(ResumeToken::parse(makeResumeToken(kDefaultTs, testUuid())));
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceCheckResumability>(
+        std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePreImageStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    DocumentSourceChangeStreamLookUpPreImageSpec spec(FullDocumentBeforeChangeModeEnum::kRequired);
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceLookupChangePreImage>(
+        std::move(spec), stageSpecAsBSON, expCtx);
+}
+
+TEST_F(ChangeStreamStageWithDualFeatureFlagValueTest, DSCSLookupChangePostImageStageSerialization) {
+    auto expCtx = getExpCtx();
+
+    DocumentSourceChangeStreamLookUpPostImageSpec spec(FullDocumentModeEnum::kUpdateLookup);
+    auto stageSpecAsBSON = BSON("" << spec.toBSON());
+
+    validateDocumentSourceStageSerialization<DocumentSourceLookupChangePostImage>(
+        std::move(spec), stageSpecAsBSON, expCtx);
 }
 
 TEST_F(ChangeStreamStageTest, CloseCursorOnInvalidateEntries) {

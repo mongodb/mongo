@@ -41,18 +41,28 @@ namespace mongo {
  * output, but all other entries pass through unmodified. Note that the namespace filter applies
  * only to unwound transaction operations, not to any other entries.
  */
-class DocumentSourceChangeStreamUnwindTransaction : public DocumentSource {
+class DocumentSourceChangeStreamUnwindTransaction : public DocumentSource,
+                                                    public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamUnwindTransaction"_sd;
 
     static boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction> create(
         const boost::intrusive_ptr<ExpressionContext>&);
 
+    static boost::intrusive_ptr<DocumentSourceChangeStreamUnwindTransaction> createFromBson(
+        const BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
+    }
+
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const;
+
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
@@ -68,7 +78,8 @@ protected:
     DocumentSource::GetNextResult doGetNext() override;
 
 private:
-    DocumentSourceChangeStreamUnwindTransaction(const boost::intrusive_ptr<ExpressionContext>&);
+    DocumentSourceChangeStreamUnwindTransaction(
+        std::string nsRegex, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Validates if the supplied document contains transaction details.

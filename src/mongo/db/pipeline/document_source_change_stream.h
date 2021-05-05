@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
@@ -160,6 +161,10 @@ public:
     // Internal op type to signal mongos to open cursors on new shards.
     static constexpr StringData kNewShardDetectedOpType = "kNewShardDetected"_sd;
 
+    static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
+    static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
+    static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
+
     enum class ChangeStreamType { kSingleCollection, kSingleDatabase, kAllChangesForCluster };
 
     /**
@@ -167,14 +172,6 @@ public:
      */
     static ChangeStreamType getChangeStreamType(const NamespaceString& nss);
     static std::string getNsRegexForChangeStream(const NamespaceString& nss);
-
-    /**
-     * Produce the BSON object representing the filter for the $match stage to filter oplog entries
-     * to only those relevant for this $changeStream stage.
-     */
-    static BSONObj buildMatchFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                    Timestamp startFrom,
-                                    bool showMigrationEvents);
 
     /**
      * Parses a $changeStream stage from 'elem' and produces the $match and transformation
@@ -190,10 +187,6 @@ public:
     static void checkValueType(const Value v, const StringData fieldName, BSONType expectedType);
 
 private:
-    static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
-    static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
-    static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
-
     // Helper function which throws if the $changeStream fails any of a series of semantic checks.
     // For instance, whether it is permitted to run given the current FCV, whether the namespace is
     // valid for the options specified in the spec, etc.
@@ -229,36 +222,23 @@ public:
 };
 
 /**
- * A custom subclass of DocumentSourceMatch which does not serialize itself (since it came from an
- * alias) and requires itself to be the first stage in the pipeline.
+ * Class interface to keep track of the change streams internal stage serialization formats across
+ * versions or features.
+ *
+ * TODO SERVER-55659: remove this serializer class and make each stage serialize only the "latest"
+ * format.
  */
-class DocumentSourceOplogMatch final : public DocumentSourceMatch {
+class ChangeStreamStageSerializationInterface {
 public:
-    DocumentSourceOplogMatch(const DocumentSourceOplogMatch& other) : DocumentSourceMatch(other) {}
-
-    virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
-        return make_intrusive<std::decay_t<decltype(*this)>>(*this);
+    Value serializeToValue(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const {
+        return feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV()
+            ? serializeLatest(explain)
+            : serializeLegacy(explain);
     }
 
-    static boost::intrusive_ptr<DocumentSourceOplogMatch> create(
-        BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-    const char* getSourceName() const final;
-
-    GetNextResult doGetNext() final {
-        // We should never execute this stage directly. We expect this stage to be absorbed into the
-        // cursor feeding the pipeline, and executing this stage may result in the use of the wrong
-        // collation. The comparisons against the oplog must use the simple collation, regardless of
-        // the collation on the ExpressionContext.
-        MONGO_UNREACHABLE;
-    }
-
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
-
-private:
-    using DocumentSourceMatch::DocumentSourceMatch;
+protected:
+    virtual Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
+    virtual Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
 };
 
 }  // namespace mongo

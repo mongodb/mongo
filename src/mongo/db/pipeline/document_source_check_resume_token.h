@@ -59,9 +59,10 @@ namespace mongo {
  * - Otherwise we cannot resume, as we do not know if there were any events between the resume token
  *   and the first matching document in the oplog.
  */
-class DocumentSourceCheckResumability : public DocumentSource {
+class DocumentSourceCheckResumability : public DocumentSource,
+                                        public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_internalCheckResumability"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamCheckResumability"_sd;
 
     // Used to record the results of comparing the token data extracted from documents in the
     // resumed stream against the client's resume token.
@@ -89,7 +90,21 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override {
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
+    }
+
+    static boost::intrusive_ptr<DocumentSourceCheckResumability> createFromBson(
+        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        uassert(5467603,
+                str::stream() << "the '" << kStageName << "' object spec must be an object",
+                spec.type() == Object);
+
+        auto parsed = DocumentSourceChangeStreamCheckResumabilitySpec::parse(
+            IDLParserErrorContext("DocumentSourceChangeStreamCheckResumabilitySpec"),
+            spec.embeddedObject());
+        return create(expCtx, parsed.getResumeToken().getData());
+    }
 
     static boost::intrusive_ptr<DocumentSourceCheckResumability> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, Timestamp ts);
@@ -108,46 +123,9 @@ protected:
 
     ResumeStatus _resumeStatus = ResumeStatus::kCheckNextDoc;
     const ResumeTokenData _tokenFromClient;
-};
-
-/**
- * This stage is used internally for change streams to ensure that the resume token is in the
- * stream.  It is not intended to be created by the user.
- */
-class DocumentSourceEnsureResumeTokenPresent final : public DocumentSourceCheckResumability {
-public:
-    static constexpr StringData kStageName = "$_internalEnsureResumeTokenPresent"_sd;
-
-    const char* getSourceName() const final;
-
-    StageConstraints constraints(Pipeline::SplitState) const final {
-        return {StreamType::kStreaming,
-                PositionRequirement::kNone,
-                // If this is parsed on mongos it should stay on mongos. If we're not in a sharded
-                // cluster then it's okay to run on mongod.
-                HostTypeRequirement::kLocalOnly,
-                DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed,
-                TransactionRequirement::kNotAllowed,
-                LookupRequirement::kNotAllowed,
-                UnionRequirement::kNotAllowed,
-                ChangeStreamRequirement::kChangeStreamStage};
-    }
-
-    static boost::intrusive_ptr<DocumentSourceEnsureResumeTokenPresent> create(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token);
 
 private:
-    /**
-     * Use the create static method to create a DocumentSourceEnsureResumeTokenPresent.
-     */
-    DocumentSourceEnsureResumeTokenPresent(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                           ResumeTokenData token);
-
-    GetNextResult doGetNext() final;
-
-    // Records whether we have observed the token in the resumed stream.
-    bool _hasSeenResumeToken = false;
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 };
-
 }  // namespace mongo

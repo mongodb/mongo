@@ -33,16 +33,16 @@
 
 namespace mongo {
 
-class DocumentSourceChangeStreamTransform : public DocumentSource {
+class DocumentSourceChangeStreamTransform : public DocumentSource,
+                                            public ChangeStreamStageSerializationInterface {
 public:
     static constexpr StringData kStageName = "$_internalChangeStreamTransform"_sd;
+
     /**
      * Creates a new transformation stage from the given specification.
      */
-    static boost::intrusive_ptr<DocumentSourceChangeStreamTransform> create(
-        const boost::intrusive_ptr<ExpressionContext>&,
-        const ServerGlobalParams::FeatureCompatibility::Version&,
-        BSONObj changeStreamSpec);
+    static boost::intrusive_ptr<DocumentSourceChangeStreamTransform> createFromBson(
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     Document applyTransformation(const Document& input);
 
@@ -50,7 +50,10 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
@@ -67,7 +70,6 @@ protected:
 private:
     // This constructor is private, callers should use the 'create()' method above.
     DocumentSourceChangeStreamTransform(const boost::intrusive_ptr<ExpressionContext>&,
-                                        const ServerGlobalParams::FeatureCompatibility::Version&,
                                         BSONObj changeStreamSpec);
 
     struct DocumentKeyCacheEntry {
@@ -91,7 +93,10 @@ private:
      */
     ResumeTokenData getResumeToken(Value ts, Value uuid, Value documentKey, Value txnOpIndex);
 
-    BSONObj _changeStreamSpec;
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
+
+    DocumentSourceChangeStreamSpec _changeStreamSpec;
 
     // Map of collection UUID to document key fields.
     std::map<UUID, DocumentKeyCacheEntry> _documentKeyCache;
@@ -101,11 +106,6 @@ private:
 
     // Set to true if the pre-image optime should be included in output documents.
     bool _includePreImageOptime = false;
-
-    // '_fcv' is used to determine which version of the resume token to generate for each change.
-    // This is a snapshot of what the feature compatibility version was at the time the stream was
-    // opened or resumed.
-    ServerGlobalParams::FeatureCompatibility::Version _fcv;
 };
 
 }  // namespace mongo

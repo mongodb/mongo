@@ -39,9 +39,10 @@ namespace mongo {
  * "invalidate" entry for commands that should invalidate the change stream (e.g. collection drop
  * for a single-collection change stream). It is not intended to be created by the user.
  */
-class DocumentSourceCheckInvalidate final : public DocumentSource {
+class DocumentSourceCheckInvalidate final : public DocumentSource,
+                                            public ChangeStreamStageSerializationInterface {
 public:
-    static constexpr StringData kStageName = "$_checkInvalidate"_sd;
+    static constexpr StringData kStageName = "$_internalChangeStreamCheckInvalidate"_sd;
 
     const char* getSourceName() const final {
         // This is used in error reporting.
@@ -65,10 +66,11 @@ public:
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
-        // We only serialize this stage in the context of explain.
-        return explain ? Value(DOC(kStageName << Document())) : Value();
+        return ChangeStreamStageSerializationInterface::serializeToValue(explain);
     }
 
+    static boost::intrusive_ptr<DocumentSourceCheckInvalidate> createFromBson(
+        BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx);
     static boost::intrusive_ptr<DocumentSourceCheckInvalidate> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<ResumeTokenData> startAfterInvalidate) {
@@ -88,6 +90,9 @@ private:
     }
 
     GetNextResult doGetNext() final;
+
+    Value serializeLegacy(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serializeLatest(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     boost::optional<ResumeTokenData> _startAfterInvalidate;
     boost::optional<Document> _queuedInvalidate;

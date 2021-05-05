@@ -31,11 +31,18 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 
 using boost::intrusive_ptr;
 namespace mongo {
 namespace {
+
+REGISTER_INTERNAL_DOCUMENT_SOURCE(
+    _internalChangeStreamCheckResumability,
+    LiteParsedDocumentSourceChangeStreamInternal::parse,
+    DocumentSourceCheckResumability::createFromBson,
+    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
 
 using ResumeStatus = DocumentSourceCheckResumability::ResumeStatus;
 
@@ -166,65 +173,6 @@ ResumeStatus compareAgainstClientResumeToken(const intrusive_ptr<ExpressionConte
 }
 }  // namespace
 
-DocumentSourceEnsureResumeTokenPresent::DocumentSourceEnsureResumeTokenPresent(
-    const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
-    : DocumentSourceCheckResumability(expCtx, std::move(token)) {}
-
-intrusive_ptr<DocumentSourceEnsureResumeTokenPresent>
-DocumentSourceEnsureResumeTokenPresent::create(const intrusive_ptr<ExpressionContext>& expCtx,
-                                               ResumeTokenData token) {
-    return new DocumentSourceEnsureResumeTokenPresent(expCtx, std::move(token));
-}
-
-const char* DocumentSourceEnsureResumeTokenPresent::getSourceName() const {
-    return kStageName.rawData();
-}
-
-DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::doGetNext() {
-    // If we have already verified the resume token is present, return the next doc immediately.
-    if (_resumeStatus == ResumeStatus::kSurpassedToken) {
-        return pSource->getNext();
-    }
-
-    auto nextInput = GetNextResult::makeEOF();
-
-    // If we are starting after an 'invalidate' and the invalidating command (e.g. collection drop)
-    // occurred at the same clusterTime on more than one shard, then we may see multiple identical
-    // resume tokens here. We swallow all of them until the resume status becomes kSurpassedToken.
-    while (_resumeStatus != ResumeStatus::kSurpassedToken) {
-        // Delegate to DocumentSourceCheckResumability to consume all events up to the token. This
-        // will also set '_resumeStatus' to indicate whether we have seen or surpassed the token.
-        nextInput = DocumentSourceCheckResumability::doGetNext();
-
-        // If there are no more results, return EOF. We will continue checking for the resume token
-        // the next time the getNext method is called. If we hit EOF, then we cannot have surpassed
-        // the resume token on this iteration.
-        if (!nextInput.isAdvanced()) {
-            invariant(_resumeStatus != ResumeStatus::kSurpassedToken);
-            return nextInput;
-        }
-
-        // When we reach here, we have either found the resume token or surpassed it.
-        invariant(_resumeStatus != ResumeStatus::kCheckNextDoc);
-
-        // If the resume status is kFoundToken, record the fact that we have seen the token. When we
-        // have surpassed the resume token, we will assert that we saw the token before doing so. We
-        // cannot simply assert once and then assume we have surpassed the token, because in certain
-        // cases we may see 1..N identical tokens and must swallow them all before proceeding.
-        _hasSeenResumeToken = (_hasSeenResumeToken || _resumeStatus == ResumeStatus::kFoundToken);
-    }
-
-    // Assert that before surpassing the resume token, we observed the token itself in the stream.
-    uassert(ErrorCodes::ChangeStreamFatalError,
-            str::stream() << "cannot resume stream; the resume token was not found. "
-                          << nextInput.getDocument()["_id"].getDocument().toString(),
-            _hasSeenResumeToken);
-
-    // At this point, we have seen the token and swallowed it. Return the next event to the client.
-    invariant(_hasSeenResumeToken && _resumeStatus == ResumeStatus::kSurpassedToken);
-    return nextInput;
-}
-
 DocumentSourceCheckResumability::DocumentSourceCheckResumability(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeTokenData token)
     : DocumentSource(getSourceName(), expCtx), _tokenFromClient(std::move(token)) {}
@@ -286,11 +234,16 @@ DocumentSource::GetNextResult DocumentSourceCheckResumability::doGetNext() {
     MONGO_UNREACHABLE;
 }
 
-Value DocumentSourceCheckResumability::serialize(
+Value DocumentSourceCheckResumability::serializeLatest(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    // We only serialize this stage in the context of explain.
-    return explain ? Value(DOC(getSourceName()
-                               << DOC("resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
-                   : Value();
+    return explain
+        ? Value(DOC(DocumentSourceChangeStream::kStageName
+                    << DOC("stage"
+                           << "internalCheckResumability"_sd
+                           << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
+        : Value(Document{
+              {DocumentSourceCheckResumability::kStageName,
+               DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
+                   .toBSON()}});
 }
 }  // namespace mongo

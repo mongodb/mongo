@@ -40,6 +40,12 @@ namespace mongo {
 
 using DSCS = DocumentSourceChangeStream;
 
+REGISTER_INTERNAL_DOCUMENT_SOURCE(
+    _internalChangeStreamCheckInvalidate,
+    LiteParsedDocumentSourceChangeStreamInternal::parse,
+    DocumentSourceCheckInvalidate::createFromBson,
+    feature_flags::gFeatureFlagChangeStreamsOptimization.isEnabledAndIgnoreFCV());
+
 namespace {
 
 // Returns true if the given 'operationType' should invalidate the change stream based on the
@@ -58,6 +64,22 @@ bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCt
 };
 
 }  // namespace
+
+boost::intrusive_ptr<DocumentSourceCheckInvalidate> DocumentSourceCheckInvalidate::createFromBson(
+    BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(5467602,
+            str::stream() << "the '" << kStageName << "' object spec must be an object",
+            spec.type() == Object);
+
+    auto parsed = DocumentSourceChangeStreamCheckInvalidateSpec::parse(
+        IDLParserErrorContext("DocumentSourceChangeStreamCheckInvalidateSpec"),
+        spec.embeddedObject());
+    return new DocumentSourceCheckInvalidate(
+        expCtx,
+        parsed.getStartAfterInvalidate()
+            ? boost::optional<ResumeTokenData>(parsed.getStartAfterInvalidate()->getData())
+            : boost::none);
+}
 
 DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
     // To declare a change stream as invalidated, this stage first emits an invalidate event and
@@ -136,6 +158,20 @@ DocumentSource::GetNextResult DocumentSourceCheckInvalidate::doGetNext() {
     _startAfterInvalidate.reset();
 
     return nextInput;
+}
+
+Value DocumentSourceCheckInvalidate::serializeLatest(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
+    if (explain) {
+        return Value(Document{{DocumentSourceChangeStream::kStageName,
+                               Document{{"stage"_sd, "internalCheckInvalidate"_sd}}}});
+    }
+
+    DocumentSourceChangeStreamCheckInvalidateSpec spec;
+    if (_startAfterInvalidate) {
+        spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
+    }
+    return Value(Document{{DocumentSourceCheckInvalidate::kStageName, spec.toBSON()}});
 }
 
 }  // namespace mongo
