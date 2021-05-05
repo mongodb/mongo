@@ -31,21 +31,37 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_data_replication.h"
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
 
+using RecipientStateTransitionController =
+    resharding_service_test_helpers::StateTransitionController<RecipientStateEnum>;
+using PauseDuringStateTransitions =
+    resharding_service_test_helpers::PauseDuringStateTransitions<RecipientStateEnum>;
+using OpObserverForTest =
+    resharding_service_test_helpers::OpObserverForTest<RecipientStateEnum,
+                                                       ReshardingRecipientDocument>;
+const ShardId recipientShardId{"myShardId"};
+
 class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
 public:
     ShardId myShardId(ServiceContext* serviceContext) const override {
-        return ShardId{"myShardId"};
+        return recipientShardId;
     }
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
@@ -125,6 +141,17 @@ private:
     const ShardId _someDonorId{"myDonorId"};
 };
 
+class RecipientOpObserverForTest : public OpObserverForTest {
+public:
+    RecipientOpObserverForTest(std::shared_ptr<RecipientStateTransitionController> controller)
+        : OpObserverForTest(std::move(controller),
+                            NamespaceString::kRecipientReshardingOperationsNamespace) {}
+
+    RecipientStateEnum getState(const ReshardingRecipientDocument& recipientDoc) override {
+        return recipientDoc.getMutableState().getState();
+    }
+};
+
 class DataReplicationForTest : public ReshardingDataReplicationInterface {
 public:
     SemiFuture<void> runUntilStrictlyConsistent(
@@ -163,6 +190,9 @@ public:
     }
 };
 
+/**
+ * Tests the behavior of the ReshardingRecipientService upon recovery from failover.
+ */
 class ReshardingRecipientServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
@@ -179,14 +209,23 @@ public:
         repl::DropPendingCollectionReaper::set(
             serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
+
+        _controller = std::make_shared<RecipientStateTransitionController>();
+        _opObserverRegistry->addObserver(std::make_unique<RecipientOpObserverForTest>(_controller));
     }
 
-    ReshardingRecipientDocument makeStateDocument() {
+    RecipientStateTransitionController* controller() {
+        return _controller.get();
+    }
+
+    ReshardingRecipientDocument makeStateDocument(bool isAlsoDonor) {
         RecipientShardContext recipientCtx;
         recipientCtx.setState(RecipientStateEnum::kAwaitingFetchTimestamp);
 
         ReshardingRecipientDocument doc(std::move(recipientCtx),
-                                        {ShardId{"donor1"}, ShardId{"donor2"}, ShardId{"donor3"}},
+                                        {ShardId{"donor1"},
+                                         isAlsoDonor ? recipientShardId : ShardId{"donor2"},
+                                         ShardId{"donor3"}},
                                         durationCount<Milliseconds>(Milliseconds{5}));
 
         NamespaceString sourceNss("sourcedb", "sourcecollection");
@@ -202,23 +241,38 @@ public:
         return doc;
     }
 
+    void createSourceCollection(OperationContext* opCtx,
+                                const ReshardingRecipientDocument& recipientDoc) {
+        CollectionOptions options;
+        options.uuid = recipientDoc.getSourceUUID();
+        resharding::data_copy::ensureCollectionDropped(opCtx, recipientDoc.getSourceNss());
+        resharding::data_copy::ensureCollectionExists(opCtx, recipientDoc.getSourceNss(), options);
+    }
+
     void notifyToStartCloning(OperationContext* opCtx,
                               RecipientStateMachine& recipient,
                               const ReshardingRecipientDocument& recipientDoc) {
         _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCloning);
     }
 
-    void notifyReshardingOutcomeDecided(OperationContext* opCtx,
-                                        RecipientStateMachine& recipient,
-                                        const ReshardingRecipientDocument& recipientDoc,
-                                        Status outcome) {
-        if (outcome.isOK()) {
-            _onReshardingFieldsChanges(
-                opCtx, recipient, recipientDoc, CoordinatorStateEnum::kDecisionPersisted);
-        } else {
-            _onReshardingFieldsChanges(
-                opCtx, recipient, recipientDoc, CoordinatorStateEnum::kError, std::move(outcome));
-        }
+    void notifyReshardingCommitting(OperationContext* opCtx,
+                                    RecipientStateMachine& recipient,
+                                    const ReshardingRecipientDocument& recipientDoc) {
+        _onReshardingFieldsChanges(
+            opCtx, recipient, recipientDoc, CoordinatorStateEnum::kDecisionPersisted);
+    }
+
+    void notifyReshardingAborting(OperationContext* opCtx,
+                                  RecipientStateMachine& recipient,
+                                  const ReshardingRecipientDocument& recipientDoc) {
+        _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kError);
+    }
+
+    void checkStateDocumentRemoved(OperationContext* opCtx) {
+        AutoGetCollection recipientColl(
+            opCtx, NamespaceString::kRecipientReshardingOperationsNamespace, MODE_IS);
+        ASSERT_TRUE(bool(recipientColl));
+        ASSERT_TRUE(bool(recipientColl->isEmpty(opCtx)));
     }
 
 private:
@@ -249,25 +303,226 @@ private:
     void _onReshardingFieldsChanges(OperationContext* opCtx,
                                     RecipientStateMachine& recipient,
                                     const ReshardingRecipientDocument& recipientDoc,
-                                    CoordinatorStateEnum coordinatorState,
-                                    boost::optional<Status> abortReason = boost::none) {
+                                    CoordinatorStateEnum coordinatorState) {
         auto reshardingFields = TypeCollectionReshardingFields{recipientDoc.getReshardingUUID()};
         reshardingFields.setRecipientFields(_makeRecipientFields(recipientDoc));
         reshardingFields.setState(coordinatorState);
         recipient.onReshardingFieldsChanges(opCtx, reshardingFields);
     }
+
+    std::shared_ptr<RecipientStateTransitionController> _controller;
 };
 
 TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion) {
-    auto doc = makeStateDocument();
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(5551105,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto opCtx = makeOperationContext();
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, StepDownStepUpEachTransition) {
+    const std::vector<RecipientStateEnum> recipientStates{RecipientStateEnum::kCreatingCollection,
+                                                          RecipientStateEnum::kCloning,
+                                                          RecipientStateEnum::kApplying,
+                                                          RecipientStateEnum::kSteadyState,
+                                                          RecipientStateEnum::kStrictConsistency,
+                                                          RecipientStateEnum::kRenaming,
+                                                          RecipientStateEnum::kDone};
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(5551106,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        PauseDuringStateTransitions stateTransitionsGuard{controller(), recipientStates};
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+        auto opCtx = makeOperationContext();
+        auto prevState = RecipientStateEnum::kUnused;
+
+        for (const auto state : recipientStates) {
+
+            auto recipient = [&] {
+                if (prevState == RecipientStateEnum::kUnused) {
+                    if (isAlsoDonor) {
+                        createSourceCollection(opCtx.get(), doc);
+                    }
+
+                    RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+                    return RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+                } else {
+                    auto maybeRecipient =
+                        RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+                    ASSERT_TRUE(bool(maybeRecipient));
+
+                    // Allow the transition to prevState to succeed on this primary-only service
+                    // instance.
+                    stateTransitionsGuard.unset(prevState);
+                    return *maybeRecipient;
+                }
+            }();
+
+            if (prevState != RecipientStateEnum::kUnused) {
+                // Allow the transition to prevState to succeed on this primary-only service
+                // instance.
+                stateTransitionsGuard.unset(prevState);
+            }
+
+            // Signal the coordinator's earliest state that allows the recipient's transition
+            // into 'state' to be valid. This mimics the real system where, upon step up, the
+            // new RecipientStateMachine instance gets refreshed with the coordinator's most
+            // recent state.
+            switch (state) {
+                case RecipientStateEnum::kCreatingCollection:
+                case RecipientStateEnum::kCloning: {
+                    notifyToStartCloning(opCtx.get(), *recipient, doc);
+                    break;
+                }
+                case RecipientStateEnum::kRenaming:
+                case RecipientStateEnum::kDone: {
+                    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            // Step down before the transition to state can complete.
+            stateTransitionsGuard.wait(state);
+            stepDown();
+
+            ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                      ErrorCodes::InterruptedDueToReplStateChange);
+
+            prevState = state;
+
+            recipient.reset();
+            stepUp(opCtx.get());
+        }
+
+        // Finally complete the operation and ensure its success.
+        auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(bool(maybeRecipient));
+
+        auto recipient = *maybeRecipient;
+
+        stateTransitionsGuard.unset(RecipientStateEnum::kDone);
+        notifyReshardingCommitting(opCtx.get(), *recipient, doc);
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort) {
+    for (bool isAlsoDonor : {false, true}) {
+        LOGV2(5551107,
+              "Running case",
+              "test"_attr = _agent.getTestName(),
+              "isAlsoDonor"_attr = isAlsoDonor);
+
+        boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
+        doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+
+        auto doc = makeStateDocument(isAlsoDonor);
+        auto instanceId =
+            BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
+
+        auto opCtx = makeOperationContext();
+
+        if (isAlsoDonor) {
+            // If the recipient is also a donor, the original collection should already exist on
+            // this shard.
+            createSourceCollection(opCtx.get(), doc);
+        }
+
+        RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
+        auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
+
+        notifyToStartCloning(opCtx.get(), *recipient, doc);
+        notifyReshardingAborting(opCtx.get(), *recipient, doc);
+
+        doneTransitionGuard->wait(RecipientStateEnum::kDone);
+        stepDown();
+
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
+                  ErrorCodes::InterruptedDueToReplStateChange);
+
+        recipient.reset();
+        stepUp(opCtx.get());
+
+        auto maybeRecipient = RecipientStateMachine::lookup(opCtx.get(), _service, instanceId);
+        ASSERT_TRUE(bool(maybeRecipient));
+        recipient = *maybeRecipient;
+
+        doneTransitionGuard.reset();
+        notifyReshardingAborting(opCtx.get(), *recipient, doc);
+
+        ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+        checkStateDocumentRemoved(opCtx.get());
+
+        if (isAlsoDonor) {
+            // Verify original collection still exists after aborting.
+            AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+            ASSERT_TRUE(bool(coll));
+            ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
+        }
+
+        // Verify the temporary collection no longer exists.
+        {
+            AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
+            ASSERT_FALSE(bool(coll));
+        }
+    }
+}
+
+TEST_F(ReshardingRecipientServiceTest, RenamesTemporaryReshardingCollectionWhenDone) {
+    // The temporary collection is renamed by the donor service when the shard is also a donor. Only
+    // on non-donor shards will the recipient service rename the temporary collection.
+    bool isAlsoDonor = false;
+    boost::optional<PauseDuringStateTransitions> stateTransitionsGuard;
+    stateTransitionsGuard.emplace(controller(), RecipientStateEnum::kApplying);
+
+    auto doc = makeStateDocument(isAlsoDonor);
     auto opCtx = makeOperationContext();
     RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
     auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
     notifyToStartCloning(opCtx.get(), *recipient, doc);
-    notifyReshardingOutcomeDecided(opCtx.get(), *recipient, doc, Status::OK());
+
+    // Wait to check the temporary collection has been created.
+    stateTransitionsGuard->wait(RecipientStateEnum::kApplying);
+    {
+        // Check the temporary collection exists but is not yet renamed.
+        AutoGetCollection coll(opCtx.get(), doc.getTempReshardingNss(), MODE_IS);
+        ASSERT_TRUE(bool(coll));
+        ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+    }
+    stateTransitionsGuard.reset();
+
+    notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
     ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
+    checkStateDocumentRemoved(opCtx.get());
+
+    {
+        // Ensure the temporary collection was renamed.
+        AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
+        ASSERT_TRUE(bool(coll));
+        ASSERT_EQ(coll->uuid(), doc.getReshardingUUID());
+    }
 }
 
 }  // namespace

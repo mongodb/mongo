@@ -33,6 +33,10 @@
 
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 
+#include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
+
 namespace mongo {
 namespace resharding_service_test_helpers {
 

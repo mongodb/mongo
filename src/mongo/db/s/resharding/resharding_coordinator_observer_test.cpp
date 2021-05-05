@@ -69,11 +69,10 @@ protected:
         RecipientStateEnum recipientState,
         boost::optional<Timestamp> timestamp = boost::none,
         boost::optional<Status> abortReason = boost::none) {
-        // TODO SERVER-55511: Make the mock state here simulate only one recipient shard errored
-        // locally.
-        return {makeRecipientShard(ShardId{"s1"}, recipientState, abortReason),
+        // The mock state here is simulating only one donor shard having errored locally.
+        return {makeRecipientShard(ShardId{"s1"}, recipientState),
                 makeRecipientShard(ShardId{"s2"}, recipientState, abortReason),
-                makeRecipientShard(ShardId{"s3"}, recipientState, abortReason)};
+                makeRecipientShard(ShardId{"s3"}, recipientState)};
     }
 };
 

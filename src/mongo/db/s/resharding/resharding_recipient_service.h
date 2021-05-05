@@ -97,14 +97,39 @@ public:
 
     ~RecipientStateMachine();
 
+    /**
+     *  Runs up until the recipient is in state kStrictConsistency or encountered an error.
+     */
+    ExecutorFuture<void> _runUntilStrictConsistencyOrErrored(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken) noexcept;
+
+    /**
+     * Notifies the coordinator if the recipient is in kStrictConsistency or kError and waits for
+     * _coordinatorHasDecisionPersisted to be fulfilled (success) or for the abortToken to be
+     * canceled (failure or stepdown).
+     */
+    ExecutorFuture<void> _notifyCoordinatorAndAwaitDecision(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken) noexcept;
+
+    /**
+     * Finishes the work left remaining on the recipient after the coordinator persists its decision
+     * to abort or complete resharding.
+     */
+    ExecutorFuture<void> _finishReshardingOperation(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& stepdownToken,
+        bool aborted) noexcept;
+
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                          const CancellationToken& token) noexcept override;
 
     void interrupt(Status status) override;
 
     /**
-     * Returns a Future that will be resolved when all work associated with this Instance has
-     * completed running.
+     * Returns a Future that will be resolved when all work associated with this Instance is done
+     * making forward progress.
      */
     SharedSemiFuture<void> getCompletionFuture() const {
         return _completionPromise.getFuture();
@@ -123,7 +148,8 @@ public:
 private:
     // The following functions correspond to the actions to take at a particular recipient state.
     ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCreatingCollection(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken);
 
     void _createTemporaryReshardingCollectionThenTransitionToCloning();
 
@@ -139,12 +165,9 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _awaitCoordinatorHasDecisionPersistedThenTransitionToRenaming(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
     void _renameTemporaryReshardingCollection();
 
-    void _cleanupReshardingCollections();
+    void _cleanupReshardingCollections(bool aborted);
 
     // Transitions the on-disk and in-memory state to 'newState'.
     void _transitionState(RecipientStateEnum newState);
@@ -184,14 +207,13 @@ private:
 
     ReshardingMetrics* _metrics() const;
 
-    // Does work necessary for both recoverable errors (failover/stepdown) and unrecoverable errors
-    // (abort resharding).
-    void _onAbortOrStepdown(WithLock, Status status);
-
     // Initializes the _abortSource and generates a token from it to return back the caller.
     //
     // Should only be called once per lifetime.
     CancellationToken _initAbortSource(const CancellationToken& stepdownToken);
+
+    // Initiates the cancellation of the resharding operation.
+    void _onAbortEncountered(OperationContext* opCtx, const Status& abortReason);
 
     const ReshardingRecipientService* const _recipientService;
 
@@ -230,7 +252,8 @@ private:
     boost::optional<CancellationSource> _abortSource;
 
     // Contains the status with which the operation was aborted.
-    boost::optional<Status> _abortStatus;
+    // TODO SERVER-56902: Remove the _abortReason completely.
+    boost::optional<Status> _abortReason;
 
     // The identifier associated to the recoverable critical section.
     const BSONObj _critSecReason;

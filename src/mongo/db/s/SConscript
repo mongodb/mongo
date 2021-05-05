@@ -533,6 +533,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'resharding_util',
         'shard_server_test_fixture',
+        'sharding_commands_d',
         'sharding_logging',
         'transaction_coordinator',
     ],
