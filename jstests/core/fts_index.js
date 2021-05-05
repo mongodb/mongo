@@ -224,3 +224,14 @@ assert.commandFailedWithCode(coll.createIndex({a: 1, c: 1}, {weights: "$foo"}),
 coll.getIndexes();
 
 coll.drop();
+
+//
+// 6. Bad direction value for non-text key in compound index.
+//
+assert.commandFailedWithCode(coll.createIndex({a: "text", b: Number.MAX_VALUE}),
+                             ErrorCodes.CannotCreateIndex);
+assert.commandFailedWithCode(coll.createIndex({a: "text", b: -Number.MAX_VALUE}),
+                             ErrorCodes.CannotCreateIndex);
+coll.getIndexes();
+
+coll.drop();

@@ -308,7 +308,8 @@ StatusWith<BSONObj> FTSSpec::fixSpec(const BSONObj& spec) {
 
                     m[e.fieldName()] = 1;
                 } else {
-                    if (e.numberInt() != 1 && e.numberInt() != -1) {
+                    auto intVal = e.safeNumberInt();
+                    if (intVal != 1 && intVal != -1) {
                         return {ErrorCodes::CannotCreateIndex,
                                 "expected value 1 or -1 for non-text key in compound index"};
                     }
