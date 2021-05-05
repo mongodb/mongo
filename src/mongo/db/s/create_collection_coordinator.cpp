@@ -364,7 +364,6 @@ CreateCollectionCoordinator::CreateCollectionCoordinator(ShardingDDLCoordinatorS
 boost::optional<BSONObj> CreateCollectionCoordinator::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
     MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
-    // TODO (SERVER-55485): Add request parameters.
     BSONObjBuilder cmdBob;
     if (const auto& optComment = getForwardableOpMetadata().getComment()) {
         cmdBob.append(optComment.get().firstElement());
