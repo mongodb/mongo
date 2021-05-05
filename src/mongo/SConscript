@@ -42,6 +42,12 @@ else:
     version_parts[3] = 0
 version_parts = [ int(x) for x in version_parts[:4]]
 
+env.AppendUnique(
+    FORCEINCLUDES=[
+        'mongo/platform/basic.h',
+    ],
+)
+
 env.SConscript(
     dirs=[
         'base',
