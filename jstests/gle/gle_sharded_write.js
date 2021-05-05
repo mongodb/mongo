@@ -111,7 +111,7 @@ assert.eq(coll.count(), 0);
 //
 // Error on one host during update
 coll.remove({});
-coll.update({_id: 1}, {$invalid: "xxx"}, true);
+coll.update({_id: 1}, {$set: {x: 12}, $hello: 1}, true);
 printjson(gle = coll.getDB().runCommand({getLastError: 1}));
 assert(gle.ok);
 assert(gle.err);
@@ -135,7 +135,7 @@ assert.eq(coll.count(), 0);
 //
 // Repeated calls to GLE should work
 coll.remove({});
-coll.update({_id: 1}, {$invalid: "xxx"}, true);
+coll.update({_id: 1}, {$set: {x: 12}, $hello: 1}, true);
 printjson(gle = coll.getDB().runCommand({getLastError: 1}));
 assert(gle.ok);
 assert(gle.err);

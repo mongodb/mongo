@@ -2,7 +2,7 @@
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
 //
-// @tags: [assumes_unsharded_collection, requires_fastcount]
+// @tags: [assumes_unsharded_collection, requires_fastcount, requires_fcv_50]
 
 t = db.update_addToSet1;
 t.drop();
@@ -71,27 +71,47 @@ t.update({_id: 1}, {$addToSet: {a: {$each: [3, 2, 2, 3, 3]}}});
 o.a.push(3);
 assert.eq(o, t.findOne(), "D4");
 
-// Test that dotted and '$' prefixed field names fail.
-t.drop();
-o = {
-    _id: 1,
-    a: [1, 2]
-};
-assert.commandWorked(t.insert(o));
+var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
+                                  .featureFlagDotsAndDollars.value;
+if (!isDotsAndDollarsEnabled) {
+    // Test that dotted and '$' prefixed field names fail.
+    t.drop();
+    o = {_id: 1, a: [1, 2]};
+    assert.commandWorked(t.insert(o));
 
-assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
-assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
 
-assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
-assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+    assert.writeError(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+    assert.writeError(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
 
-assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
 
-assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
-assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
 
-assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
-assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+    assert.writeError(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+    assert.writeError(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+} else {
+    // Test that dotted and '$' prefixed field names work when nested.
+    t.drop();
+    o = {_id: 1, a: [1, 2]};
+    assert.commandWorked(t.insert(o));
+
+    assert.commandWorked(t.update({}, {$addToSet: {a: {'x.$.y': 'bad'}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {'x.$.y': 'bad'}}}}));
+
+    assert.commandWorked(t.update({}, {$addToSet: {a: {"$bad": "bad"}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {b: {"$bad": "bad"}}}}));
+
+    assert.commandWorked(t.update({}, {$addToSet: {a: {_id: {"x.y": 2}}}}));
+
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'x.$.y': 'bad'}]}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'x.$.y': 'bad'}}]}}}));
+
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{'$bad': 'bad'}]}}}));
+    assert.commandWorked(t.update({}, {$addToSet: {a: {$each: [{b: {'$bad': 'bad'}}]}}}));
+}
 
 // Test that nested _id fields are allowed.
 t.drop();

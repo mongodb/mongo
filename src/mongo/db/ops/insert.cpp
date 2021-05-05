@@ -35,6 +35,8 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/query/dbref.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -109,7 +111,8 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj&
 
             auto fieldName = e.fieldNameStringData();
 
-            if (fieldName[0] == '$') {
+            if (!feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+                fieldName[0] == '$') {
                 return StatusWith<BSONObj>(
                     ErrorCodes::BadValue,
                     str::stream() << "Document can't have $ prefixed field names: " << fieldName);
@@ -129,7 +132,8 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj&
                 if (e.type() == Array) {
                     return StatusWith<BSONObj>(ErrorCodes::BadValue, "can't use an array for _id");
                 }
-                if (e.type() == Object) {
+                if (!feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+                    e.type() == Object) {
                     BSONObj o = e.Obj();
                     Status s = o.storageValidEmbedded();
                     if (!s.isOK())

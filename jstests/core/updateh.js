@@ -1,9 +1,8 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_fcv_50]
 
-// Disallow $ in field names
 var res;
 
 t = db.jstest_updateh;
@@ -14,21 +13,41 @@ t.insert({x: 1});
 res = t.update({x: 1}, {$set: {y: 1}});  // ok
 assert.commandWorked(res);
 
+// Disallow $ in field names at the top-level.
 res = t.update({x: 1}, {$set: {$z: 1}});  // not ok
-assert.writeError(res);
-
-res = t.update({x: 1}, {$set: {'a.$b': 1}});  // not ok
 assert.writeError(res);
 
 res = t.update({x: 1}, {$inc: {$z: 1}});  // not ok
 assert.writeError(res);
+
+var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
+                                  .featureFlagDotsAndDollars.value;
+if (isDotsAndDollarsEnabled) {
+    // Allow $ in nested field names.
+    res = t.update({x: 1}, {$set: {'a.$b': 1}});
+    assert.commandWorked(res);
+
+    res = t.update({x: 1}, {$set: {a: {$z: 1}}});
+    assert.commandWorked(res);
+
+} else {
+    // Disallow $ in nested field names.
+    res = t.update({x: 1}, {$set: {'a.$b': 1}});  // not ok
+    assert.writeError(res);
+
+    res = t.update({x: 1}, {$set: {a: {$z: 1}}});  // not ok
+    assert.writeError(res);
+
+    res = t.update({x: 1}, {$inc: {c: {$z: 1}}});  // not ok
+    assert.writeError(res);
+}
 
 // Second section
 t.drop();
 
 t.save({_id: 0, n: 0});
 
-// Test that '$' cannot be the first character in a field.
+// Test that '$' cannot be the first character in a top-level field.
 // SERVER-7150
 res = t.update({n: 0}, {$set: {$x: 1}});
 assert.writeError(res);
@@ -36,17 +55,31 @@ assert.writeError(res);
 res = t.update({n: 0}, {$set: {$$$: 1}});
 assert.writeError(res);
 
-res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
-assert.writeError(res);
-
-res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
-assert.writeError(res);
-
 res = t.update({n: 0}, {$set: {"$secret.agent.x": 1}});
 assert.writeError(res);
 
-res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
-assert.commandWorked(res);
+if (isDotsAndDollarsEnabled) {
+    // Fields that are not at the top-level are allowed to have $-prefixes.
+    res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
+    assert.commandWorked(res);
+
+    res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
+    assert.commandWorked(res);
+
+    res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
+    assert.commandWorked(res);
+
+} else {
+    res = t.update({n: 0}, {$set: {"sneaky.$x": 1}});
+    assert.writeError(res);
+
+    res = t.update({n: 0}, {$set: {"secret.agent$.$x": 1}});
+    assert.writeError(res);
+
+    res = t.update({n: 0}, {$set: {"secret.agent$": 1}});
+    assert.commandWorked(res);
+}
+
 t.save({_id: 0, n: 0});
 
 // Test that you cannot update database references into top level fields

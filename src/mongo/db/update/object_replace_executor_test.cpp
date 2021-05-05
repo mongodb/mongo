@@ -35,6 +35,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
 #include "mongo/db/update/update_node_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -258,6 +259,8 @@ TEST_F(ObjectReplaceExecutorTest, CanAddImmutableId) {
 }
 
 TEST_F(ObjectReplaceExecutorTest, CannotCreateDollarPrefixedNameWhenValidateForStorageIsTrue) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
+
     auto obj = fromjson("{a: {b: 1, $bad: 1}}");
     ObjectReplaceExecutor node(obj);
 

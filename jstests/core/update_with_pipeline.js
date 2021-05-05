@@ -8,6 +8,7 @@
  *   requires_find_command,
  *   requires_multi_updates,
  *   requires_non_retryable_writes,
+ *   requires_fcv_50,
  * ]
  */
 (function() {
@@ -261,12 +262,23 @@ testUpdate({
     nModified: 1
 });
 
-// Cannot use expressions in constants.
-assert.commandFailedWithCode(db.runCommand({
-    update: collName,
-    updates: [{q: {_id: 1}, u: [{$set: {x: "$$foo"}}], c: {foo: {$add: [1, 2]}}}]
-}),
-                             ErrorCodes.DollarPrefixedFieldName);
+const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
+                                    .featureFlagDotsAndDollars.value;
+if (isDotsAndDollarsEnabled) {
+    // Test that expressions within constants are treated as field names instead of expressions.
+    db.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: [{$set: {x: "$$foo"}}], c: {foo: {$add: [1, 2]}}}]
+    });
+    assert.eq([{_id: 1, x: {$add: [1, 2]}, foo: "$x"}], coll.find({_id: 1}).toArray());
+} else {
+    // Cannot use expressions in constants.
+    assert.commandFailedWithCode(db.runCommand({
+        update: collName,
+        updates: [{q: {_id: 1}, u: [{$set: {x: "$$foo"}}], c: {foo: {$add: [1, 2]}}}]
+    }),
+                                 ErrorCodes.DollarPrefixedFieldName);
+}
 
 // Cannot use constants with regular updates.
 assert.commandFailedWithCode(

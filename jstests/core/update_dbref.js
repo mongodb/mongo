@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_fcv_50]
 
 // Test that we can update DBRefs, but not dbref fields outside a DBRef
 
@@ -38,10 +38,14 @@ assert.writeError(res);
 assert(/\$db/.test(res.getWriteError()), "expected bad update because of $db");
 assert.docEq({_id: 1, a: new DBRef("b", 2)}, t.findOne());
 
-res = t.update({}, {$set: {"b.$id": 2}});
-assert(res.hasWriteError(),
-       "b.$id update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
+var isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
+                                  .featureFlagDotsAndDollars.value;
+if (!isDotsAndDollarsEnabled) {
+    res = t.update({}, {$set: {"b.$id": 2}});
+    assert(res.hasWriteError(),
+           "b.$id update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
 
-res = t.update({}, {$set: {"b.$ref": 2}});
-assert(res.hasWriteError(),
-       "b.$ref update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
+    res = t.update({}, {$set: {"b.$ref": 2}});
+    assert(res.hasWriteError(),
+           "b.$ref update should fail -- doc:" + tojson(t.findOne()) + " result:" + res.toString());
+}

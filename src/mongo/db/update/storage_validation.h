@@ -39,15 +39,26 @@ namespace storage_validation {
  * Validates that the MutableBSON document 'doc' is acceptable for storage in a collection. The
  * check is performed recursively on subdocuments. Uasserts if the validation fails or if the depth
  * exceeds the maximum allowable depth.
+ *
+ * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
+ * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
+ * true, do not reject $-prefixed fields at the top-level of a document.
  */
-void storageValid(const mutablebson::Document& doc);
+void storageValid(const mutablebson::Document& doc, const bool allowTopLevelDollarPrefixes = false);
 
 /**
  * Validates that the MutableBSON element 'elem' is acceptable for storage in a collection. If
  * 'deep' is true, the check is performed recursively on subdocuments. Uasserts if the validation
  * fails or if 'recursionLevel' exceeds the maximum allowable depth.
+ *
+ * When the dots and dollars feature flag is off, always reject $-prefixed fields. Otherwise, reject
+ * only $-prefixed fields at the top-level of a document. If 'allowTopLevelDollarPrefixes' is set to
+ * true, do not reject $-prefixed fields at the top-level of a document.
  */
-void storageValid(mutablebson::ConstElement elem, const bool deep, std::uint32_t recursionLevel);
+void storageValid(mutablebson::ConstElement elem,
+                  const bool deep,
+                  std::uint32_t recursionLevel,
+                  const bool allowTopLevelDollarPrefixes = false);
 
 }  // namespace storage_validation
 

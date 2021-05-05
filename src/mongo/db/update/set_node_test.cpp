@@ -36,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/update/update_node_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1035,6 +1036,8 @@ TEST_F(SetNodeTest, ApplySetModToEphemeralDocument) {
 }
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInsideSetElement) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
+
     auto update = fromjson("{$set: {a: {$bad: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
@@ -1065,6 +1068,8 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtStartOfPath) {
 }
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
+
     auto update = fromjson("{$set: {'a.$bad.b': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;
@@ -1080,6 +1085,8 @@ TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldInMiddleOfPath) {
 }
 
 TEST_F(SetNodeTest, ApplyCannotCreateDollarPrefixedFieldAtEndOfPath) {
+    RAIIServerParameterControllerForTest controller("featureFlagDotsAndDollars", false);
+
     auto update = fromjson("{$set: {'a.$bad': 1}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SetNode node;

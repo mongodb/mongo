@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
@@ -101,7 +102,10 @@ UpdateExecutor::ApplyResult PipelineExecutor::applyUpdate(ApplyParams applyParam
     // Replace the pre-image document in applyParams with the post image we got from running the
     // post image.
     auto ret = ObjectReplaceExecutor::applyReplacementUpdate(
-        applyParams, transformedDoc, transformedDocHasIdField);
+        applyParams,
+        transformedDoc,
+        transformedDocHasIdField,
+        feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV());
 
     // The oplog entry should not have been populated yet.
     invariant(ret.oplogEntry.isEmpty());
