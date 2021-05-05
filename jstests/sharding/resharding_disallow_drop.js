@@ -40,8 +40,6 @@ const collName = "foo";
 const ns = dbName + "." + collName;
 const db = st.s.getDB(dbName);
 
-configureFailPoint(st.configRS.getPrimary(), "reshardingCoordinatorCanEnterCriticalImplicitly");
-
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 

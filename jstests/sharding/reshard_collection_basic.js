@@ -203,8 +203,6 @@ let presetReshardedChunks =
     [{recipientShardId: st.shard1.shardName, min: {newKey: MinKey}, max: {newKey: MaxKey}}];
 const existingZoneName = 'x1';
 
-configureFailPoint(st.configRS.getPrimary(), "reshardingCoordinatorCanEnterCriticalImplicitly");
-
 /**
  * Fail cases
  */

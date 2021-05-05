@@ -71,7 +71,6 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeDecisionPersisted);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
-MONGO_FAIL_POINT_DEFINE(reshardingCoordinatorCanEnterCriticalImplicitly);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
@@ -1404,9 +1403,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
             _startCommitMonitor(executor);
 
             LOGV2(5391602, "Resharding operation waiting for an okay to enter critical section");
-            if (reshardingCoordinatorCanEnterCriticalImplicitly.shouldFail()) {
-                onOkayToEnterCritical();
-            }
             return _canEnterCritical.getFuture()
                 .thenRunOn(**executor)
                 .then([this, doc = std::move(coordinatorDocChangedOnDisk)] {
