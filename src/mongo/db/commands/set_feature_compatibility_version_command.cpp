@@ -162,11 +162,20 @@ void removeTimeseriesEntriesFromConfigTransactions(OperationContext* opCtx) {
     static constexpr StringData kLastWriteOpFieldName = "lastWriteOpTime"_sd;
     auto cursor = dbClient.query(NamespaceString::kSessionTransactionsTableNamespace, Query{});
     while (cursor->more()) {
-        auto entry = TransactionHistoryIterator{repl::OpTime::parse(
-                                                    cursor->next()[kLastWriteOpFieldName].Obj())}
-                         .next(opCtx);
-        if (entry.getNss().isTimeseriesBucketsCollection()) {
-            sessions.push_back(*entry.getSessionId());
+        try {
+            auto entry =
+                TransactionHistoryIterator{
+                    repl::OpTime::parse(cursor->next()[kLastWriteOpFieldName].Obj())}
+                    .next(opCtx);
+            if (entry.getNss().isTimeseriesBucketsCollection()) {
+                sessions.push_back(*entry.getSessionId());
+            }
+        } catch (const DBException& ex) {
+            // IncompleteTransactionHistory can be thrown if the oplog entry referenced by this
+            // config.transactions entry no longer exists.
+            if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
+                throw;
+            }
         }
     }
 
