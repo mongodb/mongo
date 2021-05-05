@@ -34,7 +34,7 @@
 #include <sstream>
 #include <thread>
 
-#include "component.h"
+#include "core/component.h"
 
 namespace test_harness {
 /*
@@ -44,61 +44,54 @@ namespace test_harness {
  */
 class timestamp_manager : public component {
     public:
-    timestamp_manager(configuration *config)
-        : /* _periodic_update_s is hardcoded to 1 second for now. */
-          component(config), _increment_ts(0U), _latest_ts(0U), _oldest_lag(0), _oldest_ts(0U),
-          _periodic_update_s(1), _stable_lag(0), _stable_ts(0U)
-    {
-    }
+    timestamp_manager(configuration *config) : component("timestamp_manager", config) {}
 
     void
     load()
     {
+        component::load();
+
         _oldest_lag = _config->get_int(OLDEST_LAG);
         testutil_assert(_oldest_lag >= 0);
         _stable_lag = _config->get_int(STABLE_LAG);
         testutil_assert(_stable_lag >= 0);
-        component::load();
     }
 
     void
-    run()
+    do_work()
     {
         std::string config;
         /* latest_ts_s represents the time component of the latest timestamp provided. */
         wt_timestamp_t latest_ts_s;
 
-        while (_enabled && _running) {
-            /* Timestamps are checked periodically. */
-            std::this_thread::sleep_for(std::chrono::seconds(_periodic_update_s));
-            latest_ts_s = (_latest_ts >> 32);
-            /*
-             * Keep a time window between the latest and stable ts less than the max defined in the
-             * configuration.
-             */
-            testutil_assert(latest_ts_s >= _stable_ts);
-            if ((latest_ts_s - _stable_ts) > _stable_lag) {
-                _stable_ts = latest_ts_s - _stable_lag;
-                config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
-            }
+        /* Timestamps are checked periodically. */
+        latest_ts_s = (_latest_ts >> 32);
+        /*
+         * Keep a time window between the latest and stable ts less than the max defined in the
+         * configuration.
+         */
+        testutil_assert(latest_ts_s >= _stable_ts);
+        if ((latest_ts_s - _stable_ts) > _stable_lag) {
+            _stable_ts = latest_ts_s - _stable_lag;
+            config += std::string(STABLE_TS) + "=" + decimal_to_hex(_stable_ts);
+        }
 
-            /*
-             * Keep a time window between the stable and oldest ts less than the max defined in the
-             * configuration.
-             */
-            testutil_assert(_stable_ts >= _oldest_ts);
-            if ((_stable_ts - _oldest_ts) > _oldest_lag) {
-                _oldest_ts = _stable_ts - _oldest_lag;
-                if (!config.empty())
-                    config += ",";
-                config += std::string(OLDEST_TS) + "=" + decimal_to_hex(_oldest_ts);
-            }
+        /*
+         * Keep a time window between the stable and oldest ts less than the max defined in the
+         * configuration.
+         */
+        testutil_assert(_stable_ts >= _oldest_ts);
+        if ((_stable_ts - _oldest_ts) > _oldest_lag) {
+            _oldest_ts = _stable_ts - _oldest_lag;
+            if (!config.empty())
+                config += ",";
+            config += std::string(OLDEST_TS) + "=" + decimal_to_hex(_oldest_ts);
+        }
 
-            /* Save the new timestamps. */
-            if (!config.empty()) {
-                connection_manager::instance().set_timestamp(config);
-                config = "";
-            }
+        /* Save the new timestamps. */
+        if (!config.empty()) {
+            connection_manager::instance().set_timestamp(config);
+            config = "";
         }
     }
 
@@ -138,14 +131,13 @@ class timestamp_manager : public component {
     }
 
     private:
-    const wt_timestamp_t _periodic_update_s;
     std::atomic<wt_timestamp_t> _increment_ts;
-    wt_timestamp_t _latest_ts, _oldest_ts, _stable_ts;
+    wt_timestamp_t _latest_ts = 0U, _oldest_ts = 0U, _stable_ts = 0U;
     /*
      * _oldest_lag is the time window between the stable and oldest timestamps.
      * _stable_lag is the time window between the latest and stable timestamps.
      */
-    int64_t _oldest_lag, _stable_lag;
+    int64_t _oldest_lag = 0, _stable_lag = 0;
 };
 } // namespace test_harness
 

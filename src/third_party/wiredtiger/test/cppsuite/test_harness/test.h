@@ -38,15 +38,15 @@ extern "C" {
 #include "wiredtiger.h"
 }
 
-#include "api_const.h"
-#include "component.h"
-#include "configuration.h"
+#include "util/api_const.h"
+#include "core/component.h"
+#include "core/configuration.h"
 #include "connection_manager.h"
 #include "runtime_monitor.h"
 #include "timestamp_manager.h"
 #include "thread_manager.h"
 #include "workload_generator.h"
-#include "workload_validation.h"
+#include "workload/workload_validation.h"
 
 namespace test_harness {
 /*
@@ -55,8 +55,6 @@ namespace test_harness {
 class test : public database_operation {
     public:
     test(const std::string &config, const std::string &name)
-        : _runtime_monitor(nullptr), _thread_manager(nullptr), _timestamp_manager(nullptr),
-          _workload_generator(nullptr), _workload_tracking(nullptr)
     {
         _config = new configuration(name, config);
         _runtime_monitor = new runtime_monitor(_config->get_subconfig(RUNTIME_MONITOR));
@@ -179,11 +177,11 @@ class test : public database_operation {
     std::string _name;
     std::vector<component *> _components;
     configuration *_config;
-    runtime_monitor *_runtime_monitor;
-    thread_manager *_thread_manager;
-    timestamp_manager *_timestamp_manager;
-    workload_generator *_workload_generator;
-    workload_tracking *_workload_tracking;
+    runtime_monitor *_runtime_monitor = nullptr;
+    thread_manager *_thread_manager = nullptr;
+    timestamp_manager *_timestamp_manager = nullptr;
+    workload_generator *_workload_generator = nullptr;
+    workload_tracking *_workload_tracking = nullptr;
 };
 } // namespace test_harness
 

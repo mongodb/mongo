@@ -29,6 +29,7 @@
 #ifndef THREAD_CONTEXT_H
 #define THREAD_CONTEXT_H
 
+#include "../core/throttle.h"
 #include "database_model.h"
 #include "random_generator.h"
 #include "workload_tracking.h"
@@ -50,10 +51,9 @@ enum class thread_operation {
 class thread_context {
     public:
     thread_context(timestamp_manager *timestamp_manager, workload_tracking *tracking, database &db,
-      thread_operation type, int64_t max_op, int64_t min_op, int64_t value_size)
-        : _database(db), _current_op_count(0U), _in_txn(false), _running(false), _min_op(min_op),
-          _max_op(max_op), _max_op_count(0), _timestamp_manager(timestamp_manager), _type(type),
-          _tracking(tracking), _value_size(value_size)
+      thread_operation type, int64_t max_op, int64_t min_op, int64_t value_size, throttle throttle)
+        : _database(db), _min_op(min_op), _max_op(max_op), _timestamp_manager(timestamp_manager),
+          _type(type), _tracking(tracking), _value_size(value_size), _throttle(throttle)
     {
     }
 
@@ -115,6 +115,12 @@ class thread_context {
     is_in_transaction() const
     {
         return (_in_txn);
+    }
+
+    void
+    sleep()
+    {
+        _throttle.sleep();
     }
 
     void
@@ -188,8 +194,8 @@ class thread_context {
      * _current_op_count is the current number of operations that have been executed in the current
      * transaction.
      */
-    uint64_t _current_op_count;
-    bool _in_txn, _running;
+    uint64_t _current_op_count = 0U;
+    bool _in_txn = false, _running = false;
     /*
      * _min_op and _max_op are the minimum and maximum number of operations within one transaction.
      * _max_op_count is the current maximum number of operations that can be executed in the current
@@ -198,6 +204,7 @@ class thread_context {
     int64_t _min_op, _max_op, _max_op_count;
     timestamp_manager *_timestamp_manager;
     const thread_operation _type;
+    throttle _throttle;
     workload_tracking *_tracking;
     /* Temporary member that comes from the test configuration. */
     int64_t _value_size;

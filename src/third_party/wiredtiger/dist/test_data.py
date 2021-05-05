@@ -41,11 +41,24 @@ class Config:
 
     def __ge__(self, other):
         return self.name >= other.name
+#
+# A generic configuration used by some components to define their tick rate.
+#
+throttle_config = [
+    Config('op_count', 1, r'''
+        The number of operations to be performed within the defined interval, e.g.
+        20 op_count with an interval of a second is equal to 20 ops per second.''',
+        min=1, max=10000),
+    Config('interval', 's', r'''
+        The interval to considered, either second, minute or hour.
+        The default interval is seconds.''',
+        choices=['s', 'm', 'h'])
+]
 
 #
 # Record config specifies the format of the keys and values used in the database
 #
-record_config = [
+record_config = throttle_config + [
     Config('key_size', 0, r'''
         The size of the keys created''', min=0, max=10000),
     Config('value_size', 0, r'''
@@ -60,14 +73,6 @@ populate_config = [
         The number of collections the workload generator operates over''', min=0, max=200000),
     Config('key_count', 0, r'''
         The number of keys to be operated on per collection''', min=0, max=1000000),
-]
-
-#
-# A generic configuration used by some components to define their tick rate.
-#
-throttle_config = [
-    Config('rate_per_second',1,r'''
-        The number of times an operation should be performed per second''', min=1,max=1000),
 ]
 
 #
@@ -94,6 +99,8 @@ range_config = [
         The maximum a value can be in a range''')
 ]
 
+component_config = enable_config + throttle_config
+
 transaction_config = [
     Config('ops_per_transaction', '', r'''
         Defines how many operations a transaction can perform, the range is defined with a minimum
@@ -105,7 +112,7 @@ transaction_config = [
 # Configuration that applies to the runtime monitor component, this should be a list of statistics
 # that need to be checked by the component.
 #
-runtime_monitor = throttle_config + [
+runtime_monitor = component_config + [
     Config('stat_cache_size', '', '''
         The maximum cache percentage that can be hit while running.''',
         type='category', subconfig=limit_stat)
@@ -114,7 +121,7 @@ runtime_monitor = throttle_config + [
 #
 # Configuration that applies to the timestamp_manager component.
 #
-timestamp_manager = enable_config +  [
+timestamp_manager = component_config +  [
     Config('oldest_lag', 0, r'''
         The duration between the stable and oldest timestamps''', min=0, max=1000000),
     Config('stable_lag', 0, r'''
@@ -129,7 +136,7 @@ workload_tracking = enable_config
 #
 # Configuration that applies to the workload_generator component.
 #
-workload_generator = transaction_config + record_config + populate_config + [
+workload_generator = component_config + transaction_config + record_config + populate_config + [
     Config('read_threads', 0, r'''
         The number of threads performing read operations''', min=0, max=100),
     Config('insert_threads', 0, r'''

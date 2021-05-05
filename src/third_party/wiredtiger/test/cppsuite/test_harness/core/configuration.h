@@ -174,7 +174,7 @@ class configuration {
     }
 
     std::string _config;
-    WT_CONFIG_PARSER *_config_parser;
+    WT_CONFIG_PARSER *_config_parser = nullptr;
 };
 } // namespace test_harness
 

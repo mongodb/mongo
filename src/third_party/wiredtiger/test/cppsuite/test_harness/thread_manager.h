@@ -31,8 +31,8 @@
 
 #include <thread>
 
-#include "database_operation.h"
-#include "thread_context.h"
+#include "workload/database_operation.h"
+#include "workload/thread_context.h"
 
 namespace test_harness {
 /* Class that handles threads, from their initialization to their deletion. */

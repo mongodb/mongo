@@ -201,7 +201,7 @@ class database_operation {
          * throttle management.
          */
         while (context.is_running())
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            context.sleep();
 
         /* Make sure the last operation is committed now the work is finished. */
         if (context.is_in_transaction())

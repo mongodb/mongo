@@ -30,6 +30,7 @@
 #define COMPONENT_H
 
 #include "configuration.h"
+#include "throttle.h"
 
 namespace test_harness {
 /*
@@ -38,7 +39,7 @@ namespace test_harness {
  */
 class component {
     public:
-    component(configuration *config) : _enabled(true), _running(false), _config(config) {}
+    component(const std::string &name, configuration *config) : _name(name), _config(config) {}
 
     ~component()
     {
@@ -56,14 +57,35 @@ class component {
     virtual void
     load()
     {
+        debug_print("Loading component: " + _name, DEBUG_INFO);
         _enabled = _config->get_optional_bool(ENABLED, true);
-        _running = true;
+        _throttle = throttle(_config);
+        /* If we're not enabled we shouldn't be running. */
+        _running = _enabled;
     }
 
     /*
-     * The run phase encompasses all operations that occur during the primary phase of the workload.
+     * The run function provides a top level loop that calls the do_work function every X seconds as
+     * defined by the throttle. Each run() method defined by the components is called in its own
+     * thread by the top level test class.
+     *
+     * If a component does not wish to use the standard run function, it can be overloaded.
      */
-    virtual void run() = 0;
+    virtual void
+    run()
+    {
+        debug_print("Running component: " + _name, DEBUG_INFO);
+        while (_enabled && _running) {
+            do_work();
+            _throttle.sleep();
+        }
+    }
+
+    virtual void
+    do_work()
+    {
+        /* Not implemented. */
+    }
 
     bool
     is_enabled() const
@@ -79,15 +101,18 @@ class component {
     virtual void
     finish()
     {
+        debug_print("Finishing component: " + _name, DEBUG_INFO);
         _running = false;
     }
 
-    static const std::string name;
-
     protected:
-    bool _enabled;
-    volatile bool _running;
+    bool _enabled = false;
+    volatile bool _running = false;
+    throttle _throttle;
     configuration *_config;
+
+    private:
+    std::string _name;
 };
 } // namespace test_harness
 #endif
