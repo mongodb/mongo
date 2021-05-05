@@ -387,6 +387,10 @@ void ReshardingMetrics::OperationMetrics::appendCumulativeOpMetrics(BSONObjBuild
 }
 
 boost::optional<Milliseconds> ReshardingMetrics::OperationMetrics::remainingOperationTime() const {
+    if (recipientState > RecipientStateEnum::kCloning && oplogEntriesFetched == 0) {
+        return Milliseconds(0);
+    }
+
     if (oplogEntriesApplied > 0 && oplogEntriesFetched > 0) {
         // All fetched oplogEntries must be applied. Some of them already have been.
         return remainingTime(
