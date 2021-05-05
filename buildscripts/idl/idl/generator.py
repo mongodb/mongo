@@ -446,7 +446,7 @@ class _CppFileWriterBase(object):
     def get_initializer_lambda(self, decl, unused=False, return_type=None):
         # type: (str, bool, str) -> writer.IndentedScopedBlock
         """Generate an indented block lambda initializing an outer scope variable."""
-        prefix = 'MONGO_COMPILER_VARIABLE_UNUSED ' if unused else ''
+        prefix = '[[maybe_unused]] ' if unused else ''
         prefix = prefix + decl + ' = ([]'
         if return_type:
             prefix = prefix + '() -> ' + return_type
@@ -2425,9 +2425,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line(
                 common.template_args(
                     '${unused} auto* ${alias_var} = new IDLServerParameterDeprecatedAlias(${name}, ${param_var});',
-                    unused='MONGO_COMPILER_VARIABLE_UNUSED',
-                    alias_var='scp_%d_%d' % (param_no, alias_no), name=_encaps(alias),
-                    param_var='scp_%d' % (param_no)))
+                    unused='[[maybe_unused]]', alias_var='scp_%d_%d' % (param_no, alias_no),
+                    name=_encaps(alias), param_var='scp_%d' % (param_no)))
 
     def gen_server_parameters(self, params, header_file_name):
         # type: (List[ast.ServerParameter], str) -> None
@@ -2645,7 +2644,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             '}'):
                         # If all options are guarded by non-passing #ifdefs, then params will be unused.
                         self._writer.write_line(
-                            'MONGO_COMPILER_VARIABLE_UNUSED const auto& params = optionenvironment::startupOptionsParsed;'
+                            '[[maybe_unused]] const auto& params = optionenvironment::startupOptionsParsed;'
                         )
                         self._gen_config_options_store(spec.configs, False)
 
