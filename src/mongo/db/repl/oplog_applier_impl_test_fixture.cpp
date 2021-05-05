@@ -36,6 +36,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
@@ -100,6 +101,20 @@ void OplogApplierImplOpObserver::onCreateCollection(OperationContext* opCtx,
     onCreateCollectionFn(opCtx, coll, collectionName, options, idIndex);
 }
 
+void OplogApplierImplOpObserver::onRenameCollection(OperationContext* opCtx,
+                                                    const NamespaceString& fromCollection,
+                                                    const NamespaceString& toCollection,
+                                                    OptionalCollectionUUID uuid,
+                                                    OptionalCollectionUUID dropTargetUUID,
+                                                    std::uint64_t numRecords,
+                                                    bool stayTemp) {
+    if (!onRenameCollectionFn) {
+        return;
+    }
+    onRenameCollectionFn(
+        opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
+}
+
 void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
                                                const NamespaceString& nss,
                                                CollectionUUID uuid,
@@ -109,6 +124,29 @@ void OplogApplierImplOpObserver::onCreateIndex(OperationContext* opCtx,
         return;
     }
     onCreateIndexFn(opCtx, nss, uuid, indexDoc, fromMigrate);
+}
+
+void OplogApplierImplOpObserver::onDropIndex(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             OptionalCollectionUUID uuid,
+                                             const std::string& indexName,
+                                             const BSONObj& idxDescriptor) {
+    if (!onDropIndexFn) {
+        return;
+    }
+    onDropIndexFn(opCtx, nss, uuid, indexName, idxDescriptor);
+}
+
+void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const UUID& uuid,
+                                           const BSONObj& collModCmd,
+                                           const CollectionOptions& oldCollOptions,
+                                           boost::optional<IndexCollModInfo> indexInfo) {
+    if (!onCollModFn) {
+        return;
+    }
+    onCollModFn(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
 }
 
 void OplogApplierImplTest::setUp() {
@@ -409,7 +447,7 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-        Lock::DBLock dblk(opCtx, nss.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
@@ -439,6 +477,17 @@ void createDatabase(OperationContext* opCtx, StringData dbName) {
 
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
     return AutoGetCollectionForRead(opCtx, nss).getCollection() != nullptr;
+}
+
+void createIndex(OperationContext* opCtx,
+                 const NamespaceString& nss,
+                 const UUID collUUID,
+                 const BSONObj& spec) {
+    Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
+    Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+    auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    indexBuildsCoord->createIndex(
+        opCtx, collUUID, spec, IndexBuildsManager::IndexConstraints::kEnforce, false);
 }
 
 }  // namespace repl

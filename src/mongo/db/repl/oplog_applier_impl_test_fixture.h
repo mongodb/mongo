@@ -106,15 +106,46 @@ public:
                             const OplogSlot& createOpTime) override;
 
     /**
-     * Called when OplogApplierImpl creates an index
+     * Called when OplogApplierImpl renames a collection.
+     */
+    void onRenameCollection(OperationContext* opCtx,
+                            const NamespaceString& fromCollection,
+                            const NamespaceString& toCollection,
+                            OptionalCollectionUUID uuid,
+                            OptionalCollectionUUID dropTargetUUID,
+                            std::uint64_t numRecords,
+                            bool stayTemp) override;
+
+    /**
+     * Called when OplogApplierImpl creates an index.
      */
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CollectionUUID uuid,
                        BSONObj indexDoc,
                        bool fromMigrate) override;
-    // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to check
-    // actual documents mutated.
+
+    /**
+     * Called when OplogApplierImpl drops an index.
+     */
+    void onDropIndex(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     OptionalCollectionUUID uuid,
+                     const std::string& indexName,
+                     const BSONObj& idxDescriptor) override;
+
+    /**
+     * Called when OplogApplierImpl performs a CollMod.
+     */
+    void onCollMod(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const UUID& uuid,
+                   const BSONObj& collModCmd,
+                   const CollectionOptions& oldCollOptions,
+                   boost::optional<IndexCollModInfo> indexInfo) override;
+
+    // Hooks for OpObserver functions. Defaults to a no-op function but may be overridden to
+    // check actual documents mutated.
     std::function<void(OperationContext*, const NamespaceString&, const std::vector<BSONObj>&)>
         onInsertsFn;
 
@@ -134,8 +165,33 @@ public:
                        const CollectionOptions&,
                        const BSONObj&)>
         onCreateCollectionFn;
+
+    std::function<void(OperationContext*,
+                       const NamespaceString&,
+                       const NamespaceString&,
+                       OptionalCollectionUUID,
+                       OptionalCollectionUUID,
+                       std::uint64_t,
+                       bool)>
+        onRenameCollectionFn;
+
     std::function<void(OperationContext*, const NamespaceString&, CollectionUUID, BSONObj, bool)>
         onCreateIndexFn;
+
+    std::function<void(OperationContext*,
+                       const NamespaceString&,
+                       OptionalCollectionUUID,
+                       const std::string&,
+                       const BSONObj&)>
+        onDropIndexFn;
+
+    std::function<void(OperationContext*,
+                       const NamespaceString&,
+                       const UUID&,
+                       const BSONObj&,
+                       const CollectionOptions&,
+                       boost::optional<IndexCollModInfo>)>
+        onCollModFn;
 };
 
 class OplogApplierImplTest : public ServiceContextMongoDTest {
@@ -247,6 +303,14 @@ void createDatabase(OperationContext* opCtx, StringData dbName);
  * Returns true if collection exists.
  */
 bool collectionExists(OperationContext* opCtx, const NamespaceString& nss);
+
+/**
+ * Create index on a collection.
+ */
+void createIndex(OperationContext* opCtx,
+                 const NamespaceString& nss,
+                 const UUID collUUID,
+                 const BSONObj& spec);
 
 }  // namespace repl
 }  // namespace mongo

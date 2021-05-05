@@ -35,10 +35,12 @@
 #include <boost/optional/optional_io.hpp>
 #include <vector>
 
+#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
@@ -111,6 +113,7 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantOplogApplierTestOpObserver::_mutex");
     std::vector<MutableOplogEntry> _entries;
 };
+
 constexpr auto dbName = "tenant_test"_sd;
 
 class TenantOplogApplierTest : public ServiceContextMongoDTest {
@@ -311,6 +314,58 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
     applier->join();
 }
 
+TEST_F(TenantOplogApplierTest, CommitUnpreparedTransaction_DataPartiallyApplied) {
+    createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
+    NamespaceString nss(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto lsid = makeLogicalSessionId(_opCtx.get());
+    TxnNumber txnNum(0);
+
+    const BSONObj doc1 = BSON("_id" << 1 << "data" << 1);
+    const BSONObj doc2 = BSON("_id" << 2 << "data" << 2);
+
+    auto partialOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        OpTime(Timestamp(1, 1), 1LL),
+        nss,
+        BSON("applyOps" << BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc1)) << "partialTxn"
+                        << true),
+        lsid,
+        txnNum,
+        {StmtId(0)},
+        OpTime());
+
+    auto commitOp = makeCommandOplogEntryWithSessionInfoAndStmtIds(
+        OpTime(Timestamp(2, 1), 1LL),
+        nss,
+        BSON("applyOps" << BSON_ARRAY(makeInsertApplyOpsEntry(nss, uuid, doc2))),
+        lsid,
+        txnNum,
+        {StmtId(1)},
+        partialOp.getOpTime());
+
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(),
+                                                    nss,
+                                                    {doc1, commitOp.getOpTime().getTimestamp()},
+                                                    commitOp.getOpTime().getTerm()));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc1));
+    ASSERT_FALSE(docExists(_opCtx.get(), nss, doc2));
+
+    pushOps({partialOp, commitOp});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(commitOp.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc1));
+    ASSERT_TRUE(docExists(_opCtx.get(), nss, doc2));
+
+    applier->shutdown();
+    applier->join();
+}
+
 TEST_F(TenantOplogApplierTest, ApplyInsert_DatabaseMissing) {
     auto entry = makeInsertOplogEntry(1, NamespaceString(dbName, "bar"), UUID::gen());
     bool onInsertsCalled = false;
@@ -380,6 +435,40 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_InsertExisting) {
     // This insert gets converted to an upsert.
     ASSERT_FALSE(onInsertsCalled);
     ASSERT_TRUE(onUpdateCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyInsert_UniqueKey_InsertExisting) {
+    NamespaceString nss(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+
+    // Create unique key index on the collection.
+    auto indexKey = BSON("data" << 1);
+    auto spec =
+        BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << indexKey << "name"
+                 << (indexKey.firstElementFieldNameStringData() + "_1") << "unique" << true);
+    createIndex(_opCtx.get(), nss, uuid, spec);
+
+    ASSERT_OK(getStorageInterface()->insertDocument(
+        _opCtx.get(), nss, {BSON("_id" << 0 << "data" << 2)}, 0));
+    // Insert an entry that conflicts with the existing document on the indexed field.
+    auto entry =
+        makeOplogEntry(repl::OpTypeEnum::kInsert, nss, uuid, BSON("_id" << 1 << "data" << 2));
+    bool onInsertsCalled = false;
+    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
+                                   const NamespaceString&,
+                                   const std::vector<BSONObj>&) { onInsertsCalled = true; };
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // The DuplicateKey error should be ignored and insert should succeed.
+    ASSERT_TRUE(onInsertsCalled);
     applier->shutdown();
     applier->join();
 }
@@ -626,7 +715,68 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
     applier->join();
 }
 
-TEST_F(TenantOplogApplierTest, ApplyCommand_Success) {
+TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
+    NamespaceString nss(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
+                                            const CollectionPtr&,
+                                            const NamespaceString& collNss,
+                                            const CollectionOptions&,
+                                            const BSONObj&) { applyCmdCalled = true; };
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // Since the collection already exists, onCreateCollection should not happen.
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
+    NamespaceString nss1(dbName, "foo");
+    NamespaceString nss2(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss2);
+    auto op =
+        BSON("op"
+             << "c"
+             << "ns" << nss1.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << BSON("renameCollection" << nss1.ns() << "to" << nss2.ns() << "stayTemp" << false)
+             << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onRenameCollectionFn = [&](OperationContext* opCtx,
+                                            const NamespaceString& fromColl,
+                                            const NamespaceString& toColl,
+                                            OptionalCollectionUUID uuid,
+                                            OptionalCollectionUUID dropTargetUUID,
+                                            std::uint64_t numRecords,
+                                            bool stayTemp) { applyCmdCalled = true; };
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // Since the collection already has the target name, onRenameCollection should not happen.
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
     NamespaceString nss(dbName, "t");
     auto op =
         BSON("op"
@@ -722,7 +872,7 @@ TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
     applier->join();
 }
 
-TEST_F(TenantOplogApplierTest, ApplyCommand_WrongNSS) {
+TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     // Should not be able to apply a command in the wrong namespace.
     NamespaceString nss("notmytenant", "t");
     auto op =
@@ -745,6 +895,110 @@ TEST_F(TenantOplogApplierTest, ApplyCommand_WrongNSS) {
     ASSERT_OK(applier->startup());
     auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
+    NamespaceString nss(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << BSON("dropIndexes" << nss.coll() << "index"
+                                         << "a_1")
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onDropIndexFn = [&](OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     OptionalCollectionUUID uuid,
+                                     const std::string& indexName,
+                                     const BSONObj& idxDescriptor) { applyCmdCalled = true; };
+
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // The IndexNotFound error should be ignored and drop index should not happen.
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
+    NamespaceString nss(dbName, "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << BSON("collMod" << nss.coll() << "index"
+                                     << BSON("name"
+                                             << "data_1"
+                                             << "hidden" << true))
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onCollModFn = [&](OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const UUID& uuid,
+                                   const BSONObj& collModCmd,
+                                   const CollectionOptions& oldCollOptions,
+                                   boost::optional<IndexCollModInfo> indexInfo) {
+        applyCmdCalled = true;
+    };
+
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // The IndexNotFound error should be ignored and collMod should not happen.
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
+    createDatabase(_opCtx.get(), dbName);
+    NamespaceString nss(dbName, "bar");
+    UUID uuid(UUID::gen());
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << BSON("collMod" << nss.coll() << "index"
+                                     << BSON("name"
+                                             << "data_1"
+                                             << "hidden" << true))
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    bool applyCmdCalled = false;
+    _opObserver->onCollModFn = [&](OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const UUID& uuid,
+                                   const BSONObj& collModCmd,
+                                   const CollectionOptions& oldCollOptions,
+                                   boost::optional<IndexCollModInfo> indexInfo) {
+        applyCmdCalled = true;
+    };
+
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(
+        _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_OK(opAppliedFuture.getNoThrow().getStatus());
+    // The NamespaceNotFound error should be ignored and collMod should not happen.
     ASSERT_FALSE(applyCmdCalled);
     applier->shutdown();
     applier->join();
