@@ -59,8 +59,8 @@ namespace {
 void createLockFile(ServiceContext* service);
 }  // namespace
 
-LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
-                                                       const StorageEngineInitFlags initFlags) {
+StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx,
+                                                         const StorageEngineInitFlags initFlags) {
     ServiceContext* service = opCtx->getServiceContext();
 
     // This should be set once.
@@ -174,9 +174,9 @@ LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
     guard.dismiss();
 
     if (lockFile && lockFile->createdByUncleanShutdown()) {
-        return LastStorageEngineShutdownState::kUnclean;
+        return StorageEngine::LastShutdownState::kUnclean;
     } else {
-        return LastStorageEngineShutdownState::kClean;
+        return StorageEngine::LastShutdownState::kClean;
     }
 }
 

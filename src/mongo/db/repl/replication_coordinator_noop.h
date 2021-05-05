@@ -47,8 +47,7 @@ public:
     ReplicationCoordinatorNoOp(ReplicationCoordinatorNoOp&) = delete;
     ReplicationCoordinatorNoOp& operator=(ReplicationCoordinatorNoOp&) = delete;
 
-    void startup(OperationContext* opCtx,
-                 LastStorageEngineShutdownState lastStorageEngineShutdownState) final;
+    void startup(OperationContext* opCtx, StorageEngine::LastShutdownState lastShutdownState) final;
 
     void enterTerminalShutdown() final;
 

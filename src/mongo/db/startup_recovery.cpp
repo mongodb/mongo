@@ -340,21 +340,14 @@ void assertCappedOplog(OperationContext* opCtx, Database* db) {
 void reconcileCatalogAndRebuildUnfinishedIndexes(
     OperationContext* opCtx,
     StorageEngine* storageEngine,
-    LastStorageEngineShutdownState lastStorageEngineShutdownState) {
-
-    // When starting up after an unclean shutdown, we do not attempt to recover any state from the
-    // internal idents. Thus, we drop them in this case.
-    auto reconcilePolicy =
-        LastStorageEngineShutdownState::kUnclean == lastStorageEngineShutdownState
-        ? StorageEngine::InternalIdentReconcilePolicy::kDrop
-        : StorageEngine::InternalIdentReconcilePolicy::kRetain;
+    StorageEngine::LastShutdownState lastShutdownState) {
     auto reconcileResult =
-        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx, reconcilePolicy));
+        fassert(40593, storageEngine->reconcileCatalogAndIdents(opCtx, lastShutdownState));
 
     // If we did not find any index builds to resume or we are starting up after an unclean
     // shutdown, nothing in the temp directory will be used. Thus, we can clear it.
     if (reconcileResult.indexBuildsToResume.empty() ||
-        lastStorageEngineShutdownState == LastStorageEngineShutdownState::kUnclean) {
+        lastShutdownState == StorageEngine::LastShutdownState::kUnclean) {
         LOGV2(5071100, "Clearing temp directory");
 
         boost::system::error_code ec;
@@ -548,7 +541,7 @@ void startupRecoveryReadOnly(OperationContext* opCtx, StorageEngine* storageEngi
 // Perform routine startup recovery procedure.
 void startupRecovery(OperationContext* opCtx,
                      StorageEngine* storageEngine,
-                     LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+                     StorageEngine::LastShutdownState lastShutdownState) {
     invariant(!storageGlobalParams.readOnly && !storageGlobalParams.repair);
 
     // Determine whether this is a replica set node running in standalone mode. This must be set
@@ -560,8 +553,7 @@ void startupRecovery(OperationContext* opCtx,
 
     // Drops abandoned idents. Rebuilds unfinished indexes and restarts incomplete two-phase
     // index builds.
-    reconcileCatalogAndRebuildUnfinishedIndexes(
-        opCtx, storageEngine, lastStorageEngineShutdownState);
+    reconcileCatalogAndRebuildUnfinishedIndexes(opCtx, storageEngine, lastShutdownState);
 
     const auto& replSettings = repl::ReplicationCoordinator::get(opCtx)->getSettings();
 
@@ -603,7 +595,7 @@ namespace startup_recovery {
  * if data files are incompatible with the current binary version.
  */
 void repairAndRecoverDatabases(OperationContext* opCtx,
-                               LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+                               StorageEngine::LastShutdownState lastShutdownState) {
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     Lock::GlobalWrite lk(opCtx);
 
@@ -619,7 +611,7 @@ void repairAndRecoverDatabases(OperationContext* opCtx,
     } else if (storageGlobalParams.readOnly) {
         startupRecoveryReadOnly(opCtx, storageEngine);
     } else {
-        startupRecovery(opCtx, storageEngine, lastStorageEngineShutdownState);
+        startupRecovery(opCtx, storageEngine, lastShutdownState);
     }
 
     assertFilesCompatible(opCtx, storageEngine);

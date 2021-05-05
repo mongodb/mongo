@@ -117,15 +117,12 @@ void openCatalog(OperationContext* opCtx,
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     // Ignore orphaned idents because this function is used during rollback and not at
     // startup recovery, when we may try to recover orphaned idents.
-    auto loadingFromUncleanShutdown = false;
-    storageEngine->loadCatalog(opCtx, loadingFromUncleanShutdown);
+    storageEngine->loadCatalog(opCtx, StorageEngine::LastShutdownState::kClean);
 
     LOGV2(20274, "openCatalog: reconciling catalog and idents");
-    // Retain unknown internal idents because this function is used during rollback and not at
-    // startup recovery, when we may drop unknown internal idents.
-    auto internalIdentReconcilePolicy = StorageEngine::InternalIdentReconcilePolicy::kRetain;
     auto reconcileResult = fassert(
-        40688, storageEngine->reconcileCatalogAndIdents(opCtx, internalIdentReconcilePolicy));
+        40688,
+        storageEngine->reconcileCatalogAndIdents(opCtx, StorageEngine::LastShutdownState::kClean));
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.

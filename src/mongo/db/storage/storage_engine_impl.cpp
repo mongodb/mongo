@@ -99,10 +99,12 @@ StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
     // recover these orphaned idents.
     invariant(!opCtx->lockState()->isLocked());
     Lock::GlobalWrite globalLk(opCtx);
-    loadCatalog(opCtx, _options.lockFileCreatedByUncleanShutdown);
+    loadCatalog(opCtx,
+                _options.lockFileCreatedByUncleanShutdown ? LastShutdownState::kUnclean
+                                                          : LastShutdownState::kClean);
 }
 
-void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) {
+void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) {
     bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
     if (_options.forRepair && catalogExists) {
         auto repairObserver = StorageRepairObserver::get(getGlobalServiceContext());
@@ -150,7 +152,8 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUnc
     // - doing repair; or
     // - or asked to recover orphaned idents, which is the case when loading after an unclean
     //   shutdown.
-    auto loadingFromUncleanShutdownOrRepair = loadingFromUncleanShutdown || _options.forRepair;
+    auto loadingFromUncleanShutdownOrRepair =
+        lastShutdownState == LastShutdownState::kUnclean || _options.forRepair;
 
     std::vector<std::string> identsKnownToStorageEngine;
     if (loadingFromUncleanShutdownOrRepair) {
@@ -379,21 +382,21 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-bool StorageEngineImpl::_handleInternalIdent(
-    OperationContext* opCtx,
-    const std::string& ident,
-    InternalIdentReconcilePolicy internalIdentReconcilePolicy,
-    ReconcileResult* reconcileResult,
-    std::set<std::string>* internalIdentsToDrop,
-    std::set<std::string>* allInternalIdents) {
+bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
+                                             const std::string& ident,
+                                             LastShutdownState lastShutdownState,
+                                             ReconcileResult* reconcileResult,
+                                             std::set<std::string>* internalIdentsToDrop,
+                                             std::set<std::string>* allInternalIdents) {
     if (!_catalog->isInternalIdent(ident)) {
         return false;
     }
 
     allInternalIdents->insert(ident);
 
-    if (InternalIdentReconcilePolicy::kDrop == internalIdentReconcilePolicy ||
-        !supportsResumableIndexBuilds()) {
+    // When starting up after an unclean shutdown, we do not attempt to recover any state from the
+    // internal idents. Thus, we drop them in this case.
+    if (lastShutdownState == LastShutdownState::kUnclean || !supportsResumableIndexBuilds()) {
         internalIdentsToDrop->insert(ident);
         return true;
     }
@@ -462,7 +465,7 @@ bool StorageEngineImpl::_handleInternalIdent(
  * rebuild the index.
  */
 StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAndIdents(
-    OperationContext* opCtx, InternalIdentReconcilePolicy internalIdentReconcilePolicy) {
+    OperationContext* opCtx, LastShutdownState lastShutdownState) {
     // Gather all tables known to the storage engine and drop those that aren't cross-referenced
     // in the _mdb_catalog. This can happen for two reasons.
     //
@@ -503,7 +506,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
         if (_handleInternalIdent(opCtx,
                                  it,
-                                 internalIdentReconcilePolicy,
+                                 lastShutdownState,
                                  &reconcileResult,
                                  &internalIdentsToDrop,
                                  &allInternalIdents)) {
@@ -592,13 +595,22 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
             // Two-phase index drop ensures that the underlying data table for an index in the
             // catalog is not dropped until the index removal from the catalog has been majority
-            // committed and become part of the latest checkpoint. Therefore, there should never be
-            // a case where the index catalog entry remains but the index table (identified by
-            // ident) has been removed.
-            invariant(engineIdents.find(indexIdent) != engineIdents.end(),
-                      str::stream() << "Failed to find an index data table matching " << indexIdent
-                                    << " for durable index catalog entry " << indexMetaData.spec
-                                    << " in collection " << coll);
+            // committed and become part of the latest checkpoint. Therefore, there should almost
+            // never be a case where the index catalog entry remains but the index table (identified
+            // by ident) has been removed.
+            //
+            // There is an exception to this due to the fact that we drop the index ident without a
+            // timestamp when restarting an index build for startup recovery. Then, if we experience
+            // an unclean shutdown before a checkpoint is taken, the subsequent startup recovery can
+            // see the now-dropped ident referenced by the old index catalog entry.
+            //
+            // TODO (SERVER-56639): Remove this exception once all catalog writes are timestamped.
+            invariant(
+                engineIdents.find(indexIdent) != engineIdents.end() ||
+                    (indexMetaData.buildUUID && lastShutdownState == LastShutdownState::kUnclean),
+                str::stream() << "Failed to find an index data table matching " << indexIdent
+                              << " for durable index catalog entry " << indexMetaData.spec
+                              << " in collection " << coll);
 
             // Any index build with a UUID is an unfinished two-phase build and must be restarted.
             // There are no special cases to handle on primaries or secondaries. An index build may

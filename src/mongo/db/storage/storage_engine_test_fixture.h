@@ -103,14 +103,14 @@ public:
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcile(OperationContext* opCtx) {
-        return _storageEngine->reconcileCatalogAndIdents(
-            opCtx, StorageEngine::InternalIdentReconcilePolicy::kRetain);
+        return _storageEngine->reconcileCatalogAndIdents(opCtx,
+                                                         StorageEngine::LastShutdownState::kClean);
     }
 
     StatusWith<StorageEngine::ReconcileResult> reconcileAfterUncleanShutdown(
         OperationContext* opCtx) {
         return _storageEngine->reconcileCatalogAndIdents(
-            opCtx, StorageEngine::InternalIdentReconcilePolicy::kDrop);
+            opCtx, StorageEngine::LastShutdownState::kUnclean);
     }
 
     std::vector<std::string> getAllKVEngineIdents(OperationContext* opCtx) {

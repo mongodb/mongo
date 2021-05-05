@@ -405,7 +405,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     // initialized, a noop recovery unit is used until the initialization is complete.
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    auto lastStorageEngineShutdownState =
+    auto lastShutdownState =
         initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kNone);
     StorageControl::startStorageControls(serviceContext);
 
@@ -482,8 +482,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     try {
-        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(),
-                                                    lastStorageEngineShutdownState);
+        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(), lastShutdownState);
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(
             20573,
@@ -644,7 +643,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Cannot use queryableBackupMode in a replica set",
                 !replCoord->isReplEnabled());
-        replCoord->startup(startupOpCtx.get(), lastStorageEngineShutdownState);
+        replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
     startMongoDFTDC();
@@ -694,7 +693,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext)->startup();
         }
 
-        replCoord->startup(startupOpCtx.get(), lastStorageEngineShutdownState);
+        replCoord->startup(startupOpCtx.get(), lastShutdownState);
         if (getReplSetMemberInStandaloneMode(serviceContext)) {
             LOGV2_WARNING_OPTIONS(
                 20547,

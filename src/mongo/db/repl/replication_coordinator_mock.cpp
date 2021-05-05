@@ -74,8 +74,8 @@ ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service)
 
 ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 
-void ReplicationCoordinatorMock::startup(
-    OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+void ReplicationCoordinatorMock::startup(OperationContext* opCtx,
+                                         StorageEngine::LastShutdownState lastShutdownState) {
     // TODO
 }
 

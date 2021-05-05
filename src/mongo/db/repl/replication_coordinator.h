@@ -117,7 +117,7 @@ public:
      * initialization they need.
      */
     virtual void startup(OperationContext* opCtx,
-                         LastStorageEngineShutdownState lastStorageEngineShutdownState) = 0;
+                         StorageEngine::LastShutdownState lastShutdownState) = 0;
 
     /**
      * Start terminal shutdown.  This causes the topology coordinator to refuse to vote in any

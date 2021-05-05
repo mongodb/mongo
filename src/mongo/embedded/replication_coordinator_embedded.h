@@ -46,7 +46,7 @@ public:
     // Members that are implemented and safe to call of public ReplicationCoordinator API
 
     void startup(OperationContext* opCtx,
-                 LastStorageEngineShutdownState lastStorageEngineShutdownState) override;
+                 StorageEngine::LastShutdownState lastShutdownState) override;
 
     void enterTerminalShutdown() override;
 

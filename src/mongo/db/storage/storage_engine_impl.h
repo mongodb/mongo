@@ -331,15 +331,14 @@ public:
     }
 
     StatusWith<ReconcileResult> reconcileCatalogAndIdents(
-        OperationContext* opCtx,
-        InternalIdentReconcilePolicy internalIdentReconcilePolicy) override;
+        OperationContext* opCtx, LastShutdownState lastShutdownState) override;
 
     std::string getFilesystemPathForDb(const std::string& dbName) const override;
 
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
      */
-    void loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) final;
+    void loadCatalog(OperationContext* opCtx, LastShutdownState lastShutdownState) final;
 
     void closeCatalog(OperationContext* opCtx) final;
 
@@ -411,7 +410,7 @@ private:
      */
     bool _handleInternalIdent(OperationContext* opCtx,
                               const std::string& ident,
-                              InternalIdentReconcilePolicy internalIdentReconcilePolicy,
+                              LastShutdownState lastShutdownState,
                               ReconcileResult* reconcileResult,
                               std::set<std::string>* internalIdentsToDrop,
                               std::set<std::string>* allInternalIdents);

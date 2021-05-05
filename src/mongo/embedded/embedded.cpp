@@ -240,9 +240,9 @@ ServiceContext* initialize(const char* yaml_config) {
     // engine initialization to make use of the lock manager.
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
-    auto lastStorageEngineShutdownState =
+    auto lastShutdownState =
         initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kAllowNoLockFile);
-    invariant(LastStorageEngineShutdownState::kClean == lastStorageEngineShutdownState);
+    invariant(StorageEngine::LastShutdownState::kClean == lastShutdownState);
     StorageControl::startStorageControls(serviceContext);
 
     // Warn if we detect configurations for multiple registered storage engines in the same
@@ -293,8 +293,7 @@ ServiceContext* initialize(const char* yaml_config) {
     }
 
     try {
-        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(),
-                                                    lastStorageEngineShutdownState);
+        startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(), lastShutdownState);
     } catch (const ExceptionFor<ErrorCodes::MustDowngrade>& error) {
         LOGV2_FATAL_OPTIONS(22555,
                             logv2::LogOptions(LogComponent::kControl, logv2::FatalMode::kContinue),

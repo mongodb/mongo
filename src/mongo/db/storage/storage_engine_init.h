@@ -48,16 +48,10 @@ enum StorageEngineInitFlags {
 };
 
 /**
- * Information on last server shutdown state that is relevant to the recovery process.
- * Determined by initializeStorageEngine() during mongod.lock initialization.
- */
-enum class LastStorageEngineShutdownState { kClean, kUnclean };
-
-/**
  * Initializes the storage engine on "service".
  */
-LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
-                                                       StorageEngineInitFlags initFlags);
+StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx,
+                                                         StorageEngineInitFlags initFlags);
 
 /**
  * Shuts down storage engine cleanly and releases any locks on mongod.lock.

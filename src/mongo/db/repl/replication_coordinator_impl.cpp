@@ -417,7 +417,7 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 }
 
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
-    OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+    OperationContext* opCtx, StorageEngine::LastShutdownState lastShutdownState) {
     LOGV2_DEBUG(4280500, 1, "Attempting to create internal replication collections");
     // Create necessary replication collections to guarantee that if a checkpoint sees data after
     // initial sync has completed, it also sees these collections.
@@ -462,7 +462,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
                                 "Error loading local Rollback ID document at startup",
                                 "error"_attr = status);
         }
-    } else if (lastStorageEngineShutdownState == LastStorageEngineShutdownState::kUnclean) {
+    } else if (lastShutdownState == StorageEngine::LastShutdownState::kUnclean) {
         LOGV2(501401, "Incrementing the rollback ID after unclean shutdown");
         fassert(501402, _replicationProcess->incrementRollbackID(opCtx));
     }
@@ -830,8 +830,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     }
 }
 
-void ReplicationCoordinatorImpl::startup(
-    OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+void ReplicationCoordinatorImpl::startup(OperationContext* opCtx,
+                                         StorageEngine::LastShutdownState lastShutdownState) {
     if (!isReplEnabled()) {
         if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
             uassert(ErrorCodes::InvalidOptions,
@@ -892,7 +892,7 @@ void ReplicationCoordinatorImpl::startup(
 
     ReplicaSetAwareServiceRegistry::get(_service).onStartup(opCtx);
 
-    bool doneLoadingConfig = _startLoadLocalConfig(opCtx, lastStorageEngineShutdownState);
+    bool doneLoadingConfig = _startLoadLocalConfig(opCtx, lastShutdownState);
     if (doneLoadingConfig) {
         // If we're not done loading the config, then the config state will be set by
         // _finishLoadLocalConfig.

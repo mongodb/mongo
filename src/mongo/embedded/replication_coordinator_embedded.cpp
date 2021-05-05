@@ -47,8 +47,8 @@ ReplicationCoordinatorEmbedded::ReplicationCoordinatorEmbedded(ServiceContext* s
 
 ReplicationCoordinatorEmbedded::~ReplicationCoordinatorEmbedded() = default;
 
-void ReplicationCoordinatorEmbedded::startup(
-    OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {}
+void ReplicationCoordinatorEmbedded::startup(OperationContext* opCtx,
+                                             StorageEngine::LastShutdownState lastShutdownState) {}
 
 void ReplicationCoordinatorEmbedded::enterTerminalShutdown() {}
 

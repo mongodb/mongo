@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/storage/storage_engine_init.h"  // for LastStorageEngineShutdownState
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 namespace startup_recovery {
@@ -39,7 +39,7 @@ namespace startup_recovery {
  * if data files are incompatible with the current binary version.
  */
 void repairAndRecoverDatabases(OperationContext* opCtx,
-                               LastStorageEngineShutdownState lastStorageEngineShutdownState);
+                               StorageEngine::LastShutdownState lastShutdownState);
 
 }  // namespace startup_recovery
 }  // namespace mongo
