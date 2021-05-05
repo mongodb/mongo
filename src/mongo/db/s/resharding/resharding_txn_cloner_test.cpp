@@ -31,12 +31,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional/optional_io.hpp>
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_cache_noop.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -375,6 +377,103 @@ protected:
                  makeMongoProcessInterface())
             .thenRunOn(executor)
             .onCompletion([](auto x) { return x; });
+    }
+
+    repl::OpTime makePreparedTxn(OperationContext* opCtx,
+                                 LogicalSessionId lsid,
+                                 TxnNumber txnNumber) {
+        opCtx->setInMultiDocumentTransaction();
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+
+        MongoDOperationContextSession ocs(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(
+            opCtx, txnNumber, false /* autocommit */, true /* startTransaction */);
+
+        txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
+
+        // The transaction machinery cannot store an empty locker.
+        { Lock::GlobalLock globalLock(opCtx, MODE_IX); }
+        auto opTime = repl::getNextOpTime(opCtx);
+        txnParticipant.prepareTransaction(opCtx, opTime);
+        txnParticipant.stashTransactionResources(opCtx);
+
+        return opTime;
+    }
+
+    void clearPreparedTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNumber) {
+        opCtx->setInMultiDocumentTransaction();
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+
+        MongoDOperationContextSession ocs(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        txnParticipant.beginOrContinue(
+            opCtx, txnNumber, false /* autocommit */, boost::none /* startTransaction */);
+
+        txnParticipant.unstashTransactionResources(opCtx, "abortTransaction");
+        txnParticipant.abortTransaction(opCtx);
+        txnParticipant.stashTransactionResources(opCtx);
+    }
+
+    std::vector<repl::DurableOplogEntry> findOplogEntriesNewerThan(OperationContext* opCtx,
+                                                                   Timestamp ts) {
+        std::vector<repl::DurableOplogEntry> result;
+
+        PersistentTaskStore<repl::OplogEntryBase> store(NamespaceString::kRsOplogNamespace);
+        store.forEach(opCtx, QUERY("ts" << BSON("$gt" << ts)), [&](const auto& oplogEntry) {
+            result.emplace_back(
+                unittest::assertGet(repl::DurableOplogEntry::parse(oplogEntry.toBSON())));
+            return true;
+        });
+
+        return result;
+    }
+
+    boost::optional<SessionTxnRecord> findSessionRecord(OperationContext* opCtx,
+                                                        const LogicalSessionId& lsid) {
+        boost::optional<SessionTxnRecord> result;
+
+        PersistentTaskStore<SessionTxnRecord> store(
+            NamespaceString::kSessionTransactionsTableNamespace);
+        store.forEach(opCtx,
+                      QUERY(SessionTxnRecord::kSessionIdFieldName << lsid.toBSON()),
+                      [&](const auto& sessionTxnRecord) {
+                          result.emplace(sessionTxnRecord);
+                          return false;
+                      });
+
+        return result;
+    }
+
+    void checkGeneratedNoop(const repl::DurableOplogEntry& foundOp,
+                            const LogicalSessionId& lsid,
+                            TxnNumber txnNumber,
+                            const std::vector<StmtId>& stmtIds) {
+        ASSERT_EQ(OpType_serializer(foundOp.getOpType()),
+                  OpType_serializer(repl::OpTypeEnum::kNoop))
+            << foundOp;
+
+        ASSERT_EQ(foundOp.getSessionId(), lsid) << foundOp;
+        ASSERT_EQ(foundOp.getTxnNumber(), txnNumber) << foundOp;
+        ASSERT(foundOp.getStatementIds() == stmtIds) << foundOp;
+
+        // The oplog entry must have o2 and fromMigrate set or SessionUpdateTracker will ignore it.
+        ASSERT_TRUE(foundOp.getObject2());
+        ASSERT_TRUE(foundOp.getFromMigrate());
+    }
+
+    void checkSessionTxnRecord(const SessionTxnRecord& sessionTxnRecord,
+                               const repl::DurableOplogEntry& foundOp) {
+        ASSERT_EQ(sessionTxnRecord.getSessionId(), foundOp.getSessionId())
+            << sessionTxnRecord.toBSON() << ", " << foundOp;
+        ASSERT_EQ(sessionTxnRecord.getTxnNum(), foundOp.getTxnNumber())
+            << sessionTxnRecord.toBSON() << ", " << foundOp;
+        ASSERT_EQ(sessionTxnRecord.getLastWriteOpTime(), foundOp.getOpTime())
+            << sessionTxnRecord.toBSON() << ", " << foundOp;
+        ASSERT_EQ(sessionTxnRecord.getLastWriteDate(), foundOp.getWallClockTime())
+            << sessionTxnRecord.toBSON() << ", " << foundOp;
     }
 
 private:
@@ -785,6 +884,75 @@ TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
     ASSERT_OK(status);
 
     ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+}
+
+TEST_F(ReshardingTxnClonerTest, WaitsOnPreparedTxnAndAutomaticallyRetries) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber existingTxnNumber = 100;
+    auto opTime = makePreparedTxn(operationContext(), lsid, existingTxnNumber);
+
+    TxnNumber incomingTxnNumber = existingTxnNumber + 1;
+    auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
+
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the cloner has blocked on the prepared
+    // transaction before the transaction is aborted.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    clearPreparedTxn(operationContext(), lsid, existingTxnNumber);
+
+    ASSERT_OK(future.getNoThrow());
+
+    {
+        auto foundOps = findOplogEntriesNewerThan(operationContext(), opTime.getTimestamp());
+        ASSERT_GTE(foundOps.size(), 2U);
+        // The first oplog entry is from aborting the prepared transaction via clearPreparedTxn().
+        // The second oplog entry is from the session txn record being updated by
+        // ReshardingTxnCloner.
+        checkGeneratedNoop(foundOps[1], lsid, incomingTxnNumber, {kIncompleteHistoryStmtId});
+
+        auto sessionTxnRecord = findSessionRecord(operationContext(), lsid);
+        ASSERT_TRUE(bool(sessionTxnRecord));
+        checkSessionTxnRecord(*sessionTxnRecord, foundOps[1]);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest, CancelableWhileWaitingOnPreparedTxn) {
+    auto lsid = makeLogicalSessionIdForTest();
+
+    TxnNumber existingTxnNumber = 100;
+    makePreparedTxn(operationContext(), lsid, existingTxnNumber);
+    ON_BLOCK_EXIT([&] { clearPreparedTxn(operationContext(), lsid, existingTxnNumber); });
+
+    TxnNumber incomingTxnNumber = existingTxnNumber + 1;
+    auto sessionTxnRecord = SessionTxnRecord{lsid, incomingTxnNumber, repl::OpTime{}, Date_t{}};
+
+    auto executor = makeTaskExecutorForCloner();
+    ReshardingTxnCloner cloner(kTwoSourceIdList[1], Timestamp::max());
+    CancellationSource cancelSource;
+    auto future = runCloner(cloner, executor, executor, cancelSource.token());
+
+    onCommandReturnTxns({sessionTxnRecord.toBSON()}, {});
+
+    ASSERT_FALSE(future.isReady());
+    // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
+    // transaction before the cancellation source is canceled.
+    ASSERT_OK(
+        executor->sleepFor(Milliseconds{200}, CancellationToken::uncancelable()).getNoThrow());
+    ASSERT_FALSE(future.isReady());
+
+    cancelSource.cancel();
+    ASSERT_EQ(future.getNoThrow(), ErrorCodes::CallbackCanceled);
 }
 
 }  // namespace
