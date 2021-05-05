@@ -203,10 +203,12 @@ class workload_validation {
         cursor->set_key(cursor, collection_name.c_str(), key_str.c_str());
         testutil_check(cursor->search_near(cursor, &exact));
         /*
-         * Since the timestamp which is part of the key is not provided, exact is expected to be
-         * greater than 0.
+         * Since the timestamp which is part of the key is not provided, exact cannot be 0. If it is
+         * -1, we need to go to the next key.
          */
-        testutil_assert(exact >= 0);
+        testutil_assert(exact != 0);
+        if (exact < 0)
+            testutil_check(cursor->next(cursor));
 
         do {
             testutil_check(cursor->get_key(cursor, &key_collection_name, &key, &key_timestamp));
