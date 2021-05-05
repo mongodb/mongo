@@ -3509,18 +3509,18 @@ public:
                                                   const VariablesParseState& vps);
 
     /**
-     * Constructs a $getField expression where 'field' is an expression resolving to a string Value
-     * (or null) and 'from' is an expression resolving to an object Value (or null).
+     * Constructs a $getField expression where 'field' is an expression resolving to a constant
+     * string Value and 'input' is an expression resolving to an object Value (or null).
      *
-     * If either 'field' or 'from' is nullish, $getField evaluates to null. Furthermore, if 'from'
-     * does not contain 'field', then $getField returns missing.
+     * If 'input' is nullish, $getField evaluates to null. Furthermore, if 'input' does not contain
+     * 'field', then $getField returns missing.
      */
     ExpressionGetField(ExpressionContext* const expCtx,
                        boost::intrusive_ptr<Expression> field,
-                       boost::intrusive_ptr<Expression> from)
-        : Expression(expCtx, {std::move(field), std::move(from)}),
+                       boost::intrusive_ptr<Expression> input)
+        : Expression(expCtx, {std::move(field), std::move(input)}),
           _field(_children[0]),
-          _from(_children[1]) {
+          _input(_children[1]) {
         expCtx->sbeCompatible = false;
     }
 
@@ -3541,6 +3541,6 @@ protected:
 
 private:
     boost::intrusive_ptr<Expression>& _field;
-    boost::intrusive_ptr<Expression>& _from;
+    boost::intrusive_ptr<Expression>& _input;
 };
 }  // namespace mongo

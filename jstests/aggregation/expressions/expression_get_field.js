@@ -53,25 +53,38 @@ if (!isDotsAndDollarsEnabled) {
 }
 
 // Test that $getField fails with a document missing named arguments.
-assertGetFieldFailedWithCode({from: {a: "b"}}, 3041702);
+assertGetFieldFailedWithCode({input: {a: "b"}}, 3041702);
 assertGetFieldFailedWithCode({field: "a"}, 3041703);
 
 // Test that $getField fails with a document with one or more arguments of incorrect type.
-assertGetFieldFailedWithCode({field: true, from: {a: "b"}}, 3041704);
-assertGetFieldFailedWithCode({field: {"a": 1}, from: {"a": 1}}, 3041704);
-assertGetFieldFailedWithCode({field: "a", from: true}, 3041705);
-assertGetFieldFailedWithCode(5, 3041704);
-assertGetFieldFailedWithCode(true, 3041704);
-assertGetFieldFailedWithCode({$add: [2, 3]}, 3041704);
+assertGetFieldFailedWithCode({field: true, input: {a: "b"}}, 5654602);
+assertGetFieldFailedWithCode({field: {"a": 1}, input: {"a": 1}}, 5654601);
+assertGetFieldFailedWithCode({field: "a", input: true}, 3041705);
+assertGetFieldFailedWithCode(5, 5654602);
+assertGetFieldFailedWithCode(true, 5654602);
+assertGetFieldFailedWithCode({field: null, input: {"a": 1}}, 5654602);
 
 // Test that $getField fails with a document with invalid arguments.
-assertGetFieldFailedWithCode({field: "a", from: {a: "b"}, unknown: true}, 3041701);
+assertGetFieldFailedWithCode({field: "a", input: {a: "b"}, unknown: true}, 3041701);
+
+// Test that $getField fails when 'field' argument is a field reference.
+assertGetFieldFailedWithCode({field: "$a", input: {a: "b"}}, 5654600);
+assertGetFieldFailedWithCode({field: "$a.b", input: {a: "b"}}, 5654600);
+assertGetFieldFailedWithCode({field: "$$CURRENT.a", input: {a: "b"}}, 5654600);
+
+// Test that $getField fails when 'field' argument is an arbitrary expression other than '$const'
+// String.
+assertGetFieldFailedWithCode({$add: [2, 3]}, 5654601);
+assertGetFieldFailedWithCode({field: {$concat: ["a", "b"]}, input: {"a": 1}}, 5654601);
+assertGetFieldFailedWithCode({field: {$cond: [false, null, "x"]}, input: {"a": 1}}, 5654601);
+assertGetFieldFailedWithCode({$const: true}, 5654602);
+assertGetFieldFailedWithCode({$const: {"a": 1}}, 5654602);
+assertGetFieldFailedWithCode({field: {$const: []}, input: {"a": 1}}, 5654602);
 
 // Test that $getField returns the correct value from the provided object.
-assertGetFieldResultsEq({field: "a", from: {a: "b"}}, [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
+assertGetFieldResultsEq({field: "a", input: {a: "b"}}, [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
 
-// Test that $getField returns the correct value from the $$ROOT object.
-assertGetFieldResultsEq(null, [{_id: 0, test: null}, {_id: 1, test: null}]);
+// Test that $getField returns the correct value from the $$CURRENT object.
 assertGetFieldResultsEq("a", [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
 assertGetFieldResultsEq("a$b", [{_id: 0, test: "foo"}, {_id: 1, test: "foo"}]);
 assertGetFieldResultsEq("a.b", [{_id: 0, test: "bar"}, {_id: 1, test: "bar"}]);
@@ -81,106 +94,67 @@ assertGetFieldResultsEq(".xy", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq(".$xz", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq("..zz", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
 
-// Test that $getField returns the correct value from the $$ROOT object when field is an expression.
-assertGetFieldResultsEq({$concat: ["a", "b"]},
-                        [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-assertGetFieldResultsEq({$concat: ["a", {$const: "$"}, "b"]},
-                        [{_id: 0, test: "foo"}, {_id: 1, test: "foo"}]);
-assertGetFieldResultsEq({$cond: [true, null, "x"]}, [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq({$cond: [false, null, "x"]}, [{_id: 0, test: 0}, {_id: 1, test: 1}]);
-
 // Test that $getField treats dotted fields as key literals instead of field paths. Note that it is
 // necessary to use $const in places, otherwise object field validation would reject some of these
 // field names.
-assertGetFieldResultsEq({field: "a.b", from: {$const: {"a.b": "b"}}},
+assertGetFieldResultsEq({field: "a.b", input: {$const: {"a.b": "b"}}},
                         [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
-assertGetFieldResultsEq({field: ".ab", from: {$const: {".ab": "b"}}},
+assertGetFieldResultsEq({field: ".ab", input: {$const: {".ab": "b"}}},
                         [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
-assertGetFieldResultsEq({field: "ab.", from: {$const: {"ab.": "b"}}},
+assertGetFieldResultsEq({field: "ab.", input: {$const: {"ab.": "b"}}},
                         [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
-assertGetFieldResultsEq({field: "a.b.c", from: {$const: {"a.b.c": 5}}},
+assertGetFieldResultsEq({field: "a.b.c", input: {$const: {"a.b.c": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: "a.b.c", from: {a: {b: {c: 5}}}},
-                        [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-assertGetFieldResultsEq({field: {$concat: ["a.b", ".", "c"]}, from: {$const: {"a.b.c": 5}}},
-                        [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$concat: ["a.b", ".", "c"]}, from: {a: {b: {c: 5}}}},
+assertGetFieldResultsEq({field: "a.b.c", input: {a: {b: {c: 5}}}},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
 
 // Test that $getField works with fields that contain '$'.
-assertGetFieldResultsEq({field: "a$b", from: {"a$b": "b"}},
+assertGetFieldResultsEq({field: "a$b", input: {"a$b": "b"}},
                         [{_id: 0, test: "b"}, {_id: 1, test: "b"}]);
-assertGetFieldResultsEq({field: "a$b.b", from: {$const: {"a$b.b": 5}}},
+assertGetFieldResultsEq({field: "a$b.b", input: {$const: {"a$b.b": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$const: "a$b.b"}, from: {$const: {"a$b.b": 5}}},
+assertGetFieldResultsEq({field: {$const: "a$b.b"}, input: {$const: {"a$b.b": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$const: "$b.b"}, from: {$const: {"$b.b": 5}}},
+assertGetFieldResultsEq({field: {$const: "$b.b"}, input: {$const: {"$b.b": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$const: "$b"}, from: {$const: {"$b": 5}}},
+assertGetFieldResultsEq({field: {$const: "$b"}, input: {$const: {"$b": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$const: "$.ab"}, from: {$const: {"$.ab": 5}}},
+assertGetFieldResultsEq({field: {$const: "$.ab"}, input: {$const: {"$.ab": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: {$const: "$$xz"}, from: {$const: {"$$xz": 5}}},
+assertGetFieldResultsEq({field: {$const: "$$xz"}, input: {$const: {"$$xz": 5}}},
                         [{_id: 0, test: 5}, {_id: 1, test: 5}]);
 
 // Test null and missing cases.
-assertGetFieldResultsEq({field: "a", from: null}, [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq({field: null, from: {a: 1}}, [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq({field: "a", from: {b: 2, c: 3}},
+assertGetFieldResultsEq({field: "a", input: null}, [{_id: 0, test: null}, {_id: 1, test: null}]);
+assertGetFieldResultsEq({field: "a", input: {b: 2, c: 3}},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-assertGetFieldResultsEq({field: "a", from: {a: null, b: 2, c: 3}},
+assertGetFieldResultsEq({field: "a", input: {a: null, b: 2, c: 3}},
                         [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq({field: {$const: "$a"}, from: {$const: {"$a": null, b: 2, c: 3}}},
+assertGetFieldResultsEq({field: {$const: "$a"}, input: {$const: {"$a": null, b: 2, c: 3}}},
                         [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq({field: "a", from: {}},
+assertGetFieldResultsEq({field: "a", input: {}},
                         [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-
-// These should return null because "$a.b" evaluates to a field path expression which returns a
-// nullish value (so the expression should return null), as there is no $a.b field path.
-assertGetFieldResultsEq({field: "$a.b", from: {$const: {"$a.b": 5}}},
-                        [{_id: 0, test: null}, {_id: 1, test: null}]);
-assertGetFieldResultsEq("$a.b", [{_id: 0, test: null}, {_id: 1, test: null}]);
-
-// When the field path does actually resolve to a field, the value of that field should be used.
-
-// The fieldpath $y resolves to "c" in $$ROOT.
-assertGetFieldResultsEq({field: "$y", from: {$const: {"c": 5}}},
-                        [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: "$y", from: {$const: {"a": 5}}},
-                        [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-assertGetFieldResultsEq("$y", [{_id: 0, test: {d: "x"}}, {_id: 1, test: {d: "x"}}]);
-
-// The fieldpath $c.d resolves to "x" in $$ROOT.
-assertGetFieldResultsEq({field: "$c.d", from: {$const: {"x": 5}}},
-                        [{_id: 0, test: 5}, {_id: 1, test: 5}]);
-assertGetFieldResultsEq({field: "$c.d", from: {$const: {"y": 5}}},
-                        [{_id: 0}, {_id: 1}]);  // The test field should evaluate to missing.
-assertGetFieldResultsEq("$c.d", [{_id: 0, test: 0}, {_id: 1, test: 1}]);
-
-// $x resolves to a number, so this should fail.
-assertGetFieldFailedWithCode({field: "$x", from: {$const: {"c": 5}}}, 3041704);
-assertGetFieldFailedWithCode("$x", 3041704);
 
 // Test case where $getField stages are nested.
 assertGetFieldResultsEq(
-    {field: "a", from: {$getField: {field: "b.c", from: {$const: {"b.c": {a: 5}}}}}},
+    {field: "a", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}},
     [{_id: 0, test: 5}, {_id: 1, test: 5}]);
 assertGetFieldResultsEq(
-    {field: "x", from: {$getField: {field: "b.c", from: {$const: {"b.c": {a: 5}}}}}},
+    {field: "x", input: {$getField: {field: "b.c", input: {$const: {"b.c": {a: 5}}}}}},
     [{_id: 0}, {_id: 1}]);
 assertGetFieldResultsEq(
-    {field: "a", from: {$getField: {field: "b.d", from: {$const: {"b.c": {a: 5}}}}}},
+    {field: "a", input: {$getField: {field: "b.d", input: {$const: {"b.c": {a: 5}}}}}},
     [{_id: 0, test: null}, {_id: 1, test: null}]);
 
 // Test case when a dotted/dollar path is within an array.
 assertGetFieldResultsEq({
     field: {$const: "a$b"},
-    from: {$arrayElemAt: [[{$const: {"a$b": 1}}, {$const: {"a$b": 2}}], 0]}
+    input: {$arrayElemAt: [[{$const: {"a$b": 1}}, {$const: {"a$b": 2}}], 0]}
 },
                         [{_id: 0, test: 1}, {_id: 1, test: 1}]);
 assertGetFieldResultsEq({
     field: {$const: "a.."},
-    from: {$arrayElemAt: [[{$const: {"a..": 1}}, {$const: {"a..": 2}}], 1]}
+    input: {$arrayElemAt: [[{$const: {"a..": 1}}, {$const: {"a..": 2}}], 1]}
 },
                         [{_id: 0, test: 2}, {_id: 1, test: 2}]);
 

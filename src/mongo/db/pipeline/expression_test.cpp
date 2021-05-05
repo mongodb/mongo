@@ -3134,22 +3134,22 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesStringArgumentCorrectly) {
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
     ASSERT_BSONOBJ_EQ(BSON("ignoredField" << BSON("$getField" << BSON("field" << BSON("$const"
                                                                                       << "foo")
-                                                                              << "from"
-                                                                              << "$$ROOT"))),
+                                                                              << "input"
+                                                                              << "$$CURRENT"))),
                       BSON("ignoredField" << expression->serialize(false)));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
-    BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"from\": {a: 1}}}");
+    BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"input\": {a: 1}}}");
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_BSONOBJ_EQ(BSON("ignoredField"
-                           << BSON("$getField"
-                                   << BSON("field" << BSON("$const"
-                                                           << "foo")
-                                                   << "from" << BSON("a" << BSON("$const" << 1))))),
-                      BSON("ignoredField" << expression->serialize(false)));
+    ASSERT_BSONOBJ_EQ(
+        BSON("ignoredField" << BSON(
+                 "$getField" << BSON("field" << BSON("$const"
+                                                     << "foo")
+                                             << "input" << BSON("a" << BSON("$const" << 1))))),
+        BSON("ignoredField" << expression->serialize(false)));
 }
 
 }  // namespace ExpressionTests

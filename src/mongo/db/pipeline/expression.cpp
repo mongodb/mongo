@@ -7228,20 +7228,20 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
                                                     BSONElement expr,
                                                     const VariablesParseState& vps) {
     boost::intrusive_ptr<Expression> fieldExpr;
-    boost::intrusive_ptr<Expression> fromExpr;
+    boost::intrusive_ptr<Expression> inputExpr;
 
     if (expr.type() == BSONType::Object) {
         for (auto&& elem : expr.embeddedObject()) {
             const auto fieldName = elem.fieldNameStringData();
-            if (!fieldExpr && !fromExpr && fieldName[0] == '$') {
+            if (!fieldExpr && !inputExpr && fieldName[0] == '$') {
                 // This may be an expression, so we should treat it as such.
                 fieldExpr = Expression::parseOperand(expCtx, expr, vps);
-                fromExpr = ExpressionFieldPath::parse(expCtx, "$$ROOT", vps);
+                inputExpr = ExpressionFieldPath::parse(expCtx, "$$CURRENT", vps);
                 break;
             } else if (fieldName == "field"_sd) {
                 fieldExpr = Expression::parseOperand(expCtx, elem, vps);
-            } else if (fieldName == "from"_sd) {
-                fromExpr = Expression::parseOperand(expCtx, elem, vps);
+            } else if (fieldName == "input"_sd) {
+                inputExpr = Expression::parseOperand(expCtx, elem, vps);
             } else {
                 uasserted(3041701,
                           str::stream()
@@ -7250,38 +7250,67 @@ intrusive_ptr<Expression> ExpressionGetField::parse(ExpressionContext* const exp
         }
     } else {
         fieldExpr = Expression::parseOperand(expCtx, expr, vps);
-        fromExpr = ExpressionFieldPath::parse(expCtx, "$$ROOT", vps);
+        inputExpr = ExpressionFieldPath::parse(expCtx, "$$CURRENT", vps);
     }
 
     uassert(3041702,
             str::stream() << kExpressionName << " requires 'field' to be specified",
             fieldExpr);
-    uassert(
-        3041703, str::stream() << kExpressionName << " requires 'from' to be specified", fromExpr);
+    uassert(3041703,
+            str::stream() << kExpressionName << " requires 'input' to be specified",
+            inputExpr);
 
-    return make_intrusive<ExpressionGetField>(expCtx, fieldExpr, fromExpr);
+    // The 'field' argument to '$getField' must evaluate to a constant string, for example,
+    // {$const: "$a.b"}. In case the has forgotten to wrap the value into a '$const' or
+    // '$literal' expression, we will raise an error with a more meaningful description.
+    if (auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(fieldExpr.get()); fieldPathExpr) {
+        auto fp = fieldPathExpr->getFieldPath().fullPathWithPrefix();
+        uasserted(5654600,
+                  str::stream() << "'" << fp
+                                << "' is a field path reference which is not allowed "
+                                   "in this context. Did you mean {$literal: '"
+                                << fp << "'}?");
+    }
+
+    auto constFieldExpr = dynamic_cast<ExpressionConstant*>(fieldExpr.get());
+    uassert(5654601,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to a constant, "
+                             "but got a non-constant argument",
+            constFieldExpr);
+    uassert(5654602,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to type String, "
+                             "but got "
+                          << typeName(constFieldExpr->getValue().getType()),
+            constFieldExpr->getValue().getType() == BSONType::String);
+
+    return make_intrusive<ExpressionGetField>(expCtx, fieldExpr, inputExpr);
 }
 
 Value ExpressionGetField::evaluate(const Document& root, Variables* variables) const {
     auto fieldValue = _field->evaluate(root, variables);
-    if (fieldValue.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    auto fromValue = _from->evaluate(root, variables);
-    if (fromValue.nullish()) {
-        return Value(BSONNULL);
-    }
-
-    uassert(3041704,
-            str::stream() << kExpressionName << " requires 'field' to evaluate to type String",
+    // The parser guarantees that the '_field' expression evaluates to a constant string.
+    tassert(3041704,
+            str::stream() << kExpressionName
+                          << " requires 'field' to evaluate to type String, "
+                             "but got "
+                          << typeName(fieldValue.getType()),
             fieldValue.getType() == BSONType::String);
 
-    uassert(3041705,
-            str::stream() << kExpressionName << " requires 'from' to evaluate to type Object",
-            fromValue.getType() == BSONType::Object);
+    auto inputValue = _input->evaluate(root, variables);
+    if (inputValue.nullish()) {
+        return Value(BSONNULL);
+    }
 
-    return fromValue.getDocument().getField(fieldValue.getString());
+    uassert(3041705,
+            str::stream() << kExpressionName
+                          << " requires 'input' to evaluate to type Object, "
+                             "but got "
+                          << typeName(inputValue.getType()),
+            inputValue.getType() == BSONType::Object);
+
+    return inputValue.getDocument().getField(fieldValue.getString());
 }
 
 intrusive_ptr<Expression> ExpressionGetField::optimize() {
@@ -7289,14 +7318,14 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
 }
 
 void ExpressionGetField::_doAddDependencies(DepsTracker* deps) const {
-    _from->addDependencies(deps);
+    _input->addDependencies(deps);
     _field->addDependencies(deps);
 }
 
 Value ExpressionGetField::serialize(const bool explain) const {
     return Value(Document{{"$getField"_sd,
                            Document{{"field"_sd, _field->serialize(explain)},
-                                    {"from"_sd, _from->serialize(explain)}}}});
+                                    {"input"_sd, _input->serialize(explain)}}}});
 }
 
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
