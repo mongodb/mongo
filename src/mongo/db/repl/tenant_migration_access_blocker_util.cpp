@@ -207,35 +207,26 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
             }
             return donorMtabStatus;
         })
-        .onError<ErrorCodes::CallbackCanceled>([cancelTimeoutSource,
-                                                cancelCanReadSource,
-                                                donorMtab,
-                                                recipientMtab,
-                                                timeoutError = opCtx->getTimeoutError()](
-                                                   Status status) mutable {
-            auto isCanceledDueToTimeout = cancelTimeoutSource.token().isCanceled();
+        .onError<ErrorCodes::CallbackCanceled>(
+            [cancelTimeoutSource,
+             cancelCanReadSource,
+             donorMtab,
+             recipientMtab,
+             timeoutError = opCtx->getTimeoutError()](Status status) mutable {
+                auto isCanceledDueToTimeout = cancelTimeoutSource.token().isCanceled();
 
-            if (!isCanceledDueToTimeout) {
-                cancelTimeoutSource.cancel();
-            }
+                if (!isCanceledDueToTimeout) {
+                    cancelTimeoutSource.cancel();
+                }
 
-            // At least one of 'donorMtab' or 'recipientMtab' must exist if we were canceled here.
-            BSONObj info = donorMtab ? donorMtab->getDebugInfo() : recipientMtab->getDebugInfo();
-            if (recipientMtab) {
-                info =
-                    info.addField(recipientMtab->getDebugInfo().getField("donorConnectionString"));
-            }
+                if (isCanceledDueToTimeout) {
+                    return Status(
+                        timeoutError,
+                        "Blocked read timed out waiting for tenant migration to commit or abort");
+                }
 
-            if (isCanceledDueToTimeout) {
-                return Status(
-                    timeoutError,
-                    "Blocked read timed out waiting for tenant migration to commit or abort",
-                    info);
-            }
-
-            return status.withContext(str::stream() << "Canceled read blocked by tenant migration "
-                                                    << info.toString());
-        })
+                return status.withContext("Canceled read blocked by tenant migration");
+            })
         .semi();  // To require continuation in the user executor.
 }
 

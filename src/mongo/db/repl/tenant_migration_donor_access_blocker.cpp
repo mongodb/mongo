@@ -128,8 +128,7 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
     } else if (idx == 1) {
         // Deadline finished first, return error
         return Status(opCtx->getTimeoutError(),
-                      "Operation timed out waiting for tenant migration to commit or abort",
-                      getDebugInfo());
+                      "Operation timed out waiting for tenant migration to commit or abort");
     }
     MONGO_UNREACHABLE;
 }
