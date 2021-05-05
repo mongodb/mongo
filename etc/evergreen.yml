@@ -2866,6 +2866,9 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
+        generating_for_ninja: true
+        task_install_action:
+          default
         task_compile_flags: >-
           --ninja
         targets:
@@ -2893,6 +2896,9 @@ tasks:
   commands:
     - func: "scons compile"
       vars:
+        generating_for_ninja: true
+        task_install_action:
+          default
         task_compile_flags: >-
           --build-tools=next
           --ninja
@@ -2939,8 +2945,6 @@ tasks:
 
     - func: "scons compile"
       vars:
-        task_install_action:
-            default
         task_compile_flags: >-
           --link-model=dynamic
           --build-tools=next
