@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-bool isQueryNegatingGTEorLTENull(const mongo::MatchExpression* tree) {
+bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree) {
     // If the query predicate is null, do not reuse the plan since empty arrays ([]) are
     // encoded as 'null' in the index. Thus we cannot safely invert the index bounds since 'null'
     // has special comparison semantics.
@@ -52,6 +52,7 @@ bool isQueryNegatingGTEorLTENull(const mongo::MatchExpression* tree) {
 
     const MatchExpression* child = tree->getChild(0);
     switch (child->matchType()) {
+        case MatchExpression::EQ:
         case MatchExpression::GTE:
         case MatchExpression::LTE:
             return static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
@@ -432,8 +433,8 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
 
     // If the query predicate involves comparison to null, do not reuse the plan since empty arrays
     // ([]) are encoded as null in the index. Thus we cannot safely invert the index bounds.
-    if (isQueryNegatingGTEorLTENull(tree)) {
-        *keyBuilder << "not_gte_lte_null";
+    if (isQueryNegatingEqualToNull(tree)) {
+        *keyBuilder << "not_eq_null";
     }
 
     // Traverse child nodes.

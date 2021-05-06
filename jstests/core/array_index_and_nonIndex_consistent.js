@@ -54,22 +54,30 @@ const queryList = [
 let failedLT = [];
 let failedGT = [];
 
-queryList.forEach(function(q) {
-    const queryLT = {val: {"$lt": q}};
-    const queryGT = {val: {"$gt": q}};
+function compareIndexNonIndexedResults(predicate) {
+    const query = {val: predicate};
     const projOutId = {_id: 0, val: 1};
 
-    let indexRes = indexColl.find(queryLT, projOutId).sort({val: 1}).toArray();
-    let nonIndexedRes = nonIndexedColl.find(queryLT, projOutId).sort({val: 1}).toArray();
+    let indexRes = indexColl.find(query, projOutId).sort({val: 1}).toArray();
+    let nonIndexedRes = nonIndexedColl.find(query, projOutId).sort({val: 1}).toArray();
 
     assert(arrayEq(indexRes, nonIndexedRes),
-           "Ran query " + tojson(queryLT) + " and got mismatched results.\n Indexed: " +
+           "Ran query " + tojson(query) + " and got mismatched results.\n Indexed: " +
                tojson(indexRes) + "\n NonIndexed: " + tojson(nonIndexedRes));
 
-    indexRes = indexColl.find(queryGT, projOutId).sort({val: 1}).toArray();
-    nonIndexedRes = nonIndexedColl.find(queryGT, projOutId).sort({val: 1}).toArray();
+    indexRes = indexColl.find(query, projOutId).sort({val: 1}).toArray();
+    nonIndexedRes = nonIndexedColl.find(query, projOutId).sort({val: 1}).toArray();
     assert(arrayEq(indexRes, nonIndexedRes),
-           "Ran query " + tojson(queryGT) + " and got mismatched results.\n Indexed: " +
+           "Ran query " + tojson(query) + " and got mismatched results.\n Indexed: " +
                tojson(indexRes) + "\n NonIndexed: " + tojson(nonIndexedRes));
+}
+
+queryList.forEach(function(q) {
+    const queryPreds = [{"$lt": q}, {"$gt": q}, {$elemMatch: {$not: {$eq: q}}}];
+    queryPreds.forEach(compareIndexNonIndexedResults);
 });
+
+// We need to run these queries separately.
+const inequalityPreds = [{$elemMatch: {$not: {$gte: null}}}, {$elemMatch: {$not: {$lte: null}}}];
+inequalityPreds.forEach(compareIndexNonIndexedResults);
 })();
