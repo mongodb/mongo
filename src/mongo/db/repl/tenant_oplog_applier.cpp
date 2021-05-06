@@ -40,6 +40,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/cloner_utils.h"
@@ -917,6 +918,28 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
         uasserted(5434700,
                   "Index creation, except createIndex on empty collections, is not supported in "
                   "tenant migration");
+    }
+    if (op.getCommandType() == OplogEntry::CommandType::kCreateIndexes) {
+        auto uuid = op.getUuid();
+        uassert(5652700, "Missing UUID from createIndex oplog entry", uuid);
+        AutoGetCollectionForRead autoColl(opCtx, {op.getNss().db().toString(), *uuid});
+        if (!autoColl.getCollection()) {
+            // If the collection doesn't exist, it is safe to ignore.
+            return Status::OK();
+        }
+        // During tenant migration oplog application, we only need to apply createIndex on empty
+        // collections. Otherwise, the index is guaranteed to be dropped after. This is because we
+        // block index builds on the donor for the duration of the tenant migration.
+        if (!Helpers::findOne(opCtx, autoColl.getCollection(), BSONObj(), false /* requireIndex */)
+                 .isNull()) {
+            LOGV2_DEBUG(5652701,
+                        2,
+                        "Tenant migration ignoring createIndex for non-empty collection",
+                        "op"_attr = redact(op.toBSONForLogging()),
+                        "tenant"_attr = _tenantId,
+                        "migrationUuid"_attr = _migrationUuid);
+            return Status::OK();
+        }
     }
     // We don't count tenant application in the ops applied stats.
     auto incrementOpsAppliedStats = [] {};
