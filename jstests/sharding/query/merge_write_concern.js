@@ -97,5 +97,14 @@ assert.commandWorked(source.insert([{_id: 11}, {_id: 12}, {_id: 13}]));
 testWriteConcernError(shard0);
 testWriteConcernError(shard1);
 
+// Verify that either shard can produce a WriteConcernError when the CatalogCache is empty.
+[shard0, shard1].forEach(function(shard) {
+    shard.nodes.forEach(function(node) {
+        assert.commandWorked(node.adminCommand({flushRouterConfig: target.getFullName()}));
+    });
+});
+testWriteConcernError(shard0);
+testWriteConcernError(shard1);
+
 st.stop();
 }());

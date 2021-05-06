@@ -73,10 +73,26 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     ChunkVersion targetCollectionVersion) const {
-    auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
+    auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
-    return catalogCache->checkEpochOrThrow(nss, targetCollectionVersion, shardId);
+    // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
+    // 'targetCollectionVersion'.
+    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+        nss, targetCollectionVersion, shardId);
+
+    // This will throw a 'ShardCannotRefreshDueToLocksHeldInfo' exception if the cache entry is
+    // staler than 'targetCollectionVersion' and 'checkRoutingInfoEpochOrThrow' is called under a DB
+    // lock.
+    const auto routingInfo =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss, true));
+
+    auto foundVersion = routingInfo.getVersion(shardId);
+    uassert(StaleEpochInfo(nss),
+            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
+                          << targetCollectionVersion.toString() << ", but found "
+                          << foundVersion.toString(),
+            foundVersion.epoch() == targetCollectionVersion.epoch());
 }
 
 std::pair<std::vector<FieldPath>, bool>

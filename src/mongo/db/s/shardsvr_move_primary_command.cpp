@@ -146,9 +146,8 @@ public:
                           << cmdObj,
             opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
-        // TODO (SERVER-54507): Uncomment the following snippet:
-        // ON_BLOCK_EXIT([opCtx, dbNss]
-        // {Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db());});
+        ON_BLOCK_EXIT(
+            [opCtx, dbNss] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbNss.db()); });
 
         if (movePrimaryRequest.getCommandIsFromRouter()) {
             newMovePrimaryFlow(opCtx, movePrimaryRequest, dbNss, toShard);

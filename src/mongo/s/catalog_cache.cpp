@@ -349,34 +349,6 @@ void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     }
 }
 
-void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
-                                     const ChunkVersion& targetCollectionVersion,
-                                     const ShardId& shardId) {
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
-            str::stream() << "could not act as router for " << nss.ns()
-                          << ", no entry for database " << nss.db(),
-            _databaseCache.peekLatestCached(nss.db()));
-
-    auto collectionValueHandle = _collectionCache.peekLatestCached(nss);
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
-            str::stream() << "could not act as router for " << nss.ns()
-                          << ", no entry for collection.",
-            collectionValueHandle);
-
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
-            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
-                          << targetCollectionVersion.toString()
-                          << ", but found the collection was unsharded",
-            collectionValueHandle->optRt);
-
-    auto foundVersion = collectionValueHandle->optRt->getVersion();
-    uassert(StaleConfigInfo(nss, targetCollectionVersion, foundVersion, shardId),
-            str::stream() << "could not act as router for " << nss.ns() << ", wanted "
-                          << targetCollectionVersion.toString() << ", but found "
-                          << foundVersion.toString(),
-            foundVersion.epoch() == targetCollectionVersion.epoch());
-}
-
 void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
     LOGV2_DEBUG(4997600,
                 1,
