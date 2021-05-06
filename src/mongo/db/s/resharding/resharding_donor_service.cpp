@@ -193,14 +193,17 @@ ThreadPool::Limits ReshardingDonorService::getThreadPoolLimits() const {
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::constructInstance(
     BSONObj initialState) {
     return std::make_shared<DonorStateMachine>(
+        this,
         ReshardingDonorDocument::parse({"DonorStateMachine"}, initialState),
         std::make_unique<ExternalStateImpl>());
 }
 
 ReshardingDonorService::DonorStateMachine::DonorStateMachine(
+    const ReshardingDonorService* donorService,
     const ReshardingDonorDocument& donorDoc,
     std::unique_ptr<DonorStateMachineExternalState> externalState)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
+      _donorService(donorService),
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
@@ -322,6 +325,31 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
     });
 }
 
+void ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status status) {
+    if (!status.isOK()) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        if (!_completionPromise.getFuture().isReady()) {
+            _completionPromise.setError(status);
+        }
+    }
+
+    // TODO SERVER-56040: this if-stmt must be removed.
+    if (status.isA<ErrorCategory::NotPrimaryError>() ||
+        status.isA<ErrorCategory::ShutdownError>()) {
+        auto client = cc().getServiceContext()->makeClient("ReshardingDonorCleanupClient");
+        AlternativeClientRegion acr(client);
+        auto opCtxHolder = cc().makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(),
+                                                                _metadata.getSourceNss());
+        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+        csr->exitCriticalSection(csrLock);
+        csr->clearFilteringMetadata(opCtx);
+    }
+}
+
 SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& stepdownToken) noexcept {
@@ -366,31 +394,17 @@ SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
         // necessary to use shared_from_this() to extend the lifetime so the all earlier code can
         // safely finish executing.
         .onCompletion([anchor = shared_from_this()](Status status) { return status; })
+        .thenRunOn(_donorService->getInstanceCleanupExecutor())
+        .onCompletion([this, anchor = shared_from_this()](Status status) {
+            // On stepdown or shutdown, the _scopedExecutor may have already been shut down.
+            // Everything in this function runs on the instance's cleanup executor, and will
+            // execute regardless of any work on _scopedExecutor ever running.
+            return _runMandatoryCleanup(status);
+        })
         .semi();
 }
 
-void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    if (!_completionPromise.getFuture().isReady()) {
-        _completionPromise.setError(status);
-    }
-
-    // TODO SERVER-56040: this if-stmt must be removed.
-    if (status.isA<ErrorCategory::NotPrimaryError>() ||
-        status.isA<ErrorCategory::ShutdownError>()) {
-        auto client = cc().getServiceContext()->makeClient("ReshardingDonorCleanupClient");
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(),
-                                                                _metadata.getSourceNss());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
-        csr->clearFilteringMetadata(opCtx);
-    }
-}
+void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {}
 
 boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,

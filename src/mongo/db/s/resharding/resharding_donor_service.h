@@ -69,7 +69,8 @@ public:
 class ReshardingDonorService::DonorStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
-    explicit DonorStateMachine(const ReshardingDonorDocument& donorDoc,
+    explicit DonorStateMachine(const ReshardingDonorService* donorService,
+                               const ReshardingDonorDocument& donorDoc,
                                std::unique_ptr<DonorStateMachineExternalState> externalState);
 
     ~DonorStateMachine();
@@ -124,6 +125,12 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& stepdownToken,
         bool aborted) noexcept;
+
+    /**
+     * The work inside this function must be run regardless of any work on _scopedExecutor ever
+     * running.
+     */
+    void _runMandatoryCleanup(Status status);
 
     // The following functions correspond to the actions to take at a particular donor state.
     void _transitionToPreparingToDonate();
@@ -181,6 +188,9 @@ private:
 
     // Initiates the cancellation of the resharding operation.
     void _onAbortEncountered(const Status& abortReason);
+
+    // The primary-only service instance corresponding to the donor instance. Not owned.
+    const ReshardingDonorService* const _donorService;
 
     // The in-memory representation of the immutable portion of the document in
     // config.localReshardingOperations.donor.
