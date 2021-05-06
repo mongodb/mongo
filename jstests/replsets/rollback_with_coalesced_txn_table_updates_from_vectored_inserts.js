@@ -3,6 +3,8 @@
  * with the node data at the 'stableTimestamp', specifically in the case where multiple derived ops
  * to the 'config.transactions' table were coalesced into a single operation when performing
  * vectored inserts on the primary.
+ *
+ * @tags: [requires_persistence]
  */
 
 (function() {
