@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_51,
+ *   requires_persistence,
  * ]
  */
 
@@ -45,7 +46,9 @@ function generateBatch(size) {
     return TimeseriesTest.generateHosts(size).map((host, index) => Object.assign(host, {
         _id: generateId(),
         [metaField]: index,
-        [timeField]: new Date(currentId),
+        // Use a random timestamp across a year so that we can get a larger data distribution and
+        // avoid jumbo chunks.
+        [timeField]: new Date(Math.floor(Random.rand() * (365 * 24 * 60 * 60 * 1000))),
         largeField: largeStr,
     }));
 }
@@ -58,19 +61,21 @@ function runTest(shardKey) {
 
     // Shard timeseries collection.
     assert.commandWorked(coll.createIndex(shardKey));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: shardKey,
-    }));
 
     // Insert a large dataset so that the balancer is guranteed to split the chunks.
     let bulk = coll.initializeUnorderedBulkOp();
-    const numDocs = 100000;
+    const numDocs = 50000;
     const firstBatch = generateBatch(numDocs);
     for (let doc of firstBatch) {
         bulk.insert(doc);
     }
     assert.commandWorked(bulk.execute());
+
+    assert.commandWorked(mongos.adminCommand({
+        shardCollection: `${dbName}.${collName}`,
+        key: shardKey,
+    }));
+    st.awaitBalancerRound();
 
     // Ensure that each shard has at least one chunk after the split.
     const primaryShard = st.getPrimaryShard(dbName);
