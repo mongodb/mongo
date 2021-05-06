@@ -7,8 +7,6 @@ selector:
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js
-  exclude_with_any_tags:
-  - sbe_incompatible
 executor:
   archive:
     hooks:

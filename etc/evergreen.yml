@@ -9915,7 +9915,6 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlags=featureFlagSBE
       --additionalFeatureFlags=featureFlagTimeseriesCollection
-      --excludeWithAnyTags=sbe_incompatible
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:

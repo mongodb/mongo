@@ -2,7 +2,6 @@
  * Tests inserting sample data into the time-series buckets collection. This test is for the
  * exercising the optimized $sample implementation for $_internalUnpackBucket.
  * @tags: [
- *     sbe_incompatible,
  *     requires_wiredtiger,
  * ]
  */

@@ -11,7 +11,6 @@
  * @tags: [
  *   # inMemory has journaling off, so {j:true} writes are not allowed.
  *   requires_journaling,
- *   sbe_incompatible,
  * ]
  */
 

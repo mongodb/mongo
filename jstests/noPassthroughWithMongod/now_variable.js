@@ -1,7 +1,5 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
- *
- * @tags: [sbe_incompatible]
  */
 (function() {
 "use strict";

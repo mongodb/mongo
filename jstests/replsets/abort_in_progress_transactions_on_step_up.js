@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   exclude_from_large_txns,
- *   sbe_incompatible,
  *   uses_transactions,
  * ]
  */

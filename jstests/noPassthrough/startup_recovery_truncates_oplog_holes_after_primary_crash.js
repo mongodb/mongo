@@ -10,7 +10,6 @@
  *   requires_journaling,
  *   # The primary is restarted and must retain its data.
  *   requires_persistence,
- *   sbe_incompatible,
  * ]
  */
 

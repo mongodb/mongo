@@ -6,8 +6,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  exclude_with_any_tags:
-  - sbe_incompatible
 
 executor:
   archive:
