@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future_util.h"
 
@@ -148,8 +149,12 @@ void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
             options.pipeline = pipeline.arr();
 
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(
-                db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options));
+            auto status =
+                db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options);
+            if (status == ErrorCodes::NamespaceExists) {
+                return;
+            }
+            uassertStatusOK(status);
             wuow.commit();
         });
 }
