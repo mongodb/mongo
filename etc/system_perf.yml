@@ -685,7 +685,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short"
           # Logkeeper dataset with FCV set to 4.0
-          dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data.tgz"
+          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data.tgz"
 
   - name: initialsync-logkeeper
     priority: 5
