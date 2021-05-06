@@ -10,7 +10,12 @@
  * This tests that secondaries with capped collections upgrading from FCV 4.4 to FCV 5.0 delete all
  * documents over the cap after stepping up.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *     requires_replication,
+ *     # ephemeralForTest runs with 'oplogApplicationEnforcesSteadyStateConstraints=false' by
+ *     # default.
+ *     incompatible_with_eft,
+ * ]
  */
 (function() {
 "use strict";
