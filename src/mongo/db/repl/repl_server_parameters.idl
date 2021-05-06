@@ -526,7 +526,8 @@ feature_flags:
         description: >-
             When enabled, tenant migration commands are supported.
         cpp_varname: feature_flags::gTenantMigrations
-        default: false
+        default: true
+        version: 4.9
 
     # TODO (SERVER-54730): Remove featureFlagUseSecondaryDelaySecs.
     featureFlagUseSecondaryDelaySecs:

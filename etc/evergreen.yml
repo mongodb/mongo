@@ -9151,6 +9151,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
+  - name: .tenant_migration
     distros:
       - rhel80-xlarge
   - name: server_selection_json_test_TG
@@ -10997,6 +10998,7 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .stitch
+  - name: .tenant_migration
   - name: unittest_shell_hang_analyzer_gen
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
@@ -11159,6 +11161,7 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .updatefuzzer
+  - name: .tenant_migration
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
