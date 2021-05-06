@@ -134,7 +134,7 @@ TEST(ReshardingUtilTest, HighestMinFetchTimestampThrowsWhenDonorMissingTimestamp
 
 TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceedsWithDonorStateGTkDonatingOplogEntries) {
     std::vector<DonorShardEntry> donorShards{
-        makeDonorShard(ShardId("s0"), DonorStateEnum::kPreparingToBlockWrites, Timestamp(10, 2)),
+        makeDonorShard(ShardId("s0"), DonorStateEnum::kBlockingWrites, Timestamp(10, 2)),
         makeDonorShard(ShardId("s1"), DonorStateEnum::kDonatingOplogEntries, Timestamp(10, 3)),
         makeDonorShard(ShardId("s2"), DonorStateEnum::kDonatingOplogEntries, Timestamp(10, 1))};
     auto highestMinFetchTimestamp = getHighestMinFetchTimestamp(donorShards);

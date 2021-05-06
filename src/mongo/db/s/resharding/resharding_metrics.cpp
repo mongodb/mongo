@@ -126,14 +126,6 @@ void ReshardingMetrics::setDonorState(DonorStateEnum state) noexcept {
 
     const auto oldState = std::exchange(_currentOp->donorState, state);
     invariant(oldState != state);
-
-    if (state == DonorStateEnum::kPreparingToBlockWrites) {
-        _currentOp->inCriticalSection.start();
-    }
-
-    if (oldState == DonorStateEnum::kBlockingWrites) {
-        _currentOp->inCriticalSection.end();
-    }
 }
 
 void ReshardingMetrics::setRecipientState(RecipientStateEnum state) noexcept {
@@ -213,6 +205,16 @@ void ReshardingMetrics::onDocumentsCopied(int64_t documents, int64_t bytes) noex
     _cumulativeOp.bytesCopied += bytes;
 }
 
+void ReshardingMetrics::startInCriticalSection() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->inCriticalSection.start();
+}
+
+void ReshardingMetrics::endInCritcialSection() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _currentOp->inCriticalSection.end();
+}
+
 void ReshardingMetrics::onOplogEntriesFetched(int64_t entries) noexcept {
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_currentOp)
@@ -249,7 +251,6 @@ void ReshardingMetrics::onWriteDuringCriticalSection(int64_t writes) noexcept {
 
     invariant(checkState(_currentOp->donorState,
                          {DonorStateEnum::kDonatingOplogEntries,
-                          DonorStateEnum::kPreparingToBlockWrites,
                           DonorStateEnum::kBlockingWrites,
                           DonorStateEnum::kError}));
 

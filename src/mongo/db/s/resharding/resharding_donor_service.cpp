@@ -59,7 +59,7 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsBeforePreparingToMirror);
+MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsAfterTransitionToDonatingOplogEntries);
 MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
 
 using namespace fmt::literals;
@@ -247,8 +247,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                                executor, abortToken);
                        })
                        .then([this, executor, abortToken] {
-                           return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
-                               executor, abortToken);
+                           return _awaitAllRecipientsDoneApplying(executor, abortToken);
                        })
                        .then(
                            [this] { _writeTransactionOplogEntryThenTransitionToBlockingWrites(); });
@@ -265,8 +264,8 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
                   "error"_attr = status);
 
             return withAutomaticRetry(**executor, abortToken, [this, status] {
-                // It is illegal to transition into kError if state has already surpassed
-                // kPreparingToBlockWrites.
+                // It is illegal to transition into kError if the state is in or has already
+                // surpassed kBlockingWrites.
                 invariant(_donorCtx.getState() < DonorStateEnum::kBlockingWrites);
                 _transitionToError(status);
 
@@ -528,28 +527,27 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
         .thenRunOn(**executor)
         .then([this]() { _transitionState(DonorStateEnum::kDonatingOplogEntries); })
         .onCompletion([=](Status s) {
-            if (MONGO_unlikely(reshardingDonorFailsBeforePreparingToMirror.shouldFail())) {
+            if (MONGO_unlikely(
+                    reshardingDonorFailsAfterTransitionToDonatingOplogEntries.shouldFail())) {
                 uasserted(ErrorCodes::InternalError, "Failing for test");
             }
         });
 }
 
-ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
-    _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-        const CancellationToken& abortToken) {
+ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_awaitAllRecipientsDoneApplying(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+    const CancellationToken& abortToken) {
     if (_donorCtx.getState() > DonorStateEnum::kDonatingOplogEntries) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
     return future_util::withCancellation(_allRecipientsDoneApplying.getFuture(), abortToken)
-        .thenRunOn(**executor)
-        .then([this]() { _transitionState(DonorStateEnum::kPreparingToBlockWrites); });
+        .thenRunOn(**executor);
 }
 
 void ReshardingDonorService::DonorStateMachine::
     _writeTransactionOplogEntryThenTransitionToBlockingWrites() {
-    if (_donorCtx.getState() > DonorStateEnum::kPreparingToBlockWrites) {
+    if (_donorCtx.getState() > DonorStateEnum::kDonatingOplogEntries) {
         return;
     }
 

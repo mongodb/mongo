@@ -72,12 +72,16 @@ public:
     // Allows updating metrics on "documents to copy" so long as the recipient is in cloning state.
     void onDocumentsCopied(int64_t documents, int64_t bytes) noexcept;
 
+    // Starts/ends the timer recording the time spent in the critical section.
+    void startInCriticalSection();
+    void endInCritcialSection();
+
     // Allows updating "oplog entries to apply" metrics when the recipient is in applying state.
     void onOplogEntriesFetched(int64_t entries) noexcept;
     void onOplogEntriesApplied(int64_t entries) noexcept;
 
     // Allows tracking writes during a critical section when the donor's state is either of
-    // "preparing-to-block-writes" or "blocking-writes".
+    // "donating-oplog-entries" or "blocking-writes".
     void onWriteDuringCriticalSection(int64_t writes) noexcept;
 
     // Marks the completion of the current (active) resharding operation. Aborts the process if no

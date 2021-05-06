@@ -44,7 +44,7 @@ const donor0 = new Mongo(donor_host);
 const configsvr = new Mongo(topology.configsvr.nodes[0]);
 
 const failBeforeMirroringFP =
-    configureFailPoint(donor0, "reshardingDonorFailsBeforePreparingToMirror");
+    configureFailPoint(donor0, "reshardingDonorFailsAfterTransitionToDonatingOplogEntries");
 const removeDonorDocFP = configureFailPoint(donor0, "removeDonorDocFailpoint");
 
 reshardingTest.withReshardingInBackground(

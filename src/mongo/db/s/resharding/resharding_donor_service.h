@@ -141,7 +141,7 @@ private:
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToBlockWrites(
+    ExecutorFuture<void> _awaitAllRecipientsDoneApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken);
 

@@ -298,7 +298,6 @@ TEST_F(ReshardingDonorServiceTest, WritesFinalReshardOpOplogEntriesWhileWritesBl
 TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
     const std::vector<DonorStateEnum> donorStates{DonorStateEnum::kDonatingInitialData,
                                                   DonorStateEnum::kDonatingOplogEntries,
-                                                  DonorStateEnum::kPreparingToBlockWrites,
                                                   DonorStateEnum::kBlockingWrites,
                                                   DonorStateEnum::kDone};
     PauseDuringStateTransitions stateTransitionsGuard{controller(), donorStates};
@@ -327,7 +326,6 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
                     break;
                 }
-                case DonorStateEnum::kPreparingToBlockWrites:
                 case DonorStateEnum::kBlockingWrites: {
                     notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
                     break;
