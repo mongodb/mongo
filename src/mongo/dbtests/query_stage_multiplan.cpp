@@ -58,6 +58,7 @@
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
@@ -550,12 +551,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 //
 // This is a regression test for SERVER-20111.
 TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
-    // Bail out and do not run the tests if using the SBE engine.
-    // TODO: SERVER-55163 once the feature flag is removed we should use the query configuration
-    // knob to force the use of classic engine.
-    if (feature_flags::gSBE.isEnabledAndIgnoreFCV()) {
-        return;
-    }
+    RAIIServerParameterControllerForTest controller("internalQueryForceClassicEngine", true);
 
     const int N = 5000;
     for (int i = 0; i < N; ++i) {

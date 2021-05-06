@@ -196,6 +196,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _findCommand = std::move(findCommand);
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
+    _forceClassicEngine = internalQueryForceClassicEngine.load();
 
     // Normalize and validate tree.
     _root = MatchExpression::normalize(std::move(root));

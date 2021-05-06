@@ -1201,7 +1201,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    return feature_flags::gSBE.isEnabledAndIgnoreFCV() &&
+    return !canonicalQuery->getForceClassicEngine() &&
+            feature_flags::gSBE.isEnabledAndIgnoreFCV() &&
             isQuerySbeCompatible(opCtx, canonicalQuery.get(), plannerOptions)
         ? getSlotBasedExecutor(
               opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions)

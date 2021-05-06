@@ -301,7 +301,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
       gt: 0
-  
+
   internalDocumentSourceSetWindowFieldsMaxMemoryBytes:
     description: "Maximum size of the data that the $setWindowFields aggregation stage will cache in-memory before throwing an error."
     set_at: [ startup, runtime ]
@@ -471,3 +471,10 @@ server_parameters:
     validator:
         gt: 0
         lte: { expr: BSONObjMaxInternalSize }
+
+  internalQueryForceClassicEngine:
+    description: "If true, force use of the classic query engine."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryForceClassicEngine"
+    cpp_vartype: AtomicWord<bool>
+    default: false

@@ -49,10 +49,13 @@ namespace mongo {
  */
 class PlanCacheKey {
 public:
-    PlanCacheKey(CanonicalQuery::QueryShapeString shapeString, std::string indexabilityString) {
+    PlanCacheKey(CanonicalQuery::QueryShapeString shapeString,
+                 std::string indexabilityString,
+                 bool forceClassicQueryEngine) {
         _lengthOfStablePart = shapeString.size();
         _key = std::move(shapeString);
         _key += indexabilityString;
+        _key += forceClassicQueryEngine ? "t" : "f";
     }
 
     CanonicalQuery::QueryShapeString getStableKey() const {
@@ -61,6 +64,15 @@ public:
 
     StringData getStableKeyStringData() const {
         return StringData(_key.c_str(), _lengthOfStablePart);
+    }
+
+    /**
+     * Return the 'indexability discriminators', that is, the plan cache key component after the
+     * stable key, but before the boolean indicating whether we are using the classic engine.
+     */
+    StringData getIndexabilityDiscriminators() const {
+        return StringData(_key.c_str() + _lengthOfStablePart,
+                          _key.size() - _lengthOfStablePart - 1);
     }
 
     /**
@@ -87,10 +99,11 @@ public:
     }
 
 private:
-    // Key is broken into two parts:
-    // <stable key> | <indexability discriminators>
-    // Combined, the two parts make up the plan cache key. We store them in one std::string so that
-    // we can easily/cheaply extract the stable key.
+    // Key is broken into three parts:
+    // <stable key> | <indexability discriminators> | <forceClassicQueryEngine boolean>
+    // This third part can be removed once the classic query engine reaches EOL.
+    // Combined, the three parts make up the plan cache key. We store them in one std::string so
+    // that we can easily/cheaply extract the stable key.
     std::string _key;
 
     // How long the "stable key" is.

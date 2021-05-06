@@ -220,6 +220,10 @@ public:
         return _explain;
     }
 
+    bool getForceClassicEngine() const {
+        return _forceClassicEngine;
+    }
+
     void setExplain(bool explain) {
         _explain = explain;
     }
@@ -264,6 +268,9 @@ private:
     bool _canHaveNoopMatchNodes = false;
 
     bool _explain = false;
+
+    // Determines whether the classic engine must be used.
+    bool _forceClassicEngine = false;
 };
 
 }  // namespace mongo
