@@ -148,8 +148,12 @@ void createOplogViewForTenantMigrations(OperationContext* opCtx, Database* db) {
             options.pipeline = pipeline.arr();
 
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(
-                db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options));
+            auto status =
+                db->createView(opCtx, NamespaceString::kTenantMigrationOplogView, options);
+            if (status == ErrorCodes::NamespaceExists) {
+                return;
+            }
+            uassertStatusOK(status);
             wuow.commit();
         });
 }

@@ -168,6 +168,9 @@ public:
     // Namespace for storing config.transactions cloner progress for resharding.
     static const NamespaceString kReshardingTxnClonerProgressNamespace;
 
+    // Namespace for view on local.oplog.rs for resharding.
+    static const NamespaceString kReshardingOplogView;
+
     // Namespace for storing config.collectionCriticalSections documents
     static const NamespaceString kCollectionCriticalSectionsNamespace;
 

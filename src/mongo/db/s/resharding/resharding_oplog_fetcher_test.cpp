@@ -90,6 +90,12 @@ public:
         _opCtx = operationContext();
         _svcCtx = _opCtx->getServiceContext();
 
+        {
+            Lock::GlobalWrite lk(_opCtx);
+            OldClientContext ctx(_opCtx, NamespaceString::kRsOplogNamespace.ns());
+            createSlimOplogView(_opCtx, ctx.db());
+        }
+
         // Initialize ReshardingMetrics to a recipient state compatible with fetching.
         _metrics = std::make_unique<ReshardingMetrics>(_svcCtx);
         _metrics->onStart();

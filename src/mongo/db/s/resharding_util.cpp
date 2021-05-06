@@ -51,6 +51,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
@@ -233,7 +234,7 @@ void validateZones(const std::vector<mongo::BSONObj>& zones,
 
 void createSlimOplogView(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
-        opCtx, "createReshardingSlimOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {
+        opCtx, "createReshardingSlimOplog", NamespaceString::kReshardingOplogView.ns(), [&] {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);
@@ -256,10 +257,11 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
             options.viewOn = NamespaceString::kRsOplogNamespace.coll().toString();
             options.pipeline = BSON_ARRAY(getSlimOplogPipeline());
             WriteUnitOfWork wuow(opCtx);
-            uassertStatusOK(
-                db->createView(opCtx,
-                               NamespaceString("local.system.resharding.slimOplogForGraphLookup"),
-                               options));
+            auto status = db->createView(opCtx, NamespaceString::kReshardingOplogView, options);
+            if (status == ErrorCodes::NamespaceExists) {
+                return;
+            }
+            uassertStatusOK(status);
             wuow.commit();
         });
 }

@@ -39,6 +39,7 @@
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version_document_gen.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
@@ -192,6 +193,11 @@ public:
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
             repl::createOplog(opCtx.get());
+            {
+                Lock::GlobalWrite lk(opCtx.get());
+                OldClientContext ctx(opCtx.get(), NamespaceString::kRsOplogNamespace.ns());
+                tenant_migration_util::createOplogViewForTenantMigrations(opCtx.get(), ctx.db());
+            }
 
             // Need real (non-mock) storage for the oplog buffer.
             StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());

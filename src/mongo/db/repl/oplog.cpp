@@ -82,7 +82,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/s/resharding_util.h"
@@ -661,9 +660,6 @@ void createOplog(OperationContext* opCtx,
         }
         uow.commit();
     });
-
-    createSlimOplogView(opCtx, ctx.db());
-    tenant_migration_util::createOplogViewForTenantMigrations(opCtx, ctx.db());
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     service->getStorageEngine()->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
