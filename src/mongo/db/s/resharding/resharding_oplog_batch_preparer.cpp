@@ -106,7 +106,6 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
     auto writerVectors = _makeEmptyWriterVectors();
 
     for (const auto& op : batch) {
-        invariant(!op.isForReshardingSessionApplication());
         if (op.isCrudOpType()) {
             _appendCrudOpToWriterVector(&op, writerVectors);
         } else if (op.isCommand()) {
@@ -149,17 +148,17 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
 }
 
 WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
-    OplogBatchToPrepare& batch) const {
+    const OplogBatchToPrepare& batch) const {
     auto writerVectors = _makeEmptyWriterVectors();
 
     struct SessionOpsList {
         TxnNumber txnNum = kUninitializedTxnNumber;
-        std::vector<OplogEntry*> ops;
+        std::vector<const OplogEntry*> ops;
     };
 
     LogicalSessionIdMap<SessionOpsList> sessionTracker;
 
-    auto updateSessionTracker = [&](OplogEntry* op) {
+    auto updateSessionTracker = [&](const OplogEntry* op) {
         if (const auto& lsid = op->getSessionId()) {
             uassert(4990700,
                     str::stream() << "Missing txnNumber for oplog entry with lsid: "
@@ -199,7 +198,6 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 
     for (auto& [lsid, opList] : sessionTracker) {
         for (auto& op : opList.ops) {
-            op->setIsForReshardingSessionApplication();
             _appendSessionOpToWriterVector(lsid, op, writerVectors);
         }
     }

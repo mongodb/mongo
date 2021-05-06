@@ -68,25 +68,36 @@ ReshardingOplogApplier::ReshardingOplogApplier(
 SemiFuture<void> ReshardingOplogApplier::_applyBatch(
     std::shared_ptr<executor::TaskExecutor> executor,
     CancellationToken cancelToken,
-    CancelableOperationContextFactory factory,
-    bool isForSessionApplication) {
-    auto currentWriterVectors = [&] {
-        if (isForSessionApplication) {
-            return _batchPreparer.makeSessionOpWriterVectors(_currentBatchToApply);
-        } else {
-            return _batchPreparer.makeCrudOpWriterVectors(_currentBatchToApply, _currentDerivedOps);
-        }
-    }();
+    CancelableOperationContextFactory factory) {
+    auto crudWriterVectors =
+        _batchPreparer.makeCrudOpWriterVectors(_currentBatchToApply, _currentDerivedOps);
 
     CancellationSource errorSource(cancelToken);
 
     std::vector<SharedSemiFuture<void>> batchApplierFutures;
-    batchApplierFutures.reserve(currentWriterVectors.size());
+    // Use `2 * crudWriterVectors.size()` because sessionWriterVectors.size() is very likely equal
+    // to crudWriterVectors.size(). Calling ReshardingOplogBatchApplier::applyBatch<false>() first
+    // though allows CRUD application to be concurrent with preparing the writer vectors for session
+    // application in addition to being concurrent with session application itself.
+    batchApplierFutures.reserve(2 * crudWriterVectors.size());
 
-    for (auto&& writer : currentWriterVectors) {
+    for (auto&& writer : crudWriterVectors) {
         if (!writer.empty()) {
             batchApplierFutures.emplace_back(
-                _batchApplier.applyBatch(std::move(writer), executor, errorSource.token(), factory)
+                _batchApplier
+                    .applyBatch<false>(std::move(writer), executor, errorSource.token(), factory)
+                    .share());
+        }
+    }
+
+    auto sessionWriterVectors = _batchPreparer.makeSessionOpWriterVectors(_currentBatchToApply);
+    batchApplierFutures.reserve(crudWriterVectors.size() + sessionWriterVectors.size());
+
+    for (auto&& writer : sessionWriterVectors) {
+        if (!writer.empty()) {
+            batchApplierFutures.emplace_back(
+                _batchApplier
+                    .applyBatch<true>(std::move(writer), executor, errorSource.token(), factory)
                     .share());
         }
     }
@@ -110,12 +121,7 @@ SemiFuture<void> ReshardingOplogApplier::run(std::shared_ptr<executor::TaskExecu
                        LOGV2_DEBUG(5391002, 3, "Starting batch", "batchSize"_attr = batch.size());
                        _currentBatchToApply = std::move(batch);
 
-                       return _applyBatch(
-                           executor, cancelToken, factory, false /* isForSessionApplication */);
-                   })
-                   .then([this, executor, cancelToken, factory] {
-                       return _applyBatch(
-                           executor, cancelToken, factory, true /* isForSessionApplication */);
+                       return _applyBatch(executor, cancelToken, factory);
                    })
                    .then([this, factory] {
                        if (_currentBatchToApply.empty()) {

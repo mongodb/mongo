@@ -343,12 +343,11 @@ TEST_F(ReshardingOplogBatchApplierTest, WaitsOnPreparedTxnAndAutomaticallyRetrie
 
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
-    oplogEntry.setIsForReshardingSessionApplication(true);
 
     auto executor = makeTaskExecutorForApplier();
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
-    auto future =
-        applier()->applyBatch({&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
+    auto future = applier()->applyBatch<true>(
+        {&oplogEntry}, executor, CancellationToken::uncancelable(), factory);
 
     ASSERT_FALSE(future.isReady());
     // Wait a little bit to increase the likelihood that the applier has blocked on the prepared
@@ -395,12 +394,12 @@ TEST_F(ReshardingOplogBatchApplierTest, CancelableWhileWaitingOnPreparedTxn) {
 
     TxnNumber incomingTxnNumber = existingTxnNumber + 1;
     auto oplogEntry = makeFinishTxnOp(lsid, incomingTxnNumber);
-    oplogEntry.setIsForReshardingSessionApplication(true);
 
     CancellationSource cancelSource;
     auto executor = makeTaskExecutorForApplier();
     auto factory = makeCancelableOpCtxForApplier(CancellationToken::uncancelable());
-    auto future = applier()->applyBatch({&oplogEntry}, executor, cancelSource.token(), factory);
+    auto future =
+        applier()->applyBatch<true>({&oplogEntry}, executor, cancelSource.token(), factory);
 
     ASSERT_FALSE(future.isReady());
     // Wait a little bit to increase the likelihood that the applier has blocked on the prepared

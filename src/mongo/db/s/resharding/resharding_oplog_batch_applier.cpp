@@ -47,6 +47,7 @@ ReshardingOplogBatchApplier::ReshardingOplogBatchApplier(
     const ReshardingOplogSessionApplication& sessionApplication)
     : _crudApplication(crudApplication), _sessionApplication(sessionApplication) {}
 
+template <bool IsForSessionApplication>
 SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     OplogBatch batch,
     std::shared_ptr<executor::TaskExecutor> executor,
@@ -60,27 +61,29 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
     auto chainCtx = std::make_shared<ChainContext>();
     chainCtx->batch = std::move(batch);
 
-    return resharding::WithAutomaticRetry([this, chainCtx, cancelToken, factory] {
-               // Writing `auto& i = chainCtx->nextToApply` takes care of incrementing
-               // chainCtx->nextToApply on each loop iteration.
-               for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
-                   const auto& oplogEntry = *chainCtx->batch[i];
-                   auto opCtx = factory.makeOperationContext(&cc());
+    return resharding::WithAutomaticRetry<unique_function<SemiFuture<void>()>>(
+               [this, chainCtx, cancelToken, factory] {
+                   // Writing `auto& i = chainCtx->nextToApply` takes care of incrementing
+                   // chainCtx->nextToApply on each loop iteration.
+                   for (auto& i = chainCtx->nextToApply; i < chainCtx->batch.size(); ++i) {
+                       const auto& oplogEntry = *chainCtx->batch[i];
+                       auto opCtx = factory.makeOperationContext(&cc());
 
-                   if (oplogEntry.isForReshardingSessionApplication()) {
-                       auto hitPreparedTxn =
-                           _sessionApplication.tryApplyOperation(opCtx.get(), oplogEntry);
+                       if constexpr (IsForSessionApplication) {
+                           auto hitPreparedTxn =
+                               _sessionApplication.tryApplyOperation(opCtx.get(), oplogEntry);
 
-                       if (hitPreparedTxn) {
-                           return future_util::withCancellation(std::move(*hitPreparedTxn),
-                                                                cancelToken);
+                           if (hitPreparedTxn) {
+                               return future_util::withCancellation(std::move(*hitPreparedTxn),
+                                                                    cancelToken);
+                           }
+                       } else {
+                           uassertStatusOK(
+                               _crudApplication.applyOperation(opCtx.get(), oplogEntry));
                        }
-                   } else {
-                       uassertStatusOK(_crudApplication.applyOperation(opCtx.get(), oplogEntry));
                    }
-               }
-               return makeReadyFutureWith([] {}).semi();
-           })
+                   return makeReadyFutureWith([] {}).semi();
+               })
         .onTransientError([](const Status& status) {
             LOGV2(5615800,
                   "Transient error while applying oplog entry from donor shard",
@@ -103,5 +106,17 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
         .onCompletion([](auto x) { return x; })
         .semi();
 }
+
+template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<false>(
+    OplogBatch batch,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) const;
+
+template SemiFuture<void> ReshardingOplogBatchApplier::applyBatch<true>(
+    OplogBatch batch,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    CancellationToken cancelToken,
+    CancelableOperationContextFactory factory) const;
 
 }  // namespace mongo

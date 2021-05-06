@@ -52,6 +52,7 @@ public:
     ReshardingOplogBatchApplier(const ReshardingOplogApplicationRules& crudApplication,
                                 const ReshardingOplogSessionApplication& sessionApplication);
 
+    template <bool IsForSessionApplication>
     SemiFuture<void> applyBatch(OplogBatch batch,
                                 std::shared_ptr<executor::TaskExecutor> executor,
                                 CancellationToken cancelToken,

@@ -516,10 +516,6 @@ BSONObj OplogEntry::toBSONForLogging() const {
         builder.append("isForCappedCollection", _isForCappedCollection);
     }
 
-    if (_isForReshardingSessionApplication) {
-        builder.append("isForReshardingSessionApplication", _isForReshardingSessionApplication);
-    }
-
     if (_preImageOp) {
         auto op = _preImageOp->toBSON();
         if (estimatedTotalSize + op.objsize() > sizeTooBig) {
@@ -575,14 +571,6 @@ void OplogEntry::setPostImageOp(std::shared_ptr<DurableOplogEntry> postImageOp) 
 void OplogEntry::setPostImageOp(const BSONObj& postImageOp) {
     setPostImageOp(std::make_shared<DurableOplogEntry>(
         uassertStatusOK(DurableOplogEntry::parse(postImageOp))));
-}
-
-bool OplogEntry::isForReshardingSessionApplication() const {
-    return _isForReshardingSessionApplication;
-}
-
-void OplogEntry::setIsForReshardingSessionApplication(bool isForReshardingSessionApplication) {
-    _isForReshardingSessionApplication = isForReshardingSessionApplication;
 }
 
 const boost::optional<mongo::Value>& OplogEntry::get_id() const& {

@@ -85,12 +85,8 @@ public:
      * The returned writer vectors refer to memory owned by `batch`. The caller must take care to
      * ensure `batch` outlives the writer vectors all being applied and must take care not to modify
      * `batch` until after the writer vectors have all been applied.
-     *
-     * As a performance optimization, to avoid creating a separate copy of `batch`, this function
-     * mutates the contained oplog entries. The caller should take care to apply the writer vectors
-     * from `makeCrudOpWriterVectors(batch)` first.
      */
-    WriterVectors makeSessionOpWriterVectors(OplogBatchToPrepare& batch) const;
+    WriterVectors makeSessionOpWriterVectors(const OplogBatchToPrepare& batch) const;
 
     static void throwIfUnsupportedCommandOp(const OplogEntry& op);
 

@@ -116,8 +116,7 @@ private:
      */
     SemiFuture<void> _applyBatch(std::shared_ptr<executor::TaskExecutor> executor,
                                  CancellationToken cancelToken,
-                                 CancelableOperationContextFactory factory,
-                                 bool isForSessionApplication);
+                                 CancelableOperationContextFactory factory);
 
     /**
      * Records the progress made by this applier to storage.

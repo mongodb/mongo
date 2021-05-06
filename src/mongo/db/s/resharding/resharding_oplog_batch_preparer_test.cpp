@@ -299,7 +299,6 @@ TEST_F(ReshardingOplogBatchPreparerTest, AssignsSessionOpsToWriterVectorsByLsid)
         ASSERT_BSONOBJ_BINARY_EQ(writer[i]->getObject(), BSON("_id" << i));
         ASSERT_EQ(writer[i]->getSessionId(), lsid);
         ASSERT_EQ(writer[i]->getTxnNumber(), TxnNumber{1});
-        ASSERT_TRUE(writer[i]->isForReshardingSessionApplication());
     }
 }
 
@@ -320,7 +319,6 @@ TEST_F(ReshardingOplogBatchPreparerTest, DiscardsLowerTxnNumberSessionOps) {
     ASSERT_BSONOBJ_BINARY_EQ(writer[0]->getObject(), BSON("_id" << numOps));
     ASSERT_EQ(writer[0]->getSessionId(), lsid);
     ASSERT_EQ(writer[0]->getTxnNumber(), TxnNumber{numOps});
-    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, DistributesSessionOpsToWriterVectorsFairly) {
@@ -416,7 +414,6 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForSmallUnpreparedTx
     ASSERT_EQ(writer.size(), 1U);
     ASSERT_EQ(writer[0]->getSessionId(), lsid);
     ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
-    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForCommittedTxn) {
@@ -433,7 +430,6 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForCommittedTxn) {
     ASSERT_EQ(writer.size(), 1U);
     ASSERT_EQ(writer[0]->getSessionId(), lsid);
     ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
-    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForAbortedPreparedTxn) {
@@ -449,7 +445,6 @@ TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForAbortedPreparedTx
     ASSERT_EQ(writer.size(), 1U);
     ASSERT_EQ(writer[0]->getSessionId(), lsid);
     ASSERT_EQ(*writer[0]->getTxnNumber(), 2);
-    ASSERT_TRUE(writer[0]->isForReshardingSessionApplication());
 }
 
 TEST_F(ReshardingOplogBatchPreparerTest, SessionWriteVectorsForPartialUnpreparedTxn) {
