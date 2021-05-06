@@ -192,11 +192,13 @@ class CacheDirValidate(SCons.CacheDir.CacheDir):
 
         cksum_dir = pathlib.Path(self.cachepath(node)[1]).parent
         if cksum_dir.is_dir():
-            rm_path = f"{cksum_dir}.{SCons.CacheDir.cache_tmp_uuid}.del"
-            cksum_dir.replace(rm_path)
-            shutil.rmtree(rm_path)
+            # TODO: Turn this back on and fix the error message when the race condition
+            # has been resolved in SERVER-56625
+            #rm_path = f"{cksum_dir}.{SCons.CacheDir.cache_tmp_uuid}.del"
+            #cksum_dir.replace(rm_path)
+            #shutil.rmtree(rm_path)
 
-            clean_msg = f"Removed bad cachefile {cksum_dir} from cache."
+            clean_msg = f"Bad cachefile {cksum_dir} found in cache."
             print(clean_msg)
             self.CacheDebug(clean_msg + cache_debug_suffix, node, cksum_dir)
             self.CacheDebugJson({
