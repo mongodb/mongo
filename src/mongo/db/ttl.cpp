@@ -296,7 +296,7 @@ private:
 
         const Date_t kDawnOfTime =
             Date_t::fromMillisSinceEpoch(std::numeric_limits<long long>::min());
-        const Date_t expirationTime = Date_t::now() - Seconds(secondsExpireElt.numberLong());
+        const Date_t expirationTime = Date_t::now() - Seconds(secondsExpireElt.safeNumberLong());
         const BSONObj startKey = BSON("" << kDawnOfTime);
         const BSONObj endKey = BSON("" << expirationTime);
         // The canonical check as to whether a key pattern element is "ascending" or
