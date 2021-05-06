@@ -135,8 +135,17 @@ StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj&
                 if (e.type() == Object) {
                     BSONObj o = e.Obj();
                     Status s = o.storageValidEmbedded();
-                    if (!s.isOK())
-                        return StatusWith<BSONObj>(s);
+                    if (!s.isOK()) {
+                        if (feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV() &&
+                            s.code() == ErrorCodes::DollarPrefixedFieldName) {
+                            return StatusWith<BSONObj>(
+                                s.code(),
+                                str::stream() << "_id fields may not contain '$'-prefixed fields: "
+                                              << s.reason());
+                        } else {
+                            return StatusWith<BSONObj>(s);
+                        }
+                    }
                 }
                 if (hadId) {
                     return StatusWith<BSONObj>(ErrorCodes::BadValue,

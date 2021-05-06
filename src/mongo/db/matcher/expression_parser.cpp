@@ -282,9 +282,14 @@ StatusWithMatchExpression parse(const BSONObj& obj,
             auto parseExpressionMatchFunction = retrievePathlessParser(name);
 
             if (!parseExpressionMatchFunction) {
+                const auto dotsAndDollarsHint =
+                    feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+                    ? ". If you have a field name that starts with a '$' symbol, consider using "
+                      "$getField or $setField."
+                    : "";
                 return {Status(ErrorCodes::BadValue,
-                               str::stream()
-                                   << "unknown top level operator: " << e.fieldNameStringData())};
+                               str::stream() << "unknown top level operator: "
+                                             << e.fieldNameStringData() << dotsAndDollarsHint)};
             }
 
             auto parsedExpression = parseExpressionMatchFunction(

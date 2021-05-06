@@ -20,7 +20,15 @@ assertErrMsgDoesNotContain(coll, pipeline, "$addFields");
 
 pipeline = [{'$addFields': {"$a.$c": 1}}];
 assertErrMsgContains(coll, pipeline, "$addFields");
-assertErrMsgDoesNotContain(coll, pipeline, "$set");
+const isDotsAndDollarsEnabled = db.adminCommand({getParameter: 1, featureFlagDotsAndDollars: 1})
+                                    .featureFlagDotsAndDollars.value;
+if (isDotsAndDollarsEnabled) {
+    // The error message when this flag is enabled suggests using $setField (which trivially
+    // includes $set) so this assert should check for something that isn't a substring of $setField.
+    assertErrMsgDoesNotContain(coll, pipeline, "$set ");
+} else {
+    assertErrMsgDoesNotContain(coll, pipeline, "$set");
+}
 
 // Assert that, despite the fact $unset is an alias for an exclusion projection, error messages
 // use only the name used by the user.

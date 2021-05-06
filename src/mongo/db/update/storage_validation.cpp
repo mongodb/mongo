@@ -105,10 +105,15 @@ void validateDollarPrefixElement(mutablebson::ConstElement elem) {
                 curr.rightSibling().ok() && curr.rightSibling().getFieldName() == "$id");
     } else {
         // Not an okay, $ prefixed field name.
+        const auto replaceWithHint =
+            feature_flags::gFeatureFlagDotsAndDollars.isEnabledAndIgnoreFCV()
+            ? "' is not allowed in the context of an update's replacement document. Consider using "
+              "an aggregation pipeline with $replaceWith."
+            : "' is not valid for storage.";
+
         uasserted(ErrorCodes::DollarPrefixedFieldName,
                   str::stream() << "The dollar ($) prefixed field '" << elem.getFieldName()
-                                << "' in '" << mutablebson::getFullName(elem)
-                                << "' is not valid for storage.");
+                                << "' in '" << mutablebson::getFullName(elem) << replaceWithHint);
     }
 }
 }  // namespace
