@@ -447,10 +447,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
 
             // Most of the time we can't use a multikey index for a $ne: null query, however there
             // are a few exceptions around $elemMatch.
-            const bool isNotEqualsNull =
-                (childtype == MatchExpression::EQ &&
-                 static_cast<const ComparisonMatchExpression*>(child)->getData().type() ==
-                     BSONType::jstNULL);
+            const bool isNotEqualsNull = isQueryNegatingEqualToNull(node);
             const bool canUseIndexForNeNull =
                 notEqualsNullCanUseIndex(index, keyPatternElt, keyPatternIdx, elemMatchContext);
             if (isNotEqualsNull && !canUseIndexForNeNull) {
@@ -470,11 +467,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                     return false;
                 }
             }
-        }
-
-        if (index.pathHasMultikeyComponent(keyPatternElt.fieldNameStringData()) && !index.sparse &&
-            isQueryNegatingGTEorLTENull(node)) {
-            return false;
         }
 
         // If this is an $elemMatch value, make sure _all_ of the children can use the index.

@@ -179,6 +179,20 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
     testComputeKey("{$or: [{a: 1}]}", "{}", "{'a.$': 1}", "eqa");
 }
 
+TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
+    // With '$eq', '$gte', and '$lte' negation comparison to 'null'.
+    testComputeKey("{a: {$not: {$eq: null}}}", "{}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]|a");
+    testComputeKey(
+        "{a: {$not: {$eq: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]~aa|a");
+    testComputeKey(
+        "{a: {$not: {$gte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[gea]~aa|a");
+    testComputeKey(
+        "{a: {$not: {$lte: null}}}", "{a: 1}", "{_id: 0, a: 1}", "ntnot_eq_null[lea]~aa|a");
+
+    // Same '$eq' negation query with non-'null' argument should have different key.
+    testComputeKey("{a: {$not: {$eq: true}}}", "{a: 1}", "{_id: 0, a: 1}", "nt[eqa]~aa|a");
+}
+
 // Delimiters found in user field names or non-standard projection field values
 // must be escaped.
 TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {

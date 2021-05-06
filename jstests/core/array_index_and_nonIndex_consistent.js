@@ -79,6 +79,9 @@ queryList.forEach(function(q) {
         {$not: {$gt: q}},
         {$not: {$gte: q}},
         {$not: {$eq: q}},
+        {$elemMatch: {$not: {$eq: q}}},
+        {$elemMatch: {$not: {$gte: q}}},
+        {$elemMatch: {$not: {$lte: q}}},
     ];
     const projOutId = {_id: 0, val: 1};
     queryPreds.forEach(function(pred) {

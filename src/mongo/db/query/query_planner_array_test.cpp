@@ -2450,6 +2450,28 @@ TEST_F(QueryPlannerTest, ElemMatchValueNENull) {
         "}}}}}");
 }
 
+TEST_F(QueryPlannerTest, ElemMatchValueNotGteOrNotLteNull) {
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$gte: null}}}}"));
+
+    const auto collScanSol = "{cscan: {dir: 1}}";
+    const auto ixScanSol =
+        "{fetch: {node: {"
+        "  ixscan: {pattern: {a:1}, bounds: {"
+        "    a: [['MinKey',undefined,true,false], [null,'MaxKey',false,true]]"
+        "}}}}}";
+
+    assertNumSolutions(2U);
+    assertSolutionExists(collScanSol);
+    assertSolutionExists(ixScanSol);
+
+    runQuery(fromjson("{a: {$elemMatch: {$not: {$lte: null}}}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists(collScanSol);
+    assertSolutionExists(ixScanSol);
+}
+
 TEST_F(QueryPlannerTest, ElemMatchObjectNENull) {
     addIndex(BSON("a.b" << 1));
     runQuery(fromjson("{a: {$elemMatch: {b: {$ne: null}}}}"));
