@@ -117,7 +117,7 @@ protected:
         TypeCollectionReshardingFields reshardingFields{reshardingUuid};
         reshardingFields.setState(state);
 
-        if (state == CoordinatorStateEnum::kDecisionPersisted) {
+        if (state == CoordinatorStateEnum::kCommitting) {
             TypeCollectionRecipientFields recipientFields{
                 {kThisShard, kOtherShard}, existingUuid, kNss, 5000};
             reshardingFields.setRecipientFields(std::move(recipientFields));
@@ -129,10 +129,8 @@ protected:
             reshardingFields.setDonorFields(std::move(donorFields));
         }
 
-        auto metadataUuid = (state >= CoordinatorStateEnum::kDecisionPersisted &&
-                             state != CoordinatorStateEnum::kError)
-            ? reshardingUuid
-            : existingUuid;
+        auto metadataUuid =
+            (state >= CoordinatorStateEnum::kCommitting) ? reshardingUuid : existingUuid;
 
         return makeCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1)), {}, false, metadataUuid, reshardingFields);
@@ -210,8 +208,8 @@ TEST_F(NoChunkFixture, DisallowWritesInDecisionPersistedWithOrigUUID) {
     UUID originalUUID = UUID::gen();
     UUID reshardingUUID = UUID::gen();
 
-    auto metadata = makeCollectionMetadata(
-        originalUUID, reshardingUUID, CoordinatorStateEnum::kDecisionPersisted);
+    auto metadata =
+        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kCommitting);
 
     // Writes should be disallowed if the collection metadata's UUID matches the original
     // collection's UUID.
@@ -222,8 +220,8 @@ TEST_F(NoChunkFixture, AllowWritesInDecisionPersistedWithReshardingUUID) {
     UUID originalUUID = UUID::gen();
     UUID reshardingUUID = UUID::gen();
 
-    auto metadata = makeCollectionMetadata(
-        originalUUID, reshardingUUID, CoordinatorStateEnum::kDecisionPersisted);
+    auto metadata =
+        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kCommitting);
 
     // Writes should NOT be disallowed when the UUID matches the temp collection's
     // UUID.
@@ -235,8 +233,8 @@ TEST_F(NoChunkFixture, DisallowWritesInDecisionPersistedThrows) {
     UUID reshardingUUID = UUID::gen();
     UUID rogueUUID = UUID::gen();
 
-    auto metadata = makeCollectionMetadata(
-        originalUUID, reshardingUUID, CoordinatorStateEnum::kDecisionPersisted);
+    auto metadata =
+        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kCommitting);
 
     // If the collection's UUID matches neither the original UUID nor the resharding UUID,
     // expect an exception.
@@ -272,7 +270,7 @@ TEST_F(NoChunkFixture, DisallowWritesInErrorWithOrigUUID) {
     UUID reshardingUUID = UUID::gen();
 
     auto metadata =
-        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kError);
+        makeCollectionMetadata(originalUUID, reshardingUUID, CoordinatorStateEnum::kAborting);
 
     // Writes should NOT be disallowed if the coordinator state is error.
     ASSERT(!metadata.disallowWritesForResharding(originalUUID));

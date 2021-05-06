@@ -101,8 +101,7 @@ protected:
         Date_t lastUpdated) {
         UUID uuid = UUID::gen();
         BSONObj shardKey;
-        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kDecisionPersisted &&
-            coordinatorDoc.getState() != CoordinatorStateEnum::kError) {
+        if (coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitting) {
             uuid = _reshardingUUID;
             shardKey = _newShardKey.toBSON();
         } else {
@@ -120,7 +119,7 @@ protected:
         // TODO SERVER-53330: Evaluate whether or not we can include
         // CoordinatorStateEnum::kInitializing in this if statement.
         if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
-            coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
+            coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
             collType.setAllowMigrations(true);
         } else if (coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate) {
             collType.setAllowMigrations(false);
@@ -327,8 +326,7 @@ protected:
         auto expectedCoordinatorState = expectedCoordinatorDoc.getState();
         if (expectedCoordinatorState == CoordinatorStateEnum::kDone ||
             (expectedReshardingFields &&
-             expectedReshardingFields->getState() >= CoordinatorStateEnum::kDecisionPersisted &&
-             expectedReshardingFields->getState() != CoordinatorStateEnum::kError)) {
+             expectedReshardingFields->getState() >= CoordinatorStateEnum::kCommitting)) {
             ASSERT_EQUALS(onDiskEntry.getNss(), _originalNss);
             ASSERT(onDiskEntry.getUuid() == _reshardingUUID);
             ASSERT_EQUALS(onDiskEntry.getKeyPattern().toBSON().woCompare(_newShardKey.toBSON()), 0);
@@ -359,10 +357,11 @@ protected:
         }
 
         // Check the reshardingFields.recipientFields.
-        if (expectedCoordinatorState != CoordinatorStateEnum::kError) {
-            // Don't bother checking the recipientFields if the coordinator state is already kError.
-            if (expectedCoordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
-                // Until CoordinatorStateEnum::kDecisionPersisted, recipientsFields only live on the
+        if (expectedCoordinatorState != CoordinatorStateEnum::kAborting) {
+            // Don't bother checking the recipientFields if the coordinator state is already
+            // kAborting.
+            if (expectedCoordinatorState < CoordinatorStateEnum::kCommitting) {
+                // Until CoordinatorStateEnum::kCommitting, recipientsFields only live on the
                 // temporaryNss entry in config.collections.
                 ASSERT(!onDiskReshardingFields.getRecipientFields());
             } else {
@@ -493,11 +492,10 @@ protected:
             opCtx, expectedOriginalCollType, expectedCoordinatorDoc);
 
         // Check the resharding fields and allowMigrations in the config.collections entry for the
-        // temp collection. If the expected state is >= kDecisionPersisted, the entry for the temp
+        // temp collection. If the expected state is >= kCommitting, the entry for the temp
         // collection should have been removed.
         boost::optional<CollectionType> expectedTempCollType = boost::none;
-        if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kDecisionPersisted ||
-            expectedCoordinatorDoc.getState() == CoordinatorStateEnum::kError) {
+        if (expectedCoordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
             expectedTempCollType = resharding::createTempReshardingCollectionType(
                 opCtx,
                 expectedCoordinatorDoc,
@@ -673,7 +671,7 @@ protected:
 
         // Persist the updates on disk
         auto expectedCoordinatorDoc = coordinatorDoc;
-        expectedCoordinatorDoc.setState(CoordinatorStateEnum::kError);
+        expectedCoordinatorDoc.setState(CoordinatorStateEnum::kAborting);
         auto abortReason = Status{errorCode, "reason to abort"};
         emplaceAbortReasonIfExists(expectedCoordinatorDoc, abortReason);
 
@@ -837,7 +835,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTranstionToDecisionPersistedSu
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kDecisionPersisted);
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
 
     // The new epoch to use for the resharded collection to indicate that the collection is a
     // new incarnation of the namespace
@@ -862,7 +860,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToErrorFromManualAbo
 
 TEST_F(ReshardingCoordinatorPersistenceTest, StateTransitionToDoneSucceeds) {
     auto coordinatorDoc =
-        insertStateAndCatalogEntries(CoordinatorStateEnum::kDecisionPersisted, _finalEpoch);
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kCommitting, _finalEpoch);
 
     // Ensure the chunks for the original namespace exist since they will be bumped as a product of
     // the state transition to kDone.

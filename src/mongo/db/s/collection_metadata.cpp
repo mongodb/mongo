@@ -73,9 +73,9 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
         case CoordinatorStateEnum::kUnused:
         case CoordinatorStateEnum::kInitializing:
         case CoordinatorStateEnum::kBlockingWrites:
-        case CoordinatorStateEnum::kDecisionPersisted:
+        case CoordinatorStateEnum::kAborting:
+        case CoordinatorStateEnum::kCommitting:
         case CoordinatorStateEnum::kDone:
-        case CoordinatorStateEnum::kError:
             return boost::none;
         case CoordinatorStateEnum::kPreparingToDonate:
         case CoordinatorStateEnum::kCloning:
@@ -121,10 +121,11 @@ bool CollectionMetadata::disallowWritesForResharding(const UUID& currentCollecti
         case CoordinatorStateEnum::kBlockingWrites:
             // Only return true if this is also the donor shard.
             return reshardingFields->getDonorFields() != boost::none;
-        case CoordinatorStateEnum::kDecisionPersisted:
+        case CoordinatorStateEnum::kAborting:
+            return false;
+        case CoordinatorStateEnum::kCommitting:
             break;
         case CoordinatorStateEnum::kDone:
-        case CoordinatorStateEnum::kError:
             return false;
     }
 

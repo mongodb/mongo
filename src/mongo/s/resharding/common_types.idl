@@ -47,9 +47,9 @@ enums:
             kCloning: "cloning"
             kApplying: "applying"
             kBlockingWrites: "blocking-writes"
-            kDecisionPersisted: "decision-persisted"
+            kAborting: "aborting"
+            kCommitting: "committing"
             kDone: "done"
-            kError: "error"
 
     DonorState:
         description: "The current state of a donor shard for a resharding operation."

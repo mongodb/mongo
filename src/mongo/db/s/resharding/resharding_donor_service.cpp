@@ -423,7 +423,7 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
-    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
+    if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         auto abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
         _onAbortEncountered(abortReason);
         return;
@@ -440,7 +440,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
             ensureFulfilledPromise(lk, _allRecipientsDoneApplying);
         }
 
-        if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+        if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
             ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
         }
     }
@@ -449,7 +449,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
         _critSecWasAcquired.getFuture().wait(opCtx);
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+    if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
         _critSecWasPromoted.getFuture().wait(opCtx);
     }
 }

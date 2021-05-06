@@ -201,8 +201,8 @@ void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
                             CoordinatorState_serializer(reshardingFields.getState()),
                             reshardingFields.toBSON().toString()),
                 !reshardingFields.getDonorFields() && !reshardingFields.getRecipientFields());
-    } else if (coordinatorState < CoordinatorStateEnum::kDecisionPersisted) {
-        // Prior to the state CoordinatorStateEnum::kDecisionPersisted, only the source
+    } else if (coordinatorState < CoordinatorStateEnum::kCommitting) {
+        // Prior to the state CoordinatorStateEnum::kCommitting, only the source
         // collection's config.collections entry should have donorFields, and only the
         // temporary resharding collection's entry should have recipientFields.
         uassert(5274201,
@@ -214,13 +214,13 @@ void verifyValidReshardingFields(const ReshardingFields& reshardingFields) {
                 bool(reshardingFields.getDonorFields()) !=
                     bool(reshardingFields.getRecipientFields()));
     } else {
-        // At and after state CoordinatorStateEnum::kDecisionPersisted, the temporary
+        // At and after state CoordinatorStateEnum::kCommitting, the temporary
         // resharding collection's config.collections entry has been removed, and so the
         // source collection's entry should have both donorFields and recipientFields.
         uassert(5274202,
                 fmt::format("reshardingFields must contain both donorFields and recipientFields "
                             "when the coordinator's state is greater than or equal to "
-                            "CoordinatorStateEnum::kDecisionPersisted. Got reshardingFields {}",
+                            "CoordinatorStateEnum::kCommitting. Got reshardingFields {}",
                             reshardingFields.toBSON().toString()),
                 reshardingFields.getDonorFields() && reshardingFields.getRecipientFields());
     }
@@ -283,7 +283,7 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
-    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
+    if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         // The coordinator encountered an unrecoverable error, both donors and recipients should be
         // made aware.
         processReshardingFieldsForDonorCollection(opCtx, nss, metadata, reshardingFields);

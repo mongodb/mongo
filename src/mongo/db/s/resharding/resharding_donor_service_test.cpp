@@ -181,14 +181,13 @@ public:
     void notifyReshardingCommitting(OperationContext* opCtx,
                                     DonorStateMachine& donor,
                                     const ReshardingDonorDocument& donorDoc) {
-        _onReshardingFieldsChanges(
-            opCtx, donor, donorDoc, CoordinatorStateEnum::kDecisionPersisted);
+        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kCommitting);
     }
 
     void notifyReshardingAborting(OperationContext* opCtx,
                                   DonorStateMachine& donor,
                                   const ReshardingDonorDocument& donorDoc) {
-        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kError);
+        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kAborting);
     }
 
     void checkStateDocumentRemoved(OperationContext* opCtx) {

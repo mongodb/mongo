@@ -408,7 +408,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
-    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
+    if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         auto abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
         _onAbortEncountered(opCtx, abortReason);
         return;
@@ -430,7 +430,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
                                 recipientFields.getDonorShards()});
     }
 
-    if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
+    if (coordinatorState >= CoordinatorStateEnum::kCommitting) {
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
 }

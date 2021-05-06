@@ -129,7 +129,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kThisShard.getShardId());
 
     auto reshardingFields =
-        createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kDecisionPersisted);
+        createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kCommitting);
     appendDonorFieldsToReshardingFields(reshardingFields, kReshardingKeyPattern);
 
     auto donorStateMachine =
@@ -146,7 +146,7 @@ TEST_F(ReshardingDonorRecipientCommonTest,
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard.getShardId());
 
     auto reshardingFields =
-        createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kDecisionPersisted);
+        createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kCommitting);
     appendRecipientFieldsToReshardingFields(
         reshardingFields, kShards, kExistingUUID, kOriginalNss, kCloneTimestamp);
 

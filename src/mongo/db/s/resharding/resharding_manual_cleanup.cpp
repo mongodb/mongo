@@ -190,11 +190,10 @@ void ReshardingCoordinatorCleaner::_doClean(OperationContext* opCtx,
 
     // Only drop the temporary resharding collection if the coordinator's state indicates that the
     // resharding operation exited before persisting its decision to commit.
-    uassert(
-        ErrorCodes::ManualInterventionRequired,
-        "Can't drop temporary resharding collection if resharding operation has already persisted "
-        "a decision",
-        doc.getState() != CoordinatorStateEnum::kDecisionPersisted);
+    uassert(ErrorCodes::ManualInterventionRequired,
+            "Can't drop temporary resharding collection if resharding operation has already "
+            "committed ",
+            doc.getState() != CoordinatorStateEnum::kCommitting);
 
     _dropTemporaryReshardingCollection(opCtx, doc.getTempReshardingNss());
 }

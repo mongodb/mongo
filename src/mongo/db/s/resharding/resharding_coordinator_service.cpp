@@ -269,7 +269,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
 
             return updateBuilder.obj();
         }
-        case CoordinatorStateEnum::kDecisionPersisted: {
+        case CoordinatorStateEnum::kCommitting: {
             // Update the config.collections entry for the original nss to reflect
             // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
             // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
@@ -402,7 +402,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                     false   // multi
                 );
             }
-            case CoordinatorStateEnum::kDecisionPersisted:
+            case CoordinatorStateEnum::kCommitting:
                 // Remove the entry for the temporary nss
                 return BatchedCommandRequest::buildDeleteOp(
                     CollectionType::ConfigNS,
@@ -847,8 +847,7 @@ void ReshardingCoordinatorExternalStateImpl::
     auto nextState = coordinatorDoc.getState();
 
     std::vector<NamespaceString> collNames = {coordinatorDoc.getSourceNss()};
-    if (nextState < CoordinatorStateEnum::kDecisionPersisted ||
-        nextState == CoordinatorStateEnum::kError) {
+    if (nextState < CoordinatorStateEnum::kCommitting) {
         collNames.emplace_back(coordinatorDoc.getTempReshardingNss());
     }
 
@@ -862,11 +861,10 @@ void ReshardingCoordinatorExternalStateImpl::
                 opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
             // Update the config.collections entry for the temporary resharding collection. If we've
-            // already persisted the decision that the operation will succeed, we've removed the
+            // already successfully committed that the operation will succeed, we've removed the
             // entry for the temporary collection and updated the entry with original namespace to
             // have the new shard key, UUID, and epoch
-            if (nextState < CoordinatorStateEnum::kDecisionPersisted ||
-                nextState == CoordinatorStateEnum::kError) {
+            if (nextState < CoordinatorStateEnum::kCommitting) {
                 writeToConfigCollectionsForTempNss(
                     opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
             }
@@ -881,7 +879,7 @@ void ReshardingCoordinatorExternalStateImpl::removeCoordinatorDocAndReshardingFi
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
     const bool wasDecisionPersisted =
-        coordinatorDoc.getState() == CoordinatorStateEnum::kDecisionPersisted;
+        coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting;
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
@@ -1208,10 +1206,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_onAbortCoordinatorAnd
     // kPreparingToDonate).
     invariant(_coordinatorDoc.getState() >= CoordinatorStateEnum::kPreparingToDonate);
 
-    // The coordinator only transitions into kError if there are participants to wait on before
+    // The coordinator only transitions into kAborting if there are participants to wait on before
     // transitioning to kDone.
     _updateCoordinatorDocStateAndCatalogEntries(
-        CoordinatorStateEnum::kError, _coordinatorDoc, boost::none, boost::none, status);
+        CoordinatorStateEnum::kAborting, _coordinatorDoc, boost::none, boost::none, status);
 
     auto nss = _coordinatorDoc.getSourceNss();
     _tellAllParticipantsToRefresh(nss, executor);
@@ -1467,7 +1465,7 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_persistDecisi
     }
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDecisionPersisted);
+    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitting);
 
     auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
     reshardingPauseCoordinatorBeforeDecisionPersisted.pauseWhileSetAndNotCanceled(
@@ -1502,7 +1500,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllParticipantShardsD
         _reshardingCoordinatorObserver->awaitAllDonorsDone().thenRunOn(**executor));
 
     // We only allow the stepdown token to cancel operations after progressing past
-    // kDecisionPersisted.
+    // kCommitting.
     return future_util::withCancellation(whenAllSucceed(std::move(futures)),
                                          _ctHolder->getStepdownToken())
         .thenRunOn(**executor)
@@ -1548,12 +1546,10 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
     auto recipientIds = extractShardIdsFromParticipantEntries(_coordinatorDoc.getRecipientShards());
 
     NamespaceString nssToRefresh;
-    // Refresh the temporary namespace if the coordinator is in state 'kError' just in case the
-    // previous state was before 'kDecisionPersisted'. A refresh of recipients while in
-    // 'kDecisionPersisted' should be accompanied by a refresh of all participants for the original
-    // namespace to ensure correctness.
-    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kDecisionPersisted ||
-        _coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
+    // Refresh the temporary namespace if the coordinator is in a state prior to 'kCommitting'.
+    // A refresh of recipients while in 'kCommitting' should be accompanied by a refresh of
+    // all participants for the original namespace to ensure correctness.
+    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kCommitting) {
         nssToRefresh = _coordinatorDoc.getTempReshardingNss();
     } else {
         nssToRefresh = _coordinatorDoc.getSourceNss();

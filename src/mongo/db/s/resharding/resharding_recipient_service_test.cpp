@@ -259,13 +259,13 @@ public:
                                     RecipientStateMachine& recipient,
                                     const ReshardingRecipientDocument& recipientDoc) {
         _onReshardingFieldsChanges(
-            opCtx, recipient, recipientDoc, CoordinatorStateEnum::kDecisionPersisted);
+            opCtx, recipient, recipientDoc, CoordinatorStateEnum::kCommitting);
     }
 
     void notifyReshardingAborting(OperationContext* opCtx,
                                   RecipientStateMachine& recipient,
                                   const ReshardingRecipientDocument& recipientDoc) {
-        _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kError);
+        _onReshardingFieldsChanges(opCtx, recipient, recipientDoc, CoordinatorStateEnum::kAborting);
     }
 
     void checkStateDocumentRemoved(OperationContext* opCtx) {
