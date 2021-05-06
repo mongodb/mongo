@@ -3,6 +3,7 @@
  *
  * @tags: [
  *   requires_fcv_51,
+ *   # The inMemory variants may run out of memory while inserting large input objects.
  *   requires_persistence,
  * ]
  */
