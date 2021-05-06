@@ -37,67 +37,17 @@ if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(primary)) {
     return;
 }
 
-assert.commandWorked(testDB.adminCommand({enableSharding: dbName}));
+let currentId = 0;
+function generateId() {
+    return currentId++;
+}
 
+assert.commandWorked(testDB.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(testDB.getName(), primary.shardName);
 
-assert.commandWorked(testDB.createCollection(
-    collName, {timeseries: {timeField: "time", metaField: "location", granularity: "hours"}}));
-
 const testColl = testDB[collName];
-(function setUpTestColl() {
-    assert.commandWorked(testDB.adminCommand(
-        {shardCollection: testColl.getFullName(), key: {"location.city": 1, time: 1}}));
 
-    const data = [
-        // Cork.
-        {
-            location: {city: "Cork", coordinates: [-12, 10]},
-            time: ISODate("2021-05-18T08:00:00.000Z"),
-            temperature: 12,
-        },
-        {
-            location: {city: "Cork", coordinates: [0, 0]},
-            time: ISODate("2021-05-18T07:30:00.000Z"),
-            temperature: 15,
-        },
-        // Dublin.
-        {
-            location: {city: "Dublin", coordinates: [25, -43]},
-            time: ISODate("2021-05-18T08:00:00.000Z"),
-            temperature: 12,
-        },
-        {
-            location: {city: "Dublin", coordinates: [0, 0]},
-            time: ISODate("2021-05-18T08:00:00.000Z"),
-            temperature: 22,
-        },
-        {
-            location: {city: "Dublin", coordinates: [25, -43]},
-            time: ISODate("2021-05-18T08:30:00.000Z"),
-            temperature: 12.5,
-        },
-        {
-            location: {city: "Dublin", coordinates: [25, -43]},
-            time: ISODate("2021-05-18T09:00:00.000Z"),
-            temperature: 13,
-        },
-        // Galway.
-        {
-            location: {city: "Galway", coordinates: [22, 44]},
-            time: ISODate("2021-05-18T08:00:00.000Z"),
-            temperature: 20,
-        },
-        {
-            location: {city: "Galway", coordinates: [0, 0]},
-            time: ISODate("2021-05-18T09:00:00.000Z"),
-            temperature: 20,
-        },
-    ];
-    assert.commandWorked(testColl.insertMany(data));
-})();
-
-(function defineChunks() {
+function defineChunks() {
     function splitAndMove(city, minTime, destination) {
         assert.commandWorked(st.s.adminCommand(
             {split: bucketCollFullName, middle: {"meta.city": city, 'control.min.time': minTime}}));
@@ -109,24 +59,104 @@ const testColl = testDB[collName];
         }));
     }
 
-    // Place the Dublin buckets on the primary and split the other buckets across both shards.
-    splitAndMove("Galway", ISODate("2021-05-18T08:00:00.000Z"), otherShard);
-    splitAndMove("Dublin", MinKey, primary);
+    // Split the chunks such that we have the following distrubtion.
+    // {MinKey - Cork, 2021-05-18::9:00} - PrimaryShard
+    // {Cork, 2021-05-18::9:00 - Dublin} - OtherShard
+    // {Dublin - Galway,2021-05-18::8:00} - PrimaryShard
+    // {Galway, 2021-05-18::9:00 - MaxKey} - OtherShard
     splitAndMove("Cork", ISODate("2021-05-18T09:00:00.000Z"), otherShard);
-})();
+    splitAndMove("Dublin", MinKey, primary);
+    splitAndMove("Galway", ISODate("2021-05-18T08:00:00.000Z"), otherShard);
+}
+
+function setUpTestColl(generateAdditionalData) {
+    assert(testColl.drop());
+    assert.commandWorked(testDB.adminCommand({
+        shardCollection: testColl.getFullName(),
+        timeseries: {timeField: "time", metaField: "location", granularity: "hours"},
+        key: {"location.city": 1, time: 1}
+    }));
+    defineChunks();
+
+    const data = [
+        // Cork.
+        {
+            _id: generateId(),
+            location: {city: "Cork", coordinates: [-12, 10]},
+            time: ISODate("2021-05-18T08:00:00.000Z"),
+            temperature: 12,
+        },
+        {
+            _id: generateId(),
+            location: {city: "Cork", coordinates: [0, 0]},
+            time: ISODate("2021-05-18T07:30:00.000Z"),
+            temperature: 15,
+        },
+        // Dublin.
+        {
+            _id: generateId(),
+            location: {city: "Dublin", coordinates: [25, -43]},
+            time: ISODate("2021-05-18T08:00:00.000Z"),
+            temperature: 12,
+        },
+        {
+            _id: generateId(),
+            location: {city: "Dublin", coordinates: [0, 0]},
+            time: ISODate("2021-05-18T08:00:00.000Z"),
+            temperature: 22,
+        },
+        {
+            _id: generateId(),
+            location: {city: "Dublin", coordinates: [25, -43]},
+            time: ISODate("2021-05-18T08:30:00.000Z"),
+            temperature: 12.5,
+        },
+        {
+            _id: generateId(),
+            location: {city: "Dublin", coordinates: [25, -43]},
+            time: ISODate("2021-05-18T09:00:00.000Z"),
+            temperature: 13,
+        },
+        // Galway.
+        {
+            _id: generateId(),
+            location: {city: "Galway", coordinates: [22, 44]},
+            time: ISODate("2021-05-19T08:00:00.000Z"),
+            temperature: 20,
+        },
+        {
+            _id: generateId(),
+            location: {city: "Galway", coordinates: [0, 0]},
+            time: ISODate("2021-05-19T09:00:00.000Z"),
+            temperature: 20,
+        },
+    ];
+    assert.commandWorked(testColl.insertMany(data));
+
+    let expectedDocs = data.reduce((acc, measure, i) => {
+        acc[measure._id] = {
+            _id: measure._id,
+            time: measure.time,
+            temperature: measure.temperature,
+            city: measure.location.city
+        };
+        return acc;
+    }, {});
+
+    if (generateAdditionalData) {
+        expectedDocs = Object.assign({}, expectedDocs, generateAdditionalData());
+    }
+    return expectedDocs;
+}
 
 function containsDocs(actualDocs, expectedDocs) {
-    let contains = true;
     for (const actualDoc of actualDocs) {
-        for (const expectedDoc of expectedDocs) {
-            contains = documentEq(actualDoc, expectedDoc);
-            if (contains)
-                break;
+        const expectedDoc = expectedDocs[actualDoc._id];
+        if (!expectedDoc || !documentEq(actualDoc, expectedDoc)) {
+            return false;
         }
-        if (!contains)
-            break;
     }
-    return contains;
+    return true;
 }
 
 const randomCursor = "COLLSCAN";
@@ -179,11 +209,7 @@ function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCoun
         assert.eq(result.length, expectedCount);
     }
 
-    if (expectedCount == expectedDocs.length) {
-        arrayEq(result, expectedDocs);
-    } else {
-        assert(containsDocs(result, expectedDocs), tojson(result));
-    }
+    assert(containsDocs(result, expectedDocs), {output: result, expectedDocs: expectedDocs});
 
     // Verify profiling output.
     if (shardsTargetedCount > 0) {
@@ -207,22 +233,12 @@ function testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCoun
 
 const projection = {
     $project: {
-        time: {$dateToString: {date: "$time", format: "%H:%M"}},
+        time: 1,
         temperature: 1,
         city: "$location.city",
-        _id: 0,
+        _id: 1,
     }
 };
-const initialExpectedDocs = [
-    {time: "08:00", temperature: 12, city: "Dublin"},
-    {time: "08:00", temperature: 22, city: "Dublin"},
-    {time: "08:30", temperature: 12.5, city: "Dublin"},
-    {time: "09:00", temperature: 13, city: "Dublin"},
-    {time: "08:00", temperature: 20, city: "Galway"},
-    {time: "09:00", temperature: 20, city: "Galway"},
-    {time: "08:00", temperature: 12, city: "Cork"},
-    {time: "07:30", temperature: 15, city: "Cork"},
-];
 
 /**
  * This function verifies that $sample correctly obtains only documents in the input 'expectedDocs'
@@ -235,22 +251,31 @@ const initialExpectedDocs = [
  *  4. Sample the given 'proportion' of non-Dublin (Galway, Cork) documents, which can be found on
  * both shards, and ensure we target both shards.
  */
-function runTest(expectedDocs, proportion, planForShards) {
-    jsTestLog("Running test with proportion " + proportion);
-    let expectedCount = 1;
+function runTest({proportion, planForShards, generateAdditionalData}) {
+    const expectedDocs = setUpTestColl(generateAdditionalData);
+
+    let expectedCount = Math.floor(proportion * Object.keys(expectedDocs).length);
+    jsTestLog("Running test with proportion: " + proportion + ", expected count: " + expectedCount +
+              ", expected plan: " + tojson(planForShards));
+
     let pipeline = [{$sample: {size: expectedCount}}, projection];
-    testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2});
-
-    expectedCount = Math.floor(proportion * expectedDocs.length);
-
-    pipeline = [{$sample: {size: expectedCount}}, projection];
     testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2, planForShards});
 
+    expectedCount = 1;
+    pipeline = [{$sample: {size: expectedCount}}, projection];
+    testPipeline({pipeline, expectedDocs, expectedCount, shardsTargetedCount: 2});
+
     // Dublin documents are colocated on one shard, so we should only be targeting that shard.
-    const dublinDocs = expectedDocs.filter(doc => doc.city === "Dublin");
+    const dublinDocs = {};
+    for (let key in expectedDocs) {
+        const doc = expectedDocs[key];
+        if (doc.city === "Dublin") {
+            dublinDocs[key] = doc;
+        }
+    }
     const matchDublin = {$match: {"location.city": "Dublin"}};
 
-    expectedCount = Math.floor(proportion * dublinDocs.length);
+    expectedCount = Math.floor(proportion * Object.keys(dublinDocs).length);
 
     pipeline = [matchDublin, {$sample: {size: expectedCount}}, projection];
     testPipeline({pipeline, expectedDocs: dublinDocs, expectedCount, shardsTargetedCount: 1});
@@ -261,10 +286,16 @@ function runTest(expectedDocs, proportion, planForShards) {
     testPipeline({pipeline, expectedDocs: dublinDocs, shardsTargetedCount: 2});
 
     // We should target both shards, since Cork and Galway are split across both shards.
-    const nonDublinDocs = expectedDocs.filter(doc => doc.city !== "Dublin");
+    const nonDublinDocs = {};
+    for (let key in expectedDocs) {
+        const doc = expectedDocs[key];
+        if (doc.city !== "Dublin") {
+            nonDublinDocs[key] = doc;
+        }
+    }
     const excludeDublin = {$match: {$expr: {$ne: ["$location.city", "Dublin"]}}};
 
-    expectedCount = Math.floor(proportion * nonDublinDocs.length);
+    expectedCount = Math.floor(proportion * Object.keys(nonDublinDocs).length);
 
     pipeline = [excludeDublin, {$sample: {size: expectedCount}}, projection];
     testPipeline({pipeline, expectedDocs: nonDublinDocs, expectedCount, shardsTargetedCount: 2});
@@ -272,87 +303,115 @@ function runTest(expectedDocs, proportion, planForShards) {
     // Don't use an expected count here, since we are filtering for non-Dublin docs after sampling.
     pipeline = [{$sample: {size: expectedCount}}, excludeDublin, projection];
     testPipeline({pipeline, expectedDocs: nonDublinDocs, shardsTargetedCount: 2});
+    assert(testColl.drop());
 }
 
-runTest(initialExpectedDocs, 1);
+runTest({proportion: 1});
 
-// Insert orphans and make sure they are filtered out. All "Dublin" buckets are on the primary, so
-// we can insert some Dublin documents on the other shard and make sure they don't appear in any of
-// our searches.
-otherShardDB[collName].insertMany([
-    {
-        location: {city: "Dublin", coordinates: [25, -43]},
-        time: ISODate("2021-05-18T08:00:00.000Z"),
-        temperature: 30,
-    },
-    {
-        location: {city: "Dublin", coordinates: [0, 0]},
-        time: ISODate("2021-05-18T08:00:00.000Z"),
-        temperature: -30,
-    },
-    {
-        location: {city: "Dublin", coordinates: [25, -43]},
-        time: ISODate("2021-05-18T08:30:00.000Z"),
-        temperature: 42,
-    }
-]);
-runTest(initialExpectedDocs, 1);
+function generateOrphanData() {
+    // Insert orphans and make sure they are filtered out. All "Dublin" buckets are on the primary,
+    // so we can insert some Dublin documents on the other shard and make sure they don't appear in
+    // any of our searches.
+    otherShardDB[collName].insertMany([
+        {
+            location: {city: "Dublin", coordinates: [25, -43]},
+            time: ISODate("2021-05-18T08:00:00.000Z"),
+            temperature: 30,
+        },
+        {
+            location: {city: "Dublin", coordinates: [0, 0]},
+            time: ISODate("2021-05-18T08:00:00.000Z"),
+            temperature: -30,
+        },
+        {
+            location: {city: "Dublin", coordinates: [25, -43]},
+            time: ISODate("2021-05-18T08:30:00.000Z"),
+            temperature: 42,
+        }
+    ]);
+    return {};
+}
+runTest({proportion: 1, generateAdditionalData: generateOrphanData});
 
-// Insert more measurements for each city and try again.
-const numMeasurements = 500;
-let updatedExpectedDocs = initialExpectedDocs;
-for (const city of ["Dublin", "Cork", "Galway"]) {
-    let docs = [];
-    let orphanDocs = [];
-    for (let i = 0; i < numMeasurements; i++) {
-        const minute = String(i % 60).padStart(2, '0');
-        const temperature = i % 10;
-        const time = `08:${minute}`;
-        docs.push({
-            location: {city, coordinates: [0, 0]},
-            time: ISODate(`2021-05-18T${time}:00.000Z`),
-            temperature,
-        });
-        updatedExpectedDocs.push({city, temperature, time});
+function insertAdditionalData(sparselyPackBucket) {
+    // Insert more measurements for each city and try again.
+    const numMeasurements = 5000;
+    let expectedDocs = {};
+    for (const city of ["Dublin", "Cork", "Galway"]) {
+        let docs = [];
+        let orphanDocs = [];
+        const startTime = ISODate("2021-05-19T08:00:00.000Z").getTime();
+        for (let i = 0; i < numMeasurements; i++) {
+            const temperature = i % 10;
+            const time = new Date(startTime + i);
+            const _id = generateId();
+            docs.push({
+                _id: _id,
+                location: {city, coordinates: [0, sparselyPackBucket ? i : 0]},
+                time: time,
+                temperature,
+            });
+            expectedDocs[_id] = {_id, city, temperature, time};
 
-        // Insert one orphan for every 10 measurements to increase the chances the test will fail if
-        // we are not filtering out orphans correctly.
-        if (city == "Dublin" && (i % 10 == 0)) {
-            const orphanDoc = {
-                location: {city, coordinates: [25, -43]},
-                time: ISODate("2021-05-18T08:00:00.000Z"),
-                temperature: 30,
-            };
-            orphanDocs.push(orphanDoc);
+            // Insert one orphan for every 10 measurements to increase the chances the test will
+            // fail if we are not filtering out orphans correctly.
+            if (city == "Dublin" && (i % 10 == 0)) {
+                const orphanDoc = {
+                    location: {city, coordinates: [25, -43]},
+                    time: ISODate("2021-05-18T08:00:00.000Z"),
+                    temperature: 30,
+                };
+                orphanDocs.push(orphanDoc);
+            }
+        }
+
+        // Insert all documents for a city.
+        assert.commandWorked(testColl.insertMany(docs));
+
+        // Insert any orphan documents.
+        if (orphanDocs.length > 0) {
+            assert.commandWorked(otherShardDB[collName].insertMany(orphanDocs));
         }
     }
-
-    // Insert all documents for a city.
-    assert.commandWorked(testColl.insertMany(docs));
-
-    // Insert any orphan documents.
-    if (orphanDocs) {
-        assert.commandWorked(otherShardDB[collName].insertMany(orphanDocs));
-    }
+    return expectedDocs;
 }
 
-// Test a variety of sample sizes to exercise both Top-K sort and ARHASH plans, where ARHASH is
-// selected for sample sizes of <=1% on the primary, and we don't actually run a trial at all for
-// sample sizes >= 5%. For this dataset, the non-primary shard always picks Top-K when a trial is
-// evaluated.
-for (const proportion of [0.0025, 0.005, 0.11]) {
-    runTest(updatedExpectedDocs, proportion, {
-        [primary.shardName]:
-            (proportion >= 0.05 ? randomCursor : (proportion <= 0.01 ? arhash : topK)),
-        [otherShard.shardName]: (proportion >= 0.05 ? randomCursor : topK),
-    });
-}
+// Test a variety of sample sizes to exercise different plans. We run a trail stage if the sample
+// size is less than 5% of the total documents. When a trail stage is run, an ARHASH plan is
+// generally selected when the buckets are tightly packed and the sample size is small. A Top-K plan
+// is selected if the buckets are sparsely packed.
+runTest({
+    proportion: 0.001,
+    generateAdditionalData: () => {
+        return insertAdditionalData(false);
+    },
+    planForShards: {[primary.shardName]: arhash, [otherShard.shardName]: arhash},
+});
+runTest({
+    proportion: 0.005,
+    generateAdditionalData: () => {
+        return insertAdditionalData(true);
+    },
+    planForShards: {[primary.shardName]: topK, [otherShard.shardName]: topK},
+});
+
+// Top-K plan without the trail stage.
+runTest({
+    proportion: 0.1,
+    generateAdditionalData: () => {
+        return insertAdditionalData(false);
+    },
+    planForShards: {[primary.shardName]: randomCursor, [otherShard.shardName]: randomCursor},
+});
 
 // Verify that for a sample size > 1000, we pick the Top-K sort plan without any trial.
+const expectedDocs = setUpTestColl(() => {
+    return insertAdditionalData(false);
+});
 testPipeline({
     pipeline: [{$sample: {size: 1001}}, projection],
-    expectedDocs: updatedExpectedDocs,
     expectedCount: 1001,
+    expectedDocs: expectedDocs,
     shardsTargetedCount: 2,
     planForShards: {
         [primary.shardName]: randomCursor,
