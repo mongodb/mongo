@@ -98,6 +98,11 @@ install: build
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/mongodb-org-unstable-server
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-mongos/usr/share/lintian/overrides/mongodb-org-unstable-mongos
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-org-unstable-database-tools-extra/usr/share/lintian/overrides/mongodb-org-unstable-database-tools-extra
+    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-database.substvars
+    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-shell.substvars
+    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-server.substvars
+    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-mongos.substvars
+    install -m 644 $(CURDIR)/debian/substvars               $(CURDIR)/debian/mongodb-org-unstable-database-tools-extra.substvars
 
 # Build architecture-independent files here.
 binary-indep: build install

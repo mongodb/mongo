@@ -593,6 +593,15 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     #
     sysassert(["sh", "-c", "cp -v \"%sdebian/\"*.postinst \"%sdebian/\"" % (srcdir, sdir)])
 
+    with open(sdir + "debian/substvars", "w") as fh:
+        # Empty for now. This makes it easier to add substvars to packages
+        # later on if we need it.
+        fh.write("\n")
+
+    ensure_dir(sdir + "debian/source/format")
+    with open(sdir + "debian/source/format", "w") as fh:
+        fh.write("1.0\n")
+
     # Do the packaging.
     oldcwd = os.getcwd()
     try:
@@ -779,14 +788,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
         ensure_dir("%s/%s/" % (topdir, subdir))
     distro_arch = distro.archname(arch)
 
-    # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the
-    # %{dynamic_version} macro, so do it manually
-    with open(specfile, "r") as spec_source:
-        with open(topdir + "SPECS/" + os.path.basename(specfile), "w") as spec_dest:
-            for line in spec_source:
-                line = line.replace('%{dynamic_version}', spec.pversion(distro))
-                line = line.replace('%{dynamic_release}', spec.prelease())
-                spec_dest.write(line)
+    # Places the RPM Spec file where it's expected for the rpmbuild execution later.
+    shutil.copy(specfile, topdir + "SPECS")
 
     oldcwd = os.getcwd()
     os.chdir(sdir + "/../")

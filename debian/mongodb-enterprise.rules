@@ -106,6 +106,12 @@ install: build
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-mongos/usr/share/lintian/overrides/mongodb-enterprise-mongos
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-database-tools-extra/usr/share/lintian/overrides/mongodb-enterprise-database-tools-extra
 	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-cryptd/usr/share/lintian/overrides/mongodb-enterprise-cryptd
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-database.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-shell.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-server.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-mongos.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-database-tools-extra.substvars
+	install -m 644 $(CURDIR)/debian/substvars				$(CURDIR)/debian/mongodb-enterprise-cryptd.substvars
 
 # Build architecture-independent files here.
 binary-indep: build install
