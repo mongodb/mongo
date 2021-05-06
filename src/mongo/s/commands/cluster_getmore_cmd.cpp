@@ -60,8 +60,6 @@ class ClusterGetMoreCmd final : public Command {
 public:
     ClusterGetMoreCmd() : Command("getMore") {}
 
-    // Do not currently use apiVersions because clients are prohibited from calling
-    // getMore with apiVersion.
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
     }
@@ -75,9 +73,7 @@ public:
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {
-            APIParameters::uassertNoApiParameters(request.body);
-        }
+              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {}
 
     private:
         NamespaceString ns() const override {

@@ -1,6 +1,6 @@
 /**
  * Tests passing API parameters into transaction-continuing commands.
- * @tags: [uses_transactions, requires_fcv_47]
+ * @tags: [uses_transactions, requires_fcv_50]
  */
 
 (function() {

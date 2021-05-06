@@ -47,6 +47,7 @@ selector:
   ##
 
   # These tests expects some statements to error, which will cause txns to abort entirely.
+  - jstests/core/api_params_getmore.js
   - jstests/core/bulk_api_ordered.js
   - jstests/core/bulk_api_unordered.js
   - jstests/core/bulk_legacy_enforce_gle.js
@@ -61,7 +62,6 @@ selector:
   - jstests/core/geo_allowedcomparisons.js
   - jstests/core/geo_big_polygon2.js
   - jstests/core/geonear_key.js
-  - jstests/core/get_more_cmd_refuses_api_params.js
   - jstests/core/in.js
   - jstests/core/index8.js # No explicit check for failed command.
   - jstests/core/index_decimal.js

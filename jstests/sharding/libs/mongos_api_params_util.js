@@ -569,7 +569,28 @@ let MongosAPIParametersUtil = (function() {
             skip: "executes locally on mongos (not sent to any remote node)"
         },
         {commandName: "getLog", skip: "executes locally on mongos (not sent to any remote node)"},
-        {commandName: "getMore", skip: "prohibits API parameters"},
+        {
+            commandName: "getMore",
+            run: {
+                inAPIVersion1: true,
+                shardCommandName: "getMore",
+                permittedInTxn: true,
+                setUp: (context) => {
+                    // Global setup puts one doc on each shard, we need several on each.
+                    assert.commandWorked(st.s0.getDB("db").runCommand({
+                        insert: "collection",
+                        documents: [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 11}, {_id: 12}, {_id: 13}]
+                    }));
+                    const findCmd =
+                        Object.assign({find: "collection", batchSize: 1}, context.apiParameters);
+                    const res = assert.commandWorked(context.db.runCommand(findCmd));
+                    context.cursorId = res.cursor.id;
+                },
+                command: (context) => {
+                    return {getMore: context.cursorId, collection: "collection"};
+                }
+            }
+        },
         {
             commandName: "getParameter",
             skip: "executes locally on mongos (not sent to any remote node)"
@@ -1513,6 +1534,15 @@ let MongosAPIParametersUtil = (function() {
                 }
             };
 
+            const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
+            if (inTransaction) {
+                context.session = st.s0.startSession();
+                context.session.startTransaction();
+                context.db = context.session.getDatabase(commandDbName);
+            } else {
+                context.db = st.s0.getDB(commandDbName);
+            }
+
             if (runOrExplain.setUp) {
                 jsTestLog(`setUp function for ${commandName}`);
                 runOrExplain.setUp(context);
@@ -1520,7 +1550,6 @@ let MongosAPIParametersUtil = (function() {
             }
 
             // Make a copy of the test's command body, and set its API parameters.
-            const commandDbName = runOrExplain.runsAgainstAdminDb ? "admin" : "db";
             const commandBody = runOrExplain.command(context);
             const commandWithAPIParams = Object.assign({}, commandBody);
             if (apiVersion !== undefined) {
@@ -1549,19 +1578,12 @@ let MongosAPIParametersUtil = (function() {
             setLogVerbosity([configPrimary, shardZeroPrimary, st.rs1.getPrimary()],
                             {"command": {"verbosity": 2}});
 
+            const res = context.db.runCommand(commandWithAPIParams);
+            jsTestLog(`Command result: ${tojson(res)}`);
+            assert.commandWorked(res);
+
             if (inTransaction) {
-                const session = st.s0.startSession();
-                const sessionDb = session.getDatabase(commandDbName);
-                session.startTransaction();
-                const res = sessionDb.runCommand(commandWithAPIParams);
-                jsTestLog(`Command result: ${tojson(res)}`);
-                assert.commandWorked(res);
-                assert.commandWorked(session.commitTransaction_forTesting());
-            } else {
-                const db = st.s0.getDB(commandDbName);
-                const res = db.runCommand(commandWithAPIParams);
-                jsTestLog(`Command result: ${tojson(res)}`);
-                assert.commandWorked(res);
+                assert.commandWorked(context.session.commitTransaction_forTesting());
             }
 
             const configServerCommandName = runOrExplain.configServerCommandName;

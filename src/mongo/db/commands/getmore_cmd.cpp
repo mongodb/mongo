@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <fmt/format.h>
+
 #include <memory>
 #include <string>
 
@@ -70,6 +72,8 @@
 namespace mongo {
 
 namespace {
+
+using namespace fmt::literals;
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMoreCmd);
 MONGO_FAIL_POINT_DEFINE(getMoreHangAfterPinCursor);
@@ -219,7 +223,21 @@ void setUpOperationContextStateForGetMore(OperationContext* opCtx,
                                           bool disableAwaitDataFailpointActive) {
     applyCursorReadConcern(opCtx, cursor.getReadConcernArgs());
     opCtx->setWriteConcern(cursor.getWriteConcernOptions());
+
+    auto apiParamsFromClient = APIParameters::get(opCtx);
+    // TODO (SERVER-56550): Do this check even if !apiParamsFromClient.getParamsPassed().
+    if (apiParamsFromClient.getParamsPassed()) {
+        uassert(
+            ErrorCodes::APIMismatchError,
+            "API param conflict: getMore used params {}, the cursor-creating command used {}"_format(
+                apiParamsFromClient.toBSON().toString(),
+                cursor.getAPIParameters().toBSON().toString()),
+            apiParamsFromClient == cursor.getAPIParameters());
+    }
+
+    // TODO (SERVER-56550): Remove.
     APIParameters::get(opCtx) = cursor.getAPIParameters();
+
     setUpOperationDeadline(opCtx, cursor, cmd, disableAwaitDataFailpointActive);
 
     // If the originating command had a 'comment' field, we extract it and set it on opCtx. Note
@@ -241,8 +259,6 @@ class GetMoreCmd final : public Command {
 public:
     GetMoreCmd() : Command("getMore") {}
 
-    // Do not currently use apiVersions because clients are prohibited from calling
-    // getMore with apiVersion.
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
     }
@@ -261,8 +277,6 @@ public:
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace for getMore: " << nss.ns(),
                     nss.isValid());
-
-            APIParameters::uassertNoApiParameters(request.body);
         }
 
     private:

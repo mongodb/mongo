@@ -37,13 +37,18 @@ function runTest(db, supportsTransctions, isMongos, writeConcern = {}, secondari
     assert.commandWorked(db.adminCommand({dropRole: 'testRole', apiVersion: "1", writeConcern}));
 
     /*
-     * "getMore" never accepts or requires apiVersion.
+     * "getMore" accepts apiVersion.
+     *
+     * TODO (SERVER-56550): Test that getMore fails *without* API params.
      */
     assert.commandWorked(db.runCommand(
         {insert: "collection", documents: [{}, {}, {}], apiVersion: "1", writeConcern}));
     let reply = db.runCommand({find: "collection", batchSize: 1, apiVersion: "1"});
     assert.commandWorked(reply);
-    assert.commandWorked(db.runCommand({getMore: reply.cursor.id, collection: "collection"}));
+    assert.commandWorked(
+        db.runCommand({getMore: reply.cursor.id, collection: "collection", batchSize: 1}));
+    assert.commandWorked(
+        db.runCommand({getMore: reply.cursor.id, collection: "collection", apiVersion: "1"}));
 
     if (supportsTransctions) {
         /*

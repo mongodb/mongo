@@ -4,7 +4,7 @@
  * version 1. Note "geoHaystack" index has been deprecated after 4.9.
  *
  * @tags: [
- *   requires_fcv_47,
+ *   requires_fcv_50,
  *   uses_api_parameters,
  * ]
  */
