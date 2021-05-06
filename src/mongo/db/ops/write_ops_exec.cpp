@@ -672,15 +672,16 @@ WriteResult performInserts(OperationContext* opCtx,
                 continue;  // Add more to batch before inserting.
         }
 
-        bool canContinue =
+        out.canContinue =
             insertBatchAndHandleErrors(opCtx, wholeOp, batch, &lastOpFixer, &out, source);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
         // If the batch had an error and decides to not continue, do not process a current doc that
         // was unsuccessfully "fixed" or an already executed retryable write.
-        if (!canContinue)
+        if (!out.canContinue) {
             break;
+        }
 
         // Revisit any conditions that may have caused the batch to be flushed. In those cases,
         // append the appropriate result to the output.
@@ -692,15 +693,15 @@ WriteResult performInserts(OperationContext* opCtx,
                 uassertStatusOK(fixedDoc.getStatus());
                 MONGO_UNREACHABLE;
             } catch (const DBException& ex) {
-                canContinue = handleError(opCtx,
-                                          ex,
-                                          wholeOp.getNamespace(),
-                                          wholeOp.getWriteCommandRequestBase(),
-                                          false /* multiUpdate */,
-                                          &out);
+                out.canContinue = handleError(opCtx,
+                                              ex,
+                                              wholeOp.getNamespace(),
+                                              wholeOp.getWriteCommandRequestBase(),
+                                              false /* multiUpdate */,
+                                              &out);
             }
 
-            if (!canContinue) {
+            if (!out.canContinue) {
                 break;
             }
         } else if (wasAlreadyExecuted) {
@@ -1031,14 +1032,15 @@ WriteResult performUpdates(OperationContext* opCtx,
                 source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx,
-                                                 ex,
-                                                 wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandRequestBase(),
-                                                 singleOp.getMulti(),
-                                                 &out);
-            if (!canContinue)
+            out.canContinue = handleError(opCtx,
+                                          ex,
+                                          wholeOp.getNamespace(),
+                                          wholeOp.getWriteCommandRequestBase(),
+                                          singleOp.getMulti(),
+                                          &out);
+            if (!out.canContinue) {
                 break;
+            }
         }
     }
 
@@ -1250,13 +1252,13 @@ WriteResult performDeletes(OperationContext* opCtx,
                                       source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            const bool canContinue = handleError(opCtx,
-                                                 ex,
-                                                 wholeOp.getNamespace(),
-                                                 wholeOp.getWriteCommandRequestBase(),
-                                                 false /* multiUpdate */,
-                                                 &out);
-            if (!canContinue)
+            out.canContinue = handleError(opCtx,
+                                          ex,
+                                          wholeOp.getNamespace(),
+                                          wholeOp.getWriteCommandRequestBase(),
+                                          false /* multiUpdate */,
+                                          &out);
+            if (!out.canContinue)
                 break;
         }
     }

@@ -55,6 +55,9 @@ struct WriteResult {
      * Maps 1-to-1 to single ops in request. May be shorter than input if there are errors.
      */
     std::vector<StatusWith<SingleWriteResult>> results;
+
+    // In case of an error, whether the operation can continue.
+    bool canContinue = true;
 };
 
 /**
