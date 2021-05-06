@@ -517,6 +517,16 @@ class TestCreateTaskList(unittest.TestCase):
             under_test.create_task_list(evg_conf_mock, variant, suite_dict, [])
 
 
+class TestCreateTestsByTask(unittest.TestCase):
+    def test_build_variant_not_in_evg_project_config(self):
+        variant = "novariant"
+        evg_conf_mock = MagicMock()
+        evg_conf_mock.get_variant.return_value = None
+
+        with self.assertRaises(ValueError):
+            under_test.create_tests_by_task(variant, evg_conf_mock, set())
+
+
 class TestLocalFileChangeDetector(unittest.TestCase):
     @patch(ns("find_changed_files_in_repos"))
     @patch(ns("os.path.isfile"))

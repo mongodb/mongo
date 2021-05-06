@@ -27,7 +27,7 @@ import buildscripts.resmokelib.parser
 from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get_suites
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
-    EvergreenProjectConfig, VariantTask
+    EvergreenProjectConfig, Variant, VariantTask
 # pylint: enable=wrong-import-position
 
 structlog.configure(logger_factory=LoggerFactory())
@@ -243,9 +243,9 @@ def _distro_to_run_task_on(task: VariantTask, evg_proj_config: EvergreenProjectC
     if task_def.is_generate_resmoke_task:
         resmoke_vars = task_def.generate_resmoke_tasks_command["vars"]
         if "use_large_distro" in resmoke_vars:
-            bv = evg_proj_config.get_variant(build_variant)
-            if "large_distro_name" in bv.raw["expansions"]:
-                return bv.raw["expansions"]["large_distro_name"]
+            evg_build_variant = _get_evg_build_variant_by_name(evg_proj_config, build_variant)
+            if "large_distro_name" in evg_build_variant.raw["expansions"]:
+                return evg_build_variant.raw["expansions"]["large_distro_name"]
 
     return task.run_on[0]
 
@@ -300,10 +300,7 @@ def create_task_list(evergreen_conf: EvergreenProjectConfig, build_variant: str,
     log = LOGGER.bind(build_variant=build_variant)
 
     log.debug("creating task list for suites", suites=tests_by_suite, exclude_tasks=exclude_tasks)
-    evg_build_variant = evergreen_conf.get_variant(build_variant)
-    if not evg_build_variant:
-        log.warning("Buildvariant not found in evergreen config")
-        raise ValueError(f"Buildvariant ({build_variant} not found in evergreen configuration")
+    evg_build_variant = _get_evg_build_variant_by_name(evergreen_conf, build_variant)
 
     # Find all the build variant tasks.
     exclude_tasks_set = set(exclude_tasks)
@@ -373,7 +370,8 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
     :return: Tests by task.
     """
     exclude_suites, exclude_tasks, exclude_tests = find_excludes(SELECTOR_FILE)
-    if not evg_conf.get_variant(build_variant).is_enterprise_build():
+    evg_build_variant = _get_evg_build_variant_by_name(evg_conf, build_variant)
+    if not evg_build_variant.is_enterprise_build():
         exclude_tests.append(f"{ENTERPRISE_MODULE_PATH}/**/*")
     changed_tests = filter_tests(changed_tests, exclude_tests)
 
@@ -422,6 +420,24 @@ def _configure_logging(verbose: bool):
     )
     for log_name in EXTERNAL_LOGGERS:
         logging.getLogger(log_name).setLevel(logging.WARNING)
+
+
+def _get_evg_build_variant_by_name(
+    evergreen_conf: EvergreenProjectConfig, name: str
+) -> Variant:
+    """
+    Get the evergreen build variant by name from the evergreen config file.
+    
+    :param evergreen_conf: The evergreen config file.
+    :param name: The build variant name to find.
+    :return: The evergreen build variant.
+    """
+    evg_build_variant = evergreen_conf.get_variant(name)
+    if not evg_build_variant:
+        LOGGER.warning("Build variant not found in evergreen config")
+        raise ValueError(f"Build variant ({name} not found in evergreen configuration")
+
+    return evg_build_variant
 
 
 class FileChangeDetector(ABC):
