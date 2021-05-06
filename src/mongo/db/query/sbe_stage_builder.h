@@ -35,6 +35,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
 
@@ -383,5 +384,8 @@ private:
     // A callback that should be installed on "scan" and "ixscan" nodes. It will get invoked when
     // these data access stages acquire their AutoGet*.
     const sbe::LockAcquisitionCallback _lockAcquisitionCallback;
+
+    // Common parameters to SBE stage builder functions.
+    StageBuilderState _state;
 };
 }  // namespace mongo::stage_builder

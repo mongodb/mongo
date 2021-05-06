@@ -73,7 +73,6 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/str.h"
 
@@ -116,21 +115,15 @@ using MakePredicateFn =
 struct MatchExpressionVisitorContext {
     // Construct a visitor context to generate a filter expression from a single input slot
     // holding a document against which to perform the match.
-    MatchExpressionVisitorContext(OperationContext* opCtx,
-                                  sbe::value::SlotIdGenerator* slotIdGenerator,
-                                  sbe::value::FrameIdGenerator* frameIdGenerator,
+    MatchExpressionVisitorContext(StageBuilderState& state,
                                   EvalStage inputStage,
                                   sbe::value::SlotId inputSlot,
                                   const MatchExpression* root,
-                                  sbe::RuntimeEnvironment* env,
                                   PlanNodeId planNodeId,
                                   const FilterStateHelper& stateHelper)
-        : opCtx{opCtx},
+        : state{state},
           inputSlot{inputSlot},
-          slotIdGenerator{slotIdGenerator},
-          frameIdGenerator{frameIdGenerator},
           topLevelAnd{nullptr},
-          env{env},
           planNodeId{planNodeId},
           stateHelper{stateHelper} {
         // Set up the top-level EvalFrame.
@@ -148,23 +141,14 @@ struct MatchExpressionVisitorContext {
     // Instead of a single input slot holding the root document, it takes a vector of 'keySlots' and
     // 'keyFields' which represent a subset of the fields of the index key pattern that are depended
     // on to evaluate the predicate, and corresponding slots for each of the key fields.
-    MatchExpressionVisitorContext(OperationContext* opCtx,
-                                  sbe::value::SlotIdGenerator* slotIdGenerator,
-                                  sbe::value::FrameIdGenerator* frameIdGenerator,
+    MatchExpressionVisitorContext(StageBuilderState& state,
                                   EvalStage inputStage,
                                   sbe::value::SlotVector keySlots,
                                   std::vector<std::string> keyFields,
                                   const MatchExpression* root,
-                                  sbe::RuntimeEnvironment* env,
                                   PlanNodeId planNodeId,
                                   const FilterStateHelper& stateHelper)
-        : opCtx{opCtx},
-          slotIdGenerator{slotIdGenerator},
-          frameIdGenerator{frameIdGenerator},
-          topLevelAnd{nullptr},
-          env{env},
-          planNodeId{planNodeId},
-          stateHelper{stateHelper} {
+        : state{state}, topLevelAnd{nullptr}, planNodeId{planNodeId}, stateHelper{stateHelper} {
         // Set up the top-level EvalFrame.
         evalStack.emplaceFrame(std::move(inputStage), boost::none);
 
@@ -204,8 +188,11 @@ struct MatchExpressionVisitorContext {
             // In case 'outputSlot' is defined and state contains a value, we need to extract this
             // value into a separate slot and return it. The resulting value depends on the state
             // type, see the implementation of specific state helper for details.
-            return stateHelper.projectValueCombinator(
-                *outputSlot, frame.extractStage(), planNodeId, slotIdGenerator, frameIdGenerator);
+            return stateHelper.projectValueCombinator(*outputSlot,
+                                                      frame.extractStage(),
+                                                      planNodeId,
+                                                      state.slotIdGenerator,
+                                                      state.frameIdGenerator);
         }
 
         return {boost::none, frame.extractStage()};
@@ -223,7 +210,8 @@ struct MatchExpressionVisitorContext {
         FrameData(boost::optional<sbe::value::SlotId> inputSlot) : inputSlot{inputSlot} {}
     };
 
-    OperationContext* opCtx;
+    StageBuilderState& state;
+
     EvalStack<FrameData> evalStack;
     // The current context must be initialized either with an 'inputSlot' over which an entire match
     // expression needs to be evaluated, or a pair of 'keySlots' and 'keyFields' vectors
@@ -232,10 +220,7 @@ struct MatchExpressionVisitorContext {
     // 'indexKeySlots' map.
     boost::optional<sbe::value::SlotId> inputSlot;
     StringMap<sbe::value::SlotId> indexKeySlots;
-    sbe::value::SlotIdGenerator* slotIdGenerator;
-    sbe::value::FrameIdGenerator* frameIdGenerator;
     const MatchExpression* topLevelAnd;
-    sbe::RuntimeEnvironment* env;
 
     // The id of the 'QuerySolutionNode' which houses the match expression that we are converting to
     // SBE.
@@ -256,7 +241,7 @@ void projectCurrentExprToOutputSlot(MatchExpressionVisitorContext* context) {
     tassert(5291405, "Output slot is not empty", !context->outputSlot);
     auto& frame = context->evalStack.topFrame();
     auto [projectedExprSlot, stage] = projectEvalExpr(
-        frame.popExpr(), frame.extractStage(), context->planNodeId, context->slotIdGenerator);
+        frame.popExpr(), frame.extractStage(), context->planNodeId, context->state.slotIdGenerator);
     context->outputSlot = projectedExprSlot;
     frame.pushExpr(projectedExprSlot);
     frame.setStage(std::move(stage));
@@ -587,8 +572,8 @@ void generatePredicate(MatchExpressionVisitorContext* context,
                                              *path,
                                              0,
                                              context->planNodeId,
-                                             context->slotIdGenerator,
-                                             context->frameIdGenerator,
+                                             context->state.slotIdGenerator,
+                                             context->state.frameIdGenerator,
                                              makePredicate,
                                              mode,
                                              context->stateHelper);
@@ -642,7 +627,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
                              EvalStage inputStage) -> EvalExprStagePair {
         // Generate a traverse that projects the integer value 1 for each element in the array and
         // then sums up the 1's, resulting in the count of elements in the array.
-        auto innerSlot = context->slotIdGenerator->generate();
+        auto innerSlot = context->state.slotId();
         auto innerBranch =
             makeProject(EvalStage{},
                         context->planNodeId,
@@ -650,7 +635,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                                    sbe::value::bitcastFrom<int64_t>(1)));
 
-        auto traverseSlot = context->slotIdGenerator->generate();
+        auto traverseSlot = context->state.slotId();
         auto traverseStage = makeTraverse(EvalStage{},
                                           std::move(innerBranch),
                                           inputSlot,
@@ -687,7 +672,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
         auto [opOutput, opStage] = generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicAnd,
                                                                     std::move(branches),
                                                                     context->planNodeId,
-                                                                    context->slotIdGenerator,
+                                                                    context->state.slotIdGenerator,
                                                                     BooleanStateHelper{});
 
         inputStage = makeLoopJoin(std::move(inputStage), std::move(opStage), context->planNodeId);
@@ -780,7 +765,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
             return {makeFillEmptyFalse(makeBinaryOp(binaryOp,
                                                     std::move(inputExpr),
                                                     sbe::makeE<sbe::EConstant>(tag, val),
-                                                    context->env)),
+                                                    context->state.env)),
                     std::move(inputStage)};
         } else if (sbe::value::isNaN(tag, val)) {
             // Construct an expression to perform a NaN check.
@@ -809,8 +794,10 @@ void generateComparison(MatchExpressionVisitorContext* context,
         return {makeBinaryOp(
                     sbe::EPrimBinary::logicAnd,
                     makeNot(makeFillEmptyFalse(makeFunction("isNaN", makeVariable(inputSlot)))),
-                    makeFillEmptyFalse(makeBinaryOp(
-                        binaryOp, makeVariable(inputSlot), makeConstant(tag, val), context->env))),
+                    makeFillEmptyFalse(makeBinaryOp(binaryOp,
+                                                    makeVariable(inputSlot),
+                                                    makeConstant(tag, val),
+                                                    context->state.env))),
                 std::move(inputStage)};
     };
 
@@ -968,7 +955,7 @@ void buildLogicalExpression(sbe::EPrimBinary::Op op,
     auto&& [expr, opStage] = generateShortCircuitingLogicalOp(op,
                                                               std::move(branches),
                                                               context->planNodeId,
-                                                              context->slotIdGenerator,
+                                                              context->state.slotIdGenerator,
                                                               context->stateHelper);
     frame.pushExpr(std::move(expr));
 
@@ -990,7 +977,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
     // the assumption that 'childInputSlot' is some correlated slot that will be made
     // available by childStages's parent. We add a projection here to 'inputStage' to
     // feed 'inputSlot' into 'childInputSlot'.
-    auto isInputArray = context->slotIdGenerator->generate();
+    auto isInputArray = context->state.slotId();
     auto fromBranch = makeProject(std::move(inputStage),
                                   context->planNodeId,
                                   childInputSlot,
@@ -1003,7 +990,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
             return {filterSlot, std::move(filterStage)};
         }
 
-        auto resultSlot = context->slotIdGenerator->generate();
+        auto resultSlot = context->state.slotId();
         return {resultSlot,
                 makeProject(std::move(filterStage),
                             context->planNodeId,
@@ -1016,7 +1003,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
         std::move(innerBranch), sbe::makeE<sbe::EVariable>(isInputArray), context->planNodeId);
 
     // Generate the traverse.
-    auto traverseSlot = context->slotIdGenerator->generate();
+    auto traverseSlot = context->state.slotId();
     auto traverseStage = context->stateHelper.makeTraverseCombinator(
         std::move(fromBranch),
         std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
@@ -1024,7 +1011,7 @@ EvalExprStagePair elemMatchMakePredicate(MatchExpressionVisitorContext* context,
         traverseSlot,
         innerResultSlot,
         context->planNodeId,
-        context->frameIdGenerator);
+        context->state.frameIdGenerator);
 
     // There are some cases where 'traverseOutputSlot' gets set to Nothing when TraverseStage
     // doesn't match anything. One  example of when this happens is when innerBranch->getNext()
@@ -1082,7 +1069,7 @@ public:
         // 'stage' field to be a null tree, and we set the 'inputSlot' field to be a newly allocated
         // slot (childInputSlot). childInputSlot is a "correlated slot" that will be set up later
         // (handled in the post-visitor).
-        auto childInputSlot = _context->slotIdGenerator->generate();
+        auto childInputSlot = _context->state.slotId();
         _context->evalStack.emplaceFrame(EvalStage{}, childInputSlot);
     }
 
@@ -1093,7 +1080,7 @@ public:
         // for the first child. For all of the children's EvalFrames, we set the 'inputSlot' field
         // to 'childInputSlot'. childInputSlot is a "correlated slot" that will be set up later in
         // the post-visitor (childInputSlot will be the correlated parameter of a TraverseStage).
-        auto childInputSlot = _context->slotIdGenerator->generate();
+        auto childInputSlot = _context->state.slotId();
         _context->evalStack.emplaceFrame(EvalStage{}, childInputSlot);
     }
 
@@ -1293,8 +1280,10 @@ public:
         auto childInputSlot = *_context->evalStack.topFrame().data().inputSlot;
         auto [filterSlot, filterStage] = [&]() {
             auto [expr, stage] = _context->evalStack.popFrame();
-            auto [predicateSlot, predicateStage] = projectEvalExpr(
-                std::move(expr), std::move(stage), _context->planNodeId, _context->slotIdGenerator);
+            auto [predicateSlot, predicateStage] = projectEvalExpr(std::move(expr),
+                                                                   std::move(stage),
+                                                                   _context->planNodeId,
+                                                                   _context->state.slotIdGenerator);
 
             auto isObjectOrArrayExpr =
                 makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -1348,14 +1337,14 @@ public:
             generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicAnd,
                                              std::move(childStages),
                                              _context->planNodeId,
-                                             _context->slotIdGenerator,
+                                             _context->state.slotIdGenerator,
                                              _context->stateHelper);
 
         sbe::value::SlotId filterSlot;
         std::tie(filterSlot, filterStage) = projectEvalExpr(std::move(filterExpr),
                                                             std::move(filterStage),
                                                             _context->planNodeId,
-                                                            _context->slotIdGenerator);
+                                                            _context->state.slotIdGenerator);
 
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredcate'
         // will only be called once, so it's safe to bind the reference to 'filterStage' subtree
@@ -1408,15 +1397,12 @@ public:
                 *frame.data().inputSlot == *_context->inputSlot);
 
         auto currentStage = stageOrLimitCoScan(frame.extractStage(), _context->planNodeId);
-        auto&& [_, expr, stage] = generateExpression(_context->opCtx,
+        auto&& [_, expr, stage] = generateExpression(_context->state,
                                                      matchExpr->getExpression().get(),
                                                      std::move(currentStage),
-                                                     _context->slotIdGenerator,
-                                                     _context->frameIdGenerator,
                                                      *frame.data().inputSlot,
-                                                     _context->env,
                                                      _context->planNodeId);
-        auto frameId = _context->frameIdGenerator->generate();
+        auto frameId = _context->state.frameId();
 
         // We will need to convert the result of $expr to a boolean value, so we'll wrap it into an
         // expression which does exactly that.
@@ -1485,7 +1471,7 @@ public:
                 arrSetGuard.reset();
                 return {makeIsMember(std::move(inputExpr),
                                      sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
-                                     _context->env),
+                                     _context->state.env),
                         std::move(inputStage)};
             };
 
@@ -1517,9 +1503,9 @@ public:
             auto makePredicate =
                 [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal, arrTag = arrTag, arrVal = arrVal](
                     sbe::value::SlotId inputSlot, EvalStage inputStage) -> EvalExprStagePair {
-                auto regexArraySlot{_context->slotIdGenerator->generate()};
-                auto regexInputSlot{_context->slotIdGenerator->generate()};
-                auto regexOutputSlot{_context->slotIdGenerator->generate()};
+                auto regexArraySlot{_context->state.slotId()};
+                auto regexInputSlot{_context->state.slotId()};
+                auto regexOutputSlot{_context->state.slotId()};
 
                 // Build a traverse stage that traverses the query regex pattern array. Here the
                 // FROM branch binds an array constant carrying the regex patterns to a slot. Then
@@ -1571,7 +1557,7 @@ public:
                     branches.emplace_back(
                         makeIsMember(std::move(inputExpr),
                                      sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
-                                     _context->env),
+                                     _context->state.env),
                         EvalStage{});
                     branches.emplace_back(regexOutputSlot, std::move(regexStage));
 
@@ -1579,7 +1565,7 @@ public:
                         generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
                                                          std::move(branches),
                                                          _context->planNodeId,
-                                                         _context->slotIdGenerator,
+                                                         _context->state.slotIdGenerator,
                                                          BooleanStateHelper{});
 
                     inputStage =
@@ -1893,13 +1879,10 @@ private:
 }  // namespace
 
 std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const MatchExpression* root,
     EvalStage stage,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputSlot,
-    sbe::RuntimeEnvironment* env,
     PlanNodeId planNodeId,
     bool trackIndex) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
@@ -1909,15 +1892,8 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     }
 
     auto stateHelper = makeFilterStateHelper(trackIndex);
-    MatchExpressionVisitorContext context{opCtx,
-                                          slotIdGenerator,
-                                          frameIdGenerator,
-                                          std::move(stage),
-                                          inputSlot,
-                                          root,
-                                          env,
-                                          planNodeId,
-                                          *stateHelper};
+    MatchExpressionVisitorContext context{
+        state, std::move(stage), inputSlot, root, planNodeId, *stateHelper};
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};
     MatchExpressionPostVisitor postVisitor{&context};
@@ -1928,14 +1904,11 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     return {resultSlot, std::move(resultStage)};
 }
 
-EvalStage generateIndexFilter(OperationContext* opCtx,
+EvalStage generateIndexFilter(StageBuilderState& state,
                               const MatchExpression* root,
                               EvalStage stage,
-                              sbe::value::SlotIdGenerator* slotIdGenerator,
-                              sbe::value::FrameIdGenerator* frameIdGenerator,
                               sbe::value::SlotVector keySlots,
                               std::vector<std::string> keyFields,
-                              sbe::RuntimeEnvironment* env,
                               PlanNodeId planNodeId) {
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
@@ -1947,14 +1920,11 @@ EvalStage generateIndexFilter(OperationContext* opCtx,
     // be used with a positional projection.
     const bool trackIndex = false;
     auto stateHelper = makeFilterStateHelper(trackIndex);
-    MatchExpressionVisitorContext context{opCtx,
-                                          slotIdGenerator,
-                                          frameIdGenerator,
+    MatchExpressionVisitorContext context{state,
                                           std::move(stage),
                                           std::move(keySlots),
                                           std::move(keyFields),
                                           root,
-                                          env,
                                           planNodeId,
                                           *stateHelper};
     MatchExpressionPreVisitor preVisitor{&context};

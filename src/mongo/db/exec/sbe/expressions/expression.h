@@ -120,6 +120,14 @@ public:
                                value::SlotIdGenerator* slotIdGenerator);
 
     /**
+     * Same as above, but allows to register an unnamed slot.
+     */
+    value::SlotId registerSlot(value::TypeTags tag,
+                               value::Value val,
+                               bool owned,
+                               value::SlotIdGenerator* slotIdGenerator);
+
+    /**
      * Returns a SlotId registered for the given slot 'name'. If the slot with the specified name
      * hasn't been registered, a user exception is raised.
      */
@@ -166,19 +174,27 @@ private:
     RuntimeEnvironment(const RuntimeEnvironment&);
 
     struct State {
-        auto pushSlot(StringData type, value::SlotId slot) {
+        size_t pushSlot(value::SlotId slot) {
             auto index = vals.size();
 
             typeTags.push_back(value::TypeTags::Nothing);
             vals.push_back(0);
             owned.push_back(false);
 
-            auto [it, inserted] = slots.emplace(type, std::make_pair(slot, index));
+            auto [_, inserted] = slots.emplace(slot, index);
             uassert(4946302, str::stream() << "duplicate environment slot: " << slot, inserted);
             return index;
         }
 
-        StringMap<std::pair<value::SlotId, size_t>> slots;
+        void nameSlot(StringData name, value::SlotId slot) {
+            uassert(5645901, str::stream() << "undefined slot: " << slot, slots.count(slot));
+            auto [_, inserted] = namedSlots.emplace(name, slot);
+            uassert(5645902, str::stream() << "duplicate named slot: " << name, inserted);
+        }
+
+        StringMap<value::SlotId> namedSlots;
+        value::SlotMap<size_t> slots;
+
         std::vector<value::TypeTags> typeTags;
         std::vector<value::Value> vals;
         std::vector<bool> owned;

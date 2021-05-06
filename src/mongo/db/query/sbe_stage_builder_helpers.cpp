@@ -740,4 +740,17 @@ sbe::value::SlotVector makeIndexKeyOutputSlotsMatchingParentReqs(
 
     return newIndexKeySlots;
 }
+
+sbe::value::SlotId StageBuilderState::getGlobalVariableSlot(Variables::Id variableId) {
+    if (auto it = globalVariables.find(variableId); it != globalVariables.end()) {
+        return it->second;
+    }
+
+    // Convert value of variable into SBE value.
+    auto [tag, val] = makeValue(variables.getValue(variableId));
+
+    auto slotId = env->registerSlot(tag, val, true, slotIdGenerator);
+    globalVariables.emplace(variableId, slotId);
+    return slotId;
+}
 }  // namespace mongo::stage_builder

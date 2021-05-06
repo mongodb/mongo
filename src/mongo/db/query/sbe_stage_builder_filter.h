@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 /**
@@ -51,13 +52,10 @@ namespace mongo::stage_builder {
  * Otherwise, it is Nothing.
  */
 std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const MatchExpression* root,
     EvalStage stage,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputSlot,
-    sbe::RuntimeEnvironment* env,
     PlanNodeId planNodeId,
     bool trackIndex = false);
 
@@ -71,13 +69,10 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
  *    keys cannot contain an array. As such, this function doesn't take a 'trackIndex' parameter
  *    and doesn't return an optional SLotId holding the index of a matching array element.
  */
-EvalStage generateIndexFilter(OperationContext* opCtx,
+EvalStage generateIndexFilter(StageBuilderState& state,
                               const MatchExpression* root,
                               EvalStage stage,
-                              sbe::value::SlotIdGenerator* slotIdGenerator,
-                              sbe::value::FrameIdGenerator* frameIdGenerator,
                               sbe::value::SlotVector keySlots,
                               std::vector<std::string> keyFields,
-                              sbe::RuntimeEnvironment* env,
                               PlanNodeId planNodeId);
 }  // namespace mongo::stage_builder

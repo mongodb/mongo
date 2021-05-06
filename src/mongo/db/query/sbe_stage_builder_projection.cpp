@@ -45,7 +45,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/str.h"
@@ -172,9 +171,8 @@ struct ProjectionTraversalVisitorContext {
     }
 
     void pushLevel(std::list<std::string> fields) {
-        levels.push({levels.size() <= 1 ? inputSlot : slotIdGenerator->generate(),
-                     std::move(fields),
-                     planNodeId});
+        levels.push(
+            {levels.size() <= 1 ? inputSlot : state.slotId(), std::move(fields), planNodeId});
     }
 
     std::pair<sbe::value::SlotId, PlanStageType> done() {
@@ -186,41 +184,32 @@ struct ProjectionTraversalVisitorContext {
         return {eval.slot(), std::move(topLevel().evalStage)};
     }
 
-    ProjectionTraversalVisitorContext(OperationContext* opCtx,
+    ProjectionTraversalVisitorContext(StageBuilderState& state,
                                       PlanNodeId planNodeId,
                                       projection_ast::ProjectType projectType,
-                                      sbe::value::SlotIdGenerator* slotIdGenerator,
-                                      sbe::value::FrameIdGenerator* frameIdGenerator,
                                       PlanStageType inputStage,
                                       sbe::value::SlotId inputSlot,
-                                      sbe::value::SlotId preImageSlot,
-                                      sbe::RuntimeEnvironment* env)
-        : opCtx(opCtx),
+                                      sbe::value::SlotId preImageSlot)
+        : state(state),
           planNodeId(planNodeId),
           projectType(projectType),
-          slotIdGenerator(slotIdGenerator),
-          frameIdGenerator(frameIdGenerator),
           inputSlot(inputSlot),
-          preImageSlot(preImageSlot),
-          env(env) {
+          preImageSlot(preImageSlot) {
         pushLevel({});
         topLevel().evalStage = std::move(inputStage);
     }
 
-    OperationContext* opCtx;
+    StageBuilderState& state;
 
     // The node id of the projection QuerySolutionNode.
     const PlanNodeId planNodeId;
 
     projection_ast::ProjectType projectType;
-    sbe::value::SlotIdGenerator* const slotIdGenerator;
-    sbe::value::FrameIdGenerator* const frameIdGenerator;
 
     // The slot to read a root document from.
     sbe::value::SlotId inputSlot;
     sbe::value::SlotId preImageSlot;
 
-    sbe::RuntimeEnvironment* env;
     std::stack<NestedLevel> levels;
 
     // Flag indicating if $slice operator is used in the projection.
@@ -394,13 +383,10 @@ public:
         }
 
         auto [outputSlot, expr, stage] =
-            generateExpression(_context->opCtx,
+            generateExpression(_context->state,
                                expression.get(),
                                std::move(_context->topLevel().evalStage),
-                               _context->slotIdGenerator,
-                               _context->frameIdGenerator,
                                _context->inputSlot,
-                               _context->env,
                                _context->planNodeId);
 
         _context->topLevelEvals().emplace_back(outputSlot, std::move(expr));
@@ -422,7 +408,7 @@ public:
         // inclusion projection also add a filter stage on top to filter out input values for
         // nested traversal if they don't result in documents.
         auto childLevelInputSlot = _context->topLevel().inputSlot;
-        auto childLevelResultSlot = _context->slotIdGenerator->generate();
+        auto childLevelResultSlot = _context->state.slotId();
         if (_context->projectType == projection_ast::ProjectType::kInclusion) {
             auto mkBsonStage = makeMkBsonObj(std::move(childLevelStage),
                                              childLevelResultSlot,
@@ -489,7 +475,7 @@ public:
                                                         makeConstant(_context->topFrontField())));
         }
 
-        auto parentLevelResultSlot = _context->slotIdGenerator->generate();
+        auto parentLevelResultSlot = _context->state.slotId();
         parentLevelStage = makeTraverse(std::move(parentLevelStage),
                                         std::move(childLevelStage),
                                         childLevelInputSlot,
@@ -568,7 +554,7 @@ public:
         // expression forces function to apply top-level AND optimization. This optimization does
         // not affect the correctness in this case. See 'AndMatchExpression' pre-visitor in
         // 'sbe_stage_builder_filter.cpp' for details.
-        auto inputArraySlot = _context->slotIdGenerator->generate();
+        auto inputArraySlot = _context->state.slotId();
         auto predicate = [&]() {
             if (matchExpression->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
                 auto elemMatchObject =
@@ -577,13 +563,10 @@ public:
                 invariant(elemMatchObject->numChildren() == 1);
                 auto elemMatchPredicate = elemMatchObject->getChild(0);
                 auto [_, elemMatchPredicateTree] =
-                    generateFilter(_context->opCtx,
+                    generateFilter(_context->state,
                                    elemMatchPredicate,
                                    makeLimitCoScanStage(_context->planNodeId),
-                                   _context->slotIdGenerator,
-                                   _context->frameIdGenerator,
                                    inputArraySlot,
-                                   _context->env,
                                    _context->planNodeId);
 
                 auto isObjectOrArrayExpr =
@@ -605,13 +588,10 @@ public:
                     auto clonedChild = elemMatchValue->getChild(i)->shallowClone();
                     topLevelAnd->add(std::move(clonedChild));
                 }
-                auto [_, stage] = generateFilter(_context->opCtx,
+                auto [_, stage] = generateFilter(_context->state,
                                                  topLevelAnd.get(),
                                                  makeLimitCoScanStage(_context->planNodeId),
-                                                 _context->slotIdGenerator,
-                                                 _context->frameIdGenerator,
                                                  inputArraySlot,
-                                                 _context->env,
                                                  _context->planNodeId);
                 return std::move(stage);
             } else {
@@ -644,13 +624,13 @@ public:
         //   cfilter traversingAnArrayFlagSlot
         //   project earlyExitFlagSlot = true
         //   <$elemMatch predicate tree>
-        auto earlyExitFlagSlot = _context->slotIdGenerator->generate();
+        auto earlyExitFlagSlot = _context->state.slotId();
         auto inBranch = makeProject(std::move(predicate),
                                     _context->planNodeId,
                                     earlyExitFlagSlot,
                                     makeConstant(sbe::value::TypeTags::Boolean, true));
 
-        auto traversingAnArrayFlagSlot = _context->slotIdGenerator->generate();
+        auto traversingAnArrayFlagSlot = _context->state.slotId();
         inBranch = makeFilter<true>(
             std::move(inBranch), makeVariable(traversingAnArrayFlagSlot), _context->planNodeId);
 
@@ -668,7 +648,7 @@ public:
                                  traversingAnArrayFlagSlot,
                                  makeFunction("isArray"_sd, makeVariable(inputArraySlot)));
 
-        auto filteredArraySlot = _context->slotIdGenerator->generate();
+        auto filteredArraySlot = _context->state.slotId();
         auto traverseStage = makeTraverse(std::move(fromBranch),
                                           std::move(inBranch),
                                           inputArraySlot,
@@ -682,7 +662,7 @@ public:
         // Finally, we check if the result of traversal is an empty array. In this case, there were
         // no array elements matching the $elemMatch predicate. We replace empty array with Nothing
         // to exclude the field from the resulting object.
-        auto resultSlot = _context->slotIdGenerator->generate();
+        auto resultSlot = _context->state.slotId();
         auto resultStage = makeProject(
             std::move(traverseStage),
             _context->planNodeId,
@@ -769,7 +749,7 @@ public:
         // Construct mkobj stage which adds fields evaluating $slice operator ('projectFields' and
         // 'projectSlots') to the already constructed object from all previous operators.
         auto childLevelInputSlot = _context->topLevel().inputSlot;
-        auto childLevelObjSlot = _context->slotIdGenerator->generate();
+        auto childLevelObjSlot = _context->state.slotId();
         childLevelStage = makeMkBsonObj(std::move(childLevelStage),
                                         childLevelObjSlot,
                                         childLevelInputSlot,
@@ -783,7 +763,7 @@ public:
 
         // Create a branch stage which executes mkobj stage if current element in traversal is an
         // object and returns the input unchanged if it has some other type.
-        auto childLevelResultSlot = _context->slotIdGenerator->generate();
+        auto childLevelResultSlot = _context->state.slotId();
         childLevelStage = makeBranch(std::move(childLevelStage),
                                      makeLimitCoScanStage(_context->planNodeId),
                                      makeFunction("isObject"_sd, makeVariable(childLevelInputSlot)),
@@ -814,7 +794,7 @@ public:
 
         // Create the traverse stage, going only 1 level in depth, unlike other projection operators
         // which have unlimited depth for the traversal.
-        auto parentLevelResultSlot = _context->slotIdGenerator->generate();
+        auto parentLevelResultSlot = _context->state.slotId();
         parentLevelStage = makeTraverse(std::move(parentLevelStage),
                                         std::move(childLevelStage),
                                         childLevelInputSlot,
@@ -844,7 +824,7 @@ public:
                          sbe::makeE<sbe::EVariable>(_context->topLevel().inputSlot),
                          makeConstant(_context->topFrontField()));
         auto binds = sbe::makeEs(std::move(arrayFromField));
-        auto frameId = _context->frameIdGenerator->generate();
+        auto frameId = _context->state.frameId();
         sbe::EVariable arrayVariable{frameId, 0};
 
         auto arguments = sbe::makeEs(
@@ -862,8 +842,7 @@ public:
         auto sliceExpr =
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(extractSubArrayExpr));
 
-        _context->topLevelEvals().emplace_back(_context->slotIdGenerator->generate(),
-                                               std::move(sliceExpr));
+        _context->topLevelEvals().emplace_back(_context->state.slotId(), std::move(sliceExpr));
     }
 
     void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
@@ -981,24 +960,18 @@ ExpressionType generateApplyPositionalProjectionExpr(
  * Generates tree that does path traversal according to positional projection operator semantics.
  */
 std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
+    StageBuilderState& state,
     PlanStageType inputStage,
     const PositionalProjectionData& data,
-    OperationContext* opCtx,
     PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId postImageSlot,
-    sbe::value::SlotId preImageSlot,
-    sbe::RuntimeEnvironment* env) {
+    sbe::value::SlotId preImageSlot) {
     // First step is to generate filter tree that will record an array index for positional
     // projection.
-    auto [maybeIndexSlot, indexStage] = generateFilter(opCtx,
+    auto [maybeIndexSlot, indexStage] = generateFilter(state,
                                                        &*data.matchExpression,
                                                        makeLimitCoScanStage(planNodeId),
-                                                       slotIdGenerator,
-                                                       frameIdGenerator,
                                                        preImageSlot,
-                                                       env,
                                                        planNodeId,
                                                        true /* trackIndex */);
     // The index slot is optional because there are certain queries that do not support index
@@ -1025,7 +998,7 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
     //    'a.b.c.$' and the current field is 'b', 'nextFieldResultSlot' stores result from
     //    evaluating field 'c'. Note that the loop below goes from field 'c' to field 'a', backwards
     //  - 'currentFieldResultSlot'. This slot stores result from evaluating the current field.
-    auto extractedValueSlot = slotIdGenerator->generate();
+    auto extractedValueSlot = state.slotId();
     sbe::value::SlotId nextFieldResultSlot;
     PlanStageType resultStage;
     const auto& fieldPath = data.fieldPath;
@@ -1044,7 +1017,7 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
             fromBranch = std::move(inputStage);  // NOLINT(bugprone-use-after-move)
         } else {
             // For all other fields input document will be extracted manually.
-            inputDocumentSlot = slotIdGenerator->generate();
+            inputDocumentSlot = state.slotId();
             fromBranch = makeLimitCoScanStage(planNodeId);
         }
 
@@ -1059,12 +1032,13 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
         // Construct 'in' branch of the loop-join stage below. This branch is responsible for what
         // we do with the extracted value: apply positional projection, go deeper into the object
         // or return the value unchanged.
-        auto projectionResultSlot = slotIdGenerator->generate();
-        auto inBranch = makeProject(makeLimitCoScanStage(planNodeId),
-                                    planNodeId,
-                                    projectionResultSlot,
-                                    generateApplyPositionalProjectionExpr(
-                                        maybeIndexSlot, extractedValueSlot, frameIdGenerator));
+        auto projectionResultSlot = state.slotId();
+        auto inBranch =
+            makeProject(makeLimitCoScanStage(planNodeId),
+                        planNodeId,
+                        projectionResultSlot,
+                        generateApplyPositionalProjectionExpr(
+                            maybeIndexSlot, extractedValueSlot, state.frameIdGenerator));
 
         sbe::value::SlotId fieldValueSlot = projectionResultSlot;
         if (!isLastField) {
@@ -1073,7 +1047,7 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
             // array, we apply positional projection operator. Otherwise, we pass the value to the
             // next field.
             invariant(resultStage.stage);
-            fieldValueSlot = slotIdGenerator->generate();
+            fieldValueSlot = state.slotId();
             inBranch = makeBranch(std::move(inBranch),
                                   std::move(resultStage),
                                   makeFunction("isArray", makeVariable(extractedValueSlot)),
@@ -1086,7 +1060,7 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
         // After we have computed a new field value (either by applying positional projection or by
         // getting result from the next field), we construct a new object where current field has
         // this new value.
-        auto modifiedObjectSlot = slotIdGenerator->generate();
+        auto modifiedObjectSlot = state.slotId();
         inBranch = makeMkBsonObj(std::move(inBranch),
                                  modifiedObjectSlot,
                                  inputDocumentSlot,
@@ -1126,7 +1100,7 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
         // Finally, we construct the top stage of the 'in' branch for the loop-join stage below.
         // This branch stage checks the condition constructed above and returns the
         // 'inputDocumentSlot' unchanged if this condition is false.
-        auto currentFieldResultSlot = slotIdGenerator->generate();
+        auto currentFieldResultSlot = state.slotId();
         inBranch = makeBranch(std::move(inBranch),
                               makeLimitCoScanStage(planNodeId),
                               std::move(applyProjectionCondition),
@@ -1193,23 +1167,13 @@ std::pair<sbe::value::SlotId, PlanStageType> generatePositionalProjection(
 }  // namespace
 
 std::pair<sbe::value::SlotId, EvalStage> generateProjection(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const projection_ast::Projection* projection,
     EvalStage stage,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputVar,
-    sbe::RuntimeEnvironment* env,
     PlanNodeId planNodeId) {
-    ProjectionTraversalVisitorContext context{opCtx,
-                                              planNodeId,
-                                              projection->type(),
-                                              slotIdGenerator,
-                                              frameIdGenerator,
-                                              std::move(stage),
-                                              inputVar,
-                                              inputVar,
-                                              env};
+    ProjectionTraversalVisitorContext context{
+        state, planNodeId, projection->type(), std::move(stage), inputVar, inputVar};
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalInVisitor inVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};
@@ -1223,15 +1187,8 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
         // we first build a tree to execute all other operators and then build a second tree on top
         // of it for $slice operator. This second tree modifies resulting objects from from other
         // operators to include fields with $slice operator.
-        ProjectionTraversalVisitorContext sliceContext{opCtx,
-                                                       planNodeId,
-                                                       projection->type(),
-                                                       slotIdGenerator,
-                                                       frameIdGenerator,
-                                                       std::move(resultStage),
-                                                       resultSlot,
-                                                       inputVar,
-                                                       env};
+        ProjectionTraversalVisitorContext sliceContext{
+            state, planNodeId, projection->type(), std::move(resultStage), resultSlot, inputVar};
         ProjectionTraversalPreVisitor slicePreVisitor{&sliceContext};
         ProjectionTraversalInVisitor sliceInVisitor{&sliceContext};
         SliceProjectionTraversalPostVisitor slicePostVisitor{&sliceContext};
@@ -1251,15 +1208,12 @@ std::pair<sbe::value::SlotId, EvalStage> generateProjection(
         // evaluation model. Positional projection must be applied to the first array it meets on
         // the path, while other operators are applied only to the leaf path node.
         std::tie(resultSlot, resultStage) =
-            generatePositionalProjection(std::move(resultStage),  // NOLINT(bugprone-use-after-move)
+            generatePositionalProjection(state,
+                                         std::move(resultStage),  // NOLINT(bugprone-use-after-move)
                                          *context.positionalProjectionData,
-                                         opCtx,
                                          planNodeId,
-                                         slotIdGenerator,
-                                         frameIdGenerator,
                                          resultSlot, /* postImageSlot */
-                                         inputVar,   /* preImageSlot */
-                                         env);
+                                         inputVar /* preImageSlot */);
     }
 
     return {resultSlot, std::move(resultStage)};  // NOLINT(bugprone-use-after-move)

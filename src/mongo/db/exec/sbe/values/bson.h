@@ -39,6 +39,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                                                      const char* be,
                                                      const char* end,
                                                      size_t fieldNameSize);
+
 const char* advance(const char* be, size_t fieldNameSize);
 
 inline auto fieldNameView(const char* be) noexcept {

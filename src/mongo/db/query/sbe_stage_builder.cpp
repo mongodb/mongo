@@ -57,7 +57,6 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -472,7 +471,13 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_cq, _opCtx, &_slotIdGenerator)),
       _shardFiltererFactory(shardFiltererFactory),
-      _lockAcquisitionCallback(makeLockAcquisitionCallback(solution.shouldCheckCanServeReads())) {
+      _lockAcquisitionCallback(makeLockAcquisitionCallback(solution.shouldCheckCanServeReads())),
+      _state(_opCtx,
+             _data.env,
+             _cq.getExpCtxRaw()->variables,
+             &_slotIdGenerator,
+             &_frameIdGenerator,
+             &_spoolIdGenerator) {
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
@@ -520,13 +525,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto csn = static_cast<const CollectionScanNode*>(root);
 
-    auto [stage, outputs] = generateCollScan(_opCtx,
+    auto [stage, outputs] = generateCollScan(_state,
                                              _collection,
                                              csn,
-                                             &_slotIdGenerator,
-                                             &_frameIdGenerator,
                                              _yieldPolicy,
-                                             _data.env,
                                              reqs.getIsTailableCollScanResumeBranch(),
                                              _lockAcquisitionCallback);
 
@@ -640,15 +642,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         iamMap = nullptr;
     }
 
-    auto [stage, outputs] = generateIndexScan(_opCtx,
+    auto [stage, outputs] = generateIndexScan(_state,
                                               _collection,
                                               ixn,
                                               indexKeyBitset,
-                                              &_slotIdGenerator,
-                                              &_frameIdGenerator,
-                                              &_spoolIdGenerator,
                                               _yieldPolicy,
-                                              _data.env,
                                               _lockAcquisitionCallback,
                                               iamMap,
                                               reqs.has(kIndexKeyPattern));
@@ -803,13 +801,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             relevantSlots.insert(relevantSlots.end(), indexKeySlots->begin(), indexKeySlots->end());
         }
 
-        auto [_, outputStage] = generateFilter(_opCtx,
+        auto [_, outputStage] = generateFilter(_state,
                                                fn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
-                                               &_slotIdGenerator,
-                                               &_frameIdGenerator,
                                                outputs.get(kResult),
-                                               _data.env,
                                                root->nodeId());
         stage = std::move(outputStage.stage);
     }
@@ -1471,13 +1466,10 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
     auto relevantSlots = sbe::makeSV();
     outputs.forEachSlot(childReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
-    auto [slot, stage] = generateProjection(_opCtx,
+    auto [slot, stage] = generateProjection(_state,
                                             &pn->proj,
                                             {std::move(inputStage), std::move(relevantSlots)},
-                                            &_slotIdGenerator,
-                                            &_frameIdGenerator,
                                             outputs.get(kResult),
-                                            _data.env,
                                             root->nodeId());
     outputs.set(kResult, slot);
 
@@ -1528,13 +1520,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         auto relevantSlots = sbe::makeSV();
         outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
-        auto [_, outputStage] = generateFilter(_opCtx,
+        auto [_, outputStage] = generateFilter(_state,
                                                orn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
-                                               &_slotIdGenerator,
-                                               &_frameIdGenerator,
                                                outputs.get(kResult),
-                                               _data.env,
                                                root->nodeId());
         stage = std::move(outputStage.stage);
     }

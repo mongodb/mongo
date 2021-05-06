@@ -52,7 +52,6 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -892,21 +891,17 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::SlotIdGenerator* frameIdGenerator,
-    sbe::value::SpoolIdGenerator* spoolIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    sbe::RuntimeEnvironment* env,
     sbe::LockAcquisitionCallback lockAcquisitionCallback,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck) {
 
     auto indexName = ixn->index.identifier.catalogName;
-    auto descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+    auto descriptor = collection->getIndexCatalog()->findIndexByName(state.opCtx, indexName);
     tassert(5483200,
             str::stream() << "failed to find index in catalog named: "
                           << ixn->index.identifier.catalogName,
@@ -936,7 +931,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
     auto indexKeyBitset = originalIndexKeyBitset | indexFilterKeyBitset;
-    auto indexKeySlots = slotIdGenerator->generateMultiple(indexKeyBitset.count());
+    auto indexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
     sbe::value::SlotVector relevantSlots;
 
     // Generate the relevant slots and add the access method corresponding to 'indexName' to
@@ -948,15 +943,15 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     if (iamMap) {
         iamMap->insert({indexName, accessMethod});
 
-        snapshotIdSlot = slotIdGenerator->generate();
+        snapshotIdSlot = state.slotId();
         outputs.set(PlanStageSlots::kSnapshotId, *snapshotIdSlot);
         relevantSlots.push_back(*snapshotIdSlot);
 
-        indexIdSlot = slotIdGenerator->generate();
+        indexIdSlot = state.slotId();
         outputs.set(PlanStageSlots::kIndexId, *indexIdSlot);
         relevantSlots.push_back(*indexIdSlot);
 
-        indexKeySlot = slotIdGenerator->generate();
+        indexKeySlot = state.slotId();
         outputs.set(PlanStageSlots::kIndexKey, *indexKeySlot);
         relevantSlots.push_back(*indexKeySlot);
     }
@@ -965,7 +960,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     // check.
     boost::optional<sbe::value::SlotId> indexKeyPatternSlot;
     if (needsCorruptionCheck) {
-        indexKeyPatternSlot = slotIdGenerator->generate();
+        indexKeyPatternSlot = state.slotId();
         outputs.set(PlanStageSlots::kIndexKeyPattern, *indexKeyPatternSlot);
         relevantSlots.push_back(*indexKeyPatternSlot);
     }
@@ -988,7 +983,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                             indexIdSlot,
                                             indexKeySlot,
                                             indexKeyPatternSlot,
-                                            slotIdGenerator,
+                                            state.slotIdGenerator,
                                             yieldPolicy,
                                             ixn->nodeId(),
                                             std::move(lockAcquisitionCallback));
@@ -1010,7 +1005,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                                     indexIdSlot,
                                                     indexKeySlot,
                                                     indexKeyPatternSlot,
-                                                    slotIdGenerator,
+                                                    state.slotIdGenerator,
                                                     yieldPolicy,
                                                     ixn->nodeId(),
                                                     std::move(lockAcquisitionCallback));
@@ -1030,8 +1025,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             indexIdSlot,
             indexKeySlot,
             indexKeyPatternSlot,
-            slotIdGenerator,
-            spoolIdGenerator,
+            state.slotIdGenerator,
+            state.spoolIdGenerator,
             yieldPolicy,
             std::move(lockAcquisitionCallback));
 
@@ -1054,14 +1049,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         relevantSlots.insert(
             relevantSlots.end(), indexFilterKeySlots.begin(), indexFilterKeySlots.end());
 
-        auto outputStage = generateIndexFilter(opCtx,
+        auto outputStage = generateIndexFilter(state,
                                                ixn->filter.get(),
                                                {std::move(stage), std::move(relevantSlots)},
-                                               slotIdGenerator,
-                                               frameIdGenerator,
                                                std::move(indexFilterKeySlots),
                                                std::move(indexFilterKeyFields),
-                                               env,
                                                ixn->nodeId());
         stage = std::move(outputStage.stage);
     }

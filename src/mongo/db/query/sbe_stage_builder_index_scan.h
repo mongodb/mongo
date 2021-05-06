@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 
@@ -51,15 +52,11 @@ class PlanStageSlots;
  * the specified slot with the rehydrated index key for each record.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& indexKeyBitset,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::SlotIdGenerator* frameIdGenerator,
-    sbe::value::SpoolIdGenerator* spoolIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    sbe::RuntimeEnvironment* env,
     sbe::LockAcquisitionCallback lockAcquisitionCallback,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck);

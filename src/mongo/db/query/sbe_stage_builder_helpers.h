@@ -781,4 +781,50 @@ std::pair<sbe::IndexKeysInclusionSet, std::vector<std::string>> makeIndexKeyIncl
 
     return {std::move(indexKeyBitset), std::move(keyFieldNames)};
 }
+
+/**
+ * Common parameters to SBE stage builder functions extracted into separate class to simplify
+ * argument passing. Also contains a mapping of global variable ids to slot ids.
+ */
+struct StageBuilderState {
+    StageBuilderState(OperationContext* opCtx,
+                      sbe::RuntimeEnvironment* env,
+                      const Variables& variables,
+                      sbe::value::SlotIdGenerator* slotIdGenerator,
+                      sbe::value::FrameIdGenerator* frameIdGenerator,
+                      sbe::value::SpoolIdGenerator* spoolIdGenerator)
+        : slotIdGenerator{slotIdGenerator},
+          frameIdGenerator{frameIdGenerator},
+          spoolIdGenerator{spoolIdGenerator},
+          opCtx{opCtx},
+          env{env},
+          variables{variables} {}
+
+    StageBuilderState(const StageBuilderState& other) = delete;
+
+    sbe::value::SlotId getGlobalVariableSlot(Variables::Id variableId);
+
+    sbe::value::SlotId slotId() {
+        return slotIdGenerator->generate();
+    }
+
+    sbe::FrameId frameId() {
+        return frameIdGenerator->generate();
+    }
+
+    sbe::SpoolId spoolId() {
+        return spoolIdGenerator->generate();
+    }
+
+    sbe::value::SlotIdGenerator* const slotIdGenerator;
+    sbe::value::FrameIdGenerator* const frameIdGenerator;
+    sbe::value::SpoolIdGenerator* const spoolIdGenerator;
+
+    OperationContext* const opCtx;
+    sbe::RuntimeEnvironment* const env;
+
+    const Variables& variables;
+    stdx::unordered_map<Variables::Id, sbe::value::SlotId> globalVariables;
+};
+
 }  // namespace mongo::stage_builder

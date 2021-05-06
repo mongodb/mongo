@@ -34,6 +34,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 
@@ -52,13 +53,10 @@ class PlanStageSlots;
  * In cases of an error, throws.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     const CollectionPtr& collection,
     const CollectionScanNode* csn,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    sbe::RuntimeEnvironment* env,
     bool isTailableResumeBranch,
     sbe::LockAcquisitionCallback lockAcquisitionCallback);
 

@@ -6,8 +6,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # TODO (SERVER-56459): re-enable lookup_subpipeline.js
-  - jstests/aggregation/sources/lookup/lookup_subpipeline.js
   exclude_with_any_tags:
   - requires_pipeline_optimization
 

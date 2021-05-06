@@ -35,6 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 /**
@@ -42,13 +43,10 @@ namespace mongo::stage_builder {
  * subtree to build on top of.
  */
 std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> generateExpression(
-    OperationContext* opCtx,
+    StageBuilderState& state,
     Expression* expr,
     EvalStage stage,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
     sbe::value::SlotId inputVar,
-    sbe::RuntimeEnvironment* env,
     PlanNodeId planNodeId);
 
 /**
