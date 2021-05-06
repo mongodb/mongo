@@ -39,7 +39,7 @@ structs:
         # The generated comparison operators will do a field-wise lexicographic comparison, which
         # doesn't work because it's nonsensical to lexicographically compare UUIDs.
         generate_comparison_operators: false
-        strict: true
+        strict: false
         fields:
             uuid:
                 type: uuid
