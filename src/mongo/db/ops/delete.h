@@ -33,6 +33,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/query/plan_executor.h"
 
 
@@ -53,4 +54,8 @@ long long deleteObjects(OperationContext* opCtx,
                         bool justOne,
                         bool god = false,
                         bool fromMigrate = false);
+
+boost::optional<BSONObj> deleteObject(OperationContext* opCtx,
+                                      Collection* collection,
+                                      const DeleteRequest& request);
 }

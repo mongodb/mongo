@@ -1581,6 +1581,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             timestamp = fieldTs.timestamp();
         }
 
+        bool upsertConfigImage = true;
         const StringData ns = fieldNs.valuestrsafe();
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
@@ -1589,8 +1590,19 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             if (opType[1] == 0) {
-                const auto justOne = true;
-                deleteObjects(opCtx, collection, requestNss, deleteCriteria, justOne);
+                DeleteRequest request(requestNss);
+                request.setQuery(deleteCriteria);
+                if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                    request.setReturnDeleted(true);
+                }
+                boost::optional<BSONObj> preImage = deleteObject(opCtx, collection, request);
+                if (op.hasField(OplogEntryBase::kNeedsRetryImageFieldName)) {
+                    writeToImageCollection(opCtx,
+                                           op,
+                                           preImage.get(),
+                                           repl::RetryImageEnum::kPreImage,
+                                           &upsertConfigImage);
+                }
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
             wuow.commit();

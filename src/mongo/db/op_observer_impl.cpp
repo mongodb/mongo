@@ -63,6 +63,7 @@
 
 namespace mongo {
 using repl::OplogEntry;
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
@@ -266,7 +267,8 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            Session* session,
                            StmtId stmtId,
                            bool fromMigrate,
-                           const boost::optional<BSONObj>& deletedDoc) {
+                           const boost::optional<BSONObj>& deletedDoc,
+                           const bool storeImagesInSideCollection) {
     OperationSessionInfo sessionInfo;
     repl::OplogLink oplogLink;
 
@@ -281,9 +283,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
 
     boost::optional<repl::RetryImageEnum> needsRetryImage;
     if (deletedDoc && opCtx->getTxnNumber()) {
-        if (storeFindAndModifyImagesInSideCollection.load() &&
-            serverGlobalParams.featureCompatibility.getVersion() >=
-                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+        if (storeImagesInSideCollection) {
             needsRetryImage = repl::RetryImageEnum::kPreImage;
         } else {
             auto noteOplog = logOperation(opCtx,
@@ -584,7 +584,23 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         auto operation = OplogEntry::makeDeleteOperation(nss, uuid, documentKey);
         session->addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogDelete(opCtx, nss, uuid, session, stmtId, fromMigrate, deletedDoc);
+        const auto storeImagesInSideCollection = storeFindAndModifyImagesInSideCollection.load() &&
+            serverGlobalParams.featureCompatibility.getVersion() >=
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
+        opTime = replLogDelete(opCtx,
+                               nss,
+                               uuid,
+                               session,
+                               stmtId,
+                               fromMigrate,
+                               deletedDoc,
+                               storeImagesInSideCollection);
+        if (storeImagesInSideCollection && deletedDoc && opCtx->getTxnNumber()) {
+            writeToImagesCollection(opCtx,
+                                    *deletedDoc,
+                                    repl::RetryImageEnum::kPreImage,
+                                    opTime.writeOpTime.getTimestamp());
+        }
         onWriteOpCompleted(opCtx,
                            nss,
                            session,
