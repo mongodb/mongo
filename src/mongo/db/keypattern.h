@@ -53,12 +53,6 @@ namespace mongo {
 class KeyPattern {
 public:
     /**
-     * Is the provided key pattern the index over the ID field?
-     * The always required ID index is always {_id: 1} or {_id: -1}.
-     */
-    static bool isIdKeyPattern(const BSONObj& pattern);
-
-    /**
      * Is the provided key pattern ordered increasing or decreasing or not?
      */
     static bool isOrderedKeyPattern(const BSONObj& pattern);

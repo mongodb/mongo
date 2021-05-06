@@ -1731,7 +1731,7 @@ void IndexCatalogImpl::prepareInsertDeleteOptions(OperationContext* opCtx,
     }
 
     // Don't allow dups for Id key. Allow dups for non-unique keys or when constraints relaxed.
-    if (KeyPattern::isIdKeyPattern(desc->keyPattern())) {
+    if (desc->isIdIndex()) {
         options->dupsAllowed = false;
     } else {
         options->dupsAllowed = !desc->unique() ||
