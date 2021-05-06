@@ -93,6 +93,9 @@ public:
     // Namespace of the the oplog collection.
     static const NamespaceString kRsOplogNamespace;
 
+    // Namespace used for storing retryable findAndModify images.
+    static const NamespaceString kConfigImagesNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

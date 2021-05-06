@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+extern AtomicBool storeFindAndModifyImagesInSideCollection;
+
 struct InsertStatement;
 class OperationContext;
 struct OplogSlot;

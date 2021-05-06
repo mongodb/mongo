@@ -42,15 +42,17 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/views/durable_view_catalog.h"
 #include "mongo/s/client/shard_registry.h"
@@ -64,7 +66,6 @@ using repl::OplogEntry;
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
-MONGO_EXPORT_SERVER_PARAMETER(storeFindAndModifyImagesInSideCollection, bool, false);
 
 const auto documentKeyDecoration = OperationContext::declareDecoration<BSONObj>();
 
@@ -166,17 +167,31 @@ struct OpTimeBundle {
     Date_t wallClockTime;
 };
 
+void writeToImagesCollection(OperationContext* opCtx,
+                             BSONObj image,
+                             repl::RetryImageEnum imageKind,
+                             Timestamp ts) {
+    repl::ImageEntry imageEntry;
+    invariant(opCtx->getLogicalSessionId());
+    imageEntry.set_id(*opCtx->getLogicalSessionId());
+    imageEntry.setTs(ts);
+    imageEntry.setImage(std::move(image));
+    imageEntry.setImageKind(imageKind);
+    repl::UnreplicatedWritesBlock unreplicated(opCtx);
+    AutoGetCollection imageCollectionRaii(
+        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    Helpers::upsert(opCtx, NamespaceString::kConfigImagesNamespace.toString(), imageEntry.toBSON());
+}
+
 /**
  * Write oplog entry(ies) for the update operation.
  */
 OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            Session* session,
-                           const OplogUpdateEntryArgs& args) {
+                           const OplogUpdateEntryArgs& args,
+                           const bool storeImagesInSideCollection) {
     BSONObj storeObj;
     boost::optional<repl::RetryImageEnum> needsRetryImage;
-    const auto storeImagesInSideCollection = storeFindAndModifyImagesInSideCollection.load() &&
-        serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
     if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
         invariant(args.preImageDoc);
         storeObj = *args.preImageDoc;
@@ -493,7 +508,26 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             OplogEntry::makeUpdateOperation(args.nss, args.uuid, args.update, args.criteria);
         session->addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogUpdate(opCtx, session, args);
+        const auto storeImagesInSideCollection = storeFindAndModifyImagesInSideCollection.load() &&
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() >=
+                ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
+        opTime = replLogUpdate(opCtx, session, args, storeImagesInSideCollection);
+        if (storeImagesInSideCollection && opCtx->getTxnNumber() &&
+            args.storeDocOption != OplogUpdateEntryArgs::StoreDocOption::None) {
+            BSONObj imageDoc;
+            repl::RetryImageEnum imageKind;
+            if (args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PreImage) {
+                invariant(args.preImageDoc);
+                imageDoc = *args.preImageDoc;
+                imageKind = repl::RetryImageEnum::kPreImage;
+            } else {
+                invariant(args.storeDocOption == OplogUpdateEntryArgs::StoreDocOption::PostImage);
+                imageDoc = args.updatedDoc;
+                imageKind = repl::RetryImageEnum::kPostImage;
+            }
+            writeToImagesCollection(opCtx, imageDoc, imageKind, opTime.writeOpTime.getTimestamp());
+        }
         onWriteOpCompleted(opCtx,
                            args.nss,
                            session,

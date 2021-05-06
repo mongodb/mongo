@@ -33,8 +33,11 @@
 #include "mongo/db/op_observer.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 
 namespace mongo {
+
+MONGO_EXPORT_SERVER_PARAMETER(storeFindAndModifyImagesInSideCollection, bool, false);
 namespace {
 const auto getOpObserverTimes = OperationContext::declareDecoration<OpObserver::Times>();
 }  // namespace
