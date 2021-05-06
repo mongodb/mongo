@@ -56,7 +56,7 @@ TimeseriesTest.run((insert) => {
         }
 
         // Check bucket collection.
-        const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
+        const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
         assert.eq(2, bucketDocs.length, bucketDocs);
 
         // Check both buckets.

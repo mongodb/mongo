@@ -46,7 +46,7 @@ TimeseriesTest.run((insert) => {
     jsTestLog('Removal took ' + ((new Date()).getTime() - start.getTime()) + ' ms.');
 
     // Check bucket collection.
-    const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
+    const bucketDocs = bucketsColl.find().sort({'control.min._id': 1}).toArray();
     assert.eq(0, bucketDocs.length, bucketDocs);
 });
 })();
