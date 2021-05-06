@@ -128,7 +128,7 @@ for (let transform of idPreservingTransformations) {
     }, transform);
 }
 
-// Verify that each of the blacklisted transformations above are rejected.
+// Verify that each of the denylisted transformations above are rejected.
 for (let transform of idModifyingTransformations) {
     const cmdRes = assert.commandWorked(
         db.runCommand(

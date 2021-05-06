@@ -144,8 +144,8 @@ def generate(env):
     # hash result to prevent erroneous cache hits.
     if "CCACHE_EXTRAFILES" in env and env["CCACHE_EXTRAFILES"]:
         env["ENV"]["CCACHE_EXTRAFILES"] = ":".join([
-            blackfile.path
-            for blackfile in env["CCACHE_EXTRAFILES"]
+            denyfile.path
+            for denyfile in env["CCACHE_EXTRAFILES"]
         ])
 
     # Make a generator to expand to CCACHE in the case where we are

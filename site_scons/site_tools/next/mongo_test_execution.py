@@ -72,7 +72,7 @@ def generate_test_execution_aliases(env, test):
         # Strip suffix
         dot_idx = source_base_name.rfind(".")
         suffix = source_base_name[dot_idx:]
-        if suffix in env["TEST_EXECUTION_SUFFIX_BLACKLIST"]:
+        if suffix in env["TEST_EXECUTION_SUFFIX_DENYLIST"]:
             continue
 
         source_name = source_base_name[:dot_idx]
@@ -137,8 +137,8 @@ def generate(env):
     env.Alias("test-execution-aliases")
     env.AddMethod(generate_test_execution_aliases, "GenerateTestExecutionAliases")
 
-    env["TEST_EXECUTION_SUFFIX_BLACKLIST"] = env.get(
-        "TEST_EXECUTION_SUFFIX_BLACKLIST", [".in"]
+    env["TEST_EXECUTION_SUFFIX_DENYLIST"] = env.get(
+        "TEST_EXECUTION_SUFFIX_DENYLIST", [".in"]
     )
 
     env.AppendUnique(

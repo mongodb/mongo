@@ -25,9 +25,9 @@ const allowlist = [
 ];
 
 // List of stages which the allowlist mechanism will prevent from running in a $changeStream.
-// Does not include stages which are blacklisted but already implicitly prohibited, e.g. both
+// Does not include stages which are denylisted but already implicitly prohibited, e.g. both
 // $currentOp and $changeStream must be the first stage in a pipeline.
-const blacklist = [
+const denylist = [
         {$group: {_id: "$_id"}},
         {$sort: {_id: 1}},
         {$skip: 100},
@@ -58,8 +58,8 @@ for (let allowedStage of allowlist) {
 assert.commandWorked(db.runCommand(
     {aggregate: coll.getName(), pipeline: changeStream.concat(allowlist), cursor: {}}));
 
-// Verify that a $changeStream pipeline fails to validate if a blacklisted stage is present.
-for (let bannedStage of blacklist) {
+// Verify that a $changeStream pipeline fails to validate if a denylisted stage is present.
+for (let bannedStage of denylist) {
     assertErrorCode(coll, changeStream.concat(bannedStage), ErrorCodes.IllegalOperation);
 }
 }());

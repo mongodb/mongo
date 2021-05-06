@@ -74,7 +74,7 @@ public:
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
                 UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kBlacklist};
+                ChangeStreamRequirement::kDenylist};
     }
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;

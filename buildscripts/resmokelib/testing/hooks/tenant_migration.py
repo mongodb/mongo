@@ -360,7 +360,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         return abort_reason["code"] == self.FAIL_TO_PARSE_ERR_CODE and re.search(
             err_msg_regex, abort_reason["errmsg"])
 
-    def _is_blacklisted_abort_reason(self, abort_reason):
+    def _is_denylisted_abort_reason(self, abort_reason):
         is_recipient_err = abort_reason["errmsg"].startswith(
             "Tenant migration recipient command failed")
         if not is_recipient_err:
@@ -434,10 +434,10 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                     "Tenant migration '%s' with donor replica set '%s' aborted due to failpoint: " +
                     "%s.", migration_opts.migration_id, migration_opts.get_donor_name(), str(res))
                 return False
-            if self._is_blacklisted_abort_reason(abort_reason):
+            if self._is_denylisted_abort_reason(abort_reason):
                 self.logger.info(
                     "Tenant migration '%s' with donor replica set '%s' aborted due to a " +
-                    "blacklisted error: %s.", migration_opts.migration_id,
+                    "denylisted error: %s.", migration_opts.migration_id,
                     migration_opts.get_donor_name(), str(res))
                 return False
             raise errors.ServerFailure("Tenant migration '" + str(migration_opts.migration_id) +

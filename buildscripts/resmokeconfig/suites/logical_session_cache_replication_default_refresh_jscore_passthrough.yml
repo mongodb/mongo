@@ -17,7 +17,7 @@ selector:
   # The awaitdata_getmore_cmd.js test tails the oplog and waits for the getMore batch size to equal
   # zero. The CheckReplDBHashInBackground hook consistently runs and creates sessions. At the same
   # time, the logical session cache refresh thread will flush these sessions to disk, creating more
-  # opLog entries. To prevent this infinite loop, we will blacklist the test from this suite.
+  # opLog entries. To prevent this infinite loop, we will denylist the test from this suite.
   - jstests/core/awaitdata_getmore_cmd.js
   # These tests verify that an expected number of update operations were tracked in the server
   # status metrics, but the logical session cache refresh causes additional updates to be recorded.

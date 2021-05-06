@@ -66,7 +66,7 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed,
-                                     ChangeStreamRequirement::kBlacklist);
+                                     ChangeStreamRequirement::kDenylist);
 
         // Can't swap with a $match if a limit has been absorbed, as $match can't swap with $limit.
         constraints.canSwapWithMatch = !_sortExecutor->hasLimit();

@@ -82,7 +82,7 @@ public:
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
                 UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kBlacklist};
+                ChangeStreamRequirement::kDenylist};
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {

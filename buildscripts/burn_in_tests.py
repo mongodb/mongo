@@ -155,7 +155,7 @@ def find_excludes(selector_file: str) -> Tuple[List, List, List]:
 
 def filter_tests(tests: Set[str], exclude_tests: List[str]) -> Set[str]:
     """
-    Exclude tests which have been blacklisted.
+    Exclude tests which have been denylisted.
 
     :param tests: Set of tests to filter.
     :param exclude_tests: Tests to filter out.

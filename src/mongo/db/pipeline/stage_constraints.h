@@ -86,9 +86,9 @@ struct StageConstraints {
     /**
      * A ChangeStreamRequirement determines whether a particular stage is itself a ChangeStream
      * stage, whether it is allowed to exist in a $changeStream pipeline, or whether it is
-     * blacklisted from $changeStream.
+     * denylisted from $changeStream.
      */
-    enum class ChangeStreamRequirement { kChangeStreamStage, kAllowlist, kBlacklist };
+    enum class ChangeStreamRequirement { kChangeStreamStage, kAllowlist, kDenylist };
 
     /**
      * A FacetRequirement indicates whether this stage may be used within a $facet pipeline.
@@ -149,7 +149,7 @@ struct StageConstraints {
         TransactionRequirement transactionRequirement,
         LookupRequirement lookupRequirement,
         UnionRequirement unionRequirement,
-        ChangeStreamRequirement changeStreamRequirement = ChangeStreamRequirement::kBlacklist)
+        ChangeStreamRequirement changeStreamRequirement = ChangeStreamRequirement::kDenylist)
         : requiredPosition(requiredPosition),
           hostRequirement(hostRequirement),
           diskRequirement(diskRequirement),
@@ -229,7 +229,7 @@ struct StageConstraints {
      * True if this stage is permitted to run in a pipeline which starts with $changeStream.
      */
     bool isAllowedInChangeStream() const {
-        return changeStreamRequirement != ChangeStreamRequirement::kBlacklist;
+        return changeStreamRequirement != ChangeStreamRequirement::kDenylist;
     }
 
     /**

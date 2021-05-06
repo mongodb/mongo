@@ -122,7 +122,7 @@ TEST_F(HedgeOptionsUtilTestFixture, ImplicitOperationHedging) {
     checkHedgeOptions(parameters, cmdObj, rspObj, true);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, BlacklistAggregate) {
+TEST_F(HedgeOptionsUtilTestFixture, DenylistAggregate) {
     const auto parameters = BSONObj();
     const auto cmdObj =
         BSON("aggregate" << kCollName << "pipeline" << BSONObj() << "cursor" << BSONObj());
@@ -133,7 +133,7 @@ TEST_F(HedgeOptionsUtilTestFixture, BlacklistAggregate) {
     checkHedgeOptions(parameters, cmdObj, rspObj, false);
 }
 
-TEST_F(HedgeOptionsUtilTestFixture, BlacklistMapReduce) {
+TEST_F(HedgeOptionsUtilTestFixture, DenylistMapReduce) {
     const auto parameters = BSONObj();
     const auto rspObj = BSON("mode"
                              << "nearest"

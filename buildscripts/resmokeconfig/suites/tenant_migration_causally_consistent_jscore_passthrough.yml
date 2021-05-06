@@ -14,7 +14,7 @@ selector:
   - jstests/core/**/*.js
   exclude_files:
   #
-  # Blacklists from tenant_migration_jscore_passthrough.yml
+  # Denylists from tenant_migration_jscore_passthrough.yml
   #
 
   - jstests/core/txns/**/*.js
@@ -102,7 +102,7 @@ selector:
   - jstests/core/rename_collection_staytemp.js
 
   #
-  # Blacklists from causally_consistent_jscore_passthrough.yml
+  # Denylists from causally_consistent_jscore_passthrough.yml
   #
 
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
@@ -141,7 +141,7 @@ selector:
   - jstests/core/or_to_in.js # queryPlanner in different spot in explain()
 
   #
-  # Blacklists from session_jscore_passthrough.yml
+  # Denylists from session_jscore_passthrough.yml
   #
 
   # These test run commands using legacy queries, which are not supported on sessions.

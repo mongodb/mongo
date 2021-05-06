@@ -385,7 +385,7 @@ def generate_exclude_yaml(task_path_suffix: str, output: str) -> None:
     Create a tag file associating multiversion tests to tags for exclusion.
 
     Compares the BACKPORTS_REQUIRED_FILE on the current branch with the same file on the
-    last-lts branch to determine which tests should be blacklisted.
+    last-lts branch to determine which tests should be denylisted.
     """
 
     enable_logging()

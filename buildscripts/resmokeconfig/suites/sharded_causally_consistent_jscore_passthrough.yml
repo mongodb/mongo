@@ -1,6 +1,6 @@
 test_kind: js_test
-# This suite's blacklist is a sharded_collections_jscore_passthrough blacklist with some additions
-# from causally_consistent_jscore_passthrough blacklist.
+# This suite's denylist is a sharded_collections_jscore_passthrough denylist with some additions
+# from causally_consistent_jscore_passthrough denylist.
 
 selector:
   roots:
@@ -47,7 +47,7 @@ selector:
   - jstests/core/dbcase2.js
   - jstests/core/no_db_created.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-  # Tests that need triaging & remediation | blacklist decision
+  # Tests that need triaging & remediation | denylist decision
   # Comments list possible problem point under review.
   - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
   # Tests that fail for Causal Consistency as they have statements that do not support

@@ -1033,53 +1033,53 @@ class GenerateSubSuitesTest(unittest.TestCase):
             self.assertIn(tests_runtimes[1], filtered_list)
 
     @patch(ns('_parser.set_run_options'))
-    def test_filter_blacklist_files(self, set_run_options_mock):
+    def test_filter_denylist_files(self, set_run_options_mock):
         tests_runtimes = [
             TestRuntime(test_name="dir1/file1.js", runtime=20.32),
             TestRuntime(test_name="dir2/file2.js", runtime=24.32),
             TestRuntime(test_name="dir1/file3.js", runtime=36.32),
         ]
 
-        blacklisted_test = tests_runtimes[1][0]
+        denylisted_test = tests_runtimes[1][0]
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = \
-                [runtime[0] for runtime in tests_runtimes if runtime[0] != blacklisted_test]
+                [runtime[0] for runtime in tests_runtimes if runtime[0] != denylisted_test]
             config_options = MagicMock(suite="suite")
 
             gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
             filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
             self.assertEqual(2, len(filtered_list))
-            self.assertNotIn(blacklisted_test, filtered_list)
+            self.assertNotIn(denylisted_test, filtered_list)
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[0], filtered_list)
 
     @patch(ns('_parser.set_run_options'))
-    def test_filter_blacklist_files_for_windows(self, set_run_options_mock):
+    def test_filter_denylist_files_for_windows(self, set_run_options_mock):
         tests_runtimes = [
             TestRuntime(test_name="dir1/file1.js", runtime=20.32),
             TestRuntime(test_name="dir2/file2.js", runtime=24.32),
             TestRuntime(test_name="dir1/dir3/file3.js", runtime=36.32),
         ]
 
-        blacklisted_test = tests_runtimes[1][0]
+        denylisted_test = tests_runtimes[1][0]
 
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             evg = MagicMock()
             suitesconfig_mock.get_suite.return_value.tests = [
                 runtime[0].replace("/", "\\") for runtime in tests_runtimes
-                if runtime[0] != blacklisted_test
+                if runtime[0] != denylisted_test
             ]
             config_options = MagicMock(suite="suite")
 
             gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
             filtered_list = gen_sub_suites.filter_existing_tests(tests_runtimes)
 
-            self.assertNotIn(blacklisted_test, filtered_list)
+            self.assertNotIn(denylisted_test, filtered_list)
             self.assertIn(tests_runtimes[2], filtered_list)
             self.assertIn(tests_runtimes[0], filtered_list)
             self.assertEqual(2, len(filtered_list))

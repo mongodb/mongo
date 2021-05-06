@@ -58,9 +58,9 @@ def get_py_linter(linter_filter):
 def is_interesting_file(file_name):
     # type: (str) -> bool
     """Return true if this file should be checked."""
-    file_blacklist = []  # type: List[str]
-    directory_blacklist = ["src/third_party"]
-    if file_name in file_blacklist or file_name.startswith(tuple(directory_blacklist)):
+    file_denylist = []  # type: List[str]
+    directory_denylist = ["src/third_party"]
+    if file_name in file_denylist or file_name.startswith(tuple(directory_denylist)):
         return False
     directory_list = ["buildscripts", "pytests"]
     return file_name.endswith(".py") and file_name.startswith(tuple(directory_list))

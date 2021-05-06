@@ -152,7 +152,7 @@ selector:
   - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.
 
   #
-  # Blacklists specific to this suite
+  # Denylists specific to this suite
   #
 
   - jstests/core/api_version_parameters.js

@@ -1415,7 +1415,7 @@ def main(parser_actions, options):  # pylint: disable=too-many-branches,too-many
     else:
         eval_str = ""
     fsm_test_data = copy.deepcopy(crud_test_data)
-    fsm_test_data["fsmDbBlacklist"] = [powercycle_constants.DB_NAME]
+    fsm_test_data["fsmDbDenylist"] = [powercycle_constants.DB_NAME]
     crud_test_data["dbName"] = powercycle_constants.DB_NAME
 
     # Setup the mongo_repo_root.

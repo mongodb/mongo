@@ -357,7 +357,7 @@ public:
     void clear();
 
     /**
-     * Checks whether the connection for a given host is black listed or not.
+     * Checks whether the connection for a given host is deny listed or not.
      *
      * @param hostName the name of the host the connection connects to.
      * @param conn the connection to check.

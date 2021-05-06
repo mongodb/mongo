@@ -4,7 +4,7 @@ signal:src/mongo/unittest/death_test.cpp
 
 # WiredTiger is known to cause false positives for data races because it uses a
 # nonstandard thread model that TSAN doesn't know how to deal with. We have
-# already blacklisted WiredTiger in TSAN, but that only affects threads created
+# already denylisted WiredTiger in TSAN, but that only affects threads created
 # within the WiredTiger source. For threads that call *into* WiredTiger, we
 # need to add suppressions so we still get any potential failures from
 # elsewhere.

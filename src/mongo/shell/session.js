@@ -148,7 +148,7 @@ var {
                 wireVersion <= client.getMaxWireVersion();
         }
 
-        // TODO: Update this allowlist, or convert it to a blacklist depending on the outcome of
+        // TODO: Update this allowlist, or convert it to a denylist depending on the outcome of
         // SERVER-31743.
         const kCommandsThatSupportReadConcern = new Set([
             "aggregate",
