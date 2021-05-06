@@ -130,6 +130,11 @@ public:
     void enterCriticalSectionCommitPhase(const CSRLock&);
 
     /**
+     * It transitions the critical section back to the catch up phase.
+     */
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&);
+
+    /**
      * Method to control the collection's critical secion. Method listed below must be called with
      * the CSRLock in exclusive mode.
      *

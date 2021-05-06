@@ -166,6 +166,10 @@ void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&) 
     _critSec.enterCriticalSectionCommitPhase();
 }
 
+void CollectionShardingRuntime::rollbackCriticalSectionCommitPhaseToCatchUpPhase(const CSRLock&) {
+    _critSec.rollbackCriticalSectionCommitPhaseToCatchUpPhase();
+}
+
 void CollectionShardingRuntime::exitCriticalSection(const CSRLock&) {
     _critSec.exitCriticalSection();
 }

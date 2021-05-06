@@ -39,6 +39,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -391,8 +392,12 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _collectionVersion = _result->getCollectionVersion();
                     // The collection was already created and commited but there was a
                     // stepdown after the commit.
-                    sharding_ddl_util::releaseRecoverableCriticalSection(
-                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                    RecoverableCriticalSectionService::get(opCtx)
+                        ->releaseRecoverableCriticalSection(
+                            opCtx,
+                            nss(),
+                            _critSecReason,
+                            ShardingCatalogClient::kMajorityWriteConcern);
                     return;
                 }
 
@@ -400,8 +405,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // calling this method, we need the coordinator document to be persisted (and hence
                 // the kCheck state), otherwise nothing will release the critical section in the
                 // presence of a stepdown.
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                RecoverableCriticalSectionService::get(opCtx)
+                    ->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (_recoveredFromDisk) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -430,14 +436,18 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // the collection on other shards, this way we prevent
                     // reads/writes that should be redirected to another
                     // shard.
-                    sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(
-                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                    RecoverableCriticalSectionService::get(opCtx)
+                        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                            opCtx,
+                            nss(),
+                            _critSecReason,
+                            ShardingCatalogClient::kMajorityWriteConcern);
                     _createCollectionOnNonPrimaryShards(opCtx);
 
                     _commit(opCtx);
                 }
 
-                sharding_ddl_util::releaseRecoverableCriticalSection(
+                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (!_splitPolicy->isOptimized()) {
@@ -469,30 +479,11 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                sharding_ddl_util::releaseRecoverableCriticalSection(
+                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
             }
             return status;
         });
-}
-
-void CreateCollectionCoordinator::_interrupt(Status status) noexcept {
-    // Only free the in memory critical section if we reached the commit phase (in which we might've
-    // acquired it).
-    if (_doc.getPhase() >= Phase::kCommit &&
-        (status.isA<ErrorCategory::NotPrimaryError>() ||
-         status.isA<ErrorCategory::ShutdownError>())) {
-        auto client = cc().getServiceContext()->makeClient("CreateCollectionCleanupClient");
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(), nss());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
-        csr->clearFilteringMetadata(opCtx);
-    }
 }
 
 void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx) {

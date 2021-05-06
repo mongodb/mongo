@@ -109,8 +109,6 @@ void ShardingDDLCoordinator::interrupt(Status status) {
                 "coordinatorId"_attr = _coorMetadata.getId(),
                 "reason"_attr = redact(status));
 
-    _interrupt(status);
-
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
     if (!_constructionCompletionPromise.getFuture().isReady()) {

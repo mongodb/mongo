@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
@@ -70,6 +72,11 @@ public:
      * returned pointer must not be stored.
      */
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Returns the names of the collections that have a CollectionShardingState.
+     */
+    static std::vector<NamespaceString> getCollectionNames(OperationContext* opCtx);
 
     /**
      * Obtain a pointer to the CollectionShardingState that remains safe to access without holding

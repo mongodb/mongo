@@ -46,11 +46,11 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -331,22 +331,6 @@ void ReshardingDonorService::DonorStateMachine::_runMandatoryCleanup(Status stat
             _completionPromise.setError(status);
         }
     }
-
-    // TODO SERVER-56040: this if-stmt must be removed.
-    if (status.isA<ErrorCategory::NotPrimaryError>() ||
-        status.isA<ErrorCategory::ShutdownError>()) {
-        auto client = cc().getServiceContext()->makeClient("ReshardingDonorCleanupClient");
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(),
-                                                                _metadata.getSourceNss());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
-        csr->clearFilteringMetadata(opCtx);
-    }
 }
 
 SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
@@ -431,7 +415,7 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kBlockingWrites) {
-        sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
+        RecoverableCriticalSectionService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
             opCtx,
             _metadata.getSourceNss(),
             _critSecReason,
@@ -441,11 +425,12 @@ void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     }
 
     if (coordinatorState >= CoordinatorStateEnum::kDecisionPersisted) {
-        sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(
-            opCtx,
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+        RecoverableCriticalSectionService::get(opCtx)
+            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                opCtx,
+                _metadata.getSourceNss(),
+                _critSecReason,
+                ShardingCatalogClient::kLocalWriteConcern);
 
         ensureFulfilledPromise(lk, _coordinatorHasDecisionPersisted);
     }
@@ -680,11 +665,11 @@ void ReshardingDonorService::DonorStateMachine::_transitionToDone() {
 
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        sharding_ddl_util::releaseRecoverableCriticalSection(
-            opCtx.get(),
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+        RecoverableCriticalSectionService::get(opCtx.get())
+            ->releaseRecoverableCriticalSection(opCtx.get(),
+                                                _metadata.getSourceNss(),
+                                                _critSecReason,
+                                                ShardingCatalogClient::kLocalWriteConcern);
     }
 
     _transitionState(DonorStateEnum::kDone);

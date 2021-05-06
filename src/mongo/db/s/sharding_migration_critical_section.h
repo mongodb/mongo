@@ -70,6 +70,11 @@ public:
     void exitCriticalSection();
 
     /**
+     * Sets the critical section back to the catch up phase, which disallows reads.
+     */
+    void rollbackCriticalSectionCommitPhaseToCatchUpPhase();
+
+    /**
      * Retrieves a critical section future to wait on. Will return boost::none if the migration is
      * not yet in the critical section or if the caller is a reader and the migration is not yet in
      * the commit phase.

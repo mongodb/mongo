@@ -57,6 +57,12 @@ void ShardingMigrationCriticalSection::exitCriticalSection() {
     }
 }
 
+void ShardingMigrationCriticalSection::rollbackCriticalSectionCommitPhaseToCatchUpPhase() {
+    invariant(_critSecSignal);
+    invariant(_readsShouldWaitOnCritSec);
+    _readsShouldWaitOnCritSec = false;
+}
+
 boost::optional<SharedSemiFuture<void>> ShardingMigrationCriticalSection::getSignal(
     Operation op) const {
     if (!_critSecSignal)

@@ -44,6 +44,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
@@ -51,7 +52,6 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/shard_key_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -282,22 +282,6 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     if (!_completionPromise.getFuture().isReady()) {
         _completionPromise.setError(status);
     }
-
-    // TODO SERVER-56040: this if-stmt must be removed.
-    if (status.isA<ErrorCategory::NotPrimaryError>() ||
-        status.isA<ErrorCategory::ShutdownError>()) {
-        auto client = cc().getServiceContext()->makeClient("ReshardingRecipientCleanupClient");
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(),
-                                                                _metadata.getSourceNss());
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
-        csr->clearFilteringMetadata(opCtx);
-    }
 }
 
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
@@ -326,7 +310,7 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
         _onAbortOrStepdown(lk, status);
 
         if (!_isAlsoDonor) {
-            sharding_ddl_util::releaseRecoverableCriticalSection(
+            RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
                 opCtx,
                 _metadata.getSourceNss(),
                 _critSecReason,
@@ -533,11 +517,12 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this] {
             if (!_isAlsoDonor) {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx.get(),
-                    _metadata.getSourceNss(),
-                    _critSecReason,
-                    ShardingCatalogClient::kMajorityWriteConcern);
+                RecoverableCriticalSectionService::get(opCtx.get())
+                    ->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx.get(),
+                        _metadata.getSourceNss(),
+                        _critSecReason,
+                        ShardingCatalogClient::kMajorityWriteConcern);
             }
 
             _transitionState(RecipientStateEnum::kStrictConsistency);
@@ -566,11 +551,12 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
     if (!_isAlsoDonor) {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
-        sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
-            opCtx.get(),
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+        RecoverableCriticalSectionService::get(opCtx.get())
+            ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                opCtx.get(),
+                _metadata.getSourceNss(),
+                _critSecReason,
+                ShardingCatalogClient::kLocalWriteConcern);
 
         RenameCollectionOptions options;
         options.dropTarget = true;
@@ -578,11 +564,11 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
         uassertStatusOK(renameCollection(
             opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
 
-        sharding_ddl_util::releaseRecoverableCriticalSection(
-            opCtx.get(),
-            _metadata.getSourceNss(),
-            _critSecReason,
-            ShardingCatalogClient::kLocalWriteConcern);
+        RecoverableCriticalSectionService::get(opCtx.get())
+            ->releaseRecoverableCriticalSection(opCtx.get(),
+                                                _metadata.getSourceNss(),
+                                                _critSecReason,
+                                                ShardingCatalogClient::kLocalWriteConcern);
     }
 
     _cleanupReshardingCollections();

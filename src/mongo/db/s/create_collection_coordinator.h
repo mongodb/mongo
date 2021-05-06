@@ -69,8 +69,6 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
-    void _interrupt(Status status) noexcept override;
-
     template <typename Func>
     auto _executePhase(const Phase& newPhase, Func&& func) {
         return [=] {

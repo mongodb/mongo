@@ -100,6 +100,16 @@ public:
         builder->appendNumber("rangeDeleterTasks", totalNumberOfRangesScheduledForDeletion);
     }
 
+    std::vector<NamespaceString> getCollectionNames() {
+        stdx::lock_guard lg(_mutex);
+        std::vector<NamespaceString> result;
+        result.reserve(_collections.size());
+        for (const auto& [ns, _] : _collections) {
+            result.emplace_back(ns);
+        }
+        return result;
+    }
+
 private:
     using CollectionsMap = StringMap<std::shared_ptr<CollectionShardingState>>;
 
@@ -146,6 +156,11 @@ void CollectionShardingState::appendInfoForServerStatus(OperationContext* opCtx,
                                                         BSONObjBuilder* builder) {
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
     collectionsMap->appendInfoForServerStatus(builder);
+}
+
+std::vector<NamespaceString> CollectionShardingState::getCollectionNames(OperationContext* opCtx) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    return collectionsMap->getCollectionNames();
 }
 
 void CollectionShardingStateFactory::set(ServiceContext* service,

@@ -39,6 +39,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_util.h"
+#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -230,13 +231,14 @@ SemiFuture<void> RenameParticipantInstance::run(
                     BSON("command"
                          << "rename"
                          << "from" << fromNss().toString() << "to" << toNss().toString());
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
+                auto service = RecoverableCriticalSectionService::get(opCtx);
+                service->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(
+                service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockWrites(
+                service->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx, toNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                sharding_ddl_util::acquireRecoverableCriticalSectionBlockReads(
+                service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx, toNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
 
                 snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());
@@ -290,9 +292,10 @@ SemiFuture<void> RenameParticipantInstance::run(
                     BSON("command"
                          << "rename"
                          << "from" << fromNss().toString() << "to" << toNss().toString());
-                sharding_ddl_util::releaseRecoverableCriticalSection(
+                auto service = RecoverableCriticalSectionService::get(opCtx);
+                service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
-                sharding_ddl_util::releaseRecoverableCriticalSection(
+                service->releaseRecoverableCriticalSection(
                     opCtx, toNss(), reason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(fromNss());
@@ -347,24 +350,9 @@ void RenameParticipantInstance::interrupt(Status status) noexcept {
                 "toNs"_attr = toNss(),
                 "error"_attr = redact(status));
 
-    auto releaseInMemoryCritSec = [](const NamespaceString& nss) {
-        auto client = cc().getServiceContext()->makeClient("RenameParticipantCleanupClient");
-        AlternativeClientRegion acr(client);
-        auto opCtxHolder = cc().makeOperationContext();
-        auto* opCtx = opCtxHolder.get();
-
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        auto* const csr = CollectionShardingRuntime::get_UNSAFE(opCtx->getServiceContext(), nss);
-        auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-        csr->exitCriticalSection(csrLock);
-        csr->clearFilteringMetadata(opCtx);
-    };
-
     invariant(status.isA<ErrorCategory::NotPrimaryError>() ||
               status.isA<ErrorCategory::ShutdownError>());
 
-    releaseInMemoryCritSec(fromNss());
-    releaseInMemoryCritSec(toNss());
     _invalidateFutures(status);
 }
 
