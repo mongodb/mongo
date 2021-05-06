@@ -422,12 +422,10 @@ def _configure_logging(verbose: bool):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
 
-def _get_evg_build_variant_by_name(
-    evergreen_conf: EvergreenProjectConfig, name: str
-) -> Variant:
+def _get_evg_build_variant_by_name(evergreen_conf: EvergreenProjectConfig, name: str) -> Variant:
     """
     Get the evergreen build variant by name from the evergreen config file.
-    
+
     :param evergreen_conf: The evergreen config file.
     :param name: The build variant name to find.
     :return: The evergreen build variant.
