@@ -10,26 +10,27 @@
 %define _rundir %{_localstatedir}/run
 %endif
 
-Name: mongodb-enterprise-unstable
+%define _name mongodb-enterprise-unstable
+
+Name: %{_name}-database
 Prefix: /usr
 Prefix: /var
 Prefix: /etc
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-cryptd, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
-Obsoletes: mongodb-enterprise-unstable,mongo-enterprise-unstable
 Version: %{dynamic_version}
 Release: %{dynamic_release}%{?dist}
 Summary: MongoDB open source document-oriented database system (enterprise metapackage)
 License: Commercial
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongodb-enterprise-unstable-server = %{version}, mongodb-enterprise-unstable-shell = %{version}, mongodb-enterprise-unstable-mongos = %{version}, mongodb-enterprise-unstable-tools = %{version}, mongodb-enterprise-unstable-cryptd = %{version}
+Requires: mongodb-enterprise-unstable-cryptd, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-tools, mongodb-enterprise-unstable-database-tools-extra, mongodb-enterprise-unstable-shell
 
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 BuildRequires: /usr/bin/pathfix.py, python3-devel
 %endif
 
-Source0: %{name}-%{version}.tar.gz
-BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+Source0: %{_name}-%{version}.tar.gz
+BuildRoot: %{_tmppath}/%{_name}-%{version}-%{release}-root
 
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 %define python_pkg python3
@@ -62,11 +63,37 @@ MongoDB features:
 
 This metapackage will install the mongo shell, import/export tools, other client utilities, server software, default configuration, and systemd service files.
 
-%package server
+%package -n mongodb-enterprise-unstable
+Summary: MongoDB open source document-oriented database system (enterprise metapackage)
+Group: Applications/Databases
+Requires: mongodb-enterprise-unstable-database
+Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-enterprise-cryptd, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Provides: mongo-10gen-enterprise
+
+%description -n mongodb-enterprise-unstable
+MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+
+MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+
+MongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+
+MongoDB features:
+* JSON Data Model with Dynamic Schemas
+* Auto-Sharding for Horizontal Scalability
+* Built-In Replication for High Availability
+* Rich Secondary Indexes, including geospatial
+* TTL indexes
+* Text Search
+* Aggregation Framework & Native MapReduce
+
+This metapackage will install the mongo shell, import/export tools, other client utilities, server software, default configuration, and systemd service files.
+
+%package -n mongodb-enterprise-unstable-server
 Summary: MongoDB database server (enterprise)
 Group: Applications/Databases
 Requires: openssl, net-snmp, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi, %{timezone_pkg}
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Provides: mongo-10gen-enterprise-server
 
 %if 0%{?suse_version} >= 1210 || 0%{?rhel} >= 700 || 0%{?fedora} >= 15
 BuildRequires: systemd-rpm-macros
@@ -75,7 +102,7 @@ BuildRequires: systemd
 %{?systemd_requires}
 %endif
 
-%description server
+%description -n mongodb-enterprise-unstable-server
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -93,13 +120,14 @@ MongoDB features:
 
 This package contains the MongoDB server software, default configuration files, and systemd service files.
 
-%package shell
+%package -n mongodb-enterprise-unstable-shell
 Summary: MongoDB shell client (enterprise)
 Group: Applications/Databases
 Requires: openssl, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Provides: mongo-10gen-enterprise-shell
 
-%description shell
+%description -n mongodb-enterprise-unstable-shell
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -117,13 +145,14 @@ MongoDB features:
 
 This package contains the mongo shell.
 
-%package mongos
+%package -n mongodb-enterprise-unstable-mongos
 Summary: MongoDB sharded cluster query router (enterprise)
 Group: Applications/Databases
 Requires: %{timezone_pkg}
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Provides: mongo-10gen-enterprise-mongos
 
-%description mongos
+%description -n mongodb-enterprise-unstable-mongos
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -141,13 +170,13 @@ MongoDB features:
 
 This package contains mongos, the MongoDB sharded cluster query router.
 
-%package tools
+%package -n mongodb-enterprise-unstable-tools
 Summary: MongoDB tools metapackage (enterprise)
 Group: Applications/Databases
-Requires: mongodb-database-tools, mongodb-enterprise-unstable-database-tools-extra = %{version}
+Requires: mongodb-database-tools, mongodb-enterprise-unstable-database-tools-extra
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 
-%description tools
+%description -n mongodb-enterprise-unstable-tools
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -165,13 +194,13 @@ MongoDB features:
 
 This metapackage exists to simplfy acquisition of both the database tools and the extra database tools.
 
-%package database-tools-extra
+%package -n mongodb-enterprise-unstable-database-tools-extra
 Summary: MongoDB extra database tools (enterprise)
 Group: Applications/Databases
 Requires: openssl, cyrus-sasl, cyrus-sasl-plain, cyrus-sasl-gssapi, %{python_pkg}
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-org-database-tools-extra, mongodb-org-unstable-database-tools-extra, mongodb-enterprise-database-tools-extra, mongodb-enterprise-unstable-tools <= 4.2
 
-%description database-tools-extra
+%description -n mongodb-enterprise-unstable-database-tools-extra
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -189,13 +218,13 @@ MongoDB features:
 
 This package contains extra database tools, like the Compass installer, mongodecrypt, mongoldap, and mongokerberos.
 
-%package cryptd
+%package -n mongodb-enterprise-unstable-cryptd
 Summary: MongoDB Client Side Field Level Encryption Support Daemon (enterprise)
 Group: Applications/Databases
 Requires: openssl, cyrus-sasl
 Conflicts: mongodb-enterprise-cryptd
 
-%description cryptd
+%description -n mongodb-enterprise-unstable-cryptd
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -213,12 +242,12 @@ MongoDB features:
 
 This package contains mongocryptd, the Client Side Field Level Encryption Support Daemon.
 
-%package devel
+%package -n mongodb-enterprise-unstable-devel
 Summary: Headers and libraries for MongoDB development.
 Group: Applications/Databases
 Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
 
-%description devel
+%description -n mongodb-enterprise-unstable-devel
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
 
 MongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
@@ -240,7 +269,7 @@ This package provides the MongoDB static library and header files needed to deve
 %global debug_package %{nil}
 
 %prep
-%setup
+%setup -n %{_name}-%{version}
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 pathfix.py -pni "%{__python3} %{py3_shbang_opts}" bin/install_compass
 %endif
@@ -266,7 +295,7 @@ touch $RPM_BUILD_ROOT%{_localstatedir}/log/mongodb/mongod.log
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%pre server
+%pre -n mongodb-enterprise-unstable-server
 if ! /usr/bin/id -g mongod &>/dev/null; then
     /usr/sbin/groupadd -r mongod
 fi
@@ -274,7 +303,7 @@ if ! /usr/bin/id mongod &>/dev/null; then
     /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false   -c mongod mongod > /dev/null 2>&1
 fi
 
-%post server
+%post -n mongodb-enterprise-unstable-server
 if test $1 = 1
 then
   /usr/bin/systemctl enable mongod
@@ -285,13 +314,13 @@ then
 fi
 
 
-%preun server
+%preun -n mongodb-enterprise-unstable-server
 if test $1 = 0
 then
   /usr/bin/systemctl disable mongod
 fi
 
-%postun server
+%postun -n mongodb-enterprise-unstable-server
 if test $1 -ge 1
 then
   /usr/bin/systemctl restart mongod >/dev/null 2>&1 || :
@@ -299,7 +328,9 @@ fi
 
 %files
 
-%files server
+%files -n mongodb-enterprise-unstable
+
+%files -n mongodb-enterprise-unstable-server
 %defattr(-,root,root,-)
 %config(noreplace) %{_sysconfdir}/mongod.conf
 %{_bindir}/mongod
@@ -319,19 +350,19 @@ fi
 %doc THIRD-PARTY-NOTICES
 %doc MPL-2
 
-%files shell
+%files -n mongodb-enterprise-unstable-shell
 %defattr(-,root,root,-)
 %{_bindir}/mongo
 %{_mandir}/man1/mongo.1*
 
-%files mongos
+%files -n mongodb-enterprise-unstable-mongos
 %defattr(-,root,root,-)
 %{_bindir}/mongos
 %{_mandir}/man1/mongos.1*
 
-%files tools
+%files -n mongodb-enterprise-unstable-tools
 
-%files database-tools-extra
+%files -n mongodb-enterprise-unstable-database-tools-extra
 %defattr(-,root,root,-)
 
 %{_bindir}/install_compass
@@ -342,7 +373,7 @@ fi
 %{_mandir}/man1/mongoldap.1*
 %{_mandir}/man1/mongokerberos.1*
 
-%files cryptd
+%files -n mongodb-enterprise-unstable-cryptd
 %defattr(-,root,root,-)
 %{_bindir}/mongocryptd
 
