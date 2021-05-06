@@ -94,52 +94,6 @@ function TenantMigrationTest({
     }
 
     /**
-     * Creates a role for running find command against config.external_validation_keys if it
-     * doesn't exist.
-     */
-    function createFindExternalClusterTimeKeysRoleIfNotExist(rst) {
-        const adminDB = rst.getPrimary().getDB("admin");
-
-        if (TenantMigrationUtil.roleExists(adminDB, "findExternalClusterTimeKeysRole")) {
-            return;
-        }
-
-        assert.commandWorked(adminDB.runCommand({
-            createRole: "findExternalClusterTimeKeysRole",
-            privileges: [{
-                resource: {db: "config", collection: "external_validation_keys"},
-                actions: ["find"]
-            }],
-            roles: []
-        }));
-    }
-
-    /**
-     * Gives the current admin database user the privilege to run find commands against
-     * config.external_validation_keys if it does not have that privilege. Used by
-     * 'assertNoDuplicatedExternalKeyDocs' below.
-     */
-    function grantFindExternalClusterTimeKeysPrivilegeIfNeeded(rst) {
-        const adminDB = rst.getPrimary().getDB("admin");
-        const users = assert.commandWorked(adminDB.runCommand({connectionStatus: 1}))
-                          .authInfo.authenticatedUsers;
-
-        if (users.length === 0 || users[0].user === "__system" || users[0].db != "admin") {
-            return;
-        }
-
-        const userRoles = adminDB.getUser(users[0].user).roles;
-
-        if (userRoles.includes("findExternalClusterTimeKeysRole")) {
-            return;
-        }
-
-        createFindExternalClusterTimeKeysRoleIfNotExist(rst);
-        userRoles.push("findExternalClusterTimeKeysRole");
-        assert.commandWorked(adminDB.runCommand({updateUser: users[0].user, roles: userRoles}));
-    }
-
-    /**
      * Returns whether tenant migration commands are supported.
      */
     this.isFeatureFlagEnabled = function() {
