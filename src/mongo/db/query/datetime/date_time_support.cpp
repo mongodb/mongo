@@ -644,14 +644,28 @@ inline long long daysBetweenYears(long startYear, long endYear) {
 
 /**
  * Determines a correction needed in number of hours when calculating passed hours between two time
- * instants 'startInstant' and 'endInstant' due to the Daylight Savings Time. Returns 0, if both
- * time instants 'startInstant' and 'endInstant' are either in Standard Time (ST) or in Daylight
- * Saving Time (DST); returns 1, if 'endInstant' is in ST and 'startInstant' is in DST and
- * 'endInstant' > 'startInstant' or 'endInstant' is in DST and 'startInstant' is in ST and
- * 'endInstant' < 'startInstant'; otherwise returns -1.
+ * instants 'startInstant' and 'endInstant' due to different UTC offsets.
  */
-inline long long dstCorrection(timelib_time* startInstant, timelib_time* endInstant) {
+inline long long utcOffsetCorrectionForHours(timelib_time* startInstant, timelib_time* endInstant) {
     return (startInstant->z - endInstant->z) / (kMinutesPerHour * kSecondsPerMinute);
+}
+
+/**
+ * Determines a correction needed in number of minutes when calculating passed minutes between two
+ * time instants 'startInstant' and 'endInstant' due to different UTC offsets.
+ */
+inline long long utcOffsetCorrectionForMinutes(timelib_time* startInstant,
+                                               timelib_time* endInstant) {
+    return (startInstant->z - endInstant->z) / kSecondsPerMinute;
+}
+
+/**
+ * Determines a correction needed in number of seconds when calculating passed seconds between two
+ * time instants 'startInstant' and 'endInstant' due to different UTC offsets.
+ */
+inline long long utcOffsetCorrectionForSeconds(timelib_time* startInstant,
+                                               timelib_time* endInstant) {
+    return startInstant->z - endInstant->z;
 }
 inline long long dateDiffYear(Date startInstant, Date endInstant) {
     return endInstant.year - startInstant.year;
@@ -698,18 +712,27 @@ inline long long dateDiffWeek(Date startInstant, Date endInstant, DayOfWeek star
             dayOfWeek(endInstant, startOfWeek)) /
         kDaysPerWeek;
 }
+inline long long dateDiffHourWithoutUTCOffsetCorrection(timelib_time* startInstant,
+                                                        timelib_time* endInstant) {
+    return endInstant->h - startInstant->h + dateDiffDay(*startInstant, *endInstant) * kHoursPerDay;
+}
 inline long long dateDiffHour(timelib_time* startInstant, timelib_time* endInstant) {
-    return endInstant->h - startInstant->h +
-        dateDiffDay(*startInstant, *endInstant) * kHoursPerDay +
-        dstCorrection(startInstant, endInstant);
+    return dateDiffHourWithoutUTCOffsetCorrection(startInstant, endInstant) +
+        utcOffsetCorrectionForHours(startInstant, endInstant);
+}
+inline long long dateDiffMinuteWithoutUTCOffsetCorrection(timelib_time* startInstant,
+                                                          timelib_time* endInstant) {
+    return endInstant->i - startInstant->i +
+        dateDiffHourWithoutUTCOffsetCorrection(startInstant, endInstant) * kMinutesPerHour;
 }
 inline long long dateDiffMinute(timelib_time* startInstant, timelib_time* endInstant) {
-    return endInstant->i - startInstant->i +
-        dateDiffHour(startInstant, endInstant) * kMinutesPerHour;
+    return dateDiffMinuteWithoutUTCOffsetCorrection(startInstant, endInstant) +
+        utcOffsetCorrectionForMinutes(startInstant, endInstant);
 }
 inline long long dateDiffSecond(timelib_time* startInstant, timelib_time* endInstant) {
     return endInstant->s - startInstant->s +
-        dateDiffMinute(startInstant, endInstant) * kSecondsPerMinute;
+        dateDiffMinuteWithoutUTCOffsetCorrection(startInstant, endInstant) * kSecondsPerMinute +
+        utcOffsetCorrectionForSeconds(startInstant, endInstant);
 }
 inline long long dateDiffMillisecond(Date_t startDate, Date_t endDate) {
     long long result;

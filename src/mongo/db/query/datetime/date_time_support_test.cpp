@@ -1218,6 +1218,9 @@ const TimeZone kAustraliaSydneyTimeZone =
     kDefaultTimeZoneDatabase.getTimeZone("Australia/Sydney");  // UTC offset +11:00.
 const TimeZone kUTCMinus10TimeZone =
     kDefaultTimeZoneDatabase.getTimeZone("-10:00");  // UTC offset -10:00.
+const TimeZone kAustraliaLordHoweTimeZone =
+    kDefaultTimeZoneDatabase.getTimeZone("Australia/Lord_Howe");
+const TimeZone kEuropeMadridTimeZone = kDefaultTimeZoneDatabase.getTimeZone("Europe/Madrid");
 const std::vector<const TimeZone*> kTimezones{&kDefaultTimeZone,
                                               &kNewYorkTimeZone,
                                               &kAustraliaEuclaTimeZone,
@@ -1499,6 +1502,27 @@ TEST(DateDiff, Hour) {
                        kNewYorkTimeZone.createFromDateParts(2001, 1, 1, 1, 0, 0, 0),
                        TimeUnit::hour,
                        kNewYorkTimeZone));
+
+    // Tests with Australia/Lord_Howe time zone that has 00:30 hour Daylight Savings Time (DST) UTC
+    // offset change. 'startDate' and 'endDate' parameters span a transition from/to DST.
+    //
+    // Verify that even when the UTC offset change is 30 minutes on transition from DST to Standard
+    // Time, time difference in hours is based on the local time. In the test 1.5h of real time
+    // passes, but the returned difference is 1h.
+    ASSERT_EQ(1,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(2021, 4, 4, 1, 0, 0, 0),
+                       kAustraliaLordHoweTimeZone.createFromDateParts(2021, 4, 4, 2, 0, 0, 0),
+                       TimeUnit::hour,
+                       kAustraliaLordHoweTimeZone));
+
+    // Verify that even when the UTC offset change is 30 minutes on transition from Standard Time to
+    // DST, time difference in hours is based on the local time. In the test 1h of real time passes
+    // and the returned difference is 1h.
+    ASSERT_EQ(1,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(2021, 10, 3, 1, 0, 0, 0),
+                       kAustraliaLordHoweTimeZone.createFromDateParts(2021, 10, 3, 2, 30, 0, 0),
+                       TimeUnit::hour,
+                       kAustraliaLordHoweTimeZone));
 }
 
 // Verifies 'dateDiff()' with TimeUnit::minute.
@@ -1518,11 +1542,28 @@ TEST(DateDiff, Minute) {
                        kNewYorkTimeZone.createFromDateParts(2020, 11, 8, 1, 30, 59, 999),
                        TimeUnit::minute,
                        kNewYorkTimeZone));
-    ASSERT_EQ(234047495,
+    ASSERT_EQ(234047498,
               dateDiff(kNewYorkTimeZone.createFromDateParts(1585, 11, 8, 1, 55, 0, 0),
                        kNewYorkTimeZone.createFromDateParts(2030, 11, 8, 1, 30, 59, 999),
                        TimeUnit::minute,
                        kNewYorkTimeZone));
+
+    // Tests with Australia/Lord_Howe time zone that has 00:30 hour Daylight Savings Time (DST) UTC
+    // offset change. 'startDate' and 'endDate' parameters span a transition from/to DST.
+    ASSERT_EQ(90,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 4, 4, 1, 0, 0, 0),  // UTC 2021-04-03T14:00:00
+                       kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 4, 4, 2, 0, 0, 0),  // UTC 2021-04-03T15:30:00
+                       TimeUnit::minute,
+                       kAustraliaLordHoweTimeZone));
+    ASSERT_EQ(60,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 10, 3, 1, 0, 0, 0),  // UTC 2021-10-02T14:30:00
+                       kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 10, 3, 2, 30, 0, 0),  // UTC 2021-10-02T15:30:00
+                       TimeUnit::minute,
+                       kAustraliaLordHoweTimeZone));
 }
 
 // Verifies 'dateDiff()' with TimeUnit::second.
@@ -1547,6 +1588,40 @@ TEST(DateDiff, Second) {
                        kDefaultTimeZone.createFromDateParts(2020, 11, 10, 1, 30, 16, 0),
                        TimeUnit::second,
                        kNewYorkTimeZone));
+
+    // Verify that negative milliseconds from the Unix Epoch are properly handled.
+    ASSERT_EQ(2,
+              dateDiff(kDefaultTimeZone.createFromDateParts(1969, 12, 31, 23, 59, 59, 999),
+                       kDefaultTimeZone.createFromDateParts(1970, 1, 1, 0, 0, 1, 0),
+                       TimeUnit::second,
+                       kDefaultTimeZone));
+
+    // Tests with Australia/Lord_Howe time zone that has 00:30 hour Daylight Savings Time (DST) UTC
+    // offset change. 'startDate' and 'endDate' parameters span a transition from/to DST.
+    const int secondsPerMinute{60};
+    ASSERT_EQ(90 * secondsPerMinute,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 4, 4, 1, 0, 0, 0),  // UTC 2021-04-03T14:00:00
+                       kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 4, 4, 2, 0, 0, 0),  // UTC 2021-04-03T15:30:00
+                       TimeUnit::second,
+                       kAustraliaLordHoweTimeZone));
+    ASSERT_EQ(60 * secondsPerMinute,
+              dateDiff(kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 10, 3, 1, 0, 0, 0),  // UTC 2021-10-02T14:30:00
+                       kAustraliaLordHoweTimeZone.createFromDateParts(
+                           2021, 10, 3, 2, 30, 0, 0),  // UTC 2021-10-02T15:30:00
+                       TimeUnit::second,
+                       kAustraliaLordHoweTimeZone));
+
+    // Verify that UTC offset adjustments are properly accounted for when calculating the time
+    // difference. Time zone Europe/Madrid skips 0:14:44 hours at 1900-12-31 23:45:15 to change the
+    // timezone to UTC.
+    ASSERT_EQ(1,
+              dateDiff(kEuropeMadridTimeZone.createFromDateParts(1900, 12, 31, 23, 45, 15, 0),
+                       kEuropeMadridTimeZone.createFromDateParts(1901, 1, 1, 0, 0, 0, 0),
+                       TimeUnit::second,
+                       kEuropeMadridTimeZone));
 }
 
 // Verifies 'dateDiff()' with TimeUnit::millisecond.
