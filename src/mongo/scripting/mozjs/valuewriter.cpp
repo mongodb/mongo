@@ -359,10 +359,14 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
                 auto binData = base64::decode(*str);
 
+                auto subType = o.getNumber(InternedString::type);
+                uassert(5677700,
+                        "BinData sub type must be between 0 and 255",
+                        subType >= 0 && subType <= 255);
+
                 b->appendBinData(sd,
                                  binData.size(),
-                                 static_cast<mongo::BinDataType>(
-                                     static_cast<int>(o.getNumber(InternedString::type))),
+                                 static_cast<mongo::BinDataType>(static_cast<int>(subType)),
                                  binData.c_str());
 
                 return;
