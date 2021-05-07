@@ -413,12 +413,17 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
-    WT_SESSION_IMPL *tiered_session;  /* Tiered thread session */
-    wt_thread_t tiered_tid;           /* Tiered thread */
-    bool tiered_tid_set;              /* Tiered thread set */
-    WT_CONDVAR *tiered_cond;          /* Tiered wait mutex */
-    WT_TIERED_MANAGER tiered_manager; /* Tiered worker thread information */
-    bool tiered_server_running;       /* Internal tiered server operating */
+    WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
+    wt_thread_t tiered_tid;          /* Tiered thread */
+    bool tiered_tid_set;             /* Tiered thread set */
+    WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
+    bool tiered_server_running;      /* Internal tiered server operating */
+
+    WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */
+    WT_SESSION_IMPL *tiered_mgr_session; /* Tiered manager thread session */
+    wt_thread_t tiered_mgr_tid;          /* Tiered manager thread */
+    bool tiered_mgr_tid_set;             /* Tiered manager thread set */
+    WT_CONDVAR *tiered_mgr_cond;         /* Tiered manager wait mutex */
 
     uint32_t tiered_threads_max; /* Max tiered threads */
     uint32_t tiered_threads_min; /* Min tiered threads */
@@ -621,6 +626,7 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_STATISTICS 0x10u
 #define WT_CONN_SERVER_SWEEP 0x20u
 #define WT_CONN_SERVER_TIERED 0x40u
+#define WT_CONN_SERVER_TIERED_MGR 0x80u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t server_flags;
 
