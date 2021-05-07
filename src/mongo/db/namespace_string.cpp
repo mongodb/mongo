@@ -85,6 +85,9 @@ const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::
 const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString::kConfigDb,
                                                                 "settings");
 
+const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
+                                                              "image_collection");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

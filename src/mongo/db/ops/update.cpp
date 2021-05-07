@@ -95,11 +95,23 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     auto exec = uassertStatusOK(
         getExecutorUpdate(nullOpDebug, collection, &parsedUpdate, boost::none /* verbosity */));
 
+    BSONObj docImage;
+    PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+    if (request.shouldReturnAnyDocs()) {
+        state = exec->getNext(&docImage, nullptr);
+    }
+
+    BSONObj unused;
+    while (state == PlanExecutor::ADVANCED) {
+        state = exec->getNext(&unused, nullptr);
+    }
     uassertStatusOK(exec->executePlan());
 
     const UpdateStats* updateStats = UpdateStage::getUpdateStats(exec.get());
 
-    return UpdateStage::makeUpdateResult(updateStats);
+    UpdateResult result = UpdateStage::makeUpdateResult(updateStats);
+    result.requestedDocImage = docImage.getOwned();
+    return result;
 }
 
 BSONObj applyUpdateOperators(OperationContext* opCtx,

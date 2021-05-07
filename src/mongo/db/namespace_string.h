@@ -114,6 +114,9 @@ public:
     // Namespace for balancer settings and default read and write concerns.
     static const NamespaceString kConfigSettingsNamespace;
 
+    // Namespace used for storing retryable findAndModify images.
+    static const NamespaceString kConfigImagesNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

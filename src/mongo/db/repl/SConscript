@@ -41,6 +41,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'dbcheck',
+        'image_collection_entry',
         'local_oplog_info',
         'repl_coordinator_interface',
         'repl_settings',
@@ -1455,5 +1456,18 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authservercommon',
         '$BUILD_DIR/mongo/db/commands/authentication_commands',
+    ],
+)
+
+env.Library(
+    target='image_collection_entry',
+    source=[
+        'image_collection_entry.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'oplog_entry',
     ],
 )

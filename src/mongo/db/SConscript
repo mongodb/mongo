@@ -802,6 +802,8 @@ env.Library(
         "$BUILD_DIR/mongo/s/grid",
     ],
     LIBDEPS_PRIVATE=[
+        'dbhelpers',
+        'repl/image_collection_entry',
         'repl/repl_server_parameters',
         'transaction',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
