@@ -754,10 +754,6 @@ __wt_conn_remove_storage_source(WT_SESSION_IMPL *session)
         while ((bstorage = TAILQ_FIRST(&nstorage->bucketqh)) != NULL) {
             /* Remove from the connection's list, free memory. */
             TAILQ_REMOVE(&nstorage->bucketqh, bstorage, q);
-            storage = bstorage->storage_source;
-            WT_ASSERT(session, storage != NULL);
-            if (bstorage->owned && storage->terminate != NULL)
-                WT_TRET(storage->terminate(storage, (WT_SESSION *)session));
             __wt_free(session, bstorage->auth_token);
             __wt_free(session, bstorage->bucket);
             __wt_free(session, bstorage);
@@ -2806,6 +2802,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     WT_ERR(__conn_builtin_extensions(conn, cfg));
     WT_ERR(__conn_load_extensions(session, cfg, false));
+
+    /*
+     * Do some early initialization for tiered storage, as this may affect our choice of file system
+     * for some operations.
+     */
+    WT_ERR(__wt_tiered_conn_config(session, cfg, false));
 
     /*
      * The metadata/log encryptor is configured after extensions, since

@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wtscenario, wttest
+import os, wiredtiger, wtscenario, wttest
 from wtdataset import SimpleDataSet
 
 # test_tiered02.py
@@ -37,27 +37,83 @@ class test_tiered02(wttest.WiredTigerTestCase):
     G = 1024 * M
     uri = "file:test_tiered02"
 
-    # Occasionally add a lot of records, so that merges (and bloom) happen.
-    record_count_scenarios = wtscenario.quick_scenarios(
-        'nrecs', [10, 10000], [0.9, 0.1])
+    auth_token = "test_token"
+    bucket = "mybucket"
+    bucket_prefix = "pfx_"
+    extension_name = "local_store"
 
-    scenarios = wtscenario.make_scenarios(record_count_scenarios, prune=100, prunelong=500)
+    def conn_config(self):
+        os.makedirs(self.bucket, exist_ok=True)
+        return \
+            'tiered_storage=(auth_token={},bucket={},bucket_prefix={},name={})'.format( \
+            self.auth_token, self.bucket, self.bucket_prefix, self.extension_name)
 
-    # Test drop of an object.
+    # Load the local store extension, but skip the test if it is missing.
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('storage_sources', self.extension_name)
+
+    def confirm_flush(self, increase=True):
+        # TODO: tiered: flush tests disabled, as the interface
+        # for flushing will be changed.
+        return
+
+        self.flushed_objects
+        got = sorted(list(os.listdir(self.bucket)))
+        self.pr('Flushed objects: ' + str(got))
+        if increase:
+            self.assertGreater(len(got), self.flushed_objects)
+        else:
+            self.assertEqual(len(got), self.flushed_objects)
+        self.flushed_objects = len(got)
+
+    # Test tiered storage with the old prototype way of signaling flushing to the shared
+    # tier via checkpoints.  When flush_tier is working, the checkpoint calls can be
+    # replaced with flush_tier.
     def test_tiered(self):
+        self.flushed_objects = 0
         args = 'key_format=S,block_allocation=log-structured'
-        self.verbose(3,
-            'Test log-structured allocation with config: ' + args + ' count: ' + str(self.nrecs))
-        #ds = SimpleDataSet(self, self.uri, self.nrecs, config=args)
+        self.verbose(3, 'Test log-structured allocation with config: ' + args)
+
         ds = SimpleDataSet(self, self.uri, 10, config=args)
         ds.populate()
+        ds.check()
         self.session.checkpoint()
-        ds = SimpleDataSet(self, self.uri, 10000, config=args)
+        # For some reason, every checkpoint does not cause a flush.
+        # As we're about to move to a new model of flushing, we're not going to chase this error.
+        #self.confirm_flush()
+
+        ds = SimpleDataSet(self, self.uri, 50, config=args)
         ds.populate()
+        ds.check()
+        self.session.checkpoint()
+        self.confirm_flush()
+
+        ds = SimpleDataSet(self, self.uri, 100, config=args)
+        ds.populate()
+        ds.check()
+        self.session.checkpoint()
+        self.confirm_flush()
+
+        ds = SimpleDataSet(self, self.uri, 200, config=args)
+        ds.populate()
+        ds.check()
+        self.close_conn()
+        self.confirm_flush()  # closing the connection does a checkpoint
 
         self.reopen_conn()
-        ds = SimpleDataSet(self, self.uri, 1000, config=args)
+        # Check what was there before
+        ds = SimpleDataSet(self, self.uri, 200, config=args)
+        ds.check()
+
+        # Now add some more.
+        ds = SimpleDataSet(self, self.uri, 300, config=args)
         ds.populate()
+        ds.check()
+
+        # We haven't done a checkpoint/flush so there should be
+        # nothing extra on the shared tier.
+        self.confirm_flush(increase=False)
 
 if __name__ == '__main__':
     wttest.run()

@@ -54,6 +54,15 @@ struct __wt_bucket_storage {
     uint32_t flags;
 };
 
+/* Call a function with the bucket storage and its associated file system. */
+#define WT_WITH_BUCKET_STORAGE(bsto, s, e)                                  \
+    do {                                                                    \
+        WT_BUCKET_STORAGE *__saved_bstorage = (s)->bucket_storage;          \
+        (s)->bucket_storage = ((bsto) == NULL ? S2C(s)->bstorage : (bsto)); \
+        e;                                                                  \
+        (s)->bucket_storage = __saved_bstorage;                             \
+    } while (0)
+
 /*
  * WT_KEYED_ENCRYPTOR --
  *	A list entry for an encryptor with a unique (name, keyid).
@@ -379,7 +388,8 @@ struct __wt_connection_impl {
 
     WT_LSM_MANAGER lsm_manager; /* LSM worker thread information */
 
-    WT_BUCKET_STORAGE *bstorage; /* Bucket storage for the connection */
+    WT_BUCKET_STORAGE *bstorage;     /* Bucket storage for the connection */
+    WT_BUCKET_STORAGE bstorage_none; /* Bucket storage for "none" */
 
     WT_KEYED_ENCRYPTOR *kencryptor; /* Encryptor for metadata and log */
 

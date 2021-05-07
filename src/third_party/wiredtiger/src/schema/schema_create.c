@@ -97,6 +97,29 @@ err:
 }
 
 /*
+ * __create_file_block_manager --
+ *     Create a new file in the block manager, and track it.
+ */
+static int
+__create_file_block_manager(
+  WT_SESSION_IMPL *session, const char *uri, const char *filename, uint32_t allocsize)
+{
+    WT_RET(__wt_block_manager_create(session, filename, allocsize));
+
+    /*
+     * Track the creation of this file.
+     *
+     * If something down the line fails, we're going to need to roll this back. Specifically do NOT
+     * track the op in the import case since we do not want to wipe a data file just because we fail
+     * to import it.
+     */
+    if (WT_META_TRACKING(session))
+        WT_RET(__wt_meta_track_fileop(session, NULL, uri));
+
+    return (0);
+}
+
+/*
  * __create_file --
  *     Create a new 'file:' object.
  */
@@ -189,20 +212,9 @@ __create_file(
                   uri);
             }
         }
-    } else {
+    } else
         /* Create the file. */
-        WT_ERR(__wt_block_manager_create(session, filename, allocsize));
-
-        /*
-         * Track the creation of this file.
-         *
-         * If something down the line fails, we're going to need to roll this back. Specifically do
-         * NOT track the op in the import case since we do not want to wipe a data file just because
-         * we fail to import it.
-         */
-        if (WT_META_TRACKING(session))
-            WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
-    }
+        WT_ERR(__create_file_block_manager(session, uri, filename, allocsize));
 
     /*
      * If creating an ordinary file, update the file ID and current version numbers and strip the

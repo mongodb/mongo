@@ -37,6 +37,10 @@ __tiered_dhandle_setup(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t i, 
     tier = &tiered->tiers[id];
     (void)__wt_atomic_addi32(&session->dhandle->session_inuse, 1);
     tier->tier = session->dhandle;
+
+    /* The Btree needs to use the bucket storage to do file system operations. */
+    if (session->dhandle->type == WT_DHANDLE_TYPE_BTREE)
+        ((WT_BTREE *)session->dhandle->handle)->bstorage = tiered->bstorage;
 err:
     WT_RET(__wt_session_release_dhandle(session));
     return (ret);

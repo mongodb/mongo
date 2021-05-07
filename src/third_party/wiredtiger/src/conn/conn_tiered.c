@@ -274,7 +274,8 @@ __wt_tiered_storage_create(WT_SESSION_IMPL *session, const char *cfg[], bool rec
 
     /* Destroy any existing thread since we could be a reconfigure. */
     WT_RET(__wt_tiered_storage_destroy(session));
-    WT_RET(__wt_tiered_conn_config(session, cfg, reconfig));
+    if (reconfig)
+        WT_RET(__wt_tiered_conn_config(session, cfg, reconfig));
     WT_RET(__tiered_manager_config(session, cfg, &start));
     if (!start)
         return (0);

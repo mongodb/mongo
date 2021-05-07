@@ -48,12 +48,6 @@ __tiered_common_config(WT_SESSION_IMPL *session, const char **cfg, WT_BUCKET_STO
     WT_RET(__wt_config_gets(session, cfg, "tiered_storage.object_target_size", &cval));
     bstorage->object_size = (uint64_t)cval.val;
 
-    WT_RET(__wt_config_gets(session, cfg, "tiered_storage.auth_token", &cval));
-    /*
-     * This call is purposely the last configuration processed so we don't need memory management
-     * code and an error label to free it. Note this if any code is added after this line.
-     */
-    WT_RET(__wt_strndup(session, cval.str, cval.len, &bstorage->auth_token));
     return (0);
 }
 
@@ -66,15 +60,11 @@ __wt_tiered_bucket_config(
   WT_SESSION_IMPL *session, const char *cfg[], WT_BUCKET_STORAGE **bstoragep)
 {
     WT_BUCKET_STORAGE *bstorage, *new;
-    WT_CONFIG_ITEM bucket, name, prefix;
+    WT_CONFIG_ITEM auth, bucket, name, prefix;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_NAMED_STORAGE_SOURCE *nstorage;
-#if 0
-    WT_STORAGE_SOURCE *custom, *storage;
-#else
     WT_STORAGE_SOURCE *storage;
-#endif
     uint64_t hash_bucket, hash;
 
     *bstoragep = NULL;
@@ -100,13 +90,14 @@ __wt_tiered_bucket_config(
     if (conn->bstorage == NULL && bstoragep != &conn->bstorage)
         WT_ERR_MSG(
           session, EINVAL, "table tiered storage requires connection tiered storage to be set");
-    /* A bucket and bucket_prefix are required. */
+    /* A bucket and bucket_prefix are required, auth_token is not. */
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket", &bucket));
     if (bucket.len == 0)
         WT_ERR_MSG(session, EINVAL, "table tiered storage requires bucket to be set");
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.bucket_prefix", &prefix));
     if (prefix.len == 0)
         WT_ERR_MSG(session, EINVAL, "table tiered storage requires bucket_prefix to be set");
+    WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.auth_token", &auth));
 
     hash = __wt_hash_city64(bucket.str, bucket.len);
     hash_bucket = hash & (conn->hash_size - 1);
@@ -119,20 +110,15 @@ __wt_tiered_bucket_config(
     }
 
     WT_ERR(__wt_calloc_one(session, &new));
+    WT_ERR(__wt_strndup(session, auth.str, auth.len, &new->auth_token));
     WT_ERR(__wt_strndup(session, bucket.str, bucket.len, &new->bucket));
     WT_ERR(__wt_strndup(session, prefix.str, prefix.len, &new->bucket_prefix));
+
     storage = nstorage->storage_source;
-#if 0
-    if (storage->customize != NULL) {
-        custom = NULL;
-        WT_ERR(storage->customize(storage, &session->iface, cfg_arg, &custom));
-        if (custom != NULL) {
-            bstorage->owned = 1;
-            storage = custom;
-        }
-    }
-#endif
+    WT_ERR(storage->ss_customize_file_system(storage, &session->iface, new->bucket,
+      new->bucket_prefix, new->auth_token, NULL, &new->file_system));
     new->storage_source = storage;
+
     /* If we're creating a new bucket storage, parse the other settings into it.  */
     TAILQ_INSERT_HEAD(&nstorage->bucketqh, new, q);
     TAILQ_INSERT_HEAD(&nstorage->buckethashqh[hash_bucket], new, hashq);
@@ -184,6 +170,12 @@ __wt_tiered_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfi
 
     WT_STAT_CONN_SET(session, tiered_object_size, conn->bstorage->object_size);
     WT_STAT_CONN_SET(session, tiered_retention, conn->bstorage->retain_secs);
+
+    /*
+     * Set up the designated file system for the "none" bucket.
+     */
+    WT_ASSERT(session, conn->file_system != NULL);
+    conn->bstorage_none.file_system = conn->file_system;
 
     return (0);
 

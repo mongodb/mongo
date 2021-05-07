@@ -222,11 +222,11 @@ __wt_block_fh(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t logid, WT_FH *
         return (0);
     }
 
-    /* TODO: fh readlock */
+    /* TODO: tiered: fh readlock; we may want a reference count on each file handle given out. */
     if (logid * sizeof(WT_FILE_HANDLE *) < block->lfh_alloc && (*fhp = block->lfh[logid]) != NULL)
         return (0);
 
-    /* TODO: fh writelock */
+    /* TODO: tiered: fh writelock */
     /* Ensure the array goes far enough. */
     WT_RET(__wt_realloc_def(session, &block->lfh_alloc, logid + 1, &block->lfh));
     if (logid >= block->max_logid)

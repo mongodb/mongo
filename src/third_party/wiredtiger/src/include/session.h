@@ -37,6 +37,11 @@ struct __wt_hazard {
 #define S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
 #define S2BT_SAFE(session) ((session)->dhandle == NULL ? NULL : S2BT(session))
 
+/* Get the file system for a session */
+#define S2FS(session)                                                \
+    ((session)->bucket_storage == NULL ? S2C(session)->file_system : \
+                                         (session)->bucket_storage->file_system)
+
 typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 
 /* Number of cursors cached to trigger cursor sweep. */
@@ -68,7 +73,8 @@ struct __wt_session_impl {
     uint64_t operation_timeout_us; /* Maximum operation period before rollback */
     u_int api_call_counter;        /* Depth of api calls */
 
-    WT_DATA_HANDLE *dhandle; /* Current data handle */
+    WT_DATA_HANDLE *dhandle;           /* Current data handle */
+    WT_BUCKET_STORAGE *bucket_storage; /* Current bucket storage and file system */
 
     /*
      * Each session keeps a cache of data handles. The set of handles can grow quite large so we

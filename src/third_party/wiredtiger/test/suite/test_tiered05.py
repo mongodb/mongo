@@ -39,12 +39,14 @@ class test_tiered05(wttest.WiredTigerTestCase):
     bucket = "my_bucket"
     bucket_prefix = "my_prefix"
     extension_name = "local_store"
+    bucket = "./objects"
 
     def conn_extensions(self, extlist):
         extlist.skip_if_missing = True
         extlist.extension('storage_sources', self.extension_name)
 
     def conn_config(self):
+        os.mkdir(self.bucket)
         return \
           'statistics=(fast),' + \
           'tiered_manager=(wait=10),' + \

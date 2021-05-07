@@ -12,6 +12,7 @@ src/block/block_open.c
 src/block/block_read.c
 src/block/block_session.c
 src/block/block_slvg.c
+src/block/block_tiered.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/bloom/bloom.c
