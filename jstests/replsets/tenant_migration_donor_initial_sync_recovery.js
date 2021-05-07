@@ -127,7 +127,7 @@ if (donorDoc) {
                                         .donor.abortOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
-                () => bsonWoCompare(tenantMigrationTest.donor
+                () => bsonWoCompare(tenantMigrationTest
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
                                         .donor.blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
