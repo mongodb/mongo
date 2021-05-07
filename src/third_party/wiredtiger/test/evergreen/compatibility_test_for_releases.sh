@@ -72,6 +72,7 @@ run_format()
         args+="checkpoints=1 "                  # Force periodic writes
         args+="compression=snappy "             # We only built with snappy, force the choice
         args+="data_source=table "
+        args+="huffman_key=0 "                  # Not supoprted by newer releases
         args+="in_memory=0 "                    # Interested in the on-disk format
         args+="leak_memory=1 "                  # Faster runs
         args+="logging=1 "                      # Test log compatibility
