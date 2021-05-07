@@ -370,12 +370,11 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     std::vector<ChunkType> newChunks;
 
     ChunkVersion currentMaxVersion = collVersion;
-    // Increment the major version only if the shard that owns the chunk being split has version ==
-    // collection version. See SERVER-41480 for details.
+    // Increment the major version only if the shard that owns the chunk being split has
+    // shardVersion == collection version. See SERVER-41480 for details.
     if (incrementChunkMajorVersionOnChunkSplits.load() && shardVersion == collVersion) {
         currentMaxVersion.incMajor();
     }
-
 
     auto startKey = range.getMin();
     auto newChunkBounds(splitPoints);
@@ -583,8 +582,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
             1));                             // Limit 1.
 
     if (!swCollVersion.isOK()) {
-        return swCollVersion.getStatus().withContext(str::stream()
-                                                     << "mergeChunk cannot merge chunks.");
+        return swCollVersion.getStatus().withContext("mergeChunk cannot merge chunks.");
     }
 
     auto collVersion = swCollVersion.getValue();
@@ -595,6 +593,25 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
                 "epoch of chunk does not match epoch of request. This most likely means "
                 "that the collection was dropped and re-created."};
     }
+
+    // Get the shard version (max chunk version) for the shard requesting the merge.
+    auto swShardVersion = getMaxChunkVersionFromQueryResponse(
+        nss,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            BSON("ns" << nss.ns() << "shard"
+                      << shardName),         // Query all chunks for this namespace and shard.
+            BSON(ChunkType::lastmod << -1),  // Sort by version.
+            1));                             // Limit 1.
+
+    if (!swShardVersion.isOK()) {
+        return swShardVersion.getStatus().withContext("mergeChunk cannot merge chunks.");
+    }
+
+    auto shardVersion = swShardVersion.getValue();
 
     // Build chunks to be merged
     std::vector<ChunkType> chunksToMerge;
@@ -636,7 +653,13 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     }
 
     ChunkVersion mergeVersion = collVersion;
-    mergeVersion.incMinor();
+    // Increment the major version only if the shard that owns the chunks being merged has
+    // shardVersion == collection version. See SERVER-41480 for details.
+    if (incrementChunkMajorVersionOnChunkSplits.load() && shardVersion == collVersion) {
+        mergeVersion.incMajor();
+    } else {
+        mergeVersion.incMinor();
+    }
 
     auto updates = buildMergeChunksTransactionUpdates(chunksToMerge, mergeVersion, validAfter);
     auto preCond = buildMergeChunksTransactionPrecond(chunksToMerge, collVersion);
@@ -668,7 +691,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     Grid::get(opCtx)
         ->catalogClient()
         ->logChange(opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions())
-        .transitional_ignore();
+        .ignore();
 
     return applyOpsStatus;
 }

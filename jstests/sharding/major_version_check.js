@@ -4,8 +4,7 @@
 (function() {
     'use strict';
 
-    // Test with default value of incrementChunkMajorVersionOnChunkSplits, which is
-    // false.
+    // Test with default value of incrementChunkMajorVersionOnChunkSplits, which is false.
     (() => {
         var st = new ShardingTest({shards: 1, mongos: 2});
 
@@ -39,7 +38,6 @@
         staleMongos.getCollection(coll + "").findOne();
 
         printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
-
         assert.eq(Timestamp(1, 0),
                   staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
 
@@ -48,9 +46,13 @@
         staleMongos.getCollection(coll + "").findOne();
 
         printjson(staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}));
-
         assert.eq(Timestamp(1, 0),
                   staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
+
+        // Merge the just-split chunks and ensure the major version didn't go up
+        assert.commandWorked(
+            admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
+        assert.eq(Timestamp(1, 3), admin.runCommand({getShardVersion: coll + ""}).version);
 
         st.stop();
     })();
@@ -122,6 +124,11 @@
         // The previously stale mongos should now be up-to-date.
         assert.eq(Timestamp(2, 2),
                   staleMongos.getDB("admin").runCommand({getShardVersion: coll + ""}).version);
+
+        // Merge the just-split chunks and ensure the major version went up
+        assert.commandWorked(
+            admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
+        assert.eq(Timestamp(3, 0), admin.runCommand({getShardVersion: coll + ""}).version);
 
         st.stop();
     })();
