@@ -40,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/logv2/log.h"
@@ -644,7 +645,10 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
         // Fire and forget. This is a best effort attempt to immediately clean up the exhaust
         // cursor. If the killCursors request fails here for any reasons, it will still be cleaned
         // up once the cursor times out.
-        _sep->handleRequest(opCtx.get(), makeKillCursorsMessage(cursorId)).get();
+        auto nss = NamespaceString(request.getDatabase(), request.body["collection"].String());
+        auto req = OpMsgRequest::fromDBAndBody(
+            request.getDatabase(), KillCursorsCommandRequest(nss, {cursorId}).toBSON(BSONObj{}));
+        _sep->handleRequest(opCtx.get(), req.serialize()).get();
     }
 } catch (const DBException& e) {
     LOGV2(22992,
