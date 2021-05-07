@@ -446,6 +446,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     WT_TIERED *tiered;
     uint32_t unused;
     char *metaconf;
+    const char *obj_cfg[] = {WT_CONFIG_BASE(session, object_meta), NULL, NULL};
     const char **tiered_cfg, *config;
 
     dhandle = session->dhandle;
@@ -472,14 +473,20 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     /* Collapse into one string for later use in switch. */
     WT_ERR(__wt_config_merge(session, tiered_cfg, NULL, &config));
 
+    /*
+     * Pull in any configuration of the original table for the object and file components that may
+     * have been sent in on the create.
+     */
+    obj_cfg[1] = config;
+    WT_ERR(__wt_config_collapse(session, obj_cfg, &metaconf));
+    tiered->obj_config = metaconf;
+    metaconf = NULL;
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: obj_config %s", tiered->obj_config);
+
     WT_ERR(__wt_config_getones(session, config, "key_format", &cval));
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &tiered->key_format));
     WT_ERR(__wt_config_getones(session, config, "value_format", &cval));
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &tiered->value_format));
-    WT_ERR(__wt_buf_fmt(session, tmp, ",tiered_storage=(bucket=%s,bucket_prefix=%s)",
-      tiered->bstorage->bucket, tiered->bstorage->bucket_prefix));
-    WT_ERR(__wt_strdup(session, tmp->data, &tiered->obj_config));
-    __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: obj_config %s", tiered->obj_config);
 
     WT_ERR(__wt_config_getones(session, config, "last", &cval));
     tiered->current_id = (uint64_t)cval.val;

@@ -142,7 +142,6 @@ struct __wt_tiered_tree {
     WT_DATA_HANDLE iface;
     const char *name, *config;
     const char *key_format, *value_format;
-    const char *file_config;
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TIERED_TREE_UNUSED 0x1u
