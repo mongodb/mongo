@@ -4,7 +4,7 @@
  * consider adding them together in a batch. It ensures that the proper document size is considered
  * and that we can still migrate when calling removeShard.
  *
- * @tags: [requires_fcv_44, multiversion_incompatible]
+ * @tags: [requires_fcv_44, multiversion_incompatible, does_not_support_config_stepdowns]
  */
 
 (function() {
