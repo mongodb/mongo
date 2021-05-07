@@ -365,13 +365,9 @@ void BucketCatalog::clear(const OID& oid) {
     }
 }
 
-void BucketCatalog::clear(const NamespaceString& ns) {
+void BucketCatalog::clear(const std::function<bool(const NamespaceString&)>& shouldClear) {
     auto lk = _lockExclusive();
     auto statsLk = _statsMutex.lockExclusive();
-
-    auto shouldClear = [&ns](const NamespaceString& bucketNs) {
-        return ns.coll().empty() ? ns.db() == bucketNs.db() : ns == bucketNs;
-    };
 
     for (auto it = _allBuckets.begin(); it != _allBuckets.end();) {
         auto nextIt = std::next(it);
@@ -387,8 +383,12 @@ void BucketCatalog::clear(const NamespaceString& ns) {
     }
 }
 
+void BucketCatalog::clear(const NamespaceString& ns) {
+    clear([&ns](const NamespaceString& bucketNs) { return bucketNs == ns; });
+}
+
 void BucketCatalog::clear(StringData dbName) {
-    clear(NamespaceString(dbName, ""));
+    clear([&dbName](const NamespaceString& bucketNs) { return bucketNs.db() == dbName; });
 }
 
 void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuilder* builder) const {

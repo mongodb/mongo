@@ -1518,6 +1518,16 @@ void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
     // Force the default read/write concern cache to reload on next access in case the defaults
     // document was rolled back.
     ReadWriteConcernDefaults::get(opCtx).invalidate();
+
+    stdx::unordered_set<NamespaceString> timeseriesNamespaces;
+    for (const auto& ns : rbInfo.rollbackNamespaces) {
+        if (ns.isTimeseriesBucketsCollection()) {
+            timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
+        }
+    }
+    BucketCatalog::get(opCtx).clear([&timeseriesNamespaces](const NamespaceString& bucketNs) {
+        return timeseriesNamespaces.contains(bucketNs);
+    });
 }
 
 }  // namespace mongo

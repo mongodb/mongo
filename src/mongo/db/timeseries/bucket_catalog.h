@@ -223,6 +223,11 @@ public:
     void clear(const OID& oid);
 
     /**
+     * Clears any bucket whose namespace satisfies the predicate.
+     */
+    void clear(const std::function<bool(const NamespaceString&)>& shouldClear);
+
+    /**
      * Clears the buckets for the given namespace.
      */
     void clear(const NamespaceString& ns);
