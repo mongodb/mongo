@@ -327,6 +327,27 @@ err:
     __wt_buf_free(session, &tmp);
     return (WT_THREAD_RET_VALUE);
 }
+/*
+ * __tiered_mgr_start --
+ *     Start the tiered manager flush thread.
+ */
+static int
+__tiered_mgr_start(WT_CONNECTION_IMPL *conn)
+{
+    WT_SESSION_IMPL *session;
+
+    FLD_SET(conn->server_flags, WT_CONN_SERVER_TIERED_MGR);
+    WT_RET(__wt_open_internal_session(
+      conn, "storage-mgr-server", true, 0, 0, &conn->tiered_mgr_session));
+    session = conn->tiered_mgr_session;
+
+    WT_RET(__wt_cond_alloc(session, "storage server", &conn->tiered_mgr_cond));
+
+    /* Start the thread. */
+    WT_RET(__wt_thread_create(session, &conn->tiered_mgr_tid, __tiered_mgr_server, session));
+    conn->tiered_mgr_tid_set = true;
+    return (0);
+}
 
 /*
  * __wt_tiered_storage_create --
@@ -348,7 +369,7 @@ __wt_tiered_storage_create(WT_SESSION_IMPL *session, const char *cfg[], bool rec
         WT_RET(__wt_tiered_conn_config(session, cfg, reconfig));
     WT_RET(__tiered_manager_config(session, cfg, &start));
 
-    /* Set first, the thread might run before we finish up. */
+    /* Start the internal thread. */
     FLD_SET(conn->server_flags, WT_CONN_SERVER_TIERED);
 
     WT_ERR(__wt_open_internal_session(conn, "storage-server", true, 0, 0, &conn->tiered_session));
@@ -361,19 +382,8 @@ __wt_tiered_storage_create(WT_SESSION_IMPL *session, const char *cfg[], bool rec
     conn->tiered_tid_set = true;
 
     /* After starting non-configurable threads, start the tiered manager if needed. */
-    if (!start)
-        return (0);
-
-    FLD_SET(conn->server_flags, WT_CONN_SERVER_TIERED_MGR);
-    WT_ERR(__wt_open_internal_session(
-      conn, "storage-mgr-server", true, 0, 0, &conn->tiered_mgr_session));
-    session = conn->tiered_mgr_session;
-
-    WT_ERR(__wt_cond_alloc(session, "storage server", &conn->tiered_mgr_cond));
-
-    /* Start the thread. */
-    WT_ERR(__wt_thread_create(session, &conn->tiered_mgr_tid, __tiered_mgr_server, session));
-    conn->tiered_mgr_tid_set = true;
+    if (start)
+        WT_ERR(__tiered_mgr_start(conn));
 
     if (0) {
 err:
@@ -394,7 +404,7 @@ __wt_tiered_storage_destroy(WT_SESSION_IMPL *session)
 
     conn = S2C(session);
 
-    /* Stop the server thread. */
+    /* Stop the internal server thread. */
     FLD_CLR(conn->server_flags, WT_CONN_SERVER_TIERED | WT_CONN_SERVER_TIERED_MGR);
     if (conn->tiered_tid_set) {
         __wt_cond_signal(session, conn->tiered_cond);
@@ -402,7 +412,6 @@ __wt_tiered_storage_destroy(WT_SESSION_IMPL *session)
         conn->tiered_tid_set = false;
     }
     __wt_cond_destroy(session, &conn->tiered_cond);
-    /* Close the server thread's session. */
     if (conn->tiered_session != NULL) {
         WT_TRET(__wt_session_close_internal(conn->tiered_session));
         conn->tiered_session = NULL;
@@ -416,7 +425,6 @@ __wt_tiered_storage_destroy(WT_SESSION_IMPL *session)
     }
     __wt_cond_destroy(session, &conn->tiered_mgr_cond);
 
-    /* Close the server thread's session. */
     if (conn->tiered_mgr_session != NULL) {
         WT_TRET(__wt_session_close_internal(conn->tiered_mgr_session));
         conn->tiered_mgr_session = NULL;
