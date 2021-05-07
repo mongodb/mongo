@@ -201,7 +201,7 @@ class thread_context {
      * _max_op_count is the current maximum number of operations that can be executed in the current
      * transaction. _max_op_count will always be <= _max_op.
      */
-    int64_t _min_op, _max_op, _max_op_count;
+    int64_t _min_op, _max_op, _max_op_count = 0;
     timestamp_manager *_timestamp_manager;
     const thread_operation _type;
     throttle _throttle;

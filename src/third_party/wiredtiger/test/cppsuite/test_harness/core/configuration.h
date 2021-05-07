@@ -150,7 +150,7 @@ class configuration {
     get(const std::string &key, bool optional, types type, T def, T (*func)(WT_CONFIG_ITEM item))
     {
         WT_DECL_RET;
-        WT_CONFIG_ITEM value;
+        WT_CONFIG_ITEM value = {"", 0, 1, WT_CONFIG_ITEM::WT_CONFIG_ITEM_BOOL};
         const char *error_msg = "Configuration value doesn't match requested type";
 
         ret = _config_parser->get(_config_parser, key.c_str(), &value);

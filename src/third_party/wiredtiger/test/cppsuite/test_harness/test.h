@@ -101,7 +101,7 @@ class test : public database_operation {
     virtual void
     run()
     {
-        int64_t cache_size_mb = 100, duration_seconds = 0;
+        int64_t cache_size_mb, duration_seconds;
         bool enable_logging, is_success = true;
 
         /* Build the database creation config string. */
