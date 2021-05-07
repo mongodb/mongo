@@ -456,11 +456,6 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     metaconf = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
-    if (tiered_cfg != NULL)
-        for (unused = 0; tiered_cfg[unused] != NULL; ++unused)
-            __wt_verbose(
-              session, WT_VERB_TIERED, "TIERED_OPEN: cfg[%d] %s", (int)unused, tiered_cfg[unused]);
-
     WT_UNUSED(cfg);
 
     /* Set up the bstorage from the configuration first. */
