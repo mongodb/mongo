@@ -995,28 +995,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::installCoordinatorDoc(
     _coordinatorDoc = doc;
 }
 
-ExecutorFuture<void> waitForMinimumOperationDuration(
-    std::shared_ptr<executor::TaskExecutor> executor, const CancellationToken& token) {
-    // Ensure to have at least `minDuration` elapsed after starting the operation and before
-    // engaging the critical section, unless the operation is already interrupted or canceled.
-    const auto minDuration =
-        Milliseconds(resharding::gReshardingMinimumOperationDurationMillis.load());
-    const auto elapsed =
-        ReshardingMetrics::get(cc().getServiceContext())->getOperationElapsedTime().get();
-
-    // As `ReshardingMetrics` may use a different clock source, the following is to estimate the
-    // time on the executor clock source when the operation was started. This estimation also allows
-    // logging both `startedOn` and `resumedOn` using a single clock source.
-    const auto estimatedStart = executor->now() - elapsed;
-    return executor->sleepUntil(estimatedStart + minDuration, token)
-        .then([executor, estimatedStart] {
-            LOGV2_INFO(5391801,
-                       "Resuming operation after waiting for minimum resharding operation duration",
-                       "startedOn"_attr = estimatedStart,
-                       "resumedOn"_attr = executor->now());
-        });
-}
-
 void markCompleted(const Status& status) {
     auto metrics = ReshardingMetrics::get(cc().getServiceContext());
     if (status.isOK())
@@ -1066,11 +1044,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::_runUntilReadyToPersistDeci
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
-        .then([this, executor] {
-            // TODO SERVER-53916 to verify that the following runs only after the last recipient
-            // shard reports to the coordinator that it has entered "steady-state".
-            return waitForMinimumOperationDuration(**executor, _ctHolder->getAbortToken());
-        })
         .then([this, executor] { return _awaitAllRecipientsFinishedApplying(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
