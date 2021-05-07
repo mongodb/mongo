@@ -103,8 +103,8 @@ assert.soon(() => {
         {currentOp: true, desc: "tenant recipient migration"});
     currOp = res.inprog[0];
 
-    // Wait until one batch of documents has been copied.
-    return currOp.approxTotalBytesCopied > db1Size;
+    // Wait until one batch of documents of the second database's second collection has been copied.
+    return currOp.approxTotalBytesCopied > db1Size + db2Collection1Size;
 }, res);
 
 assert.eq(currOp.approxTotalDataSize, db1Size + db2Size, res);
