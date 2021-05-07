@@ -142,7 +142,7 @@ function testRollbackInitialState() {
         // Verify that the migration restarted successfully on the new primary despite rollback.
         const stateRes = assert.commandWorked(migrationThread.returnData());
         assert.eq(stateRes.state, TenantMigrationTest.DonorState.kCommitted);
-        tenantMigrationTest.assertDonorNodesInExpectedState(
+        tenantMigrationTest.waitForDonorNodesToReachState(
             tenantMigrationTest.getDonorRst().nodes,
             migrationId,
             migrationOpts.tenantId,
