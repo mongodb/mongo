@@ -1,0 +1,22 @@
+# Drive a constant high workload through, even if WiredTiger isn't keeping
+# up by dividing the workload across a lot of threads. This needs to be
+# tuned to the particular machine so the workload is close to capacity in the
+# steady state, but not overwhelming.
+conn_config="cache_size=20GB,session_max=1000,eviction=(threads_min=4,threads_max=8),log=(enabled=false),transaction_sync=(enabled=false),checkpoint_sync=true,checkpoint=(wait=60)"
+table_config="allocation_size=4k,memory_page_max=10MB,prefix_compression=false,split_pct=90,leaf_page_max=32k,internal_page_max=16k,type=file"
+# Divide original icount by database_count.
+table_count=8
+compression=snappy
+icount=200000000
+populate_threads=1
+reopen_connection=false
+log_like_table=true
+#pareto=5
+report_interval=1
+run_time=3600
+threads=((count=10,throttle=250,inserts=1),(count=10,throttle=250,updates=1),(count=80,throttle=600,reads=1,ops_per_txn=3))
+value_sz=500
+sample_interval=5
+sample_rate=1
+backup_interval=240
+

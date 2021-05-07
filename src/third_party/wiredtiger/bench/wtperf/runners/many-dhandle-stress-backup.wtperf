@@ -1,0 +1,26 @@
+# This workload uses several tens of thousands of tables and the workload is evenly distributed
+# among them. The workload creates, opens and drop tables, and it generates warning if the time
+# taken is more than the configured max_idle_table_cycle.
+conn_config="cache_size=10G,eviction=(threads_min=4,threads_max=4),file_manager=(close_idle_time=30),session_max=1000,statistics=[all,clear],statistics_log=(wait=1,json=false,on_close=true)"
+table_config="type=file"
+table_count=15000
+max_idle_table_cycle=2
+# Uncomment to fail instead of generating a warning
+# max_idle_table_cycle_fatal=true
+random_range=1500000000
+pareto=10
+range_partition=true
+report_interval=5
+checkpoint_threads=1
+checkpoint_interval=30
+populate_threads=1
+pre_load_data=true
+# Uncomment to skip the populate phase, and use a database from a previous run as the baseline.
+# create=false
+icount=15000000
+run_time=900
+threads=((count=10,inserts=1,throttle=1000),(count=10,reads=1))
+max_latency=1000
+sample_interval=5
+sample_rate=1
+backup_interval=120
