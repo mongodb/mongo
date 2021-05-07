@@ -2670,7 +2670,7 @@ if get_option('ocsp-stapling') == 'on':
     env.SetConfigHeaderDefine("MONGO_CONFIG_OCSP_STAPLING_ENABLED")
 
 
-if not env.TargetOSIs('windows') and (env.ToolchainIs('GCC', 'clang')):
+if not env.TargetOSIs('windows', 'macOS') and (env.ToolchainIs('GCC', 'clang')):
 
     # By default, apply our current microarchitecture minima. If the
     # user has customized a flag of the same name in any of CCFLAGS,
