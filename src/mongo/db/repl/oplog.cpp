@@ -324,6 +324,7 @@ void writeToImageCollection(OperationContext* opCtx,
         LogicalSessionId::parse(IDLParserErrorContext("ParseSessionIdWhenWritingToImageCollection"),
                                 op.getField(OplogEntryBase::kSessionIdFieldName).Obj());
     imageEntry.set_id(sessionId);
+    imageEntry.setTxnNumber(op.getField(OplogEntryBase::kTxnNumberFieldName).numberLong());
     imageEntry.setTs(op["ts"].timestamp());
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(image);

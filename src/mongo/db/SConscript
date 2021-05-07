@@ -1816,6 +1816,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
         'catalog_raii',
         'catalog/collection_info_cache',
         'concurrency/lock_manager',

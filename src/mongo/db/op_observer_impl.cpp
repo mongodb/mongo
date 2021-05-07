@@ -174,7 +174,9 @@ void writeToImagesCollection(OperationContext* opCtx,
                              Timestamp ts) {
     repl::ImageEntry imageEntry;
     invariant(opCtx->getLogicalSessionId());
+    invariant(opCtx->getTxnNumber());
     imageEntry.set_id(*opCtx->getLogicalSessionId());
+    imageEntry.setTxnNumber(*opCtx->getTxnNumber());
     imageEntry.setTs(ts);
     imageEntry.setImage(std::move(image));
     imageEntry.setImageKind(imageKind);

@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
 #include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/logger/redaction.h"
 
 namespace mongo {
@@ -51,6 +52,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
+    const auto needsRetryImage = oplogEntry.getNeedsRetryImage();
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
@@ -66,7 +68,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
         uassert(40607,
                 str::stream() << "No pre-image available for findAndModify retry request:"
                               << redact(request.toBSON()),
-                oplogWithCorrectLinks.getPreImageOpTime());
+                oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
     } else if (opType == repl::OpTypeEnum::kInsert) {
         uassert(
             40608,
@@ -98,7 +100,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                   << ts.toString()
                                   << ", oplog: "
                                   << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPostImageOpTime());
+                    oplogWithCorrectLinks.getPostImageOpTime() || needsRetryImage);
         } else {
             uassert(40612,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON())
@@ -107,7 +109,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                                   << ts.toString()
                                   << ", oplog: "
                                   << redact(oplogEntry.toBSON()),
-                    oplogWithCorrectLinks.getPreImageOpTime());
+                    oplogWithCorrectLinks.getPreImageOpTime() || needsRetryImage);
         }
     }
 }
@@ -117,11 +119,31 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
  * oplog.
  */
 BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& oplog) {
-    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime());
+    invariant(oplog.getPreImageOpTime() || oplog.getPostImageOpTime() ||
+              oplog.getNeedsRetryImage());
+    DBDirectClient client(opCtx);
+    if (oplog.getNeedsRetryImage()) {
+        // Extract image from side collection.
+        auto sessionIdBson = oplog.getSessionId()->toBSON();
+        const auto txnNumber = *oplog.getTxnNumber();
+        const auto query = BSON("_id" << sessionIdBson << "txnNum" << *oplog.getTxnNumber());
+        auto imageDoc = client.findOne(NamespaceString::kConfigImagesNamespace.ns(), query);
+        uassert(5637601,
+                str::stream()
+                    << "image collection no longer contains the complete write history of this "
+                       "transaction, record with sessionId "
+                    << sessionIdBson.toString()
+                    << " and txnNumber: "
+                    << txnNumber
+                    << " cannot be found",
+                !imageDoc.isEmpty());
+        return imageDoc.getField(repl::ImageEntry::kImageFieldName).Obj().getOwned();
+    }
+
+    // Extract image from oplog.
     auto opTime = oplog.getPreImageOpTime() ? oplog.getPreImageOpTime().value()
                                             : oplog.getPostImageOpTime().value();
 
-    DBDirectClient client(opCtx);
     auto oplogDoc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
                                    opTime.asQuery(),
                                    nullptr,
