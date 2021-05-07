@@ -229,7 +229,7 @@ public:
          * -Anything else indicates a well formed validator. The MatchExpression will maintain
          * pointers into _validatorDoc.
          */
-        StatusWithMatchExpression filter = {nullptr};
+        StatusWith<std::shared_ptr<MatchExpression>> filter = {nullptr};
     };
 
     /**
