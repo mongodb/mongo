@@ -1,6 +1,12 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.  Also, the primary node cannot change because we use the local database in this test.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, does_not_support_stepdowns]
+/**
+ * This test uses the local database to test non-standard index creation options on the _id field.
+ * It uses the 'local' database because the scenarios in this test are not meant in a replicated
+ * settings. This also means the test is not meant for sharding or retryable passthroughs.
+ *
+ * @tags: [
+ *     assumes_standalone_mongod,
+ * ]
+ */
 
 // Test creation of the _id index with various options:
 // - _id indexes must have key pattern {_id: 1}.
