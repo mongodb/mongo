@@ -288,39 +288,16 @@ function testDonorAbortMigrationInterrupt(interruptFunc, fpName, isShutdown = fa
  * restarting, check the to see if the donorDoc data has persisted.
  */
 function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = false) {
-    const donorRst = new ReplSetTest({
-        nodes: 3,
-        name: "donorRst",
-        nodeOptions: Object.assign(migrationX509Options.donor, {
-            setParameter: {
-                tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
-                ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
-            }
-        })
-    });
-    const recipientRst = new ReplSetTest({
-        nodes: 1,
-        name: "recipientRst",
-        nodeOptions: Object.assign(migrationX509Options.recipient, {
-            setParameter: {
-                tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
-                ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
-            }
-        })
-    });
+    const donorRst =
+        new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();
 
-    recipientRst.startSet();
-    recipientRst.initiate();
-
-    const tenantMigrationTest =
-        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         donorRst.stopSet();
-        recipientRst.stopSet();
         return;
     }
 
@@ -373,7 +350,6 @@ function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = f
 
     tenantMigrationTest.stop();
     donorRst.stopSet();
-    recipientRst.stopSet();
 }
 
 (() => {
