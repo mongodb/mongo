@@ -72,10 +72,4 @@ coll.drop();
 assert.commandWorked(coll.runCommand("create", {autoIndexId: false}));
 assert.commandFailed(coll.createIndex({_id: "hashed"}, {name: "_id_"}));
 assert.commandFailed(coll.createIndex({a: 1}, {name: "_id_"}));
-
-// Non-_id indexes can have direction values outside the range for the integer type.
-coll.drop();
-assert.commandWorked(coll.insert({_id: 0}));
-assert.commandWorked(coll.createIndex({_id: Number.MAX_VALUE}));
-assert.commandWorked(coll.createIndex({_id: -Number.MAX_VALUE}));
 })();

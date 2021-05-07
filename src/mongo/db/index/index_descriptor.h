@@ -226,23 +226,15 @@ public:
         return _partialFilterExpression;
     }
 
-    /**
-     * Returns true if the key pattern is for the _id index.
-     * The _id index must have form exactly {_id : 1} or {_id : -1}.
-     * Allows an index of form {_id : "hashed"} to exist but
-     * Do not consider it to be the primary _id index
-     */
     static bool isIdIndexPattern(const BSONObj& pattern) {
-        BSONObjIterator iter(pattern);
-        BSONElement firstElement = iter.next();
-        if (iter.next()) {
+        BSONObjIterator i(pattern);
+        BSONElement e = i.next();
+        //_id index must have form exactly {_id : 1} or {_id : -1}.
+        // Allows an index of form {_id : "hashed"} to exist but
+        // do not consider it to be the primary _id index
+        if (!(strcmp(e.fieldName(), "_id") == 0 && (e.numberInt() == 1 || e.numberInt() == -1)))
             return false;
-        }
-        if (firstElement.fieldNameStringData() != "_id"_sd) {
-            return false;
-        }
-        auto intVal = firstElement.safeNumberInt();
-        return intVal == 1 || intVal == -1;
+        return i.next().eoo();
     }
 
 private:
