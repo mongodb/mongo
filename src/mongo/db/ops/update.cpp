@@ -95,6 +95,26 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
     auto exec = uassertStatusOK(
         getExecutorUpdate(nullOpDebug, &collection, &parsedUpdate, boost::none /* verbosity */));
 
-    return exec->executeUpdate();
+    PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+    BSONObj image;
+    if (request.shouldReturnAnyDocs()) {
+        // At the moment, an `UpdateResult` only supports returning one pre/post image
+        // document. This function won't disallow multi-updates + returning pre/post images, but
+        // will only keep the first one. Additionally, a single call to `getNext` is sufficient for
+        // capturing the image.
+        state = exec->getNext(&image, nullptr);
+    }
+
+    while (state == PlanExecutor::ADVANCED) {
+        state = exec->getNext(nullptr, nullptr);
+    }
+
+    UpdateResult result = exec->getUpdateResult();
+    if (!image.isEmpty()) {
+        result.requestedDocImage = image.getOwned();
+    }
+
+    return result;
 }
+
 }  // namespace mongo

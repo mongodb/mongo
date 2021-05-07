@@ -57,7 +57,6 @@ enums:
             kPreImage: "preImage"
             kPostImage: "postImage"
 
-
 structs:
     DurableReplOperation:
         description: "A document that represents an operation in a transaction. Should never be

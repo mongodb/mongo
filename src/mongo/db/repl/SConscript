@@ -70,6 +70,7 @@ env.Library(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
         'dbcheck',
+        'image_collection_entry',
         'local_oplog_info',
         'repl_coordinator_interface',
         'repl_server_parameters',
@@ -1882,5 +1883,18 @@ env.Library(
         'oplog_application',
         'oplog_application_interface',
         'repl_server_parameters'
+    ],
+)
+
+env.Library(
+    target='image_collection_entry',
+    source=[
+        'image_collection_entry.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'oplog_entry',
     ],
 )

@@ -844,6 +844,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
+        'dbhelpers',
+        'repl/image_collection_entry',
         'repl/repl_server_parameters',
         'transaction',
     ],

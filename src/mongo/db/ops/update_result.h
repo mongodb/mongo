@@ -57,6 +57,8 @@ struct UpdateResult {
     // this is the empty object. If an insert occurred as the result of an upsert operation, then
     // this is a single-element object containing the _id of the document inserted.
     BSONObj upsertedId;
+
+    BSONObj requestedDocImage;
 };
 
 }  // namespace mongo

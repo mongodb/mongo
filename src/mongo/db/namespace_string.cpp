@@ -127,6 +127,9 @@ const NamespaceString NamespaceString::kCollectionCriticalSectionsNamespace(
 const NamespaceString NamespaceString::kForceOplogBatchBoundaryNamespace(
     NamespaceString::kConfigDb, "system.forceOplogBatchBoundary");
 
+const NamespaceString NamespaceString::kConfigImagesNamespace(NamespaceString::kConfigDb,
+                                                              "image_collection");
+
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

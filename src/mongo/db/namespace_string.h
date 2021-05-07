@@ -178,6 +178,9 @@ public:
     // Dummy namespace used for forcing secondaries to handle an oplog entry on its own batch.
     static const NamespaceString kForceOplogBatchBoundaryNamespace;
 
+    // Namespace used for storing retryable findAndModify images.
+    static const NamespaceString kConfigImagesNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -75,6 +75,7 @@
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/image_collection_entry_gen.h"
 #include "mongo/db/repl/local_oplog_info.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -163,6 +164,24 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                         "catalogEntry"_attr = redact(catalogEntry),
                         "storageMetadata"_attr = redact(storageMetadata),
                         "isDryRun"_attr = isDryRun);
+}
+
+/**
+ * Remove this function when proper lifetime of the config.image_collection is in place.
+ */
+void createConfigImagesIfNecessary_temporary(OperationContext* opCtx) {
+    AutoGetCollection configImages(
+        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+    if (configImages.getCollection()) {
+        return;
+    }
+
+    repl::UnreplicatedWritesBlock unreplicated(opCtx);
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    invariant(DatabaseHolder::get(opCtx)
+                  ->getDb(opCtx, NamespaceString::kConfigImagesNamespace.db())
+                  ->createCollection(opCtx, NamespaceString::kConfigImagesNamespace, options));
 }
 
 }  // namespace
@@ -1391,6 +1410,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
             request.setUpdateModification(std::move(updateMod));
             request.setUpsert(upsert);
             request.setFromOplogApplication(true);
+            if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPreImage) {
+                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_OLD);
+            } else if (op.getNeedsRetryImage() == repl::RetryImageEnum::kPostImage) {
+                request.setReturnDocs(UpdateRequest::ReturnDocOption::RETURN_NEW);
+            }
 
             Timestamp timestamp;
             if (assignOperationTimestamp) {
@@ -1398,6 +1422,36 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             const StringData ns = op.getNss().ns();
+            // Operations that were part of a retryable findAndModify have two formats for
+            // replicating pre/post images. The classic format has primaries writing explicit noop
+            // oplog entries that contain the necessary details for reconstructed a response to a
+            // retried operation.
+            //
+            // In the new format, we "implicitly" replicate the necessary data. Oplog entries may
+            // contain an optional field, `needsRetryImage` with a value of `preImage` or
+            // `postImage`. When applying these oplog entries, we also retrieve the pre/post image
+            // retrieved by the query system and write that value into `config.image_collection` as
+            // part of the same oplog application transaction. The `config.image_collection`
+            // documents are keyed by the oplog entries logical session id, which is the same as the
+            // `config.transactions` table.
+            //
+            // Batches of oplog entries can contain multiple oplog entries from the same logical
+            // session. Thus updates to `config.image_collection` documents can be
+            // concurrent. Secondaries already coalesce (read: intentionally ignore) some writes to
+            // `config.transactions`, we may also omit some writes to `config.image_collection`, so
+            // long as the last write persists. To accomplish this we update
+            // `config.image_collection` entries with an upsert. The query predicate is `{_id:
+            // <lsid>, ts $lt <oplogEntry.ts>}`. This can result in a WriteConflictException when
+            // two writers are concurrently updating/inserting the same document.
+            //
+            // However, when an upsert turns into an insert, a writer can also observe a
+            // DuplicateKeyException as its `ts` clause can hide the document from being
+            // updated. Following up the failed update with an insert turns into a
+            // DuplicateKeyException. This is safe, but to break an infinite loop, we retry the
+            // operation with a regular update as opposed to an upsert. We're guaranteed to not need
+            // to insert a document. We only have to make sure we didn't race with an insert that
+            // won, but with an earlier `ts`.
+            bool upsertConfigImage = true;
             auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
                 WriteUnitOfWork wuow(opCtx);
                 if (timestamp != Timestamp::min()) {
@@ -1470,6 +1524,40 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // We shouldn't be doing upserts in secondary mode when enforcing steady state
                     // constraints.
                     invariant(!oplogApplicationEnforcesSteadyStateConstraints);
+                }
+
+                if (op.getNeedsRetryImage()) {
+                    createConfigImagesIfNecessary_temporary(opCtx);
+                    AutoGetCollection autoColl(
+                        opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IX);
+                    repl::ImageEntry image;
+                    image.set_id(op.getSessionId().get());
+                    image.setTs(op.getTimestamp());
+                    switch (op.getNeedsRetryImage().get()) {
+                        case repl::RetryImageEnum::kPreImage:
+                            image.setImageKind(repl::RetryImageEnum::kPreImage);
+                            break;
+                        case repl::RetryImageEnum::kPostImage:
+                            image.setImageKind(repl::RetryImageEnum::kPostImage);
+                            break;
+                    }
+                    image.setImage(ur.requestedDocImage);
+
+                    auto request = UpdateRequest();
+                    request.setNamespaceString(NamespaceString("config.image_collection"));
+                    request.setQuery(BSON("_id" << image.get_id().toBSON() << "ts"
+                                                << BSON("$lt" << image.getTs())));
+                    request.setUpsert(upsertConfigImage);
+                    request.setUpdateModification(
+                        write_ops::UpdateModification::parseFromClassicUpdate(image.toBSON()));
+                    request.setFromOplogApplication(true);
+                    try {
+                        ::mongo::update(opCtx, autoColl.getDb(), request);
+                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                        // We can get a duplicate key when two upserts race on inserting a document.
+                        upsertConfigImage = false;
+                        throw WriteConflictException();
+                    }
                 }
 
                 wuow.commit();
