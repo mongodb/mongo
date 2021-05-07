@@ -13,13 +13,13 @@ if [ "$#" -ne 0 ]; then
 fi
 
 NAME=boost
-VERSION=1.76.0
+VERSION=1.70.0
 VERSION_UNDERSCORE=$(echo $VERSION | tr . _)
 SRC_ROOT=$(mktemp -d /tmp/boost.XXXXXX)
 trap "rm -rf $SRC_ROOT" EXIT
 TARBALL=${NAME}_${VERSION_UNDERSCORE}.tar.gz
 SRC=${SRC_ROOT}/${NAME}_${VERSION_UNDERSCORE}
-DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME
+DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/$NAME-$VERSION
 
 cd $SRC_ROOT
 
