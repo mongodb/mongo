@@ -56,9 +56,10 @@ if (isDotsAndDollarsEnabled) {
     assert.commandWorked(coll.insert({$id: 1}));
     assert.commandWorked(coll.insert({$db: 1}));
 
-    // Test that _id can be an object with an element that has a $-prefixed field name.
-    assert.commandWorked(coll.insert({_id: {$b: 1}}));
-    assert.commandWorked(coll.insert({_id: {a: 1, $b: 1}}));
+    // Test that _id cannot be an object with an element that has a $-prefixed field name.
+    assert.writeErrorWithCode(coll.insert({_id: {$b: 1}}), ErrorCodes.DollarPrefixedFieldName);
+    assert.writeErrorWithCode(coll.insert({_id: {a: 1, $b: 1}}),
+                              ErrorCodes.DollarPrefixedFieldName);
 
     // Test that inserting an object with a $-prefixed field name is properly validated.
     assert.commandWorked(coll.insert({_id: 0, $valid: 1, "a": 1}));
