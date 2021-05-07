@@ -610,6 +610,10 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialChecks
 
 HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
                                                             const OpTime& lastOpTimeFetched) {
+    LOGV2_DEBUG(5676400,
+                2,
+                "Attempting to choose current primary as sync source",
+                "currentPrimaryIndex"_attr = _currentPrimaryIndex);
     if (_currentPrimaryIndex == -1) {
         LOGV2_DEBUG(21784,
                     1,
@@ -1463,6 +1467,11 @@ void TopologyCoordinator::_updatePrimaryFromHBDataV1(Date_t now) {
             }
         }
     }
+    LOGV2_DEBUG(5676401,
+                2,
+                "Updating primary index from heartbeat data",
+                "primaryIndex"_attr = primaryIndex,
+                "previousPrimaryIndex"_attr = _currentPrimaryIndex);
     _currentPrimaryIndex = primaryIndex;
 
     // Clear last heartbeat message on ourselves.

@@ -28,7 +28,13 @@ load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries
 
 var name = 'stepdown_needs_electable_secondary';
 
-var replTest = new ReplSetTest({name: name, nodes: 5});
+var replTest = new ReplSetTest({
+    name: name,
+    nodes: 5,
+    nodeOptions: {
+        setParameter: {logComponentVerbosity: tojson({replication: 2})},
+    }
+});
 var nodes = replTest.nodeList();
 
 replTest.startSet();
