@@ -82,6 +82,7 @@ static int
 __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 {
     WT_DECL_RET;
+    WT_TIERED_TIERS *this_tier;
     const char *cfg[4] = {NULL, NULL, NULL, NULL};
     const char *config, *name;
 
@@ -106,9 +107,11 @@ __tiered_create_local(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     __wt_verbose(
       session, WT_VERB_TIERED, "TIER_CREATE_LOCAL: schema create LOCAL: %s : %s", name, config);
     WT_ERR(__wt_schema_create(session, name, config));
-    if (tiered->tiers[WT_TIERED_INDEX_LOCAL].name != NULL)
-        __wt_free(session, tiered->tiers[WT_TIERED_INDEX_LOCAL].name);
-    tiered->tiers[WT_TIERED_INDEX_LOCAL].name = name;
+    this_tier = &tiered->tiers[WT_TIERED_INDEX_LOCAL];
+    if (this_tier->name != NULL)
+        __wt_free(session, this_tier->name);
+    this_tier->name = name;
+    F_SET(this_tier, WT_TIERS_OP_READ | WT_TIERS_OP_WRITE);
 
     if (0) {
 err:
@@ -174,6 +177,7 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 {
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
+    WT_TIERED_TIERS *this_tier;
     const char *cfg[4] = {NULL, NULL, NULL, NULL};
     const char *config, *name;
 
@@ -191,8 +195,10 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
     /* Set up a tier:example metadata for the first time. */
     __wt_verbose(session, WT_VERB_TIERED, "CREATE_TIER_TREE: schema create: %s : %s", name, config);
     WT_ERR(__wt_schema_create(session, name, config));
-    WT_ASSERT(session, tiered->tiers[WT_TIERED_INDEX_SHARED].name == NULL);
-    tiered->tiers[WT_TIERED_INDEX_SHARED].name = name;
+    this_tier = &tiered->tiers[WT_TIERED_INDEX_SHARED];
+    WT_ASSERT(session, this_tier->name == NULL);
+    this_tier->name = name;
+    F_SET(this_tier, WT_TIERS_OP_FLUSH | WT_TIERS_OP_READ);
 
     if (0)
 err:

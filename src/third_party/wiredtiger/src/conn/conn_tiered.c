@@ -127,7 +127,8 @@ static int
 __tier_storage_copy(WT_SESSION_IMPL *session)
 {
     /*
-     * Walk the work queue and copy file:<name> to shared storage object:<name>.
+     * Walk the work queue and copy file:<name> to shared storage object:<name>. Walk a tiered
+     * table's tiers array and copy it to any tier that allows WT_TIERS_OP_FLUSH.
      */
     /* XXX: We don't want to call this here, it is just to quiet the compiler that this function
      * can return NULL. So it is a placeholder until we have real content here.
