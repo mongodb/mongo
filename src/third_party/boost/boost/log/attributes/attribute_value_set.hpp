@@ -237,9 +237,7 @@ public:
      */
     BOOST_LOG_API attribute_value_set(
         attribute_set const& source_attrs,
-#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
         attribute_set const& thread_attrs,
-#endif
         attribute_set const& global_attrs,
         size_type reserve_count = 8);
 
@@ -258,9 +256,7 @@ public:
      */
     BOOST_LOG_API attribute_value_set(
         attribute_value_set const& source_attrs,
-#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
         attribute_set const& thread_attrs,
-#endif
         attribute_set const& global_attrs,
         size_type reserve_count = 8);
 
@@ -279,17 +275,11 @@ public:
      */
     attribute_value_set(
         BOOST_RV_REF(attribute_value_set) source_attrs,
-#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
         attribute_set const& thread_attrs,
-#endif
         attribute_set const& global_attrs,
         size_type reserve_count = 8) : m_pImpl(NULL)
     {
-        construct(static_cast< attribute_value_set& >(source_attrs), 
-#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
-        thread_attrs, 
-#endif
-        global_attrs, reserve_count);
+        construct(static_cast< attribute_value_set& >(source_attrs), thread_attrs, global_attrs, reserve_count);
     }
 
     /*!
@@ -467,9 +457,7 @@ private:
     //! Constructs the object by moving from \a source_attrs. This function is mostly needed to maintain ABI stable between C++03 and C++11.
     BOOST_LOG_API void construct(
         attribute_value_set& source_attrs,
-#if !defined(BOOST_LOG_WITHOUT_THREAD_ATTR)
         attribute_set const& thread_attrs,
-#endif
         attribute_set const& global_attrs,
         size_type reserve_count);
 #endif // BOOST_LOG_DOXYGEN_PASS
