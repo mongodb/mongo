@@ -38,6 +38,10 @@ const coll = db[collName];
 const sentinelColl = db[sentinelCollName];
 const paddingStr = "XXXXXXXXX";
 
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Pre-load some documents.
 
 const nDocs = 100;

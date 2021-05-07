@@ -3,6 +3,7 @@
 'use strict';
 
 load("jstests/libs/read_write_concern_defaults_propagation_common.js");
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 var st = new ShardingTest({
     shards: 1,
@@ -12,6 +13,13 @@ var st = new ShardingTest({
         rs0: {nodes: 1},
     }
 });
+
+// TODO (SERVER-56642): Fix the test to work with the new default write concern.
+if (isDefaultWriteConcernMajorityFlagEnabled(st.s)) {
+    jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
+    st.stop();
+    return;
+}
 
 const mongosAndConfigNodes = [st.s0, st.s1, st.s2, ...st.configRS.nodes];
 ReadWriteConcernDefaultsPropagation.runTests(st.s0, mongosAndConfigNodes);

@@ -31,6 +31,10 @@ rst.initiate();
 const primary = rst.getPrimary();
 const ns = "test.retryable_write_coalesced_txn_updates";
 assert.commandWorked(primary.getCollection(ns).insert({_id: -1}, {writeConcern: {w: 3}}));
+// The default WC is majority and this test can't satisfy majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+rst.awaitReplication();
 
 const [secondary1, secondary2] = rst.getSecondaries();
 

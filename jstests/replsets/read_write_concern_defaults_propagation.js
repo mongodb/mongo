@@ -3,6 +3,7 @@
 'use strict';
 
 load("jstests/libs/read_write_concern_defaults_propagation_common.js");
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 const rst = new ReplSetTest({nodes: 3});
 rst.startSet();
@@ -10,6 +11,13 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const secondaries = rst.getSecondaries();
+
+// TODO (SERVER-56642): Fix the test to work with the new default write concern.
+if (isDefaultWriteConcernMajorityFlagEnabled(primary)) {
+    jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
+    rst.stopSet();
+    return;
+}
 
 ReadWriteConcernDefaultsPropagation.runTests(primary, [primary, ...secondaries]);
 

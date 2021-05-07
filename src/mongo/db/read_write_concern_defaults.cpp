@@ -98,7 +98,7 @@ void ReadWriteConcernDefaults::checkSuitabilityAsDefault(const WriteConcern& wc)
             !wc.getProvenance().hasSource());
 }
 
-RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
+RWConcernDefault ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk(
     OperationContext* opCtx,
     const boost::optional<ReadConcern>& rc,
     const boost::optional<WriteConcern>& wc) {
@@ -124,7 +124,7 @@ RWConcernDefault ReadWriteConcernDefaults::generateNewConcerns(
     rwc.setUpdateOpTime(currentTime.clusterTime().asTimestamp());
     rwc.setUpdateWallClockTime(serviceContext->getFastClockSource()->now());
 
-    auto current = _getDefault(opCtx);
+    auto current = _getDefaultCWRWCFromDisk(opCtx);
     if (!rc && current) {
         rwc.setDefaultReadConcern(current->getDefaultReadConcern());
     }
@@ -197,7 +197,7 @@ void ReadWriteConcernDefaults::refreshIfNecessary(OperationContext* opCtx) {
 }
 
 boost::optional<ReadWriteConcernDefaults::RWConcernDefaultAndTime>
-ReadWriteConcernDefaults::_getDefault(OperationContext* opCtx) {
+ReadWriteConcernDefaults::_getDefaultCWRWCFromDisk(OperationContext* opCtx) {
     auto defaultsHandle = _defaults.acquire(opCtx, Type::kReadWriteConcernEntry);
     if (defaultsHandle) {
         // Since CWRWC is ok with continuing to use a value well after it has been invalidated
@@ -208,6 +208,33 @@ ReadWriteConcernDefaults::_getDefault(OperationContext* opCtx) {
         return RWConcernDefaultAndTime(*defaultsHandle, defaultsHandle.updateWallClockTime());
     }
     return boost::none;
+}
+
+ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getDefault(
+    OperationContext* opCtx) {
+    auto cached = _getDefaultCWRWCFromDisk(opCtx).value_or(RWConcernDefaultAndTime());
+
+    // The implicit default write concern will be w:1 if the feature compatibility version is not
+    // yet initialized. Similarly, if the config hasn't yet been loaded on the node, the default
+    // will be w:1, since we have no way of calculating the implicit default. This means that after
+    // we have loaded our config, nodes could change their implicit write concern default. This is
+    // safe since we shouldn't be accepting writes that need a write concern before we have loaded
+    // our config.
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+        !repl::feature_flags::gDefaultWCMajority.isEnabled(
+            serverGlobalParams.featureCompatibility) ||
+        !_implicitDefaultWriteConcernMajority) {
+        return cached;
+    }
+
+    if ((!cached.getDefaultWriteConcern() || cached.getDefaultWriteConcern().get().usedDefault) &&
+        _implicitDefaultWriteConcernMajority.get()) {
+        cached.setDefaultWriteConcern(WriteConcernOptions(WriteConcernOptions::kMajority,
+                                                          WriteConcernOptions::SyncMode::UNSET,
+                                                          WriteConcernOptions::kNoTimeout));
+    }
+
+    return cached;
 }
 
 void ReadWriteConcernDefaults::setImplicitDefaultWriteConcernMajority(

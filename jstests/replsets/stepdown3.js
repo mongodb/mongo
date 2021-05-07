@@ -10,6 +10,10 @@ var nodes = replTest.startSet();
 replTest.initiate();
 var primary = replTest.getPrimary();
 
+// The default WC is majority and fsyncLock will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // do a write to allow stepping down of the primary;
 // otherwise, the primary will refuse to step down
 print("\ndo a write");

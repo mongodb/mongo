@@ -8,6 +8,13 @@
 load("jstests/aggregation/extras/merge_helpers.js");  // For dropWithoutImplicitRecreate.
 load("jstests/aggregation/extras/utils.js");          // For assertArrayEq.
 load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos.
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
+
+// TODO (SERVER-56641): Fix the test to work with the new default write concern.
+if (isDefaultWriteConcernMajorityFlagEnabled(db)) {
+    jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
+    return;
+}
 
 // A helper function to create a pipeline with a $merge stage using a custom 'updatePipeline'
 // for the whenMatched mode. If 'initialStages' array is specified, the $merge stage will be

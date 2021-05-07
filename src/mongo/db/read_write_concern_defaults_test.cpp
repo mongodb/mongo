@@ -48,14 +48,27 @@ protected:
 
     ReadWriteConcernDefaults& _rwcd{[&]() -> ReadWriteConcernDefaults& {
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
-        return ReadWriteConcernDefaults::get(getServiceContext());
+        auto& rwcd = ReadWriteConcernDefaults::get(getServiceContext());
+        rwcd.setImplicitDefaultWriteConcernMajority(false);
+        return rwcd;
     }()};
+
+    ReadWriteConcernDefaults& _rwcdMajority{[&]() -> ReadWriteConcernDefaults& {
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        auto& rwcd = ReadWriteConcernDefaults::get(getServiceContext());
+        rwcd.setImplicitDefaultWriteConcernMajority(true);
+        return rwcd;
+    }()};
+
+    bool _isDefaultWCMajorityEnabled{
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        repl::feature_flags::gDefaultWCMajority.isEnabled(serverGlobalParams.featureCompatibility)};
 
     ServiceContext::UniqueOperationContext _opCtxHolder{makeOperationContext()};
     OperationContext* const _opCtx{_opCtxHolder.get()};
 };
 
-TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentDefaults) {
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWC) {
     // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
     // boost::none.
     auto defaults = _rwcd.getDefault(_opCtx);
@@ -66,7 +79,24 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentDefaults) {
     ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
 }
 
-TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithDefaultsNeverSet) {
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithAbsentCWRWCWithImplicitWCMajority) {
+    if (!_isDefaultWCMajorityEnabled) {
+        return;
+    }
+
+    // By not calling _lookupMock.setLookupCallReturnValue(), tests _defaults.lookup() returning
+    // boost::none.
+    auto defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(!defaults.getDefaultReadConcern());
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
+    ASSERT(!defaults.getUpdateOpTime());
+    ASSERT(!defaults.getUpdateWallClockTime());
+    ASSERT_EQ(Date_t(), defaults.localUpdateWallClockTime());
+}
+
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSet) {
+    // _defaults.lookup() returning default constructed RWConcern not boost::none.
     _lookupMock.setLookupCallReturnValue({});
 
     auto defaults = _rwcd.getDefault(_opCtx);
@@ -77,7 +107,23 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithDefaultsNeverSet) {
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
 }
 
-TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetDefaults) {
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithCWRWCNeverSetWithImplicitWCMajority) {
+    if (!_isDefaultWCMajorityEnabled) {
+        return;
+    }
+
+    // _defaults.lookup() returning default constructed RWConcern not boost::none.
+    _lookupMock.setLookupCallReturnValue({});
+    auto defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(!defaults.getDefaultReadConcern());
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
+    ASSERT(!defaults.getUpdateOpTime());
+    ASSERT(!defaults.getUpdateWallClockTime());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+}
+
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWC) {
     RWConcernDefault newDefaults;
     newDefaults.setUpdateOpTime(Timestamp(1, 2));
     newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
@@ -91,7 +137,26 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetDefaults) {
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
 }
 
-TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetDefaults) {
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithUnsetCWRWCWithImplicitWCMajority) {
+    if (!_isDefaultWCMajorityEnabled) {
+        return;
+    }
+
+    RWConcernDefault newDefaults;
+    newDefaults.setUpdateOpTime(Timestamp(1, 2));
+    newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
+    _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+    auto defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(!defaults.getDefaultReadConcern());
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+}
+
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetCWRWC) {
     RWConcernDefault newDefaults;
     newDefaults.setDefaultReadConcern(
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
@@ -109,7 +174,70 @@ TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetDefaults) {
     ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
     ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
     ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+
+    defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
+           repl::ReadConcernLevel::kLocalReadConcern);
+    ASSERT_EQ(4, defaults.getDefaultWriteConcern()->wNumNodes);
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
 }
+
+TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultWithSetAndUnSetCWRCWithImplicitWCMajority) {
+    if (!_isDefaultWCMajorityEnabled) {
+        return;
+    }
+
+    // Setting only default read concern.
+    RWConcernDefault newDefaults;
+    newDefaults.setDefaultReadConcern(
+        repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern));
+    newDefaults.setUpdateOpTime(Timestamp(1, 2));
+    newDefaults.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
+    _lookupMock.setLookupCallReturnValue(std::move(newDefaults));
+
+    auto defaults = _rwcd.getDefault(_opCtx);
+    ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
+           repl::ReadConcernLevel::kLocalReadConcern);
+    ASSERT(!defaults.getDefaultWriteConcern());
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+
+    defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(defaults.getDefaultReadConcern()->getLevel() ==
+           repl::ReadConcernLevel::kLocalReadConcern);
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+
+    // unsetting default read concern.
+    RWConcernDefault newDefaults2;
+    newDefaults2.setUpdateOpTime(Timestamp(1, 2));
+    newDefaults2.setUpdateWallClockTime(Date_t::fromMillisSinceEpoch(1234));
+    _lookupMock.setLookupCallReturnValue(std::move(newDefaults2));
+
+    _rwcd.refreshIfNecessary(_opCtx);
+
+    defaults = _rwcd.getDefault(_opCtx);
+    ASSERT(!defaults.getDefaultReadConcern());
+    ASSERT(!defaults.getDefaultWriteConcern());
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+
+    defaults = _rwcdMajority.getDefault(_opCtx);
+    ASSERT(!defaults.getDefaultReadConcern());
+    ASSERT(defaults.getDefaultWriteConcern());
+    ASSERT_EQ(WriteConcernOptions::kMajority, defaults.getDefaultWriteConcern().get().wMode);
+    ASSERT_EQ(Timestamp(1, 2), *defaults.getUpdateOpTime());
+    ASSERT_EQ(1234, defaults.getUpdateWallClockTime()->toMillisSinceEpoch());
+    ASSERT_GT(defaults.localUpdateWallClockTime(), Date_t());
+}
+
 
 TEST_F(ReadWriteConcernDefaultsTest, TestGetDefaultLookupFailure) {
     _lookupMock.setLookupCallFailure(Status{ErrorCodes::Error(1234), "foobar"});
@@ -250,8 +378,9 @@ TEST_F(ReadWriteConcernDefaultsTest, TestRefreshDefaultsWithLowerEpoch) {
 }
 
 /**
- * ReadWriteConcernDefaults::generateNewConcerns() uses the current clusterTime and wall clock time
- * (for epoch and setTime/localSetTime), so testing it requires a fixture with a logical clock.
+ * ReadWriteConcernDefaults::generateNewCWRWCToBeSavedOnDisk() uses the current clusterTime and wall
+ * clock time (for epoch and setTime/localSetTime), so testing it requires a fixture with a logical
+ * clock.
  */
 class ReadWriteConcernDefaultsTestWithClusterTime : public VectorClockTestFixture {
 public:
@@ -261,7 +390,7 @@ public:
 
 protected:
     auto setupOldDefaults() {
-        auto defaults = _rwcd.generateNewConcerns(
+        auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
             operationContext(),
             repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern),
             uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 4))));
@@ -288,21 +417,23 @@ protected:
     }()};
 };
 
-TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestGenerateNewConcernsInvalidNeither) {
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(operationContext(), boost::none, boost::none),
-                       AssertionException,
-                       ErrorCodes::BadValue);
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidNeither) {
+    ASSERT_THROWS_CODE(
+        _rwcd.generateNewCWRWCToBeSavedOnDisk(operationContext(), boost::none, boost::none),
+        AssertionException,
+        ErrorCodes::BadValue);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsInvalidReadConcernLevel) {
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidReadConcernLevel) {
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
                            operationContext(),
                            repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern),
                            boost::none),
                        AssertionException,
                        ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
                            operationContext(),
                            repl::ReadConcernArgs(repl::ReadConcernLevel::kLinearizableReadConcern),
                            boost::none),
@@ -311,46 +442,50 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsInvalidReadConcernFields) {
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(operationContext(),
-                                                 repl::ReadConcernArgs::fromBSONThrows(
-                                                     BSON("level"
-                                                          << "local"
-                                                          << "afterOpTime" << repl::OpTime())),
-                                                 boost::none),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(operationContext(),
-                                                 repl::ReadConcernArgs::fromBSONThrows(BSON(
-                                                     "level"
-                                                     << "local"
-                                                     << "afterClusterTime" << Timestamp(1, 2))),
-                                                 boost::none),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-    ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(operationContext(),
-                                                 repl::ReadConcernArgs::fromBSONThrows(
-                                                     BSON("level"
-                                                          << "snapshot"
-                                                          << "atClusterTime" << Timestamp(1, 2))),
-                                                 boost::none),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-}
-
-TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestGenerateNewConcernsInvalidWriteConcern) {
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidReadConcernFields) {
     ASSERT_THROWS_CODE(
-        _rwcd.generateNewConcerns(operationContext(),
-                                  boost::none,
-                                  uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 0)))),
+        _rwcd.generateNewCWRWCToBeSavedOnDisk(
+            operationContext(),
+            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
+                                                       << "local"
+                                                       << "afterOpTime" << repl::OpTime())),
+            boost::none),
+        AssertionException,
+        ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        _rwcd.generateNewCWRWCToBeSavedOnDisk(
+            operationContext(),
+            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
+                                                       << "local"
+                                                       << "afterClusterTime" << Timestamp(1, 2))),
+            boost::none),
+        AssertionException,
+        ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        _rwcd.generateNewCWRWCToBeSavedOnDisk(
+            operationContext(),
+            repl::ReadConcernArgs::fromBSONThrows(BSON("level"
+                                                       << "snapshot"
+                                                       << "atClusterTime" << Timestamp(1, 2))),
+            boost::none),
         AssertionException,
         ErrorCodes::BadValue);
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidSetReadConcernAndWriteConcerns) {
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidWriteConcern) {
+    ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                           operationContext(),
+                           boost::none,
+                           uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 0)))),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewCWRWCToBeSavedOnDiskValidSetReadConcernAndWriteConcerns) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewConcerns(
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
         operationContext(),
         repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
         uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 5))));
@@ -367,9 +502,9 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidSetReadConcernOnly) {
+       TestGenerateNewCWRWCToBeSavedOnDiskValidSetReadConcernOnly) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewConcerns(
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
         operationContext(),
         repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
         boost::none);
@@ -387,12 +522,12 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidSetWriteConcernOnly) {
+       TestGenerateNewCWRWCToBeSavedOnDiskValidSetWriteConcernOnly) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults =
-        _rwcd.generateNewConcerns(operationContext(),
-                                  boost::none,
-                                  uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 5))));
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
+        operationContext(),
+        boost::none,
+        uassertStatusOK(WriteConcernOptions::parse(BSON("w" << 5))));
     ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
            defaults.getDefaultReadConcern()->getLevel());
     ASSERT_EQ(5, defaults.getDefaultWriteConcern()->wNumNodes);
@@ -405,10 +540,11 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
     ASSERT_LT(oldDefaults.localUpdateWallClockTime(), newDefaults.localUpdateWallClockTime());
 }
 
-TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestGenerateNewConcernsValidUnsetReadConcern) {
+TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
+       TestGenerateNewCWRWCToBeSavedOnDiskValidUnsetReadConcern) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults =
-        _rwcd.generateNewConcerns(operationContext(), repl::ReadConcernArgs(), boost::none);
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
+        operationContext(), repl::ReadConcernArgs(), boost::none);
     ASSERT(!defaults.getDefaultReadConcern());
     ASSERT(defaults.getDefaultWriteConcern());
     ASSERT_EQ(oldDefaults.getDefaultWriteConcern()->wNumNodes,
@@ -423,17 +559,17 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime, TestGenerateNewConcernsValid
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsInvalidUnsetWriteConcern) {
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidUnsetWriteConcern) {
     auto oldDefaults = setupOldDefaults();
     if (repl::feature_flags::gDefaultWCMajority.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ASSERT_THROWS_CODE(
-            _rwcd.generateNewConcerns(operationContext(), boost::none, WriteConcernOptions()),
-            AssertionException,
-            ErrorCodes::IllegalOperation);
+        ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
+                               operationContext(), boost::none, WriteConcernOptions()),
+                           AssertionException,
+                           ErrorCodes::IllegalOperation);
     } else {
-        auto defaults =
-            _rwcd.generateNewConcerns(operationContext(), boost::none, WriteConcernOptions());
+        auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
+            operationContext(), boost::none, WriteConcernOptions());
         ASSERT(defaults.getDefaultReadConcern());
         ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
                defaults.getDefaultReadConcern()->getLevel());
@@ -449,16 +585,16 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsInvalidUnsetReadWriteConcern) {
+       TestGenerateNewCWRWCToBeSavedOnDiskInvalidUnsetReadWriteConcern) {
     auto oldDefaults = setupOldDefaults();
     if (repl::feature_flags::gDefaultWCMajority.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        ASSERT_THROWS_CODE(_rwcd.generateNewConcerns(
+        ASSERT_THROWS_CODE(_rwcd.generateNewCWRWCToBeSavedOnDisk(
                                operationContext(), repl::ReadConcernArgs(), WriteConcernOptions()),
                            AssertionException,
                            ErrorCodes::IllegalOperation);
     } else {
-        auto defaults = _rwcd.generateNewConcerns(
+        auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
             operationContext(), repl::ReadConcernArgs(), WriteConcernOptions());
         ASSERT(!defaults.getDefaultReadConcern());
         ASSERT(!defaults.getDefaultWriteConcern());
@@ -473,12 +609,12 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidSetWriteConcernWithOnlyJ) {
+       TestGenerateNewCWRWCToBeSavedOnDiskValidSetWriteConcernWithOnlyJ) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults =
-        _rwcd.generateNewConcerns(operationContext(),
-                                  boost::none,
-                                  uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true))));
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
+        operationContext(),
+        boost::none,
+        uassertStatusOK(WriteConcernOptions::parse(BSON("j" << true))));
     ASSERT(oldDefaults.getDefaultReadConcern()->getLevel() ==
            defaults.getDefaultReadConcern()->getLevel());
     ASSERT_EQ(1, defaults.getDefaultWriteConcern()->wNumNodes);
@@ -494,9 +630,9 @@ TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
 }
 
 TEST_F(ReadWriteConcernDefaultsTestWithClusterTime,
-       TestGenerateNewConcernsValidSetWriteConcernWithOnlyWtimeout) {
+       TestGenerateNewCWRWCToBeSavedOnDiskValidSetWriteConcernWithOnlyWtimeout) {
     auto oldDefaults = setupOldDefaults();
-    auto defaults = _rwcd.generateNewConcerns(
+    auto defaults = _rwcd.generateNewCWRWCToBeSavedOnDisk(
         operationContext(),
         boost::none,
         uassertStatusOK(WriteConcernOptions::parse(BSON("wtimeout" << 12345))));

@@ -42,6 +42,10 @@ function runTest(crashAfterRollbackTruncation) {
     const ns = "test.retryable_write_partial_rollback";
     assert.commandWorked(
         primary.getCollection(ns).insert({_id: 0, counter: 0}, {writeConcern: {w: 5}}));
+    // The default WC is majority and this test can't satisfy majority writes.
+    assert.commandWorked(primary.adminCommand(
+        {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+    rst.awaitReplication();
 
     const [secondary1, secondary2, secondary3, secondary4] = rst.getSecondaries();
 

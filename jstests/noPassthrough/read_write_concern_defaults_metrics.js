@@ -8,11 +8,16 @@
 "use strict";
 
 load("jstests/libs/ftdc.js");
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 // Verifies the transaction server status response has the fields that we expect.
 function verifyServerStatus(conn,
                             {expectedRC, expectedWC, expectNoDefaultsDocument, expectNothing}) {
     const res = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
+    if (isDefaultWriteConcernMajorityFlagEnabled(conn) && !expectedWC) {
+        expectedWC = {w: "majority", wtimeout: 0};
+    }
+
     if (expectNothing) {
         assert.eq(undefined, res.defaultRWConcern, tojson(res.defaultRWConcern));
         return;

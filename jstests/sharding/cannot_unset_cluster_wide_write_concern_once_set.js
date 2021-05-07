@@ -4,17 +4,19 @@
  */
 (function() {
 "use strict";
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
+
 function runTest(conn) {
-    const featureEnabled = assert
-                               .commandWorked(conn.adminCommand(
-                                   {getParameter: 1, featureFlagDefaultWriteConcernMajority: 1}))
-                               .featureFlagDefaultWriteConcernMajority.value;
-    if (!featureEnabled) {
+    if (!isDefaultWriteConcernMajorityFlagEnabled(conn)) {
         jsTestLog("Skipping test because the default WC majority feature flag is disabled");
         return;
     }
+
+    let expectedDefaultWC = {w: "majority", wtimeout: 0};
     let res = conn.adminCommand({getDefaultRWConcern: 1});
-    assert(!res.hasOwnProperty("defaultWriteConcern"));
+    assert(res.hasOwnProperty("defaultWriteConcern"));
+    assert.eq(expectedDefaultWC, res.defaultWriteConcern, tojson(res));
+
     jsTestLog("Setting the default write concern to empty initially works.");
     assert.commandWorked(conn.adminCommand({
         setDefaultRWConcern: 1,
@@ -22,7 +24,8 @@ function runTest(conn) {
     }));
 
     res = conn.adminCommand({getDefaultRWConcern: 1});
-    assert(!res.hasOwnProperty("defaultWriteConcern"));
+    assert(res.hasOwnProperty("defaultWriteConcern"));
+    assert.eq(expectedDefaultWC, res.defaultWriteConcern, tojson(res));
 
     jsTestLog("Setting the default write concern.");
     const newDefaultWriteConcern = {w: 2, wtimeout: 60};

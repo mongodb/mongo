@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/write_concern_util.js");  // For isDefaultWriteConcernMajorityFlagEnabled.
 
 // Set the oplog fetcher batch size to 1, in order to test fetching multiple batches while the sync
 // source is in quiesce mode.
@@ -21,6 +22,13 @@ rst.initiateWithHighElectionTimeout();
 
 const primary = rst.getPrimary();
 assert.eq(primary, rst.nodes[0]);
+
+// TODO (SERVER-56632): Fix the test to work with the new default write concern.
+if (isDefaultWriteConcernMajorityFlagEnabled(primary)) {
+    jsTestLog("Skipping test because the default WC majority feature flag is enabled.");
+    rst.stopSet();
+    return;
+}
 
 const syncSource = rst.nodes[1];
 const syncingNode = rst.nodes[2];

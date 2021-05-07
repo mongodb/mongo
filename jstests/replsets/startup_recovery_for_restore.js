@@ -36,6 +36,10 @@ const sentinelCollName = "sentinelcoll";
 const coll = db[collName];
 const paddingStr = "XXXXXXXXX";
 
+// The default WC is majority and stopServerReplication will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Pre-load some documents.
 const nPreDocs = 2;
 coll.insert([{_id: "pre1"}, {_id: "pre2"}]);

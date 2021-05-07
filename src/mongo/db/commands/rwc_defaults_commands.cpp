@@ -114,7 +114,7 @@ public:
             assertNotStandaloneOrShardServer(opCtx, SetDefaultRWConcern::kCommandName);
 
             auto& rwcDefaults = ReadWriteConcernDefaults::get(opCtx->getServiceContext());
-            auto newDefaults = rwcDefaults.generateNewConcerns(
+            auto newDefaults = rwcDefaults.generateNewCWRWCToBeSavedOnDisk(
                 opCtx, request().getDefaultReadConcern(), request().getDefaultWriteConcern());
 
             updatePersistedDefaultRWConcernDocument(opCtx, newDefaults);

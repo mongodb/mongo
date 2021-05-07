@@ -14,6 +14,10 @@ var secondary = rst.getSecondary();
 
 var coll = primary.getCollection("foo.bar");
 
+// The default WC is majority and fsyncLock will prevent satisfying any majority writes.
+assert.commandWorked(primary.adminCommand(
+    {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}}));
+
 // Insert a doc and replicate it to two servers
 coll.insert({some: "doc"});
 var gleObj = coll.getDB().getLastErrorObj(2);  // w : 2
