@@ -441,7 +441,6 @@ void DBConnectionPool::decrementEgress(const string& host, DBClientBase* c) {
     stdx::lock_guard<stdx::mutex> L(_mutex);
     PoolForHost& p = _pools[PoolKey(host, c->getSoTimeout())];
     --p._checkedOut;
-    p.notifyWaiters();
 }
 
 DBConnectionPool::~DBConnectionPool() {
