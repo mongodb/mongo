@@ -592,7 +592,7 @@ Status _collModInternal(OperationContext* opCtx,
         }
 
         if (cmrNew.collValidator) {
-            coll.getWritableCollection()->setValidator(opCtx, std::move(*cmrNew.collValidator));
+            coll.getWritableCollection()->setValidator(opCtx, *cmrNew.collValidator);
         }
         if (cmrNew.collValidationAction)
             uassertStatusOKWithContext(coll.getWritableCollection()->setValidationAction(

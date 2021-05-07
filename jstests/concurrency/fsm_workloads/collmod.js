@@ -28,6 +28,16 @@ var $config = (function() {
             if (res.hasOwnProperty('expireAfterSeconds_new')) {
                 assertWhenOwnDB.eq(res.expireAfterSeconds_new, newTTL);
             }
+
+            // Attempt an invalid collMod which should always fail regardless of whether a WCE
+            // occurred. This is meant to reproduce SERVER-56772.
+            const encryptSchema = {$jsonSchema: {properties: {_id: {encrypt: {}}}}};
+            assertAlways.commandFailedWithCode(db.runCommand({
+                collMod: this.threadCollName,
+                validator: encryptSchema,
+                validationAction: "warn"
+            }),
+                                               ErrorCodes.QueryFeatureNotAllowed);
         }
 
         return {collMod: collMod};
