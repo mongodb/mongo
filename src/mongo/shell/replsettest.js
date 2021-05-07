@@ -2200,7 +2200,6 @@ var ReplSetTest = function(opts) {
     };
 
     this.getHashesUsingSessions = function(sessions, dbName, {
-        filterCapped: filterCapped = true,
         readAtClusterTime,
     } = {}) {
         return sessions.map(session => {
@@ -2220,26 +2219,7 @@ var ReplSetTest = function(opts) {
                 }
             }
 
-            const res = assert.commandWorked(db.runCommand(commandObj));
-
-            // The "capped" field in the dbHash command response is new as of MongoDB 4.0.
-            const cappedCollections = new Set(filterCapped ? res.capped : []);
-
-            for (let collName of Object.keys(res.collections)) {
-                // Capped collections are not necessarily truncated at the same points across
-                // replica set members and may therefore not have the same md5sum. We remove them
-                // from the dbHash command response to avoid an already known case of a mismatch.
-                // See SERVER-16049 for more details.
-                if (cappedCollections.has(collName)) {
-                    delete res.collections[collName];
-                    // The "uuids" field in the dbHash command response is new as of MongoDB 4.0.
-                    if (res.hasOwnProperty("uuids")) {
-                        delete res.uuids[collName];
-                    }
-                }
-            }
-
-            return res;
+            return assert.commandWorked(db.runCommand(commandObj));
         });
     };
 
@@ -2259,11 +2239,7 @@ var ReplSetTest = function(opts) {
             })
         ].map(conn => conn.getDB('test').getSession());
 
-        // getHashes() is sometimes called for versions of MongoDB earlier than 4.0 so we cannot use
-        // the dbHash command directly to filter out capped collections. checkReplicatedDataHashes()
-        // uses the listCollections command after awaiting replication to determine if a collection
-        // is capped.
-        const hashes = this.getHashesUsingSessions(sessions, dbName, {filterCapped: false});
+        const hashes = this.getHashesUsingSessions(sessions, dbName);
         return {primary: hashes[0], secondaries: hashes.slice(1)};
     };
 
