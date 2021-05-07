@@ -1049,6 +1049,9 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_DECL_RET;
     WT_TXN *txn;
     WT_UPDATE *fix_upd, *tombstone, *upd;
+#ifdef HAVE_DIAGNOSTIC
+    WT_UPDATE *head_upd;
+#endif
     size_t not_used;
     uint32_t hs_btree_id;
     bool upd_appended;
@@ -1060,12 +1063,18 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
+    __wt_verbose(session, WT_VERB_TRANSACTION,
+      "resolving prepared op for txnid: %" PRIu64 " that %s", txn->id,
+      commit ? "committed" : "roll backed");
     /*
      * Aborted updates can exist in the update chain of our transaction. Generally this will occur
      * due to a reserved update. As such we should skip over these updates.
      */
     for (; upd != NULL && upd->txnid == WT_TXN_ABORTED; upd = upd->next)
         ;
+#ifdef HAVE_DIAGNOSTIC
+    head_upd = upd;
+#endif
 
     /*
      * The head of the update chain is not a prepared update, which means all the prepared updates
@@ -1173,6 +1182,28 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
      */
     if (fix_upd != NULL)
         WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd, commit));
+
+#ifdef HAVE_DIAGNOSTIC
+    for (; head_upd != NULL; head_upd = head_upd->next) {
+        /*
+         * Assert if we still have an update from the current transaction that hasn't been aborted.
+         * Only perform this check if aborting the prepared transaction.
+         */
+        WT_ASSERT(
+          session, commit || head_upd->txnid == WT_TXN_ABORTED || head_upd->txnid != txn->id);
+
+        if (head_upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        /*
+         * If we restored an update from the history store, it should be the last update on the
+         * chain.
+         */
+        if (upd_appended && head_upd->type == WT_UPDATE_STANDARD &&
+          F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
+            WT_ASSERT(session, head_upd->next == NULL);
+    }
+#endif
 
 err:
     if (hs_cursor != NULL)
