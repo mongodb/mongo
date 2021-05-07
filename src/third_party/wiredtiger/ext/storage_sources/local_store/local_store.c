@@ -448,7 +448,8 @@ local_customize_file_system(WT_STORAGE_SOURCE *storage_source, WT_SESSION *sessi
         goto err;
     }
     if ((ret = local_get_directory(cachedir.str, (ssize_t)cachedir.len, &fs->cache_dir)) != 0) {
-        ret = local_err(local, session, ret, "%*s: cache directory", cachedir.len, cachedir.str);
+        ret =
+          local_err(local, session, ret, "%*s: cache directory", (int)cachedir.len, cachedir.str);
         goto err;
     }
     if ((fs->fs_prefix = strdup(prefix)) == NULL) {
