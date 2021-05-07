@@ -74,6 +74,7 @@
 
 var ReplSetTest = function(opts) {
     'use strict';
+    load("jstests/multiVersion/libs/verify_versions.js");
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
@@ -1611,10 +1612,7 @@ var ReplSetTest = function(opts) {
                 const authMode = options.clusterAuthMode;
                 const notX509 =
                     authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
-
-                const serverStatus =
-                    assert.commandWorked(node.getDB("admin").runCommand({serverStatus: 1}));
-                const currVersion = serverStatus.version;
+                const currVersion = node.getBinVersion();
                 const binVersionLatest =
                     MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
                                                       MongoRunner.getBinVersionFor("latest"));
