@@ -890,7 +890,6 @@ TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation
                                        std::move(serializedPipeline));
 
     auto readConcern = repl::ReadConcernArgs(
-        boost::optional<LogicalTime>(startFetchingTimestamp),
         boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
     aggRequest.setReadConcern(readConcern.toBSONInner());
 

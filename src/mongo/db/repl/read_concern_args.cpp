@@ -187,6 +187,12 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
                                             << readConcernLevels::kAvailableName << "', or '"
                                             << readConcernLevels::kSnapshotName << "'");
             }
+        } else if (fieldName == kAllowTransactionTableSnapshot) {
+            auto status = bsonExtractBooleanField(
+                readConcernObj, kAllowTransactionTableSnapshot, &_allowTransactionTableSnapshot);
+            if (!status.isOK()) {
+                return status;
+            }
         } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
             try {
                 _provenance = ReadWriteConcernProvenance::parse(
@@ -296,6 +302,10 @@ void ReadConcernArgs::_appendInfoInner(BSONObjBuilder* builder) const {
 
     if (_atClusterTime) {
         builder->append(kAtClusterTimeFieldName, _atClusterTime->asTimestamp());
+    }
+
+    if (_allowTransactionTableSnapshot) {
+        builder->append(kAllowTransactionTableSnapshot, _allowTransactionTableSnapshot);
     }
 
     _provenance.serialize(builder);

@@ -254,6 +254,30 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
                 !coll->isCapped() ||
                     readConcernLevel != repl::ReadConcernLevel::kSnapshotReadConcern);
 
+        // Disallow snapshot reads and causal consistent majority reads on config.transactions
+        // outside of transactions to avoid running the collection at a point-in-time in the middle
+        // of a secondary batch. Such reads are unsafe because config.transactions updates are
+        // coalesced on secondaries. Majority reads without an afterClusterTime is allowed because
+        // they are allowed to return arbitrarily stale data. We allow kNoTimestamp and kLastApplied
+        // reads because they must be from internal readers given the snapshot/majority readConcern
+        // (e.g. for session checkout).
+        const NamespaceString nss = coll->ns();
+        const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
+        const auto allowTransactionTableSnapshot =
+            repl::ReadConcernArgs::get(opCtx).allowTransactionTableSnapshot();
+        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+        if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
+            readSource != RecoveryUnit::ReadSource::kNoTimestamp &&
+            readSource != RecoveryUnit::ReadSource::kLastApplied &&
+            ((readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern &&
+              !allowTransactionTableSnapshot) ||
+             (readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern &&
+              afterClusterTime))) {
+            uasserted(5557800,
+                      "Snapshot reads and causal consistent majority reads on config.transactions "
+                      "are not supported");
+        }
+
         // During batch application on secondaries, there is a potential to read inconsistent states
         // that would normally be protected by the PBWM lock. In order to serve secondary reads
         // during this period, we default to not acquiring the lock (by setting
@@ -261,9 +285,6 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
         // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
         // which is set after each complete batch.
-
-        const NamespaceString nss = coll->ns();
-        auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
 
         // Once we have our locks, check whether or not we should override the ReadSource that was
         // set before acquiring locks.
@@ -275,7 +296,6 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         }
 
         const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-        const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
         if (readTimestamp && afterClusterTime) {
             // Readers that use afterClusterTime have already waited at a higher level for the
             // all_durable time to advance to a specified optime, and they assume the read timestamp
