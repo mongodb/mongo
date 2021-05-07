@@ -21,12 +21,16 @@ assert.commandWorked(
 let oplog = conn.getDB("local").oplog.rs;
 
 // Construct a valid oplog entry.
-const lastOplogEntry = oplog.find().sort({ts: -1}).limit(1).toArray()[0];
-const highestTS = lastOplogEntry.ts;
-const toInsertTS = Timestamp(highestTS.getTime(), highestTS.getInc() + 1);
-const toInsert = Object.extend(
-    lastOplogEntry, {op: "u", ns: "test.coll", o: {$set: {a: 1}}, o2: {_id: 0}, ts: toInsertTS});
+function constructOplogEntry(oplog) {
+    const lastOplogEntry = oplog.find().sort({ts: -1}).limit(1).toArray()[0];
+    const highestTS = lastOplogEntry.ts;
+    const toInsertTS = Timestamp(highestTS.getTime(), highestTS.getInc() + 1);
+    return Object.extend(
+        lastOplogEntry,
+        {op: "u", ns: "test.coll", o: {$set: {a: 1}}, o2: {_id: 0}, ts: toInsertTS});
+}
 
+let toInsert = constructOplogEntry(oplog);
 jsTestLog("Test that oplog writes are banned when replication is enabled.");
 assert.commandFailedWithCode(oplog.insert(toInsert), ErrorCodes.InvalidNamespace);
 
@@ -34,9 +38,13 @@ jsTestLog("Restart the node in standalone mode.");
 rst.stop(0, undefined /*signal*/, undefined /*opts*/, {forRestart: true});
 conn = rst.start(0, {noReplSet: true, noCleanData: true});
 
+oplog = conn.getDB("local").oplog.rs;
+// Construct a valid oplog entry using the highest timestamp in the oplog. The highest timestamp may
+// differ from the one above due to concurrent internal writes when the node was a primary.
+toInsert = constructOplogEntry(oplog);
 jsTestLog(`Test that oplog writes are permitted in standalone mode. Inserting oplog entry: ${
     tojson(toInsert)}`);
-assert.commandWorked(conn.getDB("local").oplog.rs.insert(toInsert));
+assert.commandWorked(oplog.insert(toInsert));
 
 jsTestLog("Restart the node with replication enabled.");
 rst.stop(0, undefined /*signal*/, undefined /*opts*/, {forRestart: true});
