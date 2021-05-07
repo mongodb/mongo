@@ -549,7 +549,7 @@ TEST_F(MongodbCAPITest, InsertAndUpdate) {
 TEST_F(MongodbCAPITest, RunListCommands) {
     auto client = createClient();
 
-    std::vector<std::string> whitelist = {"_hashBSONElement",
+    std::vector<std::string> allowlist = {"_hashBSONElement",
                                           "_killOperations",
                                           "aggregate",
                                           "buildInfo",
@@ -609,7 +609,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "waitForFailPoint",
                                           "whatsmysni"};
 
-    std::sort(whitelist.begin(), whitelist.end());
+    std::sort(allowlist.begin(), allowlist.end());
 
     mongo::BSONObj listCommandsObj = mongo::fromjson("{ listCommands: 1 }");
     auto listCommandsOpMsg = mongo::OpMsgRequest::fromDBAndBody("db_name", listCommandsObj);
@@ -623,15 +623,15 @@ TEST_F(MongodbCAPITest, RunListCommands) {
 
     std::vector<std::string> missing;
     std::vector<std::string> unsupported;
-    std::set_difference(whitelist.begin(),
-                        whitelist.end(),
+    std::set_difference(allowlist.begin(),
+                        allowlist.end(),
                         commands.begin(),
                         commands.end(),
                         std::back_inserter(missing));
     std::set_difference(commands.begin(),
                         commands.end(),
-                        whitelist.begin(),
-                        whitelist.end(),
+                        allowlist.begin(),
+                        allowlist.end(),
                         std::back_inserter(unsupported));
 
     if (!missing.empty()) {

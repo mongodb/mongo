@@ -112,7 +112,7 @@ public:
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
                 UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kWhitelist};
+                ChangeStreamRequirement::kAllowlist};
     }
 
     Value serialize(

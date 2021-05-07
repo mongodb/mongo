@@ -278,7 +278,7 @@ public:
 
         // Handle collections in the config db separately.
         if (nss.db() == NamespaceString::kConfigDb) {
-            // Only whitelisted collections in config may be sharded (unless we are in test mode)
+            // Only allowlisted collections in config may be sharded (unless we are in test mode)
             uassert(ErrorCodes::IllegalOperation,
                     "only special collections in the config db may be sharded",
                     nss == NamespaceString::kLogicalSessionsNamespace);

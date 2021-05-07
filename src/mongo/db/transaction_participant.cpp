@@ -93,7 +93,7 @@ MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
 // The command names that are allowed in a prepared transaction.
-const StringMap<int> preparedTxnCmdWhitelist = {
+const StringMap<int> preparedTxnCmdAllowlist = {
     {"abortTransaction", 1}, {"commitTransaction", 1}, {"prepareTransaction", 1}};
 
 void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
@@ -1739,7 +1739,7 @@ void TransactionParticipant::Participant::_checkIsCommandValidWithTxnState(
             str::stream() << "Cannot call any operation other than abort, prepare or commit on"
                           << " a prepared transaction",
             !o().txnState.isPrepared() ||
-                preparedTxnCmdWhitelist.find(cmdName) != preparedTxnCmdWhitelist.cend());
+                preparedTxnCmdAllowlist.find(cmdName) != preparedTxnCmdAllowlist.cend());
 }
 
 BSONObj TransactionParticipant::Observer::reportStashedState(OperationContext* opCtx) const {

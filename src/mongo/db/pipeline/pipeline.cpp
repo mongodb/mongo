@@ -99,7 +99,7 @@ void validateTopLevelPipeline(const Pipeline& pipeline) {
                   firstStageConstraints.isIndependentOfAnyCollection));
 
         // If the first stage is a $changeStream stage, then all stages in the pipeline must be
-        // either $changeStream stages or whitelisted as being able to run in a change stream.
+        // either $changeStream stages or allowlisted as being able to run in a change stream.
         if (firstStageConstraints.isChangeStreamStage()) {
             for (auto&& source : sources) {
                 uassert(ErrorCodes::IllegalOperation,

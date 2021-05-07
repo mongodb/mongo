@@ -77,17 +77,17 @@ MONGO_INITIALIZER_GENERAL(SetupInternalSecurityUser,
     auth::generateUniversalPrivileges(&privileges);
     user->addPrivileges(privileges);
 
-    if (mongodGlobalParams.whitelistedClusterNetwork) {
-        const auto& whitelist = *mongodGlobalParams.whitelistedClusterNetwork;
+    if (mongodGlobalParams.allowlistedClusterNetwork) {
+        const auto& allowlist = *mongodGlobalParams.allowlistedClusterNetwork;
 
-        auto restriction = std::make_unique<ClientSourceRestriction>(whitelist);
+        auto restriction = std::make_unique<ClientSourceRestriction>(allowlist);
         auto restrictionSet = std::make_unique<RestrictionSet<>>(std::move(restriction));
         auto restrictionDocument =
             std::make_unique<RestrictionDocument<>>(std::move(restrictionSet));
 
-        RestrictionDocuments clusterWhiteList(std::move(restrictionDocument));
+        RestrictionDocuments clusterAllowList(std::move(restrictionDocument));
 
-        user->setRestrictions(std::move(clusterWhiteList));
+        user->setRestrictions(std::move(clusterAllowList));
     }
 
     internalSecurity.user = user;

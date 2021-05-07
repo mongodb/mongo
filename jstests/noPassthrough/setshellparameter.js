@@ -9,10 +9,10 @@ function test(ssp, succeed) {
         0 == result, succeed, '--setShellParameter ' + ssp + 'worked/didn\'t-work unexpectedly');
 }
 
-// Whitelisted
+// Allowlisted
 test('disabledSecureAllocatorDomains=foo', true);
 
-// Not whitelisted
+// Not allowlisted
 test('enableTestCommands=1', false);
 
 // Unknown

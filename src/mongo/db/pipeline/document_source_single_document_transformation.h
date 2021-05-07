@@ -72,7 +72,7 @@ public:
                                      TransactionRequirement::kAllowed,
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed,
-                                     ChangeStreamRequirement::kWhitelist);
+                                     ChangeStreamRequirement::kAllowlist);
         constraints.canSwapWithMatch = true;
         constraints.canSwapWithSkippingOrLimitingStage = true;
         constraints.isAllowedWithinUpdatePipeline = true;

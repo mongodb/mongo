@@ -1715,12 +1715,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
     }
 
     // The feature compatibility version in the server configuration collection cannot change during
-    // initial sync. We do not attempt to parse the whitelisted ops because they do not have a
+    // initial sync. We do not attempt to parse the allowlisted ops because they do not have a
     // collection namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry
     // for each collection dropped. 'applyOps' and 'commitTransaction' will try to apply each
     // individual operation, and those will be caught then if they are a problem. 'abortTransaction'
     // won't ever change the server configuration collection.
-    std::vector<std::string> whitelistedOps{"dropDatabase",
+    std::vector<std::string> allowlistedOps{"dropDatabase",
                                             "applyOps",
                                             "dbCheck",
                                             "commitTransaction",
@@ -1729,8 +1729,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                             "commitIndexBuild",
                                             "abortIndexBuild"};
     if ((mode == OplogApplication::Mode::kInitialSync) &&
-        (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
-         whitelistedOps.end()) &&
+        (std::find(allowlistedOps.begin(), allowlistedOps.end(), o.firstElementFieldName()) ==
+         allowlistedOps.end()) &&
         extractNs(nss.db(), o) == NamespaceString::kServerConfigurationNamespace) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Applying command to feature compatibility version "

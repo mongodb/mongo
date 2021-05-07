@@ -452,10 +452,10 @@ function executeTest(db, isMongos) {
     })();
 
     //
-    // Test that maxTimeMS is accepted by commands that have an option whitelist.
+    // Test that maxTimeMS is accepted by commands that have an option allowlist.
     //
-    (function testCommandsWithOptionWhitelist() {
-        const t = db.max_time_ms_option_whitelist;
+    (function testCommandsWithOptionAllowlist() {
+        const t = db.max_time_ms_option_allowlist;
         // The namespace must exist for collMod to work.
         assert.commandWorked(t.insert({x: 1}));
 

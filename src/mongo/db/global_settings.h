@@ -36,7 +36,7 @@ struct MongodGlobalParams {
     bool scriptingEnabled = true;  // Use "security.javascriptEnabled" to set this variable. Or use
                                    // --noscripting which will set it to false.
 
-    boost::optional<std::vector<std::string>> whitelistedClusterNetwork;
+    boost::optional<std::vector<std::string>> allowlistedClusterNetwork;
 };
 
 extern MongodGlobalParams mongodGlobalParams;

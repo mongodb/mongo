@@ -8,7 +8,7 @@
 load("jstests/libs/override_methods/override_helpers.js");
 
 // These are all commands that can return BackgroundOperationInProgress error codes.
-const commandWhitelist = new Set([
+const commandAllowlist = new Set([
     "cloneCollectionAsCapped",
     "collMod",
     "compact",
@@ -21,7 +21,7 @@ const commandWhitelist = new Set([
     "renameCollection",
 ]);
 
-// Whitelisted errors commands may encounter when retried on a sharded cluster. Shards may
+// Allowlisted errors commands may encounter when retried on a sharded cluster. Shards may
 // return different responses, so errors associated with repeated executions of a command may be
 // ignored.
 const acceptableCommandErrors = {
@@ -60,8 +60,8 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
                 return kNoRetry;
             }
 
-            // Commands that are not in the whitelist should never fail with this error code.
-            if (!commandWhitelist.has(commandName)) {
+            // Commands that are not in the allowlist should never fail with this error code.
+            if (!commandAllowlist.has(commandName)) {
                 return kNoRetry;
             }
 
@@ -85,12 +85,12 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
 
             // In certain cases, retrying a command on a sharded cluster may result in a
             // scenario where one shard has executed the command and another still has a
-            // background operation in progress. Retry, ignoring whitelisted errors on a
+            // background operation in progress. Retry, ignoring allowlisted errors on a
             // command-by-command basis.
             let shardsWithBackgroundOps = [];
 
             // If any shard has a background operation in progress and the other shards sent
-            // whitelisted errors after a first attempt, retry the entire command.
+            // allowlisted errors after a first attempt, retry the entire command.
             for (let shard in res.raw) {
                 let shardRes = res.raw[shard];
                 if (shardRes.ok) {
@@ -102,21 +102,21 @@ function runCommandWithRetries(conn, dbName, commandName, commandObj, func, make
                     continue;
                 }
 
-                // If any of the shards return an error that is not whitelisted or even if a
-                // whitelisted error is received on the first attempt, do not retry.
+                // If any of the shards return an error that is not allowlisted or even if a
+                // allowlisted error is received on the first attempt, do not retry.
                 let acceptableErrors = acceptableCommandErrors[commandName] || [];
                 if (!acceptableErrors.includes(shardRes.code)) {
                     return kNoRetry;
                 }
-                // Whitelisted errors can only occur from running a command more than once, so
+                // Allowlisted errors can only occur from running a command more than once, so
                 // it would be unexpected to receive an error on the first attempt.
                 if (attempt === 1) {
                     return kNoRetry;
                 }
             }
 
-            // At this point, all shards have resulted in whitelisted errors resulting in
-            // retrying whitelisted commands. Fake a successful response.
+            // At this point, all shards have resulted in allowlisted errors resulting in
+            // retrying allowlisted commands. Fake a successful response.
             if (shardsWithBackgroundOps.length === 0) {
                 print("done retrying " + commandName +
                       " command because all shards have responded with acceptable errors");

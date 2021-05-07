@@ -68,7 +68,7 @@ public:
     /**
      * Construct an empty AddressRestriction.
      * Note that an empty AddressRestriciton will not validate
-     * against any addresses, since nothing has been whitelisted.
+     * against any addresses, since nothing has been allowlisted.
      */
     AddressRestriction() = default;
 

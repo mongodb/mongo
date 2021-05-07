@@ -49,7 +49,7 @@ public:
                 TransactionRequirement::kAllowed,
                 LookupRequirement::kAllowed,
                 UnionRequirement::kAllowed,
-                ChangeStreamRequirement::kWhitelist};
+                ChangeStreamRequirement::kAllowlist};
     }
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

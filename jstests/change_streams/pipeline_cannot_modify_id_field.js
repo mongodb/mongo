@@ -114,7 +114,7 @@ const idPreservingTransformations = [
 
 let docId = 0;
 
-// Verify that each of the whitelisted transformations above succeeds.
+// Verify that each of the allowlisted transformations above succeeds.
 for (let transform of idPreservingTransformations) {
     const cmdRes = assert.commandWorked(
         db.runCommand(

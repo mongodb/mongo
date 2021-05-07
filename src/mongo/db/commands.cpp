@@ -114,7 +114,7 @@ bool checkAuthorizationImplPreParse(OperationContext* opCtx,
 }
 
 // The command names that are allowed in a multi-document transaction.
-const StringMap<int> txnCmdWhitelist = {{"abortTransaction", 1},
+const StringMap<int> txnCmdAllowlist = {{"abortTransaction", 1},
                                         {"aggregate", 1},
                                         {"commitTransaction", 1},
                                         {"coordinateCommitTransaction", 1},
@@ -555,11 +555,11 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             "http://dochub.mongodb.org/core/transaction-count for a recommended alternative.",
             cmdName != "count"_sd);
 
-    auto inTxnWhitelist = txnCmdWhitelist.find(cmdName) != txnCmdWhitelist.cend();
+    auto inTxnAllowlist = txnCmdAllowlist.find(cmdName) != txnCmdAllowlist.cend();
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run '" << cmdName << "' in a multi-document transaction.",
-            inTxnWhitelist);
+            inTxnAllowlist);
 
     const auto dbName = nss.db();
 

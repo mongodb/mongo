@@ -453,7 +453,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
             << "cannot rename within same database (use renameCollectionWithinDB instead): source: "
             << source << "; target: " << target);
 
-    // Refer to txnCmdWhitelist in commands.cpp.
+    // Refer to txnCmdAllowlist in commands.cpp.
     invariant(
         !opCtx->inMultiDocumentTransaction(),
         str::stream() << "renameBetweenDBs not supported in multi-document transaction: source: "

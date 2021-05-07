@@ -18,10 +18,10 @@ systemUsers.drop();
 coll.drop();
 coll.insert({});
 
-// system.foo isn't in the whitelist so it can't be renamed to or from
+// system.foo isn't in the allowlist so it can't be renamed to or from
 assert.commandFailed(coll.renameCollection(systemFoo.getName()));
 assert.commandFailed(systemFoo.renameCollection(coll.getName()));
 
-// system.users is whitelisted so these should work
+// system.users is allowlisted so these should work
 assert.commandWorked(coll.renameCollection(systemUsers.getName()));
 assert.commandWorked(systemUsers.renameCollection(coll.getName()));

@@ -62,7 +62,7 @@ using std::string;
 using std::vector;
 
 // SERVER-36807: Limit --setShellParameter to SetParameters we know we want to expose.
-const std::set<std::string> kSetShellParameterWhitelist = {
+const std::set<std::string> kSetShellParameterAllowlist = {
     "awsEC2InstanceMetadataUrl",
     "awsECSInstanceMetadataUrl",
     "ocspEnabled",
@@ -334,7 +334,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
         for (auto it : ssp) {
             const auto& name = it.first;
             auto paramIt = map.find(name);
-            if (paramIt == map.end() || !kSetShellParameterWhitelist.count(name)) {
+            if (paramIt == map.end() || !kSetShellParameterAllowlist.count(name)) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "Unknown --setShellParameter '" << name << "'"};
             }

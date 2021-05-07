@@ -283,7 +283,7 @@ res = coll.runCommand({
 });
 assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
-// Test that the following whitelisted keywords are verified as strings but otherwise ignored
+// Test that the following allowlisted keywords are verified as strings but otherwise ignored
 // in a top-level schema:
 // - description
 // - title
@@ -303,7 +303,7 @@ let listCollectionsOutput = db.runCommand({listCollections: 1, filter: {name: co
 assert.commandWorked(listCollectionsOutput);
 assert.eq(listCollectionsOutput.cursor.firstBatch[0].options.validator, {$jsonSchema: schema});
 
-// Repeat the test above using the whitelisted metadata keywords.
+// Repeat the test above using the allowlisted metadata keywords.
 coll.drop();
 schema = {
     title: "Test schema",

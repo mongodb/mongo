@@ -288,12 +288,12 @@ TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionNotFirst) {
     ASSERT_OK(statusWith.getStatus());
 }
 
-TEST(CollectionOptions, MaxTimeMSWhitelistedOptionIgnored) {
+TEST(CollectionOptions, MaxTimeMSAllowlistedOptionIgnored) {
     auto statusWith = CollectionOptions::parse(fromjson("{maxTimeMS: 1}"));
     ASSERT_OK(statusWith.getStatus());
 }
 
-TEST(CollectionOptions, WriteConcernWhitelistedOptionIgnored) {
+TEST(CollectionOptions, WriteConcernAllowlistedOptionIgnored) {
     auto statusWith = CollectionOptions::parse(fromjson("{writeConcern: 1}"));
     ASSERT_OK(statusWith.getStatus());
 }

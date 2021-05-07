@@ -37,7 +37,7 @@ namespace mongo {
 /**
  * A helper class for defining reliable static duration variables that are safe at
  * shutdown. It's also useful as a greppable identifier to emphasize, track, and
- * whitelist such objects across the codebase. This is a way to make an object that
+ * allowlist such objects across the codebase. This is a way to make an object that
  * never dies and isn't allocated. T need not be destructible, as it is never destroyed.
  *
  * Notice that in every example, there's a `static` storage class specifier on the

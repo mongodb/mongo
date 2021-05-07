@@ -464,14 +464,14 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("security.clusterIpSourceAllowlist")) {
-        mongodGlobalParams.whitelistedClusterNetwork = std::vector<std::string>();
-        for (const std::string& whitelistEntry :
+        mongodGlobalParams.allowlistedClusterNetwork = std::vector<std::string>();
+        for (const std::string& allowlistEntry :
              params["security.clusterIpSourceAllowlist"].as<std::vector<std::string>>()) {
             std::vector<std::string> intermediates;
-            str::splitStringDelim(whitelistEntry, &intermediates, ',');
+            str::splitStringDelim(allowlistEntry, &intermediates, ',');
             std::copy(intermediates.begin(),
                       intermediates.end(),
-                      std::back_inserter(*mongodGlobalParams.whitelistedClusterNetwork));
+                      std::back_inserter(*mongodGlobalParams.allowlistedClusterNetwork));
         }
     }
 

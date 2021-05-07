@@ -3,7 +3,7 @@ test_kind: js_test
 selector:
   roots:
   # Define these tests as the roots so that tags can be used to do further refinement. This is in
-  # contrast to using jstests/core/*.js as a root, and using include_files as a whitelist.
+  # contrast to using jstests/core/*.js as a root, and using include_files as a allowlist.
   - jstests/core/bulk*.js
 
 executor:
