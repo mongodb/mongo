@@ -35,75 +35,18 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/migration_source_manager.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 
 namespace mongo {
 namespace {
-
-void refreshShardVersion(OperationContext* opCtx, const NamespaceString& nss) {
-    invariant(!opCtx->lockState()->isLocked());
-    invariant(!opCtx->getClient()->isInDirectClient());
-    invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
-    if (nss.isNamespaceAlwaysUnsharded())
-        return;
-
-    {
-        boost::optional<Lock::DBLock> dbLock;
-        dbLock.emplace(opCtx, nss.db(), MODE_IS);
-
-        boost::optional<Lock::CollectionLock> collLock;
-        collLock.emplace(opCtx, nss, MODE_IS);
-
-        const auto csr = CollectionShardingRuntime::get(opCtx, nss);
-        auto critSec =
-            csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-
-        if (critSec) {
-            auto inRecoverOrRefresh = [&] {
-                invariant(critSec);
-
-                boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
-                    CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
-
-                auto metadata = csr->getCurrentMetadataIfKnown();
-
-                csrLock.reset();
-                csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
-
-                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-                bool runRecover = metadata ? false : true;
-                csr->setShardVersionRecoverRefreshFuture(
-                    recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover),
-                    *csrLock);
-                return csr->getShardVersionRecoverRefreshFuture(opCtx);
-            }();
-
-            collLock.reset();
-            dbLock.reset();
-
-            inRecoverOrRefresh->get(opCtx);
-        } else {
-            collLock.reset();
-            dbLock.reset();
-
-            onShardVersionMismatch(opCtx, nss, boost::none);
-        }
-    }
-}
 
 class FlushReshardingStateChangeCmd final : public TypedCommand<FlushReshardingStateChangeCmd> {
 public:
@@ -154,7 +97,7 @@ public:
                     "Can't call _flushReshardingStateChange if in read-only mode",
                     !storageGlobalParams.readOnly);
 
-            refreshShardVersion(opCtx, ns());
+            resharding::refreshShardVersion(opCtx, ns());
 
             CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, ns());
 
