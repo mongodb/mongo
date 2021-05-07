@@ -74,7 +74,6 @@
 
 var ReplSetTest = function(opts) {
     'use strict';
-    load("jstests/multiVersion/libs/verify_versions.js");
 
     if (!(this instanceof ReplSetTest)) {
         return new ReplSetTest(opts);
@@ -1612,15 +1611,22 @@ var ReplSetTest = function(opts) {
                 const authMode = options.clusterAuthMode;
                 const notX509 =
                     authMode != "sendX509" && authMode != "x509" && authMode != "sendKeyFile";
-                const currVersion = node.getBinVersion();
-                const binVersionLatest =
-                    MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
-                                                      MongoRunner.getBinVersionFor("latest"));
-                if (binVersionLatest && notX509) {
-                    assert.commandWorked(node.adminCommand({
-                        setParameter: 1,
-                        enableDefaultWriteConcernUpdatesForInitiate: false,
-                    }));
+
+                // We should only be checking the binary version if we are not using X509 auth,
+                // as any server command will fail if the 'authMode' is X509.
+                if (notX509) {
+                    const serverStatus =
+                        assert.commandWorked(node.getDB("admin").runCommand({serverStatus: 1}));
+                    const currVersion = serverStatus.version;
+                    const binVersionLatest =
+                        MongoRunner.areBinVersionsTheSame(MongoRunner.getBinVersionFor(currVersion),
+                                                          MongoRunner.getBinVersionFor("latest"));
+                    if (binVersionLatest) {
+                        assert.commandWorked(node.adminCommand({
+                            setParameter: 1,
+                            enableDefaultWriteConcernUpdatesForInitiate: false,
+                        }));
+                    }
                 }
             }
         });
