@@ -65,10 +65,7 @@ function run(pipeline) {
 assert.sameMembers(run([range(-1, 0)]), [
     {x: makeDate(0), y: makeDates([0])},
     {x: makeDate(1), y: makeDates([0, 1])},
-
-    // Time-based bounds work like $dateAdd, which rounds down!
-    {x: makeDate(1.5), y: makeDates([0, 1])},
-
+    {x: makeDate(1.5), y: makeDates([1, 1.5])},
     {x: makeDate(2), y: makeDates([1, 1.5, 2])},
     {x: makeDate(3), y: makeDates([2, 3])},
     // '0' means the current document and those that tie with it.
@@ -81,10 +78,7 @@ assert.sameMembers(run([range(-1, 0)]), [
 assert.sameMembers(run([range(-1000, 0, 'millisecond')]), [
     {x: makeDate(0), y: makeDates([0])},
     {x: makeDate(1), y: makeDates([0, 1])},
-
-    // Time-based bounds work like $dateAdd, which rounds down!
-    {x: makeDate(1.5), y: makeDates([0, 1])},
-
+    {x: makeDate(1.5), y: makeDates([1, 1.5])},
     {x: makeDate(2), y: makeDates([1, 1.5, 2])},
     {x: makeDate(3), y: makeDates([2, 3])},
     // '0' means the current document and those that tie with it.
@@ -103,10 +97,7 @@ assert.includes(error.message, 'range-based bounds must be an integer');
 assert.sameMembers(run([range('unbounded', 0)]), [
     {x: makeDate(0), y: makeDates([0])},
     {x: makeDate(1), y: makeDates([0, 1])},
-
-    // Since $dateAdd rounds down, the upper bound is makeDate(1).
-    {x: makeDate(1.5), y: makeDates([0, 1])},
-
+    {x: makeDate(1.5), y: makeDates([0, 1, 1.5])},
     {x: makeDate(2), y: makeDates([0, 1, 1.5, 2])},
     {x: makeDate(3), y: makeDates([0, 1, 1.5, 2, 3])},
     // '0' means current document and those that tie with it.
@@ -117,10 +108,7 @@ assert.sameMembers(run([range('unbounded', 0)]), [
 assert.sameMembers(run([range(0, 'unbounded')]), [
     {x: makeDate(0), y: makeDates([0, 1, 1.5, 2, 3, 42, 42, 43])},
     {x: makeDate(1), y: makeDates([1, 1.5, 2, 3, 42, 42, 43])},
-
-    // Sice $dateAdd rounds down,t he lower bound is makeDate(1).
-    {x: makeDate(1.5), y: makeDates([1, 1.5, 2, 3, 42, 42, 43])},
-
+    {x: makeDate(1.5), y: makeDates([1.5, 2, 3, 42, 42, 43])},
     {x: makeDate(2), y: makeDates([2, 3, 42, 42, 43])},
     {x: makeDate(3), y: makeDates([3, 42, 42, 43])},
     // '0' means current document and those that tie with it.
@@ -185,7 +173,7 @@ assert.commandWorked(coll.insert([
 assert.sameMembers(run([range(-5, 0)]), [
     {partition: "A", x: makeDate(0), y: makeDates([0])},
     {partition: "A", x: makeDate(1), y: makeDates([0, 1])},
-    {partition: "A", x: makeDate(1.5), y: makeDates([0, 1])},
+    {partition: "A", x: makeDate(1.5), y: makeDates([0, 1, 1.5])},
     {partition: "A", x: makeDate(2), y: makeDates([0, 1, 1.5, 2])},
     {partition: "A", x: makeDate(3), y: makeDates([0, 1, 1.5, 2, 3])},
     {partition: "A", x: makeDate(42), y: makeDates([42, 42])},

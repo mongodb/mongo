@@ -1133,8 +1133,13 @@ std::pair<Date_t, Date> defaultReferencePointForDateTrunc(const TimeZone& timezo
 }  // namespace
 
 Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone) {
+    if (unit == TimeUnit::millisecond) {
+        return date + Milliseconds(amount);
+    }
+
     auto utcTime = createTimelibTime();
     timelib_unixtime2gmt(utcTime.get(), seconds(date));
+    utcTime.get()->us = durationCount<Microseconds>(Milliseconds(date.toMillisSinceEpoch() % 1000));
 
     // Check if an adjustment for the last day of month is necessary.
     if (unit == TimeUnit::year || unit == TimeUnit::quarter || unit == TimeUnit::month) {
