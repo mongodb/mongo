@@ -5,7 +5,14 @@
  *
  * Runs insert_ttl_timeseries.js with retryable writes.
  *
- * @tags: [requires_replication]
+ * @tags: [
+ *   assumes_no_implicit_collection_creation_after_drop,
+ *   does_not_support_stepdowns,
+ *   requires_fcv_49,
+ *   requires_timeseries,
+ *   requires_replication,
+ *   uses_ttl,
+ * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');             // for extendWorkload
 load('jstests/concurrency/fsm_workloads/insert_ttl_timeseries.js');  // for $config
