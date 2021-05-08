@@ -3,6 +3,8 @@
  * Tests for the db collection
  *
  * @tags: [
+ *   # TODO(SERVER-56780): fix Number.MAX_VALUE scale test case for 4.4.
+ *   multiversion_incompatible,
  *   requires_capped,
  *   requires_collstats,
  *   requires_fastcount,
