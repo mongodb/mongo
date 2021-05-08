@@ -31,12 +31,41 @@
 
 #include "mongo/util/thread_context.h"
 
-#include "mongo/stdx/thread.h"
+#include <boost/optional.hpp>
+#include <fmt/format.h>
+
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/time_support.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
+
+struct Counters {
+    Counters(uint64_t c, uint64_t d, uint64_t dot)
+        : created(c), destroyed(d), destroyedOffThread(dot) {}
+
+    friend bool operator==(const Counters& a, const Counters& b) {
+        auto lens = [](auto& v) { return std::tie(v.created, v.destroyed, v.destroyedOffThread); };
+        return lens(a) == lens(b);
+    }
+    friend bool operator!=(const Counters& a, const Counters& b) {
+        return !(a == b);
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const Counters& v) {
+        return os << "(created:{}, destroyed:{}, destroyedOffThread:{})"_format(
+                   v.created, v.destroyed, v.destroyedOffThread);
+    }
+
+    uint64_t created;
+    uint64_t destroyed;
+    uint64_t destroyedOffThread;
+};
+
+synchronized_value gCounters{Counters{0, 0, 0}};
 
 /**
  * This decoration increments a set of global counters on creation and destruction.
@@ -47,43 +76,37 @@ public:
         ASSERT(!ThreadContext::get())
             << "ThreadContext decorations should be created before the ThreadContext is set";
 
-        _created.fetchAndAdd(1);
+        ++gCounters->created;
     };
 
     ~TestDecoration() {
-        _destroyed.fetchAndAdd(1);
+        ++gCounters->destroyed;
 
         if (ThreadContext::get()) {
             // We should only be able to reference a ThreadContext in our destructor if our
             // lifetime was extended to be off thread.
-            _destroyedOffThread.fetchAndAdd(1);
+            ++gCounters->destroyedOffThread;
         }
     }
-
-    static auto created() {
-        return _created.load();
-    }
-
-    static auto destroyed() {
-        return _destroyed.load();
-    }
-
-    static auto destroyedOffThread() {
-        return _destroyedOffThread.load();
-    }
-
-private:
-    static inline AtomicWord<size_t> _created{0};
-    static inline AtomicWord<size_t> _destroyed{0};
-    static inline AtomicWord<size_t> _destroyedOffThread{0};
 };
 
 const auto getThreadTestDecoration = ThreadContext::declareDecoration<TestDecoration>();
 
 class ThreadContextTest : public unittest::Test {
 public:
-    void setUp() override;
-    void tearDown() override;
+    void setUp() override {
+        ThreadContext::get();  // Ensure a ThreadContext for the main thread.
+        _monitor.emplace();
+        *gCounters = {0, 0, 0};
+    }
+
+    void tearDown() override {
+        _monitor->notifyDone();
+        _monitor.reset();
+        auto endCount = gCounters.get();
+        ASSERT_EQ(endCount.created, endCount.destroyed);
+        ASSERT_GTE(endCount.destroyed, endCount.destroyedOffThread);
+    }
 
     /**
      * Get the ThreadContext for the current thread and assert that it is valid and alive.
@@ -110,71 +133,25 @@ public:
      */
     template <typename F>
     void launchAndJoinThread(F&& f) {
-        auto t = stdx::thread(std::forward<F>(f));
-        t.join();
+        _monitor->spawn(std::forward<F>(f)).join();
     }
 
-    /**
-     * Get the amount of TestDecoration instances created since the start of this test.
-     */
-    auto decorationsCreated() const {
-        return TestDecoration::created() - _created;
-    }
-
-    /**
-     * Get the amount of TestDecoration instances destroyed since the start of this test.
-     */
-    auto decorationsDestroyed() const {
-        return TestDecoration::destroyed() - _destroyed;
-    }
-
-    /**
-     * Get the amount of TestDecoration instances destroyed off thread since the start of this test.
-     */
-    auto decorationsDestroyedOffThread() const {
-        return TestDecoration::destroyedOffThread() - _destroyedOffThread;
-    }
-
-private:
-    size_t _created;
-    size_t _destroyed;
-    size_t _destroyedOffThread;
+    boost::optional<unittest::ThreadAssertionMonitor> _monitor;
 };
-
-void ThreadContextTest::setUp() {
-    _created = TestDecoration::created();
-    _destroyed = TestDecoration::destroyed();
-    _destroyedOffThread = TestDecoration::destroyedOffThread();
-}
-
-void ThreadContextTest::tearDown() {
-    ASSERT_EQ(decorationsCreated(), decorationsDestroyed())
-        << "Each created decoration should also be destroyed";
-    ASSERT_GTE(decorationsDestroyed(), decorationsDestroyedOffThread())
-        << "We can never have more decorations destroyed off thread than we have made in total";
-}
 
 TEST_F(ThreadContextTest, HasLocalThreadContext) {
     auto context = getThreadContext();
 
     // Since this is the local thread, there should be no difference since the start of the test.
-    ASSERT_EQ(decorationsCreated(), 0);
-    ASSERT_EQ(decorationsDestroyed(), 0);
-    ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+    ASSERT_EQ(gCounters.get(), Counters(0, 0, 0));
 }
 
 TEST_F(ThreadContextTest, HasNewThreadContext) {
     launchAndJoinThread([&] {
         auto context = getThreadContext();
-
-        ASSERT_EQ(decorationsCreated(), 1);
-        ASSERT_EQ(decorationsDestroyed(), 0);
-        ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+        ASSERT_EQ(gCounters.get(), Counters(1, 0, 0));
     });
-
-    ASSERT_EQ(decorationsCreated(), 1);
-    ASSERT_EQ(decorationsDestroyed(), 1);
-    ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+    ASSERT_EQ(gCounters.get(), Counters(1, 1, 0));
 }
 
 TEST_F(ThreadContextTest, CanExtendThreadContextLifetime) {
@@ -182,24 +159,17 @@ TEST_F(ThreadContextTest, CanExtendThreadContextLifetime) {
 
     launchAndJoinThread([&] {
         context = getThreadContext();
-
-        ASSERT_EQ(decorationsCreated(), 1);
-        ASSERT_EQ(decorationsDestroyed(), 0);
-        ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+        ASSERT_EQ(gCounters.get(), Counters(1, 0, 0));
     });
 
     assertNotAlive(context);
 
-    ASSERT_EQ(decorationsCreated(), 1);
-    ASSERT_EQ(decorationsDestroyed(), 0);
-    ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+    ASSERT_EQ(gCounters.get(), Counters(1, 0, 0));
 
     context.reset();
 
     // The context is gone.
-    ASSERT_EQ(decorationsCreated(), 1);
-    ASSERT_EQ(decorationsDestroyed(), 1);
-    ASSERT_EQ(decorationsDestroyedOffThread(), 1);
+    ASSERT_EQ(gCounters.get(), Counters(1, 1, 1));
 }
 
 TEST_F(ThreadContextTest, AreThreadContextsUnique) {
@@ -208,18 +178,12 @@ TEST_F(ThreadContextTest, AreThreadContextsUnique) {
 
     launchAndJoinThread([&] {
         contextA = getThreadContext();
-
-        ASSERT_EQ(decorationsCreated(), 1);
-        ASSERT_EQ(decorationsDestroyed(), 0);
-        ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+        ASSERT_EQ(gCounters.get(), Counters(1, 0, 0));
     });
 
     launchAndJoinThread([&] {
         contextB = getThreadContext();
-
-        ASSERT_EQ(decorationsCreated(), 2);
-        ASSERT_EQ(decorationsDestroyed(), 0);
-        ASSERT_EQ(decorationsDestroyedOffThread(), 0);
+        ASSERT_EQ(gCounters.get(), Counters(2, 0, 0));
     });
 
     assertNotAlive(contextA);
@@ -233,13 +197,12 @@ TEST_F(ThreadContextTest, AreThreadContextsUnique) {
     contextA.reset();
     contextB.reset();
 
-    ASSERT_EQ(decorationsCreated(), 2);
-    ASSERT_EQ(decorationsDestroyed(), 2);
-    ASSERT_EQ(decorationsDestroyedOffThread(), 2);
+    ASSERT_EQ(gCounters.get(), Counters(2, 2, 2));
 }
 
 // This check runs in pre-init and then we check it in a test post-init.
-const bool gHasAThreadContextPreInit = [] { return static_cast<bool>(ThreadContext::get()); }();
+const bool gHasAThreadContextPreInit = !!ThreadContext::get();
+
 TEST_F(ThreadContextTest, HasNoPreInitThreadContext) {
     ASSERT(!gHasAThreadContextPreInit);
 }
