@@ -178,6 +178,19 @@ assert.eq(10,
           'db.collection.stats({scale: N}) - capped collection size scaled incorrectly: ' +
               tojson(collectionStats));
 
+// Ensure that collStats can handle large values for 'scale'.
+var collectionStats = assert.commandWorked(t.stats(Number.MAX_VALUE));
+assert.eq(0,
+          collectionStats.maxSize,
+          'db.collection.stats(Number.MAX_VALUE) - capped collection size scaled incorrectly: ' +
+              tojson(collectionStats));
+var collectionStats = assert.commandWorked(t.stats({scale: Number.MAX_VALUE}));
+assert.eq(
+    0,
+    collectionStats.maxSize,
+    'db.collection.stats({scale: Number.MAX_VALUE}) - capped collection size scaled incorrectly: ' +
+        tojson(collectionStats));
+
 // indexDetails - If true, includes 'indexDetails' field in results. Default: false.
 t.drop();
 t.save({a: 1});

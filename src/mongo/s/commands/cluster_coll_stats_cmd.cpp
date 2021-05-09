@@ -122,7 +122,7 @@ public:
 
         int scale = 1;
         if (cmdObj["scale"].isNumber()) {
-            scale = cmdObj["scale"].numberInt();
+            scale = cmdObj["scale"].safeNumberInt();
             uassert(4390200, "scale has to be >= 1", scale >= 1);
         } else if (cmdObj["scale"].trueValue()) {
             uasserted(4390201, "scale has to be a number >= 1");
