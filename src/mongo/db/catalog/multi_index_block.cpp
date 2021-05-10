@@ -55,6 +55,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -69,6 +70,19 @@ MONGO_FAIL_POINT_DEFINE(hangAfterStartingIndexBuildUnlocked);
 MONGO_FAIL_POINT_DEFINE(hangBeforeIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildOf);
 MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
+
+namespace {
+
+size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
+    if (numIndexSpecs == 0) {
+        return 0;
+    }
+
+    return static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
+        numIndexSpecs;
+}
+
+}  // namespace
 
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
@@ -230,12 +244,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
 
         std::vector<BSONObj> indexInfoObjs;
         indexInfoObjs.reserve(indexSpecs.size());
-        std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
-        if (!indexSpecs.empty()) {
-            eachIndexBuildMaxMemoryUsageBytes =
-                static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
-                indexSpecs.size();
-        }
+        std::size_t eachIndexBuildMaxMemoryUsageBytes =
+            getEachIndexBuildMaxMemoryUsageBytes(indexSpecs.size());
 
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
@@ -420,19 +430,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
     }
 
-    Timer t;
-
-    unsigned long long n = 0;
-
-    PlanExecutor::YieldPolicy yieldPolicy;
-    if (isBackgroundBuilding()) {
-        yieldPolicy = PlanExecutor::YIELD_AUTO;
-    } else {
-        yieldPolicy = PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
-    }
-    auto exec =
-        collection->makePlanExecutor(opCtx, yieldPolicy, Collection::ScanDirection::kForward);
-
     // Hint to the storage engine that this collection scan should not keep data in the cache.
     // Do not use read-once cursors for background builds because saveState/restoreState is called
     // with every insert into the index, which resets the collection scan cursor between every call
@@ -442,6 +439,98 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     bool readOnce =
         _method != IndexBuildMethod::kBackground && useReadOnceCursorsForIndexBuilds.load();
     opCtx->recoveryUnit()->setReadOnce(readOnce);
+
+    size_t numScanRestarts = 0;
+    bool restartCollectionScan = false;
+    do {
+        restartCollectionScan = false;
+        progress->reset(collection->numRecords(opCtx));
+        Timer timer;
+
+        Status status = _doCollectionScan(opCtx, collection, &progress);
+        if (status.isOK()) {
+            LOGV2(20391,
+                  "Index build: collection scan done",
+                  "buildUUID"_attr = _buildUUID,
+                  "collectionUUID"_attr = _collectionUUID,
+                  "totalRecords"_attr = progress->hits(),
+                  "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())));
+            break;
+        }
+
+        if (status.code() == ErrorCodes::CappedPositionLost) {
+            // Capped cursors are invalidated when the document they were positioned on gets
+            // deleted. The collection scan will restart in this case.
+            restartCollectionScan = true;
+            logAndBackoff(5470300,
+                          ::mongo::logv2::LogComponent::kIndex,
+                          logv2::LogSeverity::Info(),
+                          ++numScanRestarts,
+                          "Index build: collection scan restarting",
+                          "buildUUID"_attr = _buildUUID,
+                          "collectionUUID"_attr = _collectionUUID,
+                          "totalRecords"_attr = progress->hits(),
+                          "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())),
+                          "error"_attr = status);
+
+            for (auto& index : _indexes) {
+                index.bulk =
+                    index.real->initiateBulk(getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()));
+            }
+        } else {
+            return status;
+        }
+    } while (restartCollectionScan);
+
+    if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
+        LOGV2(20389,
+              "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
+              "Mimicking shutdown error code");
+        return Status(
+            ErrorCodes::InterruptedAtShutdown,
+            "background index build interrupted due to failpoint. returning a shutdown error.");
+    }
+
+    if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
+        // Unlock before hanging so replication recognizes we've completed.
+        Locker::LockSnapshot lockInfo;
+        invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
+
+        LOGV2(20390,
+              "Hanging index build with no locks due to "
+              "'hangAfterStartingIndexBuildUnlocked' failpoint");
+        hangAfterStartingIndexBuildUnlocked.pauseWhileSet();
+
+        if (isBackgroundBuilding()) {
+            opCtx->lockState()->restoreLockState(opCtx, lockInfo);
+            opCtx->recoveryUnit()->abandonSnapshot();
+        } else {
+            invariant(false,
+                      "the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for "
+                      "foreground index builds");
+        }
+    }
+
+    progress.finished();
+
+    Status ret = dumpInsertsFromBulk(opCtx);
+    if (!ret.isOK())
+        return ret;
+
+    return Status::OK();
+}
+
+Status MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
+                                          Collection* collection,
+                                          ProgressMeterHolder* progress) {
+    PlanExecutor::YieldPolicy yieldPolicy;
+    if (isBackgroundBuilding()) {
+        yieldPolicy = PlanExecutor::YIELD_AUTO;
+    } else {
+        yieldPolicy = PlanExecutor::WRITE_CONFLICT_RETRY_ONLY;
+    }
+    auto exec =
+        collection->makePlanExecutor(opCtx, yieldPolicy, Collection::ScanDirection::kForward);
 
     Snapshotted<BSONObj> objToIndex;
     RecordId loc;
@@ -468,7 +557,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
             }
 
             // Done before insert so we can retry document if it WCEs.
-            progress->setTotalWhileRunning(collection->numRecords(opCtx));
+            progress->get()->setTotalWhileRunning(collection->numRecords(opCtx));
 
             failPointHangDuringBuild(&hangBeforeIndexBuildOf, "before", objToIndex.value());
 
@@ -499,7 +588,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
 
             // Go to the next document
             progress->hit();
-            n++;
             retries = 0;
         } catch (const WriteConflictException&) {
             // Only background builds write inside transactions, and therefore should only ever
@@ -525,46 +613,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(OperationContext* opCtx,
     if (state != PlanExecutor::IS_EOF) {
         return exec->getMemberObjectStatus(objToIndex.value());
     }
-
-    if (MONGO_unlikely(leaveIndexBuildUnfinishedForShutdown.shouldFail())) {
-        LOGV2(20389,
-              "Index build interrupted due to 'leaveIndexBuildUnfinishedForShutdown' failpoint. "
-              "Mimicking shutdown error code");
-        return Status(
-            ErrorCodes::InterruptedAtShutdown,
-            "background index build interrupted due to failpoint. returning a shutdown error.");
-    }
-
-    if (MONGO_unlikely(hangAfterStartingIndexBuildUnlocked.shouldFail())) {
-        // Unlock before hanging so replication recognizes we've completed.
-        Locker::LockSnapshot lockInfo;
-        invariant(opCtx->lockState()->saveLockStateAndUnlock(&lockInfo));
-
-        LOGV2(20390,
-              "Hanging index build with no locks due to "
-              "'hangAfterStartingIndexBuildUnlocked' failpoint");
-        hangAfterStartingIndexBuildUnlocked.pauseWhileSet();
-
-        if (isBackgroundBuilding()) {
-            opCtx->lockState()->restoreLockState(opCtx, lockInfo);
-            opCtx->recoveryUnit()->abandonSnapshot();
-        } else {
-            invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for foreground index builds");
-        }
-    }
-
-    progress->finished();
-
-    LOGV2(20391,
-          "Index build: collection scan done. scanned {n} total records in {t_seconds} seconds",
-          "Index build: collection scan done",
-          "buildUUID"_attr = _buildUUID,
-          "totalRecords"_attr = n,
-          "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())));
-
-    Status ret = dumpInsertsFromBulk(opCtx);
-    if (!ret.isOK())
-        return ret;
 
     return Status::OK();
 }
