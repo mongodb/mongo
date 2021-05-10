@@ -278,20 +278,24 @@ private:
 /// Storage class used by both Document and MutableDocument
 class DocumentStorage : public RefCountable {
 public:
-    DocumentStorage() : DocumentStorage(BSONObj(), false, false) {}
+    DocumentStorage() : DocumentStorage(BSONObj(), false, false, 0) {}
 
     /**
      * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
      * the document. If we know that the BSON does not contain any metadata fields we can set the
      * 'stripMetadata' flag to false that will speed up the field iteration.
      */
-    DocumentStorage(const BSONObj& bson, bool stripMetadata, bool modified)
+    DocumentStorage(const BSONObj& bson,
+                    bool stripMetadata,
+                    bool modified,
+                    uint32_t numBytesFromBSONInCache)
         : _cache(nullptr),
           _cacheEnd(nullptr),
           _usedBytes(0),
           _numFields(0),
           _hashTabMask(0),
           _bson(bson),
+          _numBytesFromBSONInCache(numBytesFromBSONInCache),
           _stripMetadata(stripMetadata),
           _modified(modified) {}
 
@@ -400,6 +404,22 @@ public:
 
     auto bsonObjSize() const {
         return _bson.objsize();
+    }
+
+    /**
+     * Returns the size of backing BSON object minus the size of BSON fields that are already
+     * brought into the cache.
+     */
+    uint32_t nonCachedBsonObjSize() const {
+        auto bsonObjSize = _bson.objsize();
+        tassert(5376000,
+                "DocumentStorage._bson.objsize() cannot return a negative result.",
+                bsonObjSize >= 0);
+        tassert(5376001,
+                "DocumentStorage._numBytesFromBSONInCache cannot become bigger than "
+                "DocumentStorage._bson.objsize().",
+                static_cast<uint32_t>(bsonObjSize) >= _numBytesFromBSONInCache);
+        return static_cast<uint32_t>(bsonObjSize) - _numBytesFromBSONInCache;
     }
 
     bool isOwned() const {
@@ -564,6 +584,12 @@ private:
     unsigned _hashTabMask;  // equal to hashTabBuckets()-1 but used more often
 
     BSONObj _bson;
+
+    // This field determines the number of bytes from `_bson` that is put into the cache.
+    // It helps with determining a more accurate size of a modified `DocumentStorage` instance to be
+    // stored on disk, as the on-disk representation of a `DocumentStorage` does not contain the
+    // whole backing BSON, but only the portion of backing BSON that's not already in the cache.
+    uint32_t _numBytesFromBSONInCache = 0;
 
     // If '_stripMetadata' is true, tracks whether or not the metadata has been lazy-loaded from the
     // backing '_bson' object. If so, then no attempt will be made to load the metadata again, even

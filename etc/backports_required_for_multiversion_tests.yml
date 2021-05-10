@@ -132,12 +132,14 @@ all:
     test_file: jstests/core/geo_near_point_query.js
   - ticket: SERVER-48179
     test_file: jstests/replsets/reconfig_removes_node_in_rollback.js
-  - ticket: SERVER-55725
+  - ticket: SERVER-56371
     test_file: jstests/sharding/time_zone_info_mongos.js
   - ticket: SERVER-55305
     test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_during_oplog_application.js
   - ticket: SERVER-55305
     test_file: jstests/replsets/rollback_with_coalesced_txn_table_updates_from_vectored_inserts.js
+  - ticket: SERVER-53760
+    test_file: jstests/core/sort_spill_estimate_data_size.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

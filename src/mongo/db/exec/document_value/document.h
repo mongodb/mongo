@@ -304,9 +304,14 @@ public:
     struct SorterDeserializeSettings {};  // unused
     void serializeForSorter(BufBuilder& buf) const;
     static Document deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&);
-    int memUsageForSorter() const {
-        return getApproximateSize();
-    }
+
+    /**
+     * Returns the amount of memory used by this 'Document' instance when serialized, e.g. when
+     * serialized as BSON for returning to a client or when serialized for spilling to disk. This
+     * can differ substantially from 'getApproximateSize()' due to the fact that not all portions of
+     * the backing BSON may appear in the serialized version of the document.
+     */
+    size_t memUsageForSorter() const;
 
     /**
      * Returns a document that owns the underlying BSONObj.
@@ -354,6 +359,12 @@ private:
     getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const;
 
     boost::intrusive_ptr<const DocumentStorage> _storage;
+
+    /**
+     * Returns the approximate size of this `Document` instance without considering the size of its
+     * backing BSON object.
+     */
+    size_t getApproximateSizeWithoutBackingBSON() const;
 };
 
 //
@@ -673,7 +684,7 @@ public:
      *  complete list is in Document::allMetadataFieldNames).
      */
     DocumentStorage& newStorageWithBson(const BSONObj& bson, bool stripMetadata) {
-        reset(make_intrusive<DocumentStorage>(bson, stripMetadata, false));
+        reset(make_intrusive<DocumentStorage>(bson, stripMetadata, false, 0));
         return const_cast<DocumentStorage&>(*storagePtr());
     }
 

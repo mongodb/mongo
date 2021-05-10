@@ -175,6 +175,10 @@ Position DocumentStorage::constructInCache(const BSONElement& elem) {
     auto savedModified = _modified;
     auto pos = getNextPosition();
     const auto fieldName = elem.fieldNameStringData();
+    // This is the only place in the code that we bring a field from the backing BSON into the
+    // cache. From this point out, we will not use the backing BSON for this element. Hence,
+    // we account for using these many bytes of the backing BSON to be handled in the cache.
+    _numBytesFromBSONInCache += elem.size();
     appendField(fieldName, ValueElement::Kind::kCached) = Value(elem);
     _modified = savedModified;
 
@@ -292,7 +296,8 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 }
 
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
-    auto out = make_intrusive<DocumentStorage>(_bson, _stripMetadata, _modified);
+    auto out =
+        make_intrusive<DocumentStorage>(_bson, _stripMetadata, _modified, _numBytesFromBSONInCache);
 
     if (_cache) {
         // Make a copy of the buffer with the fields.
@@ -339,6 +344,7 @@ DocumentStorage::~DocumentStorage() {
 
 void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
     _bson = bson;
+    _numBytesFromBSONInCache = 0;
     _stripMetadata = stripMetadata;
     _modified = false;
 
@@ -664,7 +670,7 @@ const Value Document::getNestedField(const FieldPath& path, vector<Position>* po
     return getNestedFieldHelper(*this, path, positions, 0);
 }
 
-size_t Document::getApproximateSize() const {
+size_t Document::getApproximateSizeWithoutBackingBSON() const {
     size_t size = sizeof(Document);
     if (!_storage)
         return size;
@@ -679,9 +685,16 @@ size_t Document::getApproximateSize() const {
 
     // The metadata also occupies space in the document storage that's pre-allocated.
     size += storage().getMetadataApproximateSize();
-    size += storage().bsonObjSize();
 
     return size;
+}
+
+size_t Document::getApproximateSize() const {
+    return getApproximateSizeWithoutBackingBSON() + storage().bsonObjSize();
+}
+
+size_t Document::memUsageForSorter() const {
+    return getApproximateSizeWithoutBackingBSON() + storage().nonCachedBsonObjSize();
 }
 
 void Document::hash_combine(size_t& seed,
