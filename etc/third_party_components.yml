@@ -158,7 +158,6 @@ components:
     release_monitoring_id: 5284
     local_directory_path: src/third_party/yaml-cpp-0.6.2
     team_owner: "Security"
-    upgrade_suppression: TODO SERVER-48258
 
   JSON-Schema-Test-Suite:
     homepage_url: https://github.com/json-schema-org/JSON-Schema-Test-Suite

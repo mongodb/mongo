@@ -34,6 +34,7 @@ VCXPROJ_FOOTER = r"""
 
   <ItemGroup>
     <Natvis Include="buildscripts\win\mongodb.natvis" />
+    <Natvis Include="src\third_party\yaml-cpp\yaml-cpp\src\contrib\yaml-cpp.natvis" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

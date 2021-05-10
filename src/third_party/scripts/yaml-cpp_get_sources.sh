@@ -6,7 +6,7 @@
 set -xeuo pipefail
 
 NAME=yaml-cpp
-VERSION=0.6.2
+VERSION=0.6.3
 BRANCH="${NAME}-${VERSION}"
 GIT_REPO=https://github.com/jbeder/yaml-cpp.git
 
@@ -15,7 +15,7 @@ if grep -q Microsoft /proc/version; then
     GIT_EXE=git.exe
 fi
 
-DEST_DIR="$("${GIT_EXE}" rev-parse --show-toplevel)/src/third_party/${NAME}-${VERSION}"
+DEST_DIR="$("${GIT_EXE}" rev-parse --show-toplevel)/src/third_party/${NAME}"
 if grep -q Microsoft /proc/version; then
     DEST_DIR=$(wslpath -u "${DEST_DIR}")
 fi
@@ -29,26 +29,6 @@ echo "dest: ${DEST_DIR}"
 
 [[ -d ${CLONE_DEST} ]] && mv "${CLONE_DEST}" "${CLONE_DEST}.old"
 "${GIT_EXE}" clone --branch="${BRANCH}" "${GIT_REPO}" "${CLONE_DEST}"
-
-
-# Apply patches
-
-# These patches are backports for CVE and compile fixes, so we need to remove
-# them when we finally upgrade to a version that has them.
-# TODO: https://jira.mongodb.org/browse/SERVER-48258
-
-# Patch CVE-2019-6292 and CVE-2019-6285
-# We're using diff-tree here because the commit includes a change to a test
-# which doesn't exist in this version, so we exclude it from the patch that
-# gets generated.
-git -C "${CLONE_DEST}" diff-tree -p 4edff1fa5dbfca16fc72d89870841bee89f8ef89 -- \
-    include/yaml-cpp/depthguard.h                                               \
-    src/depthguard.cpp                                                          \
-    src/singledocparser.h                                                       \
-| git -C "${CLONE_DEST}" apply
-
-# Fix error C3646 on VS2017 due to _NOEXCEPT override specifier
-git -C "${CLONE_DEST}" cherry-pick -x 0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79
 
 
 # Prune sources
@@ -90,10 +70,7 @@ env.Library(
     target="yaml",
     source=[
         "yaml-cpp/src/binary.cpp",
-        "yaml-cpp/src/contrib/graphbuilder.cpp",
-        "yaml-cpp/src/contrib/graphbuilderadapter.cpp",
         "yaml-cpp/src/convert.cpp",
-        "yaml-cpp/src/depthguard.cpp",
         "yaml-cpp/src/directives.cpp",
         "yaml-cpp/src/emit.cpp",
         "yaml-cpp/src/emitfromevents.cpp",

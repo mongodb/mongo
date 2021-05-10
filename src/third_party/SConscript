@@ -14,7 +14,6 @@ zlibSuffix = '-1.2.11'
 zstdSuffix = '-1.4.4'
 pcreSuffix = "-8.42"
 mozjsSuffix = '-60'
-yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
 timelibSuffix = '-2021.06'
 tomcryptSuffix = '-1.18.2'
@@ -155,7 +154,7 @@ if wiredtiger and not use_system_version_of_library('wiredtiger'):
 
 if not use_system_version_of_library('yaml'):
     thirdPartyEnvironmentModifications['yaml'] = {
-        'CPPPATH' : ['#/src/third_party/yaml-cpp' + yamlSuffix + '/yaml-cpp/include'],
+        'CPPPATH' : ['#/src/third_party/yaml-cpp/yaml-cpp/include'],
         'CPPDEFINES' : ['_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING'] if env.ToolchainIs('msvc') else [],
     }
 
@@ -520,10 +519,10 @@ if use_system_version_of_library("yaml"):
 else:
     yamlEnv = yamlEnv.Clone()
     yamlEnv.InjectThirdParty(libraries=['yaml', 'boost'])
-    yamlEnv.SConscript('yaml-cpp' + yamlSuffix + '/SConscript', exports={ 'env' : yamlEnv })
+    yamlEnv.SConscript('yaml-cpp/SConscript', exports={ 'env' : yamlEnv })
     yamlEnv = yamlEnv.Clone(
         LIBDEPS_INTERFACE=[
-            'yaml-cpp' + yamlSuffix + '/yaml',
+            'yaml-cpp/yaml',
         ])
 
 yamlEnv.ShimLibrary(name="yaml")

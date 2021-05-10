@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<!-- MSVC Debugger visualization hints for YAML::Node and YAML::detail::node -->
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="YAML::Node">
+    <DisplayString Condition="!m_isValid">{{invalid}}</DisplayString>
+    <DisplayString Condition="!m_pNode">{{pNode==nullptr}}</DisplayString>
+    <DisplayString>{{ {*m_pNode} }}</DisplayString>
+    <Expand>
+      <Item Condition="m_pNode->m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Scalar" Name="scalar">m_pNode->m_pRef._Ptr->m_pData._Ptr->m_scalar</Item>
+      <Item Condition="m_pNode->m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Sequence" Name="sequence">m_pNode->m_pRef._Ptr->m_pData._Ptr->m_sequence</Item>
+      <Item Condition="m_pNode->m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Map" Name="map">m_pNode->m_pRef._Ptr->m_pData._Ptr->m_map</Item>
+      <Item Name="[details]" >m_pNode->m_pRef._Ptr->m_pData._Ptr</Item>
+    </Expand>
+  </Type>
+
+  <Type Name="YAML::detail::node">
+    <DisplayString Condition="!m_pRef._Ptr">{{node:pRef==nullptr}}</DisplayString>
+    <DisplayString Condition="!m_pRef._Ptr->m_pData._Ptr">{{node:pRef->pData==nullptr}}</DisplayString>
+    <DisplayString Condition="!m_pRef._Ptr->m_pData._Ptr->m_isDefined">{{undefined}}</DisplayString>
+    <DisplayString Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Scalar">{{{m_pRef._Ptr->m_pData._Ptr->m_scalar}}}</DisplayString>
+    <DisplayString Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Map">{{ Map {m_pRef._Ptr->m_pData._Ptr->m_map}}}</DisplayString>
+    <DisplayString Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Sequence">{{ Seq {m_pRef._Ptr->m_pData._Ptr->m_sequence}}}</DisplayString>
+    <DisplayString>{{{m_pRef._Ptr->m_pData._Ptr->m_type}}}</DisplayString>
+    <Expand>
+      <Item Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Scalar" Name="scalar">m_pRef._Ptr->m_pData._Ptr->m_scalar</Item>
+      <Item Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Sequence" Name="sequence">m_pRef._Ptr->m_pData._Ptr->m_sequence</Item>
+      <Item Condition="m_pRef._Ptr->m_pData._Ptr->m_type==YAML::NodeType::Map" Name="map">m_pRef._Ptr->m_pData._Ptr->m_map</Item>
+      <Item Name="[details]" >m_pRef._Ptr->m_pData._Ptr</Item>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>
