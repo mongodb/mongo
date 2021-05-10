@@ -48,7 +48,7 @@ hs_cursor(void *arg)
     uint32_t hs_btree_id, i;
     u_int period;
     int exact;
-    bool restart;
+    bool next, restart;
 
     (void)(arg); /* Unused parameter */
 
@@ -69,23 +69,12 @@ hs_cursor(void *arg)
     hs_counter = 0;  /* [-Wconditional-uninitialized] */
     hs_btree_id = 0; /* [-Wconditional-uninitialized] */
     for (restart = true;;) {
-        /*
-         * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
-         */
-        while ((ret = session->open_cursor(session, WT_HS_URI, NULL, NULL, &cursor)) == EBUSY)
-            __wt_yield();
-        testutil_check(ret);
-
-        /*
-         * The history file has mostly tombstones, ignore them and retrieve the underlying values.
-         * We don't care about tombstones, but we do want to hit every key rather than skip over
-         * them. This is a rollback-to-stable flag we're using for our own purposes.
-         */
-        F_SET(cursor, WT_CURSTD_IGNORE_TOMBSTONE);
+        testutil_check(__wt_curhs_open((WT_SESSION_IMPL *)session, NULL, &cursor));
+        F_SET(cursor, WT_CURSTD_HS_READ_COMMITTED);
 
         /* Search to the last-known location. */
         if (!restart) {
-            cursor->set_key(cursor, hs_btree_id, &key, hs_start_ts, hs_counter);
+            cursor->set_key(cursor, 4, hs_btree_id, &key, hs_start_ts, hs_counter);
 
             /*
              * Limit expected errors because this is a diagnostic check (the WiredTiger API allows
@@ -99,8 +88,9 @@ hs_cursor(void *arg)
          * Get some more key/value pairs. Always retrieve at least one key, that ensures we have a
          * valid key when we copy it to start the next run.
          */
+        next = mmrand(NULL, 0, 1) == 1;
         for (i = mmrand(NULL, 1, 1000); i > 0; --i) {
-            if ((ret = cursor->next(cursor)) == 0) {
+            if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) == 0) {
                 testutil_check(
                   cursor->get_key(cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
                 testutil_check(cursor->get_value(
@@ -116,7 +106,8 @@ hs_cursor(void *arg)
          * Otherwise, reset so we'll start over.
          */
         if (ret == 0) {
-            testutil_check(__wt_buf_set(CUR2S(cursor), &key, hs_key.data, hs_key.size));
+            testutil_check(
+              __wt_buf_set((WT_SESSION_IMPL *)session, &key, hs_key.data, hs_key.size));
             restart = false;
         } else
             restart = true;
@@ -130,7 +121,7 @@ hs_cursor(void *arg)
             break;
     }
 
-    __wt_buf_free(CUR2S(cursor), &key);
+    __wt_buf_free((WT_SESSION_IMPL *)session, &key);
     testutil_check(session->close(session, NULL));
 #endif
 
