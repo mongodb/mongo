@@ -424,8 +424,7 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
-        auto abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
-        _onAbortEncountered(abortReason);
+        abort();
         return;
     }
 
@@ -886,18 +885,20 @@ CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
     return _abortSource->token();
 }
 
-void ReshardingDonorService::DonorStateMachine::_onAbortEncountered(const Status& abortReason) {
+void ReshardingDonorService::DonorStateMachine::abort() {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
-        invariant(!abortReason.isOK());
 
         if (_abortSource) {
             return _abortSource;
         } else {
             // run() hasn't been called, notify the operation should be aborted by setting an
-            // error.
-            invariant(!_coordinatorHasDecisionPersisted.getFuture().isReady());
-            _coordinatorHasDecisionPersisted.setError(abortReason);
+            // error. Abort can be retried, so only set error if future is not ready.
+            if (!_coordinatorHasDecisionPersisted.getFuture().isReady()) {
+                _coordinatorHasDecisionPersisted.setError(
+                    {ErrorCodes::ReshardCollectionAborted, "aborted"});
+            }
+
             return boost::none;
         }
     }();

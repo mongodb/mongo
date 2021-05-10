@@ -70,6 +70,7 @@ const allCommands = {
     _recvChunkCommit: {skip: isPrimaryOnly},
     _recvChunkStart: {skip: isPrimaryOnly},
     _recvChunkStatus: {skip: isPrimaryOnly},
+    _shardsvrAbortReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCleanupReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
