@@ -171,32 +171,30 @@ public:
         _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kBlockingWrites);
     }
 
-    void notifyReshardingOutcomeDecided(OperationContext* opCtx,
-                                        DonorStateMachine& donor,
-                                        const ReshardingDonorDocument& donorDoc,
-                                        Status outcome) {
-        if (outcome.isOK()) {
-            _onReshardingFieldsChanges(
-                opCtx, donor, donorDoc, CoordinatorStateEnum::kDecisionPersisted);
-        } else {
-            _onReshardingFieldsChanges(
-                opCtx, donor, donorDoc, CoordinatorStateEnum::kError, std::move(outcome));
-        }
+    void notifyReshardingCommitting(OperationContext* opCtx,
+                                    DonorStateMachine& donor,
+                                    const ReshardingDonorDocument& donorDoc) {
+        _onReshardingFieldsChanges(
+            opCtx, donor, donorDoc, CoordinatorStateEnum::kDecisionPersisted);
+    }
+
+    void notifyReshardingAborting(OperationContext* opCtx,
+                                  DonorStateMachine& donor,
+                                  const ReshardingDonorDocument& donorDoc) {
+        _onReshardingFieldsChanges(opCtx, donor, donorDoc, CoordinatorStateEnum::kError);
     }
 
 private:
     void _onReshardingFieldsChanges(OperationContext* opCtx,
                                     DonorStateMachine& donor,
                                     const ReshardingDonorDocument& donorDoc,
-                                    CoordinatorStateEnum coordinatorState,
-                                    boost::optional<Status> abortReason = boost::none) {
+                                    CoordinatorStateEnum coordinatorState) {
         auto reshardingFields = TypeCollectionReshardingFields{donorDoc.getReshardingUUID()};
         auto donorFields = TypeCollectionDonorFields{donorDoc.getTempReshardingNss(),
                                                      donorDoc.getReshardingKey(),
                                                      donorDoc.getRecipientShards()};
         reshardingFields.setDonorFields(donorFields);
         reshardingFields.setState(coordinatorState);
-        emplaceAbortReasonIfExists(reshardingFields, std::move(abortReason));
         donor.onReshardingFieldsChanges(opCtx, reshardingFields);
     }
 
@@ -211,7 +209,7 @@ TEST_F(ReshardingDonorServiceTest, CanTransitionThroughEachStateToCompletion) {
 
     notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
     notifyToStartBlockingWrites(opCtx.get(), *donor, doc);
-    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
 
     ASSERT_OK(donor->getCompletionFuture().getNoThrow());
 }
@@ -331,7 +329,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
                     break;
                 }
                 case DonorStateEnum::kDone: {
-                    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+                    notifyReshardingCommitting(opCtx.get(), *donor, doc);
                     break;
                 }
                 default:
@@ -357,7 +355,7 @@ TEST_F(ReshardingDonorServiceTest, StepDownStepUpEachTransition) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         stateTransitionsGuard.unset(DonorStateEnum::kDone);
-        notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+        notifyReshardingCommitting(opCtx.get(), *donor, doc);
         ASSERT_OK(donor->getCompletionFuture().getNoThrow());
     }
 }
@@ -380,7 +378,7 @@ TEST_F(ReshardingDonorServiceTest, DropsSourceCollectionWhenDone) {
         ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
     }
 
-    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, Status::OK());
+    notifyReshardingCommitting(opCtx.get(), *donor, doc);
     ASSERT_OK(donor->getCompletionFuture().getNoThrow());
 
     {
@@ -401,7 +399,7 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterError) {
         auto donor = DonorStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyRecipientsDoneCloning(opCtx.get(), *donor, doc);
-        notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
+        notifyReshardingAborting(opCtx.get(), *donor, doc);
 
         stateTransitionsGuard.wait(DonorStateEnum::kDone);
         stepDown();
@@ -416,8 +414,9 @@ TEST_F(ReshardingDonorServiceTest, CompletesWithStepdownAfterError) {
 
         stateTransitionsGuard.unset(DonorStateEnum::kDone);
 
-        notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
-        ASSERT_EQ(donor->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
+        notifyReshardingAborting(opCtx.get(), *donor, doc);
+        ASSERT_OK(donor->getCompletionFuture().getNoThrow());
+
         {
             // Verify original collection still exists even with stepdown.
             AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);
@@ -445,8 +444,8 @@ TEST_F(ReshardingDonorServiceTest, RetainsSourceCollectionOnError) {
         ASSERT_EQ(coll->uuid(), doc.getSourceUUID());
     }
 
-    notifyReshardingOutcomeDecided(opCtx.get(), *donor, doc, {ErrorCodes::InternalError, ""});
-    ASSERT_EQ(donor->getCompletionFuture().getNoThrow(), ErrorCodes::InternalError);
+    notifyReshardingAborting(opCtx.get(), *donor, doc);
+    ASSERT_OK(donor->getCompletionFuture().getNoThrow());
 
     {
         AutoGetCollection coll(opCtx.get(), doc.getSourceNss(), MODE_IS);

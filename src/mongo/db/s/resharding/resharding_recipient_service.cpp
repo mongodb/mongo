@@ -298,9 +298,8 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     stdx::lock_guard<Latch> lk(_mutex);
-    if (reshardingFields.getAbortReason()) {
-        auto status = getStatusFromAbortReason(reshardingFields);
-        invariant(!status.isOK());
+    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
+        auto status = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
         _abortStatus.emplace(status);
 
         if (_abortSource) {

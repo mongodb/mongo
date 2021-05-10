@@ -254,7 +254,6 @@ private:
         auto reshardingFields = TypeCollectionReshardingFields{recipientDoc.getReshardingUUID()};
         reshardingFields.setRecipientFields(_makeRecipientFields(recipientDoc));
         reshardingFields.setState(coordinatorState);
-        emplaceAbortReasonIfExists(reshardingFields, std::move(abortReason));
         recipient.onReshardingFieldsChanges(opCtx, reshardingFields);
     }
 };

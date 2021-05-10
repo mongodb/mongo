@@ -213,10 +213,6 @@ private:
     // cancels the parent CancellationSource upon stepdown/failover.
     boost::optional<CancellationSource> _abortSource;
 
-    // Holds the unrecoverable error reported by the coordinator that caused the entire resharding
-    // operation to fail.
-    boost::optional<Status> _abortReason;
-
     // The identifier associated to the recoverable critical section.
     const BSONObj _critSecReason;
 

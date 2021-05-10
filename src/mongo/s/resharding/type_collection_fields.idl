@@ -84,9 +84,6 @@ structs:
     TypeCollectionReshardingFields:
         description: "Resharding-related fields meant to be stored in a config.collections
                       document."
-        inline_chained_structs: true
-        chained_structs:
-            AbortReason: AbortReasonStruct
         # Use strict:false to avoid complications around upgrade/downgrade. This isn't technically
         # required for resharding because durable state from all resharding operations is cleaned up
         # before the upgrade or downgrade can complete.

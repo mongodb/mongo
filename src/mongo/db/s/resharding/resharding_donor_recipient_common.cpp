@@ -283,7 +283,7 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
-    if (reshardingFields.getAbortReason()) {
+    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
         // The coordinator encountered an unrecoverable error, both donors and recipients should be
         // made aware.
         processReshardingFieldsForDonorCollection(opCtx, nss, metadata, reshardingFields);

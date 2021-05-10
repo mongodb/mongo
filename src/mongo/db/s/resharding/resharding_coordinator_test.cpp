@@ -351,10 +351,6 @@ protected:
             0);
 
         if (auto expectedAbortReason = expectedCoordinatorDoc.getAbortReason()) {
-            ASSERT(onDiskReshardingFields.getAbortReason());
-            ASSERT_BSONOBJ_EQ(expectedAbortReason.get(),
-                              onDiskReshardingFields.getAbortReason().get());
-
             auto userCanceled = getStatusFromAbortReason(expectedCoordinatorDoc) ==
                 ErrorCodes::ReshardCollectionAborted;
             ASSERT(onDiskReshardingFields.getUserCanceled() == userCanceled);
@@ -415,11 +411,6 @@ protected:
 
         ASSERT(onDiskReshardingFields.getUserCanceled() ==
                expectedReshardingFields.getUserCanceled());
-
-        if (onDiskReshardingFields.getState() == CoordinatorStateEnum::kError) {
-            // Confirm 'reshardingFields.abortReason' exists on the temporary collection.
-            ASSERT(onDiskReshardingFields.getAbortReason());
-        }
 
         // 'donorFields' should not exist for the temporary collection.
         ASSERT(!onDiskReshardingFields.getDonorFields());
@@ -488,9 +479,6 @@ protected:
             extractShardIdsFromParticipantEntries(expectedCoordinatorDoc.getRecipientShards()));
         expectedReshardingFields.setDonorFields(donorField);
         if (auto abortReason = expectedCoordinatorDoc.getAbortReason()) {
-            AbortReason abortReasonStruct;
-            abortReasonStruct.setAbortReason(abortReason);
-            expectedReshardingFields.setAbortReasonStruct(std::move(abortReasonStruct));
             expectedReshardingFields.setUserCanceled(
                 getStatusFromAbortReason(expectedCoordinatorDoc) ==
                 ErrorCodes::ReshardCollectionAborted);

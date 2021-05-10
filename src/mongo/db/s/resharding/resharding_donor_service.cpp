@@ -423,8 +423,8 @@ boost::optional<BSONObj> ReshardingDonorService::DonorStateMachine::reportForCur
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
-    if (reshardingFields.getAbortReason()) {
-        auto abortReason = getStatusFromAbortReason(reshardingFields);
+    if (reshardingFields.getState() == CoordinatorStateEnum::kError) {
+        auto abortReason = Status(ErrorCodes::ReshardCollectionAborted, "aborted");
         _onAbortEncountered(abortReason);
         return;
     }
@@ -851,11 +851,7 @@ void ReshardingDonorService::DonorStateMachine::_removeDonorDocument() {
 
         opCtx->recoveryUnit()->onCommit([this](boost::optional<Timestamp> unusedCommitTime) {
             stdx::lock_guard<Latch> lk(_mutex);
-            if (_abortReason) {
-                ensureFulfilledPromise(lk, _completionPromise, _abortReason.get());
-            } else {
-                ensureFulfilledPromise(lk, _completionPromise);
-            }
+            _completionPromise.emplaceValue();
         });
 
         deleteObjects(opCtx.get(),
@@ -893,8 +889,7 @@ CancellationToken ReshardingDonorService::DonorStateMachine::_initAbortSource(
 void ReshardingDonorService::DonorStateMachine::_onAbortEncountered(const Status& abortReason) {
     auto abortSource = [&]() -> boost::optional<CancellationSource> {
         stdx::lock_guard<Latch> lk(_mutex);
-        _abortReason = abortReason;
-        invariant(!_abortReason->isOK());
+        invariant(!abortReason.isOK());
 
         if (_abortSource) {
             return _abortSource;
@@ -902,7 +897,7 @@ void ReshardingDonorService::DonorStateMachine::_onAbortEncountered(const Status
             // run() hasn't been called, notify the operation should be aborted by setting an
             // error.
             invariant(!_coordinatorHasDecisionPersisted.getFuture().isReady());
-            _coordinatorHasDecisionPersisted.setError(_abortReason.get());
+            _coordinatorHasDecisionPersisted.setError(abortReason);
             return boost::none;
         }
     }();
