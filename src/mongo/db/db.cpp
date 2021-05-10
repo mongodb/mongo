@@ -112,6 +112,7 @@
 #include "mongo/db/repair_database_and_check_version.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -605,6 +606,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             str::stream()
                 << "Cannot take an unstable checkpoint on shutdown while using queryableBackupMode",
             !gTakeUnstableCheckpointOnShutdown);
+        uassert(5576603,
+                str::stream() << "Cannot specify both queryableBackupMode and "
+                              << "startupRecoveryForRestore at the same time",
+                !repl::startupRecoveryForRestore);
 
         auto replCoord = repl::ReplicationCoordinator::get(startupOpCtx.get());
         invariant(replCoord);
