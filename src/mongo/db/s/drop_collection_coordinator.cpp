@@ -186,7 +186,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {
-                // TODO SERVER-55396: retry operation until it succeeds.
                 LOGV2_ERROR(5280901,
                             "Error running drop collection",
                             "namespace"_attr = nss(),
