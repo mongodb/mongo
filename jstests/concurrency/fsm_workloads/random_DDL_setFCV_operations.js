@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Concurrently performs CRUD operations, DDL commands and FCV changes and verifies guarantees are
+ * Concurrently performs DDL commands and FCV changes and verifies guarantees are
  * not broken.
  *
  * @tags: [
@@ -13,7 +13,7 @@
  *   does_not_support_causal_consistency,
  *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
  *   does_not_support_add_remove_shards,
- *   # The mutex mechanism used in CRUD and drop states does not support stepdown
+ *   # TODO (SERVER-56789) Enable stepdown on DDL FSM workloads
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
@@ -24,12 +24,13 @@
 
 load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_DDL_CRUD_operations.js');
+load("jstests/libs/override_methods/mongos_manual_intervention_actions.js");
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.setFCV = function(db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];
-        jsTestLog('setFCV to ' + targetFCV);
+        jsTestLog('Executing FCV state, setting to:' + targetFCV);
         try {
             assertAlways.commandWorked(
                 db.adminCommand({setFeatureCompatibilityVersion: targetFCV}));
@@ -75,12 +76,11 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.transitions = {
-        init: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
-        create: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
-        CRUD: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
-        drop: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
-        rename: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08},
-        setFCV: {create: 0.23, CRUD: 0.23, drop: 0.23, rename: 0.23, setFCV: 0.08}
+        init: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
+        create: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
+        drop: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
+        rename: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10},
+        setFCV: {create: 0.30, drop: 0.30, rename: 0.30, setFCV: 0.10}
     };
 
     $config.teardown = function(db, collName, cluster) {

@@ -13,7 +13,7 @@
  *   does_not_support_causal_consistency,
  *   # TODO (SERVER-54881): ensure the new DDL paths work with add/remove shards
  *   does_not_support_add_remove_shards,
- *   # TODO (SERVER-54905): ensure all DDL are resilient.
+ *   # The mutex mechanism used in CRUD and drop states does not support stepdown
  *   does_not_support_stepdowns,
  *   # Can be removed once PM-1965-Milestone-1 is completed.
  *   does_not_support_transactions,
@@ -223,16 +223,16 @@ var $config = (function() {
     let teardown = function(db, collName, cluster) {};
 
     let transitions = {
-        init: {create: 1.0},
-        create: {create: 0.01, CRUD: 0.33, drop: 0.33, rename: 0.33},
-        CRUD: {create: 0.33, CRUD: 0.01, drop: 0.33, rename: 0.33},
-        drop: {create: 0.33, CRUD: 0.33, drop: 0.01, rename: 0.33},
-        rename: {create: 0.33, CRUD: 0.33, drop: 0.33, rename: 0.01}
+        init: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
+        create: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
+        CRUD: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
+        drop: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
+        rename: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25}
     };
 
     return {
-        threadCount: 5,
-        iterations: 50,
+        threadCount: 12,
+        iterations: 64,
         startState: 'init',
         states: states,
         transitions: transitions,
