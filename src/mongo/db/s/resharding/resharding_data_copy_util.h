@@ -79,6 +79,16 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
                                    const std::vector<DonorShardFetchTimestamp>& donorShards);
 
 /**
+ * Renames the temporary resharding collection to the source namespace string, or is a no-op if the
+ * collection has already been renamed to it.
+ *
+ * This function throws an exception if the collection doesn't exist as the temporary resharding
+ * namespace string or the source namespace string.
+ */
+void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
+                                                const CommonReshardingMetadata& metadata);
+
+/**
  * Returns the largest _id value in the collection.
  */
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection);

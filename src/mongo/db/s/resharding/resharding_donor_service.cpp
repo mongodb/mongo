@@ -631,15 +631,9 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
 
     if (_isAlsoRecipient) {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
-        RenameCollectionOptions options;
-        options.dropTarget = true;
-        options.markFromMigrate = true;
-        uassertStatusOK(renameCollection(
-            opCtx.get(), _metadata.getTempReshardingNss(), _metadata.getSourceNss(), options));
+        resharding::data_copy::ensureTemporaryReshardingCollectionRenamed(opCtx.get(), _metadata);
     } else {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-
         resharding::data_copy::ensureCollectionDropped(
             opCtx.get(), _metadata.getSourceNss(), _metadata.getSourceUUID());
     }

@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -124,6 +125,40 @@ void ensureOplogCollectionsDropped(OperationContext* opCtx,
         auto oplogBufferNss = getLocalOplogBufferNamespace(sourceUUID, donor.getShardId());
         ensureCollectionDropped(opCtx, oplogBufferNss);
     }
+}
+
+void ensureTemporaryReshardingCollectionRenamed(OperationContext* opCtx,
+                                                const CommonReshardingMetadata& metadata) {
+    invariant(!opCtx->lockState()->isLocked());
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+
+    // It is safe for resharding to drop and reacquire locks when checking for collection existence
+    // because the coordinator will prevent two resharding operations from running for the same
+    // namespace at the same time.
+    auto tempReshardingNssExists = [&] {
+        AutoGetCollection tempReshardingColl(opCtx, metadata.getTempReshardingNss(), MODE_IS);
+        uassert(ErrorCodes::InvalidUUID,
+                "Temporary resharding collection exists but doesn't have a UUID matching the"
+                " resharding operation",
+                !tempReshardingColl || tempReshardingColl->uuid() == metadata.getReshardingUUID());
+        return bool(tempReshardingColl);
+    }();
+
+    if (!tempReshardingNssExists) {
+        AutoGetCollection sourceColl(opCtx, metadata.getSourceNss(), MODE_IS);
+        auto errmsg =
+            "Temporary resharding collection doesn't exist and hasn't already been renamed"_sd;
+        uassert(ErrorCodes::NamespaceNotFound, errmsg, sourceColl);
+        uassert(
+            ErrorCodes::InvalidUUID, errmsg, sourceColl->uuid() == metadata.getReshardingUUID());
+        return;
+    }
+
+    RenameCollectionOptions options;
+    options.dropTarget = true;
+    options.markFromMigrate = true;
+    uassertStatusOK(
+        renameCollection(opCtx, metadata.getTempReshardingNss(), metadata.getSourceNss(), options));
 }
 
 Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collection) {
