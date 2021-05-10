@@ -13,7 +13,7 @@ from buildscripts import evergreen_gen_fuzzer_tests as under_test
 class TestCreateFuzzerTask(unittest.TestCase):
     @staticmethod
     def _create_options_mock():
-        options = mock.Mock
+        options = mock.Mock(spec=under_test.ConfigOptions)
         options.num_tasks = 15
         options.name = "test_task"
         options.use_multiversion = False
@@ -69,3 +69,17 @@ class TestCreateFuzzerTask(unittest.TestCase):
         self.assertEqual("do multiversion setup", config["tasks"][0]["commands"][2]["func"])
         self.assertEqual("/data/multiversion",
                          config["tasks"][0]["commands"][5]["vars"]["task_path_suffix"])
+
+    def test_with_large_distro(self):
+        build_variant = BuildVariant("build variant")
+        options = self._create_options_mock()
+        options.large_distro_name = "large build variant"
+        options.use_large_distro = True
+
+        under_test.create_fuzzer_task(options, build_variant)
+        shrub_project = ShrubProject.empty().add_build_variant(build_variant)
+        config = shrub_project.as_dict()
+
+        for variant in config["buildvariants"]:
+            for task in variant["tasks"]:
+                self.assertEqual(task["distros"], [options.large_distro_name])

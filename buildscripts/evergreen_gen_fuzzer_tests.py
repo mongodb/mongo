@@ -2,10 +2,11 @@
 """Generate fuzzer tests to run in evergreen in parallel."""
 import argparse
 from collections import namedtuple
-from typing import Set
+from typing import Set, Optional, List, NamedTuple
 
 from shrub.v2 import ShrubProject, FunctionCall, Task, TaskDependency, BuildVariant, ExistingTask
 
+from buildscripts.evergreen_generate_resmoke_tasks import NO_LARGE_DISTRO_ERR, GenerationConfiguration, GENERATE_CONFIG_FILE
 from buildscripts.util.fileops import write_file_to_dir
 import buildscripts.util.read_config as read_config
 import buildscripts.util.taskname as taskname
@@ -13,21 +14,25 @@ import buildscripts.util.taskname as taskname
 CONFIG_DIRECTORY = "generated_resmoke_config"
 GEN_PARENT_TASK = "generator_tasks"
 
-ConfigOptions = namedtuple("ConfigOptions", [
-    "num_files",
-    "num_tasks",
-    "resmoke_args",
-    "npm_command",
-    "jstestfuzz_vars",
-    "name",
-    "variant",
-    "continue_on_failure",
-    "resmoke_jobs_max",
-    "should_shuffle",
-    "timeout_secs",
-    "use_multiversion",
-    "suite",
-])
+
+class ConfigOptions(NamedTuple):
+    """Configuration options populated by Evergreen expansions."""
+
+    num_files: int
+    num_tasks: int
+    resmoke_args: str
+    npm_command: str
+    jstestfuzz_vars: str
+    name: str
+    variant: str
+    continue_on_failure: bool
+    resmoke_jobs_max: int
+    should_shuffle: bool
+    timeout_secs: int
+    use_multiversion: str
+    suite: str
+    large_distro_name: str
+    use_large_distro: bool
 
 
 def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-many-locals
@@ -70,9 +75,14 @@ def _get_config_options(cmd_line_options, config_file):  # pylint: disable=too-m
 
     suite = read_config.get_config_value("suite", cmd_line_options, config_file_data, required=True)
 
+    large_distro_name = read_config.get_config_value("large_distro_name", cmd_line_options,
+                                                     config_file_data, default="")
+    use_large_distro = read_config.get_config_value("use_large_distro", cmd_line_options,
+                                                    config_file_data, default=False)
+
     return ConfigOptions(num_files, num_tasks, resmoke_args, npm_command, jstestfuzz_vars, name,
                          variant, continue_on_failure, resmoke_jobs_max, should_shuffle,
-                         timeout_secs, use_multiversion, suite)
+                         timeout_secs, use_multiversion, suite, large_distro_name, use_large_distro)
 
 
 def build_fuzzer_sub_task(task_name: str, task_index: int, options: ConfigOptions) -> Task:
@@ -132,6 +142,26 @@ def generate_fuzzer_sub_tasks(task_name: str, options: ConfigOptions) -> Set[Tas
     return sub_tasks
 
 
+def get_distro(options: ConfigOptions, build_variant: str) -> Optional[List[str]]:
+    """
+    Get the distros that the tasks should be run on.
+
+    :param options: ConfigOptions instance
+    :param build_variant: Name of build variant being generated.
+    :return: List of distros to run on.
+    """
+    if options.use_large_distro:
+        if options.large_distro_name:
+            return [options.large_distro_name]
+
+        generate_config = GenerationConfiguration.from_yaml_file(GENERATE_CONFIG_FILE)
+        if build_variant not in generate_config.build_variant_large_distro_exceptions:
+            print(NO_LARGE_DISTRO_ERR.format(build_variant=build_variant))
+            raise ValueError("Invalid Evergreen Configuration")
+
+    return None
+
+
 def create_fuzzer_task(options: ConfigOptions, build_variant: BuildVariant) -> None:
     """
     Generate an evergreen configuration for fuzzers and add it to the given build variant.
@@ -144,7 +174,9 @@ def create_fuzzer_task(options: ConfigOptions, build_variant: BuildVariant) -> N
 
     build_variant.display_task(GEN_PARENT_TASK,
                                execution_existing_tasks={ExistingTask(f"{options.name}_gen")})
-    build_variant.display_task(task_name, sub_tasks)
+
+    distros = get_distro(options, build_variant.name)
+    build_variant.display_task(task_name, sub_tasks, distros=distros)
 
 
 def main():
