@@ -54,15 +54,16 @@ jsTest.log(
     "Testing that mongos doesn't retry the read command with startTransaction=true on replication set failover.");
 assert.commandWorked(setCommandToFail(primaryConnection, "find", kNs));
 
-assert.commandFailedWithCode(mongosDB.runCommand({
-    find: kCollName,
-    filter: kDoc0,
-    startTransaction: true,
-    txnNumber: NumberLong(transactionNumber++),
-    stmtId: NumberInt(0),
-    autocommit: false
-}),
-                             ErrorCodes.InterruptedDueToReplStateChange);
+assert.commandFailedWithCode(
+    mongosDB.runCommand({
+        find: kCollName,
+        filter: kDoc0,
+        startTransaction: true,
+        txnNumber: NumberLong(transactionNumber++),
+        stmtId: NumberInt(0),
+        autocommit: false
+    }),
+    ErrorCodes.doMongosRewrite(st.s0, ErrorCodes.InterruptedDueToReplStateChange));
 
 jsTest.log("Testing that mongos retries retryable writes on failover.");
 assert.commandWorked(setCommandToFail(primaryConnection, "insert", kNs));

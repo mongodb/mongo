@@ -29,6 +29,15 @@ const st = new ShardingTest({
 });
 
 function checkErrorCode(res, expectedErrorCodes, isWCError) {
+    // Rewrite each element of the `expectedErrorCodes` array.
+    // If it's not an array, just rewrite the scalar.
+    var rewrite = ec => ErrorCodes.doMongosRewrite(st.s, ec);
+    if (Array.isArray(expectedErrorCodes)) {
+        expectedErrorCodes = expectedErrorCodes.map(rewrite);
+    } else {
+        expectedErrorCodes = rewrite(expectedErrorCodes);
+    }
+
     if (isWCError) {
         assert.neq(null, res.writeConcernError, res);
         assert(anyEq([res.writeConcernError.code], expectedErrorCodes), res);

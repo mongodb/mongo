@@ -85,7 +85,7 @@ var res = assert.commandFailed(testDB.runReadCommand({
     readConcern: {level: "linearizable"},
     maxTimeMS: shard0ReplTest.kDefaultTimeoutMS
 }));
-assert.eq(res.code, ErrorCodes.NotWritablePrimary);
+assert.eq(res.code, ErrorCodes.doMongosRewrite(st.s, ErrorCodes.NotWritablePrimary));
 
 jsTestLog("Testing linearizable read from primaries.");
 
