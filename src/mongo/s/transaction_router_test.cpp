@@ -4745,10 +4745,8 @@ TEST_F(TransactionRouterMetricsTest, ReportResources) {
 
     auto obj = builder.obj();
     auto clientMetadata = ClientMetadata::parse(obj["client"]);
-    auto& clientMetadataIsMasterState =
-        ClientMetadataIsMasterState::get(operationContext()->getClient());
-    clientMetadataIsMasterState.setClientMetadata(operationContext()->getClient(),
-                                                  std::move(clientMetadata.getValue()));
+    ClientMetadata::setAndFinalize(operationContext()->getClient(),
+                                   std::move(clientMetadata.getValue()));
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(

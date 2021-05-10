@@ -52,7 +52,6 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
@@ -256,15 +255,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     infoBuilder->append("host", hostName);
 
     client->reportState(*infoBuilder);
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             infoBuilder->append("appName", appName);
         }
 
-        auto clientMetadataDocument = clientMetadata.get().getDocument();
+        auto clientMetadataDocument = clientMetadata->getDocument();
         infoBuilder->append("clientMetadata", clientMetadataDocument);
     }
 
@@ -719,9 +716,8 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
 
     s << curop.getNS();
 
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        auto appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             s << " appName: \"" << str::escape(appName) << '\"';
         }
@@ -890,9 +886,8 @@ void OpDebug::report(OperationContext* opCtx,
 
     pAttrs->addDeepCopy("ns", curop.getNS());
 
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-    if (clientMetadata) {
-        StringData appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        StringData appName = clientMetadata->getApplicationName();
         if (!appName.empty()) {
             pAttrs->add("appName", appName);
         }
@@ -1227,10 +1222,8 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         b.append(field, args.opCtx->getClient()->clientAddress());
     });
     addIfNeeded("appName", [](auto field, auto args, auto& b) {
-        const auto& clientMetadata =
-            ClientMetadataIsMasterState::get(args.opCtx->getClient()).getClientMetadata();
-        if (clientMetadata) {
-            auto appName = clientMetadata.get().getApplicationName();
+        if (auto clientMetadata = ClientMetadata::get(args.opCtx->getClient())) {
+            auto appName = clientMetadata->getApplicationName();
             if (!appName.empty()) {
                 b.append(field, appName);
             }

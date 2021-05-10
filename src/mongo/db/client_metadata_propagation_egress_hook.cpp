@@ -29,7 +29,7 @@
 
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {
@@ -37,9 +37,16 @@ namespace rpc {
 
 Status ClientMetadataPropagationEgressHook::writeRequestMetadata(OperationContext* opCtx,
                                                                  BSONObjBuilder* metadataBob) {
+    if (!opCtx) {
+        return Status::OK();
+    }
+
     try {
         writeAuthDataToImpersonatedUserMetadata(opCtx, metadataBob);
-        ClientMetadataIsMasterState::writeToMetadata(opCtx, metadataBob);
+
+        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+            metadata->writeToMetadata(metadataBob);
+        }
         return Status::OK();
     } catch (...) {
         return exceptionToStatus();

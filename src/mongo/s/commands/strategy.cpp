@@ -66,6 +66,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -370,11 +371,12 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
+    const auto isHello = command->getName() == "hello"_sd || command->getName() == "isMaster"_sd;
+
     opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     const auto session = opCtx->getClient()->session();
     if (session) {
-        if (!opCtx->isExhaust() ||
-            (command->getName() != "hello"_sd && command->getName() != "isMaster"_sd)) {
+        if (!opCtx->isExhaust() || !isHello) {
             InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false, commandName);
         }
     }
@@ -451,6 +453,13 @@ void runCommand(OperationContext* opCtx,
 
     boost::optional<RouterOperationContextSession> routerSession;
     try {
+        if (isHello) {
+            // Preload generic ClientMetadata ahead of our first hello request. After the first
+            // request, metaElement should always be empty.
+            auto metaElem = request.body[kMetadataDocumentName];
+            ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        }
+
         rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
 
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());

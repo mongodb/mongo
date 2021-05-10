@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/tick_source.h"
 #include "mongo/util/time_support.h"
 
@@ -56,10 +56,9 @@ public:
                 clientHostAndPort = client->getRemote().toString();
             }
             connectionId = client->getConnectionId();
-            if (const auto& metadata =
-                    ClientMetadataIsMasterState::get(client).getClientMetadata()) {
-                clientMetadata = metadata.get().getDocument();
-                appName = metadata.get().getApplicationName().toString();
+            if (auto metadata = ClientMetadata::get(client)) {
+                clientMetadata = metadata->getDocument();
+                appName = metadata->getApplicationName().toString();
             }
         }
     };
