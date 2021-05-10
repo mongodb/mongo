@@ -178,6 +178,22 @@ assert.eq([{_id: 0, "a.b": 1}], coll.find({_id: 0}).toArray());
 coll.findAndModify({query: {_id: 1, "a.b": 1}, update: {$set: {_id: 1, "a.b": 2}}});
 assert.eq([{_id: 1, a: {b: 2}}], coll.find({_id: 1}).toArray());
 
+// Dotted fields in a $literal-wrapped document can be updated in a pipeline-style update.
+coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {$literal: {_id: 1, "a.b": 3}}}]});
+assert.eq([{_id: 1, "a.b": 3}], coll.find({_id: 1}).toArray());
+
+coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {$literal: {_id: 1, "a.b.c": 3}}}]});
+assert.eq([{_id: 1, "a.b.c": 3}], coll.find({_id: 1}).toArray());
+
+// Dotted fields without $literal cannot be updated in a pipeline-style update.
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, "a.b.": 2}}]});
+});
+
+assert.throws(function() {
+    coll.findAndModify({query: {_id: 1}, update: [{$replaceWith: {_id: 1, "a.b.c": 3}}]});
+});
+
 if (isDotsAndDollarsEnabled) {
     // Top-level $-prefixed field names are not allowed in a replacement-style update.
     assert.throws(function() {
