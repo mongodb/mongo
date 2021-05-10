@@ -74,6 +74,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -1355,6 +1356,11 @@ DbResponse ClientCommand::_produceResponse() {
             dbResponse.shouldRunAgainForExhaust = reply->shouldRunAgainForExhaust();
             dbResponse.nextInvocation = reply->getNextInvocation();
         }
+    }
+    if (auto doc = rpc::RewriteStateChangeErrors::rewrite(reply->getBodyBuilder().asTempObj(),
+                                                          _rec->getOpCtx())) {
+        reply->reset();
+        reply->getBodyBuilder().appendElements(*doc);
     }
     dbResponse.response = reply->done();
 

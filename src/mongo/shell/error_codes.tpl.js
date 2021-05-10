@@ -81,3 +81,38 @@ ErrorCodes.is${cat.name} = function(err) {
     }
 };
 //#end for
+
+/**
+ * Returns true if the mongos `s` is expected to rewrite state change errors.
+ * This is determined by a `getParameter` of the "rewriteStateChangeErrors" option.
+ * Failure would indicate a mongos that doesn't support the rewrite feature.
+ */
+ErrorCodes.probeMongosRewrite = function(s) {
+    const param = "rewriteStateChangeErrors";
+    const res = s.adminCommand({getParameter: 1, [param]: 1});
+    if (!(param in res)) {
+        print("Mongos did not return a " + param + " server parameter: " + tojson(res));
+        return false;
+    }
+    return res[param];
+};
+
+/**
+ * Returns the ErrorCode to which the specified mongos `s` would remap the
+ * specified `err`. Mongos normally rewrites connection state change errors,
+ * unless it is shutting down or the code was injected by a mongos failpoint.
+ *
+ * The optional `doesRewrite` bool parameter provides a mechanism to bypass the
+ * probe, which may be useful if the probe would interfere with a test's
+ * operation.
+ */
+ErrorCodes.doMongosRewrite = function(s, err, doesRewrite) {
+    if (doesRewrite === undefined)
+        doesRewrite = ErrorCodes.probeMongosRewrite(s);
+    if (doesRewrite) {
+        if (ErrorCodes.isNotPrimaryError(err) || ErrorCodes.isShutdownError(err)) {
+            return ErrorCodes.HostUnreachable;
+        }
+    }
+    return err;
+};
