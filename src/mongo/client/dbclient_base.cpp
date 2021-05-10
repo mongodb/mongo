@@ -172,6 +172,55 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
     return rpc::UniqueReply(replyMsg, std::move(commandReply));
 }
 
+namespace {
+void appendMetadata(OperationContext* opCtx,
+                    const rpc::RequestMetadataWriter& metadataWriter,
+                    const ClientAPIVersionParameters& apiParameters,
+                    OpMsgRequest& request) {
+
+    if (!metadataWriter && !apiParameters.getVersion()) {
+        return;
+    }
+
+    BSONObjBuilder bob(std::move(request.body));
+    if (metadataWriter) {
+        uassertStatusOK(metadataWriter(opCtx, &bob));
+    }
+
+    if (apiParameters.getVersion()) {
+        bool hasVersion = false, hasStrict = false, hasDeprecationErrors = false;
+        auto i = bob.iterator();
+        while (i.more()) {
+            auto elem = i.next();
+            if (elem.fieldNameStringData() == APIParametersFromClient::kApiVersionFieldName) {
+                hasVersion = true;
+            } else if (elem.fieldNameStringData() == APIParametersFromClient::kApiStrictFieldName) {
+                hasStrict = true;
+            } else if (elem.fieldNameStringData() ==
+                       APIParametersFromClient::kApiDeprecationErrorsFieldName) {
+                hasDeprecationErrors = true;
+            }
+        }
+
+        if (!hasVersion) {
+            bob.append(APIParametersFromClient::kApiVersionFieldName, *apiParameters.getVersion());
+        }
+
+        // Include apiStrict/apiDeprecationErrors if they are not boost::none.
+        if (!hasStrict && apiParameters.getStrict()) {
+            bob.append(APIParametersFromClient::kApiStrictFieldName, *apiParameters.getStrict());
+        }
+
+        if (!hasDeprecationErrors && apiParameters.getDeprecationErrors()) {
+            bob.append(APIParametersFromClient::kApiDeprecationErrorsFieldName,
+                       *apiParameters.getDeprecationErrors());
+        }
+    }
+
+    request.body = bob.obj();
+}
+}  // namespace
+
 DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
     // Make sure to reconnect if needed before building our request, since the request depends on
     // the negotiated protocol which can change due to a reconnect.
@@ -184,55 +233,13 @@ DBClientBase* DBClientBase::runFireAndForgetCommand(OpMsgRequest request) {
         return runCommandWithTarget(request).second;
     }
 
-    if (_metadataWriter) {
-        BSONObjBuilder metadataBob(std::move(request.body));
-        uassertStatusOK(
-            _metadataWriter((haveClient() ? cc().getOperationContext() : nullptr), &metadataBob));
-        request.body = metadataBob.obj();
-    }
-
+    auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
+    appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
     auto requestMsg = request.serialize();
     OpMsg::setFlag(&requestMsg, OpMsg::kMoreToCome);
     say(requestMsg);
     return this;
 }
-
-namespace {
-void appendAPIVersionParameters(BSONObjBuilder& bob,
-                                const ClientAPIVersionParameters& apiParameters) {
-    if (!apiParameters.getVersion()) {
-        return;
-    }
-
-    bool hasVersion = false, hasStrict = false, hasDeprecationErrors = false;
-    BSONObjIterator i = bob.iterator();
-    while (i.more()) {
-        auto elem = i.next();
-        if (elem.fieldNameStringData() == APIParametersFromClient::kApiVersionFieldName) {
-            hasVersion = true;
-        } else if (elem.fieldNameStringData() == APIParametersFromClient::kApiStrictFieldName) {
-            hasStrict = true;
-        } else if (elem.fieldNameStringData() ==
-                   APIParametersFromClient::kApiDeprecationErrorsFieldName) {
-            hasDeprecationErrors = true;
-        }
-    }
-
-    if (!hasVersion) {
-        bob.append(APIParametersFromClient::kApiVersionFieldName, *apiParameters.getVersion());
-    }
-
-    // Include apiStrict/apiDeprecationErrors if they are not boost::none.
-    if (!hasStrict && apiParameters.getStrict()) {
-        bob.append(APIParametersFromClient::kApiStrictFieldName, *apiParameters.getStrict());
-    }
-
-    if (!hasDeprecationErrors && apiParameters.getDeprecationErrors()) {
-        bob.append(APIParametersFromClient::kApiDeprecationErrorsFieldName,
-                   *apiParameters.getDeprecationErrors());
-    }
-}
-}  // namespace
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     OpMsgRequest request) {
@@ -244,16 +251,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientBase::runCommandWithTarget(
     auto host = getServerAddress();
 
     auto opCtx = haveClient() ? cc().getOperationContext() : nullptr;
-
-    if (_metadataWriter || _apiParameters.getVersion()) {
-        BSONObjBuilder metadataBob(std::move(request.body));
-        if (_metadataWriter) {
-            uassertStatusOK(_metadataWriter(opCtx, &metadataBob));
-        }
-        appendAPIVersionParameters(metadataBob, _apiParameters);
-        request.body = metadataBob.obj();
-    }
-
+    appendMetadata(opCtx, _metadataWriter, _apiParameters, request);
     auto requestMsg =
         rpc::messageFromOpMsgRequest(getClientRPCProtocols(), getServerRPCProtocols(), request);
 

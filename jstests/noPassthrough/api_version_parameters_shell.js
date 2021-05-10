@@ -28,7 +28,7 @@ const testCases = [
     [true, true, {ping: 1}, {version: '1'}],
 ];
 
-function runShell(port, requireApiVersion, expectSuccess, command, api) {
+function runShellWithScript(port, requireApiVersion, expectSuccess, script, api) {
     let shellArgs = [];
     if (api.version) {
         shellArgs.push('--apiVersion', api.version);
@@ -42,6 +42,26 @@ function runShell(port, requireApiVersion, expectSuccess, command, api) {
         shellArgs.push('--apiDeprecationErrors');
     }
 
+    jsTestLog(`Run shell with script ${script} and args ${tojson(shellArgs)},` +
+              ` requireApiVersion = ${requireApiVersion}, expectSuccess = ${expectSuccess}`);
+
+    const result = runMongoProgram.apply(
+        null, ['mongo', '--port', port, '--eval', script].concat(shellArgs || []));
+
+    if (expectSuccess) {
+        assert.eq(
+            result,
+            0,
+            `Error running shell with script ${tojson(script)} and args ${tojson(shellArgs)}`);
+    } else {
+        assert.neq(result,
+                   0,
+                   `Unexpected success running shell with` +
+                       ` script ${tojson(script)} and args ${tojson(shellArgs)}`);
+    }
+}
+
+function runShellWithCommand(port, requireApiVersion, expectSuccess, command, api) {
     // Test runCommand and runReadCommand.
     const scripts = [
         `assert.commandWorked(db.getSiblingDB("admin").runCommand(${tojson(command)}))`,
@@ -49,23 +69,7 @@ function runShell(port, requireApiVersion, expectSuccess, command, api) {
     ];
 
     for (const script of scripts) {
-        jsTestLog(`Run shell with script ${script} and args ${tojson(shellArgs)},` +
-                  ` requireApiVersion = ${requireApiVersion}, expectSuccess = ${expectSuccess}`);
-
-        const result = runMongoProgram.apply(
-            null, ['mongo', '--port', port, '--eval', script].concat(shellArgs || []));
-
-        if (expectSuccess) {
-            assert.eq(result,
-                      0,
-                      `Error running shell with command ${tojson(command)} and args ${
-                          tojson(shellArgs)}`);
-        } else {
-            assert.neq(result,
-                       0,
-                       `Unexpected success running shell with` +
-                           ` command ${tojson(command)} and args ${tojson(shellArgs)}`);
-        }
+        runShellWithScript(port, requireApiVersion, expectSuccess, script, api);
     }
 }
 
@@ -100,13 +104,10 @@ for (let [requireApiVersion, successExpected, command, api] of testCases) {
     assert.commandWorked(
         m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}));
 
-    runShell(mongod.port, requireApiVersion, successExpected, command, api);
+    runShellWithCommand(mongod.port, requireApiVersion, successExpected, command, api);
     newMongo(mongod.port, requireApiVersion, successExpected, command, api);
 }
 
-/*
- * Test getMore.
- */
 let m = new Mongo(`localhost:${mongod.port}`, undefined, {api: {version: '1'}});
 assert.commandWorked(m.getDB('admin').runCommand(
     {insert: 'collection', documents: [{}, {}, {}, {}, {}, {}], apiVersion: '1'}));
@@ -121,8 +122,10 @@ for (let requireApiVersion of [false, true]) {
         assert.commandWorked(
             m.getDB("admin").runCommand({setParameter: 1, requireApiVersion: requireApiVersion}));
 
-        // Create a cursor with the right API version parameters. Use an explicit lsid to override
-        // implicit session creation.
+        /*
+         * Test getMore. Create a cursor with the right API version parameters. Use an explicit lsid
+         * to override implicit session creation.
+         */
         const lsid = UUID();
         const versionedConn = new Mongo(`localhost:${mongod.port}`, undefined, {api: api});
         const findReply = assert.commandWorked(versionedConn.getDB('admin').runCommand(
@@ -134,8 +137,32 @@ for (let requireApiVersion of [false, true]) {
             batchSize: 1
         };
 
-        runShell(mongod.port, requireApiVersion, true /* expectSuccess */, getMoreCmd, api);
+        runShellWithCommand(
+            mongod.port, requireApiVersion, true /* expectSuccess */, getMoreCmd, api);
         newMongo(mongod.port, requireApiVersion, true /* expectSuccess */, getMoreCmd, api);
+
+        /*
+         * Test unacknowledged writes (OP_MSG with moreToCome).
+         */
+        versionedConn.getDB('admin')['collection2'].insertMany([{}, {}]);
+        const deleteScript = "db.getSiblingDB('admin').collection2.deleteOne({}, {w: 0});";
+        runShellWithScript(
+            mongod.port, requireApiVersion, true /* expectSuccess */, deleteScript, api);
+        // The delete succeeds, collection2 had 2 records, it soon has 1. Use assert.soon since the
+        // write is unacknowledged. Use countDocuments which is apiStrict-compatible.
+        assert.soon(() => {
+            return 1 === versionedConn.getDB('admin')['collection2'].countDocuments({});
+        });
+        const deleteCmd = {
+            delete: 'collection2',
+            deletes: [{q: {}, limit: 1}],
+            writeConcern: {w: 0}
+        };
+        newMongo(mongod.port, requireApiVersion, true /* expectSuccess */, deleteCmd, api);
+        // The delete succeeds, collection2 soon has 0 records.
+        assert.soon(() => {
+            return 0 === versionedConn.getDB('admin')['collection2'].countDocuments({});
+        });
     }
 }
 
@@ -144,11 +171,11 @@ for (let requireApiVersion of [false, true]) {
  */
 
 // Version 2 is not supported.
-runShell(mongod.port, false, false, {ping: 1}, {version: '2'});
+runShellWithCommand(mongod.port, false, false, {ping: 1}, {version: '2'});
 // apiVersion is required if strict or deprecationErrors is included
-runShell(mongod.port, false, false, {ping: 1}, {strict: true});
-runShell(mongod.port, false, false, {ping: 1}, {deprecationErrors: true});
-runShell(mongod.port, false, false, {ping: 1}, {strict: true, deprecationErrors: true});
+runShellWithCommand(mongod.port, false, false, {ping: 1}, {strict: true});
+runShellWithCommand(mongod.port, false, false, {ping: 1}, {deprecationErrors: true});
+runShellWithCommand(mongod.port, false, false, {ping: 1}, {strict: true, deprecationErrors: true});
 
 /*
  * Mongo-specific tests.
@@ -239,7 +266,8 @@ for (let requireApiVersion of [false, true]) {
         const continueCmd =
             {find: 'collection', lsid: {id: lsid}, txnNumber: NumberLong(1), autocommit: false};
 
-        runShell(primaryPort, requireApiVersion, true /* expectSuccess */, continueCmd, api);
+        runShellWithCommand(
+            primaryPort, requireApiVersion, true /* expectSuccess */, continueCmd, api);
         newMongo(primaryPort, requireApiVersion, true /* expectSuccess */, continueCmd, api);
     }
 }
